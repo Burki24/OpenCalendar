@@ -219,7 +219,9 @@
             "A Microsoft Graph redirect to an untrusted origin was blocked.": "Eine Microsoft-Graph-Weiterleitung zu einer nicht vertrauenswürdigen Origin wurde blockiert.",
             "The Symcon OAuth request URL belongs to an untrusted origin.": "Die Symcon-OAuth-Anfrage-URL gehört zu einer nicht vertrauenswürdigen Origin.",
             "The Symcon OAuth redirect URL is invalid.": "Die Symcon-OAuth-Weiterleitungs-URL ist ungültig.",
-            "A Symcon OAuth redirect to an untrusted origin was blocked.": "Eine Symcon-OAuth-Weiterleitung zu einer nicht vertrauenswürdigen Origin wurde blockiert."
+            "A Symcon OAuth redirect to an untrusted origin was blocked.": "Eine Symcon-OAuth-Weiterleitung zu einer nicht vertrauenswürdigen Origin wurde blockiert.",
+            "OpenCalendar processes account and calendar data for the configured calendar functions. Please review the privacy information before connecting an external service.": "OpenCalendar verarbeitet Konto- und Kalenderdaten für die konfigurierten Kalenderfunktionen. Bitte lies vor dem Verbinden eines externen Dienstes die Datenschutzhinweise.",
+            "Privacy information": "Datenschutzhinweise"
         }
     }
 }

@@ -23,6 +23,19 @@ Empfohlene Reihenfolge:
 5. Erst danach die erzeugten Kalender-Instanzen bei Bedarf im Objektbaum
    verschieben oder umbenennen.
 
+## Datenschutz und externe Dienste
+
+OpenCalendar verarbeitet Konto-, Kalender- und Termindaten grundsätzlich auf der
+eigenen Symcon-Installation. Das Modul enthält keine eigene Telemetrie und
+übermittelt Kalenderinhalte nicht an einen Backenddienst des Modulautors. Bei
+OAuth-Anbindungen werden jedoch die jeweils notwendigen Dienste von Google,
+Microsoft und Symcon verwendet.
+
+Vor dem Verbinden eines externen Kontos sollten die
+[Datenschutzhinweise](PRIVACY.md) gelesen werden. Ergänzend gelten die
+[Nutzungsbedingungen](TERMS.md) sowie die Bedingungen der jeweils verwendeten
+Drittanbieter.
+
 ## Persönliches Google OAuth einrichten
 
 Die Google-Anbindung verwendet bewusst **keinen zentralen OAuth-Dienst des

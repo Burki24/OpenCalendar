@@ -51,6 +51,19 @@ Zeitlimit der Anfrage | Maximale Dauer einer HTTP-Anfrage
 
 Bestehende Instanzen behalten ihren bisherigen Minutenwert als benutzerdefiniertes Intervall. Bei ICS/Webcal sollte der Zeitplan des Kontos passend zum Zeitplan der zugehörigen Kalenderinstanz gewählt werden, da beide Instanzen den Feed für unterschiedliche Aufgaben abrufen.
 
+### Datenschutz und OAuth
+
+Das Konto-Modul verarbeitet Zugangsdaten, OAuth-Tokens sowie Kalender- und
+Termindaten. Die Daten werden grundsätzlich lokal in Symcon gespeichert oder
+zwischengespeichert. Google OAuth verwendet den persönlichen OAuth-Client des
+Anwenders und Symcon Connect für den Callback. Microsoft OAuth verwendet den
+zentralen Symcon-OAuth-Dienst; die eigentlichen Microsoft-Kalenderdaten werden
+direkt zwischen Symcon und Microsoft Graph übertragen.
+
+Ausführliche Angaben zu Datenarten, Speicherung, Löschung und Drittanbietern
+finden sich in den [Datenschutzhinweisen](../PRIVACY.md). Vor dem Verbinden eines
+externen Kontos sollten diese Hinweise gelesen werden.
+
 ### Google Calendar
 
 Nach Auswahl von **Google Calendar** werden Server-URL, Benutzername und
