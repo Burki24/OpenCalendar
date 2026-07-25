@@ -27,7 +27,7 @@ Das Ändern oder einzelne Löschen von Vorkommen einer Terminserie ist noch nich
 
 ## Voraussetzungen
 
-- Symcon ab Version 8.1
+- Symcon ab Version 9.0
 - eine verbundene Instanz **Kalender Konto**
 - eine über den Konfigurator zugewiesene Kalender-ID
 

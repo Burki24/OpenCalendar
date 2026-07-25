@@ -21,7 +21,7 @@ Wiederkehrende, vom CalDAV-Server expandierte Einzeltermine werden derzeit nur l
 
 ## Voraussetzungen
 
-- Symcon ab Version 8.1 mit Kachelvisualisierung und HTML-SDK
+- Symcon ab Version 9.0 mit Kachelvisualisierung und HTML-SDK
 - Mindestens eine eingerichtete Instanz des Moduls `Kalender`
 - für die alternative Darstellung IPSView mit einem HTML-Box-Steuerelement und Browser-Renderer
 

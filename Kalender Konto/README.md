@@ -19,7 +19,7 @@ Das Modul verwaltet die Verbindung zu einem Online-Kalenderkonto und stellt die 
 
 ## Voraussetzungen
 
-- Symcon ab Version 8.1
+- Symcon ab Version 9.0
 - PHP-Erweiterungen cURL und DOM
 - Zugriff des Symcon-Servers auf den jeweiligen Kalenderdienst
 - für Google Calendar eine aktive Symcon-Connect-Verbindung und ein persönlicher Google-OAuth-Webclient

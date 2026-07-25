@@ -45,6 +45,6 @@ Anbieter versehentlich mit dem falschen Konto verbunden werden.
 
 ## Voraussetzungen
 
-- Symcon ab Version 8.1
+- Symcon ab Version 9.0
 - ein eingerichtetes und aktives **Kalender Konto**
 - eine erfolgreiche Kontosynchronisation
