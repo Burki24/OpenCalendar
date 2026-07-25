@@ -69,6 +69,46 @@ assertSymconStrict(
     'The vendored PersistentJsonCacheHelper must match upstream version 1.0.0 exactly.'
 );
 
+$configurationFormHelperSourcePath = $root . '/libs/helper/ConfigurationFormHelper.php';
+assertSymconStrict(
+    is_file($configurationFormHelperSourcePath),
+    'The vendored ConfigurationFormHelper is missing.'
+);
+$configurationFormHelperSource = (string) file_get_contents($configurationFormHelperSourcePath);
+assertSymconStrict(
+    str_contains($configurationFormHelperSource, '@version 1.0.0'),
+    'OpenCalendar must vendor the reviewed ConfigurationFormHelper version 1.0.0.'
+);
+assertSymconStrict(
+    hash_file('sha256', $configurationFormHelperSourcePath) === 'fa87dd4c67f43a3838fe87110387e4c1a1b98685c13403eeb52c189246045678',
+    'The vendored ConfigurationFormHelper must match upstream version 1.0.0 exactly.'
+);
+
+foreach ([
+    'Kalender',
+    'Kalender Konto',
+    'Kalender Ansicht',
+    'Kalender Konfigurator'
+] as $moduleDirectory) {
+    $moduleSource = (string) file_get_contents($root . '/' . $moduleDirectory . '/module.php');
+    assertSymconStrict(
+        str_contains($moduleSource, 'use ConfigurationFormHelper;'),
+        $moduleDirectory . ' must use the shared ConfigurationFormHelper.'
+    );
+    assertSymconStrict(
+        str_contains($moduleSource, '$this->LoadConfigurationForm()'),
+        $moduleDirectory . ' must load form.json through ConfigurationFormHelper.'
+    );
+    assertSymconStrict(
+        str_contains($moduleSource, '$this->EncodeConfigurationForm($form)'),
+        $moduleDirectory . ' must serialize dynamic forms through ConfigurationFormHelper.'
+    );
+    assertSymconStrict(
+        !str_contains($moduleSource, "file_get_contents(__DIR__ . '/form.json')"),
+        $moduleDirectory . ' must not read form.json directly.'
+    );
+}
+
 $calendarSource = (string) file_get_contents($root . '/Kalender/module.php');
 assertSymconStrict(
     !str_contains($calendarSource, "RegisterVariableString('Events'"),

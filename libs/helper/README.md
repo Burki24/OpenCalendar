@@ -1,14 +1,25 @@
 # Vendored module helpers
 
-`PersistentJsonCacheHelper.php` is vendored from
-[`Burki24/Symcon_ModuleHelper`](https://github.com/Burki24/Symcon_ModuleHelper),
-version **1.0.0**.
+The helper files in this directory are vendored from
+[`Burki24/Symcon_ModuleHelper`](https://github.com/Burki24/Symcon_ModuleHelper).
 
-The file is copied into OpenCalendar deliberately so the Symcon library has no
+They are copied into OpenCalendar deliberately so the Symcon library has no
 runtime dependency on Composer, Git submodules, or external downloads.
 
 Upstream license: MIT.
 
-SHA-256 of `PersistentJsonCacheHelper.php` for version 1.0.0:
+## PersistentJsonCacheHelper.php
+
+Version: **1.0.0**
+
+SHA-256:
 
 `adbc7680abe814dc6c15a9cda1312cc30023073595052006662716bc0d65f2a4`
+
+## ConfigurationFormHelper.php
+
+Version: **1.0.0**
+
+SHA-256:
+
+`fa87dd4c67f43a3838fe87110387e4c1a1b98685c13403eeb52c189246045678`

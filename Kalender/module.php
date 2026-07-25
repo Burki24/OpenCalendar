@@ -2,14 +2,17 @@
 
 declare(strict_types=1);
 
+use Burki24\SymconModuleHelper\ConfigurationFormHelper;
 use Burki24\SymconModuleHelper\PersistentJsonCacheHelper;
 use IPSKalender\SynchronizationSchedule;
 
+require_once __DIR__ . '/../libs/helper/ConfigurationFormHelper.php';
 require_once __DIR__ . '/../libs/helper/PersistentJsonCacheHelper.php';
 require_once __DIR__ . '/../libs/SynchronizationSchedule.php';
 
 class Kalender extends IPSModuleStrict
 {
+    use ConfigurationFormHelper;
     use PersistentJsonCacheHelper;
 
     private const DATA_ID_TO_PARENT = '{4E535B1D-69C7-AC77-1372-0282B21BAEC9}';
@@ -70,12 +73,7 @@ class Kalender extends IPSModuleStrict
      */
     public function GetConfigurationForm(): string
     {
-        $form = json_decode(
-            file_get_contents(__DIR__ . '/form.json'),
-            true,
-            512,
-            JSON_THROW_ON_ERROR
-        );
+        $form = $this->LoadConfigurationForm();
         $customSchedule = $this->ReadPropertyInteger('UpdateSchedule') === SynchronizationSchedule::CUSTOM;
         foreach ($form['elements'] as &$element) {
             if (($element['name'] ?? '') === 'UpdateInterval') {
@@ -85,10 +83,7 @@ class Kalender extends IPSModuleStrict
         }
         unset($element);
 
-        return json_encode(
-            $form,
-            JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR
-        );
+        return $this->EncodeConfigurationForm($form);
     }
 
     /**

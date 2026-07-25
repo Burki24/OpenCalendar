@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use Burki24\SymconModuleHelper\ConfigurationFormHelper;
 use IPSKalender\CalendarHttpClient;
 use IPSKalender\CalendarHttpOriginPolicyInterface;
 use IPSKalender\CalendarEventTranslation;
@@ -22,6 +23,7 @@ use IPSKalender\MicrosoftGraphOriginPolicy;
 use IPSKalender\MicrosoftOAuthException;
 use IPSKalender\SynchronizationSchedule;
 
+require_once __DIR__ . '/../libs/helper/ConfigurationFormHelper.php';
 require_once __DIR__ . '/../libs/CalendarProviderInterface.php';
 require_once __DIR__ . '/../libs/CalendarHttpClient.php';
 require_once __DIR__ . '/../libs/CalendarHttpOriginPolicyInterface.php';
@@ -46,6 +48,7 @@ require_once __DIR__ . '/traits/ChildGatewayTrait.php';
 
 class KalenderKonto extends IPSModuleStrict
 {
+    use ConfigurationFormHelper;
     use KalenderKontoGoogleOAuthTrait;
     use KalenderKontoMicrosoftOAuthTrait;
     use KalenderKontoICalendarAccountTrait;
@@ -114,12 +117,7 @@ class KalenderKonto extends IPSModuleStrict
      */
     public function GetConfigurationForm(): string
     {
-        $form = json_decode(
-            file_get_contents(__DIR__ . '/form.json'),
-            true,
-            512,
-            JSON_THROW_ON_ERROR
-        );
+        $form = $this->LoadConfigurationForm();
         $provider = $this->ReadPropertyInteger('Provider');
         $isPasswordProvider = in_array($provider, [self::PROVIDER_APPLE, self::PROVIDER_CALDAV, self::PROVIDER_ICS], true);
         $isGoogle = $provider === self::PROVIDER_GOOGLE;
@@ -192,10 +190,7 @@ class KalenderKonto extends IPSModuleStrict
         }
         unset($element);
 
-        return json_encode(
-            $form,
-            JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR
-        );
+        return $this->EncodeConfigurationForm($form);
     }
 
     /**

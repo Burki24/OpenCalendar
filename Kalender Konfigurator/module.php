@@ -2,8 +2,14 @@
 
 declare(strict_types=1);
 
+use Burki24\SymconModuleHelper\ConfigurationFormHelper;
+
+require_once __DIR__ . '/../libs/helper/ConfigurationFormHelper.php';
+
 class KalenderKonfigurator extends IPSModuleStrict
 {
+    use ConfigurationFormHelper;
+
     private const DATA_ID_TO_PARENT = '{4E535B1D-69C7-AC77-1372-0282B21BAEC9}';
     private const CALENDAR_MODULE_ID = '{227B63E4-4223-316B-76E9-FD3849689562}';
 
@@ -37,12 +43,7 @@ class KalenderKonfigurator extends IPSModuleStrict
      */
     public function GetConfigurationForm(): string
     {
-        $form = json_decode(
-            file_get_contents(__DIR__ . '/form.json'),
-            true,
-            512,
-            JSON_THROW_ON_ERROR
-        );
+        $form = $this->LoadConfigurationForm();
 
         try {
             $calendars = $this->requestCalendars();
@@ -62,10 +63,7 @@ class KalenderKonfigurator extends IPSModuleStrict
 
         $form['elements'][0]['values'] = $this->buildConfiguratorValues($calendars);
 
-        return json_encode(
-            $form,
-            JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR
-        );
+        return $this->EncodeConfigurationForm($form);
     }
 
     /**
