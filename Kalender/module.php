@@ -2,12 +2,16 @@
 
 declare(strict_types=1);
 
+use Burki24\SymconModuleHelper\PersistentJsonCacheHelper;
 use IPSKalender\SynchronizationSchedule;
 
+require_once __DIR__ . '/../libs/helper/PersistentJsonCacheHelper.php';
 require_once __DIR__ . '/../libs/SynchronizationSchedule.php';
 
 class Kalender extends IPSModuleStrict
 {
+    use PersistentJsonCacheHelper;
+
     private const DATA_ID_TO_PARENT = '{4E535B1D-69C7-AC77-1372-0282B21BAEC9}';
     private const INITIALIZATION_DELAY_MS = 3_000;
 
@@ -35,7 +39,7 @@ class Kalender extends IPSModuleStrict
         $this->RegisterPropertyInteger('PastDays', 30);
         $this->RegisterPropertyInteger('FutureDays', 365);
 
-        $this->RegisterAttributeString('CachedEvents', '[]');
+        $this->RegisterPersistentJsonCache('CachedEvents');
         $this->RegisterAttributeInteger('LastSynchronization', 0);
         $this->RegisterAttributeString('LastError', '');
         $this->RegisterAttributeBoolean('CalendarMetadataAvailable', false);
@@ -54,7 +58,6 @@ class Kalender extends IPSModuleStrict
             ],
             20
         );
-        $this->RegisterVariableString('Events', $this->Translate('Events'), [], 30);
 
         $this->RegisterTimer('InitializationTimer', 0, 'IPSKAL_Initialize($_IPS[\'TARGET\']);');
         $this->RegisterTimer('SynchronizationTimer', 0, 'IPSKAL_ScheduledSynchronize($_IPS[\'TARGET\']);');
@@ -129,6 +132,7 @@ class Kalender extends IPSModuleStrict
     {
         parent::ApplyChanges();
 
+        $this->removeLegacyEventsVariable();
         $this->WriteAttributeBoolean('RuntimeReady', false);
         $this->RegisterMessage(0, IPS_KERNELSTARTED);
         $this->SetTimerInterval('InitializationTimer', 0);
@@ -264,7 +268,13 @@ class Kalender extends IPSModuleStrict
      */
     public function GetEvents(): string
     {
-        return $this->ReadAttributeString('CachedEvents');
+        return json_encode(
+            $this->readEvents(),
+            JSON_UNESCAPED_SLASHES
+                | JSON_UNESCAPED_UNICODE
+                | JSON_PRESERVE_ZERO_FRACTION
+                | JSON_THROW_ON_ERROR
+        );
     }
 
     /**
@@ -562,14 +572,9 @@ class Kalender extends IPSModuleStrict
      */
     private function storeEvents(array $events): void
     {
-        $encoded = json_encode(
-            $events,
-            JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR
-        );
         $timestamp = time();
-        $this->WriteAttributeString('CachedEvents', $encoded);
+        $this->WritePersistentJsonCache('CachedEvents', $events);
         $this->WriteAttributeInteger('LastSynchronization', $timestamp);
-        $this->SetValue('Events', $encoded);
         $this->SetValue('EventCount', count($events));
         $this->SetValue('LastSynchronization', $timestamp);
     }
@@ -580,10 +585,17 @@ class Kalender extends IPSModuleStrict
     private function readEvents(): array
     {
         try {
-            $events = json_decode($this->ReadAttributeString('CachedEvents'), true, 512, JSON_THROW_ON_ERROR);
-            return is_array($events) ? array_values(array_filter($events, 'is_array')) : [];
-        } catch (JsonException) {
+            $events = $this->ReadPersistentJsonCache('CachedEvents');
+            return array_values(array_filter($events, 'is_array'));
+        } catch (UnexpectedValueException) {
             return [];
+        }
+    }
+
+    private function removeLegacyEventsVariable(): void
+    {
+        if (@IPS_GetObjectIDByIdent('Events', $this->InstanceID) !== false) {
+            $this->UnregisterVariable('Events');
         }
     }
 
