@@ -21,7 +21,7 @@ jobs:
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.2'
+          php-version: '8.5'
           extensions: curl, dom
           coverage: none
 
@@ -54,6 +54,9 @@ jobs:
 
       - name: Check public PHPDoc coverage
         run: php tests/phpdocs.php
+
+      - name: Check Symcon Strict compliance
+        run: php tests/symcon-strict.php
 
       - name: Run CalDAV provider tests
         run: php tests/caldav.php

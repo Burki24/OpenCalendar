@@ -2,7 +2,7 @@
 
 **Stand / Last updated: 25.07.2026**
 
-OpenCalendar ist freie Open-Source-Software und wird unter der im Repository enthaltenen [MIT-Lizenz](LICENSE) bereitgestellt.
+OpenCalendar ist freie Open-Source-Software und wird unter der im Repository enthaltenen [MIT-Lizenz](https://github.com/Burki24/OpenCalendar/blob/main/LICENSE) bereitgestellt.
 
 ## Nutzung
 
@@ -24,7 +24,7 @@ Google, Google Calendar, Microsoft, Microsoft 365, Outlook, Apple und iCloud sin
 
 # Terms of Use (English)
 
-OpenCalendar is free open-source software distributed under the [MIT License](LICENSE) included in this repository.
+OpenCalendar is free open-source software distributed under the [MIT License](https://github.com/Burki24/OpenCalendar/blob/main/LICENSE) included in this repository.
 
 Users are responsible for connecting OpenCalendar only to calendar accounts and data they are authorized to access and modify. Credentials, OAuth tokens and private calendar URLs must be treated as confidential.
 

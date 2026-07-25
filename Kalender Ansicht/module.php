@@ -93,7 +93,10 @@ class KalenderAnsicht extends IPSModuleStrict
             'IPSViewCalendar',
             $this->Translate('IPSView calendar'),
             VARIABLETYPE_STRING,
-            '~HTMLBox',
+            [
+                'PRESENTATION' => VARIABLE_PRESENTATION_WEB_CONTENT,
+                'HTML_TYPE'    => 0
+            ],
             10,
             $this->ReadPropertyBoolean('EnableIPSView')
         );

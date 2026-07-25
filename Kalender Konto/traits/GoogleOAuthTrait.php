@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use IPSKalender\GoogleOAuthClient;
 use IPSKalender\GoogleOAuthException;
+use IPSKalender\GoogleOAuthOriginPolicy;
 
 trait KalenderKontoGoogleOAuthTrait
 {
@@ -57,7 +58,7 @@ trait KalenderKontoGoogleOAuthTrait
         $refreshToken = $this->ReadAttributeString('GoogleRefreshToken');
         if ($refreshToken !== '') {
             try {
-                $client = $this->createUnauthenticatedHttpClient();
+                $client = $this->createTrustedCloudHttpClient(new GoogleOAuthOriginPolicy());
                 $client->request(
                     'POST',
                     'https://oauth2.googleapis.com/revoke',
@@ -172,7 +173,7 @@ trait KalenderKontoGoogleOAuthTrait
     private function createGoogleOAuthClient(): GoogleOAuthClient
     {
         return new GoogleOAuthClient(
-            $this->createUnauthenticatedHttpClient(),
+            $this->createTrustedCloudHttpClient(new GoogleOAuthOriginPolicy()),
             trim($this->ReadPropertyString('GoogleClientID')),
             $this->ReadPropertyString('GoogleClientSecret'),
             $this->googleOAuthRedirectUri()

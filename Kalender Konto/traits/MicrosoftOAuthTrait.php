@@ -2,7 +2,6 @@
 
 declare(strict_types=1);
 
-use IPSKalender\CalendarHttpClient;
 use IPSKalender\MicrosoftOAuthClient;
 use IPSKalender\MicrosoftOAuthException;
 use IPSKalender\SymconOAuthOriginPolicy;
@@ -127,13 +126,7 @@ trait KalenderKontoMicrosoftOAuthTrait
     private function createMicrosoftOAuthClient(): MicrosoftOAuthClient
     {
         return new MicrosoftOAuthClient(
-            new CalendarHttpClient(
-                max(5, min(120, $this->ReadPropertyInteger('RequestTimeout'))),
-                $this->ReadPropertyBoolean('VerifyTLS'),
-                '',
-                '',
-                new SymconOAuthOriginPolicy()
-            ),
+            $this->createTrustedCloudHttpClient(new SymconOAuthOriginPolicy()),
             self::MICROSOFT_OAUTH_IDENTIFIER
         );
     }

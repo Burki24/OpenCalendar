@@ -76,4 +76,32 @@ assertAccountStructure(
         && !str_contains($accountSource, "RegisterPropertyString('MicrosoftClientSecret'"),
     'Microsoft OAuth must use the native shared Symcon handler without per-user client credentials.'
 );
+
+
+$googleOAuthSource = file_get_contents(__DIR__ . '/../Kalender Konto/traits/GoogleOAuthTrait.php');
+$microsoftOAuthSource = file_get_contents(__DIR__ . '/../Kalender Konto/traits/MicrosoftOAuthTrait.php');
+assertAccountStructure(
+    is_string($accountSource)
+        && str_contains($accountSource, 'new GoogleCalendarOriginPolicy()')
+        && str_contains($accountSource, 'new MicrosoftGraphOriginPolicy()')
+        && str_contains($accountSource, 'private function createTrustedCloudHttpClient')
+        && preg_match('/createTrustedCloudHttpClient\([\s\S]*?new CalendarHttpClient\([\s\S]*?true,/', $accountSource) === 1,
+    'Trusted Google/Microsoft cloud clients must always verify TLS and enforce a fixed origin policy.'
+);
+assertAccountStructure(
+    is_string($googleOAuthSource)
+        && substr_count($googleOAuthSource, 'new GoogleOAuthOriginPolicy()') >= 2
+        && is_string($microsoftOAuthSource)
+        && str_contains($microsoftOAuthSource, 'new SymconOAuthOriginPolicy()'),
+    'OAuth token and revocation requests must use fixed trusted-origin policies.'
+);
+assertAccountStructure(
+    is_string($accountSource)
+        && str_contains($accountSource, '$verifyTls = $provider === self::PROVIDER_APPLE')
+        && str_contains($accountSource, '? true')
+        && str_contains($accountSource, ': $this->ReadPropertyBoolean(\'VerifyTLS\')')
+        && str_contains($accountSource, '$this->UpdateFormField(\'VerifyTLS\', \'visible\', $canConfigureTls)'),
+    'VerifyTLS must only be user-configurable for custom CalDAV and ICS/Webcal endpoints; iCloud remains verified.'
+);
+
 fwrite(STDOUT, "KalenderKonto structure tests passed.\n");

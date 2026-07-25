@@ -44,9 +44,17 @@ class Kalender extends IPSModuleStrict
         $this->RegisterAttributeBoolean('DetectedCanWrite', false);
         $this->RegisterAttributeBoolean('RuntimeReady', false);
 
-        $this->RegisterVariableInteger('EventCount', $this->Translate('Event count'), '', 10);
-        $this->RegisterVariableInteger('LastSynchronization', $this->Translate('Last synchronization'), '~UnixTimestamp', 20);
-        $this->RegisterVariableString('Events', $this->Translate('Events'), '', 30);
+        $this->RegisterVariableInteger('EventCount', $this->Translate('Event count'), [], 10);
+        $this->RegisterVariableInteger(
+            'LastSynchronization',
+            $this->Translate('Last synchronization'),
+            [
+                'PRESENTATION' => VARIABLE_PRESENTATION_DATE_TIME,
+                'TEMPLATE'     => VARIABLE_TEMPLATE_DATE_TIME
+            ],
+            20
+        );
+        $this->RegisterVariableString('Events', $this->Translate('Events'), [], 30);
 
         $this->RegisterTimer('InitializationTimer', 0, 'IPSKAL_Initialize($_IPS[\'TARGET\']);');
         $this->RegisterTimer('SynchronizationTimer', 0, 'IPSKAL_ScheduledSynchronize($_IPS[\'TARGET\']);');

@@ -6,7 +6,9 @@ use IPSKalender\CalendarHttpClientInterface;
 use IPSKalender\CalendarHttpResponse;
 use IPSKalender\CalendarEventTranslation;
 use IPSKalender\GoogleCalendarProvider;
+use IPSKalender\GoogleCalendarOriginPolicy;
 use IPSKalender\GoogleOAuthClient;
+use IPSKalender\GoogleOAuthOriginPolicy;
 use IPSKalender\MicrosoftCalendarProvider;
 use IPSKalender\MicrosoftCalendarProviderException;
 use IPSKalender\MicrosoftGraphOriginPolicy;
@@ -19,7 +21,9 @@ use IPSKalender\ICalendarSubscriptionProvider;
 use IPSKalender\SynchronizationSchedule;
 
 require_once __DIR__ . '/../libs/GoogleCalendarProvider.php';
+require_once __DIR__ . '/../libs/GoogleCalendarOriginPolicy.php';
 require_once __DIR__ . '/../libs/GoogleOAuthClient.php';
+require_once __DIR__ . '/../libs/GoogleOAuthOriginPolicy.php';
 require_once __DIR__ . '/../libs/MicrosoftCalendarProvider.php';
 require_once __DIR__ . '/../libs/MicrosoftGraphOriginPolicy.php';
 require_once __DIR__ . '/../libs/MicrosoftOAuthClient.php';
@@ -508,6 +512,18 @@ assertSameValue('ms-rotated-refresh-token', $msTokens['refreshToken'], 'Rotating
 $msRefreshBody = [];
 parse_str($msOAuthHttpClient->requests[1]['body'], $msRefreshBody);
 assertSameValue(['refresh_token' => 'ms-refresh-token'], $msRefreshBody, 'Microsoft token renewal must use only the delegated refresh token.');
+
+$googleCalendarOriginPolicy = new GoogleCalendarOriginPolicy();
+assertTrueValue($googleCalendarOriginPolicy->isAllowedUrl('https://www.googleapis.com/calendar/v3/users/me/calendarList'), 'The Google Calendar API origin must be trusted.');
+assertTrueValue(!$googleCalendarOriginPolicy->isAllowedUrl('https://www.googleapis.com.evil.example/calendar/v3'), 'Lookalike Google Calendar API hosts must be rejected.');
+assertTrueValue(!$googleCalendarOriginPolicy->isAllowedUrl('http://www.googleapis.com/calendar/v3'), 'Google Calendar API requests must never downgrade to HTTP.');
+assertTrueValue(!$googleCalendarOriginPolicy->isAllowedUrl('https://www.googleapis.com:444/calendar/v3'), 'Unexpected Google Calendar API ports must be rejected.');
+
+$googleOAuthOriginPolicy = new GoogleOAuthOriginPolicy();
+assertTrueValue($googleOAuthOriginPolicy->isAllowedUrl('https://oauth2.googleapis.com/token'), 'The Google OAuth origin must be trusted.');
+assertTrueValue($googleOAuthOriginPolicy->isAllowedUrl('https://oauth2.googleapis.com/revoke'), 'The Google OAuth revocation endpoint must be trusted.');
+assertTrueValue(!$googleOAuthOriginPolicy->isAllowedUrl('https://oauth2.googleapis.com.evil.example/token'), 'Lookalike Google OAuth hosts must be rejected.');
+assertTrueValue(!$googleOAuthOriginPolicy->isAllowedUrl('http://oauth2.googleapis.com/token'), 'Google OAuth requests must never downgrade to HTTP.');
 
 $msOriginPolicy = new MicrosoftGraphOriginPolicy();
 assertTrueValue($msOriginPolicy->isAllowedUrl('https://graph.microsoft.com/v1.0/me/calendars'), 'The Microsoft Graph origin must be trusted.');

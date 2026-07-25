@@ -44,7 +44,7 @@ Google-OAuth-Clientschlüssel | Clientschlüssel des persönlichen Google-OAuth-
 iCalendar-Abonnements | Liste zusätzlicher Feeds mit Aktivierung, Name, URL, optionalen Zugangsdaten, Titelübersetzung, Aktualisierungsplan und optionaler Farbe
 Aktualisierungsplan | Vorgegebener Rhythmus von fünf Minuten bis jährlich oder ausschließlich manuelle Synchronisation; bei ICS/Webcal steuert er die erneute Kontosuche
 Benutzerdefiniertes Intervall | Eigener Abstand in Minuten; wird nur beim Zeitplan „Benutzerdefiniertes Intervall“ angezeigt
-TLS-Zertifikat prüfen | Sollte nur zu Diagnosezwecken deaktiviert werden
+TLS-Zertifikat prüfen | Nur für eigene CalDAV-Server und ICS/Webcal-Feeds einstellbar; für Apple, Google, Microsoft und Symcon OAuth ist die Prüfung immer aktiv
 Zeitlimit der Anfrage | Maximale Dauer einer HTTP-Anfrage
 
 Über **Verbindung testen** wird die Anmeldung geprüft und die Anzahl der gefundenen Kalender ausgegeben. **Jetzt synchronisieren** aktualisiert den internen Kalendercache und informiert die verbundenen Child-Instanzen.

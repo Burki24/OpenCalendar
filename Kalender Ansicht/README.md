@@ -15,7 +15,7 @@ Die Kalender Ansicht fasst Termine mehrerer Kalenderinstanzen in einer responsiv
 - Erstellen, Bearbeiten und Löschen von Terminen in beschreibbaren Kalendern
 - Automatische Aktualisierung der Kachel nach einer Kalendersynchronisation
 - Responsive Darstellung für große Kacheln und schmale Mobilansichten
-- Optionale IPSView-Ausgabe über eine automatisch aktualisierte `~HTMLBox`-Variable
+- Optionale IPSView-Ausgabe über eine automatisch aktualisierte String-Variable mit der modernen Darstellung **Webinhalt**
 
 Wiederkehrende, vom CalDAV-Server expandierte Einzeltermine werden derzeit nur lesend dargestellt. Dadurch wird verhindert, dass versehentlich die komplette Terminserie verändert wird.
 
@@ -40,7 +40,7 @@ Wiederkehrende, vom CalDAV-Server expandierte Einzeltermine werden derzeit nur l
 4. Mit **IPSView-Wochenausrichtung** festlegen, ob die Wochentage nebeneinander oder als vertikale Tageszeilen dargestellt werden.
 5. Mit **IPSView-Schriftgröße** die gesamte Darstellung zwischen 80 und 200 Prozent skalieren. Der Standardwert 115 Prozent verbessert die Lesbarkeit auf Touchdisplays.
 6. Über **IPSView-Farbbalkenbreite** die Kalenderkennzeichnung zwischen 2 und 16 Pixeln einstellen. Der Standardwert beträgt 7 Pixel.
-7. Unterhalb der Instanz wird die String-Variable **IPSView-Kalender** mit dem Profil `~HTMLBox` angelegt.
+7. Unterhalb der Instanz wird die String-Variable **IPSView-Kalender** mit der Darstellung **Webinhalt** angelegt.
 8. Im IPSView Designer ein Steuerelement vom Typ **HTML-Box** einfügen und diese Variable als ID auswählen.
 9. Als HTML Renderer **Browser des Clients** oder **Automatisch** verwenden. Der native einfache HTML Renderer reicht nicht aus, weil Ansichtswechsel und Navigation JavaScript verwenden.
 

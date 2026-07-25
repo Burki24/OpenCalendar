@@ -3,12 +3,14 @@
 declare(strict_types=1);
 
 use IPSKalender\CalendarHttpClient;
+use IPSKalender\CalendarHttpOriginPolicyInterface;
 use IPSKalender\CalendarEventTranslation;
 use IPSKalender\CalendarProviderInterface;
 use IPSKalender\CalDAVProvider;
 use IPSKalender\CalDAVProviderException;
 use IPSKalender\CalDAVOriginPolicy;
 use IPSKalender\GoogleCalendarProvider;
+use IPSKalender\GoogleCalendarOriginPolicy;
 use IPSKalender\GoogleCalendarProviderException;
 use IPSKalender\GoogleOAuthException;
 use IPSKalender\ICalendarFeedProvider;
@@ -22,11 +24,14 @@ use IPSKalender\SynchronizationSchedule;
 
 require_once __DIR__ . '/../libs/CalendarProviderInterface.php';
 require_once __DIR__ . '/../libs/CalendarHttpClient.php';
+require_once __DIR__ . '/../libs/CalendarHttpOriginPolicyInterface.php';
 require_once __DIR__ . '/../libs/CalendarEventTranslation.php';
 require_once __DIR__ . '/../libs/CalDAVProvider.php';
 require_once __DIR__ . '/../libs/CalDAVOriginPolicy.php';
 require_once __DIR__ . '/../libs/GoogleCalendarProvider.php';
+require_once __DIR__ . '/../libs/GoogleCalendarOriginPolicy.php';
 require_once __DIR__ . '/../libs/GoogleOAuthClient.php';
+require_once __DIR__ . '/../libs/GoogleOAuthOriginPolicy.php';
 require_once __DIR__ . '/../libs/ICalendarFeedProvider.php';
 require_once __DIR__ . '/../libs/ICalendarSubscriptionProvider.php';
 require_once __DIR__ . '/../libs/MicrosoftCalendarProvider.php';
@@ -62,7 +67,6 @@ class KalenderKonto extends IPSModuleStrict
     private const STATUS_CONFIGURATION_MISSING = 201;
     private const STATUS_AUTHENTICATION_FAILED = 202;
     private const STATUS_CONNECTION_FAILED = 203;
-    private const STATUS_PROVIDER_NOT_IMPLEMENTED = 204;
     private const STATUS_INVALID_RESPONSE = 205;
 
     /**
@@ -121,6 +125,7 @@ class KalenderKonto extends IPSModuleStrict
         $isGoogle = $provider === self::PROVIDER_GOOGLE;
         $isMicrosoft = $provider === self::PROVIDER_MICROSOFT;
         $isIcs = $provider === self::PROVIDER_ICS;
+        $canConfigureTls = in_array($provider, [self::PROVIDER_CALDAV, self::PROVIDER_ICS], true);
 
         foreach ($form['elements'] as &$element) {
             $name = (string) ($element['name'] ?? '');
@@ -146,6 +151,8 @@ class KalenderKonto extends IPSModuleStrict
                 $element['caption'] = $isIcs
                     ? $this->Translate('Account custom interval')
                     : $this->Translate('Custom interval');
+            } elseif ($name === 'VerifyTLS') {
+                $element['visible'] = $canConfigureTls;
             } elseif (in_array($name, [
                 'GoogleOAuthHint',
                 'GoogleRedirectURI',
@@ -200,6 +207,7 @@ class KalenderKonto extends IPSModuleStrict
         $isGoogle = $provider === self::PROVIDER_GOOGLE;
         $isMicrosoft = $provider === self::PROVIDER_MICROSOFT;
         $isIcs = $provider === self::PROVIDER_ICS;
+        $canConfigureTls = in_array($provider, [self::PROVIDER_CALDAV, self::PROVIDER_ICS], true);
         $this->UpdateFormField('ServerURL', 'visible', $isPasswordProvider);
         $this->UpdateFormField('ServerURL', 'caption', $isIcs ? $this->Translate('iCalendar URL') : $this->Translate('Server URL'));
         $this->UpdateFormField('Username', 'visible', $isPasswordProvider);
@@ -208,6 +216,7 @@ class KalenderKonto extends IPSModuleStrict
         $this->UpdateFormField('ICalendarTranslationProfile', 'visible', $isIcs);
         $this->UpdateFormField('ICalendarFeeds', 'visible', $isIcs);
         $this->UpdateFormField('ICalendarSubscriptionsHint', 'visible', $isIcs);
+        $this->UpdateFormField('VerifyTLS', 'visible', $canConfigureTls);
         $this->UpdateFormField(
             'UpdateSchedule',
             'caption',
@@ -355,13 +364,6 @@ class KalenderKonto extends IPSModuleStrict
             return;
         }
 
-        if (!$this->isProviderImplemented($this->ReadPropertyInteger('Provider'))) {
-            $this->SetTimerInterval('SynchronizationTimer', 0);
-            $this->WriteAttributeString('LastError', $this->Translate('The selected provider is not implemented yet.'));
-            $this->SetStatus(self::STATUS_PROVIDER_NOT_IMPLEMENTED);
-            return;
-        }
-
         $this->SetTimerInterval(
             'SynchronizationTimer',
             SynchronizationSchedule::timerInterval(
@@ -408,17 +410,6 @@ class KalenderKonto extends IPSModuleStrict
             );
         }
 
-        if (!$this->isProviderImplemented($this->ReadPropertyInteger('Provider'))) {
-            $message = $this->Translate('The selected provider is not implemented yet.');
-            $this->WriteAttributeString('LastError', $message);
-            $this->SetStatus(self::STATUS_PROVIDER_NOT_IMPLEMENTED);
-
-            return json_encode(
-                ['success' => false, 'message' => $message],
-                JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR
-            );
-        }
-
         try {
             $provider = $this->createProvider();
             $result = $provider->testConnection();
@@ -454,12 +445,6 @@ class KalenderKonto extends IPSModuleStrict
         if ($validationError !== '') {
             $this->WriteAttributeString('LastError', $validationError);
             $this->SetStatus(self::STATUS_CONFIGURATION_MISSING);
-            return false;
-        }
-
-        if (!$this->isProviderImplemented($this->ReadPropertyInteger('Provider'))) {
-            $this->WriteAttributeString('LastError', $this->Translate('The selected provider is not implemented yet.'));
-            $this->SetStatus(self::STATUS_PROVIDER_NOT_IMPLEMENTED);
             return false;
         }
 
@@ -547,10 +532,6 @@ class KalenderKonto extends IPSModuleStrict
             throw new InvalidArgumentException($validationError);
         }
 
-        if (!$this->isProviderImplemented($this->ReadPropertyInteger('Provider'))) {
-            throw new RuntimeException('The selected provider is not implemented yet.');
-        }
-
         $calendars = $this->createProvider()->getCalendars();
         if ($this->ReadPropertyInteger('Provider') === self::PROVIDER_ICS) {
             $this->pruneICalendarFeedCache(array_map(
@@ -607,26 +588,17 @@ class KalenderKonto extends IPSModuleStrict
     private function createProvider(): CalendarProviderInterface
     {
         $provider = $this->ReadPropertyInteger('Provider');
-        if (!$this->isProviderImplemented($provider)) {
-            throw new RuntimeException('The selected provider is not implemented yet.');
-        }
 
         if ($provider === self::PROVIDER_GOOGLE) {
             return new GoogleCalendarProvider(
-                $this->createUnauthenticatedHttpClient(),
+                $this->createTrustedCloudHttpClient(new GoogleCalendarOriginPolicy()),
                 $this->getGoogleAccessToken()
             );
         }
 
         if ($provider === self::PROVIDER_MICROSOFT) {
             return new MicrosoftCalendarProvider(
-                new CalendarHttpClient(
-                    max(5, min(120, $this->ReadPropertyInteger('RequestTimeout'))),
-                    $this->ReadPropertyBoolean('VerifyTLS'),
-                    '',
-                    '',
-                    new MicrosoftGraphOriginPolicy()
-                ),
+                $this->createTrustedCloudHttpClient(new MicrosoftGraphOriginPolicy()),
                 $this->getMicrosoftAccessToken()
             );
         }
@@ -654,16 +626,23 @@ class KalenderKonto extends IPSModuleStrict
             );
         }
 
+        if (!in_array($provider, [self::PROVIDER_APPLE, self::PROVIDER_CALDAV], true)) {
+            throw new InvalidArgumentException('Unknown calendar provider.');
+        }
+
         $serverUrl = $provider === self::PROVIDER_APPLE
             ? self::APPLE_CALDAV_URL
             : trim($this->ReadPropertyString('ServerURL'));
 
         $originPolicy = new CalDAVOriginPolicy($serverUrl);
+        $verifyTls = $provider === self::PROVIDER_APPLE
+            ? true
+            : $this->ReadPropertyBoolean('VerifyTLS');
 
         return new CalDAVProvider(
             new CalendarHttpClient(
                 max(5, min(120, $this->ReadPropertyInteger('RequestTimeout'))),
-                $this->ReadPropertyBoolean('VerifyTLS'),
+                $verifyTls,
                 trim($this->ReadPropertyString('Username')),
                 $this->ReadPropertyString('Password'),
                 $originPolicy
@@ -768,21 +747,6 @@ class KalenderKonto extends IPSModuleStrict
         return '';
     }
 
-    private function isProviderImplemented(int $provider): bool
-    {
-        return in_array(
-            $provider,
-            [
-                self::PROVIDER_APPLE,
-                self::PROVIDER_CALDAV,
-                self::PROVIDER_GOOGLE,
-                self::PROVIDER_MICROSOFT,
-                self::PROVIDER_ICS
-            ],
-            true
-        );
-    }
-
     private function getProviderName(int $provider): string
     {
         return $this->Translate(match ($provider) {
@@ -836,11 +800,15 @@ class KalenderKonto extends IPSModuleStrict
         return $message;
     }
 
-    private function createUnauthenticatedHttpClient(): CalendarHttpClient
-    {
+    private function createTrustedCloudHttpClient(
+        CalendarHttpOriginPolicyInterface $originPolicy
+    ): CalendarHttpClient {
         return new CalendarHttpClient(
             max(5, min(120, $this->ReadPropertyInteger('RequestTimeout'))),
-            $this->ReadPropertyBoolean('VerifyTLS')
+            true,
+            '',
+            '',
+            $originPolicy
         );
     }
 

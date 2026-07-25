@@ -74,7 +74,6 @@
             "Configuration incomplete": "Konfiguration unvollständig",
             "Authentication failed": "Authentifizierung fehlgeschlagen",
             "Connection failed": "Verbindung fehlgeschlagen",
-            "Provider not implemented yet": "Anbieter noch nicht implementiert",
             "Invalid provider response": "Ungültige Antwort des Anbieters",
             "Apple iCloud": "Apple iCloud",
             "CalDAV": "CalDAV",
@@ -82,7 +81,6 @@
             "Unknown": "Unbekannt",
             "Connection successful.": "Verbindung erfolgreich.",
             "Invalid JSON data.": "Ungültige JSON-Daten.",
-            "The selected provider is not implemented yet.": "Der ausgewählte Anbieter ist noch nicht implementiert.",
             "The synchronization schedule is invalid.": "Der Aktualisierungsplan ist ungültig.",
             "Unknown calendar provider.": "Unbekannter Kalenderanbieter.",
             "The Apple Account email address is missing.": "Die E-Mail-Adresse des Apple-Accounts fehlt.",
@@ -221,7 +219,13 @@
             "The Symcon OAuth redirect URL is invalid.": "Die Symcon-OAuth-Weiterleitungs-URL ist ungültig.",
             "A Symcon OAuth redirect to an untrusted origin was blocked.": "Eine Symcon-OAuth-Weiterleitung zu einer nicht vertrauenswürdigen Origin wurde blockiert.",
             "OpenCalendar processes account and calendar data for the configured calendar functions. Please review the privacy information before connecting an external service.": "OpenCalendar verarbeitet Konto- und Kalenderdaten für die konfigurierten Kalenderfunktionen. Bitte lies vor dem Verbinden eines externen Dienstes die Datenschutzhinweise.",
-            "Privacy information": "Datenschutzhinweise"
+            "Privacy information": "Datenschutzhinweise",
+            "The Google Calendar request URL belongs to an untrusted origin.": "Die Google-Kalender-Anfrage gehört zu einer nicht vertrauenswürdigen Origin.",
+            "The Google Calendar redirect URL is invalid.": "Die Google-Kalender-Weiterleitungs-URL ist ungültig.",
+            "A Google Calendar redirect to an untrusted origin was blocked.": "Eine Google-Kalender-Weiterleitung zu einer nicht vertrauenswürdigen Origin wurde blockiert.",
+            "The Google OAuth request URL belongs to an untrusted origin.": "Die Google-OAuth-Anfrage gehört zu einer nicht vertrauenswürdigen Origin.",
+            "The Google OAuth redirect URL is invalid.": "Die Google-OAuth-Weiterleitungs-URL ist ungültig.",
+            "A Google OAuth redirect to an untrusted origin was blocked.": "Eine Google-OAuth-Weiterleitung zu einer nicht vertrauenswürdigen Origin wurde blockiert."
         }
     }
 }

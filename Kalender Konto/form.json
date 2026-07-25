@@ -555,11 +555,6 @@
             "caption": "Connection failed"
         },
         {
-            "code": 204,
-            "icon": "inactive",
-            "caption": "Provider not implemented yet"
-        },
-        {
             "code": 205,
             "icon": "error",
             "caption": "Invalid provider response"
