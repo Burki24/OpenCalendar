@@ -38,7 +38,6 @@
             "Event write conflict": "Terminkonflikt beim Schreiben",
             "Event count": "Anzahl Termine",
             "Last synchronization": "Letzte Synchronisation",
-            "Events": "Termine",
             "The synchronization schedule is invalid.": "Der Aktualisierungsplan ist ungültig.",
             "The calendar ID is missing.": "Die Kalender-ID fehlt.",
             "The event changes are invalid.": "Die Terminänderungen sind ungültig.",

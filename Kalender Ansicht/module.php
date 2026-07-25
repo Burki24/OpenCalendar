@@ -136,9 +136,9 @@ class KalenderAnsicht extends IPSModuleStrict
             foreach ($calendars as $calendar) {
                 $instanceId = $calendar['instanceId'];
                 $this->RegisterMessage($instanceId, OM_CHANGENAME);
-                $eventsVariableId = $this->findChildByIdent($instanceId, 'Events');
-                if ($eventsVariableId > 0) {
-                    $this->RegisterMessage($eventsVariableId, VM_UPDATE);
+                $synchronizationVariableId = $this->findChildByIdent($instanceId, 'LastSynchronization');
+                if ($synchronizationVariableId > 0) {
+                    $this->RegisterMessage($synchronizationVariableId, VM_UPDATE);
                 }
             }
 
@@ -154,7 +154,7 @@ class KalenderAnsicht extends IPSModuleStrict
     }
 
     /**
-     * Reacts to kernel, calendar-name, and event-variable changes.
+     * Reacts to kernel, calendar-name, and synchronization updates.
      *
      * @param array<int, mixed> $Data Message payload supplied by Symcon.
      */

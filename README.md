@@ -83,7 +83,6 @@ und die Einrichtung der
 sowie das
 [Ablaufverhalten von Aktualisierungstoken](https://developers.google.com/identity/protocols/oauth2#expiration).
 
-<<<<<<< Updated upstream
 ## Microsoft 365 / Outlook.com verbinden
 
 Die Microsoft-Anbindung ist für Anwender bewusst ohne eigene App-Registrierung
@@ -124,8 +123,6 @@ Client-Schlüssel oder andere zentrale App-Zugangsdaten gehören **nicht** in da
 Repository. Erst nach dieser einmaligen serverseitigen Registrierung kann der
 Microsoft-Login produktiv durchlaufen.
 
-=======
->>>>>>> Stashed changes
 Folgende Module beinhaltet das Repository:
 
 - __Kalender Konto__ ([Dokumentation](Kalender%20Konto))  
