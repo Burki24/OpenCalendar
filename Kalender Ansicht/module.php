@@ -3,12 +3,15 @@
 declare(strict_types=1);
 
 use Burki24\SymconModuleHelper\ConfigurationFormHelper;
+use Burki24\SymconModuleHelper\VisualizationAssetHelper;
 
 require_once __DIR__ . '/../libs/helper/ConfigurationFormHelper.php';
+require_once __DIR__ . '/../libs/helper/VisualizationAssetHelper.php';
 
 class KalenderAnsicht extends IPSModuleStrict
 {
     use ConfigurationFormHelper;
+    use VisualizationAssetHelper;
 
     private const CALENDAR_MODULE_ID = '{227B63E4-4223-316B-76E9-FD3849689562}';
     private const INITIALIZATION_DELAY_MS = 5_000;
@@ -399,8 +402,8 @@ class KalenderAnsicht extends IPSModuleStrict
      */
     private function renderCalendarHtml(array $state, bool $ipsView): string
     {
-        $html = file_get_contents(__DIR__ . '/module.html');
-        if ($html === false) {
+        $html = $this->VisualizationAsset('module.html');
+        if ($html === '') {
             return '';
         }
 

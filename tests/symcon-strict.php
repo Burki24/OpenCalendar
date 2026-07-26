@@ -84,6 +84,21 @@ assertSymconStrict(
     'The vendored ConfigurationFormHelper must match upstream version 1.0.0 exactly.'
 );
 
+$visualizationAssetHelperSourcePath = $root . '/libs/helper/VisualizationAssetHelper.php';
+assertSymconStrict(
+    is_file($visualizationAssetHelperSourcePath),
+    'The vendored VisualizationAssetHelper is missing.'
+);
+$visualizationAssetHelperSource = (string) file_get_contents($visualizationAssetHelperSourcePath);
+assertSymconStrict(
+    str_contains($visualizationAssetHelperSource, '@version 1.0.0'),
+    'OpenCalendar must vendor the reviewed VisualizationAssetHelper version 1.0.0.'
+);
+assertSymconStrict(
+    hash_file('sha256', $visualizationAssetHelperSourcePath) === '1693b2399bcf95d270a6d9a01df6534caad906497bd4ba9489916a951abaffcc',
+    'The vendored VisualizationAssetHelper must match upstream version 1.0.0 exactly.'
+);
+
 foreach ([
     'Kalender',
     'Kalender Konto',
@@ -149,6 +164,17 @@ $viewSource = (string) file_get_contents($root . '/Kalender Ansicht/module.php')
 assertSymconStrict(
     str_contains($viewSource, 'findChildByIdent($instanceId, \'LastSynchronization\')'),
     'The calendar view must use the small synchronization status variable as its update signal.'
+);
+assertSymconStrict(
+    str_contains($viewSource, 'use VisualizationAssetHelper;')
+        && str_contains($viewSource, '$this->VisualizationAsset(\'module.html\')')
+        && !str_contains($viewSource, "file_get_contents(__DIR__ . '/module.html')"),
+    'The calendar view must load visualization files through VisualizationAssetHelper.'
+);
+assertSymconStrict(
+    is_file($root . '/Kalender Ansicht/visualization/module.html')
+        && !is_file($root . '/Kalender Ansicht/module.html'),
+    'The calendar view template must live in the visualization directory.'
 );
 
 fwrite(STDOUT, "Symcon Strict compliance checks passed.\n");

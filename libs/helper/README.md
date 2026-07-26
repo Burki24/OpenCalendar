@@ -31,3 +31,11 @@ Version: **1.0.0**
 SHA-256:
 
 `fa87dd4c67f43a3838fe87110387e4c1a1b98685c13403eeb52c189246045678`
+
+## VisualizationAssetHelper.php
+
+Version: **1.0.0**
+
+SHA-256:
+
+`1693b2399bcf95d270a6d9a01df6534caad906497bd4ba9489916a951abaffcc`

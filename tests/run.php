@@ -1067,7 +1067,7 @@ $calendarModuleSource = file_get_contents(__DIR__ . '/../Kalender/module.php');
 $accountModuleSource = file_get_contents(__DIR__ . '/../Kalender Konto/module.php');
 $accountGoogleOAuthSource = file_get_contents(__DIR__ . '/../Kalender Konto/traits/GoogleOAuthTrait.php');
 $viewModuleSource = file_get_contents(__DIR__ . '/../Kalender Ansicht/module.php');
-$viewTemplateSource = file_get_contents(__DIR__ . '/../Kalender Ansicht/module.html');
+$viewTemplateSource = file_get_contents(__DIR__ . '/../Kalender Ansicht/visualization/module.html');
 assertTrueValue(
     is_string($accountModuleSource)
         && str_contains($accountModuleSource, "RegisterPropertyString('GoogleClientID'")
@@ -1109,6 +1109,15 @@ assertTrueValue(
     'Calendar view selections must survive module reloads and remain recoverable after an update.'
 );
 assertTrueValue(
+    is_string($viewModuleSource)
+        && str_contains($viewModuleSource, 'use Burki24\\SymconModuleHelper\\VisualizationAssetHelper;')
+        && str_contains($viewModuleSource, "require_once __DIR__ . '/../libs/helper/VisualizationAssetHelper.php';")
+        && str_contains($viewModuleSource, 'use VisualizationAssetHelper;')
+        && str_contains($viewModuleSource, '$this->VisualizationAsset(\'module.html\')')
+        && !str_contains($viewModuleSource, "file_get_contents(__DIR__ . '/module.html')"),
+    'The calendar view must load its HTML template through the shared VisualizationAssetHelper.'
+);
+assertTrueValue(
     is_string($viewTemplateSource)
         && str_contains($viewTemplateSource, "t('CW')")
         && str_contains($viewTemplateSource, 'isoWeekNumber(start)')
@@ -1123,6 +1132,13 @@ assertTrueValue(
         && str_contains($viewTemplateSource, 'dayOfYear(date)')
         && str_contains($viewTemplateSource, 'daysInYear(date)'),
     'Agenda, three-day and weekly headings must optionally show the day of year.'
+);
+
+$visualizationAssetHelperPath = __DIR__ . '/../libs/helper/VisualizationAssetHelper.php';
+assertSameValue(
+    '1693b2399bcf95d270a6d9a01df6534caad906497bd4ba9489916a951abaffcc',
+    hash_file('sha256', $visualizationAssetHelperPath),
+    'The vendored VisualizationAssetHelper must match upstream v1.0.0.'
 );
 
 $configuratorModuleSource = file_get_contents(__DIR__ . '/../Kalender Konfigurator/module.php');
