@@ -46,6 +46,9 @@ jobs:
             php -r 'json_decode(file_get_contents($argv[1]), true, 512, JSON_THROW_ON_ERROR);' "$file"
           done < <(find . -type f -name '*.json' -not -path './.git/*' -print0)
 
+      - name: Verify vendored helper integrity
+        run: python3 tests/helper_integrity.py
+
       - name: Run OpenCalendar tests
         run: php tests/run.php
 

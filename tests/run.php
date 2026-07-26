@@ -1134,7 +1134,7 @@ assertTrueValue(
     'Agenda, three-day and weekly headings must optionally show the day of year.'
 );
 
-$variableHelperPath = __DIR__ . '/../libs/helper/VariableHelper.php';
+
 assertTrueValue(
     is_string($calendarModuleSource)
         && str_contains($calendarModuleSource, 'use Burki24\\SymconModuleHelper\\VariableHelper;')
@@ -1154,21 +1154,10 @@ assertTrueValue(
         && !str_contains($viewModuleSource, 'findChildByIdent('),
     'The calendar view must use parent-aware VariableHelper lookups instead of its local child scan.'
 );
-assertSameValue(
-    'd1c1bb4d170ebe3d0b2976590c027f341cc3f11ecd5e43e02a0abe17340484f4',
-    hash_file('sha256', $variableHelperPath),
-    'The vendored VariableHelper must match upstream v1.1.0.'
-);
 
-$visualizationAssetHelperPath = __DIR__ . '/../libs/helper/VisualizationAssetHelper.php';
-assertSameValue(
-    '1693b2399bcf95d270a6d9a01df6534caad906497bd4ba9489916a951abaffcc',
-    hash_file('sha256', $visualizationAssetHelperPath),
-    'The vendored VisualizationAssetHelper must match upstream v1.0.0.'
-);
 
 $configuratorModuleSource = file_get_contents(__DIR__ . '/../Kalender Konfigurator/module.php');
-$parentConnectionHelperPath = __DIR__ . '/../libs/helper/ParentConnectionHelper.php';
+
 assertTrueValue(
     is_string($configuratorModuleSource)
         && str_contains($configuratorModuleSource, 'use Burki24\\SymconModuleHelper\\ParentConnectionHelper;')
@@ -1177,16 +1166,11 @@ assertTrueValue(
         && str_contains($configuratorModuleSource, '$parentId = $this->GetParentID();'),
     'The calendar configurator must use the shared ParentConnectionHelper for its connected account.'
 );
-assertSameValue(
-    'd4f01dee721aa32e64410979ca15b2795a0fcc59c0232c0ad69e4702d9ff573c',
-    hash_file('sha256', $parentConnectionHelperPath),
-    'The vendored ParentConnectionHelper must match upstream v1.0.0.'
-);
 
 $accountModuleSource = file_get_contents(__DIR__ . '/../Kalender Konto/module.php');
 $googleOAuthTraitSource = file_get_contents(__DIR__ . '/../Kalender Konto/traits/GoogleOAuthTrait.php');
 $microsoftOAuthTraitSource = file_get_contents(__DIR__ . '/../Kalender Konto/traits/MicrosoftOAuthTrait.php');
-$httpResponseHelperPath = __DIR__ . '/../libs/helper/HttpResponseHelper.php';
+
 assertTrueValue(
     is_string($accountModuleSource)
         && str_contains($accountModuleSource, 'use Burki24\\SymconModuleHelper\\HttpResponseHelper;')
@@ -1208,11 +1192,6 @@ assertTrueValue(
         && str_contains($microsoftOAuthTraitSource, '400,')
         && !str_contains($microsoftOAuthTraitSource, "header('Content-Type: text/html; charset=utf-8')"),
     'Microsoft OAuth callback responses must be emitted through HttpResponseHelper with HTTP 400 on errors.'
-);
-assertSameValue(
-    'be4fae4c23f757ab462237d8e74d2a9dca1b504937ed4d4b51c7ff76004cf1cd',
-    hash_file('sha256', $httpResponseHelperPath),
-    'The vendored HttpResponseHelper must match upstream v1.1.0.'
 );
 
 echo "All OpenCalendar tests passed.\n";

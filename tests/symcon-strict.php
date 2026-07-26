@@ -54,80 +54,29 @@ assertSymconStrict(
 
 
 
-$helperSourcePath = $root . '/libs/helper/PersistentJsonCacheHelper.php';
-assertSymconStrict(
-    is_file($helperSourcePath),
-    'The vendored PersistentJsonCacheHelper is missing.'
+$helperManifestPath = $root . '/libs/helper/manifest.json';
+assertSymconStrict(is_file($helperManifestPath), 'The vendored helper manifest is missing.');
+$helperManifest = json_decode(
+    (string) file_get_contents($helperManifestPath),
+    true,
+    512,
+    JSON_THROW_ON_ERROR
 );
-$helperSource = (string) file_get_contents($helperSourcePath);
-assertSymconStrict(
-    str_contains($helperSource, '@version 1.0.0'),
-    'OpenCalendar must vendor the reviewed PersistentJsonCacheHelper version 1.0.0.'
-);
-assertSymconStrict(
-    hash_file('sha256', $helperSourcePath) === 'adbc7680abe814dc6c15a9cda1312cc30023073595052006662716bc0d65f2a4',
-    'The vendored PersistentJsonCacheHelper must match upstream version 1.0.0 exactly.'
-);
-
-$configurationFormHelperSourcePath = $root . '/libs/helper/ConfigurationFormHelper.php';
-assertSymconStrict(
-    is_file($configurationFormHelperSourcePath),
-    'The vendored ConfigurationFormHelper is missing.'
-);
-$configurationFormHelperSource = (string) file_get_contents($configurationFormHelperSourcePath);
-assertSymconStrict(
-    str_contains($configurationFormHelperSource, '@version 1.0.0'),
-    'OpenCalendar must vendor the reviewed ConfigurationFormHelper version 1.0.0.'
-);
-assertSymconStrict(
-    hash_file('sha256', $configurationFormHelperSourcePath) === 'fa87dd4c67f43a3838fe87110387e4c1a1b98685c13403eeb52c189246045678',
-    'The vendored ConfigurationFormHelper must match upstream version 1.0.0 exactly.'
-);
-
-$variableHelperSourcePath = $root . '/libs/helper/VariableHelper.php';
-assertSymconStrict(
-    is_file($variableHelperSourcePath),
-    'The vendored VariableHelper is missing.'
-);
-$variableHelperSource = (string) file_get_contents($variableHelperSourcePath);
-assertSymconStrict(
-    str_contains($variableHelperSource, '@version 1.1.0'),
-    'OpenCalendar must vendor the reviewed VariableHelper version 1.1.0.'
-);
-assertSymconStrict(
-    hash_file('sha256', $variableHelperSourcePath) === 'd1c1bb4d170ebe3d0b2976590c027f341cc3f11ecd5e43e02a0abe17340484f4',
-    'The vendored VariableHelper must match upstream version 1.1.0 exactly.'
-);
-
-$visualizationAssetHelperSourcePath = $root . '/libs/helper/VisualizationAssetHelper.php';
-assertSymconStrict(
-    is_file($visualizationAssetHelperSourcePath),
-    'The vendored VisualizationAssetHelper is missing.'
-);
-$visualizationAssetHelperSource = (string) file_get_contents($visualizationAssetHelperSourcePath);
-assertSymconStrict(
-    str_contains($visualizationAssetHelperSource, '@version 1.0.0'),
-    'OpenCalendar must vendor the reviewed VisualizationAssetHelper version 1.0.0.'
-);
-assertSymconStrict(
-    hash_file('sha256', $visualizationAssetHelperSourcePath) === '1693b2399bcf95d270a6d9a01df6534caad906497bd4ba9489916a951abaffcc',
-    'The vendored VisualizationAssetHelper must match upstream version 1.0.0 exactly.'
-);
-
-$httpResponseHelperSourcePath = $root . '/libs/helper/HttpResponseHelper.php';
-assertSymconStrict(
-    is_file($httpResponseHelperSourcePath),
-    'The vendored HttpResponseHelper is missing.'
-);
-$httpResponseHelperSource = (string) file_get_contents($httpResponseHelperSourcePath);
-assertSymconStrict(
-    str_contains($httpResponseHelperSource, '@version 1.1.0'),
-    'OpenCalendar must vendor the reviewed HttpResponseHelper version 1.1.0.'
-);
-assertSymconStrict(
-    hash_file('sha256', $httpResponseHelperSourcePath) === 'be4fae4c23f757ab462237d8e74d2a9dca1b504937ed4d4b51c7ff76004cf1cd',
-    'The vendored HttpResponseHelper must match upstream version 1.1.0 exactly.'
-);
+foreach ([
+    'PersistentJsonCacheHelper',
+    'ConfigurationFormHelper',
+    'VariableHelper',
+    'VisualizationAssetHelper',
+    'ParentConnectionHelper',
+    'HttpResponseHelper'
+] as $helperName) {
+    $helperPath = $root . '/libs/helper/' . $helperName . '.php';
+    assertSymconStrict(is_file($helperPath), 'The vendored ' . $helperName . ' is missing.');
+    assertSymconStrict(
+        isset($helperManifest['helpers'][$helperName]),
+        'The helper manifest is missing ' . $helperName . '.'
+    );
+}
 
 foreach ([
     'Kalender',

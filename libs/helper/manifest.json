@@ -1,0 +1,36 @@
+{
+  "schema": 1,
+  "source_repository": "Burki24/Symcon_ModuleHelper",
+  "helpers": {
+    "ConfigurationFormHelper": {
+      "version": "1.0.0",
+      "sha256": "fa87dd4c67f43a3838fe87110387e4c1a1b98685c13403eeb52c189246045678",
+      "path": "libs/helper/ConfigurationFormHelper.php"
+    },
+    "HttpResponseHelper": {
+      "version": "1.1.0",
+      "sha256": "be4fae4c23f757ab462237d8e74d2a9dca1b504937ed4d4b51c7ff76004cf1cd",
+      "path": "libs/helper/HttpResponseHelper.php"
+    },
+    "ParentConnectionHelper": {
+      "version": "1.0.0",
+      "sha256": "d4f01dee721aa32e64410979ca15b2795a0fcc59c0232c0ad69e4702d9ff573c",
+      "path": "libs/helper/ParentConnectionHelper.php"
+    },
+    "PersistentJsonCacheHelper": {
+      "version": "1.0.0",
+      "sha256": "adbc7680abe814dc6c15a9cda1312cc30023073595052006662716bc0d65f2a4",
+      "path": "libs/helper/PersistentJsonCacheHelper.php"
+    },
+    "VariableHelper": {
+      "version": "1.1.0",
+      "sha256": "d1c1bb4d170ebe3d0b2976590c027f341cc3f11ecd5e43e02a0abe17340484f4",
+      "path": "libs/helper/VariableHelper.php"
+    },
+    "VisualizationAssetHelper": {
+      "version": "1.0.0",
+      "sha256": "1693b2399bcf95d270a6d9a01df6534caad906497bd4ba9489916a951abaffcc",
+      "path": "libs/helper/VisualizationAssetHelper.php"
+    }
+  }
+}

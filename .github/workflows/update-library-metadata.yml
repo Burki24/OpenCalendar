@@ -3,7 +3,7 @@ name: Update Library Metadata
 on:
   push:
     branches:
-      - '**'
+      - dev
 
 permissions:
   contents: write
