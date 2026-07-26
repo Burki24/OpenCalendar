@@ -99,6 +99,21 @@ assertSymconStrict(
     'The vendored VisualizationAssetHelper must match upstream version 1.0.0 exactly.'
 );
 
+$httpResponseHelperSourcePath = $root . '/libs/helper/HttpResponseHelper.php';
+assertSymconStrict(
+    is_file($httpResponseHelperSourcePath),
+    'The vendored HttpResponseHelper is missing.'
+);
+$httpResponseHelperSource = (string) file_get_contents($httpResponseHelperSourcePath);
+assertSymconStrict(
+    str_contains($httpResponseHelperSource, '@version 1.1.0'),
+    'OpenCalendar must vendor the reviewed HttpResponseHelper version 1.1.0.'
+);
+assertSymconStrict(
+    hash_file('sha256', $httpResponseHelperSourcePath) === 'be4fae4c23f757ab462237d8e74d2a9dca1b504937ed4d4b51c7ff76004cf1cd',
+    'The vendored HttpResponseHelper must match upstream version 1.1.0 exactly.'
+);
+
 foreach ([
     'Kalender',
     'Kalender Konto',
@@ -123,6 +138,24 @@ foreach ([
         $moduleDirectory . ' must not read form.json directly.'
     );
 }
+
+$accountSource = (string) file_get_contents($root . '/Kalender Konto/module.php');
+assertSymconStrict(
+    str_contains($accountSource, 'use HttpResponseHelper;'),
+    'The calendar account must use the shared HttpResponseHelper.'
+);
+$googleOAuthSource = (string) file_get_contents($root . '/Kalender Konto/traits/GoogleOAuthTrait.php');
+$microsoftOAuthSource = (string) file_get_contents($root . '/Kalender Konto/traits/MicrosoftOAuthTrait.php');
+assertSymconStrict(
+    str_contains($googleOAuthSource, 'SendHtmlTextResponse(')
+        && !str_contains($googleOAuthSource, "header('Content-Type: text/html; charset=utf-8')"),
+    'Google OAuth responses must use HttpResponseHelper.'
+);
+assertSymconStrict(
+    str_contains($microsoftOAuthSource, 'SendHtmlTextResponse(')
+        && !str_contains($microsoftOAuthSource, "header('Content-Type: text/html; charset=utf-8')"),
+    'Microsoft OAuth responses must use HttpResponseHelper.'
+);
 
 $calendarSource = (string) file_get_contents($root . '/Kalender/module.php');
 assertSymconStrict(

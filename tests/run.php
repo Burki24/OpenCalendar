@@ -1157,4 +1157,36 @@ assertSameValue(
     'The vendored ParentConnectionHelper must match upstream v1.0.0.'
 );
 
+$accountModuleSource = file_get_contents(__DIR__ . '/../Kalender Konto/module.php');
+$googleOAuthTraitSource = file_get_contents(__DIR__ . '/../Kalender Konto/traits/GoogleOAuthTrait.php');
+$microsoftOAuthTraitSource = file_get_contents(__DIR__ . '/../Kalender Konto/traits/MicrosoftOAuthTrait.php');
+$httpResponseHelperPath = __DIR__ . '/../libs/helper/HttpResponseHelper.php';
+assertTrueValue(
+    is_string($accountModuleSource)
+        && str_contains($accountModuleSource, 'use Burki24\\SymconModuleHelper\\HttpResponseHelper;')
+        && str_contains($accountModuleSource, "require_once __DIR__ . '/../libs/helper/HttpResponseHelper.php';")
+        && str_contains($accountModuleSource, 'use HttpResponseHelper;'),
+    'The calendar account must use the shared HttpResponseHelper.'
+);
+assertTrueValue(
+    is_string($googleOAuthTraitSource)
+        && str_contains($googleOAuthTraitSource, 'SendHtmlTextResponse(')
+        && str_contains($googleOAuthTraitSource, '400,')
+        && !str_contains($googleOAuthTraitSource, "header('Content-Type: text/html; charset=utf-8')")
+        && !str_contains($googleOAuthTraitSource, 'http_response_code(400)'),
+    'Google OAuth callback responses must be emitted through HttpResponseHelper.'
+);
+assertTrueValue(
+    is_string($microsoftOAuthTraitSource)
+        && str_contains($microsoftOAuthTraitSource, 'SendHtmlTextResponse(')
+        && str_contains($microsoftOAuthTraitSource, '400,')
+        && !str_contains($microsoftOAuthTraitSource, "header('Content-Type: text/html; charset=utf-8')"),
+    'Microsoft OAuth callback responses must be emitted through HttpResponseHelper with HTTP 400 on errors.'
+);
+assertSameValue(
+    'be4fae4c23f757ab462237d8e74d2a9dca1b504937ed4d4b51c7ff76004cf1cd',
+    hash_file('sha256', $httpResponseHelperPath),
+    'The vendored HttpResponseHelper must match upstream v1.1.0.'
+);
+
 echo "All OpenCalendar tests passed.\n";

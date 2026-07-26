@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Burki24\SymconModuleHelper\ConfigurationFormHelper;
+use Burki24\SymconModuleHelper\HttpResponseHelper;
 use IPSKalender\CalendarHttpClient;
 use IPSKalender\CalendarHttpOriginPolicyInterface;
 use IPSKalender\CalendarEventTranslation;
@@ -24,6 +25,7 @@ use IPSKalender\MicrosoftOAuthException;
 use IPSKalender\SynchronizationSchedule;
 
 require_once __DIR__ . '/../libs/helper/ConfigurationFormHelper.php';
+require_once __DIR__ . '/../libs/helper/HttpResponseHelper.php';
 require_once __DIR__ . '/../libs/CalendarProviderInterface.php';
 require_once __DIR__ . '/../libs/CalendarHttpClient.php';
 require_once __DIR__ . '/../libs/CalendarHttpOriginPolicyInterface.php';
@@ -49,6 +51,7 @@ require_once __DIR__ . '/traits/ChildGatewayTrait.php';
 class KalenderKonto extends IPSModuleStrict
 {
     use ConfigurationFormHelper;
+    use HttpResponseHelper;
     use KalenderKontoGoogleOAuthTrait;
     use KalenderKontoMicrosoftOAuthTrait;
     use KalenderKontoICalendarAccountTrait;

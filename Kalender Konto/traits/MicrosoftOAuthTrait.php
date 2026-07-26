@@ -69,21 +69,15 @@ trait KalenderKontoMicrosoftOAuthTrait
             $this->SetStatus($this->ReadPropertyBoolean('Active') ? IS_ACTIVE : IS_INACTIVE);
             $this->ReloadForm();
 
-            header('Content-Type: text/html; charset=utf-8');
-            header('Cache-Control: no-store');
-            echo htmlspecialchars(
-                $this->Translate('Microsoft 365 was connected successfully. You can close this window.'),
-                ENT_QUOTES | ENT_SUBSTITUTE,
-                'UTF-8'
+            $this->SendHtmlTextResponse(
+                200,
+                $this->Translate('Microsoft 365 was connected successfully. You can close this window.')
             );
         } catch (Throwable $exception) {
             $message = $this->handleProviderError($exception);
-            header('Content-Type: text/html; charset=utf-8');
-            header('Cache-Control: no-store');
-            echo htmlspecialchars(
-                $this->Translate('Microsoft 365 could not be connected') . ': ' . $message,
-                ENT_QUOTES | ENT_SUBSTITUTE,
-                'UTF-8'
+            $this->SendHtmlTextResponse(
+                400,
+                $this->Translate('Microsoft 365 could not be connected') . ': ' . $message
             );
         }
     }

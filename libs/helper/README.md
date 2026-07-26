@@ -39,3 +39,11 @@ Version: **1.0.0**
 SHA-256:
 
 `1693b2399bcf95d270a6d9a01df6534caad906497bd4ba9489916a951abaffcc`
+
+## HttpResponseHelper.php
+
+Version: **1.1.0**
+
+SHA-256:
+
+`be4fae4c23f757ab462237d8e74d2a9dca1b504937ed4d4b51c7ff76004cf1cd`
