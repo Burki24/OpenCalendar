@@ -65,6 +65,7 @@ $helperManifest = json_decode(
 foreach ([
     'PersistentJsonCacheHelper',
     'ConfigurationFormHelper',
+    'DataFlowHelper',
     'VariableHelper',
     'VisualizationAssetHelper',
     'ParentConnectionHelper',

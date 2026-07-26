@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Burki24\SymconModuleHelper\ConfigurationFormHelper;
+use Burki24\SymconModuleHelper\DataFlowHelper;
 use Burki24\SymconModuleHelper\HttpResponseHelper;
 use IPSKalender\CalendarHttpClient;
 use IPSKalender\CalendarHttpOriginPolicyInterface;
@@ -25,6 +26,7 @@ use IPSKalender\MicrosoftOAuthException;
 use IPSKalender\SynchronizationSchedule;
 
 require_once __DIR__ . '/../libs/helper/ConfigurationFormHelper.php';
+require_once __DIR__ . '/../libs/helper/DataFlowHelper.php';
 require_once __DIR__ . '/../libs/helper/HttpResponseHelper.php';
 require_once __DIR__ . '/../libs/CalendarProviderInterface.php';
 require_once __DIR__ . '/../libs/CalendarHttpClient.php';
@@ -51,12 +53,14 @@ require_once __DIR__ . '/traits/ChildGatewayTrait.php';
 class KalenderKonto extends IPSModuleStrict
 {
     use ConfigurationFormHelper;
+    use DataFlowHelper;
     use HttpResponseHelper;
     use KalenderKontoGoogleOAuthTrait;
     use KalenderKontoMicrosoftOAuthTrait;
     use KalenderKontoICalendarAccountTrait;
     use KalenderKontoChildGatewayTrait;
 
+    private const DATA_ID_FROM_CHILD = '{4E535B1D-69C7-AC77-1372-0282B21BAEC9}';
     private const DATA_ID_TO_CHILD = '{8ED646DD-88E9-ACE2-95D5-9766EED4B5B0}';
     private const APPLE_CALDAV_URL = 'https://caldav.icloud.com';
     private const CONNECT_CONTROL_MODULE_ID = '{9486D575-BE8C-4ED8-B5B5-20930E26DE6F}';
@@ -450,13 +454,12 @@ class KalenderKonto extends IPSModuleStrict
             $calendars = $this->discoverCalendars();
             $this->SetStatus(IS_ACTIVE);
 
-            $this->SendDataToChildren(json_encode(
+            $this->SendDataToChildren($this->EncodeDataFlowMessage(
+                self::DATA_ID_TO_CHILD,
                 [
-                    'DataID'    => self::DATA_ID_TO_CHILD,
                     'Operation' => 'CalendarsUpdated',
                     'Payload'   => $calendars
-                ],
-                JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR
+                ]
             ));
 
             $this->SendDebug('Synchronize', sprintf('%d calendars synchronized.', count($calendars)), 0);

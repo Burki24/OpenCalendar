@@ -2,14 +2,17 @@
 
 declare(strict_types=1);
 
+use Burki24\SymconModuleHelper\DataFlowHelper;
 use Burki24\SymconModuleHelper\ParentConnectionHelper;
 use Burki24\SymconModuleHelper\ConfigurationFormHelper;
 
+require_once __DIR__ . '/../libs/helper/DataFlowHelper.php';
 require_once __DIR__ . '/../libs/helper/ParentConnectionHelper.php';
 require_once __DIR__ . '/../libs/helper/ConfigurationFormHelper.php';
 
 class KalenderKonfigurator extends IPSModuleStrict
 {
+    use DataFlowHelper;
     use ParentConnectionHelper;
     use ConfigurationFormHelper;
 
@@ -129,13 +132,12 @@ class KalenderKonfigurator extends IPSModuleStrict
      */
     private function requestCalendars(): array
     {
-        $responseJson = $this->SendDataToParent(json_encode(
+        $responseJson = $this->SendDataToParent($this->EncodeDataFlowMessage(
+            self::DATA_ID_TO_PARENT,
             [
-                'DataID'    => self::DATA_ID_TO_PARENT,
                 'Operation' => 'DiscoverCalendars',
                 'RequestID' => bin2hex(random_bytes(8))
-            ],
-            JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR
+            ]
         ));
 
         if ($responseJson === '') {

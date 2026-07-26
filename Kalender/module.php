@@ -3,11 +3,13 @@
 declare(strict_types=1);
 
 use Burki24\SymconModuleHelper\ConfigurationFormHelper;
+use Burki24\SymconModuleHelper\DataFlowHelper;
 use Burki24\SymconModuleHelper\PersistentJsonCacheHelper;
 use Burki24\SymconModuleHelper\VariableHelper;
 use IPSKalender\SynchronizationSchedule;
 
 require_once __DIR__ . '/../libs/helper/ConfigurationFormHelper.php';
+require_once __DIR__ . '/../libs/helper/DataFlowHelper.php';
 require_once __DIR__ . '/../libs/helper/PersistentJsonCacheHelper.php';
 require_once __DIR__ . '/../libs/helper/VariableHelper.php';
 require_once __DIR__ . '/../libs/SynchronizationSchedule.php';
@@ -15,10 +17,12 @@ require_once __DIR__ . '/../libs/SynchronizationSchedule.php';
 class Kalender extends IPSModuleStrict
 {
     use ConfigurationFormHelper;
+    use DataFlowHelper;
     use PersistentJsonCacheHelper;
     use VariableHelper;
 
     private const DATA_ID_TO_PARENT = '{4E535B1D-69C7-AC77-1372-0282B21BAEC9}';
+    private const DATA_ID_FROM_PARENT = '{8ED646DD-88E9-ACE2-95D5-9766EED4B5B0}';
     private const INITIALIZATION_DELAY_MS = 3_000;
 
     private const STATUS_CONFIGURATION_MISSING = 201;
@@ -222,8 +226,8 @@ class Kalender extends IPSModuleStrict
     public function ReceiveData(string $JSONString): string
     {
         try {
-            $message = json_decode($JSONString, true, 512, JSON_THROW_ON_ERROR);
-            if (is_array($message) && ($message['Operation'] ?? '') === 'CalendarsUpdated'
+            $message = $this->DecodeDataFlowMessage($JSONString, self::DATA_ID_FROM_PARENT);
+            if (($message['Operation'] ?? '') === 'CalendarsUpdated'
                 && is_array($message['Payload'] ?? null)) {
                 $this->applyCalendarMetadata($message['Payload']);
             }
@@ -516,17 +520,15 @@ class Kalender extends IPSModuleStrict
 
         $request = array_merge(
             [
-                'DataID'     => self::DATA_ID_TO_PARENT,
                 'Operation'  => $operation,
                 'RequestID'  => bin2hex(random_bytes(8)),
                 'CalendarID' => $this->effectiveCalendarId()
             ],
             $additionalData
         );
-        $responseJson = $this->SendDataToParent(json_encode(
-            $request,
-            JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR
-        ));
+        $responseJson = $this->SendDataToParent(
+            $this->EncodeDataFlowMessage(self::DATA_ID_TO_PARENT, $request)
+        );
         if ($responseJson === '') {
             throw new RuntimeException('The calendar account did not return a response.');
         }

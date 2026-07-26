@@ -13,10 +13,7 @@ trait KalenderKontoChildGatewayTrait
     public function ForwardData(string $JSONString): string
     {
         try {
-            $request = json_decode($JSONString, true, 512, JSON_THROW_ON_ERROR);
-            if (!is_array($request)) {
-                throw new InvalidArgumentException('The request must be a JSON object.');
-            }
+            $request = $this->DecodeDataFlowMessage($JSONString, self::DATA_ID_FROM_CHILD);
 
             $operation = (string) ($request['Operation'] ?? '');
             $requestID = (string) ($request['RequestID'] ?? '');

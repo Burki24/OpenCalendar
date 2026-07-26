@@ -1,26 +1,29 @@
 {
-  "schema": 1,
-  "source_repository": "Burki24/Symcon_ModuleHelper",
-  "base_branch": "dev",
-  "readme_language": "en",
-  "helpers": {
-    "ConfigurationFormHelper": {
-      "target": "libs/helper/ConfigurationFormHelper.php"
-    },
-    "HttpResponseHelper": {
-      "target": "libs/helper/HttpResponseHelper.php"
-    },
-    "ParentConnectionHelper": {
-      "target": "libs/helper/ParentConnectionHelper.php"
-    },
-    "PersistentJsonCacheHelper": {
-      "target": "libs/helper/PersistentJsonCacheHelper.php"
-    },
-    "VariableHelper": {
-      "target": "libs/helper/VariableHelper.php"
-    },
-    "VisualizationAssetHelper": {
-      "target": "libs/helper/VisualizationAssetHelper.php"
+    "schema": 1,
+    "source_repository": "Burki24/Symcon_ModuleHelper",
+    "base_branch": "dev",
+    "readme_language": "en",
+    "helpers": {
+        "ConfigurationFormHelper": {
+            "target": "libs/helper/ConfigurationFormHelper.php"
+        },
+        "DataFlowHelper": {
+            "target": "libs/helper/DataFlowHelper.php"
+        },
+        "HttpResponseHelper": {
+            "target": "libs/helper/HttpResponseHelper.php"
+        },
+        "ParentConnectionHelper": {
+            "target": "libs/helper/ParentConnectionHelper.php"
+        },
+        "PersistentJsonCacheHelper": {
+            "target": "libs/helper/PersistentJsonCacheHelper.php"
+        },
+        "VariableHelper": {
+            "target": "libs/helper/VariableHelper.php"
+        },
+        "VisualizationAssetHelper": {
+            "target": "libs/helper/VisualizationAssetHelper.php"
+        }
     }
-  }
 }

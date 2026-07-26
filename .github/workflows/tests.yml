@@ -49,6 +49,9 @@ jobs:
       - name: Verify vendored helper integrity
         run: python3 tests/helper_integrity.py
 
+      - name: Verify DataFlowHelper integration
+        run: python3 tests/data_flow_integration.py
+
       - name: Run OpenCalendar tests
         run: php tests/run.php
 
