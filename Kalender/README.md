@@ -21,7 +21,7 @@ beliebig verschoben oder vom Benutzer umbenannt werden.
 - Ändern einzelner, nicht wiederkehrender Termine
 - Löschen einzelner, nicht wiederkehrender Termine
 - ETag-basierter Schutz vor dem Überschreiben zwischenzeitlicher Änderungen
-- Statusvariablen für Terminanzahl, Zeitpunkt der letzten Synchronisation und Termindaten
+- Statusvariablen für Terminanzahl und Zeitpunkt der letzten Synchronisation
 
 Das Ändern oder einzelne Löschen von Vorkommen einer Terminserie ist noch nicht freigegeben. Dadurch verhindert das Modul, dass eine komplette Serie versehentlich überschrieben oder gelöscht wird.
 
@@ -50,7 +50,8 @@ Variable | Typ | Beschreibung
 --- | --- | ---
 Anzahl Termine | Integer | Anzahl der aktuell zwischengespeicherten Termine
 Letzte Synchronisation | Integer | Unix-Zeitpunkt der letzten erfolgreichen Abfrage
-Termine | String | JSON-kodierte Liste der Termine
+
+Die eigentlichen Termindaten werden bewusst nicht in einer Statusvariable gespiegelt, sondern nur im internen Modulcache gehalten. Sie werden über `IPSKAL_GetEvents()` abgerufen. Dadurch werden große JSON-Datenmengen nicht bei jeder Synchronisation als Variablenwert durch Symcon verteilt.
 
 Ein Termin enthält unter anderem `id`, `uid`, `resourceUrl`, `etag`, `summary`, `description`, `location`, `start`, `end`, `startTimestamp`, `endTimestamp`, `allDay`, `status`, `recurrenceRule` und `recurrenceId`. Wurde der Titel durch ein ausgewähltes iCalendar-Übersetzungsprofil angepasst, enthält `originalSummary` zusätzlich den unveränderten Originaltitel.
 
