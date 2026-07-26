@@ -2,8 +2,14 @@
 
 declare(strict_types=1);
 
+use Burki24\SymconModuleHelper\ParentConnectionHelper;
+
+require_once __DIR__ . '/../libs/helper/ParentConnectionHelper.php';
+
 class KalenderKonfigurator extends IPSModuleStrict
 {
+    use ParentConnectionHelper;
+
     private const DATA_ID_TO_PARENT = '{4E535B1D-69C7-AC77-1372-0282B21BAEC9}';
     private const CALENDAR_MODULE_ID = '{227B63E4-4223-316B-76E9-FD3849689562}';
 
@@ -256,7 +262,7 @@ class KalenderKonfigurator extends IPSModuleStrict
      */
     private function getExistingCalendarInstances(): array
     {
-        $parentId = (int) (IPS_GetInstance($this->InstanceID)['ConnectionID'] ?? 0);
+        $parentId = $this->GetParentID();
         $instances = [];
 
         foreach (IPS_GetInstanceListByModuleID(self::CALENDAR_MODULE_ID) as $instanceId) {

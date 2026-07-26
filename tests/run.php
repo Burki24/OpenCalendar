@@ -1125,4 +1125,20 @@ assertTrueValue(
     'Agenda, three-day and weekly headings must optionally show the day of year.'
 );
 
+$configuratorModuleSource = file_get_contents(__DIR__ . '/../Kalender Konfigurator/module.php');
+$parentConnectionHelperPath = __DIR__ . '/../libs/helper/ParentConnectionHelper.php';
+assertTrueValue(
+    is_string($configuratorModuleSource)
+        && str_contains($configuratorModuleSource, 'use Burki24\\SymconModuleHelper\\ParentConnectionHelper;')
+        && str_contains($configuratorModuleSource, "require_once __DIR__ . '/../libs/helper/ParentConnectionHelper.php';")
+        && str_contains($configuratorModuleSource, 'use ParentConnectionHelper;')
+        && str_contains($configuratorModuleSource, '$parentId = $this->GetParentID();'),
+    'The calendar configurator must use the shared ParentConnectionHelper for its connected account.'
+);
+assertSameValue(
+    'd4f01dee721aa32e64410979ca15b2795a0fcc59c0232c0ad69e4702d9ff573c',
+    hash_file('sha256', $parentConnectionHelperPath),
+    'The vendored ParentConnectionHelper must match upstream v1.0.0.'
+);
+
 echo "All OpenCalendar tests passed.\n";
