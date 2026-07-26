@@ -84,6 +84,21 @@ assertSymconStrict(
     'The vendored ConfigurationFormHelper must match upstream version 1.0.0 exactly.'
 );
 
+$variableHelperSourcePath = $root . '/libs/helper/VariableHelper.php';
+assertSymconStrict(
+    is_file($variableHelperSourcePath),
+    'The vendored VariableHelper is missing.'
+);
+$variableHelperSource = (string) file_get_contents($variableHelperSourcePath);
+assertSymconStrict(
+    str_contains($variableHelperSource, '@version 1.1.0'),
+    'OpenCalendar must vendor the reviewed VariableHelper version 1.1.0.'
+);
+assertSymconStrict(
+    hash_file('sha256', $variableHelperSourcePath) === 'd1c1bb4d170ebe3d0b2976590c027f341cc3f11ecd5e43e02a0abe17340484f4',
+    'The vendored VariableHelper must match upstream version 1.1.0 exactly.'
+);
+
 $visualizationAssetHelperSourcePath = $root . '/libs/helper/VisualizationAssetHelper.php';
 assertSymconStrict(
     is_file($visualizationAssetHelperSourcePath),
@@ -195,8 +210,17 @@ assertSymconStrict(
 
 $viewSource = (string) file_get_contents($root . '/Kalender Ansicht/module.php');
 assertSymconStrict(
-    str_contains($viewSource, 'findChildByIdent($instanceId, \'LastSynchronization\')'),
-    'The calendar view must use the small synchronization status variable as its update signal.'
+    str_contains($calendarSource, 'use VariableHelper;')
+        && str_contains($calendarSource, '$this->VariableExists(\'Events\')')
+        && !str_contains($calendarSource, "IPS_GetObjectIDByIdent('Events'"),
+    'The calendar module must use VariableHelper for the legacy Events variable.'
+);
+assertSymconStrict(
+    str_contains($viewSource, 'use VariableHelper;')
+        && str_contains($viewSource, 'GetVariableIDByIdent(\'LastSynchronization\', $instanceId)')
+        && str_contains($viewSource, "VariableExists('IPSViewCalendar')")
+        && !str_contains($viewSource, 'findChildByIdent('),
+    'The calendar view must use VariableHelper for variable lookups across calendar instances.'
 );
 assertSymconStrict(
     str_contains($viewSource, 'use VisualizationAssetHelper;')

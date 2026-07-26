@@ -47,3 +47,11 @@ Version: **1.1.0**
 SHA-256:
 
 `be4fae4c23f757ab462237d8e74d2a9dca1b504937ed4d4b51c7ff76004cf1cd`
+
+## VariableHelper.php
+
+Version: **1.1.0**
+
+SHA-256:
+
+`d1c1bb4d170ebe3d0b2976590c027f341cc3f11ecd5e43e02a0abe17340484f4`

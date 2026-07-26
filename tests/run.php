@@ -1134,6 +1134,32 @@ assertTrueValue(
     'Agenda, three-day and weekly headings must optionally show the day of year.'
 );
 
+$variableHelperPath = __DIR__ . '/../libs/helper/VariableHelper.php';
+assertTrueValue(
+    is_string($calendarModuleSource)
+        && str_contains($calendarModuleSource, 'use Burki24\\SymconModuleHelper\\VariableHelper;')
+        && str_contains($calendarModuleSource, "require_once __DIR__ . '/../libs/helper/VariableHelper.php';")
+        && str_contains($calendarModuleSource, 'use VariableHelper;')
+        && str_contains($calendarModuleSource, '$this->VariableExists(\'Events\')')
+        && !str_contains($calendarModuleSource, "IPS_GetObjectIDByIdent('Events'"),
+    'The calendar module must use VariableHelper for legacy Events variable detection.'
+);
+assertTrueValue(
+    is_string($viewModuleSource)
+        && str_contains($viewModuleSource, 'use Burki24\\SymconModuleHelper\\VariableHelper;')
+        && str_contains($viewModuleSource, "require_once __DIR__ . '/../libs/helper/VariableHelper.php';")
+        && str_contains($viewModuleSource, 'use VariableHelper;')
+        && str_contains($viewModuleSource, 'GetVariableIDByIdent(\'LastSynchronization\', $instanceId)')
+        && str_contains($viewModuleSource, "VariableExists('IPSViewCalendar')")
+        && !str_contains($viewModuleSource, 'findChildByIdent('),
+    'The calendar view must use parent-aware VariableHelper lookups instead of its local child scan.'
+);
+assertSameValue(
+    'd1c1bb4d170ebe3d0b2976590c027f341cc3f11ecd5e43e02a0abe17340484f4',
+    hash_file('sha256', $variableHelperPath),
+    'The vendored VariableHelper must match upstream v1.1.0.'
+);
+
 $visualizationAssetHelperPath = __DIR__ . '/../libs/helper/VisualizationAssetHelper.php';
 assertSameValue(
     '1693b2399bcf95d270a6d9a01df6534caad906497bd4ba9489916a951abaffcc',

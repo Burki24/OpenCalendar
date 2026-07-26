@@ -3,14 +3,17 @@
 declare(strict_types=1);
 
 use Burki24\SymconModuleHelper\ConfigurationFormHelper;
+use Burki24\SymconModuleHelper\VariableHelper;
 use Burki24\SymconModuleHelper\VisualizationAssetHelper;
 
 require_once __DIR__ . '/../libs/helper/ConfigurationFormHelper.php';
+require_once __DIR__ . '/../libs/helper/VariableHelper.php';
 require_once __DIR__ . '/../libs/helper/VisualizationAssetHelper.php';
 
 class KalenderAnsicht extends IPSModuleStrict
 {
     use ConfigurationFormHelper;
+    use VariableHelper;
     use VisualizationAssetHelper;
 
     private const CALENDAR_MODULE_ID = '{227B63E4-4223-316B-76E9-FD3849689562}';
@@ -137,7 +140,7 @@ class KalenderAnsicht extends IPSModuleStrict
             foreach ($calendars as $calendar) {
                 $instanceId = $calendar['instanceId'];
                 $this->RegisterMessage($instanceId, OM_CHANGENAME);
-                $synchronizationVariableId = $this->findChildByIdent($instanceId, 'LastSynchronization');
+                $synchronizationVariableId = $this->GetVariableIDByIdent('LastSynchronization', $instanceId);
                 if ($synchronizationVariableId > 0) {
                     $this->RegisterMessage($synchronizationVariableId, VM_UPDATE);
                 }
@@ -377,7 +380,7 @@ class KalenderAnsicht extends IPSModuleStrict
         }
 
         if ($this->ReadPropertyBoolean('EnableIPSView')
-            && $this->findChildByIdent($this->InstanceID, 'IPSViewCalendar') > 0) {
+            && $this->VariableExists('IPSViewCalendar')) {
             try {
                 $this->SetValue('IPSViewCalendar', $this->renderCalendarHtml($state, true));
             } catch (Throwable $exception) {
@@ -703,17 +706,6 @@ class KalenderAnsicht extends IPSModuleStrict
             );
             $this->storeCalendarSelectionBackup($selection);
         }
-    }
-
-    private function findChildByIdent(int $parentId, string $ident): int
-    {
-        foreach (IPS_GetChildrenIDs($parentId) as $childId) {
-            $object = IPS_GetObject($childId);
-            if (($object['ObjectIdent'] ?? '') === $ident) {
-                return $childId;
-            }
-        }
-        return 0;
     }
 
     /**

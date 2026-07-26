@@ -4,16 +4,19 @@ declare(strict_types=1);
 
 use Burki24\SymconModuleHelper\ConfigurationFormHelper;
 use Burki24\SymconModuleHelper\PersistentJsonCacheHelper;
+use Burki24\SymconModuleHelper\VariableHelper;
 use IPSKalender\SynchronizationSchedule;
 
 require_once __DIR__ . '/../libs/helper/ConfigurationFormHelper.php';
 require_once __DIR__ . '/../libs/helper/PersistentJsonCacheHelper.php';
+require_once __DIR__ . '/../libs/helper/VariableHelper.php';
 require_once __DIR__ . '/../libs/SynchronizationSchedule.php';
 
 class Kalender extends IPSModuleStrict
 {
     use ConfigurationFormHelper;
     use PersistentJsonCacheHelper;
+    use VariableHelper;
 
     private const DATA_ID_TO_PARENT = '{4E535B1D-69C7-AC77-1372-0282B21BAEC9}';
     private const INITIALIZATION_DELAY_MS = 3_000;
@@ -589,7 +592,7 @@ class Kalender extends IPSModuleStrict
 
     private function removeLegacyEventsVariable(): void
     {
-        if (@IPS_GetObjectIDByIdent('Events', $this->InstanceID) !== false) {
+        if ($this->VariableExists('Events')) {
             $this->UnregisterVariable('Events');
         }
     }
