@@ -20,6 +20,7 @@ class KalenderKonfigurator extends IPSModuleStrict
     private const CALENDAR_MODULE_ID = '{227B63E4-4223-316B-76E9-FD3849689562}';
 
     private const STATUS_DISCOVERY_FAILED = 201;
+    private const STATUS_PARENT_MISSING = 202;
 
     /**
      * Registers the configurator cache and error state.
@@ -38,6 +39,13 @@ class KalenderKonfigurator extends IPSModuleStrict
     public function ApplyChanges(): void
     {
         parent::ApplyChanges();
+
+        $parentError = $this->parentConnectionError();
+        if ($parentError !== '') {
+            $this->WriteAttributeString('LastError', $parentError);
+            $this->SetStatus(self::STATUS_PARENT_MISSING);
+            return;
+        }
 
         $this->SetStatus(IS_ACTIVE);
     }
@@ -59,7 +67,11 @@ class KalenderKonfigurator extends IPSModuleStrict
         } catch (Throwable $exception) {
             $message = $this->sanitizeError($exception->getMessage());
             $this->WriteAttributeString('LastError', $message);
-            $this->SetStatus(self::STATUS_DISCOVERY_FAILED);
+            $this->SetStatus(
+                $this->parentConnectionError() !== ''
+                    ? self::STATUS_PARENT_MISSING
+                    : self::STATUS_DISCOVERY_FAILED
+            );
             $calendars = $this->readCachedCalendars();
             $form['actions'][] = [
                 'type'    => 'Label',
@@ -121,7 +133,11 @@ class KalenderKonfigurator extends IPSModuleStrict
         } catch (Throwable $exception) {
             $message = $this->sanitizeError($exception->getMessage());
             $this->WriteAttributeString('LastError', $message);
-            $this->SetStatus(self::STATUS_DISCOVERY_FAILED);
+            $this->SetStatus(
+                $this->parentConnectionError() !== ''
+                    ? self::STATUS_PARENT_MISSING
+                    : self::STATUS_DISCOVERY_FAILED
+            );
 
             return $this->Translate('Calendar discovery failed') . ': ' . $message;
         }
@@ -132,6 +148,11 @@ class KalenderKonfigurator extends IPSModuleStrict
      */
     private function requestCalendars(): array
     {
+        $parentError = $this->parentConnectionError();
+        if ($parentError !== '') {
+            throw new RuntimeException($parentError);
+        }
+
         $responseJson = $this->SendDataToParent($this->EncodeDataFlowMessage(
             self::DATA_ID_TO_PARENT,
             [
@@ -140,7 +161,7 @@ class KalenderKonfigurator extends IPSModuleStrict
             ]
         ));
 
-        if ($responseJson === '') {
+        if (!is_string($responseJson) || $responseJson === '') {
             throw new RuntimeException('The calendar account did not return a response.');
         }
 
@@ -275,6 +296,20 @@ class KalenderKonfigurator extends IPSModuleStrict
         }
 
         return $instances;
+    }
+
+    private function parentConnectionError(): string
+    {
+        if (!$this->HasParent()) {
+            return $this->Translate('No calendar account is connected. Select a parent gateway first.');
+        }
+
+        $parent = IPS_GetInstance($this->GetParentID());
+        if ((int) ($parent['InstanceStatus'] ?? 0) !== IS_ACTIVE) {
+            return $this->Translate('The connected calendar account is not active.');
+        }
+
+        return '';
     }
 
     private function sanitizeError(string $message): string

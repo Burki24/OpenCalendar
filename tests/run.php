@@ -1166,6 +1166,13 @@ assertTrueValue(
         && str_contains($configuratorModuleSource, '$parentId = $this->GetParentID();'),
     'The calendar configurator must use the shared ParentConnectionHelper for its connected account.'
 );
+assertTrueValue(
+    is_string($configuratorModuleSource)
+        && str_contains($configuratorModuleSource, 'private function parentConnectionError(): string')
+        && str_contains($configuratorModuleSource, 'if (!$this->HasParent())')
+        && str_contains($configuratorModuleSource, 'if (!is_string($responseJson) || $responseJson === \'\')'),
+    'The calendar configurator must not send or decode data without a valid active parent account.'
+);
 
 $accountModuleSource = file_get_contents(__DIR__ . '/../Kalender Konto/module.php');
 $googleOAuthTraitSource = file_get_contents(__DIR__ . '/../Kalender Konto/traits/GoogleOAuthTrait.php');

@@ -68,6 +68,11 @@
             "code": 201,
             "icon": "error",
             "caption": "Calendar discovery failed"
+        },
+        {
+            "code": 202,
+            "icon": "inactive",
+            "caption": "Calendar account connection missing"
         }
     ]
 }

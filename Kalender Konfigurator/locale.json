@@ -19,7 +19,10 @@
             "The calendar account returned invalid calendar data.": "Das Kalenderkonto hat ungültige Kalenderdaten zurückgegeben.",
             "Unknown error.": "Unbekannter Fehler.",
             "Calendars refreshed.": "Kalender aktualisiert.",
-            "Calendar discovery failed. Please check the instance status for details.": "Kalendersuche fehlgeschlagen. Bitte prüfen Sie den Instanzstatus für weitere Details."
+            "Calendar discovery failed. Please check the instance status for details.": "Kalendersuche fehlgeschlagen. Bitte prüfen Sie den Instanzstatus für weitere Details.",
+            "No calendar account is connected. Select a parent gateway first.": "Es ist kein Kalenderkonto verbunden. Wählen Sie zuerst ein übergeordnetes Gateway aus.",
+            "The connected calendar account is not active.": "Das verbundene Kalenderkonto ist nicht aktiv.",
+            "Calendar account connection missing": "Verbindung zum Kalenderkonto fehlt"
         }
     }
 }
