@@ -15,14 +15,13 @@ use IPSKalender\CalDAVOriginPolicy;
 use IPSKalender\GoogleCalendarProvider;
 use IPSKalender\GoogleCalendarOriginPolicy;
 use IPSKalender\GoogleCalendarProviderException;
-use IPSKalender\GoogleOAuthException;
 use IPSKalender\ICalendarFeedProvider;
 use IPSKalender\ICalendarFeedProviderException;
 use IPSKalender\ICalendarSubscriptionProvider;
 use IPSKalender\MicrosoftCalendarProvider;
 use IPSKalender\MicrosoftCalendarProviderException;
 use IPSKalender\MicrosoftGraphOriginPolicy;
-use IPSKalender\MicrosoftOAuthException;
+use IPSKalender\SymconOAuthException;
 use IPSKalender\SynchronizationSchedule;
 
 require_once __DIR__ . '/../libs/helper/ConfigurationFormHelper.php';
@@ -36,15 +35,15 @@ require_once __DIR__ . '/../libs/CalDAVProvider.php';
 require_once __DIR__ . '/../libs/CalDAVOriginPolicy.php';
 require_once __DIR__ . '/../libs/GoogleCalendarProvider.php';
 require_once __DIR__ . '/../libs/GoogleCalendarOriginPolicy.php';
-require_once __DIR__ . '/../libs/GoogleOAuthClient.php';
 require_once __DIR__ . '/../libs/GoogleOAuthOriginPolicy.php';
 require_once __DIR__ . '/../libs/ICalendarFeedProvider.php';
 require_once __DIR__ . '/../libs/ICalendarSubscriptionProvider.php';
 require_once __DIR__ . '/../libs/MicrosoftCalendarProvider.php';
-require_once __DIR__ . '/../libs/MicrosoftOAuthClient.php';
 require_once __DIR__ . '/../libs/MicrosoftGraphOriginPolicy.php';
+require_once __DIR__ . '/../libs/SymconOAuthClient.php';
 require_once __DIR__ . '/../libs/SymconOAuthOriginPolicy.php';
 require_once __DIR__ . '/../libs/SynchronizationSchedule.php';
+require_once __DIR__ . '/traits/SymconOAuthTrait.php';
 require_once __DIR__ . '/traits/GoogleOAuthTrait.php';
 require_once __DIR__ . '/traits/MicrosoftOAuthTrait.php';
 require_once __DIR__ . '/traits/ICalendarAccountTrait.php';
@@ -55,6 +54,7 @@ class KalenderKonto extends IPSModuleStrict
     use ConfigurationFormHelper;
     use DataFlowHelper;
     use HttpResponseHelper;
+    use KalenderKontoSymconOAuthTrait;
     use KalenderKontoGoogleOAuthTrait;
     use KalenderKontoMicrosoftOAuthTrait;
     use KalenderKontoICalendarAccountTrait;
@@ -64,8 +64,7 @@ class KalenderKonto extends IPSModuleStrict
     private const DATA_ID_TO_CHILD = '{8ED646DD-88E9-ACE2-95D5-9766EED4B5B0}';
     private const APPLE_CALDAV_URL = 'https://caldav.icloud.com';
     private const CONNECT_CONTROL_MODULE_ID = '{9486D575-BE8C-4ED8-B5B5-20930E26DE6F}';
-    private const GOOGLE_OAUTH_HOOK_PREFIX = 'ips-kalender-google-';
-    private const GOOGLE_OAUTH_STATE_TTL = 900;
+    private const GOOGLE_OAUTH_IDENTIFIER = 'opencalendar_google';
     private const MICROSOFT_OAUTH_IDENTIFIER = 'opencalendar_microsoft';
 
     private const PROVIDER_APPLE = 0;
@@ -80,7 +79,7 @@ class KalenderKonto extends IPSModuleStrict
     private const STATUS_INVALID_RESPONSE = 205;
 
     /**
-     * Registers account properties, provider state, cache attributes, timers, and OAuth hook.
+     * Registers account properties, provider state, cache attributes, timers, and OAuth handlers.
      */
     public function Create(): void
     {
@@ -91,8 +90,6 @@ class KalenderKonto extends IPSModuleStrict
         $this->RegisterPropertyString('ServerURL', self::APPLE_CALDAV_URL);
         $this->RegisterPropertyString('Username', '');
         $this->RegisterPropertyString('Password', '');
-        $this->RegisterPropertyString('GoogleClientID', '');
-        $this->RegisterPropertyString('GoogleClientSecret', '');
         $this->RegisterPropertyString('CalendarName', '');
         $this->RegisterPropertyInteger('ICalendarTranslationProfile', CalendarEventTranslation::NONE);
         $this->RegisterPropertyString('ICalendarFeeds', '[]');
@@ -107,13 +104,14 @@ class KalenderKonto extends IPSModuleStrict
         $this->RegisterAttributeString('LastError', '');
         $this->RegisterAttributeString('GoogleRefreshToken', '');
         $this->RegisterAttributeString('GoogleAccount', '');
+        // Legacy marker used to require one reconnect after migrating from personal Google OAuth.
         $this->RegisterAttributeString('GoogleTokenClientID', '');
-        $this->RegisterAttributeString('GoogleOAuthState', '');
         $this->RegisterAttributeString('MicrosoftRefreshToken', '');
         $this->RegisterAttributeString('MicrosoftAccount', '');
+        $this->RegisterAttributeInteger('PendingOAuthProvider', -1);
 
         $this->RegisterTimer('SynchronizationTimer', 0, 'IPSKALACC_ScheduledSynchronize($_IPS[\'TARGET\']);');
-        $this->RegisterHook($this->googleOAuthHookAddress());
+        $this->RegisterOAuth(self::GOOGLE_OAUTH_IDENTIFIER);
         $this->RegisterOAuth(self::MICROSOFT_OAUTH_IDENTIFIER);
     }
 
@@ -160,18 +158,13 @@ class KalenderKonto extends IPSModuleStrict
                 $element['visible'] = $canConfigureTls;
             } elseif (in_array($name, [
                 'GoogleOAuthHint',
-                'GoogleRedirectURI',
-                'GoogleShowRedirectURI',
-                'GoogleClientID',
-                'GoogleClientSecret',
+                'GoogleConnectHint',
                 'GoogleStatus',
                 'GoogleConnect',
                 'GoogleDisconnect'
             ], true)) {
                 $element['visible'] = $isGoogle;
-                if ($name === 'GoogleRedirectURI') {
-                    $element['caption'] = $this->googleRedirectUriText();
-                } elseif ($name === 'GoogleStatus') {
+                if ($name === 'GoogleStatus') {
                     $element['caption'] = $this->googleStatusText();
                 } elseif ($name === 'GoogleConnect') {
                     $element['visible'] = $isGoogle && !$this->isGoogleConnected();
@@ -231,11 +224,7 @@ class KalenderKonto extends IPSModuleStrict
         );
         $this->UpdateFormField('GoogleStatus', 'visible', $isGoogle);
         $this->UpdateFormField('GoogleOAuthHint', 'visible', $isGoogle);
-        $this->UpdateFormField('GoogleRedirectURI', 'visible', $isGoogle);
-        $this->UpdateFormField('GoogleRedirectURI', 'caption', $this->googleRedirectUriText());
-        $this->UpdateFormField('GoogleShowRedirectURI', 'visible', $isGoogle);
-        $this->UpdateFormField('GoogleClientID', 'visible', $isGoogle);
-        $this->UpdateFormField('GoogleClientSecret', 'visible', $isGoogle);
+        $this->UpdateFormField('GoogleConnectHint', 'visible', $isGoogle);
         $this->UpdateFormField('GoogleConnect', 'visible', $isGoogle && !$this->isGoogleConnected());
         $this->UpdateFormField('GoogleDisconnect', 'visible', $isGoogle && $this->isGoogleConnected());
         $this->UpdateFormField('MicrosoftOAuthHint', 'visible', $isMicrosoft);
@@ -287,6 +276,34 @@ class KalenderKonto extends IPSModuleStrict
     }
 
     /**
+     * Routes a native Symcon OAuth callback to the provider configured for this account.
+     */
+    protected function ProcessOAuthData(): void
+    {
+        $pendingProvider = $this->ReadAttributeInteger('PendingOAuthProvider');
+        $this->WriteAttributeInteger('PendingOAuthProvider', -1);
+        $provider = in_array($pendingProvider, [self::PROVIDER_GOOGLE, self::PROVIDER_MICROSOFT], true)
+            ? $pendingProvider
+            : $this->ReadPropertyInteger('Provider');
+
+        switch ($provider) {
+            case self::PROVIDER_GOOGLE:
+                $this->processGoogleOAuthData();
+                break;
+
+            case self::PROVIDER_MICROSOFT:
+                $this->processMicrosoftOAuthData();
+                break;
+
+            default:
+                $this->SendHtmlTextResponse(
+                    400,
+                    $this->Translate('The selected calendar provider does not support OAuth.')
+                );
+        }
+    }
+
+    /**
      * Handles actions triggered from the account configuration form.
      *
      * @param string $Ident Action identifier supplied by Symcon.
@@ -321,10 +338,6 @@ class KalenderKonto extends IPSModuleStrict
 
             case 'FormGoogleAuthorizationFailed':
                 $this->UpdateFormField('GoogleAuthorizationFailedPopup', 'visible', true);
-                break;
-
-            case 'FormGoogleRedirectUnavailable':
-                $this->UpdateFormField('GoogleRedirectUnavailablePopup', 'visible', true);
                 break;
 
             case 'FormMicrosoftAuthorizationFailed':
@@ -730,12 +743,6 @@ class KalenderKonto extends IPSModuleStrict
         }
 
         if ($provider === self::PROVIDER_GOOGLE) {
-            if (trim($this->ReadPropertyString('GoogleClientID')) === '') {
-                return $this->Translate('The Google OAuth client ID is missing.');
-            }
-            if ($this->ReadPropertyString('GoogleClientSecret') === '') {
-                return $this->Translate('The Google OAuth client secret is missing.');
-            }
             if (!$this->isGoogleConnected()) {
                 return $this->Translate('Google Calendar is not connected yet.');
             }
@@ -784,7 +791,7 @@ class KalenderKonto extends IPSModuleStrict
             $this->SetStatus(in_array($exception->httpStatus, [401, 403], true)
                 ? self::STATUS_AUTHENTICATION_FAILED
                 : self::STATUS_CONNECTION_FAILED);
-        } elseif ($exception instanceof GoogleOAuthException || $exception instanceof MicrosoftOAuthException) {
+        } elseif ($exception instanceof SymconOAuthException) {
             $this->SetStatus(self::STATUS_AUTHENTICATION_FAILED);
         } elseif ($exception instanceof JsonException) {
             $this->SetStatus(self::STATUS_INVALID_RESPONSE);
@@ -873,7 +880,6 @@ class KalenderKonto extends IPSModuleStrict
             $message = str_replace($password, '***', $message);
         }
         foreach ([
-            $this->ReadPropertyString('GoogleClientSecret'),
             $this->ReadAttributeString('GoogleRefreshToken'),
             $this->ReadAttributeString('MicrosoftRefreshToken')
         ] as $secret) {

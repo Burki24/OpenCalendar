@@ -20,6 +20,7 @@ function assertAccountStructure(bool $condition, string $message): void
 $reflection = new ReflectionClass(KalenderKonto::class);
 $traits = class_uses(KalenderKonto::class);
 foreach ([
+    KalenderKontoSymconOAuthTrait::class,
     KalenderKontoGoogleOAuthTrait::class,
     KalenderKontoMicrosoftOAuthTrait::class,
     KalenderKontoICalendarAccountTrait::class,
@@ -38,7 +39,6 @@ foreach ([
     'UpdateScheduleForm',
     'RequestAction',
     'ConnectGoogle',
-    'GetGoogleRedirectURI',
     'DisconnectGoogle',
     'ConnectMicrosoft',
     'DisconnectMicrosoft',
@@ -58,28 +58,34 @@ foreach ([
 }
 
 assertAccountStructure(
-    $reflection->hasMethod('ProcessHookData') && $reflection->getMethod('ProcessHookData')->isProtected(),
-    'The Google OAuth hook handler must remain protected.'
-);
-
-
-assertAccountStructure(
     $reflection->hasMethod('ProcessOAuthData') && $reflection->getMethod('ProcessOAuthData')->isProtected(),
-    'The native Microsoft OAuth handler must remain protected.'
+    'The native Google/Microsoft OAuth handler must remain protected.'
+);
+assertAccountStructure(
+    is_string(file_get_contents(__DIR__ . '/../Kalender Konto/module.php'))
+        && str_contains(
+            (string) file_get_contents(__DIR__ . '/../Kalender Konto/module.php'),
+            "RegisterAttributeInteger('PendingOAuthProvider', -1)"
+        ),
+    'OAuth callbacks must retain their pending provider across form changes and restarts.'
 );
 
 $accountSource = file_get_contents(__DIR__ . '/../Kalender Konto/module.php');
 assertAccountStructure(
     is_string($accountSource)
+        && str_contains($accountSource, 'RegisterOAuth(self::GOOGLE_OAUTH_IDENTIFIER)')
         && str_contains($accountSource, 'RegisterOAuth(self::MICROSOFT_OAUTH_IDENTIFIER)')
+        && !str_contains($accountSource, "RegisterPropertyString('GoogleClientID'")
+        && !str_contains($accountSource, "RegisterPropertyString('GoogleClientSecret'")
         && !str_contains($accountSource, "RegisterPropertyString('MicrosoftClientID'")
         && !str_contains($accountSource, "RegisterPropertyString('MicrosoftClientSecret'"),
-    'Microsoft OAuth must use the native shared Symcon handler without per-user client credentials.'
+    'Google and Microsoft OAuth must use native shared Symcon handlers without per-user client credentials.'
 );
 
 
 $googleOAuthSource = file_get_contents(__DIR__ . '/../Kalender Konto/traits/GoogleOAuthTrait.php');
 $microsoftOAuthSource = file_get_contents(__DIR__ . '/../Kalender Konto/traits/MicrosoftOAuthTrait.php');
+$sharedOAuthSource = file_get_contents(__DIR__ . '/../Kalender Konto/traits/SymconOAuthTrait.php');
 assertAccountStructure(
     is_string($accountSource)
         && str_contains($accountSource, 'new GoogleCalendarOriginPolicy()')
@@ -90,9 +96,10 @@ assertAccountStructure(
 );
 assertAccountStructure(
     is_string($googleOAuthSource)
-        && substr_count($googleOAuthSource, 'new GoogleOAuthOriginPolicy()') >= 2
+        && str_contains($googleOAuthSource, 'new GoogleOAuthOriginPolicy()')
         && is_string($microsoftOAuthSource)
-        && str_contains($microsoftOAuthSource, 'new SymconOAuthOriginPolicy()'),
+        && is_string($sharedOAuthSource)
+        && str_contains($sharedOAuthSource, 'new SymconOAuthOriginPolicy()'),
     'OAuth token and revocation requests must use fixed trusted-origin policies.'
 );
 assertAccountStructure(

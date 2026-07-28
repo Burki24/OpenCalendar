@@ -2,9 +2,7 @@
 
 declare(strict_types=1);
 
-use IPSKalender\MicrosoftOAuthClient;
-use IPSKalender\MicrosoftOAuthException;
-use IPSKalender\SymconOAuthOriginPolicy;
+use IPSKalender\SymconOAuthException;
 
 trait KalenderKontoMicrosoftOAuthTrait
 {
@@ -16,15 +14,20 @@ trait KalenderKontoMicrosoftOAuthTrait
     public function ConnectMicrosoft(): string
     {
         try {
-            $this->assertMicrosoftConnectAvailable();
+            $this->assertSymconConnectAvailable();
             if (!$this->RegisterOAuth(self::MICROSOFT_OAUTH_IDENTIFIER)) {
-                throw new MicrosoftOAuthException('Microsoft OAuth could not be registered in Symcon.');
+                throw new SymconOAuthException('Microsoft OAuth could not be registered in Symcon.');
             }
 
             $this->SetBuffer('MicrosoftAccessToken', '');
+            $this->WriteAttributeInteger('PendingOAuthProvider', self::PROVIDER_MICROSOFT);
 
-            return $this->createMicrosoftOAuthClient()->getAuthorizationUrl((string) IPS_GetLicensee());
+            return $this->createSymconOAuthClient(
+                self::MICROSOFT_OAUTH_IDENTIFIER,
+                'Microsoft 365'
+            )->getAuthorizationUrl((string) IPS_GetLicensee());
         } catch (Throwable $exception) {
+            $this->WriteAttributeInteger('PendingOAuthProvider', -1);
             return $this->Translate('Microsoft authorization could not be started') . ': '
                 . $this->handleProviderError($exception);
         }
@@ -39,6 +42,7 @@ trait KalenderKontoMicrosoftOAuthTrait
     {
         $this->WriteAttributeString('MicrosoftRefreshToken', '');
         $this->WriteAttributeString('MicrosoftAccount', '');
+        $this->WriteAttributeInteger('PendingOAuthProvider', -1);
         $this->SetBuffer('MicrosoftAccessToken', '');
         $this->ClearCache();
         $this->SetStatus($this->ReadPropertyBoolean('Active') ? self::STATUS_CONFIGURATION_MISSING : IS_INACTIVE);
@@ -48,20 +52,21 @@ trait KalenderKontoMicrosoftOAuthTrait
     }
 
     /**
-     * Receives the Microsoft authorization code forwarded by Symcon OAuth.
+     * Handles a Microsoft callback forwarded by the native Symcon OAuth handler.
      */
-    protected function ProcessOAuthData(): void
+    private function processMicrosoftOAuthData(): void
     {
         try {
-            $oauthData = $this->readMicrosoftOAuthData();
+            $oauthData = $this->readSymconOAuthData();
             $error = trim((string) ($oauthData['error_description'] ?? $oauthData['error'] ?? ''));
             if ($error !== '') {
-                throw new MicrosoftOAuthException($error);
+                throw new SymconOAuthException($error);
             }
 
-            $tokens = $this->createMicrosoftOAuthClient()->exchangeAuthorizationCode(
-                (string) ($oauthData['code'] ?? '')
-            );
+            $tokens = $this->createSymconOAuthClient(
+                self::MICROSOFT_OAUTH_IDENTIFIER,
+                'Microsoft 365'
+            )->exchangeAuthorizationCode((string) ($oauthData['code'] ?? ''));
             $this->storeMicrosoftTokens($tokens);
             $this->WriteAttributeString('MicrosoftAccount', '');
             $this->WriteAttributeString('LastError', '');
@@ -85,7 +90,7 @@ trait KalenderKontoMicrosoftOAuthTrait
     private function getMicrosoftAccessToken(): string
     {
         if (!$this->isMicrosoftConnected()) {
-            throw new MicrosoftOAuthException('Microsoft 365 is not connected yet.');
+            throw new SymconOAuthException('Microsoft 365 is not connected yet.');
         }
 
         $cached = json_decode($this->GetBuffer('MicrosoftAccessToken'), true);
@@ -95,9 +100,10 @@ trait KalenderKontoMicrosoftOAuthTrait
             return (string) $cached['token'];
         }
 
-        $tokens = $this->createMicrosoftOAuthClient()->refreshAccessToken(
-            $this->ReadAttributeString('MicrosoftRefreshToken')
-        );
+        $tokens = $this->createSymconOAuthClient(
+            self::MICROSOFT_OAUTH_IDENTIFIER,
+            'Microsoft 365'
+        )->refreshAccessToken($this->ReadAttributeString('MicrosoftRefreshToken'));
         $this->storeMicrosoftTokens($tokens);
 
         return $tokens['accessToken'];
@@ -117,14 +123,6 @@ trait KalenderKontoMicrosoftOAuthTrait
         ));
     }
 
-    private function createMicrosoftOAuthClient(): MicrosoftOAuthClient
-    {
-        return new MicrosoftOAuthClient(
-            $this->createTrustedCloudHttpClient(new SymconOAuthOriginPolicy()),
-            self::MICROSOFT_OAUTH_IDENTIFIER
-        );
-    }
-
     private function isMicrosoftConnected(): bool
     {
         return trim($this->ReadAttributeString('MicrosoftRefreshToken')) !== '';
@@ -137,60 +135,9 @@ trait KalenderKontoMicrosoftOAuthTrait
         }
 
         $account = trim($this->ReadAttributeString('MicrosoftAccount'));
+
         return $account !== ''
             ? sprintf($this->Translate('Connected with %s.'), $account)
             : $this->Translate('Microsoft account is connected.');
-    }
-
-    private function assertMicrosoftConnectAvailable(): void
-    {
-        foreach (IPS_GetInstanceListByModuleID(self::CONNECT_CONTROL_MODULE_ID) as $connectId) {
-            $instance = IPS_GetInstance($connectId);
-            if ((int) ($instance['InstanceStatus'] ?? 0) === IS_ACTIVE) {
-                return;
-            }
-        }
-
-        throw new MicrosoftOAuthException('An active Symcon Connect connection is required for Microsoft OAuth.');
-    }
-
-    /**
-     * @return array<string, string>
-     */
-    private function readMicrosoftOAuthData(): array
-    {
-        $rawInput = trim((string) file_get_contents('php://input'));
-        $data = [];
-
-        if ($rawInput !== '') {
-            $decoded = json_decode($rawInput, true);
-            if (is_array($decoded)) {
-                foreach ($decoded as $key => $value) {
-                    if (is_scalar($value)) {
-                        $data[(string) $key] = (string) $value;
-                    }
-                }
-            } elseif (str_contains($rawInput, 'code=') || str_contains($rawInput, 'error=')) {
-                $formData = [];
-                parse_str($rawInput, $formData);
-                foreach ($formData as $key => $value) {
-                    if (is_scalar($value)) {
-                        $data[(string) $key] = (string) $value;
-                    }
-                }
-            } else {
-                $data['code'] = $rawInput;
-            }
-        }
-
-        foreach (['code', 'error', 'error_description'] as $key) {
-            if (isset($_GET[$key]) && is_scalar($_GET[$key])) {
-                $data[$key] = (string) $_GET[$key];
-            } elseif (isset($_POST[$key]) && is_scalar($_POST[$key])) {
-                $data[$key] = (string) $_POST[$key];
-            }
-        }
-
-        return $data;
     }
 }

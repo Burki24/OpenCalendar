@@ -22,7 +22,7 @@ Das Modul verwaltet die Verbindung zu einem Online-Kalenderkonto und stellt die 
 - Symcon ab Version 9.0
 - PHP-Erweiterungen cURL und DOM
 - Zugriff des Symcon-Servers auf den jeweiligen Kalenderdienst
-- für Google Calendar eine aktive Symcon-Connect-Verbindung und ein persönlicher Google-OAuth-Webclient
+- für Google Calendar eine aktive Symcon-Connect-Verbindung; keine eigenen OAuth-Zugangsdaten des Anwenders
 - für Microsoft 365/Outlook.com eine aktive Symcon-Connect-Verbindung; keine eigenen OAuth-Zugangsdaten des Anwenders
 
 Für Apple iCloud wird ein anwendungsspezifisches Passwort benötigt. Das normale Kennwort des Apple Accounts sollte nicht verwendet werden.
@@ -39,8 +39,6 @@ Server-URL | Bei Apple vorbelegt; ansonsten URL des CalDAV-Servers. Bei ICS/Webc
 Kalendername | Optionale Bezeichnung des bisherigen einzelnen iCalendar-Abonnements
 Benutzername | Benutzername beziehungsweise E-Mail-Adresse des Kontos; beim bisherigen einzelnen iCalendar-Abonnement optional
 Passwort | Passwort oder anwendungsspezifisches Passwort; beim bisherigen einzelnen iCalendar-Abonnement optional
-Google-OAuth-Client-ID | Client-ID des persönlichen Google-OAuth-Webclients
-Google-OAuth-Clientschlüssel | Clientschlüssel des persönlichen Google-OAuth-Webclients
 iCalendar-Abonnements | Liste zusätzlicher Feeds mit Aktivierung, Name, URL, optionalen Zugangsdaten, Titelübersetzung, Aktualisierungsplan und optionaler Farbe
 Aktualisierungsplan | Vorgegebener Rhythmus von fünf Minuten bis jährlich oder ausschließlich manuelle Synchronisation; bei ICS/Webcal steuert er die erneute Kontosuche
 Benutzerdefiniertes Intervall | Eigener Abstand in Minuten; wird nur beim Zeitplan „Benutzerdefiniertes Intervall“ angezeigt
@@ -55,10 +53,10 @@ Bestehende Instanzen behalten ihren bisherigen Minutenwert als benutzerdefiniert
 
 Das Konto-Modul verarbeitet Zugangsdaten, OAuth-Tokens sowie Kalender- und
 Termindaten. Die Daten werden grundsätzlich lokal in Symcon gespeichert oder
-zwischengespeichert. Google OAuth verwendet den persönlichen OAuth-Client des
-Anwenders und Symcon Connect für den Callback. Microsoft OAuth verwendet den
-zentralen Symcon-OAuth-Dienst; die eigentlichen Microsoft-Kalenderdaten werden
-direkt zwischen Symcon und Microsoft Graph übertragen.
+zwischengespeichert. Google und Microsoft verwenden den zentralen
+Symcon-OAuth-Dienst. Die eigentlichen Kalenderdaten werden direkt zwischen der
+Symcon-Installation und Google Calendar beziehungsweise Microsoft Graph
+übertragen.
 
 Ausführliche Angaben zu Datenarten, Speicherung, Löschung und Drittanbietern
 finden sich in den [Datenschutzhinweisen](../PRIVACY.md). Vor dem Verbinden eines
@@ -67,40 +65,43 @@ externen Kontos sollten diese Hinweise gelesen werden.
 ### Google Calendar
 
 Nach Auswahl von **Google Calendar** werden Server-URL, Benutzername und
-Passwort ausgeblendet. Stattdessen zeigt die Instanz eine eindeutige
-Weiterleitungs-URI sowie Eingabefelder für die persönliche Google-OAuth-Client-ID
-und den Clientschlüssel an. Die Weiterleitungs-URI enthält die Instanz-ID und
-darf deshalb nur für genau dieses Kalender Konto verwendet werden.
+Passwort ausgeblendet. Eine eigene Client-ID oder ein Clientschlüssel ist nicht
+erforderlich. Mit **Google-Konto verbinden** öffnet Symcon den zentral
+registrierten OAuth-Ablauf im Browser.
 
 Einrichtung:
 
-1. In einem eigenen Google-Cloud-Projekt die **Google Calendar API** aktivieren.
-2. Den OAuth-Zustimmungsbildschirm konfigurieren und das Google-Konto während
-   des Testbetriebs als Testnutzer eintragen.
-3. Eine OAuth-Client-ID vom Typ **Webanwendung** erstellen.
-4. Die in Symcon angezeigte URI unverändert als autorisierte
-   Weiterleitungs-URI eintragen.
-5. Client-ID und Clientschlüssel in Symcon eintragen und die Konfiguration
-   übernehmen.
-6. **Google-Konto verbinden** aufrufen und die Freigabe bei Google bestätigen.
+1. Eine aktive Symcon-Connect-Verbindung sicherstellen.
+2. **Google-Konto verbinden** aufrufen.
+3. Bei Google anmelden und den Zugriff auf Kalenderliste und Termine bestätigen.
+4. Anschließend das Konto synchronisieren und die gefundenen Kalender über den
+   zugehörigen **Kalender Konfigurator** anlegen.
 
-Das Modul speichert den Refresh-Token intern und erneuert kurzlebige
-Access-Tokens automatisch. **Google-Konto trennen** widerruft den Token bei
-Google und entfernt die lokal gespeicherten Zugangsdaten.
+Das Modul speichert den benutzerspezifischen Refresh-Token intern und erneuert
+kurzlebige Access-Tokens über den Symcon-OAuth-Dienst automatisch.
+**Google-Konto trennen** widerruft den Token nach Möglichkeit bei Google und
+entfernt die lokal gespeicherten OAuth-Daten.
 
-Für die direkte Google-Cloud-Anbindung werden verwendet:
+Bestehende Verbindungen aus Versionen mit persönlicher Google-Client-ID müssen
+nach dem Modulupdate einmal über **Google-Konto verbinden** neu autorisiert
+werden. Das Modul erkennt solche älteren Tokens und verwendet sie nicht am
+zentralen Symcon-OAuth-Endpunkt.
 
-- Autorisierungs-Endpunkt: `https://accounts.google.com/o/oauth2/v2/auth`
-- Token-Endpunkt: `https://oauth2.googleapis.com/token`
-- Redirect-URL: persönliche Symcon-Connect-Adresse mit dem instanzspezifischen Pfad `/hook/ips-kalender-google-{InstanzID}`
-- Scopes: `https://www.googleapis.com/auth/calendar.calendarlist.readonly` und `https://www.googleapis.com/auth/calendar.events`
-- Offline-Zugriff, damit Google einen Refresh-Token ausstellt
+Der zentrale Google-Client verwendet die Redirect-URI
+`https://oauth.ipmagic.de/forward/opencalendar_google` und die Scopes
+`https://www.googleapis.com/auth/calendar.calendarlist.readonly` sowie
+`https://www.googleapis.com/auth/calendar.events`. Der Identifier
+`opencalendar_google` muss einmalig vom Modulautor beim Symcon-OAuth-Dienst
+registriert werden. Die gegebenenfalls notwendige Google-Verifizierung richtet
+sich nach Nutzerkreis und angeforderten Berechtigungen. Da die Redirect-URI auf
+der Symcon-Domain `ipmagic.de` liegt, ist die Einrichtung einschließlich der
+Google-Domainprüfung mit Symcon abzustimmen.
 
-Bei einem externen Zustimmungsbildschirm im Veröffentlichungsstatus **Test**
-läuft der Refresh-Token nach sieben Tagen ab. Für den dauerhaften Betrieb muss
-der Zustimmungsbildschirm deshalb auf **In Produktion** gestellt werden. Eine
-gegebenenfalls notwendige Google-Verifizierung richtet sich nach Nutzerkreis
-und angeforderten Berechtigungen.
+Eine externe Google-App im Status **Testing** eignet sich nur für die
+Entwicklung: Das verwendete Google-Konto muss als Testnutzer eingetragen sein
+und das Refresh-Token läuft bei den angeforderten Kalenderscopes nach sieben
+Tagen ab. Für den dauerhaften Einsatz muss die App in den Produktivstatus
+überführt und gegebenenfalls von Google verifiziert werden.
 
 Kalender mit den Google-Rollen `owner` und `writer` werden als les- und schreibbar erkannt. `reader` wird schreibgeschützt angeboten. Einträge mit ausschließlich `freeBusyReader` werden nicht angelegt, weil sie keine Termindetails liefern.
 
@@ -254,7 +255,6 @@ string IPSKALACC_GetCalendars(int $InstanzID);
 string IPSKALACC_GetAccountStatus(int $InstanzID);
 void IPSKALACC_ClearCache(int $InstanzID);
 string IPSKALACC_ConnectGoogle(int $InstanzID);
-string IPSKALACC_GetGoogleRedirectURI(int $InstanzID);
 bool IPSKALACC_DisconnectGoogle(int $InstanzID);
 string IPSKALACC_ConnectMicrosoft(int $InstanzID);
 bool IPSKALACC_DisconnectMicrosoft(int $InstanzID);

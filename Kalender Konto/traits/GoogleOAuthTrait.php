@@ -2,49 +2,35 @@
 
 declare(strict_types=1);
 
-use IPSKalender\GoogleOAuthClient;
-use IPSKalender\GoogleOAuthException;
 use IPSKalender\GoogleOAuthOriginPolicy;
+use IPSKalender\SymconOAuthException;
 
 trait KalenderKontoGoogleOAuthTrait
 {
     /**
-     * Starts the Google OAuth flow and returns the authorization URL.
+     * Starts Google authorization through the native Symcon OAuth handler.
      *
      * @return string Authorization URL, or a localized error message when startup fails.
      */
     public function ConnectGoogle(): string
     {
         try {
-            $state = bin2hex(random_bytes(32));
-            $this->WriteAttributeString(
-                'GoogleOAuthState',
-                json_encode(
-                    ['value' => $state, 'createdAt' => time()],
-                    JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR
-                )
-            );
-            $this->SetBuffer('GoogleAccessToken', '');
+            $this->assertSymconConnectAvailable();
+            if (!$this->RegisterOAuth(self::GOOGLE_OAUTH_IDENTIFIER)) {
+                throw new SymconOAuthException('Google OAuth could not be registered in Symcon.');
+            }
 
-            return $this->createGoogleOAuthClient()->getAuthorizationUrl($state);
+            $this->SetBuffer('GoogleAccessToken', '');
+            $this->WriteAttributeInteger('PendingOAuthProvider', self::PROVIDER_GOOGLE);
+
+            return $this->createSymconOAuthClient(
+                self::GOOGLE_OAUTH_IDENTIFIER,
+                'Google Calendar'
+            )->getAuthorizationUrl((string) IPS_GetLicensee());
         } catch (Throwable $exception) {
-            $this->WriteAttributeString('GoogleOAuthState', '');
+            $this->WriteAttributeInteger('PendingOAuthProvider', -1);
             return $this->Translate('Google authorization could not be started') . ': '
                 . $this->handleProviderError($exception);
-        }
-    }
-
-    /**
-     * Returns the Symcon Connect callback URI used for Google OAuth.
-     *
-     * @return string Redirect URI, or a localized error message when it is unavailable.
-     */
-    public function GetGoogleRedirectURI(): string
-    {
-        try {
-            return $this->googleOAuthRedirectUri();
-        } catch (Throwable $exception) {
-            return $this->translateErrorMessage($exception->getMessage());
         }
     }
 
@@ -73,7 +59,7 @@ trait KalenderKontoGoogleOAuthTrait
         $this->WriteAttributeString('GoogleRefreshToken', '');
         $this->WriteAttributeString('GoogleAccount', '');
         $this->WriteAttributeString('GoogleTokenClientID', '');
-        $this->WriteAttributeString('GoogleOAuthState', '');
+        $this->WriteAttributeInteger('PendingOAuthProvider', -1);
         $this->SetBuffer('GoogleAccessToken', '');
         $this->ClearCache();
         $this->SetStatus($this->ReadPropertyBoolean('Active') ? self::STATUS_CONFIGURATION_MISSING : IS_INACTIVE);
@@ -82,36 +68,29 @@ trait KalenderKontoGoogleOAuthTrait
         return true;
     }
 
-    protected function ProcessHookData(): void
+    /**
+     * Handles a Google callback forwarded by the native Symcon OAuth handler.
+     */
+    private function processGoogleOAuthData(): void
     {
         try {
-            if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'GET') {
-                throw new GoogleOAuthException('Unsupported OAuth callback method.');
+            $oauthData = $this->readSymconOAuthData();
+            $error = trim((string) ($oauthData['error_description'] ?? $oauthData['error'] ?? ''));
+            if ($error !== '') {
+                throw new SymconOAuthException($error);
             }
 
-            $storedState = json_decode($this->ReadAttributeString('GoogleOAuthState'), true);
-            $receivedState = trim((string) ($_GET['state'] ?? ''));
-            if (!is_array($storedState)
-                || trim((string) ($storedState['value'] ?? '')) === ''
-                || $receivedState === ''
-                || !hash_equals((string) $storedState['value'], $receivedState)
-                || (int) ($storedState['createdAt'] ?? 0) < time() - self::GOOGLE_OAUTH_STATE_TTL) {
-                throw new GoogleOAuthException('The Google OAuth state is invalid or has expired.');
-            }
-            $this->WriteAttributeString('GoogleOAuthState', '');
-
-            $oauthError = trim((string) ($_GET['error_description'] ?? $_GET['error'] ?? ''));
-            if ($oauthError !== '') {
-                throw new GoogleOAuthException($oauthError);
-            }
-
-            $tokens = $this->createGoogleOAuthClient()->exchangeAuthorizationCode(
-                (string) ($_GET['code'] ?? '')
-            );
+            $tokens = $this->createSymconOAuthClient(
+                self::GOOGLE_OAUTH_IDENTIFIER,
+                'Google Calendar'
+            )->exchangeAuthorizationCode((string) ($oauthData['code'] ?? ''));
             $this->storeGoogleTokens($tokens);
+            $this->WriteAttributeString('GoogleAccount', '');
             $this->WriteAttributeString('LastError', '');
+            $this->ClearCache();
             $this->SetStatus($this->ReadPropertyBoolean('Active') ? IS_ACTIVE : IS_INACTIVE);
             $this->ReloadForm();
+
             $this->SendHtmlTextResponse(
                 200,
                 $this->Translate('Google Calendar was connected successfully. You can close this window.')
@@ -128,7 +107,7 @@ trait KalenderKontoGoogleOAuthTrait
     private function getGoogleAccessToken(): string
     {
         if (!$this->isGoogleConnected()) {
-            throw new GoogleOAuthException('Google Calendar is not connected yet.');
+            throw new SymconOAuthException('Google Calendar is not connected yet.');
         }
 
         $cached = json_decode($this->GetBuffer('GoogleAccessToken'), true);
@@ -138,10 +117,12 @@ trait KalenderKontoGoogleOAuthTrait
             return (string) $cached['token'];
         }
 
-        $tokens = $this->createGoogleOAuthClient()->refreshAccessToken(
-            $this->ReadAttributeString('GoogleRefreshToken')
-        );
+        $tokens = $this->createSymconOAuthClient(
+            self::GOOGLE_OAUTH_IDENTIFIER,
+            'Google Calendar'
+        )->refreshAccessToken($this->ReadAttributeString('GoogleRefreshToken'));
         $this->storeGoogleTokens($tokens);
+
         return $tokens['accessToken'];
     }
 
@@ -153,83 +134,33 @@ trait KalenderKontoGoogleOAuthTrait
         if ($tokens['refreshToken'] !== '') {
             $this->WriteAttributeString('GoogleRefreshToken', $tokens['refreshToken']);
         }
-        $this->WriteAttributeString(
-            'GoogleTokenClientID',
-            trim($this->ReadPropertyString('GoogleClientID'))
-        );
+
+        // An empty legacy client marker identifies tokens issued by the central Symcon OAuth application.
+        $this->WriteAttributeString('GoogleTokenClientID', '');
         $this->SetBuffer('GoogleAccessToken', json_encode(
             ['token' => $tokens['accessToken'], 'expiresAt' => $tokens['expiresAt']],
             JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR
         ));
     }
 
-    private function createGoogleOAuthClient(): GoogleOAuthClient
-    {
-        return new GoogleOAuthClient(
-            $this->createTrustedCloudHttpClient(new GoogleOAuthOriginPolicy()),
-            trim($this->ReadPropertyString('GoogleClientID')),
-            $this->ReadPropertyString('GoogleClientSecret'),
-            $this->googleOAuthRedirectUri()
-        );
-    }
-
-    private function googleOAuthHookAddress(): string
-    {
-        return self::GOOGLE_OAUTH_HOOK_PREFIX . $this->InstanceID;
-    }
-
-    private function googleOAuthRedirectUri(): string
-    {
-        foreach (IPS_GetInstanceListByModuleID(self::CONNECT_CONTROL_MODULE_ID) as $connectId) {
-            $instance = IPS_GetInstance($connectId);
-            if ((int) ($instance['InstanceStatus'] ?? 0) !== IS_ACTIVE) {
-                continue;
-            }
-
-            $connectUrl = trim((string) CC_GetConnectURL($connectId));
-            if (filter_var($connectUrl, FILTER_VALIDATE_URL) === false
-                || strtolower((string) parse_url($connectUrl, PHP_URL_SCHEME)) !== 'https') {
-                continue;
-            }
-
-            return rtrim($connectUrl, '/') . '/hook/' . rawurlencode($this->googleOAuthHookAddress());
-        }
-
-        throw new GoogleOAuthException('An active Symcon Connect connection is required for Google OAuth.');
-    }
-
-    private function googleRedirectUriText(): string
-    {
-        try {
-            return sprintf(
-                $this->Translate('Authorized redirect URI: %s'),
-                $this->googleOAuthRedirectUri()
-            );
-        } catch (Throwable $exception) {
-            return $this->Translate('Authorized redirect URI is unavailable') . ': '
-                . $this->translateErrorMessage($exception->getMessage());
-        }
-    }
-
     private function isGoogleConnected(): bool
     {
-        $clientId = trim($this->ReadPropertyString('GoogleClientID'));
-
-        return $clientId !== ''
-            && trim($this->ReadAttributeString('GoogleRefreshToken')) !== ''
-            && hash_equals($clientId, $this->ReadAttributeString('GoogleTokenClientID'));
+        return trim($this->ReadAttributeString('GoogleRefreshToken')) !== ''
+            && trim($this->ReadAttributeString('GoogleTokenClientID')) === '';
     }
 
     private function googleStatusText(): string
     {
-        if (trim($this->ReadPropertyString('GoogleClientID')) === ''
-            || $this->ReadPropertyString('GoogleClientSecret') === '') {
-            return $this->Translate('Enter your personal Google OAuth client credentials.');
-        }
         if (!$this->isGoogleConnected()) {
+            if (trim($this->ReadAttributeString('GoogleTokenClientID')) !== '') {
+                return $this->Translate('Reconnect the Google account to migrate it to Symcon OAuth.');
+            }
+
             return $this->Translate('Google account is not connected.');
         }
+
         $account = trim($this->ReadAttributeString('GoogleAccount'));
+
         return $account !== ''
             ? sprintf($this->Translate('Connected with %s.'), $account)
             : $this->Translate('Google account is connected.');

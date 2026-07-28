@@ -9,40 +9,44 @@ use Throwable;
 
 require_once __DIR__ . '/CalendarHttpClient.php';
 
-final class MicrosoftOAuthException extends RuntimeException
+final class SymconOAuthException extends RuntimeException
 {
 }
 
 /**
- * OAuth client for Microsoft authorization routed through the Symcon OAuth service.
+ * OAuth client for provider authorizations routed through the Symcon OAuth service.
  *
- * The Microsoft application secret stays on the Symcon OAuth backend. OpenCalendar
- * only stores the user-specific refresh token returned for the connected account.
+ * Provider application secrets stay on the Symcon OAuth backend. OpenCalendar
+ * only stores the user-specific refresh token returned for a connected account.
  */
-final class MicrosoftOAuthClient
+final class SymconOAuthClient
 {
     private const OAUTH_BASE_URL = 'https://oauth.ipmagic.de';
 
     /**
-     * Creates a Microsoft OAuth client for the centrally registered Symcon OAuth identifier.
+     * Creates a client for one centrally registered Symcon OAuth identifier.
      */
     public function __construct(
         private readonly CalendarHttpClientInterface $httpClient,
-        private readonly string $identifier
+        private readonly string $identifier,
+        private readonly string $providerName
     ) {
         if (preg_match('/^[a-z0-9_]+$/', $this->identifier) !== 1) {
-            throw new MicrosoftOAuthException('The Microsoft OAuth identifier is invalid.');
+            throw new SymconOAuthException('The Symcon OAuth identifier is invalid.');
+        }
+        if (trim($this->providerName) === '') {
+            throw new SymconOAuthException('The OAuth provider name is missing.');
         }
     }
 
     /**
-     * Returns the Symcon OAuth authorization URL for the current Symcon license account.
+     * Returns the authorization URL for the current Symcon license account.
      */
     public function getAuthorizationUrl(string $licensee): string
     {
         $licensee = trim($licensee);
         if ($licensee === '') {
-            throw new MicrosoftOAuthException('The Symcon license account is unavailable.');
+            throw new SymconOAuthException('The Symcon license account is unavailable.');
         }
 
         return self::OAUTH_BASE_URL . '/authorize/' . rawurlencode($this->identifier) . '?' . http_build_query(
@@ -54,7 +58,7 @@ final class MicrosoftOAuthClient
     }
 
     /**
-     * Exchanges the authorization code forwarded by the Symcon OAuth Control.
+     * Exchanges the authorization code forwarded by Symcon OAuth.
      *
      * @return array{accessToken: string, refreshToken: string, expiresAt: int}
      */
@@ -62,14 +66,14 @@ final class MicrosoftOAuthClient
     {
         $code = trim($code);
         if ($code === '') {
-            throw new MicrosoftOAuthException('The authorization code is missing.');
+            throw new SymconOAuthException('The authorization code is missing.');
         }
 
         return $this->requestToken(['code' => $code], true);
     }
 
     /**
-     * Refreshes a Microsoft access token through the Symcon OAuth service.
+     * Refreshes an access token through the Symcon OAuth service.
      *
      * @return array{accessToken: string, refreshToken: string, expiresAt: int}
      */
@@ -77,7 +81,7 @@ final class MicrosoftOAuthClient
     {
         $refreshToken = trim($refreshToken);
         if ($refreshToken === '') {
-            throw new MicrosoftOAuthException('Microsoft 365 is not connected yet.');
+            throw new SymconOAuthException($this->providerName . ' is not connected yet.');
         }
 
         return $this->requestToken(['refresh_token' => $refreshToken], false, $refreshToken);
@@ -105,16 +109,20 @@ final class MicrosoftOAuthClient
         try {
             $data = json_decode($response->body, true, 512, JSON_THROW_ON_ERROR);
         } catch (Throwable) {
-            throw new MicrosoftOAuthException('Symcon OAuth returned an invalid Microsoft token response.');
+            throw new SymconOAuthException(
+                'Symcon OAuth returned an invalid token response for ' . $this->providerName . '.'
+            );
         }
         if (!is_array($data)) {
-            throw new MicrosoftOAuthException('Symcon OAuth returned an invalid Microsoft token response.');
+            throw new SymconOAuthException(
+                'Symcon OAuth returned an invalid token response for ' . $this->providerName . '.'
+            );
         }
 
         if ($response->statusCode < 200 || $response->statusCode >= 300 || isset($data['error'])) {
             $message = trim((string) ($data['error_description'] ?? $data['error'] ?? ''));
-            throw new MicrosoftOAuthException(
-                $message !== '' ? $message : 'The Microsoft OAuth token request failed.'
+            throw new SymconOAuthException(
+                $message !== '' ? $message : $this->providerName . ' OAuth token request failed.'
             );
         }
 
@@ -122,11 +130,11 @@ final class MicrosoftOAuthClient
         $tokenType = strtolower(trim((string) ($data['token_type'] ?? 'bearer')));
         $refreshToken = trim((string) ($data['refresh_token'] ?? $currentRefreshToken));
         if ($accessToken === '' || $tokenType !== 'bearer') {
-            throw new MicrosoftOAuthException('Microsoft did not return a Bearer access token.');
+            throw new SymconOAuthException($this->providerName . ' did not return a Bearer access token.');
         }
         if ($requireRefreshToken && $refreshToken === '') {
-            throw new MicrosoftOAuthException(
-                'Microsoft did not return a refresh token. Disconnect the account and connect it again.'
+            throw new SymconOAuthException(
+                $this->providerName . ' did not return a refresh token. Disconnect the account and connect it again.'
             );
         }
 

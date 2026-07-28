@@ -36,52 +36,64 @@ Vor dem Verbinden eines externen Kontos sollten die
 [Nutzungsbedingungen](TERMS.md) sowie die Bedingungen der jeweils verwendeten
 Drittanbieter.
 
-## Persönliches Google OAuth einrichten
+## Google Calendar verbinden
 
-Die Google-Anbindung verwendet bewusst **keinen zentralen OAuth-Dienst des
-Modulautors**. Jeder Anwender hinterlegt seinen eigenen Google-OAuth-Client im
-jeweiligen **Kalender Konto**. Zugangsdaten und Aktualisierungstoken bleiben
-dadurch in der eigenen Symcon-Installation.
+Die Google-Anbindung verwendet den zentral registrierten OAuth-Dienst von
+Symcon. Anwender benötigen keine eigene Google-Client-ID und keinen
+Clientschlüssel. Voraussetzung ist lediglich eine aktive
+**Symcon-Connect-Verbindung**.
 
-Voraussetzungen sind eine aktive Symcon-Connect-Verbindung und ein eigenes
-Projekt in der [Google Cloud Console](https://console.cloud.google.com/).
+Im **Kalender Konto** wird als Anbieter **Google Calendar** gewählt und
+anschließend **Google-Konto verbinden** aufgerufen. Nach der Anmeldung und
+Zustimmung bei Google genügt **Jetzt synchronisieren**. Die gefundenen Kalender
+werden danach über den zugehörigen **Kalender Konfigurator** angelegt.
 
-1. Im Google-Cloud-Projekt die **Google Calendar API** aktivieren.
-2. Den OAuth-Zustimmungsbildschirm konfigurieren. Während des Testbetriebs das
-   gewünschte Google-Konto als Testnutzer eintragen.
-3. In Symcon ein **Kalender Konto** öffnen, als Anbieter
-   **Google Calendar** wählen und die angezeigte autorisierte
-   Weiterleitungs-URI kopieren.
-4. In Google unter **APIs und Dienste → Anmeldedaten** eine OAuth-Client-ID vom
-   Anwendungstyp **Webanwendung** erstellen.
-5. Die von Symcon angezeigte URI unverändert als **Autorisierte
-   Weiterleitungs-URI** eintragen. Schema, Host, Pfad und Groß-/Kleinschreibung
-   müssen exakt übereinstimmen.
-6. Client-ID und Clientschlüssel in das Kalender Konto eintragen und die
-   Änderungen übernehmen.
-7. **Google-Konto verbinden** wählen, die Google-Freigabe bestätigen und danach
-   das Konto synchronisieren.
-8. Die gefundenen Kalender anschließend über den zugehörigen
-   **Kalender Konfigurator** anlegen.
+Eine mit einer älteren OpenCalendar-Version über einen persönlichen
+Google-OAuth-Client hergestellte Verbindung muss nach dem Update einmal neu
+verbunden werden. Der frühere persönliche Client wird danach nicht mehr
+verwendet.
 
-Bei einem externen OAuth-Zustimmungsbildschirm im Veröffentlichungsstatus
-**Test** laufen Aktualisierungstoken nach sieben Tagen ab. Für einen dauerhaft
-laufenden Kalender muss der Zustimmungsbildschirm deshalb später auf
-**In Produktion** gestellt werden. Für den persönlichen Einsatz kann Google
-dabei weiterhin einen Hinweis auf eine nicht verifizierte App anzeigen.
+OpenCalendar fordert nur
+`https://www.googleapis.com/auth/calendar.calendarlist.readonly` zum Auflisten
+der abonnierten Kalender sowie
+`https://www.googleapis.com/auth/calendar.events` zum Lesen und Verwalten von
+Terminen an. Das benutzerspezifische Aktualisierungstoken wird als internes
+Attribut der Kalender-Konto-Instanz gespeichert; kurzlebige Access-Tokens
+liegen nur im Instanzpuffer.
 
-Der OAuth-Client fordert nur die Berechtigungen zum Auflisten der Kalender
-sowie zum Lesen und Verwalten von Terminen an. Das Aktualisierungstoken wird
-lokal als internes Instanzattribut gespeichert; der Clientschlüssel liegt in
-der Symcon-Instanzkonfiguration. Konfigurationsdateien und Backups mit diesen
-Daten dürfen daher nicht veröffentlicht werden.
+### Einmalige Google-Freischaltung für Modulautoren
 
-Google dokumentiert den verwendeten
+Der gemeinsame Google-OAuth-Client wird einmalig außerhalb des Repositorys
+eingerichtet. Diese Einrichtung ist **nicht** von jedem Anwender durchzuführen:
+
+1. In einem Google-Cloud-Projekt die **Google Calendar API** aktivieren.
+2. Den OAuth-Zustimmungsbildschirm für eine externe Anwendung konfigurieren und
+   die beiden oben genannten Scopes eintragen.
+3. Eine OAuth-Client-ID vom Typ **Webanwendung** erstellen.
+4. Als autorisierte Redirect-URI
+   `https://oauth.ipmagic.de/forward/opencalendar_google` hinterlegen.
+5. Den Client unter dem Identifier `opencalendar_google` beim
+   Symcon-OAuth-Dienst registrieren lassen.
+6. Vor einer öffentlichen Nutzung die von Google für die angeforderten
+   Kalenderscopes verlangte OAuth-Verifizierung abschließen.
+
+Da die Redirect-URI auf der Symcon-Domain `ipmagic.de` liegt, muss die
+Einrichtung mit Symcon abgestimmt werden. Google erlaubt Redirect-Domains nur,
+wenn der Projektverantwortliche sie besitzt oder ausdrücklich verwenden darf;
+für die Google-Domainprüfung kann daher Unterstützung durch Symcon erforderlich
+sein.
+
+Für einen ersten Entwicklungstest kann die Google-App im Status **Testing**
+bleiben und das verwendete Google-Konto als Testnutzer eingetragen werden.
+Google lässt bei einer externen Test-App mit Kalenderscopes das Refresh-Token
+jedoch nach sieben Tagen ablaufen. Ein dauerhafter Betrieb setzt deshalb den
+Produktivstatus und die gegebenenfalls erforderliche Verifizierung voraus.
+
+Clientschlüssel und andere zentrale App-Zugangsdaten gehören **nicht** in das
+Repository. Google beschreibt den verwendeten
 [OAuth-Ablauf für Webserver-Anwendungen](https://developers.google.com/identity/protocols/oauth2/web-server)
-und die Einrichtung der
-[OAuth-Zugangsdaten](https://developers.google.com/workspace/guides/create-credentials#oauth-client-id)
-sowie das
-[Ablaufverhalten von Aktualisierungstoken](https://developers.google.com/identity/protocols/oauth2#expiration).
+und die
+[Kalenderberechtigungen](https://developers.google.com/workspace/calendar/api/auth).
 
 ## Microsoft 365 / Outlook.com verbinden
 

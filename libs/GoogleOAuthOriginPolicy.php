@@ -8,7 +8,7 @@ require_once __DIR__ . '/CalendarHttpOriginPolicyInterface.php';
 require_once __DIR__ . '/CalDAVOriginPolicy.php';
 
 /**
- * Restricts Google OAuth token and revocation requests to oauth2.googleapis.com.
+ * Restricts direct Google OAuth revocation requests to oauth2.googleapis.com.
  */
 final class GoogleOAuthOriginPolicy implements CalendarHttpOriginPolicyInterface
 {

@@ -1,6 +1,6 @@
 # Datenschutzhinweise / Privacy Notice
 
-**Stand / Last updated: 25.07.2026**
+**Stand / Last updated: 28.07.2026**
 
 OpenCalendar ist eine Open-Source-Bibliothek für Symcon. Die Kalenderverarbeitung findet grundsätzlich auf der Symcon-Installation des Anwenders statt. Der Modulautor betreibt keinen eigenen Kalender-Backenddienst und erhält über OpenCalendar keine Kalenderinhalte.
 
@@ -21,14 +21,14 @@ OpenCalendar enthält keine eigene Telemetrie, Werbung oder Nutzeranalyse. Kalen
 
 ## 2. Google Calendar
 
-Die Google-Anbindung verwendet einen persönlichen OAuth-Webclient des Anwenders. Client-ID und Clientschlüssel werden in der jeweiligen Symcon-Instanz konfiguriert.
+Die Google-Anbindung verwendet eine zentral registrierte Google-Anwendung und den OAuth-Dienst von Symcon. Anwender müssen keine eigene Client-ID und keinen eigenen Clientschlüssel hinterlegen.
 
 OpenCalendar fordert ausschließlich folgende Google-Berechtigungen an:
 
 - `https://www.googleapis.com/auth/calendar.calendarlist.readonly` zum Auflisten der Kalender,
 - `https://www.googleapis.com/auth/calendar.events` zum Lesen und Verwalten von Terminen.
 
-Der OAuth-Callback läuft über die persönliche Symcon-Connect-Adresse des Anwenders. Der Austausch von OAuth-Tokens und die Kalenderzugriffe erfolgen anschließend direkt zwischen der Symcon-Installation und Google. Das Google-Refresh-Token wird als internes, persistentes Symcon-Attribut gespeichert; kurzlebige Access-Tokens werden nur im Instanzpuffer gehalten.
+Für Anmeldung und Token-Aktualisierung werden OAuth-Daten über den Symcon-OAuth-Dienst unter `https://oauth.ipmagic.de` verarbeitet. Dazu gehören insbesondere Autorisierungscodes und Refresh-Tokens, die für den Austausch mit Google erforderlich sind. Die eigentlichen Kalender- und Termindaten werden von der Symcon-Installation direkt über `https://www.googleapis.com` mit Google Calendar ausgetauscht und nicht über einen Kalender-Backenddienst des Modulautors geleitet. Das Google-Refresh-Token wird als internes, persistentes Symcon-Attribut gespeichert; kurzlebige Access-Tokens werden nur im Instanzpuffer gehalten.
 
 Die von Google erhaltenen Kalenderdaten werden ausschließlich verwendet, um die vom Anwender eingerichteten Kalender in OpenCalendar zu synchronisieren, darzustellen und – soweit vom Anwender ausgelöst oder konfiguriert – zu verändern.
 
@@ -57,7 +57,7 @@ OpenCalendar speichert konfigurierte Zugangsdaten und URLs lokal in der Symcon-I
 
 ## 5. Symcon Connect und Symcon OAuth
 
-Google OAuth benötigt für den Callback eine aktive Symcon-Connect-Verbindung. Microsoft OAuth verwendet zusätzlich den zentralen Symcon-OAuth-Dienst. Diese Dienste werden von der Symcon GmbH betrieben und unterliegen deren eigenen Datenschutzbestimmungen.
+Google und Microsoft OAuth benötigen eine aktive Symcon-Connect-Verbindung und verwenden den zentralen Symcon-OAuth-Dienst. Diese Dienste werden von der Symcon GmbH betrieben und unterliegen deren eigenen Datenschutzbestimmungen.
 
 OpenCalendar hat keinen Zugriff auf serverseitige Protokolle oder andere Daten, die Symcon im Rahmen dieser Dienste verarbeitet.
 
@@ -103,12 +103,12 @@ OpenCalendar contains no proprietary telemetry, advertising or user analytics. C
 
 ## 2. Google Calendar
 
-Google integration uses a personal OAuth web client configured by the user. The requested scopes are limited to:
+Google integration uses a centrally registered Google application and the Symcon OAuth service. Users do not have to provide their own client ID or client secret. The requested scopes are limited to:
 
 - `https://www.googleapis.com/auth/calendar.calendarlist.readonly`,
 - `https://www.googleapis.com/auth/calendar.events`.
 
-The OAuth callback is routed through the user's personal Symcon Connect address. Token exchange and Calendar API access then take place directly between the Symcon installation and Google. The Google refresh token is stored as an internal persistent Symcon attribute; short-lived access tokens are held only in the instance buffer.
+OAuth authorization codes and refresh tokens required for sign-in and token renewal are processed through the Symcon OAuth service at `https://oauth.ipmagic.de`. Actual calendar and event data is exchanged directly between the user's Symcon installation and Google Calendar at `https://www.googleapis.com` and is not routed through a calendar backend operated by the module author. The Google refresh token is stored as an internal persistent Symcon attribute; short-lived access tokens are held only in the instance buffer.
 
 Google user data is used solely to synchronize, display and, where initiated or configured by the user, modify the calendars managed through OpenCalendar.
 
@@ -137,7 +137,7 @@ Configured credentials and URLs are stored locally in the Symcon installation. i
 
 ## 5. Symcon Connect and Symcon OAuth
 
-Google OAuth requires an active Symcon Connect connection for the callback. Microsoft OAuth additionally uses the central Symcon OAuth service. These services are operated by Symcon GmbH and are subject to Symcon's own privacy policy.
+Google and Microsoft OAuth require an active Symcon Connect connection and use the central Symcon OAuth service. These services are operated by Symcon GmbH and are subject to Symcon's own privacy policy.
 
 OpenCalendar has no access to server-side logs or other information processed by Symcon as part of these services.
 
