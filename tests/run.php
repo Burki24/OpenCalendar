@@ -1078,12 +1078,21 @@ $viewTemplateSource = file_get_contents(__DIR__ . '/../Kalender Ansicht/visualiz
 assertTrueValue(
     is_string($accountModuleSource)
         && str_contains($accountModuleSource, 'RegisterOAuth(self::GOOGLE_OAUTH_IDENTIFIER)')
+        && str_contains($accountModuleSource, 'RegisterOAuth(self::MICROSOFT_OAUTH_IDENTIFIER)')
+        && str_contains($accountModuleSource, 'RegisterMessage(0, IPS_KERNELSTARTED)')
+        && str_contains($accountModuleSource, 'IPS_GetKernelRunlevel() === KR_READY')
+        && preg_match(
+            '/public function Create\(\): void[\s\S]*?public function GetConfigurationForm/',
+            $accountModuleSource,
+            $accountCreateMethod
+        ) === 1
+        && !str_contains($accountCreateMethod[0], 'RegisterOAuth(')
         && !str_contains($accountModuleSource, "RegisterPropertyString('GoogleClientID'")
         && !str_contains($accountModuleSource, "RegisterPropertyString('GoogleClientSecret'")
         && !str_contains($accountModuleSource, 'RegisterHook(')
         && is_string($accountGoogleOAuthSource)
         && str_contains($accountGoogleOAuthSource, 'private function processGoogleOAuthData(): void'),
-    'Google OAuth must use the native shared Symcon handler without per-user client credentials.'
+    'OAuth handlers must be registered after kernel readiness without per-user client credentials.'
 );
 assertTrueValue(
     is_string($calendarModuleSource)

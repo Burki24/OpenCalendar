@@ -79,12 +79,13 @@ class KalenderKonto extends IPSModuleStrict
     private const STATUS_INVALID_RESPONSE = 205;
 
     /**
-     * Registers account properties, provider state, cache attributes, timers, and OAuth handlers.
+     * Registers account properties, provider state, cache attributes, timers, and kernel messages.
      */
     public function Create(): void
     {
         parent::Create();
 
+        $this->RegisterMessage(0, IPS_KERNELSTARTED);
         $this->RegisterPropertyBoolean('Active', false);
         $this->RegisterPropertyInteger('Provider', self::PROVIDER_APPLE);
         $this->RegisterPropertyString('ServerURL', self::APPLE_CALDAV_URL);
@@ -111,8 +112,6 @@ class KalenderKonto extends IPSModuleStrict
         $this->RegisterAttributeInteger('PendingOAuthProvider', -1);
 
         $this->RegisterTimer('SynchronizationTimer', 0, 'IPSKALACC_ScheduledSynchronize($_IPS[\'TARGET\']);');
-        $this->RegisterOAuth(self::GOOGLE_OAUTH_IDENTIFIER);
-        $this->RegisterOAuth(self::MICROSOFT_OAUTH_IDENTIFIER);
     }
 
     /**
@@ -276,6 +275,18 @@ class KalenderKonto extends IPSModuleStrict
     }
 
     /**
+     * Registers the native OAuth callbacks once all Symcon instance interfaces are available.
+     *
+     * @param array<int, mixed> $Data Message payload supplied by Symcon.
+     */
+    public function MessageSink(int $TimeStamp, int $SenderID, int $Message, array $Data): void
+    {
+        if ($SenderID === 0 && $Message === IPS_KERNELSTARTED) {
+            $this->registerOAuthHandlers();
+        }
+    }
+
+    /**
      * Routes a native Symcon OAuth callback to the provider configured for this account.
      */
     protected function ProcessOAuthData(): void
@@ -365,6 +376,10 @@ class KalenderKonto extends IPSModuleStrict
         };
         $this->SetSummary($username !== '' ? $providerName . ' – ' . $username : $providerName);
 
+        if (IPS_GetKernelRunlevel() === KR_READY) {
+            $this->registerOAuthHandlers();
+        }
+
         if (!$this->ReadPropertyBoolean('Active')) {
             $this->SetTimerInterval('SynchronizationTimer', 0);
             $this->SetStatus(IS_INACTIVE);
@@ -387,6 +402,15 @@ class KalenderKonto extends IPSModuleStrict
             )
         );
         $this->SetStatus(IS_ACTIVE);
+    }
+
+    /**
+     * Registers shared Google and Microsoft OAuth endpoints after the kernel is ready.
+     */
+    private function registerOAuthHandlers(): void
+    {
+        $this->RegisterOAuth(self::GOOGLE_OAUTH_IDENTIFIER);
+        $this->RegisterOAuth(self::MICROSOFT_OAUTH_IDENTIFIER);
     }
 
     /**

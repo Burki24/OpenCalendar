@@ -37,6 +37,7 @@ foreach ([
     'GetConfigurationForm',
     'UpdateProviderForm',
     'UpdateScheduleForm',
+    'MessageSink',
     'RequestAction',
     'ConnectGoogle',
     'DisconnectGoogle',
@@ -75,11 +76,19 @@ assertAccountStructure(
     is_string($accountSource)
         && str_contains($accountSource, 'RegisterOAuth(self::GOOGLE_OAUTH_IDENTIFIER)')
         && str_contains($accountSource, 'RegisterOAuth(self::MICROSOFT_OAUTH_IDENTIFIER)')
+        && str_contains($accountSource, 'RegisterMessage(0, IPS_KERNELSTARTED)')
+        && str_contains($accountSource, 'IPS_GetKernelRunlevel() === KR_READY')
+        && preg_match(
+            '/public function Create\(\): void[\s\S]*?public function GetConfigurationForm/',
+            $accountSource,
+            $createMethod
+        ) === 1
+        && !str_contains($createMethod[0], 'RegisterOAuth(')
         && !str_contains($accountSource, "RegisterPropertyString('GoogleClientID'")
         && !str_contains($accountSource, "RegisterPropertyString('GoogleClientSecret'")
         && !str_contains($accountSource, "RegisterPropertyString('MicrosoftClientID'")
         && !str_contains($accountSource, "RegisterPropertyString('MicrosoftClientSecret'"),
-    'Google and Microsoft OAuth must use native shared Symcon handlers without per-user client credentials.'
+    'Google and Microsoft OAuth must be registered after kernel readiness without per-user client credentials.'
 );
 
 
