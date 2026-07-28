@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-use IPSKalender\SymconOAuthException;
+use Burki24\SymconModuleHelper\SymconOAuthException;
 
 trait KalenderKontoMicrosoftOAuthTrait
 {

@@ -88,6 +88,14 @@ $microsoftOAuthSource = file_get_contents(__DIR__ . '/../Kalender Konto/traits/M
 $sharedOAuthSource = file_get_contents(__DIR__ . '/../Kalender Konto/traits/SymconOAuthTrait.php');
 assertAccountStructure(
     is_string($accountSource)
+        && str_contains($accountSource, "require_once __DIR__ . '/../libs/helper/SymconOAuthHelper.php';")
+        && is_string($sharedOAuthSource)
+        && str_contains($sharedOAuthSource, 'use Burki24\\SymconModuleHelper\\SymconOAuthClient;')
+        && !is_file(__DIR__ . '/../libs/SymconOAuthClient.php'),
+    'The account module must use the shared vendored SymconOAuthHelper without retaining a duplicate client.'
+);
+assertAccountStructure(
+    is_string($accountSource)
         && str_contains($accountSource, 'new GoogleCalendarOriginPolicy()')
         && str_contains($accountSource, 'new MicrosoftGraphOriginPolicy()')
         && str_contains($accountSource, 'private function createTrustedCloudHttpClient')

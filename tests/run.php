@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use Burki24\SymconModuleHelper\SymconOAuthClient;
 use IPSKalender\CalendarHttpClientInterface;
 use IPSKalender\CalendarHttpResponse;
 use IPSKalender\CalendarEventTranslation;
@@ -11,7 +12,6 @@ use IPSKalender\GoogleOAuthOriginPolicy;
 use IPSKalender\MicrosoftCalendarProvider;
 use IPSKalender\MicrosoftCalendarProviderException;
 use IPSKalender\MicrosoftGraphOriginPolicy;
-use IPSKalender\SymconOAuthClient;
 use IPSKalender\SymconOAuthOriginPolicy;
 use IPSKalender\ICalendarCodec;
 use IPSKalender\ICalendarFeedProvider;
@@ -24,7 +24,7 @@ require_once __DIR__ . '/../libs/GoogleCalendarOriginPolicy.php';
 require_once __DIR__ . '/../libs/GoogleOAuthOriginPolicy.php';
 require_once __DIR__ . '/../libs/MicrosoftCalendarProvider.php';
 require_once __DIR__ . '/../libs/MicrosoftGraphOriginPolicy.php';
-require_once __DIR__ . '/../libs/SymconOAuthClient.php';
+require_once __DIR__ . '/../libs/helper/SymconOAuthHelper.php';
 require_once __DIR__ . '/../libs/SymconOAuthOriginPolicy.php';
 require_once __DIR__ . '/../libs/CalendarEventTranslation.php';
 require_once __DIR__ . '/../libs/ICalendarFeedProvider.php';
@@ -68,6 +68,23 @@ function response(int $status, array|string $body = ''): CalendarHttpResponse
         is_array($body) ? json_encode($body, JSON_THROW_ON_ERROR) : $body,
         'https://example.test'
     );
+}
+
+/**
+ * Adapts the calendar test transport to the generic shared OAuth transport contract.
+ *
+ * @return Closure(string,string,array<string,string>,string):array{statusCode:int,body:string}
+ */
+function oauthTransport(FakeHttpClient $httpClient): Closure
+{
+    return static function (string $method, string $url, array $headers, string $body) use ($httpClient): array {
+        $response = $httpClient->request($method, $url, $headers, $body);
+
+        return [
+            'statusCode' => $response->statusCode,
+            'body'       => $response->body
+        ];
+    };
 }
 
 function assertSameValue(mixed $expected, mixed $actual, string $message): void
@@ -213,7 +230,7 @@ $googleOAuthHttpClient = new FakeHttpClient([
     ])
 ]);
 $googleOAuth = new SymconOAuthClient(
-    $googleOAuthHttpClient,
+    oauthTransport($googleOAuthHttpClient),
     'opencalendar_google',
     'Google Calendar'
 );
@@ -477,7 +494,11 @@ $msOAuthHttpClient = new FakeHttpClient([
         'token_type'    => 'Bearer'
     ])
 ]);
-$msOAuth = new SymconOAuthClient($msOAuthHttpClient, 'opencalendar_microsoft', 'Microsoft 365');
+$msOAuth = new SymconOAuthClient(
+    oauthTransport($msOAuthHttpClient),
+    'opencalendar_microsoft',
+    'Microsoft 365'
+);
 $msAuthorizationUrl = $msOAuth->getAuthorizationUrl('license@example.com');
 $msAuthorizationQuery = [];
 parse_str((string) parse_url($msAuthorizationUrl, PHP_URL_QUERY), $msAuthorizationQuery);

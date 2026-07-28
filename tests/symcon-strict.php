@@ -69,7 +69,8 @@ foreach ([
     'VariableHelper',
     'VisualizationAssetHelper',
     'ParentConnectionHelper',
-    'HttpResponseHelper'
+    'HttpResponseHelper',
+    'SymconOAuthHelper'
 ] as $helperName) {
     $helperPath = $root . '/libs/helper/' . $helperName . '.php';
     assertSymconStrict(is_file($helperPath), 'The vendored ' . $helperName . ' is missing.');

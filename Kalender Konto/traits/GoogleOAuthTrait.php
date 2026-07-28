@@ -2,8 +2,8 @@
 
 declare(strict_types=1);
 
+use Burki24\SymconModuleHelper\SymconOAuthException;
 use IPSKalender\GoogleOAuthOriginPolicy;
-use IPSKalender\SymconOAuthException;
 
 trait KalenderKontoGoogleOAuthTrait
 {

@@ -19,6 +19,9 @@
         "PersistentJsonCacheHelper": {
             "target": "libs/helper/PersistentJsonCacheHelper.php"
         },
+        "SymconOAuthHelper": {
+            "target": "libs/helper/SymconOAuthHelper.php"
+        },
         "VariableHelper": {
             "target": "libs/helper/VariableHelper.php"
         },

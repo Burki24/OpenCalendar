@@ -2,8 +2,8 @@
 
 declare(strict_types=1);
 
-use IPSKalender\SymconOAuthClient;
-use IPSKalender\SymconOAuthException;
+use Burki24\SymconModuleHelper\SymconOAuthClient;
+use Burki24\SymconModuleHelper\SymconOAuthException;
 use IPSKalender\SymconOAuthOriginPolicy;
 
 trait KalenderKontoSymconOAuthTrait
@@ -13,8 +13,17 @@ trait KalenderKontoSymconOAuthTrait
      */
     private function createSymconOAuthClient(string $identifier, string $providerName): SymconOAuthClient
     {
+        $httpClient = $this->createTrustedCloudHttpClient(new SymconOAuthOriginPolicy());
+
         return new SymconOAuthClient(
-            $this->createTrustedCloudHttpClient(new SymconOAuthOriginPolicy()),
+            static function (string $method, string $url, array $headers, string $body) use ($httpClient): array {
+                $response = $httpClient->request($method, $url, $headers, $body);
+
+                return [
+                    'statusCode' => $response->statusCode,
+                    'body'       => $response->body
+                ];
+            },
             $identifier,
             $providerName
         );

@@ -27,6 +27,11 @@
             "sha256": "adbc7680abe814dc6c15a9cda1312cc30023073595052006662716bc0d65f2a4",
             "path": "libs/helper/PersistentJsonCacheHelper.php"
         },
+        "SymconOAuthHelper": {
+            "version": "1.0.0",
+            "sha256": "d9053bfd083a581b96f8526cbb05e8568a6ad24a81cafa3e9b05108343bf2a65",
+            "path": "libs/helper/SymconOAuthHelper.php"
+        },
         "VariableHelper": {
             "version": "1.2.0",
             "sha256": "43b205a2ca87553a3a59a9e94f1c5c72fc4643cebedb080a9706139d98b30624",
