@@ -1,7 +1,7 @@
 {
     "id": "{122338A9-8B35-0E58-DDDA-B9C094C88CE8}",
     "name": "OpenCalendar",
-    "author": "Burki24",
+    "author": "Burkhard Kneiseler",
     "url": "https://github.com/Burki24/OpenCalendar",
     "compatibility": {
         "version": "9.0"
