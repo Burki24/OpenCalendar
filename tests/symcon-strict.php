@@ -68,6 +68,7 @@ foreach ([
     'DataFlowHelper',
     'VariableHelper',
     'VisualizationAssetHelper',
+    'VisualizationThemeHelper',
     'ParentConnectionHelper',
     'HttpResponseHelper',
     'SymconOAuthHelper'
@@ -178,6 +179,11 @@ assertSymconStrict(
         && str_contains($viewSource, '$this->VisualizationAsset(\'module.html\')')
         && !str_contains($viewSource, "file_get_contents(__DIR__ . '/module.html')"),
     'The calendar view must load visualization files through VisualizationAssetHelper.'
+);
+assertSymconStrict(
+    str_contains($viewSource, 'use VisualizationThemeHelper;')
+        && str_contains($viewSource, '$this->VisualizationThemeCSS()'),
+    'The calendar view must use VisualizationThemeHelper.'
 );
 assertSymconStrict(
     is_file($root . '/Kalender Ansicht/visualization/module.html')

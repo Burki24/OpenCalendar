@@ -2,6 +2,8 @@
 
 Die Kalender Ansicht fasst Termine mehrerer Kalenderinstanzen in einer responsiven Kachel der Symcon-Kachelvisualisierung oder in einer HTMLBox für IPSView zusammen.
 
+Die Kachel verwendet gemeinsam mit OpenHomeAlarm den vendorten `VisualizationThemeHelper`. Farben, Oberflächen, Statusfarben, Radien und Fokusdarstellung orientieren sich dadurch an den nativen Symcon-Designvariablen und wechseln automatisch mit dem Light-/Dark-Design. Die separat einstellbaren IPSView-Kontraste und der transparente IPSView-Hintergrund bleiben davon unberührt.
+
 ## Funktionsumfang
 
 - Agenda-, 3-Tage-, Wochen- und Monatsansicht

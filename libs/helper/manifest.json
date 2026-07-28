@@ -42,6 +42,11 @@
             "version": "1.0.0",
             "sha256": "1693b2399bcf95d270a6d9a01df6534caad906497bd4ba9489916a951abaffcc",
             "path": "libs/helper/VisualizationAssetHelper.php"
+        },
+        "VisualizationThemeHelper": {
+            "version": "1.0.0",
+            "sha256": "81ca4cdeac42ac97cecdb73305e9f68597a6037b1d50b843df11900c96c48dbf",
+            "path": "libs/helper/VisualizationThemeHelper.php"
         }
     }
 }

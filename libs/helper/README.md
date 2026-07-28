@@ -13,5 +13,6 @@ The files in this directory are vendored from
 | `SymconOAuthHelper.php` | 1.0.0 | `d9053bfd083a581b96f8526cbb05e8568a6ad24a81cafa3e9b05108343bf2a65` |
 | `VariableHelper.php` | 1.2.0 | `43b205a2ca87553a3a59a9e94f1c5c72fc4643cebedb080a9706139d98b30624` |
 | `VisualizationAssetHelper.php` | 1.0.0 | `1693b2399bcf95d270a6d9a01df6534caad906497bd4ba9489916a951abaffcc` |
+| `VisualizationThemeHelper.php` | 1.0.0 | `81ca4cdeac42ac97cecdb73305e9f68597a6037b1d50b843df11900c96c48dbf` |
 
 The copies are shipped with the library deliberately; there is no external runtime dependency.

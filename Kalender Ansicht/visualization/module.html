@@ -3,20 +3,19 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <style>
+    <style>{{SYMC_THEME}}
         :root {
-            color-scheme: light dark;
             --tile-title-clearance: 58px;
-            --cal-text: var(--content-color, light-dark(#18202f, #f3f6fb));
-            --cal-card: var(--card-color, light-dark(#ffffff, #111111));
-            --cal-dialog: var(--card-color, light-dark(#ffffff, #111111));
-            --cal-muted: color-mix(in srgb, currentColor 58%, transparent);
-            --cal-border: color-mix(in srgb, currentColor 14%, transparent);
-            --cal-surface: color-mix(in srgb, currentColor 7%, transparent);
-            --cal-surface-hover: color-mix(in srgb, currentColor 12%, transparent);
-            --cal-accent: var(--accent-color, #4f8ef7);
-            --cal-danger: #d84a4a;
-            --cal-radius: 12px;
+            --cal-text: var(--symc-text);
+            --cal-card: var(--symc-background);
+            --cal-dialog: var(--symc-background);
+            --cal-muted: var(--symc-muted);
+            --cal-border: var(--symc-border);
+            --cal-surface: var(--symc-surface);
+            --cal-surface-hover: var(--symc-surface-hover);
+            --cal-accent: var(--symc-accent);
+            --cal-danger: var(--symc-danger);
+            --cal-radius: var(--symc-radius-medium);
             --agenda-color-bar-width: 5px;
             --compact-color-bar-width: 3px;
         }
@@ -37,28 +36,28 @@
         html.ipsview-mode { --tile-title-clearance: 0px; }
         html.ipsview-mode.ipsview-light {
             color-scheme: light;
-            --cal-text: #18202f;
+            --cal-text: #202124;
             --cal-card: #ffffff;
             --cal-dialog: #ffffff;
         }
         html.ipsview-mode.ipsview-dark {
             color-scheme: dark;
-            --cal-text: #f3f6fb;
-            --cal-card: #111111;
-            --cal-dialog: #111111;
+            --cal-text: #f4f5f7;
+            --cal-card: #333438;
+            --cal-dialog: #333438;
         }
         @media (prefers-color-scheme: light) {
             html.ipsview-mode.ipsview-auto {
-                --cal-text: #18202f;
+                --cal-text: #202124;
                 --cal-card: #ffffff;
                 --cal-dialog: #ffffff;
             }
         }
         @media (prefers-color-scheme: dark) {
             html.ipsview-mode.ipsview-auto {
-                --cal-text: #f3f6fb;
-                --cal-card: #111111;
-                --cal-dialog: #111111;
+                --cal-text: #f4f5f7;
+                --cal-card: #333438;
+                --cal-dialog: #333438;
             }
         }
         html.ipsview-mode.ipsview-transparent {

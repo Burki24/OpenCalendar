@@ -5,16 +5,19 @@ declare(strict_types=1);
 use Burki24\SymconModuleHelper\ConfigurationFormHelper;
 use Burki24\SymconModuleHelper\VariableHelper;
 use Burki24\SymconModuleHelper\VisualizationAssetHelper;
+use Burki24\SymconModuleHelper\VisualizationThemeHelper;
 
 require_once __DIR__ . '/../libs/helper/ConfigurationFormHelper.php';
 require_once __DIR__ . '/../libs/helper/VariableHelper.php';
 require_once __DIR__ . '/../libs/helper/VisualizationAssetHelper.php';
+require_once __DIR__ . '/../libs/helper/VisualizationThemeHelper.php';
 
 class KalenderAnsicht extends IPSModuleStrict
 {
     use ConfigurationFormHelper;
     use VariableHelper;
     use VisualizationAssetHelper;
+    use VisualizationThemeHelper;
 
     private const CALENDAR_MODULE_ID = '{227B63E4-4223-316B-76E9-FD3849689562}';
     private const INITIALIZATION_DELAY_MS = 5_000;
@@ -409,6 +412,7 @@ class KalenderAnsicht extends IPSModuleStrict
         if ($html === '') {
             return '';
         }
+        $html = str_replace('{{SYMC_THEME}}', $this->VisualizationThemeCSS(), $html);
 
         $translations = [];
         if ($ipsView) {

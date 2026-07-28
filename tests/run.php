@@ -1134,6 +1134,18 @@ assertTrueValue(
     'The calendar view must load its HTML template through the shared VisualizationAssetHelper.'
 );
 assertTrueValue(
+    is_string($viewModuleSource)
+        && str_contains($viewModuleSource, 'use Burki24\\SymconModuleHelper\\VisualizationThemeHelper;')
+        && str_contains($viewModuleSource, "require_once __DIR__ . '/../libs/helper/VisualizationThemeHelper.php';")
+        && str_contains($viewModuleSource, 'use VisualizationThemeHelper;')
+        && str_contains($viewModuleSource, '$this->VisualizationThemeCSS()')
+        && is_string($viewTemplateSource)
+        && str_contains($viewTemplateSource, '{{SYMC_THEME}}')
+        && str_contains($viewTemplateSource, '--cal-accent: var(--symc-accent);')
+        && str_contains($viewTemplateSource, '--cal-card: var(--symc-background);'),
+    'The calendar view must consume the shared Symcon visualization theme.'
+);
+assertTrueValue(
     is_string($viewTemplateSource)
         && str_contains($viewTemplateSource, "t('CW')")
         && str_contains($viewTemplateSource, 'isoWeekNumber(start)')
