@@ -3,11 +3,13 @@
 declare(strict_types=1);
 
 use Burki24\SymconModuleHelper\ConfigurationFormHelper;
+use Burki24\SymconModuleHelper\IPSViewColorPaletteHelper;
 use Burki24\SymconModuleHelper\VariableHelper;
 use Burki24\SymconModuleHelper\VisualizationAssetHelper;
 use Burki24\SymconModuleHelper\VisualizationThemeHelper;
 
 require_once __DIR__ . '/../libs/helper/ConfigurationFormHelper.php';
+require_once __DIR__ . '/../libs/helper/IPSViewColorPaletteHelper.php';
 require_once __DIR__ . '/../libs/helper/VariableHelper.php';
 require_once __DIR__ . '/../libs/helper/VisualizationAssetHelper.php';
 require_once __DIR__ . '/../libs/helper/VisualizationThemeHelper.php';
@@ -15,6 +17,7 @@ require_once __DIR__ . '/../libs/helper/VisualizationThemeHelper.php';
 class KalenderAnsicht extends IPSModuleStrict
 {
     use ConfigurationFormHelper;
+    use IPSViewColorPaletteHelper;
     use VariableHelper;
     use VisualizationAssetHelper;
     use VisualizationThemeHelper;
@@ -50,6 +53,7 @@ class KalenderAnsicht extends IPSModuleStrict
         $this->RegisterPropertyInteger('IPSViewFontScale', 115);
         $this->RegisterPropertyInteger('IPSViewColorBarWidth', 7);
         $this->RegisterPropertyInteger('IPSViewWeekOrientation', 0);
+        $this->RegisterIPSViewColorProperties();
         $this->RegisterAttributeBoolean('RuntimeReady', false);
         $this->RegisterAttributeString('CalendarSelectionBackup', '[]');
 
@@ -77,6 +81,9 @@ class KalenderAnsicht extends IPSModuleStrict
                 }
                 unset($element);
             }
+        }
+        if (isset($form['elements']) && is_array($form['elements'])) {
+            $this->injectIPSViewColorFormItems($form['elements']);
         }
 
         return $this->EncodeConfigurationForm($form);
@@ -363,6 +370,42 @@ class KalenderAnsicht extends IPSModuleStrict
         return $this->renderCalendarHtml($this->buildState(), true);
     }
 
+    /** @param array<int,array<string,mixed>> $elements */
+    private function injectIPSViewColorFormItems(array &$elements): void
+    {
+        foreach ($elements as $index => $element) {
+            if (($element['caption'] ?? null) !== 'Choose the IPSView palette directly. The colors are stored in the module configuration.') {
+                continue;
+            }
+
+            array_splice($elements, $index, 1, $this->IPSViewColorFormItems('250px'));
+
+            return;
+        }
+    }
+
+    private function renderIPSViewColorThemeCSS(): string
+    {
+        $variables = $this->IPSViewColorCSSVariables(
+            $this->ReadPropertyBoolean('IPSViewTransparent'),
+            ':root'
+        );
+
+        return $variables . "\n" . <<<'CSS'
+html.ipsview-mode.ipsview-custom {
+    --cal-text: var(--ipsview-text);
+    --cal-card: var(--ipsview-background);
+    --cal-dialog: var(--ipsview-surface-strong);
+    --cal-muted: var(--ipsview-muted);
+    --cal-border: var(--ipsview-border);
+    --cal-surface: var(--ipsview-surface);
+    --cal-surface-hover: var(--ipsview-surface-strong);
+    --cal-accent: var(--ipsview-accent);
+    --cal-danger: var(--ipsview-danger);
+}
+CSS;
+    }
+
     private function broadcastState(): void
     {
         if (!$this->isRuntimeReady()) {
@@ -413,6 +456,9 @@ class KalenderAnsicht extends IPSModuleStrict
             return '';
         }
         $html = str_replace('{{SYMC_THEME}}', $this->VisualizationThemeCSS(), $html);
+        if (!$ipsView) {
+            $html = str_replace('{{IPSVIEW_THEME}}', '', $html);
+        }
 
         $translations = [];
         if ($ipsView) {
@@ -420,11 +466,18 @@ class KalenderAnsicht extends IPSModuleStrict
             if ($this->ReadPropertyBoolean('IPSViewTransparent')) {
                 $classes[] = 'ipsview-transparent';
             }
-            $classes[] = match ($this->ReadPropertyInteger('IPSViewTheme')) {
+            $ipsViewTheme = $this->ReadPropertyInteger('IPSViewTheme');
+            $classes[] = match ($ipsViewTheme) {
                 1       => 'ipsview-light',
                 2       => 'ipsview-dark',
+                3       => 'ipsview-custom',
                 default => 'ipsview-auto'
             };
+            $html = str_replace(
+                '{{IPSVIEW_THEME}}',
+                $ipsViewTheme === 3 ? $this->renderIPSViewColorThemeCSS() : '',
+                $html
+            );
             $fontScale = max(80, min(200, $this->ReadPropertyInteger('IPSViewFontScale')));
             $colorBarWidth = max(2, min(16, $this->ReadPropertyInteger('IPSViewColorBarWidth')));
             $language = $this->Translate('Today') === 'Heute' ? 'de' : 'en';

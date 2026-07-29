@@ -13,6 +13,9 @@
         "HttpResponseHelper": {
             "target": "libs/helper/HttpResponseHelper.php"
         },
+        "IPSViewColorPaletteHelper": {
+            "target": "libs/helper/IPSViewColorPaletteHelper.php"
+        },
         "ParentConnectionHelper": {
             "target": "libs/helper/ParentConnectionHelper.php"
         },

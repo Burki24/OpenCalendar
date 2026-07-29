@@ -1075,6 +1075,7 @@ $accountModuleSource = file_get_contents(__DIR__ . '/../Kalender Konto/module.ph
 $accountGoogleOAuthSource = file_get_contents(__DIR__ . '/../Kalender Konto/traits/GoogleOAuthTrait.php');
 $viewModuleSource = file_get_contents(__DIR__ . '/../Kalender Ansicht/module.php');
 $viewTemplateSource = file_get_contents(__DIR__ . '/../Kalender Ansicht/visualization/module.html');
+$viewFormSource = file_get_contents(__DIR__ . '/../Kalender Ansicht/form.json');
 assertTrueValue(
     is_string($accountModuleSource)
         && str_contains($accountModuleSource, 'RegisterOAuth(self::GOOGLE_OAUTH_IDENTIFIER)')
@@ -1144,6 +1145,33 @@ assertTrueValue(
         && str_contains($viewTemplateSource, '--cal-accent: var(--symc-accent);')
         && str_contains($viewTemplateSource, '--cal-card: var(--symc-background);'),
     'The calendar view must consume the shared Symcon visualization theme.'
+);
+assertTrueValue(
+    is_string($viewModuleSource)
+        && str_contains($viewModuleSource, 'use Burki24\\SymconModuleHelper\\IPSViewColorPaletteHelper;')
+        && str_contains($viewModuleSource, "require_once __DIR__ . '/../libs/helper/IPSViewColorPaletteHelper.php';")
+        && str_contains($viewModuleSource, 'use IPSViewColorPaletteHelper;')
+        && str_contains($viewModuleSource, '$this->RegisterIPSViewColorProperties();')
+        && str_contains($viewModuleSource, "\$this->IPSViewColorFormItems('250px')")
+        && str_contains($viewModuleSource, '$this->IPSViewColorCSSVariables(')
+        && str_contains($viewModuleSource, "3       => 'ipsview-custom'")
+        && is_string($viewTemplateSource)
+        && str_contains($viewTemplateSource, '{{IPSVIEW_THEME}}')
+        && str_contains($viewModuleSource, '--cal-text: var(--ipsview-text);')
+        && str_contains($viewModuleSource, '--cal-surface: var(--ipsview-surface);')
+        && str_contains($viewModuleSource, '--cal-accent: var(--ipsview-accent);')
+        && str_contains($viewModuleSource, '--cal-danger: var(--ipsview-danger);'),
+    'The calendar view must consume the shared IPSView color palette without replacing calendar event colors.'
+);
+assertTrueValue(
+    is_string($viewFormSource)
+        && str_contains($viewFormSource, '"caption": "Custom colors"')
+        && str_contains($viewFormSource, '"value": 3')
+        && str_contains(
+            $viewFormSource,
+            'Choose the IPSView palette directly. The colors are stored in the module configuration.'
+        ),
+    'The calendar view form must expose the shared custom IPSView palette option.'
 );
 assertTrueValue(
     is_string($viewTemplateSource)

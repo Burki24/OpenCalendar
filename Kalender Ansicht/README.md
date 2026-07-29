@@ -2,7 +2,7 @@
 
 Die Kalender Ansicht fasst Termine mehrerer Kalenderinstanzen in einer responsiven Kachel der Symcon-Kachelvisualisierung oder in einer HTMLBox für IPSView zusammen.
 
-Die Kachel verwendet gemeinsam mit OpenHomeAlarm den vendorten `VisualizationThemeHelper`. Farben, Oberflächen, Statusfarben, Radien und Fokusdarstellung orientieren sich dadurch an den nativen Symcon-Designvariablen und wechseln automatisch mit dem Light-/Dark-Design. Die separat einstellbaren IPSView-Kontraste und der transparente IPSView-Hintergrund bleiben davon unberührt.
+Die Kachel verwendet den vendorten `VisualizationThemeHelper` und orientiert sich dadurch an den nativen Symcon-Designvariablen. Für die eigenständige IPSView-Seite steht zusätzlich der gemeinsame `IPSViewColorPaletteHelper` zur Verfügung. Er stellt dieselben neun konfigurierbaren Grund-, Flächen-, Schrift- und Statusfarben bereit, die auch OpenHomeAlarm verwendet, und korrigiert sie bei Bedarf für lesbaren Kontrast.
 
 ## Funktionsumfang
 
@@ -38,17 +38,18 @@ Wiederkehrende, vom CalDAV-Server expandierte Einzeltermine werden derzeit nur l
 
 1. In der Instanz **Kalender Ansicht** die Option **IPSView-HTMLBox bereitstellen** aktivieren und die Änderungen übernehmen.
 2. Mit **Transparenter IPSView-Hintergrund** festlegen, ob die Oberfläche der umgebenden View sichtbar bleiben soll.
-3. Unter **IPSView-Kontrast** die Darstellung an den Hintergrund anpassen. **Heller Hintergrund** erzeugt dunkle Schrift, **Dunkler Hintergrund** helle Schrift. **Automatisch** übernimmt das Farbschema des Endgeräts.
-4. Mit **IPSView-Wochenausrichtung** festlegen, ob die Wochentage nebeneinander oder als vertikale Tageszeilen dargestellt werden.
-5. Mit **IPSView-Schriftgröße** die gesamte Darstellung zwischen 80 und 200 Prozent skalieren. Der Standardwert 115 Prozent verbessert die Lesbarkeit auf Touchdisplays.
-6. Über **IPSView-Farbbalkenbreite** die Kalenderkennzeichnung zwischen 2 und 16 Pixeln einstellen. Der Standardwert beträgt 7 Pixel.
-7. Unterhalb der Instanz wird die String-Variable **IPSView-Kalender** mit der Darstellung **Webinhalt** angelegt.
-8. Im IPSView Designer ein Steuerelement vom Typ **HTML-Box** einfügen und diese Variable als ID auswählen.
-9. Als HTML Renderer **Browser des Clients** oder **Automatisch** verwenden. Der native einfache HTML Renderer reicht nicht aus, weil Ansichtswechsel und Navigation JavaScript verwenden.
+3. Unter **IPSView-Farbschema** zwischen **Automatisch**, **Heller Hintergrund**, **Dunkler Hintergrund** und **Benutzerdefinierte Farben** wählen. Die bisherigen drei Modi bleiben für bestehende Instanzen unverändert.
+4. Bei **Benutzerdefinierte Farben** die neun Farben für Seite, Karten, hervorgehobene Flächen, primäre und sekundäre Schrift, Akzent sowie Bereit-, Warn- und Fehlerzustände festlegen. Der gemeinsame Helper leitet daraus kontrastsichere Nebenfarben und Rahmen ab. Kalender- und Terminfarben bleiben davon unabhängig.
+5. Mit **IPSView-Wochenausrichtung** festlegen, ob die Wochentage nebeneinander oder als vertikale Tageszeilen dargestellt werden.
+6. Mit **IPSView-Schriftgröße** die gesamte Darstellung zwischen 80 und 200 Prozent skalieren. Der Standardwert 115 Prozent verbessert die Lesbarkeit auf Touchdisplays.
+7. Über **IPSView-Farbbalkenbreite** die Kalenderkennzeichnung zwischen 2 und 16 Pixeln einstellen. Der Standardwert beträgt 7 Pixel.
+8. Unterhalb der Instanz wird die String-Variable **IPSView-Kalender** mit der Darstellung **Webinhalt** angelegt.
+9. Im IPSView Designer ein Steuerelement vom Typ **HTML-Box** einfügen und diese Variable als ID auswählen.
+10. Als HTML Renderer **Browser des Clients** oder **Automatisch** verwenden. Der native einfache HTML Renderer reicht nicht aus, weil Ansichtswechsel und Navigation JavaScript verwenden.
 
 Agenda, 3-Tage-, Wochen- und Monatsansicht sowie die Navigation funktionieren direkt innerhalb der IPSView-HTMLBox. Die Variable wird bei Änderungen oder Synchronisationen der ausgewählten Kalender automatisch neu erzeugt. Das Öffnen von Termindetails ist lesend möglich. Erstellen, Bearbeiten, Löschen und die manuelle Synchronisationsschaltfläche bleiben der Symcon-Kachel vorbehalten, da die IPSView-HTMLBox keine Symcon-HTML-SDK-Aktionsbrücke bereitstellt.
 
-Die HTMLBox kann den Hintergrund der umgebenden IPSView nicht auslesen, da sie in einem eigenen Browserbereich ausgeführt wird. Deshalb ist der Kontrast unabhängig von der Transparenz einstellbar. Bei älteren IPSView-Clients oder nativen Renderern kann der Browserbereich trotz transparentem HTML einen eigenen Hintergrund zeichnen; in diesem Fall den aktuellen Browser-Renderer des Clients verwenden.
+Die HTMLBox kann den Hintergrund der umgebenden IPSView nicht auslesen, da sie in einem eigenen Browserbereich ausgeführt wird. Für eine genaue Anpassung an eine vorhandene View deshalb **Benutzerdefinierte Farben** verwenden. Bei älteren IPSView-Clients oder nativen Renderern kann der Browserbereich trotz transparentem HTML einen eigenen Hintergrund zeichnen; in diesem Fall den aktuellen Browser-Renderer des Clients verwenden.
 
 Die IPSView-Option **Seite skalieren** wird laut Hersteller nur von den mobilen Clients unterstützt und hat unter Windows keine Wirkung. Schriftgröße und Farbbalkenbreite werden deshalb vom Modul direkt am Kalenderinhalt gesetzt. Für die zuverlässige Verarbeitung von CSS und JavaScript muss in IPSView **Browser des Clients** statt **HTML Renderer** ausgewählt sein.
 

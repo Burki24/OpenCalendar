@@ -139,7 +139,7 @@
         {
             "type": "Select",
             "name": "IPSViewTheme",
-            "caption": "IPSView contrast",
+            "caption": "IPSView color scheme",
             "options": [
                 {
                     "caption": "Automatic",
@@ -152,8 +152,16 @@
                 {
                     "caption": "Dark background",
                     "value": 2
+                },
+                {
+                    "caption": "Custom colors",
+                    "value": 3
                 }
             ]
+        },
+        {
+            "type": "Label",
+            "caption": "Choose the IPSView palette directly. The colors are stored in the module configuration."
         },
         {
             "type": "Select",

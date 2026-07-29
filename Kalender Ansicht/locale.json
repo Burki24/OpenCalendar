@@ -85,7 +85,20 @@
             "The visualization request is invalid.": "Die Visualisierungsanfrage ist ungültig.",
             "The selected calendar is not writable.": "Der ausgewählte Kalender ist schreibgeschützt.",
             "Synchronization failed. Please check the instance status for details.": "Synchronisation fehlgeschlagen. Bitte prüfen Sie den Instanzstatus für weitere Details.",
-            "The description of Microsoft online meetings is protected and cannot be edited here.": "Die Beschreibung von Microsoft-Onlinebesprechungen ist geschützt und kann hier nicht bearbeitet werden."
+            "The description of Microsoft online meetings is protected and cannot be edited here.": "Die Beschreibung von Microsoft-Onlinebesprechungen ist geschützt und kann hier nicht bearbeitet werden.",
+            "IPSView color scheme": "IPSView-Farbschema",
+            "Custom colors": "Benutzerdefinierte Farben",
+            "Choose the IPSView palette directly. The colors are stored in the module configuration.": "Legen Sie die IPSView-Farbpalette direkt fest. Die Farben werden in der Modulkonfiguration gespeichert.",
+            "Page/background color": "Seiten-/Hintergrundfarbe",
+            "Cards and controls": "Karten und Bedienelemente",
+            "Highlighted surface": "Hervorgehobene Fläche",
+            "Primary text color": "Primäre Schriftfarbe",
+            "Secondary text color": "Sekundäre Schriftfarbe",
+            "Accent/active color": "Akzent-/Aktivfarbe",
+            "Ready/active color": "Bereit-/Aktivfarbe",
+            "Warning/delay color": "Warn-/Verzögerungsfarbe",
+            "Alarm/error color": "Alarm-/Fehlerfarbe",
+            "Card surfaces and text colors are corrected only when needed for readable contrast. Module-specific opacity and gradients remain unchanged.": "Flächen- und Schriftfarben werden nur bei Bedarf für einen lesbaren Kontrast korrigiert. Modulspezifische Deckkraft und Farbverläufe bleiben unverändert."
         }
     }
 }
