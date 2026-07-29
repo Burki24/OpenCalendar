@@ -6,6 +6,8 @@ namespace Burki24\SymconModuleHelper;
 
 use InvalidArgumentException;
 
+require_once __DIR__ . '/HelperTranslationHelper.php';
+
 /**
  * Provides a reusable IPSView style source, form controls and CSS tokens.
  *
@@ -14,10 +16,11 @@ use InvalidArgumentException;
  * their components, but do not define module-specific colors, gradients,
  * typography, borders or shadows.
  *
- * @version 1.1.0
+ * @version 1.2.0
  */
 trait IPSViewStyleHelper
 {
+    use HelperTranslationHelper;
     public const IPSVIEW_STYLE_SOURCE_CUSTOM = 0;
     public const IPSVIEW_STYLE_SOURCE_MEDIA = 1;
     public const IPSVIEW_STYLE_SOURCE_LIGHT = 2;
@@ -82,18 +85,18 @@ trait IPSViewStyleHelper
 
     /** @var array<string,string> */
     private const IPSVIEW_STYLE_OPACITY_CAPTIONS = [
-        'ViewBackground'            => 'View background opacity',
-        'PageBackground'            => 'Page background opacity',
-        'LabelBackground'           => 'Label background opacity',
-        'ControlBackground'         => 'Control background opacity',
-        'ControlActiveBackground'   => 'Active control opacity',
-        'ControlInactiveBackground' => 'Inactive control opacity',
-        'PopupBackground'           => 'Popup background opacity',
-        'Border'                    => 'Border opacity',
-        'Line'                      => 'Line opacity',
-        'PopupBorder'               => 'Popup border opacity',
-        'ShadowColor'               => 'Shadow opacity',
-        'PopupShadow'               => 'Popup shadow opacity'
+        'ViewBackground'            => 'opacity.view_background',
+        'PageBackground'            => 'opacity.page_background',
+        'LabelBackground'           => 'opacity.label_background',
+        'ControlBackground'         => 'opacity.control_background',
+        'ControlActiveBackground'   => 'opacity.control_active',
+        'ControlInactiveBackground' => 'opacity.control_inactive',
+        'PopupBackground'           => 'opacity.popup_background',
+        'Border'                    => 'opacity.border',
+        'Line'                      => 'opacity.line',
+        'PopupBorder'               => 'opacity.popup_border',
+        'ShadowColor'               => 'opacity.shadow',
+        'PopupShadow'               => 'opacity.popup_shadow'
     ];
 
     /** @var array<string,int> */
@@ -123,27 +126,88 @@ trait IPSViewStyleHelper
 
     /** @var array<string,string> */
     private const IPSVIEW_STYLE_COLOR_CAPTIONS = [
-        'ViewBackground'            => 'View background',
-        'PageBackground'            => 'Page background',
-        'LabelBackground'           => 'Label background',
-        'ControlBackground'         => 'Control background',
-        'ControlActiveBackground'   => 'Active control background',
-        'ControlInactiveBackground' => 'Inactive control background',
-        'Text'                      => 'Primary text',
-        'TextActive'                => 'Active text',
-        'TextInactive'              => 'Inactive text',
-        'LabelText'                 => 'Label text',
-        'Icon'                      => 'Icon color',
-        'Border'                    => 'Border color',
-        'Line'                      => 'Line color',
-        'PopupBackground'           => 'Popup background',
-        'PopupBorder'               => 'Popup border',
-        'Accent'                    => 'Accent color',
-        'Information'               => 'Information color',
-        'Positive'                  => 'Positive status',
-        'Warning'                   => 'Warning status',
-        'Critical'                  => 'Critical status',
-        'Shadow'                    => 'Shadow color'
+        'ViewBackground'            => 'color.view_background',
+        'PageBackground'            => 'color.page_background',
+        'LabelBackground'           => 'color.label_background',
+        'ControlBackground'         => 'color.control_background',
+        'ControlActiveBackground'   => 'color.control_active_background',
+        'ControlInactiveBackground' => 'color.control_inactive_background',
+        'Text'                      => 'color.text_primary',
+        'TextActive'                => 'color.text_active',
+        'TextInactive'              => 'color.text_inactive',
+        'LabelText'                 => 'color.label_text',
+        'Icon'                      => 'color.icon',
+        'Border'                    => 'color.border',
+        'Line'                      => 'color.line',
+        'PopupBackground'           => 'color.popup_background',
+        'PopupBorder'               => 'color.popup_border',
+        'Accent'                    => 'color.accent',
+        'Information'               => 'color.information',
+        'Positive'                  => 'color.positive',
+        'Warning'                   => 'color.warning',
+        'Critical'                  => 'color.critical',
+        'Shadow'                    => 'color.shadow'
+    ];
+
+    /** @var array<string,string> */
+    private const IPSVIEW_STYLE_TRANSLATION_SOURCES = [
+        'description.choose_source'         => 'Choose a shared IPSView style source. The same roles and effects are used by every consuming module.',
+        'description.media_source'          => 'The media source imports the whitelisted standard style from an IPSView media object. Custom values below are used only for the custom source.',
+        'section.universal_colors'          => 'Universal colors',
+        'section.surface_transparency'      => 'Surface transparency',
+        'section.typography_effects'        => 'Typography, borders and effects',
+        'field.style_source'                => 'Style source',
+        'field.media_object'                => 'IPSView media object',
+        'field.transparent_background'      => 'Transparent background',
+        'field.font_scale'                  => 'Font scale (%)',
+        'option.custom_style'               => 'Custom style',
+        'option.ipsview_standard_style'     => 'IPSView standard style',
+        'option.light_preset'               => 'Light preset',
+        'option.dark_preset'                => 'Dark preset',
+        'color.view_background'             => 'View background',
+        'color.page_background'             => 'Page background',
+        'color.label_background'            => 'Label background',
+        'color.control_background'          => 'Control background',
+        'color.control_active_background'   => 'Active control background',
+        'color.control_inactive_background' => 'Inactive control background',
+        'color.text_primary'                => 'Primary text',
+        'color.text_active'                 => 'Active text',
+        'color.text_inactive'               => 'Inactive text',
+        'color.label_text'                  => 'Label text',
+        'color.icon'                        => 'Icon color',
+        'color.border'                      => 'Border color',
+        'color.line'                        => 'Line color',
+        'color.popup_background'            => 'Popup background',
+        'color.popup_border'                => 'Popup border',
+        'color.accent'                      => 'Accent color',
+        'color.information'                 => 'Information color',
+        'color.positive'                    => 'Positive status',
+        'color.warning'                     => 'Warning status',
+        'color.critical'                    => 'Critical status',
+        'color.shadow'                      => 'Shadow color',
+        'opacity.view_background'           => 'View background opacity',
+        'opacity.page_background'           => 'Page background opacity',
+        'opacity.label_background'          => 'Label background opacity',
+        'opacity.control_background'        => 'Control background opacity',
+        'opacity.control_active'            => 'Active control opacity',
+        'opacity.control_inactive'          => 'Inactive control opacity',
+        'opacity.popup_background'          => 'Popup background opacity',
+        'opacity.border'                    => 'Border opacity',
+        'opacity.line'                      => 'Line opacity',
+        'opacity.popup_border'              => 'Popup border opacity',
+        'opacity.shadow'                    => 'Shadow opacity',
+        'opacity.popup_shadow'              => 'Popup shadow opacity',
+        'field.font_family'                 => 'Font family',
+        'field.base_font_size'              => 'Base font size',
+        'field.border_radius'               => 'Border radius',
+        'field.border_width'                => 'Border width',
+        'field.line_width'                  => 'Line width',
+        'field.shadow_blur'                 => 'Shadow blur',
+        'field.shadow_spread'               => 'Shadow spread',
+        'field.shadow_offset_x'             => 'Shadow offset X',
+        'field.shadow_offset_y'             => 'Shadow offset Y',
+        'field.inactive_opacity'            => 'Inactive opacity',
+        'field.gradient_strength'           => 'Gradient strength'
     ];
 
     /** @var array<string,mixed> */
@@ -265,7 +329,7 @@ trait IPSViewStyleHelper
         $items = [
             [
                 'type'    => 'Label',
-                'caption' => 'Choose a shared IPSView style source. The same roles and effects are used by every consuming module.'
+                'caption' => $this->IPSViewStyleText('description.choose_source')
             ],
             [
                 'type'  => 'RowLayout',
@@ -273,30 +337,30 @@ trait IPSViewStyleHelper
                     [
                         'type'    => 'Select',
                         'name'    => 'IPSViewStyleSource',
-                        'caption' => 'Style source',
+                        'caption' => $this->IPSViewStyleText('field.style_source'),
                         'options' => [
-                            ['caption' => 'Custom style', 'value' => self::IPSVIEW_STYLE_SOURCE_CUSTOM],
-                            ['caption' => 'IPSView standard style', 'value' => self::IPSVIEW_STYLE_SOURCE_MEDIA],
-                            ['caption' => 'Light preset', 'value' => self::IPSVIEW_STYLE_SOURCE_LIGHT],
-                            ['caption' => 'Dark preset', 'value' => self::IPSVIEW_STYLE_SOURCE_DARK]
+                            ['caption' => $this->IPSViewStyleText('option.custom_style'), 'value' => self::IPSVIEW_STYLE_SOURCE_CUSTOM],
+                            ['caption' => $this->IPSViewStyleText('option.ipsview_standard_style'), 'value' => self::IPSVIEW_STYLE_SOURCE_MEDIA],
+                            ['caption' => $this->IPSViewStyleText('option.light_preset'), 'value' => self::IPSVIEW_STYLE_SOURCE_LIGHT],
+                            ['caption' => $this->IPSViewStyleText('option.dark_preset'), 'value' => self::IPSVIEW_STYLE_SOURCE_DARK]
                         ],
                         'width' => '220px'
                     ],
                     [
                         'type'    => 'SelectMedia',
                         'name'    => 'IPSViewStyleMediaID',
-                        'caption' => 'IPSView media object',
+                        'caption' => $this->IPSViewStyleText('field.media_object'),
                         'width'   => '320px'
                     ],
                     [
                         'type'    => 'CheckBox',
                         'name'    => 'IPSViewStyleTransparentBackground',
-                        'caption' => 'Transparent background'
+                        'caption' => $this->IPSViewStyleText('field.transparent_background')
                     ],
                     [
                         'type'    => 'NumberSpinner',
                         'name'    => 'IPSViewStyleFontScale',
-                        'caption' => 'Font scale (%)',
+                        'caption' => $this->IPSViewStyleText('field.font_scale'),
                         'minimum' => 60,
                         'maximum' => 200,
                         'suffix'  => ' %',
@@ -306,11 +370,11 @@ trait IPSViewStyleHelper
             ],
             [
                 'type'    => 'Label',
-                'caption' => 'The media source imports the whitelisted standard style from an IPSView media object. Custom values below are used only for the custom source.'
+                'caption' => $this->IPSViewStyleText('description.media_source')
             ],
             [
                 'type'    => 'Label',
-                'caption' => 'Universal colors'
+                'caption' => $this->IPSViewStyleText('section.universal_colors')
             ]
         ];
 
@@ -320,7 +384,7 @@ trait IPSViewStyleHelper
                 $row[] = [
                     'type'             => 'SelectColor',
                     'name'             => self::IPSVIEW_STYLE_COLOR_PROPERTIES[$key],
-                    'caption'          => self::IPSVIEW_STYLE_COLOR_CAPTIONS[$key],
+                    'caption'          => $this->IPSViewStyleText(self::IPSVIEW_STYLE_COLOR_CAPTIONS[$key]),
                     'allowTransparent' => false,
                     'width'            => $colorWidth
                 ];
@@ -334,7 +398,7 @@ trait IPSViewStyleHelper
 
         $items[] = [
             'type'    => 'Label',
-            'caption' => 'Surface transparency'
+            'caption' => $this->IPSViewStyleText('section.surface_transparency')
         ];
         foreach (array_chunk(array_keys(self::IPSVIEW_STYLE_OPACITY_PROPERTIES), 3) as $keys) {
             $row = [];
@@ -342,7 +406,7 @@ trait IPSViewStyleHelper
                 $row[] = [
                     'type'    => 'NumberSpinner',
                     'name'    => self::IPSVIEW_STYLE_OPACITY_PROPERTIES[$key],
-                    'caption' => self::IPSVIEW_STYLE_OPACITY_CAPTIONS[$key],
+                    'caption' => $this->IPSViewStyleText(self::IPSVIEW_STYLE_OPACITY_CAPTIONS[$key]),
                     'minimum' => 0,
                     'maximum' => 100,
                     'suffix'  => ' %',
@@ -358,7 +422,7 @@ trait IPSViewStyleHelper
 
         $items[] = [
             'type'    => 'Label',
-            'caption' => 'Typography, borders and effects'
+            'caption' => $this->IPSViewStyleText('section.typography_effects')
         ];
         $items[] = [
             'type'  => 'RowLayout',
@@ -366,13 +430,13 @@ trait IPSViewStyleHelper
                 [
                     'type'    => 'ValidationTextBox',
                     'name'    => 'IPSViewStyleFontFamily',
-                    'caption' => 'Font family',
+                    'caption' => $this->IPSViewStyleText('field.font_family'),
                     'width'   => '300px'
                 ],
                 [
                     'type'    => 'NumberSpinner',
                     'name'    => 'IPSViewStyleBaseFontSize',
-                    'caption' => 'Base font size',
+                    'caption' => $this->IPSViewStyleText('field.base_font_size'),
                     'minimum' => 8,
                     'maximum' => 32,
                     'suffix'  => ' px',
@@ -381,7 +445,7 @@ trait IPSViewStyleHelper
                 [
                     'type'    => 'NumberSpinner',
                     'name'    => 'IPSViewStyleBorderRadius',
-                    'caption' => 'Border radius',
+                    'caption' => $this->IPSViewStyleText('field.border_radius'),
                     'minimum' => 0,
                     'maximum' => 40,
                     'digits'  => 1,
@@ -391,7 +455,7 @@ trait IPSViewStyleHelper
                 [
                     'type'    => 'NumberSpinner',
                     'name'    => 'IPSViewStyleBorderWidth',
-                    'caption' => 'Border width',
+                    'caption' => $this->IPSViewStyleText('field.border_width'),
                     'minimum' => 0,
                     'maximum' => 10,
                     'digits'  => 1,
@@ -401,7 +465,7 @@ trait IPSViewStyleHelper
                 [
                     'type'    => 'NumberSpinner',
                     'name'    => 'IPSViewStyleLineWidth',
-                    'caption' => 'Line width',
+                    'caption' => $this->IPSViewStyleText('field.line_width'),
                     'minimum' => 0,
                     'maximum' => 10,
                     'digits'  => 1,
@@ -416,7 +480,7 @@ trait IPSViewStyleHelper
                 [
                     'type'    => 'NumberSpinner',
                     'name'    => 'IPSViewStyleShadowBlur',
-                    'caption' => 'Shadow blur',
+                    'caption' => $this->IPSViewStyleText('field.shadow_blur'),
                     'minimum' => 0,
                     'maximum' => 80,
                     'digits'  => 1,
@@ -426,7 +490,7 @@ trait IPSViewStyleHelper
                 [
                     'type'    => 'NumberSpinner',
                     'name'    => 'IPSViewStyleShadowSpread',
-                    'caption' => 'Shadow spread',
+                    'caption' => $this->IPSViewStyleText('field.shadow_spread'),
                     'minimum' => -20,
                     'maximum' => 40,
                     'digits'  => 1,
@@ -436,7 +500,7 @@ trait IPSViewStyleHelper
                 [
                     'type'    => 'NumberSpinner',
                     'name'    => 'IPSViewStyleShadowOffsetX',
-                    'caption' => 'Shadow offset X',
+                    'caption' => $this->IPSViewStyleText('field.shadow_offset_x'),
                     'minimum' => -40,
                     'maximum' => 40,
                     'digits'  => 1,
@@ -446,7 +510,7 @@ trait IPSViewStyleHelper
                 [
                     'type'    => 'NumberSpinner',
                     'name'    => 'IPSViewStyleShadowOffsetY',
-                    'caption' => 'Shadow offset Y',
+                    'caption' => $this->IPSViewStyleText('field.shadow_offset_y'),
                     'minimum' => -40,
                     'maximum' => 40,
                     'digits'  => 1,
@@ -456,7 +520,7 @@ trait IPSViewStyleHelper
                 [
                     'type'    => 'NumberSpinner',
                     'name'    => 'IPSViewStyleDisabledOpacity',
-                    'caption' => 'Inactive opacity',
+                    'caption' => $this->IPSViewStyleText('field.inactive_opacity'),
                     'minimum' => 10,
                     'maximum' => 100,
                     'suffix'  => ' %',
@@ -465,7 +529,7 @@ trait IPSViewStyleHelper
                 [
                     'type'    => 'NumberSpinner',
                     'name'    => 'IPSViewStyleGradientStrength',
-                    'caption' => 'Gradient strength',
+                    'caption' => $this->IPSViewStyleText('field.gradient_strength'),
                     'minimum' => 0,
                     'maximum' => 80,
                     'suffix'  => ' %',
@@ -675,6 +739,14 @@ trait IPSViewStyleHelper
         $decoded = base64_decode($encoded, true);
 
         return $decoded === false ? '' : $decoded;
+    }
+
+    /** Returns one translated IPSView style label. */
+    private function IPSViewStyleText(string $key): string
+    {
+        $fallback = self::IPSVIEW_STYLE_TRANSLATION_SOURCES[$key] ?? $key;
+
+        return $this->TranslateHelperText('IPSViewStyleHelper', $key, $fallback);
     }
 
     /** @return array<string,mixed> */

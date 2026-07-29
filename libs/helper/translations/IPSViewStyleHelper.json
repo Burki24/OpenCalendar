@@ -1,0 +1,238 @@
+{
+    "schema": 1,
+    "sourceLanguage": "en",
+    "requiredLanguages": [
+        "en",
+        "de"
+    ],
+    "translations": {
+        "description.choose_source": {
+            "en": "Choose a shared IPSView style source. The same roles and effects are used by every consuming module.",
+            "de": "Wählen Sie eine gemeinsame IPSView-Stilquelle. Alle nutzenden Module verwenden dieselben Rollen und Effekte."
+        },
+        "description.media_source": {
+            "en": "The media source imports the whitelisted standard style from an IPSView media object. Custom values below are used only for the custom source.",
+            "de": "Die Medienquelle übernimmt die freigegebenen Standardstil-Werte aus einem IPSView-Medienobjekt. Die nachfolgenden benutzerdefinierten Werte werden nur für die Stilquelle „Benutzerdefinierter Stil“ verwendet."
+        },
+        "section.universal_colors": {
+            "en": "Universal colors",
+            "de": "Universelle Farben"
+        },
+        "section.surface_transparency": {
+            "en": "Surface transparency",
+            "de": "Flächentransparenz"
+        },
+        "section.typography_effects": {
+            "en": "Typography, borders and effects",
+            "de": "Typografie, Rahmen und Effekte"
+        },
+        "field.style_source": {
+            "en": "Style source",
+            "de": "Stilquelle"
+        },
+        "field.media_object": {
+            "en": "IPSView media object",
+            "de": "IPSView-Medienobjekt"
+        },
+        "field.transparent_background": {
+            "en": "Transparent background",
+            "de": "Transparenter Hintergrund"
+        },
+        "field.font_scale": {
+            "en": "Font scale (%)",
+            "de": "Schriftskalierung (%)"
+        },
+        "option.custom_style": {
+            "en": "Custom style",
+            "de": "Benutzerdefinierter Stil"
+        },
+        "option.ipsview_standard_style": {
+            "en": "IPSView standard style",
+            "de": "IPSView-Standardstil"
+        },
+        "option.light_preset": {
+            "en": "Light preset",
+            "de": "Helle Vorgabe"
+        },
+        "option.dark_preset": {
+            "en": "Dark preset",
+            "de": "Dunkle Vorgabe"
+        },
+        "color.view_background": {
+            "en": "View background",
+            "de": "View-Hintergrund"
+        },
+        "color.page_background": {
+            "en": "Page background",
+            "de": "Seitenhintergrund"
+        },
+        "color.label_background": {
+            "en": "Label background",
+            "de": "Label-Hintergrund"
+        },
+        "color.control_background": {
+            "en": "Control background",
+            "de": "Bedienelement-Hintergrund"
+        },
+        "color.control_active_background": {
+            "en": "Active control background",
+            "de": "Aktiver Bedienelement-Hintergrund"
+        },
+        "color.control_inactive_background": {
+            "en": "Inactive control background",
+            "de": "Inaktiver Bedienelement-Hintergrund"
+        },
+        "color.text_primary": {
+            "en": "Primary text",
+            "de": "Primäre Schrift"
+        },
+        "color.text_active": {
+            "en": "Active text",
+            "de": "Aktive Schrift"
+        },
+        "color.text_inactive": {
+            "en": "Inactive text",
+            "de": "Inaktive Schrift"
+        },
+        "color.label_text": {
+            "en": "Label text",
+            "de": "Label-Schrift"
+        },
+        "color.icon": {
+            "en": "Icon color",
+            "de": "Iconfarbe"
+        },
+        "color.border": {
+            "en": "Border color",
+            "de": "Rahmenfarbe"
+        },
+        "color.line": {
+            "en": "Line color",
+            "de": "Linienfarbe"
+        },
+        "color.popup_background": {
+            "en": "Popup background",
+            "de": "Popup-Hintergrund"
+        },
+        "color.popup_border": {
+            "en": "Popup border",
+            "de": "Popup-Rahmen"
+        },
+        "color.accent": {
+            "en": "Accent color",
+            "de": "Akzentfarbe"
+        },
+        "color.information": {
+            "en": "Information color",
+            "de": "Informationsfarbe"
+        },
+        "color.positive": {
+            "en": "Positive status",
+            "de": "Positiver Status"
+        },
+        "color.warning": {
+            "en": "Warning status",
+            "de": "Warnstatus"
+        },
+        "color.critical": {
+            "en": "Critical status",
+            "de": "Kritischer Status"
+        },
+        "color.shadow": {
+            "en": "Shadow color",
+            "de": "Schattenfarbe"
+        },
+        "opacity.view_background": {
+            "en": "View background opacity",
+            "de": "Deckkraft des View-Hintergrunds"
+        },
+        "opacity.page_background": {
+            "en": "Page background opacity",
+            "de": "Deckkraft des Seitenhintergrunds"
+        },
+        "opacity.label_background": {
+            "en": "Label background opacity",
+            "de": "Deckkraft des Label-Hintergrunds"
+        },
+        "opacity.control_background": {
+            "en": "Control background opacity",
+            "de": "Deckkraft des Bedienelement-Hintergrunds"
+        },
+        "opacity.control_active": {
+            "en": "Active control opacity",
+            "de": "Deckkraft aktiver Bedienelemente"
+        },
+        "opacity.control_inactive": {
+            "en": "Inactive control opacity",
+            "de": "Deckkraft inaktiver Bedienelemente"
+        },
+        "opacity.popup_background": {
+            "en": "Popup background opacity",
+            "de": "Deckkraft des Popup-Hintergrunds"
+        },
+        "opacity.border": {
+            "en": "Border opacity",
+            "de": "Deckkraft der Rahmen"
+        },
+        "opacity.line": {
+            "en": "Line opacity",
+            "de": "Deckkraft der Linien"
+        },
+        "opacity.popup_border": {
+            "en": "Popup border opacity",
+            "de": "Deckkraft des Popup-Rahmens"
+        },
+        "opacity.shadow": {
+            "en": "Shadow opacity",
+            "de": "Deckkraft des Schattens"
+        },
+        "opacity.popup_shadow": {
+            "en": "Popup shadow opacity",
+            "de": "Deckkraft des Popup-Schattens"
+        },
+        "field.font_family": {
+            "en": "Font family",
+            "de": "Schriftfamilie"
+        },
+        "field.base_font_size": {
+            "en": "Base font size",
+            "de": "Grundschriftgröße"
+        },
+        "field.border_radius": {
+            "en": "Border radius",
+            "de": "Eckenradius"
+        },
+        "field.border_width": {
+            "en": "Border width",
+            "de": "Rahmenstärke"
+        },
+        "field.line_width": {
+            "en": "Line width",
+            "de": "Linienstärke"
+        },
+        "field.shadow_blur": {
+            "en": "Shadow blur",
+            "de": "Schattenunschärfe"
+        },
+        "field.shadow_spread": {
+            "en": "Shadow spread",
+            "de": "Schattenausdehnung"
+        },
+        "field.shadow_offset_x": {
+            "en": "Shadow offset X",
+            "de": "Schattenversatz X"
+        },
+        "field.shadow_offset_y": {
+            "en": "Shadow offset Y",
+            "de": "Schattenversatz Y"
+        },
+        "field.inactive_opacity": {
+            "en": "Inactive opacity",
+            "de": "Deckkraft inaktiver Elemente"
+        },
+        "field.gradient_strength": {
+            "en": "Gradient strength",
+            "de": "Verlaufsstärke"
+        }
+    }
+}
