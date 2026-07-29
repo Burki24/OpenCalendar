@@ -23,10 +23,25 @@
             "path": "libs/helper/IPSViewHTMLPageHelper.php"
         },
         "IPSViewStyleHelper": {
-            "version": "1.1.0",
-            "sha256": "802d055e91ae0cd9c6c2351b6cc2231e3e21a3a7150b7a52efdeb220f922334e",
+            "version": "1.2.0",
+            "sha256": "290b564748719297cc3686463c03622e820c8c28afbcbc832198014811fcb601",
             "path": "libs/helper/IPSViewStyleHelper.php",
-            "source_sha": "bd7d676e55903e33e91e5800133fe5fd8f8f2592"
+            "source_sha": "b466a01644ab8fdf33166c1e9edfa554b7aca1c4",
+            "assets": [
+                {
+                    "path": "libs/helper/translations/IPSViewStyleHelper.json",
+                    "sha256": "75eef3aaf784e001de3f6e9c206169d8c73d8ed5291b65aa9b920e93999e5880"
+                }
+            ],
+            "dependencies": [
+                {
+                    "name": "HelperTranslationHelper",
+                    "version": "1.0.0",
+                    "sha256": "d3deee581eca9f8eb11e9adce060170227a2dc836ee898bd134f93d27604f639",
+                    "path": "libs/helper/HelperTranslationHelper.php",
+                    "source_sha": "b466a01644ab8fdf33166c1e9edfa554b7aca1c4"
+                }
+            ]
         },
         "ParentConnectionHelper": {
             "version": "1.0.0",
