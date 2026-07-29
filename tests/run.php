@@ -1148,30 +1148,41 @@ assertTrueValue(
 );
 assertTrueValue(
     is_string($viewModuleSource)
-        && str_contains($viewModuleSource, 'use Burki24\\SymconModuleHelper\\IPSViewColorPaletteHelper;')
-        && str_contains($viewModuleSource, "require_once __DIR__ . '/../libs/helper/IPSViewColorPaletteHelper.php';")
-        && str_contains($viewModuleSource, 'use IPSViewColorPaletteHelper;')
-        && str_contains($viewModuleSource, '$this->RegisterIPSViewColorProperties();')
-        && str_contains($viewModuleSource, "\$this->IPSViewColorFormItems('250px')")
-        && str_contains($viewModuleSource, '$this->IPSViewColorCSSVariables(')
-        && str_contains($viewModuleSource, "3       => 'ipsview-custom'")
+        && str_contains($viewModuleSource, 'use Burki24\\SymconModuleHelper\\IPSViewStyleHelper;')
+        && str_contains($viewModuleSource, "require_once __DIR__ . '/../libs/helper/IPSViewStyleHelper.php';")
+        && str_contains($viewModuleSource, 'use IPSViewStyleHelper;')
+        && str_contains($viewModuleSource, '$this->RegisterIPSViewStyleProperties();')
+        && str_contains($viewModuleSource, "\$this->IPSViewStyleFormItems('220px')")
+        && str_contains($viewModuleSource, '$this->IPSViewStyleCSSVariables(')
+        && str_contains($viewModuleSource, '$this->RegisterIPSViewStyleMediaMessages();')
+        && str_contains($viewModuleSource, '$this->IsIPSViewStyleMediaUpdate(')
         && is_string($viewTemplateSource)
         && str_contains($viewTemplateSource, '{{IPSVIEW_THEME}}')
-        && str_contains($viewModuleSource, '--cal-text: var(--ipsview-text);')
-        && str_contains($viewModuleSource, '--cal-surface: var(--ipsview-surface);')
-        && str_contains($viewModuleSource, '--cal-accent: var(--ipsview-accent);')
-        && str_contains($viewModuleSource, '--cal-danger: var(--ipsview-danger);'),
-    'The calendar view must consume the shared IPSView color palette without replacing calendar event colors.'
+        && str_contains($viewTemplateSource, '--cal-text: var(--ipsview-text);')
+        && str_contains($viewTemplateSource, '--cal-surface: var(--ipsview-control-background);')
+        && str_contains($viewTemplateSource, '--cal-accent: var(--ipsview-accent);')
+        && str_contains($viewTemplateSource, '--cal-danger: var(--ipsview-critical);')
+        && str_contains($viewTemplateSource, '--cal-popup-shadow: var(--ipsview-popup-shadow);'),
+    'The calendar view must consume the shared universal IPSView style without replacing calendar event colors.'
 );
 assertTrueValue(
     is_string($viewFormSource)
-        && str_contains($viewFormSource, '"caption": "Custom colors"')
-        && str_contains($viewFormSource, '"value": 3')
         && str_contains(
             $viewFormSource,
-            'Choose the IPSView palette directly. The colors are stored in the module configuration.'
-        ),
-    'The calendar view form must expose the shared custom IPSView palette option.'
+            'Configure the shared IPSView style used by the standalone HTML page.'
+        )
+        && !str_contains($viewFormSource, '"name": "IPSViewTheme"')
+        && !str_contains($viewFormSource, '"name": "IPSViewTransparent"')
+        && !str_contains($viewFormSource, '"name": "IPSViewFontScale"'),
+    'The calendar view form must delegate the complete shared IPSView style to the helper.'
+);
+assertTrueValue(
+    is_string($viewModuleSource)
+        && str_contains($viewModuleSource, 'public function Migrate(string $JSONData): string')
+        && str_contains($viewModuleSource, "'IPSViewTheme'")
+        && str_contains($viewModuleSource, "'IPSViewTransparent' => 'IPSViewStyleTransparentBackground'")
+        && str_contains($viewModuleSource, "'IPSViewFontScale'   => 'IPSViewStyleFontScale'"),
+    'The calendar view must migrate its former IPSView palette and layout properties.'
 );
 assertTrueValue(
     is_string($viewTemplateSource)

@@ -132,36 +132,12 @@
             "caption": "Provide IPSView HTMLBox"
         },
         {
-            "type": "CheckBox",
-            "name": "IPSViewTransparent",
-            "caption": "Transparent IPSView background"
-        },
-        {
-            "type": "Select",
-            "name": "IPSViewTheme",
-            "caption": "IPSView color scheme",
-            "options": [
-                {
-                    "caption": "Automatic",
-                    "value": 0
-                },
-                {
-                    "caption": "Light background",
-                    "value": 1
-                },
-                {
-                    "caption": "Dark background",
-                    "value": 2
-                },
-                {
-                    "caption": "Custom colors",
-                    "value": 3
-                }
-            ]
+            "type": "Label",
+            "caption": "Creates a WebContent variable with the calendar for an IPSView HTML-Box."
         },
         {
             "type": "Label",
-            "caption": "Choose the IPSView palette directly. The colors are stored in the module configuration."
+            "caption": "Configure the shared IPSView style used by the standalone HTML page."
         },
         {
             "type": "Select",
@@ -179,25 +155,16 @@
             ]
         },
         {
-            "type": "RowLayout",
-            "items": [
-                {
-                    "type": "NumberSpinner",
-                    "name": "IPSViewFontScale",
-                    "caption": "IPSView font size",
-                    "minimum": 80,
-                    "maximum": 200,
-                    "suffix": " %"
-                },
-                {
-                    "type": "NumberSpinner",
-                    "name": "IPSViewColorBarWidth",
-                    "caption": "IPSView color bar width",
-                    "minimum": 2,
-                    "maximum": 16,
-                    "suffix": " px"
-                }
-            ]
+            "type": "NumberSpinner",
+            "name": "IPSViewColorBarWidth",
+            "caption": "IPSView color bar width",
+            "minimum": 2,
+            "maximum": 16,
+            "suffix": " px"
+        },
+        {
+            "type": "Label",
+            "caption": "In IPSView, use an HTML-Box with the client browser renderer so JavaScript is available."
         }
     ],
     "actions": [

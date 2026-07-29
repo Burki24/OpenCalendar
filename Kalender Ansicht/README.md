@@ -2,7 +2,7 @@
 
 Die Kalender Ansicht fasst Termine mehrerer Kalenderinstanzen in einer responsiven Kachel der Symcon-Kachelvisualisierung oder in einer HTMLBox für IPSView zusammen.
 
-Die Kachel verwendet den vendorten `VisualizationThemeHelper` und orientiert sich dadurch an den nativen Symcon-Designvariablen. Für die eigenständige IPSView-Seite steht zusätzlich der gemeinsame `IPSViewColorPaletteHelper` zur Verfügung. Er stellt dieselben neun konfigurierbaren Grund-, Flächen-, Schrift- und Statusfarben bereit, die auch OpenHomeAlarm verwendet, und korrigiert sie bei Bedarf für lesbaren Kontrast.
+Die Kachel verwendet den vendorten `VisualizationThemeHelper` und orientiert sich dadurch an den nativen Symcon-Designvariablen. Die eigenständige IPSView-Seite verwendet den universellen `IPSViewStyleHelper`. Dadurch stehen in allen angebundenen Modulen dieselben Stilquellen, Bezeichnungen, Flächen, Schriften, Rahmen, Schatten, Statusrollen und Verläufe zur Verfügung.
 
 ## Funktionsumfang
 
@@ -37,21 +37,21 @@ Wiederkehrende, vom CalDAV-Server expandierte Einzeltermine werden derzeit nur l
 ### IPSView
 
 1. In der Instanz **Kalender Ansicht** die Option **IPSView-HTMLBox bereitstellen** aktivieren und die Änderungen übernehmen.
-2. Mit **Transparenter IPSView-Hintergrund** festlegen, ob die Oberfläche der umgebenden View sichtbar bleiben soll.
-3. Unter **IPSView-Farbschema** zwischen **Automatisch**, **Heller Hintergrund**, **Dunkler Hintergrund** und **Benutzerdefinierte Farben** wählen. Die bisherigen drei Modi bleiben für bestehende Instanzen unverändert.
-4. Bei **Benutzerdefinierte Farben** die neun Farben für Seite, Karten, hervorgehobene Flächen, primäre und sekundäre Schrift, Akzent sowie Bereit-, Warn- und Fehlerzustände festlegen. Der gemeinsame Helper leitet daraus kontrastsichere Nebenfarben und Rahmen ab. Kalender- und Terminfarben bleiben davon unabhängig.
-5. Mit **IPSView-Wochenausrichtung** festlegen, ob die Wochentage nebeneinander oder als vertikale Tageszeilen dargestellt werden.
-6. Mit **IPSView-Schriftgröße** die gesamte Darstellung zwischen 80 und 200 Prozent skalieren. Der Standardwert 115 Prozent verbessert die Lesbarkeit auf Touchdisplays.
-7. Über **IPSView-Farbbalkenbreite** die Kalenderkennzeichnung zwischen 2 und 16 Pixeln einstellen. Der Standardwert beträgt 7 Pixel.
+2. Unter **Stilquelle** zwischen **Benutzerdefinierter Stil**, **IPSView-Standardstil**, **Helle Vorgabe** und **Dunkle Vorgabe** wählen.
+3. Für **IPSView-Standardstil** das Medienobjekt auswählen, das die gewünschte `.ipsView`-Datei enthält. Der Helper übernimmt daraus ausschließlich freigegebene Standardstil-Werte wie Farben, Schrift, Rahmen, Schatten und Rundungen. Wird das Medienobjekt aktualisiert, wird auch die WebContent-Ausgabe neu erzeugt.
+4. Beim **Benutzerdefinierten Stil** die universellen Flächen-, Schrift-, Icon-, Rahmen-, Popup- und Statusfarben sowie Typografie und Effekte direkt festlegen. Diese Rollen besitzen in allen Modulen dieselbe Bedeutung und Wirkung.
+5. Mit **Transparenter Hintergrund** festlegen, ob die umgebende View sichtbar bleiben soll.
+6. Mit **IPSView-Wochenausrichtung** festlegen, ob die Wochentage nebeneinander oder als vertikale Tageszeilen dargestellt werden.
+7. Über **IPSView-Farbbalkenbreite** die Kalenderkennzeichnung zwischen 2 und 16 Pixeln einstellen. Kalender- und Terminfarben bleiben fachliche Inhaltsfarben und werden nicht durch den gemeinsamen Stil ersetzt.
 8. Unterhalb der Instanz wird die String-Variable **IPSView-Kalender** mit der Darstellung **Webinhalt** angelegt.
 9. Im IPSView Designer ein Steuerelement vom Typ **HTML-Box** einfügen und diese Variable als ID auswählen.
 10. Als HTML Renderer **Browser des Clients** oder **Automatisch** verwenden. Der native einfache HTML Renderer reicht nicht aus, weil Ansichtswechsel und Navigation JavaScript verwenden.
 
 Agenda, 3-Tage-, Wochen- und Monatsansicht sowie die Navigation funktionieren direkt innerhalb der IPSView-HTMLBox. Die Variable wird bei Änderungen oder Synchronisationen der ausgewählten Kalender automatisch neu erzeugt. Das Öffnen von Termindetails ist lesend möglich. Erstellen, Bearbeiten, Löschen und die manuelle Synchronisationsschaltfläche bleiben der Symcon-Kachel vorbehalten, da die IPSView-HTMLBox keine Symcon-HTML-SDK-Aktionsbrücke bereitstellt.
 
-Die HTMLBox kann den Hintergrund der umgebenden IPSView nicht auslesen, da sie in einem eigenen Browserbereich ausgeführt wird. Für eine genaue Anpassung an eine vorhandene View deshalb **Benutzerdefinierte Farben** verwenden. Bei älteren IPSView-Clients oder nativen Renderern kann der Browserbereich trotz transparentem HTML einen eigenen Hintergrund zeichnen; in diesem Fall den aktuellen Browser-Renderer des Clients verwenden.
+Der `IPSViewStyleHelper` erzeugt sämtliche allgemeinen CSS-Rollen zentral. OpenCalendar ordnet diesen Rollen nur seine Komponenten zu; eigene Grund-, Status- oder Popupfarben werden im Modul nicht mehr festgelegt. Die frei gewählten Farben einzelner Kalender und Termine bleiben davon unabhängig.
 
-Die IPSView-Option **Seite skalieren** wird laut Hersteller nur von den mobilen Clients unterstützt und hat unter Windows keine Wirkung. Schriftgröße und Farbbalkenbreite werden deshalb vom Modul direkt am Kalenderinhalt gesetzt. Für die zuverlässige Verarbeitung von CSS und JavaScript muss in IPSView **Browser des Clients** statt **HTML Renderer** ausgewählt sein.
+Die IPSView-Option **Seite skalieren** wird laut Hersteller nur von den mobilen Clients unterstützt und hat unter Windows keine Wirkung. Schriftgröße und Stilskalierung werden deshalb vom Helper direkt am Kalenderinhalt gesetzt. Für die zuverlässige Verarbeitung von CSS und JavaScript muss in IPSView **Browser des Clients** statt **HTML Renderer** ausgewählt sein.
 
 Über `Kalender synchronisieren` kann die Verbindung bereits in der Konfiguration geprüft werden. Neu vom Konfigurator angelegte Kalender übernehmen Farbe und Schreibberechtigung automatisch. Bei Kalenderinstanzen, die vor Einführung dieser Eigenschaften angelegt wurden, die Konfiguration über den Kalender-Konfigurator einmal neu anwenden.
 

@@ -3,13 +3,13 @@
 declare(strict_types=1);
 
 use Burki24\SymconModuleHelper\ConfigurationFormHelper;
-use Burki24\SymconModuleHelper\IPSViewColorPaletteHelper;
+use Burki24\SymconModuleHelper\IPSViewStyleHelper;
 use Burki24\SymconModuleHelper\VariableHelper;
 use Burki24\SymconModuleHelper\VisualizationAssetHelper;
 use Burki24\SymconModuleHelper\VisualizationThemeHelper;
 
 require_once __DIR__ . '/../libs/helper/ConfigurationFormHelper.php';
-require_once __DIR__ . '/../libs/helper/IPSViewColorPaletteHelper.php';
+require_once __DIR__ . '/../libs/helper/IPSViewStyleHelper.php';
 require_once __DIR__ . '/../libs/helper/VariableHelper.php';
 require_once __DIR__ . '/../libs/helper/VisualizationAssetHelper.php';
 require_once __DIR__ . '/../libs/helper/VisualizationThemeHelper.php';
@@ -17,7 +17,7 @@ require_once __DIR__ . '/../libs/helper/VisualizationThemeHelper.php';
 class KalenderAnsicht extends IPSModuleStrict
 {
     use ConfigurationFormHelper;
-    use IPSViewColorPaletteHelper;
+    use IPSViewStyleHelper;
     use VariableHelper;
     use VisualizationAssetHelper;
     use VisualizationThemeHelper;
@@ -27,6 +27,56 @@ class KalenderAnsicht extends IPSModuleStrict
 
     private const STATUS_NO_CALENDARS = 201;
     private const STATUS_INVALID_CONFIGURATION = 202;
+
+    private const LEGACY_IPSVIEW_STRING_COLOR_PROPERTIES = [
+        'IPSViewPageColor'          => 'IPSViewPageColorValue',
+        'IPSViewSurfaceColor'       => 'IPSViewSurfaceColorValue',
+        'IPSViewSurfaceStrongColor' => 'IPSViewSurfaceStrongColorValue',
+        'IPSViewTextColor'          => 'IPSViewTextColorValue',
+        'IPSViewMutedTextColor'     => 'IPSViewMutedTextColorValue',
+        'IPSViewAccentColor'        => 'IPSViewAccentColorValue',
+        'IPSViewSuccessColor'       => 'IPSViewSuccessColorValue',
+        'IPSViewWarningColor'       => 'IPSViewWarningColorValue',
+        'IPSViewDangerColor'        => 'IPSViewDangerColorValue'
+    ];
+
+    private const LEGACY_IPSVIEW_STYLE_PROPERTIES = [
+        'IPSViewPageColorValue'          => [
+            'IPSViewStyleViewBackgroundColor',
+            'IPSViewStylePageBackgroundColor'
+        ],
+        'IPSViewSurfaceColorValue'       => [
+            'IPSViewStyleControlBackgroundColor',
+            'IPSViewStyleControlInactiveBackgroundColor'
+        ],
+        'IPSViewSurfaceStrongColorValue' => [
+            'IPSViewStyleLabelBackgroundColor',
+            'IPSViewStyleControlActiveBackgroundColor',
+            'IPSViewStylePopupBackgroundColor'
+        ],
+        'IPSViewTextColorValue'          => [
+            'IPSViewStyleTextColor',
+            'IPSViewStyleTextActiveColor',
+            'IPSViewStyleLabelTextColor',
+            'IPSViewStyleIconColor'
+        ],
+        'IPSViewMutedTextColorValue'     => [
+            'IPSViewStyleTextInactiveColor'
+        ],
+        'IPSViewAccentColorValue'        => [
+            'IPSViewStyleAccentColor',
+            'IPSViewStyleInformationColor'
+        ],
+        'IPSViewSuccessColorValue'       => [
+            'IPSViewStylePositiveColor'
+        ],
+        'IPSViewWarningColorValue'       => [
+            'IPSViewStyleWarningColor'
+        ],
+        'IPSViewDangerColorValue'        => [
+            'IPSViewStyleCriticalColor'
+        ]
+    ];
 
     /**
      * Registers visualization properties, runtime attributes, and initialization state.
@@ -48,12 +98,9 @@ class KalenderAnsicht extends IPSModuleStrict
         $this->RegisterPropertyBoolean('ShowLocation', true);
         $this->RegisterPropertyBoolean('ShowDescription', false);
         $this->RegisterPropertyBoolean('EnableIPSView', false);
-        $this->RegisterPropertyBoolean('IPSViewTransparent', true);
-        $this->RegisterPropertyInteger('IPSViewTheme', 0);
-        $this->RegisterPropertyInteger('IPSViewFontScale', 115);
         $this->RegisterPropertyInteger('IPSViewColorBarWidth', 7);
         $this->RegisterPropertyInteger('IPSViewWeekOrientation', 0);
-        $this->RegisterIPSViewColorProperties();
+        $this->RegisterIPSViewStyleProperties();
         $this->RegisterAttributeBoolean('RuntimeReady', false);
         $this->RegisterAttributeString('CalendarSelectionBackup', '[]');
 
@@ -83,10 +130,108 @@ class KalenderAnsicht extends IPSModuleStrict
             }
         }
         if (isset($form['elements']) && is_array($form['elements'])) {
-            $this->injectIPSViewColorFormItems($form['elements']);
+            $this->injectIPSViewStyleFormItems($form['elements']);
         }
 
         return $this->EncodeConfigurationForm($form);
+    }
+
+    /**
+     * Migrates the former calendar-specific IPSView palette to the shared style system.
+     */
+    public function Migrate(string $JSONData): string
+    {
+        parent::Migrate($JSONData);
+
+        try {
+            $persistence = json_decode($JSONData, true, 512, JSON_THROW_ON_ERROR);
+        } catch (JsonException) {
+            return '';
+        }
+
+        if (
+            !is_array($persistence)
+            || !isset($persistence['configuration'])
+            || !is_array($persistence['configuration'])
+        ) {
+            return '';
+        }
+
+        $configuration = &$persistence['configuration'];
+        $changed = false;
+
+        foreach (self::LEGACY_IPSVIEW_STRING_COLOR_PROPERTIES as $legacyProperty => $integerProperty) {
+            if (!array_key_exists($legacyProperty, $configuration)) {
+                continue;
+            }
+
+            $legacyValue = $configuration[$legacyProperty];
+            if (is_string($legacyValue) && preg_match('/^#?([0-9a-fA-F]{6})$/', trim($legacyValue), $matches)) {
+                $configuration[$integerProperty] = hexdec($matches[1]);
+            }
+
+            unset($configuration[$legacyProperty]);
+            $changed = true;
+        }
+
+        $legacyTheme = $configuration['IPSViewTheme'] ?? null;
+        if (is_int($legacyTheme) && !array_key_exists('IPSViewStyleSource', $configuration)) {
+            $configuration['IPSViewStyleSource'] = match ($legacyTheme) {
+                1       => self::IPSVIEW_STYLE_SOURCE_LIGHT,
+                2       => self::IPSVIEW_STYLE_SOURCE_DARK,
+                default => self::IPSVIEW_STYLE_SOURCE_CUSTOM
+            };
+        }
+        if (array_key_exists('IPSViewTheme', $configuration)) {
+            unset($configuration['IPSViewTheme']);
+            $changed = true;
+        }
+
+        foreach ([
+            'IPSViewTransparent' => 'IPSViewStyleTransparentBackground',
+            'IPSViewFontScale'   => 'IPSViewStyleFontScale'
+        ] as $legacyProperty => $styleProperty) {
+            if (!array_key_exists($legacyProperty, $configuration)) {
+                continue;
+            }
+
+            if (!array_key_exists($styleProperty, $configuration)) {
+                $configuration[$styleProperty] = $configuration[$legacyProperty];
+            }
+            unset($configuration[$legacyProperty]);
+            $changed = true;
+        }
+
+        foreach (self::LEGACY_IPSVIEW_STYLE_PROPERTIES as $legacyProperty => $styleProperties) {
+            if (!array_key_exists($legacyProperty, $configuration)) {
+                continue;
+            }
+
+            $value = $configuration[$legacyProperty];
+            if (is_int($value) && $value >= 0 && $value <= 0xFFFFFF) {
+                foreach ($styleProperties as $styleProperty) {
+                    if (!array_key_exists($styleProperty, $configuration)) {
+                        $configuration[$styleProperty] = $value;
+                    }
+                }
+            }
+
+            unset($configuration[$legacyProperty]);
+            $changed = true;
+        }
+
+        if (!$changed) {
+            return '';
+        }
+
+        try {
+            return json_encode(
+                $persistence,
+                JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE
+            );
+        } catch (JsonException) {
+            return '';
+        }
     }
 
     /**
@@ -102,6 +247,7 @@ class KalenderAnsicht extends IPSModuleStrict
             $this->storeCalendarSelectionBackup($configured);
         }
         $this->RegisterMessage(0, IPS_KERNELSTARTED);
+        $this->RegisterIPSViewStyleMediaMessages();
         $this->SetTimerInterval('InitializationTimer', 0);
         $this->MaintainVariable(
             'IPSViewCalendar',
@@ -143,6 +289,7 @@ class KalenderAnsicht extends IPSModuleStrict
                 $this->UnregisterMessage($senderId, $messageId);
             }
         }
+        $this->RegisterIPSViewStyleMediaMessages();
 
         $this->WriteAttributeBoolean('RuntimeReady', true);
         try {
@@ -176,6 +323,13 @@ class KalenderAnsicht extends IPSModuleStrict
     {
         if ($SenderID === 0 && $Message === IPS_KERNELSTARTED) {
             $this->scheduleInitialization();
+            return;
+        }
+        if ($this->IsIPSViewStyleMediaUpdate($SenderID, $Message)) {
+            if ($this->isRuntimeReady()) {
+                $this->broadcastState();
+            }
+
             return;
         }
         if (!$this->isRuntimeReady()) {
@@ -371,39 +525,31 @@ class KalenderAnsicht extends IPSModuleStrict
     }
 
     /** @param array<int,array<string,mixed>> $elements */
-    private function injectIPSViewColorFormItems(array &$elements): void
+    private function injectIPSViewStyleFormItems(array &$elements): void
     {
         foreach ($elements as $index => $element) {
-            if (($element['caption'] ?? null) !== 'Choose the IPSView palette directly. The colors are stored in the module configuration.') {
+            if (($element['caption'] ?? null) !== 'Configure the shared IPSView style used by the standalone HTML page.') {
                 continue;
             }
 
-            array_splice($elements, $index, 1, $this->IPSViewColorFormItems('250px'));
+            array_splice($elements, $index, 1, $this->IPSViewStyleFormItems('220px'));
 
             return;
         }
     }
 
-    private function renderIPSViewColorThemeCSS(): string
+    private function renderIPSViewStyleCSS(): string
     {
-        $variables = $this->IPSViewColorCSSVariables(
-            $this->ReadPropertyBoolean('IPSViewTransparent'),
-            ':root'
-        );
+        return $this->IPSViewStyleCSSVariables(':root');
+    }
 
-        return $variables . "\n" . <<<'CSS'
-html.ipsview-mode.ipsview-custom {
-    --cal-text: var(--ipsview-text);
-    --cal-card: var(--ipsview-background);
-    --cal-dialog: var(--ipsview-surface-strong);
-    --cal-muted: var(--ipsview-muted);
-    --cal-border: var(--ipsview-border);
-    --cal-surface: var(--ipsview-surface);
-    --cal-surface-hover: var(--ipsview-surface-strong);
-    --cal-accent: var(--ipsview-accent);
-    --cal-danger: var(--ipsview-danger);
-}
-CSS;
+    private function IPSViewRootFontSize(): string
+    {
+        $style = $this->IPSViewResolvedStyle();
+        $scale = max(60, min(200, $this->ReadPropertyInteger('IPSViewStyleFontScale'))) / 100;
+        $fontSize = max(8, min(64, (int) round((float) $style['FontSize'] * $scale)));
+
+        return $fontSize . 'px';
     }
 
     private function broadcastState(): void
@@ -462,28 +608,12 @@ CSS;
 
         $translations = [];
         if ($ipsView) {
-            $classes = ['ipsview-mode'];
-            if ($this->ReadPropertyBoolean('IPSViewTransparent')) {
-                $classes[] = 'ipsview-transparent';
-            }
-            $ipsViewTheme = $this->ReadPropertyInteger('IPSViewTheme');
-            $classes[] = match ($ipsViewTheme) {
-                1       => 'ipsview-light',
-                2       => 'ipsview-dark',
-                3       => 'ipsview-custom',
-                default => 'ipsview-auto'
-            };
-            $html = str_replace(
-                '{{IPSVIEW_THEME}}',
-                $ipsViewTheme === 3 ? $this->renderIPSViewColorThemeCSS() : '',
-                $html
-            );
-            $fontScale = max(80, min(200, $this->ReadPropertyInteger('IPSViewFontScale')));
+            $html = str_replace('{{IPSVIEW_THEME}}', $this->renderIPSViewStyleCSS(), $html);
             $colorBarWidth = max(2, min(16, $this->ReadPropertyInteger('IPSViewColorBarWidth')));
             $language = $this->Translate('Today') === 'Heute' ? 'de' : 'en';
             $html = str_replace(
                 '<html lang="en">',
-                '<html lang="' . $language . '" class="' . implode(' ', $classes) . '">',
+                '<html lang="' . $language . '" class="ipsview-mode">',
                 $html
             );
             $html = str_replace(
@@ -494,8 +624,8 @@ CSS;
             $html = str_replace(
                 '<div id="calendar-app">',
                 sprintf(
-                    '<div id="calendar-app" style="font-size:%d%% !important; --agenda-color-bar-width:%dpx; --compact-color-bar-width:%dpx;">',
-                    $fontScale,
+                    '<div id="calendar-app" style="font-size:%s !important; --agenda-color-bar-width:%dpx; --compact-color-bar-width:%dpx;">',
+                    $this->IPSViewRootFontSize(),
                     $colorBarWidth,
                     $colorBarWidth
                 ),

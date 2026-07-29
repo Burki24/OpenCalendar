@@ -17,10 +17,10 @@
             "sha256": "be4fae4c23f757ab462237d8e74d2a9dca1b504937ed4d4b51c7ff76004cf1cd",
             "path": "libs/helper/HttpResponseHelper.php"
         },
-        "IPSViewColorPaletteHelper": {
+        "IPSViewStyleHelper": {
             "version": "1.0.0",
-            "sha256": "2f73639e1c25f09950dad90e5560276de5f8fb66bbc024ae35fa0c072a0e08fe",
-            "path": "libs/helper/IPSViewColorPaletteHelper.php"
+            "sha256": "a675da17c8b6c0361ef7c5a65566ff587833e2ae8cfbdc92df4f5d977c804cc8",
+            "path": "libs/helper/IPSViewStyleHelper.php"
         },
         "ParentConnectionHelper": {
             "version": "1.0.0",
