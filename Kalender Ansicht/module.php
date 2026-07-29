@@ -527,14 +527,18 @@ class KalenderAnsicht extends IPSModuleStrict
     /** @param array<int,array<string,mixed>> $elements */
     private function injectIPSViewStyleFormItems(array &$elements): void
     {
-        foreach ($elements as $index => $element) {
-            if (($element['caption'] ?? null) !== 'Configure the shared IPSView style used by the standalone HTML page.') {
+        foreach ($elements as $index => &$element) {
+            if (($element['caption'] ?? null) === 'Configure the shared IPSView style used by the standalone HTML page.') {
+                array_splice($elements, $index, 1, $this->IPSViewStyleFormItems('220px'));
+
+                return;
+            }
+
+            if (!isset($element['items']) || !is_array($element['items'])) {
                 continue;
             }
 
-            array_splice($elements, $index, 1, $this->IPSViewStyleFormItems('220px'));
-
-            return;
+            $this->injectIPSViewStyleFormItems($element['items']);
         }
     }
 

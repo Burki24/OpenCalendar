@@ -127,44 +127,51 @@
             ]
         },
         {
-            "type": "CheckBox",
-            "name": "EnableIPSView",
-            "caption": "Provide IPSView HTMLBox"
-        },
-        {
-            "type": "Label",
-            "caption": "Creates a WebContent variable with the calendar for an IPSView HTML-Box."
-        },
-        {
-            "type": "Label",
-            "caption": "Configure the shared IPSView style used by the standalone HTML page."
-        },
-        {
-            "type": "Select",
-            "name": "IPSViewWeekOrientation",
-            "caption": "IPSView week orientation",
-            "options": [
+            "type": "ExpansionPanel",
+            "caption": "IPSView",
+            "expanded": false,
+            "items": [
                 {
-                    "caption": "Horizontal",
-                    "value": 0
+                    "type": "CheckBox",
+                    "name": "EnableIPSView",
+                    "caption": "Provide IPSView HTMLBox"
                 },
                 {
-                    "caption": "Vertical",
-                    "value": 1
+                    "type": "Label",
+                    "caption": "Creates a WebContent variable with the calendar for an IPSView HTML-Box."
+                },
+                {
+                    "type": "Label",
+                    "caption": "Configure the shared IPSView style used by the standalone HTML page."
+                },
+                {
+                    "type": "Select",
+                    "name": "IPSViewWeekOrientation",
+                    "caption": "IPSView week orientation",
+                    "options": [
+                        {
+                            "caption": "Horizontal",
+                            "value": 0
+                        },
+                        {
+                            "caption": "Vertical",
+                            "value": 1
+                        }
+                    ]
+                },
+                {
+                    "type": "NumberSpinner",
+                    "name": "IPSViewColorBarWidth",
+                    "caption": "IPSView color bar width",
+                    "minimum": 2,
+                    "maximum": 16,
+                    "suffix": " px"
+                },
+                {
+                    "type": "Label",
+                    "caption": "In IPSView, use an HTML-Box with the client browser renderer so JavaScript is available."
                 }
             ]
-        },
-        {
-            "type": "NumberSpinner",
-            "name": "IPSViewColorBarWidth",
-            "caption": "IPSView color bar width",
-            "minimum": 2,
-            "maximum": 16,
-            "suffix": " px"
-        },
-        {
-            "type": "Label",
-            "caption": "In IPSView, use an HTML-Box with the client browser renderer so JavaScript is available."
         }
     ],
     "actions": [
