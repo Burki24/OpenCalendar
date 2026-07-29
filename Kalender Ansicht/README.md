@@ -2,7 +2,7 @@
 
 Die Kalender Ansicht fasst Termine mehrerer Kalenderinstanzen in einer responsiven Kachel der Symcon-Kachelvisualisierung oder in einer HTMLBox für IPSView zusammen.
 
-Die Kachel verwendet den vendorten `VisualizationThemeHelper` und orientiert sich dadurch an den nativen Symcon-Designvariablen. Die eigenständige IPSView-Seite verwendet den universellen `IPSViewStyleHelper`. Dadurch stehen in allen angebundenen Modulen dieselben Stilquellen, Bezeichnungen, Flächen, Schriften, Rahmen, Schatten, Statusrollen und Verläufe zur Verfügung.
+Die Kachel verwendet den vendorten `VisualizationThemeHelper` und orientiert sich dadurch an den nativen Symcon-Designvariablen. Die eigenständige IPSView-Seite verwendet den universellen `IPSViewStyleHelper`. Dadurch stehen in allen angebundenen Modulen dieselben Stilquellen, Bezeichnungen, Flächen, Schriften, Rahmen, Schatten, Statusrollen und Verläufe zur Verfügung. Native Kachel und IPSView-Seite werden über den gemeinsamen `IPSViewHTMLPageHelper` aus derselben Asset-Struktur `visualization/index.html`, `style.css` und `app.js` erzeugt.
 
 ## Funktionsumfang
 

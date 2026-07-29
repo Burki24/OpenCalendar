@@ -1,3 +1,6 @@
-After copying the files from this package, delete this obsolete helper file from the repository:
+After copying the files from this package, delete these obsolete files from the repository:
 
-libs/helper/IPSViewColorPaletteHelper.php
+Kalender Ansicht/visualization/module.html
+libs/helper/IPSViewColorPaletteHelper.php (only if it still exists)
+
+Afterwards, DELETE_FILES.txt itself can be removed from the repository.

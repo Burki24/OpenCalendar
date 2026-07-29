@@ -55,6 +55,9 @@ jobs:
       - name: Run OpenCalendar tests
         run: php tests/run.php
 
+      - name: Check shared visualization contract
+        run: php tests/visualization.php
+
       - name: Run account module structure tests
         run: php tests/account-module.php
 

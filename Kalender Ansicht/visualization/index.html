@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="{{HTML_LANGUAGE}}" class="{{HTML_CLASSES}}" style="--cal-root-font-size: {{ROOT_FONT_SIZE}};">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="{{VIEWPORT_CONTENT}}">
+    <title>{{DOCUMENT_TITLE}}</title>
+    <style>{{VISUALIZATION_THEME}}
+{{MODULE_STYLE}}
+{{IPSVIEW_STYLE}}</style>
+</head>
+<body>
+<div id="calendar-app">
+    <div class="toolbar">
+        <div class="toolbar-group">
+            <button class="icon-button" id="previous-button" title="Previous" aria-label="Previous">‹</button>
+            <button class="icon-button" id="today-button" title="Today" aria-label="Today">●</button>
+            <button class="icon-button" id="next-button" title="Next" aria-label="Next">›</button>
+        </div>
+        <div class="toolbar-title" id="period-title"></div>
+        <div class="toolbar-spacer"></div>
+        <div class="toolbar-group" id="view-buttons">
+            <button class="view-button" data-view="agenda">Agenda</button>
+            <button class="view-button" data-view="threeDays">3 Days</button>
+            <button class="view-button" data-view="week">Week</button>
+            <button class="view-button" data-view="month">Month</button>
+        </div>
+        <button class="icon-button" id="refresh-button" title="Refresh" aria-label="Refresh">↻</button>
+    </div>
+    <main class="content" id="calendar-content"></main>
+    <button class="floating-add" id="add-button" title="Create event" aria-label="Create event">+</button>
+    <div class="toast" id="toast" role="status"></div>
+</div>
+
+<dialog id="event-dialog">
+    <form id="event-form">
+        <div class="dialog-header">
+            <span id="dialog-color" style="width:10px;height:10px;border-radius:50%;background:var(--cal-accent)"></span>
+            <h2 id="dialog-title">Event</h2>
+            <button type="button" class="icon-button" id="dialog-close" aria-label="Close">×</button>
+        </div>
+        <div class="dialog-body">
+            <div class="form-row">
+                <label for="event-calendar">Calendar</label>
+                <select id="event-calendar" required></select>
+            </div>
+            <div class="form-row">
+                <label for="event-summary">Title</label>
+                <input id="event-summary" maxlength="250" required>
+            </div>
+            <label class="checkbox-row"><input type="checkbox" id="event-all-day"> <span id="all-day-label">All day</span></label>
+            <div class="form-row two">
+                <div class="form-row">
+                    <label for="event-start">Start</label>
+                    <input id="event-start" type="datetime-local" required>
+                </div>
+                <div class="form-row">
+                    <label for="event-end">End</label>
+                    <input id="event-end" type="datetime-local" required>
+                </div>
+            </div>
+            <div class="form-row">
+                <label for="event-location">Location</label>
+                <input id="event-location" maxlength="500">
+            </div>
+            <div class="form-row">
+                <label for="event-description">Description</label>
+                <textarea id="event-description" maxlength="5000"></textarea>
+            </div>
+            <div class="dialog-note hidden" id="dialog-note"></div>
+        </div>
+        <div class="dialog-actions">
+            <button type="button" class="danger-button hidden" id="delete-button">Delete</button>
+            <button type="button" class="secondary-button" id="cancel-button">Cancel</button>
+            <button type="submit" class="primary-button" id="save-button">Save</button>
+        </div>
+    </form>
+</dialog>
+<script>
+window.SYMC_VISUALIZATION = {{BOOTSTRAP_JSON}};
+{{MODULE_SCRIPT}}
+</script>
+</body>
+</html>

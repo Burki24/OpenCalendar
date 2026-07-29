@@ -1074,7 +1074,9 @@ $calendarModuleSource = file_get_contents(__DIR__ . '/../Kalender/module.php');
 $accountModuleSource = file_get_contents(__DIR__ . '/../Kalender Konto/module.php');
 $accountGoogleOAuthSource = file_get_contents(__DIR__ . '/../Kalender Konto/traits/GoogleOAuthTrait.php');
 $viewModuleSource = file_get_contents(__DIR__ . '/../Kalender Ansicht/module.php');
-$viewTemplateSource = file_get_contents(__DIR__ . '/../Kalender Ansicht/visualization/module.html');
+$viewTemplateSource = file_get_contents(__DIR__ . '/../Kalender Ansicht/visualization/index.html');
+$viewStyleSource = file_get_contents(__DIR__ . '/../Kalender Ansicht/visualization/style.css');
+$viewScriptSource = file_get_contents(__DIR__ . '/../Kalender Ansicht/visualization/app.js');
 $viewFormSource = file_get_contents(__DIR__ . '/../Kalender Ansicht/form.json');
 assertTrueValue(
     is_string($accountModuleSource)
@@ -1130,9 +1132,29 @@ assertTrueValue(
         && str_contains($viewModuleSource, 'use Burki24\\SymconModuleHelper\\VisualizationAssetHelper;')
         && str_contains($viewModuleSource, "require_once __DIR__ . '/../libs/helper/VisualizationAssetHelper.php';")
         && str_contains($viewModuleSource, 'use VisualizationAssetHelper;')
-        && str_contains($viewModuleSource, '$this->VisualizationAsset(\'module.html\')')
-        && !str_contains($viewModuleSource, "file_get_contents(__DIR__ . '/module.html')"),
-    'The calendar view must load its HTML template through the shared VisualizationAssetHelper.'
+        && str_contains($viewModuleSource, 'use Burki24\\SymconModuleHelper\\IPSViewHTMLPageHelper;')
+        && str_contains($viewModuleSource, "require_once __DIR__ . '/../libs/helper/IPSViewHTMLPageHelper.php';")
+        && str_contains($viewModuleSource, 'use IPSViewHTMLPageHelper;')
+        && str_contains($viewModuleSource, '$this->RenderVisualizationHTMLPage($ipsView, ['),
+    'The calendar view must render its visualization through the shared HTML page helper.'
+);
+assertTrueValue(
+    is_string($viewTemplateSource)
+        && is_string($viewStyleSource)
+        && is_string($viewScriptSource)
+        && str_contains($viewTemplateSource, '{{HTML_LANGUAGE}}')
+        && str_contains($viewTemplateSource, '{{HTML_CLASSES}}')
+        && str_contains($viewTemplateSource, '{{VIEWPORT_CONTENT}}')
+        && str_contains($viewTemplateSource, '{{ROOT_FONT_SIZE}}')
+        && str_contains($viewTemplateSource, '{{VISUALIZATION_THEME}}')
+        && str_contains($viewTemplateSource, '{{MODULE_STYLE}}')
+        && str_contains($viewTemplateSource, '{{IPSVIEW_STYLE}}')
+        && str_contains($viewTemplateSource, '{{BOOTSTRAP_JSON}}')
+        && str_contains($viewTemplateSource, '{{MODULE_SCRIPT}}')
+        && str_contains($viewScriptSource, 'window.SYMC_VISUALIZATION')
+        && str_contains($viewScriptSource, "handleMessage({ type: 'state', payload: calendarVisualization.state });")
+        && !str_contains($viewModuleSource, "VisualizationAsset('module.html')"),
+    'The calendar view must use the shared asset and bootstrap contract.'
 );
 assertTrueValue(
     is_string($viewModuleSource)
@@ -1141,9 +1163,10 @@ assertTrueValue(
         && str_contains($viewModuleSource, 'use VisualizationThemeHelper;')
         && str_contains($viewModuleSource, '$this->VisualizationThemeCSS()')
         && is_string($viewTemplateSource)
-        && str_contains($viewTemplateSource, '{{SYMC_THEME}}')
-        && str_contains($viewTemplateSource, '--cal-accent: var(--symc-accent);')
-        && str_contains($viewTemplateSource, '--cal-card: var(--symc-background);'),
+        && is_string($viewStyleSource)
+        && str_contains($viewTemplateSource, '{{VISUALIZATION_THEME}}')
+        && str_contains($viewStyleSource, '--cal-accent: var(--symc-accent);')
+        && str_contains($viewStyleSource, '--cal-card: var(--symc-background);'),
     'The calendar view must consume the shared Symcon visualization theme.'
 );
 assertTrueValue(
@@ -1157,12 +1180,13 @@ assertTrueValue(
         && str_contains($viewModuleSource, '$this->RegisterIPSViewStyleMediaMessages();')
         && str_contains($viewModuleSource, '$this->IsIPSViewStyleMediaUpdate(')
         && is_string($viewTemplateSource)
-        && str_contains($viewTemplateSource, '{{IPSVIEW_THEME}}')
-        && str_contains($viewTemplateSource, '--cal-text: var(--ipsview-text);')
-        && str_contains($viewTemplateSource, '--cal-surface: var(--ipsview-control-background);')
-        && str_contains($viewTemplateSource, '--cal-accent: var(--ipsview-accent);')
-        && str_contains($viewTemplateSource, '--cal-danger: var(--ipsview-critical);')
-        && str_contains($viewTemplateSource, '--cal-popup-shadow: var(--ipsview-popup-shadow);'),
+        && is_string($viewStyleSource)
+        && str_contains($viewTemplateSource, '{{IPSVIEW_STYLE}}')
+        && str_contains($viewStyleSource, '--cal-text: var(--ipsview-text);')
+        && str_contains($viewStyleSource, '--cal-surface: var(--ipsview-control-background);')
+        && str_contains($viewStyleSource, '--cal-accent: var(--ipsview-accent);')
+        && str_contains($viewStyleSource, '--cal-danger: var(--ipsview-critical);')
+        && str_contains($viewStyleSource, '--cal-popup-shadow: var(--ipsview-popup-shadow);'),
     'The calendar view must consume the shared universal IPSView style without replacing calendar event colors.'
 );
 assertTrueValue(
@@ -1185,19 +1209,19 @@ assertTrueValue(
     'The calendar view must migrate its former IPSView palette and layout properties.'
 );
 assertTrueValue(
-    is_string($viewTemplateSource)
-        && str_contains($viewTemplateSource, "t('CW')")
-        && str_contains($viewTemplateSource, 'isoWeekNumber(start)')
-        && str_contains($viewTemplateSource, 'Date.UTC'),
+    is_string($viewScriptSource)
+        && str_contains($viewScriptSource, "t('CW')")
+        && str_contains($viewScriptSource, 'isoWeekNumber(start)')
+        && str_contains($viewScriptSource, 'Date.UTC'),
     'The weekly tile and IPSView title must include an ISO calendar week.'
 );
 assertTrueValue(
     is_string($viewModuleSource)
         && str_contains($viewModuleSource, "RegisterPropertyBoolean('ShowDayOfYear', true)")
-        && is_string($viewTemplateSource)
-        && str_contains($viewTemplateSource, 'formatDayHeading(')
-        && str_contains($viewTemplateSource, 'dayOfYear(date)')
-        && str_contains($viewTemplateSource, 'daysInYear(date)'),
+        && is_string($viewScriptSource)
+        && str_contains($viewScriptSource, 'formatDayHeading(')
+        && str_contains($viewScriptSource, 'dayOfYear(date)')
+        && str_contains($viewScriptSource, 'daysInYear(date)'),
     'Agenda, three-day and weekly headings must optionally show the day of year.'
 );
 

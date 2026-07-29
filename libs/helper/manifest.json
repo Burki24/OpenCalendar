@@ -17,6 +17,11 @@
             "sha256": "be4fae4c23f757ab462237d8e74d2a9dca1b504937ed4d4b51c7ff76004cf1cd",
             "path": "libs/helper/HttpResponseHelper.php"
         },
+        "IPSViewHTMLPageHelper": {
+            "version": "1.0.0",
+            "sha256": "5cbe377be2277d40f20599d6b52dc4e0d631c03b54d3b8e14da5c9c6f48d9325",
+            "path": "libs/helper/IPSViewHTMLPageHelper.php"
+        },
         "IPSViewStyleHelper": {
             "version": "1.0.0",
             "sha256": "a675da17c8b6c0361ef7c5a65566ff587833e2ae8cfbdc92df4f5d977c804cc8",

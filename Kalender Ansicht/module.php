@@ -3,12 +3,14 @@
 declare(strict_types=1);
 
 use Burki24\SymconModuleHelper\ConfigurationFormHelper;
+use Burki24\SymconModuleHelper\IPSViewHTMLPageHelper;
 use Burki24\SymconModuleHelper\IPSViewStyleHelper;
 use Burki24\SymconModuleHelper\VariableHelper;
 use Burki24\SymconModuleHelper\VisualizationAssetHelper;
 use Burki24\SymconModuleHelper\VisualizationThemeHelper;
 
 require_once __DIR__ . '/../libs/helper/ConfigurationFormHelper.php';
+require_once __DIR__ . '/../libs/helper/IPSViewHTMLPageHelper.php';
 require_once __DIR__ . '/../libs/helper/IPSViewStyleHelper.php';
 require_once __DIR__ . '/../libs/helper/VariableHelper.php';
 require_once __DIR__ . '/../libs/helper/VisualizationAssetHelper.php';
@@ -17,6 +19,7 @@ require_once __DIR__ . '/../libs/helper/VisualizationThemeHelper.php';
 class KalenderAnsicht extends IPSModuleStrict
 {
     use ConfigurationFormHelper;
+    use IPSViewHTMLPageHelper;
     use IPSViewStyleHelper;
     use VariableHelper;
     use VisualizationAssetHelper;
@@ -601,70 +604,72 @@ class KalenderAnsicht extends IPSModuleStrict
      */
     private function renderCalendarHtml(array $state, bool $ipsView): string
     {
-        $html = $this->VisualizationAsset('module.html');
-        if ($html === '') {
-            return '';
-        }
-        $html = str_replace('{{SYMC_THEME}}', $this->VisualizationThemeCSS(), $html);
-        if (!$ipsView) {
-            $html = str_replace('{{IPSVIEW_THEME}}', '', $html);
-        }
+        $translations = $ipsView
+            ? $this->IPSViewTranslationsFromLocale($this->calendarVisualizationTranslationKeys())
+            : [];
 
-        $translations = [];
-        if ($ipsView) {
-            $html = str_replace('{{IPSVIEW_THEME}}', $this->renderIPSViewStyleCSS(), $html);
-            $colorBarWidth = max(2, min(16, $this->ReadPropertyInteger('IPSViewColorBarWidth')));
-            $language = $this->Translate('Today') === 'Heute' ? 'de' : 'en';
-            $html = str_replace(
-                '<html lang="en">',
-                '<html lang="' . $language . '" class="ipsview-mode">',
-                $html
-            );
-            $html = str_replace(
-                '<meta name="viewport" content="width=device-width, initial-scale=1.0">',
-                '<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">',
-                $html
-            );
-            $html = str_replace(
-                '<div id="calendar-app">',
-                sprintf(
-                    '<div id="calendar-app" style="font-size:%s !important; --agenda-color-bar-width:%dpx; --compact-color-bar-width:%dpx;">',
-                    $this->IPSViewRootFontSize(),
-                    $colorBarWidth,
-                    $colorBarWidth
-                ),
-                $html
-            );
-            foreach ([
-                'Agenda', '3 Days', 'Week', 'Month', 'CW', 'Day', 'Previous', 'Today', 'Next', 'Refresh',
-                'No calendars selected', 'Select at least one calendar in the instance configuration.',
-                'No events', 'There are no events in this period.', 'All day', 'Untitled event',
-                'more', 'Create event', 'Event details', 'Calendar', 'Title', 'Start', 'End', 'Location',
-                'Description', 'Cancel', 'Save', 'Delete', 'Close', 'Tomorrow', 'Yesterday',
-                'Recurring occurrences are currently read-only.', 'This calendar is read-only.',
-                'Editing events is only available in the Symcon tile.',
-                'The description of Microsoft online meetings is protected and cannot be edited here.',
-                'Delete this event?'
-            ] as $text) {
-                $translations[$text] = $this->Translate($text);
-            }
-        }
+        return $this->RenderVisualizationHTMLPage($ipsView, [
+            'language'           => $this->Translate('Today') === 'Heute' ? 'de' : 'en',
+            'classes'            => $ipsView ? ['ipsview-mode'] : [],
+            'rootFontSize'       => $ipsView ? $this->IPSViewRootFontSize() : '100%',
+            'title'              => $this->Translate('Calendar'),
+            'visualizationTheme' => $this->VisualizationThemeCSS(),
+            'ipsViewStyle'       => $ipsView ? $this->renderIPSViewStyleCSS() : '',
+            'state'              => $state,
+            'runtime'            => null,
+            'translations'       => $translations,
+            'options'            => [
+                'agendaColorBarWidth' => $ipsView
+                    ? max(2, min(16, $this->ReadPropertyInteger('IPSViewColorBarWidth')))
+                    : 5,
+                'compactColorBarWidth' => $ipsView
+                    ? max(2, min(16, $this->ReadPropertyInteger('IPSViewColorBarWidth')))
+                    : 3
+            ]
+        ]);
+    }
 
-        $bootstrap = [
-            'translations' => $translations,
-            'message'      => ['type' => 'state', 'payload' => $state]
+    /** @return list<string> */
+    private function calendarVisualizationTranslationKeys(): array
+    {
+        return [
+            'Agenda',
+            '3 Days',
+            'Week',
+            'Month',
+            'CW',
+            'Day',
+            'Previous',
+            'Today',
+            'Next',
+            'Refresh',
+            'No calendars selected',
+            'Select at least one calendar in the instance configuration.',
+            'No events',
+            'There are no events in this period.',
+            'All day',
+            'Untitled event',
+            'more',
+            'Create event',
+            'Event details',
+            'Calendar',
+            'Title',
+            'Start',
+            'End',
+            'Location',
+            'Description',
+            'Cancel',
+            'Save',
+            'Delete',
+            'Close',
+            'Tomorrow',
+            'Yesterday',
+            'Recurring occurrences are currently read-only.',
+            'This calendar is read-only.',
+            'Editing events is only available in the Symcon tile.',
+            'The description of Microsoft online meetings is protected and cannot be edited here.',
+            'Delete this event?'
         ];
-
-        $script = '<script>(function(bootstrap){'
-            . 'window.ipsViewTranslations=bootstrap.translations||{};'
-            . 'handleMessage(bootstrap.message);'
-            . '})(' . json_encode(
-                $bootstrap,
-                JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT
-                    | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR
-            ) . ');</script>';
-
-        return str_replace('</body>', $script . '</body>', $html);
     }
 
     /**

@@ -177,9 +177,9 @@ assertSymconStrict(
 );
 assertSymconStrict(
     str_contains($viewSource, 'use VisualizationAssetHelper;')
-        && str_contains($viewSource, '$this->VisualizationAsset(\'module.html\')')
-        && !str_contains($viewSource, "file_get_contents(__DIR__ . '/module.html')"),
-    'The calendar view must load visualization files through VisualizationAssetHelper.'
+        && str_contains($viewSource, 'use IPSViewHTMLPageHelper;')
+        && str_contains($viewSource, '$this->RenderVisualizationHTMLPage($ipsView, ['),
+    'The calendar view must load and render visualization assets through the shared helpers.'
 );
 assertSymconStrict(
     str_contains($viewSource, 'use VisualizationThemeHelper;')
@@ -196,9 +196,12 @@ assertSymconStrict(
     'The calendar view must use IPSViewStyleHelper for the standalone IPSView style.'
 );
 assertSymconStrict(
-    is_file($root . '/Kalender Ansicht/visualization/module.html')
+    is_file($root . '/Kalender Ansicht/visualization/index.html')
+        && is_file($root . '/Kalender Ansicht/visualization/style.css')
+        && is_file($root . '/Kalender Ansicht/visualization/app.js')
+        && !is_file($root . '/Kalender Ansicht/visualization/module.html')
         && !is_file($root . '/Kalender Ansicht/module.html'),
-    'The calendar view template must live in the visualization directory.'
+    'The calendar view assets must use the shared visualization directory structure.'
 );
 
 fwrite(STDOUT, "Symcon Strict compliance checks passed.\n");
