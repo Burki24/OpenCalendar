@@ -23,9 +23,10 @@
             "path": "libs/helper/IPSViewHTMLPageHelper.php"
         },
         "IPSViewStyleHelper": {
-            "version": "1.0.0",
-            "sha256": "a675da17c8b6c0361ef7c5a65566ff587833e2ae8cfbdc92df4f5d977c804cc8",
-            "path": "libs/helper/IPSViewStyleHelper.php"
+            "version": "1.1.0",
+            "sha256": "802d055e91ae0cd9c6c2351b6cc2231e3e21a3a7150b7a52efdeb220f922334e",
+            "path": "libs/helper/IPSViewStyleHelper.php",
+            "source_sha": "bd7d676e55903e33e91e5800133fe5fd8f8f2592"
         },
         "ParentConnectionHelper": {
             "version": "1.0.0",

@@ -14,7 +14,7 @@ use InvalidArgumentException;
  * their components, but do not define module-specific colors, gradients,
  * typography, borders or shadows.
  *
- * @version 1.0.0
+ * @version 1.1.0
  */
 trait IPSViewStyleHelper
 {
@@ -46,6 +46,54 @@ trait IPSViewStyleHelper
         'Warning'                   => 'IPSViewStyleWarningColor',
         'Critical'                  => 'IPSViewStyleCriticalColor',
         'Shadow'                    => 'IPSViewStyleShadowColor'
+    ];
+
+    /** @var array<string,string> */
+    private const IPSVIEW_STYLE_OPACITY_PROPERTIES = [
+        'ViewBackground'            => 'IPSViewStyleViewBackgroundOpacity',
+        'PageBackground'            => 'IPSViewStylePageBackgroundOpacity',
+        'LabelBackground'           => 'IPSViewStyleLabelBackgroundOpacity',
+        'ControlBackground'         => 'IPSViewStyleControlBackgroundOpacity',
+        'ControlActiveBackground'   => 'IPSViewStyleControlActiveBackgroundOpacity',
+        'ControlInactiveBackground' => 'IPSViewStyleControlInactiveBackgroundOpacity',
+        'PopupBackground'           => 'IPSViewStylePopupBackgroundOpacity',
+        'Border'                    => 'IPSViewStyleBorderOpacity',
+        'Line'                      => 'IPSViewStyleLineOpacity',
+        'PopupBorder'               => 'IPSViewStylePopupBorderOpacity',
+        'ShadowColor'               => 'IPSViewStyleShadowOpacity',
+        'PopupShadow'               => 'IPSViewStylePopupShadowOpacity'
+    ];
+
+    /** @var array<string,int> */
+    private const IPSVIEW_STYLE_OPACITY_DEFAULTS = [
+        'ViewBackground'            => 100,
+        'PageBackground'            => 100,
+        'LabelBackground'           => 100,
+        'ControlBackground'         => 100,
+        'ControlActiveBackground'   => 100,
+        'ControlInactiveBackground' => 100,
+        'PopupBackground'           => 100,
+        'Border'                    => 100,
+        'Line'                      => 100,
+        'PopupBorder'               => 100,
+        'ShadowColor'               => 24,
+        'PopupShadow'               => 32
+    ];
+
+    /** @var array<string,string> */
+    private const IPSVIEW_STYLE_OPACITY_CAPTIONS = [
+        'ViewBackground'            => 'View background opacity',
+        'PageBackground'            => 'Page background opacity',
+        'LabelBackground'           => 'Label background opacity',
+        'ControlBackground'         => 'Control background opacity',
+        'ControlActiveBackground'   => 'Active control opacity',
+        'ControlInactiveBackground' => 'Inactive control opacity',
+        'PopupBackground'           => 'Popup background opacity',
+        'Border'                    => 'Border opacity',
+        'Line'                      => 'Line opacity',
+        'PopupBorder'               => 'Popup border opacity',
+        'ShadowColor'               => 'Shadow opacity',
+        'PopupShadow'               => 'Popup shadow opacity'
     ];
 
     /** @var array<string,int> */
@@ -182,6 +230,9 @@ trait IPSViewStyleHelper
         foreach (self::IPSVIEW_STYLE_COLOR_PROPERTIES as $key => $propertyName) {
             $this->RegisterPropertyInteger($propertyName, self::IPSVIEW_STYLE_CUSTOM_DEFAULTS[$key]);
         }
+        foreach (self::IPSVIEW_STYLE_OPACITY_PROPERTIES as $key => $propertyName) {
+            $this->RegisterPropertyInteger($propertyName, self::IPSVIEW_STYLE_OPACITY_DEFAULTS[$key]);
+        }
 
         $this->RegisterPropertyString('IPSViewStyleFontFamily', '');
         $this->RegisterPropertyInteger('IPSViewStyleBaseFontSize', 16);
@@ -272,6 +323,30 @@ trait IPSViewStyleHelper
                     'caption'          => self::IPSVIEW_STYLE_COLOR_CAPTIONS[$key],
                     'allowTransparent' => false,
                     'width'            => $colorWidth
+                ];
+            }
+
+            $items[] = [
+                'type'  => 'RowLayout',
+                'items' => $row
+            ];
+        }
+
+        $items[] = [
+            'type'    => 'Label',
+            'caption' => 'Surface transparency'
+        ];
+        foreach (array_chunk(array_keys(self::IPSVIEW_STYLE_OPACITY_PROPERTIES), 3) as $keys) {
+            $row = [];
+            foreach ($keys as $key) {
+                $row[] = [
+                    'type'    => 'NumberSpinner',
+                    'name'    => self::IPSVIEW_STYLE_OPACITY_PROPERTIES[$key],
+                    'caption' => self::IPSVIEW_STYLE_OPACITY_CAPTIONS[$key],
+                    'minimum' => 0,
+                    'maximum' => 100,
+                    'suffix'  => ' %',
+                    'width'   => '190px'
                 ];
             }
 
@@ -498,66 +573,78 @@ trait IPSViewStyleHelper
         $transparent = $this->ReadPropertyBoolean('IPSViewStyleTransparentBackground');
         $fontScale = max(60, min(200, $this->ReadPropertyInteger('IPSViewStyleFontScale'))) / 100;
         $variables = [
-            'color-scheme'                                => $style['ColorScheme'],
-            '--ipsview-view-background'                   => $style['ViewBackground'],
-            '--ipsview-page-background'                   => $style['PageBackground'],
-            '--ipsview-background'                        => $transparent ? 'transparent' : $style['ViewBackground'],
-            '--ipsview-label-background'                  => $style['LabelBackground'],
-            '--ipsview-control-background'                => $style['ControlBackground'],
-            '--ipsview-control-background-active'         => $style['ControlActiveBackground'],
-            '--ipsview-control-background-inactive'       => $style['ControlInactiveBackground'],
-            '--ipsview-control-background-soft'           => $style['ControlSoftBackground'],
-            '--ipsview-popup-background'                  => $style['PopupBackground'],
-            '--ipsview-text'                              => $style['Text'],
-            '--ipsview-text-active'                       => $style['TextActive'],
-            '--ipsview-text-inactive'                     => $style['TextInactive'],
-            '--ipsview-text-label'                        => $style['LabelText'],
-            '--ipsview-text-secondary'                    => $style['TextSecondary'],
-            '--ipsview-text-faint'                        => $style['TextFaint'],
-            '--ipsview-icon'                              => $style['Icon'],
-            '--ipsview-border'                            => $style['Border'],
-            '--ipsview-line'                              => $style['Line'],
-            '--ipsview-popup-border'                      => $style['PopupBorder'],
-            '--ipsview-accent'                            => $style['Accent'],
-            '--ipsview-information'                       => $style['Information'],
-            '--ipsview-positive'                          => $style['Positive'],
-            '--ipsview-warning'                           => $style['Warning'],
-            '--ipsview-critical'                          => $style['Critical'],
-            '--ipsview-accent-soft'                       => $style['AccentSoft'],
-            '--ipsview-information-soft'                  => $style['InformationSoft'],
-            '--ipsview-positive-soft'                     => $style['PositiveSoft'],
-            '--ipsview-warning-soft'                      => $style['WarningSoft'],
-            '--ipsview-critical-soft'                     => $style['CriticalSoft'],
-            '--ipsview-accent-contrast'                   => $style['AccentContrast'],
-            '--ipsview-information-contrast'              => $style['InformationContrast'],
-            '--ipsview-positive-contrast'                 => $style['PositiveContrast'],
-            '--ipsview-warning-contrast'                  => $style['WarningContrast'],
-            '--ipsview-critical-contrast'                 => $style['CriticalContrast'],
-            '--ipsview-gradient-accent'                   => $style['GradientAccent'],
-            '--ipsview-gradient-information'              => $style['GradientInformation'],
-            '--ipsview-gradient-positive'                 => $style['GradientPositive'],
-            '--ipsview-gradient-warning'                  => $style['GradientWarning'],
-            '--ipsview-gradient-critical'                 => $style['GradientCritical'],
-            '--ipsview-font-family'                       => $style['FontFamily'],
-            '--ipsview-font-size'                         => $this->IPSViewFormatNumber((float) $style['FontSize']) . 'px',
-            '--ipsview-font-scale'                        => $this->IPSViewFormatNumber($fontScale),
-            '--ipsview-radius'                            => $this->IPSViewFormatNumber((float) $style['BorderRadius']) . 'px',
-            '--ipsview-border-width'                      => $this->IPSViewFormatNumber((float) $style['BorderWidth']) . 'px',
-            '--ipsview-line-width'                        => $this->IPSViewFormatNumber((float) $style['LineWidth']) . 'px',
-            '--ipsview-disabled-opacity'                  => $this->IPSViewFormatNumber((float) $style['DisabledOpacity']),
-            '--ipsview-shadow'                            => $style['Shadow'],
-            '--ipsview-popup-shadow'                      => $style['PopupShadow'],
-            '--ipsview-page'                              => $style['PageBackground'],
-            '--ipsview-surface'                           => $style['ControlBackground'],
-            '--ipsview-surface-strong'                    => $style['ControlActiveBackground'],
-            '--ipsview-surface-soft'                      => $style['ControlSoftBackground'],
-            '--ipsview-muted'                             => $style['TextSecondary'],
-            '--ipsview-faint'                             => $style['TextFaint'],
-            '--ipsview-success'                           => $style['Positive'],
-            '--ipsview-success-soft'                      => $style['PositiveSoft'],
-            '--ipsview-success-border'                    => $style['PositiveBorder'],
-            '--ipsview-danger'                            => $style['Critical'],
-            '--ipsview-danger-soft'                       => $style['CriticalSoft']
+            'color-scheme'                                  => $style['ColorScheme'],
+            '--ipsview-view-background'                     => $style['ViewBackground'],
+            '--ipsview-page-background'                     => $style['PageBackground'],
+            '--ipsview-background'                          => $transparent ? 'transparent' : $style['ViewBackground'],
+            '--ipsview-label-background'                    => $style['LabelBackground'],
+            '--ipsview-control-background'                  => $style['ControlBackground'],
+            '--ipsview-control-background-active'           => $style['ControlActiveBackground'],
+            '--ipsview-control-background-inactive'         => $style['ControlInactiveBackground'],
+            '--ipsview-control-background-soft'             => $style['ControlSoftBackground'],
+            '--ipsview-popup-background'                    => $style['PopupBackground'],
+            '--ipsview-view-background-opacity'             => $this->IPSViewFormatNumber((float) $style['ViewBackgroundOpacity']),
+            '--ipsview-page-background-opacity'             => $this->IPSViewFormatNumber((float) $style['PageBackgroundOpacity']),
+            '--ipsview-label-background-opacity'            => $this->IPSViewFormatNumber((float) $style['LabelBackgroundOpacity']),
+            '--ipsview-control-background-opacity'          => $this->IPSViewFormatNumber((float) $style['ControlBackgroundOpacity']),
+            '--ipsview-control-background-active-opacity'   => $this->IPSViewFormatNumber((float) $style['ControlActiveOpacity']),
+            '--ipsview-control-background-inactive-opacity' => $this->IPSViewFormatNumber((float) $style['ControlInactiveOpacity']),
+            '--ipsview-popup-background-opacity'            => $this->IPSViewFormatNumber((float) $style['PopupBackgroundOpacity']),
+            '--ipsview-border-opacity'                      => $this->IPSViewFormatNumber((float) $style['BorderOpacity']),
+            '--ipsview-line-opacity'                        => $this->IPSViewFormatNumber((float) $style['LineOpacity']),
+            '--ipsview-popup-border-opacity'                => $this->IPSViewFormatNumber((float) $style['PopupBorderOpacity']),
+            '--ipsview-shadow-opacity'                      => $this->IPSViewFormatNumber((float) $style['ShadowOpacity']),
+            '--ipsview-popup-shadow-opacity'                => $this->IPSViewFormatNumber((float) $style['PopupShadowOpacity']),
+            '--ipsview-text'                                => $style['Text'],
+            '--ipsview-text-active'                         => $style['TextActive'],
+            '--ipsview-text-inactive'                       => $style['TextInactive'],
+            '--ipsview-text-label'                          => $style['LabelText'],
+            '--ipsview-text-secondary'                      => $style['TextSecondary'],
+            '--ipsview-text-faint'                          => $style['TextFaint'],
+            '--ipsview-icon'                                => $style['Icon'],
+            '--ipsview-border'                              => $style['Border'],
+            '--ipsview-line'                                => $style['Line'],
+            '--ipsview-popup-border'                        => $style['PopupBorder'],
+            '--ipsview-accent'                              => $style['Accent'],
+            '--ipsview-information'                         => $style['Information'],
+            '--ipsview-positive'                            => $style['Positive'],
+            '--ipsview-warning'                             => $style['Warning'],
+            '--ipsview-critical'                            => $style['Critical'],
+            '--ipsview-accent-soft'                         => $style['AccentSoft'],
+            '--ipsview-information-soft'                    => $style['InformationSoft'],
+            '--ipsview-positive-soft'                       => $style['PositiveSoft'],
+            '--ipsview-warning-soft'                        => $style['WarningSoft'],
+            '--ipsview-critical-soft'                       => $style['CriticalSoft'],
+            '--ipsview-accent-contrast'                     => $style['AccentContrast'],
+            '--ipsview-information-contrast'                => $style['InformationContrast'],
+            '--ipsview-positive-contrast'                   => $style['PositiveContrast'],
+            '--ipsview-warning-contrast'                    => $style['WarningContrast'],
+            '--ipsview-critical-contrast'                   => $style['CriticalContrast'],
+            '--ipsview-gradient-accent'                     => $style['GradientAccent'],
+            '--ipsview-gradient-information'                => $style['GradientInformation'],
+            '--ipsview-gradient-positive'                   => $style['GradientPositive'],
+            '--ipsview-gradient-warning'                    => $style['GradientWarning'],
+            '--ipsview-gradient-critical'                   => $style['GradientCritical'],
+            '--ipsview-font-family'                         => $style['FontFamily'],
+            '--ipsview-font-size'                           => $this->IPSViewFormatNumber((float) $style['FontSize']) . 'px',
+            '--ipsview-font-scale'                          => $this->IPSViewFormatNumber($fontScale),
+            '--ipsview-radius'                              => $this->IPSViewFormatNumber((float) $style['BorderRadius']) . 'px',
+            '--ipsview-border-width'                        => $this->IPSViewFormatNumber((float) $style['BorderWidth']) . 'px',
+            '--ipsview-line-width'                          => $this->IPSViewFormatNumber((float) $style['LineWidth']) . 'px',
+            '--ipsview-disabled-opacity'                    => $this->IPSViewFormatNumber((float) $style['DisabledOpacity']),
+            '--ipsview-shadow'                              => $style['Shadow'],
+            '--ipsview-popup-shadow'                        => $style['PopupShadow'],
+            '--ipsview-page'                                => $style['PageBackground'],
+            '--ipsview-surface'                             => $style['ControlBackground'],
+            '--ipsview-surface-strong'                      => $style['ControlActiveBackground'],
+            '--ipsview-surface-soft'                        => $style['ControlSoftBackground'],
+            '--ipsview-muted'                               => $style['TextSecondary'],
+            '--ipsview-faint'                               => $style['TextFaint'],
+            '--ipsview-success'                             => $style['Positive'],
+            '--ipsview-success-soft'                        => $style['PositiveSoft'],
+            '--ipsview-success-border'                      => $style['PositiveBorder'],
+            '--ipsview-danger'                              => $style['Critical'],
+            '--ipsview-danger-soft'                         => $style['CriticalSoft']
         ];
 
         $lines = [$selector . ' {'];
@@ -602,13 +689,21 @@ trait IPSViewStyleHelper
             $style[$key] = $this->IPSViewColorIntegerToHex($value);
         }
 
-        $style['PopupShadow'] = $this->IPSViewColorWithAlpha($style['Shadow'], 0.32);
+        foreach (self::IPSVIEW_STYLE_OPACITY_PROPERTIES as $key => $propertyName) {
+            if (in_array($key, ['ShadowColor', 'PopupShadow'], true)) {
+                continue;
+            }
+
+            $style[$key] = $this->IPSViewColorWithAlpha($style[$key], $this->IPSViewOpacityProperty($key));
+        }
+
+        $style['PopupShadow'] = $this->IPSViewColorWithAlpha($style['Shadow'], $this->IPSViewOpacityProperty('PopupShadow'));
         $style['FontFamily'] = $this->IPSViewNormalizeFontFamily($this->ReadPropertyString('IPSViewStyleFontFamily'));
         $style['FontSize'] = (float) max(8, min(32, $this->ReadPropertyInteger('IPSViewStyleBaseFontSize')));
         $style['BorderRadius'] = $this->IPSViewClampFloat($this->ReadPropertyFloat('IPSViewStyleBorderRadius'), 0.0, 40.0);
         $style['BorderWidth'] = $this->IPSViewClampFloat($this->ReadPropertyFloat('IPSViewStyleBorderWidth'), 0.0, 10.0);
         $style['LineWidth'] = $this->IPSViewClampFloat($this->ReadPropertyFloat('IPSViewStyleLineWidth'), 0.0, 10.0);
-        $style['ShadowColor'] = $this->IPSViewColorWithAlpha($style['Shadow'], 0.24);
+        $style['ShadowColor'] = $this->IPSViewColorWithAlpha($style['Shadow'], $this->IPSViewOpacityProperty('ShadowColor'));
         $style['ShadowBlur'] = $this->IPSViewClampFloat($this->ReadPropertyFloat('IPSViewStyleShadowBlur'), 0.0, 80.0);
         $style['ShadowSpread'] = $this->IPSViewClampFloat($this->ReadPropertyFloat('IPSViewStyleShadowSpread'), -20.0, 40.0);
         $style['ShadowOffsetX'] = $this->IPSViewClampFloat($this->ReadPropertyFloat('IPSViewStyleShadowOffsetX'), -40.0, 40.0);
@@ -771,7 +866,19 @@ trait IPSViewStyleHelper
             'LineWidth'                 => (float) $style['LineWidth'],
             'DisabledOpacity'           => $disabledOpacity,
             'Shadow'                    => $shadow,
-            'PopupShadow'               => $popupShadow
+            'PopupShadow'               => $popupShadow,
+            'ViewBackgroundOpacity'     => $this->IPSViewCSSColorToRGB((string) $style['ViewBackground'])['alpha'],
+            'PageBackgroundOpacity'     => $this->IPSViewCSSColorToRGB((string) $style['PageBackground'])['alpha'],
+            'LabelBackgroundOpacity'    => $label['alpha'],
+            'ControlBackgroundOpacity'  => $control['alpha'],
+            'ControlActiveOpacity'      => $controlActive['alpha'],
+            'ControlInactiveOpacity'    => $controlInactive['alpha'],
+            'PopupBackgroundOpacity'    => $popup['alpha'],
+            'BorderOpacity'             => $this->IPSViewCSSColorToRGB((string) $style['Border'])['alpha'],
+            'LineOpacity'               => $this->IPSViewCSSColorToRGB((string) $style['Line'])['alpha'],
+            'PopupBorderOpacity'        => $this->IPSViewCSSColorToRGB((string) $style['PopupBorder'])['alpha'],
+            'ShadowOpacity'             => $shadowColor['alpha'],
+            'PopupShadowOpacity'        => $popupShadowColor['alpha']
         ];
 
         foreach (['Accent', 'Information', 'Positive', 'Warning', 'Critical'] as $role) {
@@ -875,6 +982,17 @@ trait IPSViewStyleHelper
         $value = strtolower(trim($value));
 
         return str_replace(['ä', 'ö', 'ü', 'ß'], ['ae', 'oe', 'ue', 'ss'], $value);
+    }
+
+    private function IPSViewOpacityProperty(string $key): float
+    {
+        $propertyName = self::IPSVIEW_STYLE_OPACITY_PROPERTIES[$key] ?? null;
+        $default = self::IPSVIEW_STYLE_OPACITY_DEFAULTS[$key] ?? 100;
+        if ($propertyName === null) {
+            return $default / 100;
+        }
+
+        return max(0, min(100, $this->ReadPropertyInteger($propertyName))) / 100;
     }
 
     private function IPSViewNormalizeFontFamily(string $fontFamily): string
