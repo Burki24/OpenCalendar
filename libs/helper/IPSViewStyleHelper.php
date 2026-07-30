@@ -16,7 +16,7 @@ require_once __DIR__ . '/HelperTranslationHelper.php';
  * their components, but do not define module-specific colors, gradients,
  * typography, borders or shadows.
  *
- * @version 1.2.0
+ * @version 1.3.0
  */
 trait IPSViewStyleHelper
 {
@@ -282,6 +282,7 @@ trait IPSViewStyleHelper
 
     private const IPSVIEW_STYLE_TEXT_CONTRAST = 4.5;
     private const IPSVIEW_STYLE_INACTIVE_TEXT_CONTRAST = 3.0;
+    private const IPSVIEW_STYLE_FORM_MARKER = 'Configure the shared IPSView style used by the standalone HTML page.';
 
     /** Registers the complete shared IPSView style configuration. */
     protected function RegisterIPSViewStyleProperties(): void
@@ -539,6 +540,68 @@ trait IPSViewStyleHelper
         ];
 
         return $items;
+    }
+
+    /**
+     * Replaces a nested form marker with the complete shared IPSView style form.
+     *
+     * Consumers can keep the insertion point in their static form.json and call
+     * this method after loading the configuration form. The marker is removed
+     * before the form is returned, so its untranslated caption is never shown.
+     *
+     * @param array<int,array<string,mixed>> $elements Form elements to search recursively.
+     *
+     * @throws InvalidArgumentException If the marker caption is empty.
+     */
+    protected function InsertIPSViewStyleFormItems(
+        array &$elements,
+        string $markerCaption = self::IPSVIEW_STYLE_FORM_MARKER,
+        string $colorWidth = '240px'
+    ): bool {
+        $markerCaption = trim($markerCaption);
+        if ($markerCaption === '') {
+            throw new InvalidArgumentException('IPSView style form marker caption must not be empty.');
+        }
+
+        foreach ($elements as $index => &$element) {
+            if (
+                ($element['type'] ?? null) === 'Label'
+                && ($element['caption'] ?? null) === $markerCaption
+            ) {
+                array_splice($elements, $index, 1, $this->IPSViewStyleFormItems($colorWidth));
+                unset($element);
+
+                return true;
+            }
+
+            if (
+                isset($element['items'])
+                && is_array($element['items'])
+                && $this->InsertIPSViewStyleFormItems($element['items'], $markerCaption, $colorWidth)
+            ) {
+                unset($element);
+
+                return true;
+            }
+        }
+        unset($element);
+
+        return false;
+    }
+
+    /**
+     * Returns the scaled root font size for a standalone IPSView HTML document.
+     *
+     * The resolved base font size is combined with the shared font-scale
+     * property and normalized to a safe integer range for responsive pages.
+     */
+    protected function IPSViewStyleRootFontSize(?string $document = null): string
+    {
+        $style = $this->IPSViewResolvedStyle($document);
+        $fontScale = max(60, min(200, $this->ReadPropertyInteger('IPSViewStyleFontScale'))) / 100;
+        $fontSize = max(8, min(64, (int) round((float) $style['FontSize'] * $fontScale)));
+
+        return $fontSize . 'px';
     }
 
     /** Returns the configured IPSView style source. */
