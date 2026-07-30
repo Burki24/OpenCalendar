@@ -1,0 +1,18 @@
+{
+    "schema": 1,
+    "sourceLanguage": "en",
+    "requiredLanguages": [
+        "en",
+        "de"
+    ],
+    "translations": {
+        "field.enable_ipsview": {
+            "en": "Provide IPSView HTML output",
+            "de": "IPSView-HTML-Ausgabe bereitstellen"
+        },
+        "description.enable_ipsview": {
+            "en": "When enabled, the module creates additional String variables with the WebContent presentation for IPSView. Native Symcon tile views remain available separately.",
+            "de": "Wenn aktiviert, legt das Modul zusätzliche String-Variablen mit der WebContent-Darstellung für IPSView an. Die nativen Symcon-Kachelansichten bleiben davon getrennt verfügbar."
+        }
+    }
+}
