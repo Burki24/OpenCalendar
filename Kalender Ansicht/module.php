@@ -643,6 +643,7 @@ class KalenderAnsicht extends IPSModuleStrict
             'Untitled event',
             'more',
             'Create event',
+            'No writable calendar available',
             'Event details',
             'Calendar',
             'Title',

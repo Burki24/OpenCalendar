@@ -72,9 +72,16 @@ function render() {
     } else {
         renderAgenda();
     }
-    const hasWritableCalendar = hasActionBridge()
+    const actionBridgeAvailable = hasActionBridge();
+    const hasWritableCalendar = actionBridgeAvailable
         && calendarState.calendars.some(calendar => calendar.canWrite);
-    document.getElementById('add-button').classList.toggle('visible', hasWritableCalendar);
+    const addButton = document.getElementById('add-button');
+    addButton.classList.toggle('visible', actionBridgeAvailable);
+    addButton.disabled = !hasWritableCalendar;
+    addButton.setAttribute('aria-disabled', String(!hasWritableCalendar));
+    const addButtonText = hasWritableCalendar ? 'Create event' : 'No writable calendar available';
+    addButton.title = t(addButtonText);
+    addButton.setAttribute('aria-label', t(addButtonText));
 }
 
 function updateToolbar() {
@@ -562,6 +569,7 @@ function applyStaticTranslations() {
     ].forEach(([id, text]) => { document.getElementById(id).textContent = t(text); });
     document.getElementById('all-day-label').textContent = t('All day');
     document.getElementById('dialog-title').textContent = t('Event');
+    document.getElementById('add-button-label').textContent = t('Create event');
     [
         ['dialog-close', 'Close'],
         ['add-button', 'Create event']
