@@ -40,7 +40,7 @@ Wiederkehrende, vom CalDAV-Server expandierte Einzeltermine werden derzeit nur l
 2. Unter **Stilquelle** zwischen **Benutzerdefinierter Stil**, **IPSView-Standardstil**, **Helle Vorgabe** und **Dunkle Vorgabe** wählen.
 3. Für **IPSView-Standardstil** das Medienobjekt auswählen, das die gewünschte `.ipsView`-Datei enthält. Der Helper übernimmt daraus ausschließlich freigegebene Standardstil-Werte wie Farben, Schrift, Rahmen, Schatten und Rundungen. Wird das Medienobjekt aktualisiert, wird auch die WebContent-Ausgabe neu erzeugt.
 4. Beim **Benutzerdefinierten Stil** die universellen Flächen-, Schrift-, Icon-, Rahmen-, Popup- und Statusfarben sowie Typografie und Effekte direkt festlegen. Diese Rollen besitzen in allen Modulen dieselbe Bedeutung und Wirkung.
-5. Mit **Transparenter Hintergrund** festlegen, ob die umgebende View sichtbar bleiben soll.
+5. Mit **Transparenter Hintergrund** festlegen, ob der vollständige Kalenderhintergrund transparent wird und die umgebende IPSView sichtbar bleibt. Ohne Transparenz verwendet die Kalenderfläche den **View-Hintergrund**; der **Seitenhintergrund** bleibt inneren Kalenderflächen vorbehalten.
 6. Mit **IPSView-Wochenausrichtung** festlegen, ob die Wochentage nebeneinander oder als vertikale Tageszeilen dargestellt werden.
 7. Über **IPSView-Farbbalkenbreite** die Kalenderkennzeichnung zwischen 2 und 16 Pixeln einstellen. Kalender- und Terminfarben bleiben fachliche Inhaltsfarben und werden nicht durch den gemeinsamen Stil ersetzt.
 8. Unterhalb der Instanz wird die String-Variable **IPSView-Kalender** mit der Darstellung **Webinhalt** angelegt.

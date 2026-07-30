@@ -110,7 +110,7 @@ button { color: inherit; }
     min-height: 170px;
     overscroll-behavior: none;
     isolation: isolate;
-    background: var(--cal-page-background);
+    background: var(--cal-view-background);
     color: var(--cal-text);
 }
 

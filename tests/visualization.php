@@ -71,13 +71,15 @@ assertVisualization(
     'The calendar stylesheet must map every text, icon and page role to the canonical IPSView contract.'
 );
 assertVisualization(
-    str_contains($style, 'background: var(--cal-view-background);')
-        && str_contains($style, 'background: var(--cal-page-background);')
+    preg_match('/html, body\s*\{[^}]*background:\s*var\(--cal-view-background\);/s', $style) === 1
+        && preg_match('/#calendar-app\s*\{[^}]*background:\s*var\(--cal-view-background\);/s', $style) === 1
+        && !preg_match('/#calendar-app\s*\{[^}]*background:\s*var\(--cal-page-background\);/s', $style)
+        && str_contains($style, '--cal-card: var(--ipsview-role-page-background);')
         && str_contains($style, 'color: var(--cal-text-active, var(--cal-text));')
         && str_contains($style, 'color: var(--cal-text-inactive);')
         && str_contains($style, 'color: var(--cal-label-text);')
         && str_contains($style, 'color: var(--cal-icon);'),
-    'Calendar components must consume the canonical roles according to their semantic purpose.'
+    'The calendar viewport must use the view background so transparency works, while inner pages consume the page background role.'
 );
 
 $renderer = new CalendarVisualizationRenderer();
