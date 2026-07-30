@@ -11,8 +11,36 @@
             "de": "IPSView-HTML-Ausgabe bereitstellen"
         },
         "description.enable_ipsview": {
-            "en": "When enabled, the module creates additional String variables with the WebContent presentation for IPSView. Native Symcon tile views remain available separately.",
-            "de": "Wenn aktiviert, legt das Modul zusätzliche String-Variablen mit der WebContent-Darstellung für IPSView an. Die nativen Symcon-Kachelansichten bleiben davon getrennt verfügbar."
+            "en": "When enabled, the module creates additional String variables with the WebContent presentation for IPSView. Native Symcon tile views remain available separately. When disabled, existing IPSView variables are retained until the user explicitly deletes them.",
+            "de": "Wenn aktiviert, legt das Modul zusätzliche String-Variablen mit der WebContent-Darstellung für IPSView an. Die nativen Symcon-Kachelansichten bleiben davon getrennt verfügbar. Beim Deaktivieren bleiben vorhandene IPSView-Variablen erhalten, bis der Benutzer sie ausdrücklich löscht."
+        },
+        "description.retained_variables": {
+            "en": "IPSView output is disabled. Existing IPSView variables are retained and are no longer updated.",
+            "de": "Die IPSView-Ausgabe ist deaktiviert. Vorhandene IPSView-Variablen bleiben erhalten und werden nicht mehr aktualisiert."
+        },
+        "action.delete_variables": {
+            "en": "Delete retained IPSView variables...",
+            "de": "IPSView-Variablen löschen..."
+        },
+        "popup.delete_caption": {
+            "en": "Delete IPSView variables?",
+            "de": "IPSView-Variablen löschen?"
+        },
+        "popup.delete_description": {
+            "en": "The following IPSView variables will be deleted permanently. Existing links and placements that reference them will no longer work.",
+            "de": "Die folgenden IPSView-Variablen werden dauerhaft gelöscht. Bestehende Verknüpfungen und Platzierungen, die darauf verweisen, funktionieren anschließend nicht mehr."
+        },
+        "action.keep_variables": {
+            "en": "Keep variables",
+            "de": "Variablen behalten"
+        },
+        "action.confirm_delete": {
+            "en": "Delete variables",
+            "de": "Variablen löschen"
+        },
+        "message.variables_deleted": {
+            "en": "The retained IPSView variables were deleted.",
+            "de": "Die beibehaltenen IPSView-Variablen wurden gelöscht."
         }
     }
 }

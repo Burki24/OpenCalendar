@@ -19,7 +19,7 @@ require_once __DIR__ . '/HelperTranslationHelper.php';
  * visual implementation in style.css/app.js. The helper owns asset loading,
  * bootstrap encoding, page metadata, fixed placeholders and validation.
  *
- * @version 1.1.0
+ * @version 1.2.0
  */
 trait IPSViewHTMLPageHelper
 {
@@ -28,12 +28,22 @@ trait IPSViewHTMLPageHelper
     public const IPSVIEW_HTML_CONTRACT_VERSION = 1;
 
     private const IPSVIEW_HTML_ENABLE_PROPERTY = 'EnableIPSView';
+    private const IPSVIEW_HTML_DELETE_REQUEST_PROPERTY = 'IPSViewHTMLDeleteRequest';
+    private const IPSVIEW_HTML_VARIABLE_REGISTRY_ATTRIBUTE = 'IPSViewHTMLVariableRegistry';
+    private const IPSVIEW_HTML_DELETE_STATE_ATTRIBUTE = 'IPSViewHTMLDeleteState';
     private const IPSVIEW_HTML_FORM_MARKER = 'Configure optional IPSView HTML output.';
 
     /** @var array<string,string> */
     private const IPSVIEW_HTML_TRANSLATION_SOURCES = [
-        'field.enable_ipsview'       => 'Provide IPSView HTML output',
-        'description.enable_ipsview' => 'When enabled, the module creates additional String variables with the WebContent presentation for IPSView. Native Symcon tile views remain available separately.'
+        'field.enable_ipsview'           => 'Provide IPSView HTML output',
+        'description.enable_ipsview'     => 'When enabled, the module creates additional String variables with the WebContent presentation for IPSView. Native Symcon tile views remain available separately. When disabled, existing IPSView variables are retained until the user explicitly deletes them.',
+        'description.retained_variables' => 'IPSView output is disabled. Existing IPSView variables are retained and are no longer updated.',
+        'action.delete_variables'        => 'Delete retained IPSView variables...',
+        'popup.delete_caption'           => 'Delete IPSView variables?',
+        'popup.delete_description'       => 'The following IPSView variables will be deleted permanently. Existing links and placements that reference them will no longer work.',
+        'action.keep_variables'          => 'Keep variables',
+        'action.confirm_delete'          => 'Delete variables',
+        'message.variables_deleted'      => 'The retained IPSView variables were deleted.'
     ];
 
     /** @var list<string> */
@@ -68,10 +78,13 @@ trait IPSViewHTMLPageHelper
         'replacements'
     ];
 
-    /** Registers the common switch for optional standalone IPSView HTML output. */
+    /** Registers the common switch and internal deletion state for optional IPSView HTML output. */
     protected function RegisterIPSViewHTMLPageProperties(): void
     {
         $this->RegisterPropertyBoolean(self::IPSVIEW_HTML_ENABLE_PROPERTY, false);
+        $this->RegisterPropertyString(self::IPSVIEW_HTML_DELETE_REQUEST_PROPERTY, '');
+        $this->RegisterAttributeString(self::IPSVIEW_HTML_VARIABLE_REGISTRY_ATTRIBUTE, '[]');
+        $this->RegisterAttributeString(self::IPSVIEW_HTML_DELETE_STATE_ATTRIBUTE, '{}');
     }
 
     /**
@@ -89,7 +102,7 @@ trait IPSViewHTMLPageHelper
             $description = $this->IPSViewHTMLPageText('description.enable_ipsview');
         }
 
-        return [
+        $items = [
             [
                 'type'    => 'CheckBox',
                 'name'    => self::IPSVIEW_HTML_ENABLE_PROPERTY,
@@ -100,6 +113,19 @@ trait IPSViewHTMLPageHelper
                 'caption' => $description
             ]
         ];
+
+        $retainedVariables = $this->IPSViewHTMLRetainedVariables();
+        if ($this->IsIPSViewHTMLPageEnabled() || $retainedVariables === []) {
+            return $items;
+        }
+
+        $items[] = [
+            'type'    => 'Label',
+            'caption' => $this->IPSViewHTMLPageText('description.retained_variables')
+        ];
+        $items[] = $this->IPSViewHTMLDeleteVariablesPopup($retainedVariables);
+
+        return $items;
     }
 
     /**
@@ -152,12 +178,12 @@ trait IPSViewHTMLPageHelper
     }
 
     /**
-     * Creates or removes one optional IPSView WebContent variable.
+     * Creates, preserves or explicitly deletes one optional IPSView WebContent variable.
      *
      * The variable is maintained as a native String variable with the Symcon
-     * WebContent presentation in HTML mode. When IPSView output is disabled,
-     * only this optional variable is removed; native visualization tiles remain
-     * untouched.
+     * WebContent presentation in HTML mode. Disabling IPSView only stops updates;
+     * an existing variable remains untouched until the user confirms deletion in
+     * the configuration form. Native visualization tiles remain untouched.
      *
      * @param string    $ident       Stable variable ident.
      * @param string    $caption     Visible variable caption.
@@ -185,6 +211,14 @@ trait IPSViewHTMLPageHelper
         if ($position < 0) {
             throw new InvalidArgumentException('IPSView HTML variable position must not be negative.');
         }
+
+        $this->RememberIPSViewHTMLVariable($ident, $caption);
+
+        if (!$this->IsIPSViewHTMLPageEnabled()) {
+            $this->DeleteIPSViewHTMLVariableWhenRequested($ident);
+
+            return false;
+        }
         if (!method_exists($this, 'MaintainVariable') || !method_exists($this, 'SetValue')) {
             throw new RuntimeException('IPSViewHTMLPageHelper requires MaintainVariable() and SetValue().');
         }
@@ -197,17 +231,16 @@ trait IPSViewHTMLPageHelper
             $presentation['PADDING'] = $padding;
         }
 
-        $enabled = $this->IsIPSViewHTMLPageEnabled();
         $created = $this->MaintainVariable(
             $ident,
             $caption,
             VARIABLETYPE_STRING,
             $presentation,
             $position,
-            $enabled
+            true
         );
 
-        if ($created && $enabled) {
+        if ($created) {
             $this->SetValue($ident, $initialHtml);
         }
 
@@ -227,7 +260,7 @@ trait IPSViewHTMLPageHelper
         if (!$this->IsIPSViewHTMLPageEnabled()) {
             return false;
         }
-        if (method_exists($this, 'VariableExists') && !$this->VariableExists($ident)) {
+        if (!$this->IPSViewHTMLVariableExists($ident)) {
             return false;
         }
         if (!method_exists($this, 'SetValue')) {
@@ -600,6 +633,156 @@ trait IPSViewHTMLPageHelper
         }
 
         return $translations;
+    }
+
+    /**
+     * @return array<string,string> Existing retained variables mapped from ident to caption.
+     */
+    private function IPSViewHTMLRetainedVariables(): array
+    {
+        $retained = [];
+        foreach ($this->ReadIPSViewHTMLVariableRegistry() as $ident => $caption) {
+            if ($this->IPSViewHTMLVariableExists($ident)) {
+                $retained[$ident] = $caption;
+            }
+        }
+
+        return $retained;
+    }
+
+    /**
+     * @param array<string,string> $variables Existing retained variables mapped from ident to caption.
+     *
+     * @return array<string,mixed> PopupButton form item with an explicit delete confirmation.
+     */
+    private function IPSViewHTMLDeleteVariablesPopup(array $variables): array
+    {
+        $popupItems = [
+            [
+                'type'    => 'Label',
+                'caption' => $this->IPSViewHTMLPageText('popup.delete_description')
+            ]
+        ];
+        foreach ($variables as $caption) {
+            $popupItems[] = [
+                'type'    => 'Label',
+                'caption' => '• ' . $caption
+            ];
+        }
+
+        $message = 'MESSAGE:' . $this->IPSViewHTMLPageText('message.variables_deleted');
+
+        return [
+            'type'    => 'PopupButton',
+            'caption' => $this->IPSViewHTMLPageText('action.delete_variables'),
+            'popup'   => [
+                'caption'      => $this->IPSViewHTMLPageText('popup.delete_caption'),
+                'closeCaption' => $this->IPSViewHTMLPageText('action.keep_variables'),
+                'items'        => $popupItems,
+                'buttons'      => [
+                    [
+                        'caption' => $this->IPSViewHTMLPageText('action.confirm_delete'),
+                        'onClick' => [
+                            'IPS_SetProperty($id, ' . var_export(self::IPSVIEW_HTML_DELETE_REQUEST_PROPERTY, true) . ', bin2hex(random_bytes(16)));',
+                            'IPS_ApplyChanges($id);',
+                            'return ' . var_export($message, true) . ';'
+                        ]
+                    ]
+                ]
+            ]
+        ];
+    }
+
+    private function RememberIPSViewHTMLVariable(string $ident, string $caption): void
+    {
+        $registry = $this->ReadIPSViewHTMLVariableRegistry();
+        if (($registry[$ident] ?? null) === $caption) {
+            return;
+        }
+
+        $registry[$ident] = $caption;
+        ksort($registry, SORT_STRING);
+        $this->WriteAttributeString(
+            self::IPSVIEW_HTML_VARIABLE_REGISTRY_ATTRIBUTE,
+            json_encode($registry, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)
+        );
+    }
+
+    private function DeleteIPSViewHTMLVariableWhenRequested(string $ident): void
+    {
+        $request = trim($this->ReadPropertyString(self::IPSVIEW_HTML_DELETE_REQUEST_PROPERTY));
+        if ($request === '') {
+            return;
+        }
+
+        $state = $this->ReadIPSViewHTMLDeleteState();
+        if (($state[$ident] ?? null) === $request) {
+            return;
+        }
+        if ($this->IPSViewHTMLVariableExists($ident)) {
+            if (!method_exists($this, 'UnregisterVariable')) {
+                throw new RuntimeException('IPSViewHTMLPageHelper requires UnregisterVariable() for confirmed deletion.');
+            }
+
+            $this->UnregisterVariable($ident);
+        }
+
+        $state[$ident] = $request;
+        ksort($state, SORT_STRING);
+        $this->WriteAttributeString(
+            self::IPSVIEW_HTML_DELETE_STATE_ATTRIBUTE,
+            json_encode($state, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)
+        );
+    }
+
+    /** @return array<string,string> */
+    private function ReadIPSViewHTMLVariableRegistry(): array
+    {
+        return $this->ReadIPSViewHTMLStringMapAttribute(self::IPSVIEW_HTML_VARIABLE_REGISTRY_ATTRIBUTE);
+    }
+
+    /** @return array<string,string> */
+    private function ReadIPSViewHTMLDeleteState(): array
+    {
+        return $this->ReadIPSViewHTMLStringMapAttribute(self::IPSVIEW_HTML_DELETE_STATE_ATTRIBUTE);
+    }
+
+    /** @return array<string,string> */
+    private function ReadIPSViewHTMLStringMapAttribute(string $name): array
+    {
+        try {
+            $decoded = json_decode($this->ReadAttributeString($name), true, 512, JSON_THROW_ON_ERROR);
+        } catch (JsonException) {
+            return [];
+        }
+        if (!is_array($decoded)) {
+            return [];
+        }
+
+        $normalized = [];
+        foreach ($decoded as $key => $value) {
+            if (is_string($key) && is_string($value)) {
+                $normalized[$key] = $value;
+            }
+        }
+
+        return $normalized;
+    }
+
+    private function IPSViewHTMLVariableExists(string $ident): bool
+    {
+        if (method_exists($this, 'VariableExists')) {
+            return (bool) $this->VariableExists($ident);
+        }
+        if (!method_exists($this, 'GetIDForIdent')) {
+            return false;
+        }
+
+        try {
+            return $this->GetIDForIdent($ident) > 0;
+        } catch (Throwable) {
+            return false;
+        }
     }
 
     private function NormalizeIPSViewHTMLVariableIdent(string $ident): string
