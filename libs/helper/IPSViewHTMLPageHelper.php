@@ -8,6 +8,9 @@ use InvalidArgumentException;
 use JsonException;
 use ReflectionClass;
 use RuntimeException;
+use Throwable;
+
+require_once __DIR__ . '/HelperTranslationHelper.php';
 
 /**
  * Renders native and IPSView HTML pages through one shared asset contract.
@@ -16,11 +19,22 @@ use RuntimeException;
  * visual implementation in style.css/app.js. The helper owns asset loading,
  * bootstrap encoding, page metadata, fixed placeholders and validation.
  *
- * @version 1.0.0
+ * @version 1.1.0
  */
 trait IPSViewHTMLPageHelper
 {
+    use HelperTranslationHelper;
+
     public const IPSVIEW_HTML_CONTRACT_VERSION = 1;
+
+    private const IPSVIEW_HTML_ENABLE_PROPERTY = 'EnableIPSView';
+    private const IPSVIEW_HTML_FORM_MARKER = 'Configure optional IPSView HTML output.';
+
+    /** @var array<string,string> */
+    private const IPSVIEW_HTML_TRANSLATION_SOURCES = [
+        'field.enable_ipsview'       => 'Provide IPSView HTML output',
+        'description.enable_ipsview' => 'When enabled, the module creates additional String variables with the WebContent presentation for IPSView. Native Symcon tile views remain available separately.'
+    ];
 
     /** @var list<string> */
     private const IPSVIEW_HTML_REQUIRED_PLACEHOLDERS = [
@@ -53,6 +67,185 @@ trait IPSViewHTMLPageHelper
         'options',
         'replacements'
     ];
+
+    /** Registers the common switch for optional standalone IPSView HTML output. */
+    protected function RegisterIPSViewHTMLPageProperties(): void
+    {
+        $this->RegisterPropertyBoolean(self::IPSVIEW_HTML_ENABLE_PROPERTY, false);
+    }
+
+    /**
+     * Returns the common configuration-form controls for optional IPSView output.
+     *
+     * A module-specific description can replace the generic helper hint. The
+     * checkbox caption always remains helper-owned and centrally translated.
+     *
+     * @return array<int,array<string,mixed>> Symcon configuration-form items.
+     */
+    protected function IPSViewHTMLPageFormItems(string $description = ''): array
+    {
+        $description = trim($description);
+        if ($description === '') {
+            $description = $this->IPSViewHTMLPageText('description.enable_ipsview');
+        }
+
+        return [
+            [
+                'type'    => 'CheckBox',
+                'name'    => self::IPSVIEW_HTML_ENABLE_PROPERTY,
+                'caption' => $this->IPSViewHTMLPageText('field.enable_ipsview')
+            ],
+            [
+                'type'    => 'Label',
+                'caption' => $description
+            ]
+        ];
+    }
+
+    /**
+     * Replaces a nested form marker with the optional IPSView output controls.
+     *
+     * @param array<int,array<string,mixed>> $elements Form elements to search recursively.
+     *
+     * @throws InvalidArgumentException If the marker caption is empty.
+     */
+    protected function InsertIPSViewHTMLPageFormItems(
+        array &$elements,
+        string $markerCaption = self::IPSVIEW_HTML_FORM_MARKER,
+        string $description = ''
+    ): bool {
+        $markerCaption = trim($markerCaption);
+        if ($markerCaption === '') {
+            throw new InvalidArgumentException('IPSView HTML form marker caption must not be empty.');
+        }
+
+        foreach ($elements as $index => &$element) {
+            if (
+                ($element['type'] ?? null) === 'Label'
+                && ($element['caption'] ?? null) === $markerCaption
+            ) {
+                array_splice($elements, $index, 1, $this->IPSViewHTMLPageFormItems($description));
+                unset($element);
+
+                return true;
+            }
+
+            if (
+                isset($element['items'])
+                && is_array($element['items'])
+                && $this->InsertIPSViewHTMLPageFormItems($element['items'], $markerCaption, $description)
+            ) {
+                unset($element);
+
+                return true;
+            }
+        }
+        unset($element);
+
+        return false;
+    }
+
+    /** Returns whether the optional IPSView HTML output is enabled. */
+    protected function IsIPSViewHTMLPageEnabled(): bool
+    {
+        return $this->ReadPropertyBoolean(self::IPSVIEW_HTML_ENABLE_PROPERTY);
+    }
+
+    /**
+     * Creates or removes one optional IPSView WebContent variable.
+     *
+     * The variable is maintained as a native String variable with the Symcon
+     * WebContent presentation in HTML mode. When IPSView output is disabled,
+     * only this optional variable is removed; native visualization tiles remain
+     * untouched.
+     *
+     * @param string    $ident       Stable variable ident.
+     * @param string    $caption     Visible variable caption.
+     * @param int       $position    Position below the module instance.
+     * @param string    $initialHtml Initial HTML written when the variable is newly created.
+     * @param bool|null $padding     Optional WebContent padding setting; null preserves the presentation default.
+     *
+     * @return bool True when the variable was newly created.
+     *
+     * @throws InvalidArgumentException If ident, caption or position is invalid.
+     * @throws RuntimeException         If the consumer does not provide MaintainVariable() or SetValue().
+     */
+    protected function MaintainIPSViewHTMLVariable(
+        string $ident,
+        string $caption,
+        int $position,
+        string $initialHtml = '',
+        ?bool $padding = null
+    ): bool {
+        $ident = $this->NormalizeIPSViewHTMLVariableIdent($ident);
+        $caption = trim($caption);
+        if ($caption === '') {
+            throw new InvalidArgumentException('IPSView HTML variable caption must not be empty.');
+        }
+        if ($position < 0) {
+            throw new InvalidArgumentException('IPSView HTML variable position must not be negative.');
+        }
+        if (!method_exists($this, 'MaintainVariable') || !method_exists($this, 'SetValue')) {
+            throw new RuntimeException('IPSViewHTMLPageHelper requires MaintainVariable() and SetValue().');
+        }
+
+        $presentation = [
+            'PRESENTATION' => VARIABLE_PRESENTATION_WEB_CONTENT,
+            'HTML_TYPE'    => 0
+        ];
+        if ($padding !== null) {
+            $presentation['PADDING'] = $padding;
+        }
+
+        $enabled = $this->IsIPSViewHTMLPageEnabled();
+        $created = $this->MaintainVariable(
+            $ident,
+            $caption,
+            VARIABLETYPE_STRING,
+            $presentation,
+            $position,
+            $enabled
+        );
+
+        if ($created && $enabled) {
+            $this->SetValue($ident, $initialHtml);
+        }
+
+        return $created;
+    }
+
+    /**
+     * Updates an existing optional IPSView HTML variable when output is enabled.
+     *
+     * Missing variables and disabled output are ignored. Runtime write errors
+     * are reported through SendDebug() and return false, matching the defensive
+     * behavior used by existing consumer modules.
+     */
+    protected function UpdateIPSViewHTMLVariable(string $ident, string $html): bool
+    {
+        $ident = $this->NormalizeIPSViewHTMLVariableIdent($ident);
+        if (!$this->IsIPSViewHTMLPageEnabled()) {
+            return false;
+        }
+        if (method_exists($this, 'VariableExists') && !$this->VariableExists($ident)) {
+            return false;
+        }
+        if (!method_exists($this, 'SetValue')) {
+            throw new RuntimeException('IPSViewHTMLPageHelper requires SetValue().');
+        }
+
+        try {
+            $this->SetValue($ident, $html);
+
+            return true;
+        } catch (Throwable $exception) {
+            if (method_exists($this, 'SendDebug')) {
+                $this->SendDebug(__FUNCTION__, $exception->getMessage(), 0);
+            }
+
+            return false;
+        }
+    }
 
     /**
      * Renders a complete visualization document from index.html, style.css and app.js.
@@ -407,6 +600,23 @@ trait IPSViewHTMLPageHelper
         }
 
         return $translations;
+    }
+
+    private function NormalizeIPSViewHTMLVariableIdent(string $ident): string
+    {
+        $ident = trim($ident);
+        if (preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/', $ident) !== 1) {
+            throw new InvalidArgumentException('Invalid IPSView HTML variable ident: ' . $ident);
+        }
+
+        return $ident;
+    }
+
+    private function IPSViewHTMLPageText(string $key): string
+    {
+        $fallback = self::IPSVIEW_HTML_TRANSLATION_SOURCES[$key] ?? $key;
+
+        return $this->TranslateHelperText('IPSViewHTMLPageHelper', $key, $fallback);
     }
 
     private function ResolveIPSViewHTMLModuleDirectory(): string
