@@ -1,9 +1,16 @@
 :root {
     --tile-title-clearance: 58px;
+    --cal-view-background: var(--symc-background);
+    --cal-page-background: var(--symc-background);
     --cal-text: var(--symc-text);
+    --cal-text-active: var(--symc-text);
+    --cal-text-inactive: var(--symc-muted);
+    --cal-label-text: var(--symc-text);
+    --cal-muted: var(--symc-muted);
+    --cal-faint: var(--symc-subtle);
+    --cal-icon: var(--symc-muted);
     --cal-card: var(--symc-background);
     --cal-dialog: var(--symc-background);
-    --cal-muted: var(--symc-muted);
     --cal-border: var(--symc-border);
     --cal-surface: var(--symc-surface);
     --cal-surface-hover: var(--symc-surface-hover);
@@ -39,45 +46,48 @@ html, body {
     margin: 0;
     overflow: hidden;
     overscroll-behavior: none;
-    background: var(--cal-card);
+    background: var(--cal-view-background);
     color: var(--cal-text);
     font-family: var(--cal-font-family);
 }
 
 html.ipsview-mode {
     --tile-title-clearance: 0px;
-    --cal-text: var(--ipsview-text);
-    --cal-text-active: var(--ipsview-text-active);
-    --cal-text-inactive: var(--ipsview-text-inactive);
-    --cal-card: var(--ipsview-background);
-    --cal-page: var(--ipsview-page-background);
-    --cal-dialog: var(--ipsview-popup-background);
-    --cal-muted: var(--ipsview-text-secondary);
-    --cal-faint: var(--ipsview-text-faint);
-    --cal-border: var(--ipsview-border);
-    --cal-line: var(--ipsview-line);
-    --cal-surface: var(--ipsview-control-background);
-    --cal-surface-hover: var(--ipsview-control-background-active);
-    --cal-surface-inactive: var(--ipsview-control-background-inactive);
-    --cal-accent: var(--ipsview-accent);
-    --cal-accent-contrast: var(--ipsview-accent-contrast);
-    --cal-information: var(--ipsview-information);
-    --cal-information-soft: var(--ipsview-information-soft);
-    --cal-information-contrast: var(--ipsview-information-contrast);
-    --cal-positive: var(--ipsview-positive);
-    --cal-warning: var(--ipsview-warning);
-    --cal-danger: var(--ipsview-critical);
-    --cal-danger-soft: var(--ipsview-critical-soft);
-    --cal-danger-contrast: var(--ipsview-critical-contrast);
-    --cal-gradient-accent: var(--ipsview-gradient-accent);
-    --cal-radius: var(--ipsview-radius);
-    --cal-border-width: var(--ipsview-border-width);
-    --cal-line-width: var(--ipsview-line-width);
-    --cal-shadow: var(--ipsview-shadow);
-    --cal-popup-border: var(--ipsview-popup-border);
-    --cal-popup-shadow: var(--ipsview-popup-shadow);
-    --cal-disabled-opacity: var(--ipsview-disabled-opacity);
-    --cal-font-family: var(--ipsview-font-family);
+    --cal-view-background: var(--ipsview-role-view-background);
+    --cal-page-background: var(--ipsview-role-page-background);
+    --cal-text: var(--ipsview-role-text-primary);
+    --cal-text-active: var(--ipsview-role-text-active);
+    --cal-text-inactive: var(--ipsview-role-text-inactive);
+    --cal-label-text: var(--ipsview-role-text-label);
+    --cal-muted: var(--ipsview-role-text-secondary);
+    --cal-faint: var(--ipsview-role-text-faint);
+    --cal-icon: var(--ipsview-role-icon);
+    --cal-card: var(--ipsview-role-page-background);
+    --cal-dialog: var(--ipsview-role-popup-background);
+    --cal-border: var(--ipsview-role-border);
+    --cal-line: var(--ipsview-role-line);
+    --cal-surface: var(--ipsview-role-control-background);
+    --cal-surface-hover: var(--ipsview-role-control-active-background);
+    --cal-surface-inactive: var(--ipsview-role-control-inactive-background);
+    --cal-accent: var(--ipsview-role-accent);
+    --cal-accent-contrast: var(--ipsview-role-accent-contrast);
+    --cal-information: var(--ipsview-role-information);
+    --cal-information-soft: var(--ipsview-role-information-soft);
+    --cal-information-contrast: var(--ipsview-role-information-contrast);
+    --cal-positive: var(--ipsview-role-positive);
+    --cal-warning: var(--ipsview-role-warning);
+    --cal-danger: var(--ipsview-role-critical);
+    --cal-danger-soft: var(--ipsview-role-critical-soft);
+    --cal-danger-contrast: var(--ipsview-role-critical-contrast);
+    --cal-gradient-accent: var(--ipsview-role-gradient-accent);
+    --cal-radius: var(--ipsview-role-radius);
+    --cal-border-width: var(--ipsview-role-border-width);
+    --cal-line-width: var(--ipsview-role-line-width);
+    --cal-shadow: var(--ipsview-role-shadow);
+    --cal-popup-border: var(--ipsview-role-popup-border);
+    --cal-popup-shadow: var(--ipsview-role-popup-shadow);
+    --cal-disabled-opacity: var(--ipsview-role-disabled-opacity);
+    --cal-font-family: var(--ipsview-role-font-family);
 }
 html.ipsview-mode #refresh-button,
 html.ipsview-mode #add-button { display: none !important; }
@@ -100,6 +110,8 @@ button { color: inherit; }
     min-height: 170px;
     overscroll-behavior: none;
     isolation: isolate;
+    background: var(--cal-page-background);
+    color: var(--cal-text);
 }
 
 .toolbar {
@@ -141,6 +153,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 
 .icon-button {
     display: inline-grid;
+    color: var(--cal-icon);
     width: 34px;
     height: 34px;
     padding: 0;
@@ -246,7 +259,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .weekday {
     padding: 7px 4px;
     background: color-mix(in srgb, var(--cal-card) 96%, transparent);
-    color: var(--cal-muted);
+    color: var(--cal-label-text);
     font-size: .68em;
     font-weight: 650;
     text-align: center;
@@ -393,7 +406,7 @@ dialog::backdrop {
 .dialog-body { display: grid; gap: 10px; max-height: calc(100vh - var(--tile-title-clearance) - 165px); padding: 14px 15px; overflow: auto; overscroll-behavior: contain; }
 .form-row { display: grid; gap: 5px; }
 .form-row.two { grid-template-columns: 1fr 1fr; gap: 10px; }
-.form-row label { color: var(--cal-muted); font-size: .7em; font-weight: 600; }
+.form-row label { color: var(--cal-label-text); font-size: .7em; font-weight: 600; }
 .form-row input, .form-row select, .form-row textarea {
     width: 100%;
     padding: 8px 9px;

@@ -1193,11 +1193,13 @@ assertTrueValue(
         && is_string($viewTemplateSource)
         && is_string($viewStyleSource)
         && str_contains($viewTemplateSource, '{{IPSVIEW_STYLE}}')
-        && str_contains($viewStyleSource, '--cal-text: var(--ipsview-text);')
-        && str_contains($viewStyleSource, '--cal-surface: var(--ipsview-control-background);')
-        && str_contains($viewStyleSource, '--cal-accent: var(--ipsview-accent);')
-        && str_contains($viewStyleSource, '--cal-danger: var(--ipsview-critical);')
-        && str_contains($viewStyleSource, '--cal-popup-shadow: var(--ipsview-popup-shadow);'),
+        && str_contains($viewStyleSource, '--cal-text: var(--ipsview-role-text-primary);')
+        && str_contains($viewStyleSource, '--cal-text-active: var(--ipsview-role-text-active);')
+        && str_contains($viewStyleSource, '--cal-label-text: var(--ipsview-role-text-label);')
+        && str_contains($viewStyleSource, '--cal-surface: var(--ipsview-role-control-background);')
+        && str_contains($viewStyleSource, '--cal-accent: var(--ipsview-role-accent);')
+        && str_contains($viewStyleSource, '--cal-danger: var(--ipsview-role-critical);')
+        && str_contains($viewStyleSource, '--cal-popup-shadow: var(--ipsview-role-popup-shadow);'),
     'The calendar view must consume IPSViewStyleHelper directly without replacing calendar event colors.'
 );
 assertTrueValue(

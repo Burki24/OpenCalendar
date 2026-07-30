@@ -57,6 +57,29 @@ function assertVisualization(bool $condition, string $message): void
     }
 }
 
+$style = (string) file_get_contents(__DIR__ . '/../Kalender Ansicht/visualization/style.css');
+assertVisualization(
+    str_contains($style, '--cal-view-background: var(--ipsview-role-view-background);')
+        && str_contains($style, '--cal-page-background: var(--ipsview-role-page-background);')
+        && str_contains($style, '--cal-text: var(--ipsview-role-text-primary);')
+        && str_contains($style, '--cal-text-active: var(--ipsview-role-text-active);')
+        && str_contains($style, '--cal-text-inactive: var(--ipsview-role-text-inactive);')
+        && str_contains($style, '--cal-label-text: var(--ipsview-role-text-label);')
+        && str_contains($style, '--cal-muted: var(--ipsview-role-text-secondary);')
+        && str_contains($style, '--cal-faint: var(--ipsview-role-text-faint);')
+        && str_contains($style, '--cal-icon: var(--ipsview-role-icon);'),
+    'The calendar stylesheet must map every text, icon and page role to the canonical IPSView contract.'
+);
+assertVisualization(
+    str_contains($style, 'background: var(--cal-view-background);')
+        && str_contains($style, 'background: var(--cal-page-background);')
+        && str_contains($style, 'color: var(--cal-text-active, var(--cal-text));')
+        && str_contains($style, 'color: var(--cal-text-inactive);')
+        && str_contains($style, 'color: var(--cal-label-text);')
+        && str_contains($style, 'color: var(--cal-icon);'),
+    'Calendar components must consume the canonical roles according to their semantic purpose.'
+);
+
 $renderer = new CalendarVisualizationRenderer();
 $native = $renderer->render(false);
 $ipsView = $renderer->render(true);
