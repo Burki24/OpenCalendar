@@ -2,7 +2,7 @@
 
 Die Kalender Ansicht fasst Termine mehrerer Kalenderinstanzen in einer responsiven Kachel der Symcon-Kachelvisualisierung oder in einer HTMLBox für IPSView zusammen.
 
-Die Kachel verwendet den vendorten `VisualizationThemeHelper` und orientiert sich dadurch an den nativen Symcon-Designvariablen. Die eigenständige IPSView-Seite verwendet den universellen `IPSViewStyleHelper`. Dadurch stehen in allen angebundenen Modulen dieselben Stilquellen, Bezeichnungen, Flächen, Schriften, Rahmen, Schatten, Statusrollen und Verläufe zur Verfügung. Native Kachel und IPSView-Seite werden über den gemeinsamen `IPSViewHTMLPageHelper` aus derselben Asset-Struktur `visualization/index.html`, `style.css` und `app.js` erzeugt.
+Die Kachel verwendet den vendorten `VisualizationThemeHelper` und orientiert sich dadurch an den nativen Symcon-Designvariablen. Die eigenständige IPSView-Seite verwendet den universellen `IPSViewStyleHelper`. Dadurch stehen in allen angebundenen Modulen dieselben Stilquellen, Bezeichnungen, Flächen, Schriften, Rahmen, Schatten, Statusrollen und Verläufe zur Verfügung. Native Kachel und IPSView-Seite werden über den gemeinsamen `IPSViewHTMLPageHelper` aus derselben Asset-Struktur `visualization/index.html`, `style.css` und `app.js` erzeugt. Der Helper verwaltet außerdem die optionale IPSView-WebContent-Variable einschließlich der bestätigungspflichtigen Löschung.
 
 ## Funktionsumfang
 
@@ -36,7 +36,7 @@ Wiederkehrende, vom CalDAV-Server expandierte Einzeltermine werden derzeit nur l
 
 ### IPSView
 
-1. In der Instanz **Kalender Ansicht** die Option **IPSView-HTMLBox bereitstellen** aktivieren und die Änderungen übernehmen.
+1. In der Instanz **Kalender Ansicht** die Option **IPSView-HTML-Ausgabe bereitstellen** aktivieren und die Konfiguration speichern.
 2. Unter **Stilquelle** zwischen **Benutzerdefinierter Stil**, **IPSView-Standardstil**, **Helle Vorgabe** und **Dunkle Vorgabe** wählen.
 3. Für **IPSView-Standardstil** das Medienobjekt auswählen, das die gewünschte `.ipsView`-Datei enthält. Der Helper übernimmt daraus ausschließlich freigegebene Standardstil-Werte wie Farben, Schrift, Rahmen, Schatten und Rundungen. Wird das Medienobjekt aktualisiert, wird auch die WebContent-Ausgabe neu erzeugt.
 4. Beim **Benutzerdefinierten Stil** die universellen Flächen-, Schrift-, Icon-, Rahmen-, Popup- und Statusfarben sowie Typografie und Effekte direkt festlegen. Diese Rollen besitzen in allen Modulen dieselbe Bedeutung und Wirkung.
@@ -47,7 +47,7 @@ Wiederkehrende, vom CalDAV-Server expandierte Einzeltermine werden derzeit nur l
 9. Im IPSView Designer ein Steuerelement vom Typ **HTML-Box** einfügen und diese Variable als ID auswählen.
 10. Als HTML Renderer **Browser des Clients** oder **Automatisch** verwenden. Der native einfache HTML Renderer reicht nicht aus, weil Ansichtswechsel und Navigation JavaScript verwenden.
 
-Agenda, 3-Tage-, Wochen- und Monatsansicht sowie die Navigation funktionieren direkt innerhalb der IPSView-HTMLBox. Die Variable wird bei Änderungen oder Synchronisationen der ausgewählten Kalender automatisch neu erzeugt. Das Öffnen von Termindetails ist lesend möglich. Erstellen, Bearbeiten, Löschen und die manuelle Synchronisationsschaltfläche bleiben der Symcon-Kachel vorbehalten, da die IPSView-HTMLBox keine Symcon-HTML-SDK-Aktionsbrücke bereitstellt.
+Agenda, 3-Tage-, Wochen- und Monatsansicht sowie die Navigation funktionieren direkt innerhalb der IPSView-HTMLBox. Die Variable wird bei Änderungen oder Synchronisationen der ausgewählten Kalender automatisch neu erzeugt. Wird die IPSView-Ausgabe deaktiviert, bleibt eine bereits vorhandene Variable mit ihrer Objekt-ID, Positionierung und bestehenden Verknüpfungen erhalten und wird nicht mehr aktualisiert. In der Instanzkonfiguration erscheint dann eine gesonderte Löschaktion; erst nach ausdrücklicher Bestätigung wird die Variable entfernt. Das Öffnen von Termindetails ist lesend möglich. Erstellen, Bearbeiten, Löschen und die manuelle Synchronisationsschaltfläche bleiben der Symcon-Kachel vorbehalten, da die IPSView-HTMLBox keine Symcon-HTML-SDK-Aktionsbrücke bereitstellt.
 
 Der `IPSViewStyleHelper` erzeugt sämtliche allgemeinen CSS-Rollen zentral. OpenCalendar ordnet diesen Rollen nur seine Komponenten zu; eigene Grund-, Status- oder Popupfarben werden im Modul nicht mehr festgelegt. Die frei gewählten Farben einzelner Kalender und Termine bleiben davon unabhängig.
 

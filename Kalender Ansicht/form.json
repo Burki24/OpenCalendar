@@ -132,13 +132,8 @@
             "expanded": false,
             "items": [
                 {
-                    "type": "CheckBox",
-                    "name": "EnableIPSView",
-                    "caption": "Provide IPSView HTMLBox"
-                },
-                {
                     "type": "Label",
-                    "caption": "Creates a WebContent variable with the calendar for an IPSView HTML-Box."
+                    "caption": "Configure optional IPSView HTML output."
                 },
                 {
                     "type": "Label",

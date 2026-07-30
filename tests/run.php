@@ -1078,6 +1078,7 @@ $viewTemplateSource = file_get_contents(__DIR__ . '/../Kalender Ansicht/visualiz
 $viewStyleSource = file_get_contents(__DIR__ . '/../Kalender Ansicht/visualization/style.css');
 $viewScriptSource = file_get_contents(__DIR__ . '/../Kalender Ansicht/visualization/app.js');
 $viewFormSource = file_get_contents(__DIR__ . '/../Kalender Ansicht/form.json');
+$viewLocaleSource = file_get_contents(__DIR__ . '/../Kalender Ansicht/locale.json');
 assertTrueValue(
     is_string($accountModuleSource)
         && str_contains($accountModuleSource, 'RegisterOAuth(self::GOOGLE_OAUTH_IDENTIFIER)')
@@ -1135,8 +1136,14 @@ assertTrueValue(
         && str_contains($viewModuleSource, 'use Burki24\\SymconModuleHelper\\IPSViewHTMLPageHelper;')
         && str_contains($viewModuleSource, "require_once __DIR__ . '/../libs/helper/IPSViewHTMLPageHelper.php';")
         && str_contains($viewModuleSource, 'use IPSViewHTMLPageHelper;')
-        && str_contains($viewModuleSource, '$this->RenderVisualizationHTMLPage($ipsView, ['),
-    'The calendar view must render its visualization through the shared HTML page helper.'
+        && str_contains($viewModuleSource, '$this->RegisterIPSViewHTMLPageProperties();')
+        && str_contains($viewModuleSource, '$this->InsertIPSViewHTMLPageFormItems($form[\'elements\']);')
+        && str_contains($viewModuleSource, '$this->MaintainIPSViewHTMLVariable(')
+        && str_contains($viewModuleSource, '$this->UpdateIPSViewHTMLVariable(')
+        && str_contains($viewModuleSource, '$this->RenderVisualizationHTMLPage($ipsView, [')
+        && !str_contains($viewModuleSource, "RegisterPropertyBoolean('EnableIPSView'")
+        && !str_contains($viewModuleSource, '$this->MaintainVariable('),
+    'The calendar view must manage and render its optional IPSView output through IPSViewHTMLPageHelper.'
 );
 assertTrueValue(
     is_string($viewTemplateSource)
@@ -1175,10 +1182,14 @@ assertTrueValue(
         && str_contains($viewModuleSource, "require_once __DIR__ . '/../libs/helper/IPSViewStyleHelper.php';")
         && str_contains($viewModuleSource, 'use IPSViewStyleHelper;')
         && str_contains($viewModuleSource, '$this->RegisterIPSViewStyleProperties();')
-        && str_contains($viewModuleSource, "\$this->IPSViewStyleFormItems('220px')")
+        && str_contains($viewModuleSource, '$this->InsertIPSViewStyleFormItems(')
+        && str_contains($viewModuleSource, '$this->IPSViewStyleRootFontSize()')
         && str_contains($viewModuleSource, '$this->IPSViewStyleCSSVariables(')
         && str_contains($viewModuleSource, '$this->RegisterIPSViewStyleMediaMessages();')
         && str_contains($viewModuleSource, '$this->IsIPSViewStyleMediaUpdate(')
+        && !str_contains($viewModuleSource, 'private function injectIPSViewStyleFormItems(')
+        && !str_contains($viewModuleSource, 'private function IPSViewRootFontSize(')
+        && !str_contains($viewModuleSource, 'private function renderIPSViewStyleCSS(')
         && is_string($viewTemplateSource)
         && is_string($viewStyleSource)
         && str_contains($viewTemplateSource, '{{IPSVIEW_STYLE}}')
@@ -1187,18 +1198,27 @@ assertTrueValue(
         && str_contains($viewStyleSource, '--cal-accent: var(--ipsview-accent);')
         && str_contains($viewStyleSource, '--cal-danger: var(--ipsview-critical);')
         && str_contains($viewStyleSource, '--cal-popup-shadow: var(--ipsview-popup-shadow);'),
-    'The calendar view must consume the shared universal IPSView style without replacing calendar event colors.'
+    'The calendar view must consume IPSViewStyleHelper directly without replacing calendar event colors.'
 );
 assertTrueValue(
     is_string($viewFormSource)
+        && str_contains($viewFormSource, 'Configure optional IPSView HTML output.')
         && str_contains(
             $viewFormSource,
             'Configure the shared IPSView style used by the standalone HTML page.'
         )
+        && !str_contains($viewFormSource, '"name": "EnableIPSView"')
         && !str_contains($viewFormSource, '"name": "IPSViewTheme"')
         && !str_contains($viewFormSource, '"name": "IPSViewTransparent"')
         && !str_contains($viewFormSource, '"name": "IPSViewFontScale"'),
-    'The calendar view form must delegate the complete shared IPSView style to the helper.'
+    'The calendar view form must delegate optional output and the complete shared style to the helpers.'
+);
+assertTrueValue(
+    is_string($viewLocaleSource)
+        && !str_contains($viewLocaleSource, 'Provide IPSView HTMLBox')
+        && !str_contains($viewLocaleSource, 'Creates a WebContent variable with the calendar for an IPSView HTML-Box.')
+        && !str_contains($viewLocaleSource, 'Choose a shared IPSView style source.'),
+    'Helper-owned IPSView captions and hints must not be duplicated in the calendar locale.'
 );
 assertTrueValue(
     is_string($viewModuleSource)
@@ -1241,7 +1261,6 @@ assertTrueValue(
         && str_contains($viewModuleSource, "require_once __DIR__ . '/../libs/helper/VariableHelper.php';")
         && str_contains($viewModuleSource, 'use VariableHelper;')
         && str_contains($viewModuleSource, 'GetVariableIDByIdent(\'LastSynchronization\', $instanceId)')
-        && str_contains($viewModuleSource, "VariableExists('IPSViewCalendar')")
         && !str_contains($viewModuleSource, 'findChildByIdent('),
     'The calendar view must use parent-aware VariableHelper lookups instead of its local child scan.'
 );

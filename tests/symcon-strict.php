@@ -171,15 +171,20 @@ assertSymconStrict(
 assertSymconStrict(
     str_contains($viewSource, 'use VariableHelper;')
         && str_contains($viewSource, 'GetVariableIDByIdent(\'LastSynchronization\', $instanceId)')
-        && str_contains($viewSource, "VariableExists('IPSViewCalendar')")
         && !str_contains($viewSource, 'findChildByIdent('),
     'The calendar view must use VariableHelper for variable lookups across calendar instances.'
 );
 assertSymconStrict(
     str_contains($viewSource, 'use VisualizationAssetHelper;')
         && str_contains($viewSource, 'use IPSViewHTMLPageHelper;')
-        && str_contains($viewSource, '$this->RenderVisualizationHTMLPage($ipsView, ['),
-    'The calendar view must load and render visualization assets through the shared helpers.'
+        && str_contains($viewSource, '$this->RegisterIPSViewHTMLPageProperties();')
+        && str_contains($viewSource, '$this->InsertIPSViewHTMLPageFormItems($form[\'elements\']);')
+        && str_contains($viewSource, '$this->MaintainIPSViewHTMLVariable(')
+        && str_contains($viewSource, '$this->UpdateIPSViewHTMLVariable(')
+        && str_contains($viewSource, '$this->RenderVisualizationHTMLPage($ipsView, [')
+        && !str_contains($viewSource, "RegisterPropertyBoolean('EnableIPSView'")
+        && !str_contains($viewSource, '$this->MaintainVariable('),
+    'The calendar view must manage its optional IPSView output through IPSViewHTMLPageHelper.'
 );
 assertSymconStrict(
     str_contains($viewSource, 'use VisualizationThemeHelper;')
@@ -189,11 +194,15 @@ assertSymconStrict(
 assertSymconStrict(
     str_contains($viewSource, 'use IPSViewStyleHelper;')
         && str_contains($viewSource, '$this->RegisterIPSViewStyleProperties()')
-        && str_contains($viewSource, '$this->IPSViewStyleFormItems(')
+        && str_contains($viewSource, '$this->InsertIPSViewStyleFormItems(')
+        && str_contains($viewSource, '$this->IPSViewStyleRootFontSize()')
         && str_contains($viewSource, '$this->IPSViewStyleCSSVariables(')
         && str_contains($viewSource, '$this->RegisterIPSViewStyleMediaMessages()')
-        && str_contains($viewSource, '$this->IsIPSViewStyleMediaUpdate('),
-    'The calendar view must use IPSViewStyleHelper for the standalone IPSView style.'
+        && str_contains($viewSource, '$this->IsIPSViewStyleMediaUpdate(')
+        && !str_contains($viewSource, 'private function injectIPSViewStyleFormItems(')
+        && !str_contains($viewSource, 'private function IPSViewRootFontSize(')
+        && !str_contains($viewSource, 'private function renderIPSViewStyleCSS('),
+    'The calendar view must use IPSViewStyleHelper directly for the standalone IPSView style.'
 );
 assertSymconStrict(
     is_file($root . '/Kalender Ansicht/visualization/index.html')

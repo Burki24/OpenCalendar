@@ -100,7 +100,7 @@ class KalenderAnsicht extends IPSModuleStrict
         $this->RegisterPropertyBoolean('ShowCalendarName', true);
         $this->RegisterPropertyBoolean('ShowLocation', true);
         $this->RegisterPropertyBoolean('ShowDescription', false);
-        $this->RegisterPropertyBoolean('EnableIPSView', false);
+        $this->RegisterIPSViewHTMLPageProperties();
         $this->RegisterPropertyInteger('IPSViewColorBarWidth', 7);
         $this->RegisterPropertyInteger('IPSViewWeekOrientation', 0);
         $this->RegisterIPSViewStyleProperties();
@@ -133,7 +133,8 @@ class KalenderAnsicht extends IPSModuleStrict
             }
         }
         if (isset($form['elements']) && is_array($form['elements'])) {
-            $this->injectIPSViewStyleFormItems($form['elements']);
+            $this->InsertIPSViewHTMLPageFormItems($form['elements']);
+            $this->InsertIPSViewStyleFormItems($form['elements'], colorWidth: '220px');
         }
 
         return $this->EncodeConfigurationForm($form);
@@ -252,16 +253,10 @@ class KalenderAnsicht extends IPSModuleStrict
         $this->RegisterMessage(0, IPS_KERNELSTARTED);
         $this->RegisterIPSViewStyleMediaMessages();
         $this->SetTimerInterval('InitializationTimer', 0);
-        $this->MaintainVariable(
+        $this->MaintainIPSViewHTMLVariable(
             'IPSViewCalendar',
             $this->Translate('IPSView calendar'),
-            VARIABLETYPE_STRING,
-            [
-                'PRESENTATION' => VARIABLE_PRESENTATION_WEB_CONTENT,
-                'HTML_TYPE'    => 0
-            ],
-            10,
-            $this->ReadPropertyBoolean('EnableIPSView')
+            10
         );
 
         if (IPS_GetKernelRunlevel() !== KR_READY) {
@@ -527,38 +522,6 @@ class KalenderAnsicht extends IPSModuleStrict
         return $this->renderCalendarHtml($this->buildState(), true);
     }
 
-    /** @param array<int,array<string,mixed>> $elements */
-    private function injectIPSViewStyleFormItems(array &$elements): void
-    {
-        foreach ($elements as $index => &$element) {
-            if (($element['caption'] ?? null) === 'Configure the shared IPSView style used by the standalone HTML page.') {
-                array_splice($elements, $index, 1, $this->IPSViewStyleFormItems('220px'));
-
-                return;
-            }
-
-            if (!isset($element['items']) || !is_array($element['items'])) {
-                continue;
-            }
-
-            $this->injectIPSViewStyleFormItems($element['items']);
-        }
-    }
-
-    private function renderIPSViewStyleCSS(): string
-    {
-        return $this->IPSViewStyleCSSVariables(':root');
-    }
-
-    private function IPSViewRootFontSize(): string
-    {
-        $style = $this->IPSViewResolvedStyle();
-        $scale = max(60, min(200, $this->ReadPropertyInteger('IPSViewStyleFontScale'))) / 100;
-        $fontSize = max(8, min(64, (int) round((float) $style['FontSize'] * $scale)));
-
-        return $fontSize . 'px';
-    }
-
     private function broadcastState(): void
     {
         if (!$this->isRuntimeReady()) {
@@ -578,10 +541,12 @@ class KalenderAnsicht extends IPSModuleStrict
             $this->SendDebug('VisualizationUpdate', $exception->getMessage(), 0);
         }
 
-        if ($this->ReadPropertyBoolean('EnableIPSView')
-            && $this->VariableExists('IPSViewCalendar')) {
+        if ($this->IsIPSViewHTMLPageEnabled()) {
             try {
-                $this->SetValue('IPSViewCalendar', $this->renderCalendarHtml($state, true));
+                $this->UpdateIPSViewHTMLVariable(
+                    'IPSViewCalendar',
+                    $this->renderCalendarHtml($state, true)
+                );
             } catch (Throwable $exception) {
                 $this->SendDebug('IPSViewUpdate', $exception->getMessage(), 0);
             }
@@ -611,10 +576,10 @@ class KalenderAnsicht extends IPSModuleStrict
         return $this->RenderVisualizationHTMLPage($ipsView, [
             'language'           => $this->Translate('Today') === 'Heute' ? 'de' : 'en',
             'classes'            => $ipsView ? ['ipsview-mode'] : [],
-            'rootFontSize'       => $ipsView ? $this->IPSViewRootFontSize() : '100%',
+            'rootFontSize'       => $ipsView ? $this->IPSViewStyleRootFontSize() : '100%',
             'title'              => $this->Translate('Calendar'),
             'visualizationTheme' => $this->VisualizationThemeCSS(),
-            'ipsViewStyle'       => $ipsView ? $this->renderIPSViewStyleCSS() : '',
+            'ipsViewStyle'       => $ipsView ? $this->IPSViewStyleCSSVariables(':root') : '',
             'state'              => $state,
             'runtime'            => null,
             'translations'       => $translations,
