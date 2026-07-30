@@ -87,9 +87,12 @@ assertVisualization(
 assertVisualization(
     !str_contains($style, 'html.ipsview-mode #add-button { display: none !important; }')
         && str_contains($style, 'html.ipsview-mode .floating-add {')
-        && str_contains($style, 'height: 48px;')
+        && str_contains($style, 'height: 46px;')
+        && str_contains($style, 'padding: 0 11px;')
+        && str_contains($style, 'box-shadow: none;')
+        && str_contains($style, 'width: 48px;')
         && str_contains($style, 'html.ipsview-mode .floating-add-label { display: inline; }'),
-    'IPSView must expose a labelled, touch-sized event creation button instead of hiding it.'
+    'IPSView must expose a compact labelled creation button with a touch-sized control and a round narrow-screen fallback.'
 );
 
 $renderer = new CalendarVisualizationRenderer();
@@ -103,6 +106,7 @@ foreach ([$native, $ipsView] as $html) {
     assertVisualization(str_contains($html, 'contractVersion'), 'The bootstrap contract version must be embedded.');
     assertVisualization(str_contains($html, 'calendarVisualization.state'), 'The calendar script must consume the shared state contract.');
     assertVisualization(str_contains($html, 'id="add-button-label"'), 'The event creation control must expose a visible text label for touch users.');
+    assertVisualization(str_contains($html, "t('New event')"), 'The visible creation label must use the compact translation while title and aria-label remain descriptive.');
     assertVisualization(str_contains($html, "addButton.disabled = !hasWritableCalendar"), 'The creation control must stay visible and communicate unavailable write access by disabling itself.');
     assertVisualization(str_contains($html, '--agenda-color-bar-width'), 'Calendar-specific options must remain available through the shared bootstrap.');
 }

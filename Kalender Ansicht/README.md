@@ -72,4 +72,4 @@ $html = IPSKALVIEW_GetIPSViewHTML(12345);
 
 ### Touch-Bedienung in IPSView
 
-In der IPSView-Darstellung steht in der oberen Werkzeugleiste eine deutlich beschriftete Schaltfläche **„Termin erstellen“** bereit. Sie verwendet eine mindestens 48 Pixel hohe Touch-Fläche. Ist aktuell kein ausgewählter Kalender beschreibbar, bleibt die Schaltfläche sichtbar, ist jedoch deaktiviert und weist auf den fehlenden Schreibzugriff hin. Auf schmalen Darstellungen wechselt sie platzsparend zu einer großen runden Plus-Schaltfläche.
+In der IPSView-Darstellung steht in der oberen Werkzeugleiste die kompakte Schaltfläche **„＋ Termin“** bereit. Ihre 46 Pixel hohe Bedienfläche bleibt touch-tauglich, ohne die Ansichtsumschaltung zu dominieren. Ist aktuell kein ausgewählter Kalender beschreibbar, bleibt die Schaltfläche sichtbar, ist jedoch deaktiviert und weist auf den fehlenden Schreibzugriff hin. Auf schmalen Darstellungen wechselt sie platzsparend zu einer runden Plus-Schaltfläche mit 48 × 48 Pixeln.

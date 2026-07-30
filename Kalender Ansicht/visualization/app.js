@@ -569,7 +569,7 @@ function applyStaticTranslations() {
     ].forEach(([id, text]) => { document.getElementById(id).textContent = t(text); });
     document.getElementById('all-day-label').textContent = t('All day');
     document.getElementById('dialog-title').textContent = t('Event');
-    document.getElementById('add-button-label').textContent = t('Create event');
+    document.getElementById('add-button-label').textContent = t('New event');
     [
         ['dialog-close', 'Close'],
         ['add-button', 'Create event']

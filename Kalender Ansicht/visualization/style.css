@@ -377,17 +377,18 @@ html.ipsview-mode .floating-add {
     position: static;
     flex: 0 0 auto;
     width: auto;
-    min-width: 54px;
-    height: 48px;
-    padding: 0 16px;
-    gap: 8px;
+    min-width: 0;
+    height: 46px;
+    padding: 0 11px;
+    gap: 6px;
     border: var(--cal-border-width, 1px) solid var(--cal-accent);
     border-radius: var(--cal-radius);
-    font-size: .82em;
-    font-weight: 700;
+    box-shadow: none;
+    font-size: .76em;
+    font-weight: 650;
     white-space: nowrap;
 }
-html.ipsview-mode .floating-add-symbol { font-size: 1.45em; line-height: 1; }
+html.ipsview-mode .floating-add-symbol { font-size: 1.25em; line-height: 1; }
 html.ipsview-mode .floating-add-label { display: inline; }
 html.ipsview-mode .form-row input,
 html.ipsview-mode .form-row select,
@@ -487,9 +488,9 @@ dialog::backdrop {
         position: absolute;
         right: 12px;
         bottom: 12px;
-        width: 56px;
-        height: 56px;
-        min-width: 56px;
+        width: 48px;
+        height: 48px;
+        min-width: 48px;
         padding: 0;
         border-radius: 50%;
     }
