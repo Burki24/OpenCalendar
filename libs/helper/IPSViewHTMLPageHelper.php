@@ -19,7 +19,7 @@ require_once __DIR__ . '/HelperTranslationHelper.php';
  * visual implementation in style.css/app.js. The helper owns asset loading,
  * bootstrap encoding, page metadata, fixed placeholders and validation.
  *
- * @version 1.2.0
+ * @version 1.2.1
  */
 trait IPSViewHTMLPageHelper
 {
@@ -779,7 +779,9 @@ trait IPSViewHTMLPageHelper
         }
 
         try {
-            return $this->GetIDForIdent($ident) > 0;
+            $variableID = @$this->GetIDForIdent($ident);
+
+            return is_int($variableID) && $variableID > 0;
         } catch (Throwable) {
             return false;
         }
