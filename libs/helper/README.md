@@ -11,7 +11,7 @@ The files in this directory are vendored from
 | `IPSViewHTMLPageHelper.php` | 1.2.1 | `ccd3cb992473e919538fda14aa96970176901437bd5060a005a6ffcb9a4a2a39` |
 | `HelperTranslationHelper.php` | 1.0.0 | `d3deee581eca9f8eb11e9adce060170227a2dc836ee898bd134f93d27604f639` |
 | `VisualizationAssetHelper.php` | 1.0.0 | `1693b2399bcf95d270a6d9a01df6534caad906497bd4ba9489916a951abaffcc` |
-| `IPSViewStyleHelper.php` | 1.4.0 | `b5b5f5052e15511a04705f0f7be8960b200429e4bad1da909be92bd6e0ee4310` |
+| `IPSViewStyleHelper.php` | 1.4.1 | `1e5d2c47180e9ca686661307ebd8b37ffac177a91d8889c593f3663d88e011e1` |
 | `ParentConnectionHelper.php` | 1.0.0 | `d4f01dee721aa32e64410979ca15b2795a0fcc59c0232c0ad69e4702d9ff573c` |
 | `PersistentJsonCacheHelper.php` | 1.0.0 | `adbc7680abe814dc6c15a9cda1312cc30023073595052006662716bc0d65f2a4` |
 | `SymconOAuthHelper.php` | 1.0.0 | `d9053bfd083a581b96f8526cbb05e8568a6ad24a81cafa3e9b05108343bf2a65` |

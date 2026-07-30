@@ -16,7 +16,7 @@ require_once __DIR__ . '/HelperTranslationHelper.php';
  * their components, but do not define module-specific colors, gradients,
  * typography, borders or shadows.
  *
- * @version 1.4.0
+ * @version 1.4.1
  */
 trait IPSViewStyleHelper
 {
@@ -280,8 +280,6 @@ trait IPSViewStyleHelper
         'ShadowOffsetY'             => 10.0
     ];
 
-    private const IPSVIEW_STYLE_TEXT_CONTRAST = 4.5;
-    private const IPSVIEW_STYLE_INACTIVE_TEXT_CONTRAST = 3.0;
     private const IPSVIEW_STYLE_FORM_MARKER = 'Configure the shared IPSView style used by the standalone HTML page.';
 
     /** Registers the complete shared IPSView style configuration. */
@@ -659,7 +657,7 @@ trait IPSViewStyleHelper
     }
 
     /**
-     * Resolves the active style source into universal, contrast-safe tokens.
+     * Resolves the active style source into universal semantic tokens.
      *
      * The optional document accepts raw JSON or base64-encoded JSON and is
      * primarily useful for tests. When omitted, the selected media object is
@@ -701,15 +699,15 @@ trait IPSViewStyleHelper
         $fontScale = max(60, min(200, $this->ReadPropertyInteger('IPSViewStyleFontScale'))) / 100;
         $variables = [
             'color-scheme'                                  => $style['ColorScheme'],
-            '--ipsview-view-background'                     => $style['ViewBackground'],
-            '--ipsview-page-background'                     => $style['PageBackground'],
-            '--ipsview-background'                          => $transparent ? 'transparent' : $style['ViewBackground'],
-            '--ipsview-label-background'                    => $style['LabelBackground'],
-            '--ipsview-control-background'                  => $style['ControlBackground'],
-            '--ipsview-control-background-active'           => $style['ControlActiveBackground'],
-            '--ipsview-control-background-inactive'         => $style['ControlInactiveBackground'],
-            '--ipsview-control-background-soft'             => $style['ControlSoftBackground'],
-            '--ipsview-popup-background'                    => $style['PopupBackground'],
+            '--ipsview-view-background'                     => $this->IPSViewCSSVariableColor((string) $style['ViewBackground']),
+            '--ipsview-page-background'                     => $this->IPSViewCSSVariableColor((string) $style['PageBackground']),
+            '--ipsview-background'                          => $transparent ? 'transparent' : $this->IPSViewCSSVariableColor((string) $style['ViewBackground']),
+            '--ipsview-label-background'                    => $this->IPSViewCSSVariableColor((string) $style['LabelBackground']),
+            '--ipsview-control-background'                  => $this->IPSViewCSSVariableColor((string) $style['ControlBackground']),
+            '--ipsview-control-background-active'           => $this->IPSViewCSSVariableColor((string) $style['ControlActiveBackground']),
+            '--ipsview-control-background-inactive'         => $this->IPSViewCSSVariableColor((string) $style['ControlInactiveBackground']),
+            '--ipsview-control-background-soft'             => $this->IPSViewCSSVariableColor((string) $style['ControlSoftBackground']),
+            '--ipsview-popup-background'                    => $this->IPSViewCSSVariableColor((string) $style['PopupBackground']),
             '--ipsview-view-background-opacity'             => $this->IPSViewFormatNumber((float) $style['ViewBackgroundOpacity']),
             '--ipsview-page-background-opacity'             => $this->IPSViewFormatNumber((float) $style['PageBackgroundOpacity']),
             '--ipsview-label-background-opacity'            => $this->IPSViewFormatNumber((float) $style['LabelBackgroundOpacity']),
@@ -722,31 +720,31 @@ trait IPSViewStyleHelper
             '--ipsview-popup-border-opacity'                => $this->IPSViewFormatNumber((float) $style['PopupBorderOpacity']),
             '--ipsview-shadow-opacity'                      => $this->IPSViewFormatNumber((float) $style['ShadowOpacity']),
             '--ipsview-popup-shadow-opacity'                => $this->IPSViewFormatNumber((float) $style['PopupShadowOpacity']),
-            '--ipsview-text'                                => $style['Text'],
-            '--ipsview-text-active'                         => $style['TextActive'],
-            '--ipsview-text-inactive'                       => $style['TextInactive'],
-            '--ipsview-text-label'                          => $style['LabelText'],
-            '--ipsview-text-secondary'                      => $style['TextSecondary'],
-            '--ipsview-text-faint'                          => $style['TextFaint'],
-            '--ipsview-icon'                                => $style['Icon'],
-            '--ipsview-border'                              => $style['Border'],
-            '--ipsview-line'                                => $style['Line'],
-            '--ipsview-popup-border'                        => $style['PopupBorder'],
-            '--ipsview-accent'                              => $style['Accent'],
-            '--ipsview-information'                         => $style['Information'],
-            '--ipsview-positive'                            => $style['Positive'],
-            '--ipsview-warning'                             => $style['Warning'],
-            '--ipsview-critical'                            => $style['Critical'],
-            '--ipsview-accent-soft'                         => $style['AccentSoft'],
-            '--ipsview-information-soft'                    => $style['InformationSoft'],
-            '--ipsview-positive-soft'                       => $style['PositiveSoft'],
-            '--ipsview-warning-soft'                        => $style['WarningSoft'],
-            '--ipsview-critical-soft'                       => $style['CriticalSoft'],
-            '--ipsview-accent-contrast'                     => $style['AccentContrast'],
-            '--ipsview-information-contrast'                => $style['InformationContrast'],
-            '--ipsview-positive-contrast'                   => $style['PositiveContrast'],
-            '--ipsview-warning-contrast'                    => $style['WarningContrast'],
-            '--ipsview-critical-contrast'                   => $style['CriticalContrast'],
+            '--ipsview-text'                                => $this->IPSViewCSSVariableColor((string) $style['Text']),
+            '--ipsview-text-active'                         => $this->IPSViewCSSVariableColor((string) $style['TextActive']),
+            '--ipsview-text-inactive'                       => $this->IPSViewCSSVariableColor((string) $style['TextInactive']),
+            '--ipsview-text-label'                          => $this->IPSViewCSSVariableColor((string) $style['LabelText']),
+            '--ipsview-text-secondary'                      => $this->IPSViewCSSVariableColor((string) $style['TextSecondary']),
+            '--ipsview-text-faint'                          => $this->IPSViewCSSVariableColor((string) $style['TextFaint']),
+            '--ipsview-icon'                                => $this->IPSViewCSSVariableColor((string) $style['Icon']),
+            '--ipsview-border'                              => $this->IPSViewCSSVariableColor((string) $style['Border']),
+            '--ipsview-line'                                => $this->IPSViewCSSVariableColor((string) $style['Line']),
+            '--ipsview-popup-border'                        => $this->IPSViewCSSVariableColor((string) $style['PopupBorder']),
+            '--ipsview-accent'                              => $this->IPSViewCSSVariableColor((string) $style['Accent']),
+            '--ipsview-information'                         => $this->IPSViewCSSVariableColor((string) $style['Information']),
+            '--ipsview-positive'                            => $this->IPSViewCSSVariableColor((string) $style['Positive']),
+            '--ipsview-warning'                             => $this->IPSViewCSSVariableColor((string) $style['Warning']),
+            '--ipsview-critical'                            => $this->IPSViewCSSVariableColor((string) $style['Critical']),
+            '--ipsview-accent-soft'                         => $this->IPSViewCSSVariableColor((string) $style['AccentSoft']),
+            '--ipsview-information-soft'                    => $this->IPSViewCSSVariableColor((string) $style['InformationSoft']),
+            '--ipsview-positive-soft'                       => $this->IPSViewCSSVariableColor((string) $style['PositiveSoft']),
+            '--ipsview-warning-soft'                        => $this->IPSViewCSSVariableColor((string) $style['WarningSoft']),
+            '--ipsview-critical-soft'                       => $this->IPSViewCSSVariableColor((string) $style['CriticalSoft']),
+            '--ipsview-accent-contrast'                     => $this->IPSViewCSSVariableColor((string) $style['AccentContrast']),
+            '--ipsview-information-contrast'                => $this->IPSViewCSSVariableColor((string) $style['InformationContrast']),
+            '--ipsview-positive-contrast'                   => $this->IPSViewCSSVariableColor((string) $style['PositiveContrast']),
+            '--ipsview-warning-contrast'                    => $this->IPSViewCSSVariableColor((string) $style['WarningContrast']),
+            '--ipsview-critical-contrast'                   => $this->IPSViewCSSVariableColor((string) $style['CriticalContrast']),
             '--ipsview-gradient-accent'                     => $style['GradientAccent'],
             '--ipsview-gradient-information'                => $style['GradientInformation'],
             '--ipsview-gradient-positive'                   => $style['GradientPositive'],
@@ -808,17 +806,17 @@ trait IPSViewStyleHelper
             '--ipsview-role-disabled-opacity'               => 'var(--ipsview-disabled-opacity)',
             '--ipsview-role-shadow'                         => 'var(--ipsview-shadow)',
             '--ipsview-role-popup-shadow'                   => 'var(--ipsview-popup-shadow)',
-            '--ipsview-page'                                => $style['PageBackground'],
-            '--ipsview-surface'                             => $style['ControlBackground'],
-            '--ipsview-surface-strong'                      => $style['ControlActiveBackground'],
-            '--ipsview-surface-soft'                        => $style['ControlSoftBackground'],
-            '--ipsview-muted'                               => $style['TextSecondary'],
-            '--ipsview-faint'                               => $style['TextFaint'],
-            '--ipsview-success'                             => $style['Positive'],
-            '--ipsview-success-soft'                        => $style['PositiveSoft'],
-            '--ipsview-success-border'                      => $style['PositiveBorder'],
-            '--ipsview-danger'                              => $style['Critical'],
-            '--ipsview-danger-soft'                         => $style['CriticalSoft']
+            '--ipsview-page'                                => 'var(--ipsview-page-background)',
+            '--ipsview-surface'                             => 'var(--ipsview-control-background)',
+            '--ipsview-surface-strong'                      => 'var(--ipsview-control-background-active)',
+            '--ipsview-surface-soft'                        => 'var(--ipsview-control-background-soft)',
+            '--ipsview-muted'                               => 'var(--ipsview-text-secondary)',
+            '--ipsview-faint'                               => 'var(--ipsview-text-faint)',
+            '--ipsview-success'                             => 'var(--ipsview-positive)',
+            '--ipsview-success-soft'                        => 'var(--ipsview-positive-soft)',
+            '--ipsview-success-border'                      => $this->IPSViewCSSVariableColor((string) $style['PositiveBorder']),
+            '--ipsview-danger'                              => 'var(--ipsview-critical)',
+            '--ipsview-danger-soft'                         => 'var(--ipsview-critical-soft)'
         ];
 
         $lines = [$selector . ' {'];
@@ -971,36 +969,14 @@ trait IPSViewStyleHelper
         $popup = $this->IPSViewCSSColorToRGB((string) $style['PopupBackground']);
         $label = $this->IPSViewCSSColorToRGB((string) $style['LabelBackground']);
         $page = $this->IPSViewCSSColorToRGB((string) $style['PageBackground']);
-        $text = $this->IPSViewEnsureContrast(
-            $this->IPSViewCSSColorToRGB((string) $style['Text']),
-            [$control, $page],
-            self::IPSVIEW_STYLE_TEXT_CONTRAST
-        );
-        $textActive = $this->IPSViewEnsureContrast(
-            $this->IPSViewCSSColorToRGB((string) $style['TextActive']),
-            [$controlActive],
-            self::IPSVIEW_STYLE_TEXT_CONTRAST
-        );
-        $textInactive = $this->IPSViewEnsureContrast(
-            $this->IPSViewCSSColorToRGB((string) $style['TextInactive']),
-            [$controlInactive],
-            self::IPSVIEW_STYLE_INACTIVE_TEXT_CONTRAST
-        );
-        $labelText = $this->IPSViewEnsureContrast(
-            $this->IPSViewCSSColorToRGB((string) $style['LabelText']),
-            [$label['alpha'] < 0.05 ? $page : $label],
-            self::IPSVIEW_STYLE_TEXT_CONTRAST
-        );
-        $secondary = $this->IPSViewEnsureContrast(
-            $this->IPSViewMixRGB($text, $control, 0.24),
-            [$control, $controlActive],
-            3.5
-        );
-        $faint = $this->IPSViewEnsureContrast(
-            $this->IPSViewMixRGB($secondary, $control, 0.18),
-            [$control, $controlActive],
-            3.0
-        );
+        $text = $this->IPSViewCSSColorToRGB((string) $style['Text']);
+        $textActive = $this->IPSViewCSSColorToRGB((string) $style['TextActive']);
+        $textInactive = $this->IPSViewCSSColorToRGB((string) $style['TextInactive']);
+        $labelText = $this->IPSViewCSSColorToRGB((string) $style['LabelText']);
+        $secondary = $text;
+        $secondary['alpha'] = 0.72;
+        $faint = $text;
+        $faint['alpha'] = 0.52;
         $soft = $this->IPSViewMixRGB($control, $this->IPSViewCSSColorToRGB((string) $style['PageBackground']), 0.20);
         $gradientStrength = max(0, min(80, $this->ReadPropertyInteger('IPSViewStyleGradientStrength'))) / 100;
         $disabledOpacity = max(10, min(100, $this->ReadPropertyInteger('IPSViewStyleDisabledOpacity'))) / 100;
@@ -1202,6 +1178,25 @@ trait IPSViewStyleHelper
         return $this->IPSViewRGBToCSS($this->IPSViewCSSColorToRGB($color), $alpha);
     }
 
+    private function IPSViewCSSVariableColor(string $color): string
+    {
+        $resolved = $this->IPSViewCSSColorToRGB($color);
+        $alpha = max(0.0, min(1.0, $resolved['alpha']));
+        if ($alpha <= 0.001) {
+            return 'transparent';
+        }
+        if ($alpha >= 0.999) {
+            return $this->IPSViewRGBToCSS($resolved, 1.0);
+        }
+
+        $red = (int) round(max(0.0, min(255.0, $resolved['red'])));
+        $green = (int) round(max(0.0, min(255.0, $resolved['green'])));
+        $blue = (int) round(max(0.0, min(255.0, $resolved['blue'])));
+        $percentage = $this->IPSViewFormatNumber($alpha * 100);
+
+        return sprintf('rgba(%d, %d, %d, %s%%)', $red, $green, $blue, $percentage);
+    }
+
     /** @return array{red:float,green:float,blue:float,alpha:float} */
     private function IPSViewCSSColorToRGB(string $color): array
     {
@@ -1284,53 +1279,6 @@ trait IPSViewStyleHelper
         $darker = min($firstLuminance, $secondLuminance);
 
         return ($lighter + 0.05) / ($darker + 0.05);
-    }
-
-    /** @param array{red:float,green:float,blue:float,alpha?:float} $foreground
-     *  @param array<int,array{red:float,green:float,blue:float,alpha?:float}> $backgrounds
-     *  @return array{red:float,green:float,blue:float,alpha:float}
-     */
-    private function IPSViewEnsureContrast(array $foreground, array $backgrounds, float $minimum): array
-    {
-        $readable = true;
-        foreach ($backgrounds as $background) {
-            if ($this->IPSViewContrastRatio($foreground, $background) < $minimum) {
-                $readable = false;
-                break;
-            }
-        }
-        if ($readable) {
-            return [
-                'red'   => $foreground['red'],
-                'green' => $foreground['green'],
-                'blue'  => $foreground['blue'],
-                'alpha' => 1.0
-            ];
-        }
-
-        $black = ['red' => 0.0, 'green' => 0.0, 'blue' => 0.0, 'alpha' => 1.0];
-        $white = ['red' => 255.0, 'green' => 255.0, 'blue' => 255.0, 'alpha' => 1.0];
-        $blackRatio = min(array_map(fn (array $background): float => $this->IPSViewContrastRatio($black, $background), $backgrounds));
-        $whiteRatio = min(array_map(fn (array $background): float => $this->IPSViewContrastRatio($white, $background), $backgrounds));
-        $target = $blackRatio >= $whiteRatio ? $black : $white;
-
-        for ($step = 1; $step <= 100; $step++) {
-            $candidate = $this->IPSViewMixRGB($foreground, $target, $step / 100);
-            $valid = true;
-            foreach ($backgrounds as $background) {
-                if ($this->IPSViewContrastRatio($candidate, $background) < $minimum) {
-                    $valid = false;
-                    break;
-                }
-            }
-            if ($valid) {
-                $candidate['alpha'] = 1.0;
-
-                return $candidate;
-            }
-        }
-
-        return $target;
     }
 
     /** @param array{red:float,green:float,blue:float,alpha?:float} $background */
