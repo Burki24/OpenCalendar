@@ -23,10 +23,10 @@
             "path": "libs/helper/IPSViewHTMLPageHelper.php"
         },
         "IPSViewStyleHelper": {
-            "version": "1.2.0",
-            "sha256": "290b564748719297cc3686463c03622e820c8c28afbcbc832198014811fcb601",
+            "version": "1.3.0",
+            "sha256": "9a2af54930f23341491f4cd6ef4c9012b5e98011056a99472f677def5c846e7f",
             "path": "libs/helper/IPSViewStyleHelper.php",
-            "source_sha": "b466a01644ab8fdf33166c1e9edfa554b7aca1c4",
+            "source_sha": "212b253d316fb2eb0ab50dabb5a7678d7eb15b29",
             "assets": [
                 {
                     "path": "libs/helper/translations/IPSViewStyleHelper.json",
@@ -39,7 +39,7 @@
                     "version": "1.0.0",
                     "sha256": "d3deee581eca9f8eb11e9adce060170227a2dc836ee898bd134f93d27604f639",
                     "path": "libs/helper/HelperTranslationHelper.php",
-                    "source_sha": "b466a01644ab8fdf33166c1e9edfa554b7aca1c4"
+                    "source_sha": "212b253d316fb2eb0ab50dabb5a7678d7eb15b29"
                 }
             ]
         },

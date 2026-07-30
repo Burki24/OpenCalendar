@@ -9,7 +9,7 @@ The files in this directory are vendored from
 | `DataFlowHelper.php` | 1.0.0 | `4c25828b283367692d0db1631d2b7d71ba6012883798bc5ffddb8f2d551d6dfb` |
 | `HttpResponseHelper.php` | 1.1.0 | `be4fae4c23f757ab462237d8e74d2a9dca1b504937ed4d4b51c7ff76004cf1cd` |
 | `IPSViewHTMLPageHelper.php` | 1.0.0 | `5cbe377be2277d40f20599d6b52dc4e0d631c03b54d3b8e14da5c9c6f48d9325` |
-| `IPSViewStyleHelper.php` | 1.2.0 | `290b564748719297cc3686463c03622e820c8c28afbcbc832198014811fcb601` |
+| `IPSViewStyleHelper.php` | 1.3.0 | `9a2af54930f23341491f4cd6ef4c9012b5e98011056a99472f677def5c846e7f` |
 | `HelperTranslationHelper.php` | 1.0.0 | `d3deee581eca9f8eb11e9adce060170227a2dc836ee898bd134f93d27604f639` |
 | `ParentConnectionHelper.php` | 1.0.0 | `d4f01dee721aa32e64410979ca15b2795a0fcc59c0232c0ad69e4702d9ff573c` |
 | `PersistentJsonCacheHelper.php` | 1.0.0 | `adbc7680abe814dc6c15a9cda1312cc30023073595052006662716bc0d65f2a4` |
