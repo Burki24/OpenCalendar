@@ -18,10 +18,10 @@
             "path": "libs/helper/HttpResponseHelper.php"
         },
         "IPSViewHTMLPageHelper": {
-            "version": "1.2.0",
-            "sha256": "62c55f0ef50d54dd623796841533576d8ecea3755972864e24bb37a9da3cfbfd",
+            "version": "1.2.1",
+            "sha256": "ccd3cb992473e919538fda14aa96970176901437bd5060a005a6ffcb9a4a2a39",
             "path": "libs/helper/IPSViewHTMLPageHelper.php",
-            "source_sha": "d106132bb70a1a8810c06c3a653a7b80eb93ca2e",
+            "source_sha": "180dc03f5df67e49fd802b34e47a225c3fa21579",
             "assets": [
                 {
                     "path": "libs/helper/translations/IPSViewHTMLPageHelper.json",
@@ -34,14 +34,14 @@
                     "version": "1.0.0",
                     "sha256": "d3deee581eca9f8eb11e9adce060170227a2dc836ee898bd134f93d27604f639",
                     "path": "libs/helper/HelperTranslationHelper.php",
-                    "source_sha": "d106132bb70a1a8810c06c3a653a7b80eb93ca2e"
+                    "source_sha": "180dc03f5df67e49fd802b34e47a225c3fa21579"
                 },
                 {
                     "name": "VisualizationAssetHelper",
                     "version": "1.0.0",
                     "sha256": "1693b2399bcf95d270a6d9a01df6534caad906497bd4ba9489916a951abaffcc",
                     "path": "libs/helper/VisualizationAssetHelper.php",
-                    "source_sha": "d106132bb70a1a8810c06c3a653a7b80eb93ca2e"
+                    "source_sha": "180dc03f5df67e49fd802b34e47a225c3fa21579"
                 }
             ]
         },
