@@ -27,6 +27,10 @@ class KalenderAnsicht extends IPSModuleStrict
 
     private const CALENDAR_MODULE_ID = '{227B63E4-4223-316B-76E9-FD3849689562}';
     private const INITIALIZATION_DELAY_MS = 5_000;
+    private const ATTRIBUTE_IPSVIEW_TOKEN_1 = 'IPSViewToken1';
+    private const ATTRIBUTE_IPSVIEW_TOKEN_2 = 'IPSViewToken2';
+    private const ATTRIBUTE_IPSVIEW_TOKEN_3 = 'IPSViewToken3';
+    private const ATTRIBUTE_IPSVIEW_TOKEN_4 = 'IPSViewToken4';
 
     private const STATUS_NO_CALENDARS = 201;
     private const STATUS_INVALID_CONFIGURATION = 202;
@@ -106,6 +110,15 @@ class KalenderAnsicht extends IPSModuleStrict
         $this->RegisterIPSViewStyleProperties();
         $this->RegisterAttributeBoolean('RuntimeReady', false);
         $this->RegisterAttributeString('CalendarSelectionBackup', '[]');
+        $this->RegisterAttributeInteger(self::ATTRIBUTE_IPSVIEW_TOKEN_1, 0);
+        $this->RegisterAttributeInteger(self::ATTRIBUTE_IPSVIEW_TOKEN_2, 0);
+        $this->RegisterAttributeInteger(self::ATTRIBUTE_IPSVIEW_TOKEN_3, 0);
+        $this->RegisterAttributeInteger(self::ATTRIBUTE_IPSVIEW_TOKEN_4, 0);
+        $this->ensureIPSViewToken();
+
+        if (method_exists($this, 'RegisterHook')) {
+            $this->RegisterHook($this->ipsViewHookAddress());
+        }
 
         $this->SetVisualizationType(1);
         $this->RegisterTimer('InitializationTimer', 0, 'IPSKALVIEW_Initialize($_IPS[\'TARGET\']);');
@@ -245,6 +258,7 @@ class KalenderAnsicht extends IPSModuleStrict
     {
         parent::ApplyChanges();
 
+        $this->ensureIPSViewToken();
         $this->WriteAttributeBoolean('RuntimeReady', false);
         $configured = $this->decodeCalendarConfiguration($this->ReadPropertyString('Calendars'));
         if ($configured !== []) {
@@ -373,79 +387,10 @@ class KalenderAnsicht extends IPSModuleStrict
                     );
                     break;
 
-                case 'Refresh':
-                    $success = $this->SynchronizeCalendars();
-                    $this->sendToast(
-                        $success ? 'success' : 'error',
-                        $success ? 'Calendars synchronized.' : 'Synchronization failed.'
-                    );
-                    break;
-
-                case 'CreateEvent':
-                    $request = $this->decodeActionValue($Value);
-                    $instanceId = $this->requireWritableCalendar($request);
-                    $event = $request['event'] ?? null;
-                    if (!is_array($event)) {
-                        throw new InvalidArgumentException($this->Translate('The event data is invalid.'));
-                    }
-                    $result = json_decode(
-                        IPSKAL_CreateEvent(
-                            $instanceId,
-                            json_encode($event, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR)
-                        ),
-                        true,
-                        512,
-                        JSON_THROW_ON_ERROR
-                    );
-                    if (!is_array($result) || !($result['success'] ?? false)) {
-                        throw new RuntimeException((string) ($result['error'] ?? $this->Translate('Event creation failed.')));
-                    }
-                    $this->sendToast('success', 'Event created.');
-                    $this->broadcastState();
-                    break;
-
-                case 'UpdateEvent':
-                    $request = $this->decodeActionValue($Value);
-                    $instanceId = $this->requireWritableCalendar($request);
-                    $event = $request['event'] ?? null;
-                    if (!is_array($event)) {
-                        throw new InvalidArgumentException($this->Translate('The event data is invalid.'));
-                    }
-                    $result = json_decode(
-                        IPSKAL_UpdateEvent(
-                            $instanceId,
-                            json_encode($event, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR)
-                        ),
-                        true,
-                        512,
-                        JSON_THROW_ON_ERROR
-                    );
-                    if (!is_array($result) || !($result['success'] ?? false)) {
-                        throw new RuntimeException((string) ($result['error'] ?? $this->Translate('Event update failed.')));
-                    }
-                    $this->sendToast('success', 'Event updated.');
-                    $this->broadcastState();
-                    break;
-
-                case 'DeleteEvent':
-                    $request = $this->decodeActionValue($Value);
-                    $instanceId = $this->requireWritableCalendar($request);
-                    $event = $request['event'] ?? null;
-                    if (!is_array($event)) {
-                        throw new InvalidArgumentException($this->Translate('The event data is invalid.'));
-                    }
-                    if (!IPSKAL_DeleteEvent(
-                        $instanceId,
-                        json_encode($event, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR)
-                    )) {
-                        throw new RuntimeException($this->Translate('Event deletion failed.'));
-                    }
-                    $this->sendToast('success', 'Event deleted.');
-                    $this->broadcastState();
-                    break;
-
                 default:
-                    throw new InvalidArgumentException(sprintf($this->Translate('Unsupported visualization action: %s'), $Ident));
+                    $result = $this->executeVisualizationAction($Ident, $Value);
+                    $this->sendToast($result['level'], $result['message']);
+                    break;
             }
         } catch (Throwable $exception) {
             $this->SendDebug('VisualizationAction', $exception->getMessage(), 0);
@@ -460,13 +405,9 @@ class KalenderAnsicht extends IPSModuleStrict
      */
     public function SynchronizeCalendars(): bool
     {
-        $success = true;
-        foreach ($this->getSelectedCalendars() as $calendar) {
-            if (!IPSKAL_Synchronize($calendar['instanceId'])) {
-                $success = false;
-            }
-        }
+        $success = $this->synchronizeSelectedCalendars();
         $this->broadcastState();
+
         return $success;
     }
 
@@ -522,17 +463,96 @@ class KalenderAnsicht extends IPSModuleStrict
         return $this->renderCalendarHtml($this->buildState(), true);
     }
 
-    private function broadcastState(): void
+    /**
+     * Handles the authenticated action bridge used by the IPSView HTML-Box.
+     */
+    protected function ProcessHookData(): void
+    {
+        if (!$this->IsIPSViewHTMLPageEnabled()) {
+            $this->outputIPSViewResponse(['Error' => 'IPSView is disabled.'], 404);
+
+            return;
+        }
+
+        if (strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? '')) !== 'POST') {
+            $this->outputIPSViewResponse(['Error' => 'Method not allowed.'], 405);
+
+            return;
+        }
+
+        $request = $_POST;
+        if ($request === []) {
+            parse_str((string) file_get_contents('php://input'), $request);
+        }
+
+        $token = is_string($request['token'] ?? null) ? $request['token'] : '';
+        if ($token === '' || !hash_equals($this->ipsViewToken(), $token)) {
+            $this->outputIPSViewResponse(['Error' => 'Unauthorized.'], 403);
+
+            return;
+        }
+
+        $action = is_string($request['action'] ?? null) ? $request['action'] : '';
+        if ($action === 'GetState') {
+            try {
+                $this->outputIPSViewResponse([
+                    'type'    => 'state',
+                    'payload' => $this->buildState()
+                ]);
+            } catch (Throwable $exception) {
+                $this->SendDebug('IPSViewAction', $exception->getMessage(), 0);
+                $this->outputIPSViewResponse(['Error' => 'State retrieval failed.'], 500);
+            }
+
+            return;
+        }
+
+        $rawValue = $request['value'] ?? 'null';
+        $value = null;
+        if (is_string($rawValue)) {
+            try {
+                $value = json_decode($rawValue, true, 64, JSON_THROW_ON_ERROR);
+            } catch (JsonException) {
+                $this->outputIPSViewResponse(['Error' => 'Invalid value.'], 400);
+
+                return;
+            }
+        }
+
+        try {
+            $result = $this->executeVisualizationAction($action, $value);
+            $this->outputIPSViewResponse([
+                'type'    => 'state',
+                'payload' => $result['state'],
+                'toast'   => [
+                    'level'   => $result['level'],
+                    'message' => $result['message']
+                ]
+            ]);
+        } catch (InvalidArgumentException $exception) {
+            $this->outputIPSViewResponse(['Error' => $exception->getMessage()], 400);
+        } catch (RuntimeException $exception) {
+            $this->outputIPSViewResponse(['Error' => $exception->getMessage()], 400);
+        } catch (Throwable $exception) {
+            $this->SendDebug('IPSViewAction', $exception->getMessage(), 0);
+            $this->outputIPSViewResponse(['Error' => 'Action failed.'], 500);
+        }
+    }
+
+    private function broadcastState(?array $state = null): void
     {
         if (!$this->isRuntimeReady()) {
             return;
         }
 
-        try {
-            $state = $this->buildState();
-        } catch (Throwable $exception) {
-            $this->SendDebug('CalendarState', $exception->getMessage(), 0);
-            return;
+        if ($state === null) {
+            try {
+                $state = $this->buildState();
+            } catch (Throwable $exception) {
+                $this->SendDebug('CalendarState', $exception->getMessage(), 0);
+
+                return;
+            }
         }
 
         try {
@@ -573,6 +593,13 @@ class KalenderAnsicht extends IPSModuleStrict
             ? $this->IPSViewTranslationsFromLocale($this->calendarVisualizationTranslationKeys())
             : [];
 
+        $runtime = $ipsView
+            ? [
+                'endpoint' => '/hook/' . $this->ipsViewHookAddress(),
+                'token'    => $this->ipsViewToken()
+            ]
+            : null;
+
         return $this->RenderVisualizationHTMLPage($ipsView, [
             'language'           => $this->Translate('Today') === 'Heute' ? 'de' : 'en',
             'classes'            => $ipsView ? ['ipsview-mode'] : [],
@@ -581,7 +608,7 @@ class KalenderAnsicht extends IPSModuleStrict
             'visualizationTheme' => $this->VisualizationThemeCSS(),
             'ipsViewStyle'       => $ipsView ? $this->IPSViewStyleCSSVariables(':root') : '',
             'state'              => $state,
-            'runtime'            => null,
+            'runtime'            => $runtime,
             'translations'       => $translations,
             'options'            => [
                 'agendaColorBarWidth' => $ipsView
@@ -631,7 +658,8 @@ class KalenderAnsicht extends IPSModuleStrict
             'Yesterday',
             'Recurring occurrences are currently read-only.',
             'This calendar is read-only.',
-            'Editing events is only available in the Symcon tile.',
+            'Editing events is unavailable because no action bridge is configured.',
+            'Action failed.',
             'The description of Microsoft online meetings is protected and cannot be edited here.',
             'Delete this event?'
         ];
@@ -870,17 +898,184 @@ class KalenderAnsicht extends IPSModuleStrict
     }
 
     /**
+     * Executes the explicitly supported calendar actions for both Symcon and IPSView.
+     *
+     * @return array{state: array<string, mixed>, level: string, message: string}
+     */
+    private function executeVisualizationAction(string $ident, mixed $value): array
+    {
+        $level = 'success';
+        $message = '';
+
+        switch ($ident) {
+            case 'Refresh':
+                $success = $this->synchronizeSelectedCalendars();
+                $level = $success ? 'success' : 'error';
+                $message = $success ? 'Calendars synchronized.' : 'Synchronization failed.';
+                break;
+
+            case 'CreateEvent':
+                $request = $this->decodeActionValue($value);
+                $instanceId = $this->requireWritableCalendar($request);
+                $event = $request['event'] ?? null;
+                if (!is_array($event)) {
+                    throw new InvalidArgumentException($this->Translate('The event data is invalid.'));
+                }
+                $result = json_decode(
+                    IPSKAL_CreateEvent(
+                        $instanceId,
+                        json_encode($event, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR)
+                    ),
+                    true,
+                    512,
+                    JSON_THROW_ON_ERROR
+                );
+                if (!is_array($result) || !($result['success'] ?? false)) {
+                    throw new RuntimeException((string) ($result['error'] ?? $this->Translate('Event creation failed.')));
+                }
+                $message = 'Event created.';
+                break;
+
+            case 'UpdateEvent':
+                $request = $this->decodeActionValue($value);
+                $instanceId = $this->requireWritableCalendar($request);
+                $event = $request['event'] ?? null;
+                if (!is_array($event)) {
+                    throw new InvalidArgumentException($this->Translate('The event data is invalid.'));
+                }
+                $result = json_decode(
+                    IPSKAL_UpdateEvent(
+                        $instanceId,
+                        json_encode($event, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR)
+                    ),
+                    true,
+                    512,
+                    JSON_THROW_ON_ERROR
+                );
+                if (!is_array($result) || !($result['success'] ?? false)) {
+                    throw new RuntimeException((string) ($result['error'] ?? $this->Translate('Event update failed.')));
+                }
+                $message = 'Event updated.';
+                break;
+
+            case 'DeleteEvent':
+                $request = $this->decodeActionValue($value);
+                $instanceId = $this->requireWritableCalendar($request);
+                $event = $request['event'] ?? null;
+                if (!is_array($event)) {
+                    throw new InvalidArgumentException($this->Translate('The event data is invalid.'));
+                }
+                if (!IPSKAL_DeleteEvent(
+                    $instanceId,
+                    json_encode($event, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR)
+                )) {
+                    throw new RuntimeException($this->Translate('Event deletion failed.'));
+                }
+                $message = 'Event deleted.';
+                break;
+
+            default:
+                throw new InvalidArgumentException(sprintf(
+                    $this->Translate('Unsupported visualization action: %s'),
+                    $ident
+                ));
+        }
+
+        $state = $this->buildState();
+        $this->broadcastState($state);
+
+        return [
+            'state'   => $state,
+            'level'   => $level,
+            'message' => $message
+        ];
+    }
+
+    private function synchronizeSelectedCalendars(): bool
+    {
+        $success = true;
+        foreach ($this->getSelectedCalendars() as $calendar) {
+            if (!IPSKAL_Synchronize($calendar['instanceId'])) {
+                $success = false;
+            }
+        }
+
+        return $success;
+    }
+
+    private function ipsViewHookAddress(): string
+    {
+        return 'opencalendar/view/' . $this->InstanceID;
+    }
+
+    private function ensureIPSViewToken(): void
+    {
+        if (
+            !method_exists($this, 'ReadAttributeInteger')
+            || !method_exists($this, 'WriteAttributeInteger')
+        ) {
+            return;
+        }
+
+        if ($this->ipsViewToken() !== str_repeat('0', 32)) {
+            return;
+        }
+
+        foreach ([
+            self::ATTRIBUTE_IPSVIEW_TOKEN_1,
+            self::ATTRIBUTE_IPSVIEW_TOKEN_2,
+            self::ATTRIBUTE_IPSVIEW_TOKEN_3,
+            self::ATTRIBUTE_IPSVIEW_TOKEN_4
+        ] as $attribute) {
+            $this->WriteAttributeInteger($attribute, random_int(1, 0x7FFFFFFF));
+        }
+    }
+
+    private function ipsViewToken(): string
+    {
+        if (!method_exists($this, 'ReadAttributeInteger')) {
+            return str_repeat('0', 32);
+        }
+
+        return implode('', array_map(
+            fn (string $attribute): string => sprintf('%08x', $this->ReadAttributeInteger($attribute)),
+            [
+                self::ATTRIBUTE_IPSVIEW_TOKEN_1,
+                self::ATTRIBUTE_IPSVIEW_TOKEN_2,
+                self::ATTRIBUTE_IPSVIEW_TOKEN_3,
+                self::ATTRIBUTE_IPSVIEW_TOKEN_4
+            ]
+        ));
+    }
+
+    /** @param array<string, mixed> $payload */
+    private function outputIPSViewResponse(array $payload, int $statusCode = 200): void
+    {
+        http_response_code($statusCode);
+        header('Content-Type: application/json; charset=utf-8');
+        header('Cache-Control: no-store, no-cache, must-revalidate');
+        header('X-Content-Type-Options: nosniff');
+        header('Access-Control-Allow-Origin: *');
+
+        echo json_encode(
+            $payload,
+            JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES
+        );
+    }
+
+    /**
      * @return array<string, mixed>
      */
     private function decodeActionValue(mixed $value): array
     {
-        if (!is_string($value)) {
-            throw new InvalidArgumentException($this->Translate('The visualization request is invalid.'));
+        $request = $value;
+        if (is_string($value)) {
+            $request = json_decode($value, true, 512, JSON_THROW_ON_ERROR);
         }
-        $request = json_decode($value, true, 512, JSON_THROW_ON_ERROR);
         if (!is_array($request) || array_is_list($request)) {
             throw new InvalidArgumentException($this->Translate('The visualization request is invalid.'));
         }
+
         return $request;
     }
 

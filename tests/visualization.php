@@ -24,7 +24,9 @@ final class CalendarVisualizationRenderer
                 'calendars' => [],
                 'settings'  => ['defaultView' => 'agenda']
             ],
-            'runtime'      => null,
+            'runtime'      => $ipsView
+                ? ['endpoint' => '/hook/opencalendar/view/12345', 'token' => '0123456789abcdef0123456789abcdef']
+                : null,
             'translations' => ['Today' => 'Heute'],
             'options'      => [
                 'agendaColorBarWidth'  => 7,
@@ -102,6 +104,12 @@ assertVisualization(str_contains($ipsView, '--ipsview-accent: #654321'), 'The IP
 assertVisualization(!str_contains($ipsView, '--symc-accent: #123456'), 'The IPSView page must not include the native visualization theme.');
 assertVisualization(str_contains($ipsView, 'class="ipsview-mode"'), 'The IPSView page must expose its shared mode class.');
 assertVisualization(str_contains($ipsView, '"mode":"ipsview"'), 'The IPSView bootstrap mode must be explicit.');
+assertVisualization(
+    str_contains($ipsView, '"endpoint":"/hook/opencalendar/view/12345"')
+        && str_contains($ipsView, '"token":"0123456789abcdef0123456789abcdef"'),
+    'The IPSView bootstrap must include its authenticated action bridge.'
+);
+assertVisualization(!str_contains($native, 'opencalendar/view/12345'), 'The native tile must not expose IPSView credentials.');
 assertVisualization(str_contains($native, '"mode":"symcon"'), 'The native bootstrap mode must be explicit.');
 
 fwrite(STDOUT, "Calendar visualization contract checks passed.\n");

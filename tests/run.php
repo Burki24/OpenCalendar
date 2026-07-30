@@ -1146,6 +1146,33 @@ assertTrueValue(
     'The calendar view must manage and render its optional IPSView output through IPSViewHTMLPageHelper.'
 );
 assertTrueValue(
+    is_string($viewModuleSource)
+        && str_contains($viewModuleSource, '$this->RegisterHook($this->ipsViewHookAddress());')
+        && str_contains($viewModuleSource, 'protected function ProcessHookData(): void')
+        && str_contains($viewModuleSource, "strtoupper((string) (\$_SERVER['REQUEST_METHOD'] ?? '')) !== 'POST'")
+        && str_contains($viewModuleSource, 'hash_equals($this->ipsViewToken(), $token)')
+        && str_contains($viewModuleSource, "case 'CreateEvent':")
+        && str_contains($viewModuleSource, "case 'UpdateEvent':")
+        && str_contains($viewModuleSource, "case 'DeleteEvent':")
+        && str_contains($viewModuleSource, "return 'opencalendar/view/' . \$this->InstanceID;")
+        && str_contains($viewModuleSource, "'endpoint' => '/hook/' . \$this->ipsViewHookAddress()")
+        && str_contains($viewModuleSource, "'token'    => \$this->ipsViewToken()"),
+    'The calendar IPSView page must use a unique, token-protected POST WebHook with an explicit action whitelist.'
+);
+assertTrueValue(
+    is_string($viewScriptSource)
+        && str_contains($viewScriptSource, "const calendarIPSViewConfig = calendarVisualization.mode === 'ipsview'")
+        && str_contains($viewScriptSource, 'async function calendarIPSViewRequest(action, value)')
+        && str_contains($viewScriptSource, "body.set('token', String(calendarIPSViewConfig.token));")
+        && str_contains($viewScriptSource, "'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8'")
+        && !str_contains($viewScriptSource, 'Authorization')
+        && !str_contains($viewScriptSource, "'/api/'")
+        && str_contains($viewScriptSource, "return typeof requestAction === 'function' || hasIPSViewActionBridge();")
+        && str_contains($viewScriptSource, 'if (await sendAction(action, value))')
+        && str_contains($viewScriptSource, "await sendAction('DeleteEvent',"),
+    'The shared calendar interface must create, update, delete and refresh through either requestAction or the IPSView WebHook.'
+);
+assertTrueValue(
     is_string($viewTemplateSource)
         && is_string($viewStyleSource)
         && is_string($viewScriptSource)

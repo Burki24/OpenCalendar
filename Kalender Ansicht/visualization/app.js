@@ -9,6 +9,10 @@ const calendarTranslations = calendarVisualization.translations && typeof calend
 const calendarOptions = calendarVisualization.options && typeof calendarVisualization.options === 'object'
     ? calendarVisualization.options
     : {};
+const calendarRuntime = calendarVisualization.runtime && typeof calendarVisualization.runtime === 'object'
+    ? calendarVisualization.runtime
+    : null;
+const calendarIPSViewConfig = calendarVisualization.mode === 'ipsview' ? calendarRuntime : null;
 const calendarAgendaColorBarWidth = Math.max(2, Math.min(16, Number(calendarOptions.agendaColorBarWidth) || 5));
 const calendarCompactColorBarWidth = Math.max(2, Math.min(16, Number(calendarOptions.compactColorBarWidth) || 3));
 document.documentElement.style.setProperty('--agenda-color-bar-width', `${calendarAgendaColorBarWidth}px`);
@@ -34,6 +38,9 @@ function handleMessage(data) {
         try { message = JSON.parse(message); } catch (error) { return; }
     }
     if (!message || typeof message !== 'object') return;
+    if (message.toast && typeof message.toast === 'object') {
+        showToast(t(message.toast.message || ''), message.toast.level || 'success');
+    }
     if (message.type === 'toast') {
         showToast(t(message.message || ''), message.level || 'success');
         return;
@@ -326,7 +333,7 @@ function openExistingEvent(event) {
     const note = document.getElementById('dialog-note');
     if (!editable) {
         note.textContent = !hasActionBridge()
-            ? t('Editing events is only available in the Symcon tile.')
+            ? t('Editing events is unavailable because no action bridge is configured.')
             : (event.recurring || event.recurrenceId
                 ? t('Recurring occurrences are currently read-only.')
                 : t('This calendar is read-only.'));
@@ -377,7 +384,7 @@ function updateDialogColor() {
     document.getElementById('dialog-color').style.background = safeColor(calendar?.color);
 }
 
-eventForm.addEventListener('submit', event => {
+eventForm.addEventListener('submit', async event => {
     event.preventDefault();
     const allDay = document.getElementById('event-all-day').checked;
     const calendarInstanceId = Number(document.getElementById('event-calendar').value);
@@ -392,8 +399,9 @@ eventForm.addEventListener('submit', event => {
     if (!eventData.summary || !eventData.start || !eventData.end) return;
     if (selectedEvent?.onlineMeeting) delete eventData.description;
 
-    if (selectedEvent) {
-        sendAction('UpdateEvent', {
+    const action = selectedEvent ? 'UpdateEvent' : 'CreateEvent';
+    const value = selectedEvent
+        ? {
             calendarInstanceId,
             event: {
                 uid: selectedEvent.uid,
@@ -402,16 +410,17 @@ eventForm.addEventListener('submit', event => {
                 recurrenceId: selectedEvent.recurrenceId || '',
                 changes: eventData
             }
-        });
-    } else {
-        sendAction('CreateEvent', { calendarInstanceId, event: eventData });
+        }
+        : { calendarInstanceId, event: eventData };
+
+    if (await sendAction(action, value)) {
+        eventDialog.close();
     }
-    eventDialog.close();
 });
 
-document.getElementById('delete-button').addEventListener('click', () => {
+document.getElementById('delete-button').addEventListener('click', async () => {
     if (!selectedEvent || !confirm(t('Delete this event?'))) return;
-    sendAction('DeleteEvent', {
+    const success = await sendAction('DeleteEvent', {
         calendarInstanceId: selectedEvent.calendarInstanceId,
         event: {
             resourceUrl: selectedEvent.resourceUrl,
@@ -419,7 +428,9 @@ document.getElementById('delete-button').addEventListener('click', () => {
             recurrenceId: selectedEvent.recurrenceId || ''
         }
     });
-    eventDialog.close();
+    if (success) {
+        eventDialog.close();
+    }
 });
 
 document.getElementById('event-all-day').addEventListener('change', event => {
@@ -485,11 +496,60 @@ function moveVisibleDays(start, amount) {
     return result;
 }
 
-function sendAction(ident, value) {
-    if (typeof requestAction === 'function') requestAction(ident, typeof value === 'string' ? value : JSON.stringify(value));
+async function sendAction(ident, value) {
+    if (typeof requestAction === 'function') {
+        requestAction(ident, typeof value === 'string' ? value : JSON.stringify(value));
+        return true;
+    }
+    if (!hasIPSViewActionBridge()) {
+        return false;
+    }
+
+    try {
+        const payload = await calendarIPSViewRequest(ident, value);
+        handleMessage(payload);
+        return true;
+    } catch (error) {
+        console.error('OpenCalendar IPSView request failed:', error);
+        showToast(t(error instanceof Error ? error.message : 'Action failed.'), 'error');
+        return false;
+    }
 }
 
-function hasActionBridge() { return typeof requestAction === 'function'; }
+function hasActionBridge() {
+    return typeof requestAction === 'function' || hasIPSViewActionBridge();
+}
+
+function hasIPSViewActionBridge() {
+    return Boolean(calendarIPSViewConfig?.endpoint && calendarIPSViewConfig?.token);
+}
+
+async function calendarIPSViewRequest(action, value) {
+    if (!hasIPSViewActionBridge()) {
+        throw new Error(t('Action failed.'));
+    }
+
+    const body = new URLSearchParams();
+    body.set('token', String(calendarIPSViewConfig.token));
+    body.set('action', action);
+    body.set('value', JSON.stringify(value));
+
+    const response = await fetch(String(calendarIPSViewConfig.endpoint), {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8'
+        },
+        body: body.toString(),
+        cache: 'no-store',
+        credentials: 'same-origin'
+    });
+    const payload = await response.json();
+    if (!response.ok || payload?.Error) {
+        throw new Error(payload?.Error || `HTTP ${response.status}`);
+    }
+
+    return payload;
+}
 
 function applyStaticTranslations() {
     document.querySelectorAll('label[for]').forEach(label => {

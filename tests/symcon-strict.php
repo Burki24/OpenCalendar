@@ -187,6 +187,16 @@ assertSymconStrict(
     'The calendar view must manage its optional IPSView output through IPSViewHTMLPageHelper.'
 );
 assertSymconStrict(
+    str_contains($viewSource, '$this->RegisterHook($this->ipsViewHookAddress());')
+        && str_contains($viewSource, 'protected function ProcessHookData(): void')
+        && str_contains($viewSource, 'hash_equals($this->ipsViewToken(), $token)')
+        && str_contains($viewSource, 'private function executeVisualizationAction(')
+        && str_contains($viewSource, "case 'CreateEvent':")
+        && str_contains($viewSource, "case 'UpdateEvent':")
+        && str_contains($viewSource, "case 'DeleteEvent':"),
+    'The IPSView action bridge must use a per-instance token and the same explicit calendar action dispatcher.'
+);
+assertSymconStrict(
     str_contains($viewSource, 'use VisualizationThemeHelper;')
         && str_contains($viewSource, '$this->VisualizationThemeCSS()'),
     'The calendar view must use VisualizationThemeHelper.'
