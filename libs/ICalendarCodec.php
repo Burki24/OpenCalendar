@@ -616,8 +616,8 @@ final class ICalendarCodec
     private static function escapeText(string $value): string
     {
         return str_replace(
-            ["\\", "\r\n", "\r", "\n", ';', ','],
-            ["\\\\", '\\n', '\\n', '\\n', '\\;', '\\,'],
+            ['\\', "\r\n", "\r", "\n", ';', ','],
+            ['\\\\', '\\n', '\\n', '\\n', '\\;', '\\,'],
             $value
         );
     }
@@ -628,7 +628,7 @@ final class ICalendarCodec
             '/\\\\([nN,;\\\\])/',
             static fn (array $matches): string => match ($matches[1]) {
                 'n', 'N' => "\n",
-                default => $matches[1]
+                default  => $matches[1]
             },
             $value
         );

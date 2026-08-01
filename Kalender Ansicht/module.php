@@ -194,8 +194,8 @@ class KalenderAnsicht extends IPSModuleStrict
         $legacyTheme = $configuration['IPSViewTheme'] ?? null;
         if (is_int($legacyTheme) && !array_key_exists('IPSViewStyleSource', $configuration)) {
             $configuration['IPSViewStyleSource'] = match ($legacyTheme) {
-                1 => self::IPSVIEW_STYLE_SOURCE_LIGHT,
-                2 => self::IPSVIEW_STYLE_SOURCE_DARK,
+                1       => self::IPSVIEW_STYLE_SOURCE_LIGHT,
+                2       => self::IPSVIEW_STYLE_SOURCE_DARK,
                 default => self::IPSVIEW_STYLE_SOURCE_CUSTOM
             };
         }

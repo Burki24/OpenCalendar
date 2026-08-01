@@ -19,15 +19,15 @@ trait KalenderKontoChildGatewayTrait
             $requestID = (string) ($request['RequestID'] ?? '');
 
             $payload = match ($operation) {
-                'GetCalendars' => json_decode($this->GetCalendars(), true, 512, JSON_THROW_ON_ERROR),
+                'GetCalendars'      => json_decode($this->GetCalendars(), true, 512, JSON_THROW_ON_ERROR),
                 'DiscoverCalendars' => $this->discoverCalendars(),
-                'GetEvents' => $this->getEventsForChild($request),
-                'CreateEvent' => $this->createEventForChild($request),
-                'UpdateEvent' => $this->updateEventForChild($request),
-                'DeleteEvent' => ['success' => $this->deleteEventForChild($request)],
-                'Synchronize' => ['success' => $this->Synchronize()],
-                'TestConnection' => json_decode($this->TestConnection(), true, 512, JSON_THROW_ON_ERROR),
-                default => throw new InvalidArgumentException('Unsupported operation: ' . $operation)
+                'GetEvents'         => $this->getEventsForChild($request),
+                'CreateEvent'       => $this->createEventForChild($request),
+                'UpdateEvent'       => $this->updateEventForChild($request),
+                'DeleteEvent'       => ['success' => $this->deleteEventForChild($request)],
+                'Synchronize'       => ['success' => $this->Synchronize()],
+                'TestConnection'    => json_decode($this->TestConnection(), true, 512, JSON_THROW_ON_ERROR),
+                default             => throw new InvalidArgumentException('Unsupported operation: ' . $operation)
             };
 
             return $this->encodeResponse(true, $operation, $requestID, $payload);

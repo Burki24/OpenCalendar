@@ -224,11 +224,11 @@ final class ICalendarRecurrence
         }
 
         $matchesFrequency = match ($frequency) {
-            'DAILY' => self::calendarDayDifference($seriesStart, $date) % $interval === 0,
-            'WEEKLY' => self::matchesWeeklyInterval($date, $seriesStart, $rule, $interval),
+            'DAILY'   => self::calendarDayDifference($seriesStart, $date) % $interval === 0,
+            'WEEKLY'  => self::matchesWeeklyInterval($date, $seriesStart, $rule, $interval),
             'MONTHLY' => self::calendarMonthDifference($seriesStart, $date) % $interval === 0,
-            'YEARLY' => ((int) $date->format('Y') - (int) $seriesStart->format('Y')) % $interval === 0,
-            default => false
+            'YEARLY'  => ((int) $date->format('Y') - (int) $seriesStart->format('Y')) % $interval === 0,
+            default   => false
         };
         if (!$matchesFrequency) {
             return false;
@@ -350,7 +350,7 @@ final class ICalendarRecurrence
         array $setPositions
     ): bool {
         [$periodStart, $periodEnd] = match ($frequency) {
-            'WEEKLY' => [
+            'WEEKLY'  => [
                 self::startOfWeek($date, self::weekdayNumber($rule['WKST'][0] ?? 'MO')),
                 self::startOfWeek($date, self::weekdayNumber($rule['WKST'][0] ?? 'MO'))->add(new DateInterval('P7D'))
             ],
@@ -358,11 +358,11 @@ final class ICalendarRecurrence
                 $date->modify('first day of this month')->setTime(0, 0),
                 $date->modify('first day of next month')->setTime(0, 0)
             ],
-            'YEARLY' => [
+            'YEARLY'  => [
                 $date->setDate((int) $date->format('Y'), 1, 1)->setTime(0, 0),
                 $date->setDate((int) $date->format('Y') + 1, 1, 1)->setTime(0, 0)
             ],
-            default => [$date->setTime(0, 0), $date->setTime(0, 0)->add(new DateInterval('P1D'))]
+            default   => [$date->setTime(0, 0), $date->setTime(0, 0)->add(new DateInterval('P1D'))]
         };
 
         $matches = [];
@@ -538,12 +538,12 @@ final class ICalendarRecurrence
     private static function weekdayNumber(string $weekday): int
     {
         return match (strtoupper($weekday)) {
-            'TU' => 2,
-            'WE' => 3,
-            'TH' => 4,
-            'FR' => 5,
-            'SA' => 6,
-            'SU' => 7,
+            'TU'    => 2,
+            'WE'    => 3,
+            'TH'    => 4,
+            'FR'    => 5,
+            'SA'    => 6,
+            'SU'    => 7,
             default => 1
         };
     }

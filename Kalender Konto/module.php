@@ -341,10 +341,10 @@ class KalenderKonto extends IPSModuleStrict
 
         $providerName = $this->getProviderName($this->ReadPropertyInteger('Provider'));
         $username = match ($this->ReadPropertyInteger('Provider')) {
-            self::PROVIDER_GOOGLE => trim($this->ReadAttributeString('GoogleAccount')),
+            self::PROVIDER_GOOGLE    => trim($this->ReadAttributeString('GoogleAccount')),
             self::PROVIDER_MICROSOFT => trim($this->ReadAttributeString('MicrosoftAccount')),
-            self::PROVIDER_ICS => $this->iCalendarSummary(),
-            default => trim($this->ReadPropertyString('Username'))
+            self::PROVIDER_ICS       => $this->iCalendarSummary(),
+            default                  => trim($this->ReadPropertyString('Username'))
         };
         $this->SetSummary($username !== '' ? $providerName . ' – ' . $username : $providerName);
 
@@ -784,12 +784,12 @@ class KalenderKonto extends IPSModuleStrict
     private function getProviderName(int $provider): string
     {
         return $this->Translate(match ($provider) {
-            self::PROVIDER_APPLE => 'Apple iCloud',
-            self::PROVIDER_CALDAV => 'CalDAV',
-            self::PROVIDER_GOOGLE => 'Google Calendar',
+            self::PROVIDER_APPLE     => 'Apple iCloud',
+            self::PROVIDER_CALDAV    => 'CalDAV',
+            self::PROVIDER_GOOGLE    => 'Google Calendar',
             self::PROVIDER_MICROSOFT => 'Microsoft 365',
-            self::PROVIDER_ICS => 'ICS/Webcal',
-            default => 'Unknown'
+            self::PROVIDER_ICS       => 'ICS/Webcal',
+            default                  => 'Unknown'
         });
     }
 
