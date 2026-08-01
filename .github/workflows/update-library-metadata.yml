@@ -1,4 +1,4 @@
-name: Update Library Metadata
+name: Update library metadata
 
 on:
   push:
@@ -6,23 +6,46 @@ on:
       - dev
 
 permissions:
-  contents: write
+  contents: read
+
+concurrency:
+  group: update-library-metadata-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   update-library-metadata:
-    if: github.actor != 'github-actions[bot]' && !contains(github.event.head_commit.message, '[skip metadata]')
+    if: "${{ github.event.head_commit == null || !startsWith(github.event.head_commit.message, 'CHORE: Update library metadata') }}"
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout module
-        uses: actions/checkout@v4
+      - name: Create GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@v3
+        with:
+          client-id: ${{ vars.HELPER_SYNC_APP_CLIENT_ID }}
+          private-key: ${{ secrets.HELPER_SYNC_APP_PRIVATE_KEY }}
+          permission-contents: write
+
+      - name: Checkout
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
+          ref: ${{ github.ref_name }}
+          token: ${{ steps.app-token.outputs.token }}
 
-      - name: Setup PHP
-        uses: shivammathur/setup-php@v2
+      - name: Get GitHub App user ID
+        id: app-user
+        shell: bash
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          echo "user-id=$(gh api "/users/${{ steps.app-token.outputs.app-slug }}[bot]" --jq .id)" >> "$GITHUB_OUTPUT"
+
+      - name: Run shared module tests
+        uses: Burki24/Symcon_ModuleCI/php-tests@v1.0.0
         with:
           php-version: '8.5'
+          php-extensions: curl, dom
 
       - name: Check current library metadata
         id: metadata
@@ -44,17 +67,28 @@ jobs:
         if: steps.metadata.outputs.current != 'true'
         run: php .github/scripts/update-library-metadata.php --next-build
 
-      - name: Commit library metadata
+      - name: Commit and push metadata
         if: steps.metadata.outputs.current != 'true'
         shell: bash
+        env:
+          APP_SLUG: ${{ steps.app-token.outputs.app-slug }}
+          APP_USER_ID: ${{ steps.app-user.outputs.user-id }}
+          SOURCE_SHA: ${{ github.sha }}
         run: |
+          set -euo pipefail
+
           if git diff --quiet -- library.json; then
             echo "library.json is already current."
             exit 0
           fi
 
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config user.name "${APP_SLUG}[bot]"
+          git config user.email "${APP_USER_ID}+${APP_SLUG}[bot]@users.noreply.github.com"
+
+          version=$(php -r '$library = json_decode(file_get_contents("library.json"), true); echo (string) $library["version"];')
+          build=$(php -r '$library = json_decode(file_get_contents("library.json"), true); echo (int) $library["build"];')
+          short_sha=${SOURCE_SHA:0:7}
+
           git add library.json
-          git commit -m "CHORE: update library metadata [skip metadata]"
-          git push origin HEAD:${{ github.ref_name }}
+          git commit -m "CHORE: Update library metadata to v${version} build ${build} (${short_sha})"
+          git push origin "HEAD:${GITHUB_REF_NAME}"

@@ -3,72 +3,27 @@ name: Tests
 on:
   push:
     branches:
-      - '**'
+      - dev
+      - main
   pull_request:
+    branches:
+      - dev
+      - main
 
 permissions:
   contents: read
 
 jobs:
-  php-tests:
-    if: github.actor != 'github-actions[bot]'
+  tests:
+    name: tests
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout module
+      - name: Checkout
         uses: actions/checkout@v6
 
-      - name: Setup PHP
-        uses: shivammathur/setup-php@v2
+      - name: Run shared module tests
+        uses: Burki24/Symcon_ModuleCI/php-tests@v1.0.0
         with:
           php-version: '8.5'
-          extensions: curl, dom
-          coverage: none
-
-      - name: Show PHP environment
-        run: |
-          php -v
-          php -m
-
-      - name: Lint PHP files
-        shell: bash
-        run: |
-          set -euo pipefail
-          while IFS= read -r -d '' file; do
-            php -l "$file" > /dev/null
-          done < <(find . -type f -name '*.php' -not -path './.git/*' -print0)
-
-      - name: Validate JSON files
-        shell: bash
-        run: |
-          set -euo pipefail
-          while IFS= read -r -d '' file; do
-            php -r 'json_decode(file_get_contents($argv[1]), true, 512, JSON_THROW_ON_ERROR);' "$file"
-          done < <(find . -type f -name '*.json' -not -path './.git/*' -print0)
-
-      - name: Verify vendored helper integrity
-        run: python3 tests/helper_integrity.py
-
-      - name: Verify DataFlowHelper integration
-        run: python3 tests/data_flow_integration.py
-
-      - name: Run OpenCalendar tests
-        run: php tests/run.php
-
-      - name: Check shared visualization contract
-        run: php tests/visualization.php
-
-      - name: Run account module structure tests
-        run: php tests/account-module.php
-
-      - name: Check public PHPDoc coverage
-        run: php tests/phpdocs.php
-
-      - name: Check Symcon Strict compliance
-        run: php tests/symcon-strict.php
-
-      - name: Run CalDAV provider tests
-        run: php tests/caldav.php
-
-      - name: Run CalDAV HTTP integration tests
-        run: bash tests/run-caldav-http.sh
+          php-extensions: curl, dom

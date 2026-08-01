@@ -148,3 +148,23 @@ Folgende Module beinhaltet das Repository:
 
 - __Kalender Ansicht__ ([Dokumentation](Kalender%20Ansicht))  
 	Führt mehrere Kalender in einer modernen Kachelansicht zusammen.
+
+## Entwicklung und Continuous Integration
+
+OpenCalendar verwendet die gemeinsamen Prüfaktionen aus
+[`Burki24/Symcon_ModuleCI`](https://github.com/Burki24/Symcon_ModuleCI),
+fest auf Version `v1.0.0` gesetzt. Die verpflichtenden Status-Checks heißen in
+allen angebundenen Repositories einheitlich:
+
+- `tests`
+- `style`
+
+Der zentrale Testlauf richtet PHP 8.5 mit den Erweiterungen cURL und DOM sowie
+Python ein, prüft PHP- und JSON-Dateien und startet anschließend den lokalen
+Einstiegspunkt `php tests/run.php`. Dieser führt sämtliche OpenCalendar-
+Prüfungen einschließlich CalDAV-HTTP-Integration aus.
+
+Die offiziellen Symcon-Entwicklungsgrundlagen werden als Git-Submodule geführt:
+
+- `.style` → `symcon/StylePHP`
+- `tests/stubs` → `symcon/SymconStubs`

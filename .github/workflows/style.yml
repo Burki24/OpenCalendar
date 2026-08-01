@@ -3,8 +3,12 @@ name: Check Style
 on:
   push:
     branches:
-      - '**'
+      - dev
+      - main
   pull_request:
+    branches:
+      - dev
+      - main
   workflow_dispatch:
 
 permissions:
@@ -12,11 +16,12 @@ permissions:
 
 jobs:
   style:
+    name: style
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout module
+      - name: Checkout
         uses: actions/checkout@v6
 
-      - name: Check Symcon PHP style
-        uses: symcon/action-style@v3
+      - name: Run shared style check
+        uses: Burki24/Symcon_ModuleCI/style@v1.0.0
