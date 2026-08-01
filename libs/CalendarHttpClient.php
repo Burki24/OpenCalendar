@@ -133,19 +133,20 @@ final class CalendarHttpClient implements CalendarHttpClientInterface
         }
 
         $options = [
-            CURLOPT_URL             => $url,
-            CURLOPT_CUSTOMREQUEST   => strtoupper($method),
-            CURLOPT_RETURNTRANSFER  => true,
-            CURLOPT_FOLLOWLOCATION  => $followRedirects,
-            CURLOPT_MAXREDIRS       => self::MAX_REDIRECTS,
-            CURLOPT_CONNECTTIMEOUT  => min($this->timeout, 15),
-            CURLOPT_TIMEOUT         => $this->timeout,
-            CURLOPT_SSL_VERIFYPEER  => $this->verifyTLS,
-            CURLOPT_SSL_VERIFYHOST  => $this->verifyTLS ? 2 : 0,
-            CURLOPT_HTTPHEADER      => $headerLines,
-            CURLOPT_ENCODING        => '',
-            CURLOPT_USERAGENT       => 'OpenCalendar/1.0',
-            CURLOPT_HEADERFUNCTION  => static function ($curl, string $line) use (&$responseHeaders): int {
+            CURLOPT_URL            => $url,
+            CURLOPT_CUSTOMREQUEST  => strtoupper($method),
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_FOLLOWLOCATION => $followRedirects,
+            CURLOPT_MAXREDIRS      => self::MAX_REDIRECTS,
+            CURLOPT_CONNECTTIMEOUT => min($this->timeout, 15),
+            CURLOPT_TIMEOUT        => $this->timeout,
+            CURLOPT_SSL_VERIFYPEER => $this->verifyTLS,
+            CURLOPT_SSL_VERIFYHOST => $this->verifyTLS ? 2 : 0,
+            CURLOPT_HTTPHEADER     => $headerLines,
+            CURLOPT_ENCODING       => '',
+            CURLOPT_USERAGENT      => 'OpenCalendar/1.0',
+            CURLOPT_HEADERFUNCTION => static function ($curl, string $line) use (&$responseHeaders): int
+            {
                 $length = strlen($line);
                 $trimmedLine = trim($line);
 

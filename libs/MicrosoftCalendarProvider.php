@@ -103,7 +103,8 @@ final class MicrosoftCalendarProvider implements CalendarProviderInterface
             $url = $this->nextLink($data);
         }
 
-        usort($calendars, static function (array $left, array $right): int {
+        usort($calendars, static function (array $left, array $right): int
+        {
             return ((int) ($right['primary'] ?? false) <=> (int) ($left['primary'] ?? false))
                 ?: strcasecmp((string) $left['name'], (string) $right['name']);
         });
@@ -148,7 +149,7 @@ final class MicrosoftCalendarProvider implements CalendarProviderInterface
 
         usort(
             $events,
-            static fn(array $left, array $right): int => ($left['startTimestamp'] <=> $right['startTimestamp'])
+            static fn (array $left, array $right): int => ($left['startTimestamp'] <=> $right['startTimestamp'])
                 ?: strcasecmp((string) $left['summary'], (string) $right['summary'])
         );
 

@@ -142,7 +142,7 @@ final class CalDAVProvider implements CalendarProviderInterface
 
         usort(
             $events,
-            static fn(array $left, array $right): int => ($left['startTimestamp'] <=> $right['startTimestamp'])
+            static fn (array $left, array $right): int => ($left['startTimestamp'] <=> $right['startTimestamp'])
                 ?: strcasecmp((string) $left['summary'], (string) $right['summary'])
         );
 
@@ -375,7 +375,7 @@ final class CalDAVProvider implements CalendarProviderInterface
             ];
         }
 
-        usort($calendars, static fn(array $left, array $right): int => strcasecmp((string) $left['name'], (string) $right['name']));
+        usort($calendars, static fn (array $left, array $right): int => strcasecmp((string) $left['name'], (string) $right['name']));
 
         return $calendars;
     }

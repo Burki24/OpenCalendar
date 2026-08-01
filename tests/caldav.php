@@ -16,11 +16,11 @@ if (!class_exists(DOMDocument::class)) {
 
 final class FakeCalDAVHttpClient implements CalendarHttpClientInterface
 {
-    /** @var list<CalendarHttpResponse|Throwable> */
-    private array $responses;
-
     /** @var list<array{method: string, url: string, headers: array<string, string>, body: string}> */
     public array $requests = [];
+
+    /** @var list<CalendarHttpResponse|Throwable> */
+    private array $responses;
 
     /** @param list<CalendarHttpResponse|Throwable> $responses */
     public function __construct(array $responses)
@@ -247,7 +247,7 @@ $foreignPrincipalClient = new FakeCalDAVHttpClient([
 ]);
 $provider = new CalDAVProvider($foreignPrincipalClient, 'https://calendar.example/dav/');
 assertCalDAVThrows(
-    static fn() => $provider->getCalendars(),
+    static fn () => $provider->getCalendars(),
     CalDAVProviderException::class,
     'untrusted origin',
     'An absolute current-user-principal on another origin must be rejected.'
@@ -260,7 +260,7 @@ $foreignEffectiveClient = new FakeCalDAVHttpClient([
 ]);
 $provider = new CalDAVProvider($foreignEffectiveClient, 'https://calendar.example/dav/');
 assertCalDAVThrows(
-    static fn() => $provider->getCalendars(),
+    static fn () => $provider->getCalendars(),
     CalDAVProviderException::class,
     'untrusted origin',
     'A foreign effective URL returned by the HTTP layer must be rejected.'
@@ -273,7 +273,7 @@ $foreignEventClient = new FakeCalDAVHttpClient([
 ]);
 $provider = new CalDAVProvider($foreignEventClient, 'https://calendar.example/dav/');
 assertCalDAVThrows(
-    static fn() => $provider->getEvents(
+    static fn () => $provider->getEvents(
         'https://calendar.example/calendars/user/work/',
         new DateTimeImmutable('2026-07-24T00:00:00Z'),
         new DateTimeImmutable('2026-07-25T00:00:00Z')
@@ -288,7 +288,7 @@ $outsideCalendarClient = new FakeCalDAVHttpClient([
 ]);
 $provider = new CalDAVProvider($outsideCalendarClient, 'https://calendar.example/dav/');
 assertCalDAVThrows(
-    static fn() => $provider->getEvents(
+    static fn () => $provider->getEvents(
         'https://calendar.example/calendars/user/work/',
         new DateTimeImmutable('2026-07-24T00:00:00Z'),
         new DateTimeImmutable('2026-07-25T00:00:00Z')
@@ -348,7 +348,7 @@ $createOutsideClient = new FakeCalDAVHttpClient([
 ]);
 $provider = new CalDAVProvider($createOutsideClient, 'https://calendar.example/dav/');
 assertCalDAVThrows(
-    static fn() => $provider->createEvent(
+    static fn () => $provider->createEvent(
         'https://calendar.example/calendars/user/work/',
         [
             'summary' => 'Created event',
@@ -368,7 +368,7 @@ $conflictClient = new FakeCalDAVHttpClient([
 ]);
 $provider = new CalDAVProvider($conflictClient, 'https://calendar.example/dav/');
 $conflict = assertCalDAVThrows(
-    static fn() => $provider->deleteEvent(
+    static fn () => $provider->deleteEvent(
         'https://calendar.example/calendars/user/work/',
         $resourceUrl,
         '"old-etag"'
@@ -384,7 +384,7 @@ assertCalDAVSame('"old-etag"', $conflictClient->requests[0]['headers']['If-Match
 $recurrenceClient = new FakeCalDAVHttpClient([]);
 $provider = new CalDAVProvider($recurrenceClient, 'https://calendar.example/dav/');
 assertCalDAVThrows(
-    static fn() => $provider->deleteEvent(
+    static fn () => $provider->deleteEvent(
         'https://calendar.example/calendars/user/work/',
         $resourceUrl,
         '',

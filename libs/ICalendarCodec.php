@@ -43,30 +43,30 @@ final class ICalendarCodec
                 : null;
 
             $events[] = [
-                'id'                => hash('sha256', $resourceUrl . '|' . $uid . '|' . $recurrenceId . '|' . $start['value']),
-                'uid'               => $uid,
-                'resourceUrl'       => $resourceUrl,
-                'etag'              => $etag,
-                'summary'           => self::unescapeText(self::propertyValue($properties, 'SUMMARY')),
-                'description'       => self::unescapeText(self::propertyValue($properties, 'DESCRIPTION')),
-                'location'          => self::unescapeText(self::propertyValue($properties, 'LOCATION')),
-                'start'             => $start['value'],
-                'end'               => $end['value'],
-                'startTimestamp'    => $start['timestamp'],
-                'endTimestamp'      => $end['timestamp'],
-                'allDay'            => $start['allDay'],
-                'timezone'          => $start['timezone'],
-                'status'            => strtoupper(self::propertyValue($properties, 'STATUS')),
-                'recurrenceRule'    => self::propertyValue($properties, 'RRULE'),
-                'recurrenceId'      => $recurrenceId,
+                'id'                    => hash('sha256', $resourceUrl . '|' . $uid . '|' . $recurrenceId . '|' . $start['value']),
+                'uid'                   => $uid,
+                'resourceUrl'           => $resourceUrl,
+                'etag'                  => $etag,
+                'summary'               => self::unescapeText(self::propertyValue($properties, 'SUMMARY')),
+                'description'           => self::unescapeText(self::propertyValue($properties, 'DESCRIPTION')),
+                'location'              => self::unescapeText(self::propertyValue($properties, 'LOCATION')),
+                'start'                 => $start['value'],
+                'end'                   => $end['value'],
+                'startTimestamp'        => $start['timestamp'],
+                'endTimestamp'          => $end['timestamp'],
+                'allDay'                => $start['allDay'],
+                'timezone'              => $start['timezone'],
+                'status'                => strtoupper(self::propertyValue($properties, 'STATUS')),
+                'recurrenceRule'        => self::propertyValue($properties, 'RRULE'),
+                'recurrenceId'          => $recurrenceId,
                 'recurrenceIdTimestamp' => $parsedRecurrenceId['timestamp'] ?? null,
-                'exceptionDates'    => self::parseDatePropertyList($properties['EXDATE'] ?? []),
-                'recurrenceDates'   => self::parseDatePropertyList($properties['RDATE'] ?? []),
-                'recurring'         => self::propertyValue($properties, 'RRULE') !== '' || $recurrenceId !== '',
-                'sequence'          => (int) self::propertyValue($properties, 'SEQUENCE'),
-                'created'           => self::parseOptionalDate(self::firstProperty($properties, 'CREATED')),
-                'lastModified'      => self::parseOptionalDate(self::firstProperty($properties, 'LAST-MODIFIED')),
-                'url'               => self::propertyValue($properties, 'URL')
+                'exceptionDates'        => self::parseDatePropertyList($properties['EXDATE'] ?? []),
+                'recurrenceDates'       => self::parseDatePropertyList($properties['RDATE'] ?? []),
+                'recurring'             => self::propertyValue($properties, 'RRULE') !== '' || $recurrenceId !== '',
+                'sequence'              => (int) self::propertyValue($properties, 'SEQUENCE'),
+                'created'               => self::parseOptionalDate(self::firstProperty($properties, 'CREATED')),
+                'lastModified'          => self::parseOptionalDate(self::firstProperty($properties, 'LAST-MODIFIED')),
+                'url'                   => self::propertyValue($properties, 'URL')
             ];
         }
 
@@ -261,7 +261,7 @@ final class ICalendarCodec
     private static function extractEventBlocks(array $lines): array
     {
         return array_map(
-            static fn(array $block): array => $block['lines'],
+            static fn (array $block): array => $block['lines'],
             self::extractEventBlocksWithOffsets($lines)
         );
     }
@@ -341,7 +341,7 @@ final class ICalendarCodec
                 if ($parameterSeparator !== false) {
                     $params[strtoupper(substr($parameter, 0, $parameterSeparator))] = trim(
                         substr($parameter, $parameterSeparator + 1),
-                        "\""
+                        '"'
                     );
                 }
             }
@@ -598,7 +598,7 @@ final class ICalendarCodec
             $first = array_shift($matches);
             if ($replacement === null) {
                 array_splice($block, $first, 1);
-                $matches = array_map(static fn(int $index): int => $index - 1, $matches);
+                $matches = array_map(static fn (int $index): int => $index - 1, $matches);
             } else {
                 $block[$first] = $replacement;
             }
@@ -626,9 +626,9 @@ final class ICalendarCodec
     {
         return (string) preg_replace_callback(
             '/\\\\([nN,;\\\\])/',
-            static fn(array $matches): string => match ($matches[1]) {
+            static fn (array $matches): string => match ($matches[1]) {
                 'n', 'N' => "\n",
-                default  => $matches[1]
+                default => $matches[1]
             },
             $value
         );

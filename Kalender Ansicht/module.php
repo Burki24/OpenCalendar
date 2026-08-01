@@ -194,8 +194,8 @@ class KalenderAnsicht extends IPSModuleStrict
         $legacyTheme = $configuration['IPSViewTheme'] ?? null;
         if (is_int($legacyTheme) && !array_key_exists('IPSViewStyleSource', $configuration)) {
             $configuration['IPSViewStyleSource'] = match ($legacyTheme) {
-                1       => self::IPSVIEW_STYLE_SOURCE_LIGHT,
-                2       => self::IPSVIEW_STYLE_SOURCE_DARK,
+                1 => self::IPSVIEW_STYLE_SOURCE_LIGHT,
+                2 => self::IPSVIEW_STYLE_SOURCE_DARK,
                 default => self::IPSVIEW_STYLE_SOURCE_CUSTOM
             };
         }
@@ -419,7 +419,7 @@ class KalenderAnsicht extends IPSModuleStrict
     public function SelectAllCalendars(): bool
     {
         $selection = array_map(
-            static fn(int $instanceId): array => [
+            static fn (int $instanceId): array => [
                 'InstanceID' => $instanceId,
                 'Enabled'    => true
             ],
@@ -611,7 +611,7 @@ class KalenderAnsicht extends IPSModuleStrict
             'runtime'            => $runtime,
             'translations'       => $translations,
             'options'            => [
-                'agendaColorBarWidth' => $ipsView
+                'agendaColorBarWidth'  => $ipsView
                     ? max(2, min(16, $this->ReadPropertyInteger('IPSViewColorBarWidth')))
                     : 5,
                 'compactColorBarWidth' => $ipsView
@@ -712,7 +712,7 @@ class KalenderAnsicht extends IPSModuleStrict
 
         usort(
             $events,
-            static fn(array $left, array $right): int => ((int) $left['startTimestamp'] <=> (int) $right['startTimestamp'])
+            static fn (array $left, array $right): int => ((int) $left['startTimestamp'] <=> (int) $right['startTimestamp'])
                 ?: strcasecmp((string) ($left['summary'] ?? ''), (string) ($right['summary'] ?? ''))
         );
         $events = array_slice($events, 0, max(1, min(1000, $this->ReadPropertyInteger('MaxEvents'))));
@@ -744,18 +744,18 @@ class KalenderAnsicht extends IPSModuleStrict
     private function viewSettings(): array
     {
         return [
-            'defaultView'      => match ($this->ReadPropertyInteger('DefaultView')) {
+            'defaultView'            => match ($this->ReadPropertyInteger('DefaultView')) {
                 1       => 'week',
                 2       => 'month',
                 3       => 'threeDays',
                 default => 'agenda'
             },
-            'showWeekends'     => $this->ReadPropertyBoolean('ShowWeekends'),
-            'showDayOfYear'    => $this->ReadPropertyBoolean('ShowDayOfYear'),
-            'showCalendarName' => $this->ReadPropertyBoolean('ShowCalendarName'),
-            'showLocation'     => $this->ReadPropertyBoolean('ShowLocation'),
-            'showDescription'  => $this->ReadPropertyBoolean('ShowDescription'),
-            'tileWeekOrientation' => $this->ReadPropertyInteger('TileWeekOrientation') === 1
+            'showWeekends'           => $this->ReadPropertyBoolean('ShowWeekends'),
+            'showDayOfYear'          => $this->ReadPropertyBoolean('ShowDayOfYear'),
+            'showCalendarName'       => $this->ReadPropertyBoolean('ShowCalendarName'),
+            'showLocation'           => $this->ReadPropertyBoolean('ShowLocation'),
+            'showDescription'        => $this->ReadPropertyBoolean('ShowDescription'),
+            'tileWeekOrientation'    => $this->ReadPropertyInteger('TileWeekOrientation') === 1
                 ? 'vertical'
                 : 'horizontal',
             'ipsViewWeekOrientation' => $this->ReadPropertyInteger('IPSViewWeekOrientation') === 1

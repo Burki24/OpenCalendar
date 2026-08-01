@@ -16,7 +16,8 @@ trait KalenderKontoSymconOAuthTrait
         $httpClient = $this->createTrustedCloudHttpClient(new SymconOAuthOriginPolicy());
 
         return new SymconOAuthClient(
-            static function (string $method, string $url, array $headers, string $body) use ($httpClient): array {
+            static function (string $method, string $url, array $headers, string $body) use ($httpClient): array
+            {
                 $response = $httpClient->request($method, $url, $headers, $body);
 
                 return [

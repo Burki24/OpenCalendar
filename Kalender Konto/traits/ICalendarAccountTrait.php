@@ -246,14 +246,14 @@ trait KalenderKontoICalendarAccountTrait
     {
         $staleFeeds = array_values(array_filter(
             $this->iCalendarCacheStatus(),
-            static fn(array $status): bool => (bool) ($status['stale'] ?? false)
+            static fn (array $status): bool => (bool) ($status['stale'] ?? false)
         ));
         if ($staleFeeds === []) {
             return '';
         }
 
         $names = array_map(
-            static fn(array $status): string => trim((string) ($status['name'] ?? '')) ?: 'iCalendar',
+            static fn (array $status): string => trim((string) ($status['name'] ?? '')) ?: 'iCalendar',
             $staleFeeds
         );
 

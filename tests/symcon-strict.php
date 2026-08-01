@@ -52,8 +52,6 @@ assertSymconStrict(
     'The test workflow must run on PHP 8.5 to match Symcon 9.0.'
 );
 
-
-
 $helperManifestPath = $root . '/libs/helper/manifest.json';
 assertSymconStrict(is_file($helperManifestPath), 'The vendored helper manifest is missing.');
 $helperManifest = json_decode(

@@ -40,7 +40,7 @@ final class ICalendarRecurrence
 
         usort(
             $result,
-            static fn(array $left, array $right): int => ((int) $left['startTimestamp'] <=> (int) $right['startTimestamp'])
+            static fn (array $left, array $right): int => ((int) $left['startTimestamp'] <=> (int) $right['startTimestamp'])
                 ?: strcasecmp((string) ($left['summary'] ?? ''), (string) ($right['summary'] ?? ''))
         );
 
@@ -73,7 +73,7 @@ final class ICalendarRecurrence
         if ($masters === []) {
             return array_values(array_filter(
                 $overrides,
-                static fn(array $event): bool => !self::isCancelled($event)
+                static fn (array $event): bool => !self::isCancelled($event)
                     && self::overlapsRange($event, $rangeStart, $rangeEnd)
             ));
         }
@@ -224,11 +224,11 @@ final class ICalendarRecurrence
         }
 
         $matchesFrequency = match ($frequency) {
-            'DAILY'   => self::calendarDayDifference($seriesStart, $date) % $interval === 0,
-            'WEEKLY'  => self::matchesWeeklyInterval($date, $seriesStart, $rule, $interval),
+            'DAILY' => self::calendarDayDifference($seriesStart, $date) % $interval === 0,
+            'WEEKLY' => self::matchesWeeklyInterval($date, $seriesStart, $rule, $interval),
             'MONTHLY' => self::calendarMonthDifference($seriesStart, $date) % $interval === 0,
-            'YEARLY'  => ((int) $date->format('Y') - (int) $seriesStart->format('Y')) % $interval === 0,
-            default   => false
+            'YEARLY' => ((int) $date->format('Y') - (int) $seriesStart->format('Y')) % $interval === 0,
+            default => false
         };
         if (!$matchesFrequency) {
             return false;
@@ -441,7 +441,7 @@ final class ICalendarRecurrence
             $name = trim(substr($part, 0, $separator));
             $values = array_values(array_filter(
                 array_map('trim', explode(',', substr($part, $separator + 1))),
-                static fn(string $value): bool => $value !== ''
+                static fn (string $value): bool => $value !== ''
             ));
             if ($name !== '' && $values !== []) {
                 $result[$name] = $values;
@@ -538,12 +538,12 @@ final class ICalendarRecurrence
     private static function weekdayNumber(string $weekday): int
     {
         return match (strtoupper($weekday)) {
-            'TU'    => 2,
-            'WE'    => 3,
-            'TH'    => 4,
-            'FR'    => 5,
-            'SA'    => 6,
-            'SU'    => 7,
+            'TU' => 2,
+            'WE' => 3,
+            'TH' => 4,
+            'FR' => 5,
+            'SA' => 6,
+            'SU' => 7,
             default => 1
         };
     }

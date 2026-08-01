@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
+use Burki24\SymconModuleHelper\ConfigurationFormHelper;
 use Burki24\SymconModuleHelper\DataFlowHelper;
 use Burki24\SymconModuleHelper\ParentConnectionHelper;
-use Burki24\SymconModuleHelper\ConfigurationFormHelper;
 
 require_once __DIR__ . '/../libs/helper/DataFlowHelper.php';
 require_once __DIR__ . '/../libs/helper/ParentConnectionHelper.php';

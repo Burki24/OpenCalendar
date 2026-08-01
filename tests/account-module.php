@@ -91,7 +91,6 @@ assertAccountStructure(
     'Google and Microsoft OAuth must be registered after kernel readiness without per-user client credentials.'
 );
 
-
 $googleOAuthSource = file_get_contents(__DIR__ . '/../Kalender Konto/traits/GoogleOAuthTrait.php');
 $microsoftOAuthSource = file_get_contents(__DIR__ . '/../Kalender Konto/traits/MicrosoftOAuthTrait.php');
 $sharedOAuthSource = file_get_contents(__DIR__ . '/../Kalender Konto/traits/SymconOAuthTrait.php');

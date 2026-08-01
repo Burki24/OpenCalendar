@@ -3,20 +3,20 @@
 declare(strict_types=1);
 
 use Burki24\SymconModuleHelper\SymconOAuthClient;
+use IPSKalender\CalendarEventTranslation;
 use IPSKalender\CalendarHttpClientInterface;
 use IPSKalender\CalendarHttpResponse;
-use IPSKalender\CalendarEventTranslation;
-use IPSKalender\GoogleCalendarProvider;
 use IPSKalender\GoogleCalendarOriginPolicy;
+use IPSKalender\GoogleCalendarProvider;
 use IPSKalender\GoogleOAuthOriginPolicy;
-use IPSKalender\MicrosoftCalendarProvider;
-use IPSKalender\MicrosoftCalendarProviderException;
-use IPSKalender\MicrosoftGraphOriginPolicy;
-use IPSKalender\SymconOAuthOriginPolicy;
 use IPSKalender\ICalendarCodec;
 use IPSKalender\ICalendarFeedProvider;
 use IPSKalender\ICalendarFeedProviderException;
 use IPSKalender\ICalendarSubscriptionProvider;
+use IPSKalender\MicrosoftCalendarProvider;
+use IPSKalender\MicrosoftCalendarProviderException;
+use IPSKalender\MicrosoftGraphOriginPolicy;
+use IPSKalender\SymconOAuthOriginPolicy;
 use IPSKalender\SynchronizationSchedule;
 
 require_once __DIR__ . '/../libs/GoogleCalendarProvider.php';
@@ -33,11 +33,11 @@ require_once __DIR__ . '/../libs/SynchronizationSchedule.php';
 
 final class FakeHttpClient implements CalendarHttpClientInterface
 {
-    /** @var list<CalendarHttpResponse|Throwable> */
-    private array $responses;
-
     /** @var list<array{method: string, url: string, headers: array<string, string>, body: string}> */
     public array $requests = [];
+
+    /** @var list<CalendarHttpResponse|Throwable> */
+    private array $responses;
 
     /** @param list<CalendarHttpResponse|Throwable> $responses */
     public function __construct(array $responses)
@@ -77,7 +77,8 @@ function response(int $status, array|string $body = ''): CalendarHttpResponse
  */
 function oauthTransport(FakeHttpClient $httpClient): Closure
 {
-    return static function (string $method, string $url, array $headers, string $body) use ($httpClient): array {
+    return static function (string $method, string $url, array $headers, string $body) use ($httpClient): array
+    {
         $response = $httpClient->request($method, $url, $headers, $body);
 
         return [
@@ -105,7 +106,7 @@ function assertTrueValue(bool $condition, string $message): void
 
 $calendarClient = new FakeHttpClient([
     response(200, [
-        'items' => [
+        'items'         => [
             [
                 'id'              => 'owner@example.com',
                 'summary'         => 'Primary',
@@ -155,11 +156,11 @@ $eventClient = new FakeHttpClient([
             [
                 'id'               => 'instance-id',
                 'iCalUID'          => 'series@example.com',
-                'summary'           => 'Meeting',
-                'status'            => 'confirmed',
-                'recurringEventId'  => 'series-id',
-                'start'             => ['dateTime' => '2026-07-20T10:00:00+02:00', 'timeZone' => 'Europe/Berlin'],
-                'end'               => ['dateTime' => '2026-07-20T11:00:00+02:00', 'timeZone' => 'Europe/Berlin']
+                'summary'          => 'Meeting',
+                'status'           => 'confirmed',
+                'recurringEventId' => 'series-id',
+                'start'            => ['dateTime' => '2026-07-20T10:00:00+02:00', 'timeZone' => 'Europe/Berlin'],
+                'end'              => ['dateTime' => '2026-07-20T11:00:00+02:00', 'timeZone' => 'Europe/Berlin']
             ],
             [
                 'id'     => 'deleted-id',
@@ -190,10 +191,10 @@ $writeClient = new FakeHttpClient([
 ]);
 $provider = new GoogleCalendarProvider($writeClient, 'access-token');
 $created = $provider->createEvent('owner@example.com', [
-    'summary' => 'Test',
-    'allDay'  => false,
-    'start'   => '2026-07-20T10:00:00+02:00',
-    'end'     => '2026-07-20T11:00:00+02:00',
+    'summary'  => 'Test',
+    'allDay'   => false,
+    'start'    => '2026-07-20T10:00:00+02:00',
+    'end'      => '2026-07-20T11:00:00+02:00',
     'location' => 'Berlin'
 ]);
 assertSameValue('created-id', $created['eventReference'], 'The created Google event ID must be returned.');
@@ -269,10 +270,9 @@ $googleRefreshBody = [];
 parse_str($googleOAuthHttpClient->requests[1]['body'], $googleRefreshBody);
 assertSameValue(['refresh_token' => 'google-refresh-token'], $googleRefreshBody, 'Google token renewal must use only the delegated refresh token.');
 
-
 $msCalendarClient = new FakeHttpClient([
     response(200, [
-        'value' => [
+        'value'           => [
             [
                 'id'                => 'AQMk-primary',
                 'name'              => 'Calendar',
@@ -324,7 +324,7 @@ assertSameValue(
 
 $msUntrustedPageClient = new FakeHttpClient([
     response(200, [
-        'value' => [],
+        'value'           => [],
         '@odata.nextLink' => 'https://evil.example/steal-token'
     ])
 ]);
@@ -352,18 +352,18 @@ $msEventClient = new FakeHttpClient([
                 'type'        => 'singleInstance'
             ],
             [
-                'id'                => 'instance/id+1',
-                'iCalUId'           => 'series@example.com',
-                '@odata.etag'       => 'W/"etag-2"',
-                'subject'           => 'Teams meeting',
-                'body'              => ['contentType' => 'text', 'content' => 'Agenda'],
-                'location'          => ['displayName' => 'Berlin'],
-                'start'             => ['dateTime' => '2026-07-20T10:00:00.1234567', 'timeZone' => 'UTC'],
-                'end'               => ['dateTime' => '2026-07-20T11:00:00.1234567', 'timeZone' => 'UTC'],
-                'type'              => 'occurrence',
-                'seriesMasterId'    => 'series-master',
-                'isOnlineMeeting'   => true,
-                'webLink'           => 'https://outlook.office.com/calendar/item/1'
+                'id'              => 'instance/id+1',
+                'iCalUId'         => 'series@example.com',
+                '@odata.etag'     => 'W/"etag-2"',
+                'subject'         => 'Teams meeting',
+                'body'            => ['contentType' => 'text', 'content' => 'Agenda'],
+                'location'        => ['displayName' => 'Berlin'],
+                'start'           => ['dateTime' => '2026-07-20T10:00:00.1234567', 'timeZone' => 'UTC'],
+                'end'             => ['dateTime' => '2026-07-20T11:00:00.1234567', 'timeZone' => 'UTC'],
+                'type'            => 'occurrence',
+                'seriesMasterId'  => 'series-master',
+                'isOnlineMeeting' => true,
+                'webLink'         => 'https://outlook.office.com/calendar/item/1'
             ],
             [
                 'id'          => 'cancelled-id',
@@ -605,7 +605,8 @@ $conditionalProvider = new ICalendarFeedProvider(
     'https://calendar.example/cached.ics',
     '',
     [],
-    static function (array $cacheState) use (&$persistentFeedCache): void {
+    static function (array $cacheState) use (&$persistentFeedCache): void
+    {
         $persistentFeedCache = $cacheState;
     }
 );
@@ -627,7 +628,8 @@ $notModifiedProvider = new ICalendarFeedProvider(
     'https://calendar.example/cached.ics',
     '',
     $persistentFeedCache,
-    static function (array $cacheState) use (&$persistentFeedCache): void {
+    static function (array $cacheState) use (&$persistentFeedCache): void
+    {
         $persistentFeedCache = $cacheState;
     }
 );
@@ -662,7 +664,8 @@ $invalidRefreshProvider = new ICalendarFeedProvider(
     'https://calendar.example/cached.ics',
     '',
     $persistentFeedCache,
-    static function (array $cacheState) use (&$persistentFeedCache): void {
+    static function (array $cacheState) use (&$persistentFeedCache): void
+    {
         $persistentFeedCache = $cacheState;
     }
 );
@@ -824,7 +827,7 @@ try {
             ['url' => 'https://calendar.example/duplicate.ics'],
             ['url' => 'https://calendar.example/duplicate.ics']
         ],
-        static fn(array $subscription): ICalendarFeedProvider => new ICalendarFeedProvider(
+        static fn (array $subscription): ICalendarFeedProvider => new ICalendarFeedProvider(
             new FakeHttpClient([]),
             (string) $subscription['url']
         )
@@ -842,7 +845,7 @@ try {
             'url'                => 'https://calendar.example/invalid-translation.ics',
             'translationProfile' => 999
         ]],
-        static fn(array $subscription): ICalendarFeedProvider => new ICalendarFeedProvider(
+        static fn (array $subscription): ICalendarFeedProvider => new ICalendarFeedProvider(
             new FakeHttpClient([]),
             (string) $subscription['url']
         )
@@ -915,12 +918,12 @@ $monthlyEvents = ICalendarCodec::parseEventsInRange(
     new DateTimeImmutable('2026-04-02T00:00:00Z')
 );
 $firstMondayDates = array_values(array_map(
-    static fn(array $event): string => substr((string) $event['start'], 0, 10),
-    array_filter($monthlyEvents, static fn(array $event): bool => $event['uid'] === 'first-monday@example.com')
+    static fn (array $event): string => substr((string) $event['start'], 0, 10),
+    array_filter($monthlyEvents, static fn (array $event): bool => $event['uid'] === 'first-monday@example.com')
 ));
 $lastWorkdayDates = array_values(array_map(
-    static fn(array $event): string => (string) $event['start'],
-    array_filter($monthlyEvents, static fn(array $event): bool => $event['uid'] === 'last-workday@example.com')
+    static fn (array $event): string => (string) $event['start'],
+    array_filter($monthlyEvents, static fn (array $event): bool => $event['uid'] === 'last-workday@example.com')
 ));
 assertSameValue(
     ['2026-01-05', '2026-02-02', '2026-03-02'],
@@ -979,23 +982,23 @@ $advancedEvents = ICalendarCodec::parseEventsInRange(
     new DateTimeImmutable('2028-01-01T00:00:00Z')
 );
 $dailyDates = array_values(array_map(
-    static fn(array $event): string => (string) $event['start'],
-    array_filter($advancedEvents, static fn(array $event): bool => $event['uid'] === 'daily-until@example.com')
+    static fn (array $event): string => (string) $event['start'],
+    array_filter($advancedEvents, static fn (array $event): bool => $event['uid'] === 'daily-until@example.com')
 ));
 $monthEndDates = array_values(array_map(
-    static fn(array $event): string => (string) $event['start'],
-    array_filter($advancedEvents, static fn(array $event): bool => $event['uid'] === 'last-month-day@example.com')
+    static fn (array $event): string => (string) $event['start'],
+    array_filter($advancedEvents, static fn (array $event): bool => $event['uid'] === 'last-month-day@example.com')
 ));
 $yearlyDates = array_values(array_map(
-    static fn(array $event): string => (string) $event['start'],
-    array_filter($advancedEvents, static fn(array $event): bool => $event['uid'] === 'yearly-sunday@example.com')
+    static fn (array $event): string => (string) $event['start'],
+    array_filter($advancedEvents, static fn (array $event): bool => $event['uid'] === 'yearly-sunday@example.com')
 ));
 assertSameValue(['2026-07-01', '2026-07-03'], $dailyDates, 'UNTIL must be inclusive and cancelled overrides must remove occurrences.');
 assertSameValue(['2026-01-31', '2026-02-28', '2026-03-31'], $monthEndDates, 'Negative BYMONTHDAY values must count from month end.');
 assertSameValue(['2026-03-29', '2027-03-28'], $yearlyDates, 'Yearly ordinal BYDAY rules must be expanded.');
 $durationEvents = array_values(array_filter(
     $advancedEvents,
-    static fn(array $event): bool => $event['uid'] === 'duration@example.com'
+    static fn (array $event): bool => $event['uid'] === 'duration@example.com'
 ));
 assertSameValue('2026-07-05T11:30:00+02:00', $durationEvents[0]['end'], 'DURATION must define the event end when DTEND is absent.');
 
@@ -1274,7 +1277,6 @@ assertTrueValue(
     'Agenda, three-day and weekly headings must optionally show the day of year.'
 );
 
-
 assertTrueValue(
     is_string($calendarModuleSource)
         && str_contains($calendarModuleSource, 'use Burki24\\SymconModuleHelper\\VariableHelper;')
@@ -1293,7 +1295,6 @@ assertTrueValue(
         && !str_contains($viewModuleSource, 'findChildByIdent('),
     'The calendar view must use parent-aware VariableHelper lookups instead of its local child scan.'
 );
-
 
 $configuratorModuleSource = file_get_contents(__DIR__ . '/../Kalender Konfigurator/module.php');
 

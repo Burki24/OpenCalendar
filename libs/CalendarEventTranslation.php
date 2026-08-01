@@ -82,7 +82,8 @@ final class CalendarEventTranslation
     {
         $translated = preg_replace_callback(
             '/(?<!\d)(\d{1,2})(?::(\d{2}))?\s*([ap])\.?m\.?(?![a-z])/i',
-            static function (array $matches): string {
+            static function (array $matches): string
+            {
                 $hour = (int) $matches[1] % 12;
                 if (strtolower($matches[3]) === 'p') {
                     $hour += 12;

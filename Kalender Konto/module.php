@@ -6,15 +6,15 @@ use Burki24\SymconModuleHelper\ConfigurationFormHelper;
 use Burki24\SymconModuleHelper\DataFlowHelper;
 use Burki24\SymconModuleHelper\HttpResponseHelper;
 use Burki24\SymconModuleHelper\SymconOAuthException;
-use IPSKalender\CalendarHttpClient;
-use IPSKalender\CalendarHttpOriginPolicyInterface;
-use IPSKalender\CalendarEventTranslation;
-use IPSKalender\CalendarProviderInterface;
+use IPSKalender\CalDAVOriginPolicy;
 use IPSKalender\CalDAVProvider;
 use IPSKalender\CalDAVProviderException;
-use IPSKalender\CalDAVOriginPolicy;
-use IPSKalender\GoogleCalendarProvider;
+use IPSKalender\CalendarEventTranslation;
+use IPSKalender\CalendarHttpClient;
+use IPSKalender\CalendarHttpOriginPolicyInterface;
+use IPSKalender\CalendarProviderInterface;
 use IPSKalender\GoogleCalendarOriginPolicy;
+use IPSKalender\GoogleCalendarProvider;
 use IPSKalender\GoogleCalendarProviderException;
 use IPSKalender\ICalendarFeedProvider;
 use IPSKalender\ICalendarFeedProviderException;
@@ -287,34 +287,6 @@ class KalenderKonto extends IPSModuleStrict
     }
 
     /**
-     * Routes a native Symcon OAuth callback to the provider configured for this account.
-     */
-    protected function ProcessOAuthData(): void
-    {
-        $pendingProvider = $this->ReadAttributeInteger('PendingOAuthProvider');
-        $this->WriteAttributeInteger('PendingOAuthProvider', -1);
-        $provider = in_array($pendingProvider, [self::PROVIDER_GOOGLE, self::PROVIDER_MICROSOFT], true)
-            ? $pendingProvider
-            : $this->ReadPropertyInteger('Provider');
-
-        switch ($provider) {
-            case self::PROVIDER_GOOGLE:
-                $this->processGoogleOAuthData();
-                break;
-
-            case self::PROVIDER_MICROSOFT:
-                $this->processMicrosoftOAuthData();
-                break;
-
-            default:
-                $this->SendHtmlTextResponse(
-                    400,
-                    $this->Translate('The selected calendar provider does not support OAuth.')
-                );
-        }
-    }
-
-    /**
      * Handles actions triggered from the account configuration form.
      *
      * @param string $Ident Action identifier supplied by Symcon.
@@ -369,10 +341,10 @@ class KalenderKonto extends IPSModuleStrict
 
         $providerName = $this->getProviderName($this->ReadPropertyInteger('Provider'));
         $username = match ($this->ReadPropertyInteger('Provider')) {
-            self::PROVIDER_GOOGLE    => trim($this->ReadAttributeString('GoogleAccount')),
+            self::PROVIDER_GOOGLE => trim($this->ReadAttributeString('GoogleAccount')),
             self::PROVIDER_MICROSOFT => trim($this->ReadAttributeString('MicrosoftAccount')),
-            self::PROVIDER_ICS       => $this->iCalendarSummary(),
-            default               => trim($this->ReadPropertyString('Username'))
+            self::PROVIDER_ICS => $this->iCalendarSummary(),
+            default => trim($this->ReadPropertyString('Username'))
         };
         $this->SetSummary($username !== '' ? $providerName . ' – ' . $username : $providerName);
 
@@ -402,15 +374,6 @@ class KalenderKonto extends IPSModuleStrict
             )
         );
         $this->SetStatus(IS_ACTIVE);
-    }
-
-    /**
-     * Registers shared Google and Microsoft OAuth endpoints after the kernel is ready.
-     */
-    private function registerOAuthHandlers(): void
-    {
-        $this->RegisterOAuth(self::GOOGLE_OAUTH_IDENTIFIER);
-        $this->RegisterOAuth(self::MICROSOFT_OAUTH_IDENTIFIER);
     }
 
     /**
@@ -561,6 +524,43 @@ class KalenderKonto extends IPSModuleStrict
     }
 
     /**
+     * Routes a native Symcon OAuth callback to the provider configured for this account.
+     */
+    protected function ProcessOAuthData(): void
+    {
+        $pendingProvider = $this->ReadAttributeInteger('PendingOAuthProvider');
+        $this->WriteAttributeInteger('PendingOAuthProvider', -1);
+        $provider = in_array($pendingProvider, [self::PROVIDER_GOOGLE, self::PROVIDER_MICROSOFT], true)
+            ? $pendingProvider
+            : $this->ReadPropertyInteger('Provider');
+
+        switch ($provider) {
+            case self::PROVIDER_GOOGLE:
+                $this->processGoogleOAuthData();
+                break;
+
+            case self::PROVIDER_MICROSOFT:
+                $this->processMicrosoftOAuthData();
+                break;
+
+            default:
+                $this->SendHtmlTextResponse(
+                    400,
+                    $this->Translate('The selected calendar provider does not support OAuth.')
+                );
+        }
+    }
+
+    /**
+     * Registers shared Google and Microsoft OAuth endpoints after the kernel is ready.
+     */
+    private function registerOAuthHandlers(): void
+    {
+        $this->RegisterOAuth(self::GOOGLE_OAUTH_IDENTIFIER);
+        $this->RegisterOAuth(self::MICROSOFT_OAUTH_IDENTIFIER);
+    }
+
+    /**
      * @return list<array<string, mixed>>
      */
     private function discoverCalendars(): array
@@ -573,7 +573,7 @@ class KalenderKonto extends IPSModuleStrict
         $calendars = $this->createProvider()->getCalendars();
         if ($this->ReadPropertyInteger('Provider') === self::PROVIDER_ICS) {
             $this->pruneICalendarFeedCache(array_map(
-                static fn(array $calendar): string => (string) ($calendar['id'] ?? ''),
+                static fn (array $calendar): string => (string) ($calendar['id'] ?? ''),
                 $calendars
             ));
         }
@@ -644,7 +644,8 @@ class KalenderKonto extends IPSModuleStrict
         if ($provider === self::PROVIDER_ICS) {
             return new ICalendarSubscriptionProvider(
                 $this->iCalendarSubscriptions(),
-                function (array $subscription): ICalendarFeedProvider {
+                function (array $subscription): ICalendarFeedProvider
+                {
                     $subscriptionId = (string) ($subscription['id'] ?? '');
                     return new ICalendarFeedProvider(
                         new CalendarHttpClient(
@@ -656,7 +657,8 @@ class KalenderKonto extends IPSModuleStrict
                         (string) ($subscription['url'] ?? ''),
                         (string) ($subscription['name'] ?? ''),
                         $this->readICalendarFeedCache($subscriptionId),
-                        function (array $cacheState) use ($subscriptionId): void {
+                        function (array $cacheState) use ($subscriptionId): void
+                        {
                             $this->writeICalendarFeedCache($subscriptionId, $cacheState);
                         }
                     );
@@ -782,12 +784,12 @@ class KalenderKonto extends IPSModuleStrict
     private function getProviderName(int $provider): string
     {
         return $this->Translate(match ($provider) {
-            self::PROVIDER_APPLE     => 'Apple iCloud',
-            self::PROVIDER_CALDAV    => 'CalDAV',
-            self::PROVIDER_GOOGLE    => 'Google Calendar',
+            self::PROVIDER_APPLE => 'Apple iCloud',
+            self::PROVIDER_CALDAV => 'CalDAV',
+            self::PROVIDER_GOOGLE => 'Google Calendar',
             self::PROVIDER_MICROSOFT => 'Microsoft 365',
-            self::PROVIDER_ICS       => 'ICS/Webcal',
-            default                  => 'Unknown'
+            self::PROVIDER_ICS => 'ICS/Webcal',
+            default => 'Unknown'
         });
     }
 
@@ -863,26 +865,26 @@ class KalenderKonto extends IPSModuleStrict
         }
 
         $patterns = [
-            '/^HTTP request failed \((\d+)\): (.+)$/' => ['HTTP request failed (%d): %s', [1, 2]],
-            '/^Unexpected CalDAV response: HTTP (\d+)\.$/' => ['Unexpected CalDAV response: HTTP %d.', [1]],
-            '/^Google Calendar request failed with HTTP (\d+)\.$/' => ['Google Calendar request failed with HTTP %d.', [1]],
-            '/^Microsoft Calendar request failed with HTTP (\d+)\.$/' => ['Microsoft Calendar request failed with HTTP %d.', [1]],
-            '/^The calendar feed returned HTTP status (\d+)\.$/' => ['The calendar feed returned HTTP status %d.', [1]],
-            '/^The calendar contains an invalid date value: (.+)$/' => ['The calendar contains an invalid date value: %s', [1]],
-            '/^The iCalendar subscription URL for "(.+)" is configured more than once\.$/' => ['The iCalendar subscription URL for "%s" is configured more than once.', [1]],
-            '/^The configured color for iCalendar subscription "(.+)" is invalid\.$/' => ['The configured color for iCalendar subscription "%s" is invalid.', [1]],
-            '/^The synchronization schedule for iCalendar subscription "(.+)" is invalid\.$/' => ['The synchronization schedule for iCalendar subscription "%s" is invalid.', [1]],
+            '/^HTTP request failed \((\d+)\): (.+)$/'                                          => ['HTTP request failed (%d): %s', [1, 2]],
+            '/^Unexpected CalDAV response: HTTP (\d+)\.$/'                                     => ['Unexpected CalDAV response: HTTP %d.', [1]],
+            '/^Google Calendar request failed with HTTP (\d+)\.$/'                             => ['Google Calendar request failed with HTTP %d.', [1]],
+            '/^Microsoft Calendar request failed with HTTP (\d+)\.$/'                          => ['Microsoft Calendar request failed with HTTP %d.', [1]],
+            '/^The calendar feed returned HTTP status (\d+)\.$/'                               => ['The calendar feed returned HTTP status %d.', [1]],
+            '/^The calendar contains an invalid date value: (.+)$/'                            => ['The calendar contains an invalid date value: %s', [1]],
+            '/^The iCalendar subscription URL for "(.+)" is configured more than once\.$/'     => ['The iCalendar subscription URL for "%s" is configured more than once.', [1]],
+            '/^The configured color for iCalendar subscription "(.+)" is invalid\.$/'          => ['The configured color for iCalendar subscription "%s" is invalid.', [1]],
+            '/^The synchronization schedule for iCalendar subscription "(.+)" is invalid\.$/'  => ['The synchronization schedule for iCalendar subscription "%s" is invalid.', [1]],
             '/^The title translation profile for iCalendar subscription "(.+)" is invalid\.$/' => ['The title translation profile for iCalendar subscription "%s" is invalid.', [1]],
-            '/^The iCalendar URL for subscription "(.+)" is invalid\.$/' => ['The iCalendar URL for subscription "%s" is invalid.', [1]],
-            '/^The iCalendar URL for subscription "(.+)" is configured more than once\.$/' => ['The iCalendar URL for subscription "%s" is configured more than once.', [1]],
-            '/^The color for iCalendar subscription "(.+)" is invalid\.$/' => ['The color for iCalendar subscription "%s" is invalid.', [1]],
+            '/^The iCalendar URL for subscription "(.+)" is invalid\.$/'                       => ['The iCalendar URL for subscription "%s" is invalid.', [1]],
+            '/^The iCalendar URL for subscription "(.+)" is configured more than once\.$/'     => ['The iCalendar URL for subscription "%s" is configured more than once.', [1]],
+            '/^The color for iCalendar subscription "(.+)" is invalid\.$/'                     => ['The color for iCalendar subscription "%s" is invalid.', [1]],
         ];
 
         foreach ($patterns as $pattern => [$template, $groups]) {
             if (preg_match($pattern, $message, $matches) !== 1) {
                 continue;
             }
-            $values = array_map(static fn(int $group): string => $matches[$group], $groups);
+            $values = array_map(static fn (int $group): string => $matches[$group], $groups);
             return sprintf($this->Translate($template), ...$values);
         }
 
@@ -926,5 +928,4 @@ class KalenderKonto extends IPSModuleStrict
 
         return $message;
     }
-
 }

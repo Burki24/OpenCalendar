@@ -349,8 +349,8 @@ class Kalender extends IPSModuleStrict
             $result = $this->sendRequest(
                 'DeleteEvent',
                 [
-                    'ResourceURL' => trim((string) ($event['resourceUrl'] ?? '')),
-                    'ETag'        => trim((string) ($event['etag'] ?? '')),
+                    'ResourceURL'  => trim((string) ($event['resourceUrl'] ?? '')),
+                    'ETag'         => trim((string) ($event['etag'] ?? '')),
                     'RecurrenceID' => trim((string) ($event['recurrenceId'] ?? ''))
                 ]
             );
@@ -445,7 +445,7 @@ class Kalender extends IPSModuleStrict
         if ($instanceName !== '') {
             $nameMatches = array_values(array_filter(
                 $availableCalendars,
-                static fn(array $calendar): bool => strcasecmp(
+                static fn (array $calendar): bool => strcasecmp(
                     trim((string) ($calendar['name'] ?? '')),
                     $instanceName
                 ) === 0

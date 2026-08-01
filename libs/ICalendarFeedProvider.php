@@ -125,7 +125,7 @@ final class ICalendarFeedProvider implements CalendarProviderInterface
 
         usort(
             $events,
-            static fn(array $left, array $right): int => ($left['startTimestamp'] <=> $right['startTimestamp'])
+            static fn (array $left, array $right): int => ($left['startTimestamp'] <=> $right['startTimestamp'])
                 ?: strcasecmp((string) $left['summary'], (string) $right['summary'])
         );
 
@@ -244,15 +244,15 @@ final class ICalendarFeedProvider implements CalendarProviderInterface
             : $now;
 
         $this->cacheState = [
-            'body'          => $response->body,
-            'etag'          => trim((string) ($response->headers['etag'] ?? '')),
-            'lastModified'  => trim((string) ($response->headers['last-modified'] ?? '')),
-            'contentHash'   => $contentHash,
-            'lastCheck'     => $now,
-            'lastDownload'  => $now,
-            'lastChange'    => $lastChange,
-            'lastError'     => '',
-            'stale'         => false
+            'body'         => $response->body,
+            'etag'         => trim((string) ($response->headers['etag'] ?? '')),
+            'lastModified' => trim((string) ($response->headers['last-modified'] ?? '')),
+            'contentHash'  => $contentHash,
+            'lastCheck'    => $now,
+            'lastDownload' => $now,
+            'lastChange'   => $lastChange,
+            'lastError'    => '',
+            'stale'        => false
         ];
         $this->persistCache();
 
