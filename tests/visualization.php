@@ -105,6 +105,10 @@ foreach ([$native, $ipsView] as $html) {
     assertVisualization(str_contains($html, 'window.SYMC_VISUALIZATION = '), 'The shared bootstrap object must be embedded.');
     assertVisualization(str_contains($html, 'contractVersion'), 'The bootstrap contract version must be embedded.');
     assertVisualization(str_contains($html, 'calendarVisualization.state'), 'The calendar script must consume the shared state contract.');
+    assertVisualization(
+        str_contains($html, "calendarIPSViewRequest('GetState', null)"),
+        'IPSView must refresh the embedded calendar state from its authenticated action bridge on page load.'
+    );
     assertVisualization(str_contains($html, 'id="add-button-label"'), 'The event creation control must expose a visible text label for touch users.');
     assertVisualization(str_contains($html, 't(\'New event\')'), 'The visible creation label must use the compact translation while title and aria-label remain descriptive.');
     assertVisualization(str_contains($html, 'addButton.disabled = !hasWritableCalendar'), 'The creation control must stay visible and communicate unavailable write access by disabling itself.');

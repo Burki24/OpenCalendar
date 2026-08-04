@@ -387,6 +387,16 @@ class KalenderAnsicht extends IPSModuleStrict
                     );
                     break;
 
+                case 'FormRegenerateIPSViewHTML':
+                    $this->UpdateFormField(
+                        $this->RegenerateIPSViewHTML()
+                            ? 'IPSViewRegenerationSuccessPopup'
+                            : 'IPSViewRegenerationFailurePopup',
+                        'visible',
+                        true
+                    );
+                    break;
+
                 default:
                     $result = $this->executeVisualizationAction($Ident, $Value);
                     $this->sendToast($result['level'], $result['message']);
@@ -461,6 +471,34 @@ class KalenderAnsicht extends IPSModuleStrict
     public function GetIPSViewHTML(): string
     {
         return $this->renderCalendarHtml($this->buildState(), true);
+    }
+
+    /**
+     * Re-renders the existing IPSView WebContent variable without replacing it.
+     *
+     * @return bool True when the current HTML was written to the existing variable.
+     */
+    public function RegenerateIPSViewHTML(): bool
+    {
+        if (!$this->IsIPSViewHTMLPageEnabled()) {
+            return false;
+        }
+        if (!$this->isRuntimeReady() && !$this->Initialize()) {
+            return false;
+        }
+
+        try {
+            $html = $this->renderCalendarHtml($this->buildState(), true);
+            if ($html === '') {
+                return false;
+            }
+
+            return $this->UpdateIPSViewHTMLVariable('IPSViewCalendar', $html);
+        } catch (Throwable $exception) {
+            $this->SendDebug('IPSViewRegeneration', $exception->getMessage(), 0);
+
+            return false;
+        }
     }
 
     /**

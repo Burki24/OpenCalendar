@@ -1162,6 +1162,14 @@ assertTrueValue(
 );
 assertTrueValue(
     is_string($viewModuleSource)
+        && str_contains($viewModuleSource, "case 'FormRegenerateIPSViewHTML':")
+        && str_contains($viewModuleSource, 'public function RegenerateIPSViewHTML(): bool')
+        && str_contains($viewModuleSource, "return \$this->UpdateIPSViewHTMLVariable('IPSViewCalendar', \$html);")
+        && !str_contains($viewModuleSource, "UnregisterVariable('IPSViewCalendar')"),
+    'Manual IPSView regeneration must update the existing WebContent variable without replacing its object ID.'
+);
+assertTrueValue(
+    is_string($viewModuleSource)
         && str_contains($viewModuleSource, '$this->RegisterHook($this->ipsViewHookAddress());')
         && str_contains($viewModuleSource, 'protected function ProcessHookData(): void')
         && str_contains($viewModuleSource, "strtoupper((string) (\$_SERVER['REQUEST_METHOD'] ?? '')) !== 'POST'")

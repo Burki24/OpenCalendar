@@ -575,6 +575,16 @@ async function calendarIPSViewRequest(action, value) {
     return payload;
 }
 
+async function refreshIPSViewState() {
+    if (!hasIPSViewActionBridge()) return;
+
+    try {
+        handleMessage(await calendarIPSViewRequest('GetState', null));
+    } catch (error) {
+        console.warn('OpenCalendar IPSView state refresh failed; using embedded state.', error);
+    }
+}
+
 function applyStaticTranslations() {
     document.querySelectorAll('label[for]').forEach(label => {
         label.textContent = t(label.textContent.trim());
@@ -674,4 +684,8 @@ function safeColor(value) {
 
 if (calendarVisualization.state && typeof calendarVisualization.state === 'object') {
     handleMessage({ type: 'state', payload: calendarVisualization.state });
+}
+
+if (calendarVisualization.mode === 'ipsview') {
+    void refreshIPSViewState();
 }
