@@ -258,6 +258,7 @@ class KalenderAnsicht extends IPSModuleStrict
     {
         parent::ApplyChanges();
 
+        $preservedIPSViewHTML = $this->existingIPSViewHTML();
         $this->ensureIPSViewToken();
         $this->WriteAttributeBoolean('RuntimeReady', false);
         $configured = $this->decodeCalendarConfiguration($this->ReadPropertyString('Calendars'));
@@ -270,7 +271,8 @@ class KalenderAnsicht extends IPSModuleStrict
         $this->MaintainIPSViewHTMLVariable(
             'IPSViewCalendar',
             $this->Translate('IPSView calendar'),
-            10
+            10,
+            $preservedIPSViewHTML
         );
 
         if (IPS_GetKernelRunlevel() !== KR_READY) {
@@ -488,8 +490,8 @@ class KalenderAnsicht extends IPSModuleStrict
         }
 
         try {
-            $html = $this->renderCalendarHtml($this->buildState(), true);
-            if ($html === '') {
+            $html = $this->renderNonEmptyIPSViewHTML($this->buildState(), 'IPSViewRegeneration');
+            if ($html === null) {
                 return false;
             }
 
@@ -601,10 +603,10 @@ class KalenderAnsicht extends IPSModuleStrict
 
         if ($this->IsIPSViewHTMLPageEnabled()) {
             try {
-                $this->UpdateIPSViewHTMLVariable(
-                    'IPSViewCalendar',
-                    $this->renderCalendarHtml($state, true)
-                );
+                $html = $this->renderNonEmptyIPSViewHTML($state, 'IPSViewUpdate');
+                if ($html !== null) {
+                    $this->UpdateIPSViewHTMLVariable('IPSViewCalendar', $html);
+                }
             } catch (Throwable $exception) {
                 $this->SendDebug('IPSViewUpdate', $exception->getMessage(), 0);
             }
@@ -657,6 +659,49 @@ class KalenderAnsicht extends IPSModuleStrict
                     : 3
             ]
         ]);
+    }
+
+    /**
+     * Renders a complete IPSView page without allowing a transient asset-loading
+     * failure to replace the last working WebContent value with an empty string.
+     *
+     * @param array<string, mixed> $state        Current calendar state.
+     * @param string               $debugContext Debug channel used when rendering is incomplete.
+     *
+     * @return string|null Complete HTML or null when the existing page must be preserved.
+     */
+    private function renderNonEmptyIPSViewHTML(array $state, string $debugContext): ?string
+    {
+        $html = $this->renderCalendarHtml($state, true);
+        if ($html !== '') {
+            return $html;
+        }
+
+        $this->SendDebug(
+            $debugContext,
+            'Rendering returned an empty document; preserving the existing IPSView HTML.',
+            0
+        );
+
+        return null;
+    }
+
+    /**
+     * Reads the current WebContent value before MaintainVariable() can recreate
+     * its presentation during a module update.
+     */
+    private function existingIPSViewHTML(): string
+    {
+        try {
+            $variableId = @$this->GetIDForIdent('IPSViewCalendar');
+        } catch (Throwable) {
+            return '';
+        }
+        if (!is_int($variableId) || $variableId <= 0 || !IPS_VariableExists($variableId)) {
+            return '';
+        }
+
+        return GetValueString($variableId);
     }
 
     /** @return list<string> */

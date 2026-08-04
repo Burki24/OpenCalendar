@@ -1165,8 +1165,11 @@ assertTrueValue(
         && str_contains($viewModuleSource, "case 'FormRegenerateIPSViewHTML':")
         && str_contains($viewModuleSource, 'public function RegenerateIPSViewHTML(): bool')
         && str_contains($viewModuleSource, "return \$this->UpdateIPSViewHTMLVariable('IPSViewCalendar', \$html);")
+        && str_contains($viewModuleSource, 'private function renderNonEmptyIPSViewHTML(array $state, string $debugContext): ?string')
+        && str_contains($viewModuleSource, 'private function existingIPSViewHTML(): string')
+        && str_contains($viewModuleSource, "'Rendering returned an empty document; preserving the existing IPSView HTML.'")
         && !str_contains($viewModuleSource, "UnregisterVariable('IPSViewCalendar')"),
-    'Manual IPSView regeneration must update the existing WebContent variable without replacing its object ID.'
+    'IPSView regeneration must preserve the object ID and must never replace valid WebContent with an empty render result.'
 );
 assertTrueValue(
     is_string($viewModuleSource)
