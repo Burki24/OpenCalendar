@@ -391,8 +391,8 @@ html.ipsview-mode .floating-add {
 html.ipsview-mode .floating-add-symbol { font-size: 1.25em; line-height: 1; }
 html.ipsview-mode .floating-add-label { display: inline; }
 html.ipsview-mode .form-row input,
-html.ipsview-mode .form-row select,
-html.ipsview-mode .form-row textarea { min-height: 46px; }
+html.ipsview-mode .form-row textarea,
+html.ipsview-mode .calendar-picker-trigger { min-height: 46px; }
 html.ipsview-mode .primary-button,
 html.ipsview-mode .secondary-button,
 html.ipsview-mode .danger-button { min-height: 48px; padding-inline: 18px; }
@@ -439,7 +439,7 @@ dialog::backdrop {
 .form-row { display: grid; gap: 5px; }
 .form-row.two { grid-template-columns: 1fr 1fr; gap: 10px; }
 .form-row label { color: var(--cal-label-text); font-size: .7em; font-weight: 600; }
-.form-row input, .form-row select, .form-row textarea {
+.form-row input, .form-row textarea {
     width: 100%;
     padding: 8px 9px;
     border: var(--cal-border-width, 1px) solid var(--cal-border);
@@ -447,9 +447,61 @@ dialog::backdrop {
     background: var(--cal-surface);
     color: inherit;
 }
-.form-row select option {
-    background-color: var(--cal-dialog);
+.calendar-picker { display: grid; gap: 4px; min-width: 0; }
+.calendar-picker-trigger {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    width: 100%;
+    min-height: 36px;
+    padding: 8px 9px;
+    border: var(--cal-border-width, 1px) solid var(--cal-border);
+    border-radius: var(--cal-radius);
+    background: var(--cal-surface);
     color: var(--cal-text);
+    text-align: left;
+}
+.calendar-picker-trigger:hover:not(:disabled) { background: var(--cal-surface-hover); }
+.calendar-picker-trigger:disabled {
+    background: var(--cal-surface-inactive, var(--cal-surface));
+    color: var(--cal-text-inactive);
+    opacity: var(--cal-disabled-opacity);
+}
+.calendar-picker-trigger:focus-visible,
+.calendar-picker-option:focus-visible {
+    outline: 2px solid var(--cal-accent);
+    outline-offset: 1px;
+}
+.calendar-picker-chevron { flex: 0 0 auto; transition: transform 120ms ease; }
+.calendar-picker-trigger[aria-expanded="true"] .calendar-picker-chevron { transform: rotate(180deg); }
+.calendar-picker-options {
+    display: grid;
+    gap: 2px;
+    max-height: min(230px, 36vh);
+    padding: 4px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    border: var(--cal-border-width, 1px) solid var(--cal-popup-border);
+    border-radius: var(--cal-radius);
+    background: var(--cal-dialog);
+    box-shadow: var(--cal-popup-shadow);
+}
+.calendar-picker-option {
+    width: 100%;
+    min-height: 34px;
+    padding: 7px 9px;
+    border: 0;
+    border-radius: max(3px, calc(var(--cal-radius) - 2px));
+    background: transparent;
+    color: var(--cal-text);
+    text-align: left;
+}
+.calendar-picker-option:hover,
+.calendar-picker-option:focus-visible { background: var(--cal-surface-hover); }
+.calendar-picker-option[aria-selected="true"] {
+    background: var(--cal-surface-hover);
+    box-shadow: inset 3px 0 0 var(--cal-accent);
 }
 .form-row textarea { min-height: 62px; resize: vertical; }
 .checkbox-row { display: flex; align-items: center; gap: 8px; }

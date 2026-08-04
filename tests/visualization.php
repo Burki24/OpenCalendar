@@ -110,6 +110,18 @@ foreach ([$native, $ipsView] as $html) {
         'IPSView must refresh the embedded calendar state from its authenticated action bridge on page load.'
     );
     assertVisualization(str_contains($html, 'id="add-button-label"'), 'The event creation control must expose a visible text label for touch users.');
+    assertVisualization(
+        str_contains($html, 'id="event-calendar-options" role="listbox"')
+            && str_contains($html, 'class="calendar-picker-trigger"')
+            && !str_contains($html, '<select id="event-calendar"'),
+        'Calendar selection must use an in-document listbox instead of the unreliable native WebView2 select popup.'
+    );
+    assertVisualization(
+        str_contains($html, 'function handleCalendarOptionKeydown(event)')
+            && str_contains($html, "event.key === 'ArrowDown'")
+            && str_contains($html, "event.key === 'Escape'"),
+        'The custom calendar picker must provide keyboard navigation and escape handling.'
+    );
     assertVisualization(str_contains($html, 't(\'New event\')'), 'The visible creation label must use the compact translation while title and aria-label remain descriptive.');
     assertVisualization(str_contains($html, 'addButton.disabled = !hasWritableCalendar'), 'The creation control must stay visible and communicate unavailable write access by disabling itself.');
     assertVisualization(str_contains($html, "calendarVisualization.mode === 'symcon'"), 'Native action availability must be derived from the explicit visualization mode.');

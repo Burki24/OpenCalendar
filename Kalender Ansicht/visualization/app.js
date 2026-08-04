@@ -29,6 +29,11 @@ const content = document.getElementById('calendar-content');
 const periodTitle = document.getElementById('period-title');
 const eventDialog = document.getElementById('event-dialog');
 const eventForm = document.getElementById('event-form');
+const eventCalendarInput = document.getElementById('event-calendar');
+const eventCalendarPicker = document.getElementById('event-calendar-picker');
+const eventCalendarTrigger = document.getElementById('event-calendar-trigger');
+const eventCalendarValue = document.getElementById('event-calendar-value');
+const eventCalendarOptions = document.getElementById('event-calendar-options');
 
 applySymconColorScheme();
 
@@ -325,7 +330,7 @@ function openNewEvent() {
 function openExistingEvent(event) {
     selectedEvent = event;
     populateCalendarSelect(calendarState.calendars, event.calendarInstanceId);
-    document.getElementById('event-calendar').disabled = true;
+    setCalendarSelectDisabled(true);
     document.getElementById('dialog-title').textContent = t('Event details');
     document.getElementById('event-summary').value = event.summary || '';
     document.getElementById('event-location').value = event.location || '';
@@ -356,16 +361,94 @@ function openExistingEvent(event) {
 }
 
 function populateCalendarSelect(calendars, selectedId) {
-    const select = document.getElementById('event-calendar');
-    select.replaceChildren();
+    eventCalendarOptions.replaceChildren();
     calendars.forEach(calendar => {
-        const option = document.createElement('option');
-        option.value = String(calendar.instanceId);
+        const option = document.createElement('button');
+        option.type = 'button';
+        option.className = 'calendar-picker-option';
+        option.dataset.value = String(calendar.instanceId);
         option.textContent = calendar.name;
-        option.selected = calendar.instanceId === Number(selectedId);
-        select.appendChild(option);
+        option.setAttribute('role', 'option');
+        option.addEventListener('click', () => {
+            selectCalendarOption(calendar.instanceId, true);
+            eventCalendarTrigger.focus();
+        });
+        option.addEventListener('keydown', handleCalendarOptionKeydown);
+        eventCalendarOptions.appendChild(option);
     });
-    select.disabled = false;
+
+    const selectedCalendar = calendars.find(calendar => calendar.instanceId === Number(selectedId))
+        || calendars[0]
+        || null;
+    selectCalendarOption(selectedCalendar?.instanceId || 0, false);
+    setCalendarSelectDisabled(selectedCalendar === null);
+}
+
+function selectCalendarOption(instanceId, notify) {
+    const value = String(Number(instanceId) || '');
+    eventCalendarInput.value = value;
+    let selectedOption = null;
+    eventCalendarOptions.querySelectorAll('.calendar-picker-option').forEach(option => {
+        const selected = option.dataset.value === value;
+        option.setAttribute('aria-selected', String(selected));
+        if (selected) selectedOption = option;
+    });
+    eventCalendarValue.textContent = selectedOption?.textContent || '';
+    closeCalendarPicker();
+    if (notify) {
+        eventCalendarInput.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+}
+
+function setCalendarSelectDisabled(disabled) {
+    eventCalendarInput.disabled = disabled;
+    eventCalendarTrigger.disabled = disabled;
+    eventCalendarTrigger.setAttribute('aria-disabled', String(disabled));
+    if (disabled) closeCalendarPicker();
+}
+
+function openCalendarPicker(focusSelected = false) {
+    if (eventCalendarTrigger.disabled) return;
+    eventCalendarOptions.classList.remove('hidden');
+    eventCalendarTrigger.setAttribute('aria-expanded', 'true');
+    if (focusSelected) {
+        const selected = eventCalendarOptions.querySelector('[aria-selected="true"]')
+            || eventCalendarOptions.querySelector('.calendar-picker-option');
+        selected?.focus();
+    }
+}
+
+function closeCalendarPicker() {
+    eventCalendarOptions.classList.add('hidden');
+    eventCalendarTrigger.setAttribute('aria-expanded', 'false');
+}
+
+function toggleCalendarPicker() {
+    if (eventCalendarOptions.classList.contains('hidden')) {
+        openCalendarPicker();
+    } else {
+        closeCalendarPicker();
+    }
+}
+
+function handleCalendarOptionKeydown(event) {
+    const options = Array.from(eventCalendarOptions.querySelectorAll('.calendar-picker-option'));
+    const currentIndex = options.indexOf(event.currentTarget);
+    let nextIndex = currentIndex;
+    if (event.key === 'ArrowDown') nextIndex = Math.min(options.length - 1, currentIndex + 1);
+    else if (event.key === 'ArrowUp') nextIndex = Math.max(0, currentIndex - 1);
+    else if (event.key === 'Home') nextIndex = 0;
+    else if (event.key === 'End') nextIndex = options.length - 1;
+    else if (event.key === 'Escape') {
+        event.preventDefault();
+        closeCalendarPicker();
+        eventCalendarTrigger.focus();
+        return;
+    } else {
+        return;
+    }
+    event.preventDefault();
+    options[nextIndex]?.focus();
 }
 
 function setDialogEditable(editable, descriptionEditable = editable) {
@@ -386,7 +469,7 @@ function setDateInputs(start, end, allDay) {
 }
 
 function updateDialogColor() {
-    const instanceId = Number(document.getElementById('event-calendar').value);
+    const instanceId = Number(eventCalendarInput.value);
     const calendar = calendarState.calendars.find(entry => entry.instanceId === instanceId);
     document.getElementById('dialog-color').style.background = safeColor(calendar?.color);
 }
@@ -394,7 +477,7 @@ function updateDialogColor() {
 eventForm.addEventListener('submit', async event => {
     event.preventDefault();
     const allDay = document.getElementById('event-all-day').checked;
-    const calendarInstanceId = Number(document.getElementById('event-calendar').value);
+    const calendarInstanceId = Number(eventCalendarInput.value);
     const eventData = {
         summary: document.getElementById('event-summary').value.trim(),
         description: document.getElementById('event-description').value.trim(),
@@ -403,7 +486,7 @@ eventForm.addEventListener('submit', async event => {
         start: inputDateValue(document.getElementById('event-start').value, allDay),
         end: inputDateValue(document.getElementById('event-end').value, allDay)
     };
-    if (!eventData.summary || !eventData.start || !eventData.end) return;
+    if (!calendarInstanceId || !eventData.summary || !eventData.start || !eventData.end) return;
     if (selectedEvent?.onlineMeeting) delete eventData.description;
 
     const action = selectedEvent ? 'UpdateEvent' : 'CreateEvent';
@@ -446,7 +529,30 @@ document.getElementById('event-all-day').addEventListener('change', event => {
     if (event.target.checked && end <= start) end = addDays(start, 1);
     setDateInputs(start, end, event.target.checked);
 });
-document.getElementById('event-calendar').addEventListener('change', updateDialogColor);
+eventCalendarInput.addEventListener('change', updateDialogColor);
+eventCalendarTrigger.addEventListener('click', event => {
+    event.stopPropagation();
+    toggleCalendarPicker();
+});
+eventCalendarTrigger.addEventListener('keydown', event => {
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+        event.preventDefault();
+        openCalendarPicker(true);
+    } else if (event.key === 'Escape') {
+        closeCalendarPicker();
+    }
+});
+document.addEventListener('click', event => {
+    if (!eventCalendarPicker.contains(event.target)) closeCalendarPicker();
+});
+eventDialog.addEventListener('cancel', event => {
+    if (!eventCalendarOptions.classList.contains('hidden')) {
+        event.preventDefault();
+        closeCalendarPicker();
+        eventCalendarTrigger.focus();
+    }
+});
+eventDialog.addEventListener('close', closeCalendarPicker);
 document.getElementById('dialog-close').addEventListener('click', () => eventDialog.close());
 document.getElementById('cancel-button').addEventListener('click', () => eventDialog.close());
 document.getElementById('add-button').addEventListener('click', openNewEvent);
@@ -463,9 +569,12 @@ document.addEventListener('wheel', containWheelInsideTile, { capture: true, pass
 function containWheelInsideTile(event) {
     if (event.ctrlKey) return;
 
-    const scrollTarget = eventDialog.open
+    const calendarOptionList = event.target instanceof Element
+        ? event.target.closest('.calendar-picker-options')
+        : null;
+    const scrollTarget = calendarOptionList || (eventDialog.open
         ? document.querySelector('.dialog-body')
-        : content;
+        : content);
     const factor = event.deltaMode === WheelEvent.DOM_DELTA_LINE
         ? 16
         : (event.deltaMode === WheelEvent.DOM_DELTA_PAGE ? scrollTarget.clientHeight : 1);

@@ -43,8 +43,17 @@
         </div>
         <div class="dialog-body">
             <div class="form-row">
-                <label for="event-calendar">Calendar</label>
-                <select id="event-calendar" required></select>
+                <label for="event-calendar-trigger" id="event-calendar-label">Calendar</label>
+                <div class="calendar-picker" id="event-calendar-picker">
+                    <input type="hidden" id="event-calendar">
+                    <button type="button" class="calendar-picker-trigger" id="event-calendar-trigger"
+                        aria-haspopup="listbox" aria-expanded="false" aria-controls="event-calendar-options">
+                        <span id="event-calendar-value"></span>
+                        <span class="calendar-picker-chevron" aria-hidden="true">⌄</span>
+                    </button>
+                    <div class="calendar-picker-options hidden" id="event-calendar-options" role="listbox"
+                        aria-labelledby="event-calendar-label"></div>
+                </div>
             </div>
             <div class="form-row">
                 <label for="event-summary">Title</label>
