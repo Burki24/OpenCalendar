@@ -504,11 +504,13 @@ function moveVisibleDays(start, amount) {
 }
 
 async function sendAction(ident, value) {
-    if (typeof requestAction === 'function') {
+    if (typeof requestAction === 'function'
+        || (isNativeVisualization() && await waitForNativeActionBridge())) {
         requestAction(ident, typeof value === 'string' ? value : JSON.stringify(value));
         return true;
     }
     if (!hasIPSViewActionBridge()) {
+        showToast(t('Action failed.'), 'error');
         return false;
     }
 
@@ -524,7 +526,22 @@ async function sendAction(ident, value) {
 }
 
 function hasActionBridge() {
-    return typeof requestAction === 'function' || hasIPSViewActionBridge();
+    return isNativeVisualization() || hasIPSViewActionBridge();
+}
+
+function isNativeVisualization() {
+    return calendarVisualization.mode === 'symcon';
+}
+
+async function waitForNativeActionBridge(timeoutMilliseconds = 1500) {
+    const deadline = Date.now() + timeoutMilliseconds;
+    while (Date.now() < deadline) {
+        if (typeof requestAction === 'function') {
+            return true;
+        }
+        await new Promise(resolve => window.setTimeout(resolve, 50));
+    }
+    return false;
 }
 
 function hasIPSViewActionBridge() {

@@ -108,6 +108,8 @@ foreach ([$native, $ipsView] as $html) {
     assertVisualization(str_contains($html, 'id="add-button-label"'), 'The event creation control must expose a visible text label for touch users.');
     assertVisualization(str_contains($html, 't(\'New event\')'), 'The visible creation label must use the compact translation while title and aria-label remain descriptive.');
     assertVisualization(str_contains($html, 'addButton.disabled = !hasWritableCalendar'), 'The creation control must stay visible and communicate unavailable write access by disabling itself.');
+    assertVisualization(str_contains($html, "calendarVisualization.mode === 'symcon'"), 'Native action availability must be derived from the explicit visualization mode.');
+    assertVisualization(str_contains($html, 'waitForNativeActionBridge'), 'Native actions must tolerate delayed HTML-SDK bridge injection.');
     assertVisualization(str_contains($html, '--agenda-color-bar-width'), 'Calendar-specific options must remain available through the shared bootstrap.');
 }
 

@@ -1117,6 +1117,14 @@ assertTrueValue(
     'Existing calendar instances with a missing ID must recover an unambiguous identity without recreation.'
 );
 assertTrueValue(
+    is_string($calendarModuleSource)
+        && str_contains($calendarModuleSource, "RegisterAttributeBoolean('DetectedWriteAccessKnown', false)")
+        && str_contains($calendarModuleSource, "array_key_exists('writeAccessKnown', \$calendar)")
+        && str_contains($calendarModuleSource, "\$this->ReadAttributeBoolean('DetectedCanWrite')
+                            || \$this->ReadPropertyBoolean('CanWrite')"),
+    'Calendar instances must preserve writable CalDAV operation when servers omit privilege metadata.'
+);
+assertTrueValue(
     is_string($viewModuleSource)
         && str_contains($viewModuleSource, 'RegisterMessage(0, IPS_KERNELSTARTED)')
         && str_contains($viewModuleSource, "RegisterTimer('InitializationTimer'")
@@ -1170,7 +1178,9 @@ assertTrueValue(
         && str_contains($viewScriptSource, "'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8'")
         && !str_contains($viewScriptSource, 'Authorization')
         && !str_contains($viewScriptSource, "'/api/'")
-        && str_contains($viewScriptSource, "return typeof requestAction === 'function' || hasIPSViewActionBridge();")
+        && str_contains($viewScriptSource, "return isNativeVisualization() || hasIPSViewActionBridge();")
+        && str_contains($viewScriptSource, "return calendarVisualization.mode === 'symcon';")
+        && str_contains($viewScriptSource, 'async function waitForNativeActionBridge(timeoutMilliseconds = 1500)')
         && str_contains($viewScriptSource, 'if (await sendAction(action, value))')
         && str_contains($viewScriptSource, "await sendAction('DeleteEvent',"),
     'The shared calendar interface must create, update, delete and refresh through either requestAction or the IPSView WebHook.'

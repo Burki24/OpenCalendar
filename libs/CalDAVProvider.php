@@ -351,22 +351,25 @@ final class CalDAVProvider implements CalendarProviderInterface
                 }
             }
 
-            $canWrite = count(array_intersect($privileges, ['write', 'write-content', 'bind', 'unbind'])) > 0;
+            $writeAccessKnown = $privileges !== [];
+            $canWrite = !$writeAccessKnown
+                || count(array_intersect($privileges, ['write', 'write-content', 'bind', 'unbind'])) > 0;
             $name = $this->firstNodeValue($xpath, './/d:displayname', $calendarResponse);
             $url = $this->resolveUrl($this->trustedEffectiveUrl($response, $homeSetUrl), $href);
 
             $calendars[] = [
-                'id'           => hash('sha256', $url),
-                'providerId'   => $url,
-                'reference'    => $url,
-                'url'          => $url,
-                'name'         => $name !== '' ? $name : basename(rtrim(rawurldecode($href), '/')),
-                'description'  => $this->firstNodeValue($xpath, './/c:calendar-description', $calendarResponse),
-                'color'        => $this->normalizeColor($this->firstNodeValue($xpath, './/a:calendar-color', $calendarResponse)),
-                'etag'         => $this->firstNodeValue($xpath, './/d:getetag', $calendarResponse),
-                'syncToken'    => $this->firstNodeValue($xpath, './/d:sync-token', $calendarResponse),
-                'components'   => array_values(array_unique($components)),
-                'capabilities' => [
+                'id'               => hash('sha256', $url),
+                'providerId'       => $url,
+                'reference'        => $url,
+                'url'              => $url,
+                'name'             => $name !== '' ? $name : basename(rtrim(rawurldecode($href), '/')),
+                'description'      => $this->firstNodeValue($xpath, './/c:calendar-description', $calendarResponse),
+                'color'            => $this->normalizeColor($this->firstNodeValue($xpath, './/a:calendar-color', $calendarResponse)),
+                'etag'             => $this->firstNodeValue($xpath, './/d:getetag', $calendarResponse),
+                'syncToken'        => $this->firstNodeValue($xpath, './/d:sync-token', $calendarResponse),
+                'components'       => array_values(array_unique($components)),
+                'writeAccessKnown' => $writeAccessKnown,
+                'capabilities'     => [
                     'read'   => true,
                     'create' => $canWrite,
                     'update' => $canWrite,

@@ -224,6 +224,23 @@ assertCalDAVSame(1, count($calendars), 'Calendar discovery must ignore collectio
 assertCalDAVSame('Work', $calendars[0]['name'], 'The CalDAV display name must be returned.');
 assertCalDAVSame('#123456', $calendars[0]['color'], 'Apple eight-digit calendar colors must be normalized.');
 assertCalDAVSame(true, $calendars[0]['capabilities']['create'], 'Write privileges must enable event creation.');
+assertCalDAVSame(true, $calendars[0]['writeAccessKnown'], 'Returned privileges must mark write access as known.');
+
+$calendarXmlWithoutPrivileges = preg_replace(
+    '/<d:current-user-privilege-set>.*?<\/d:current-user-privilege-set>/',
+    '',
+    calendarsResponseXml()
+);
+assertCalDAVTrue(is_string($calendarXmlWithoutPrivileges), 'The privilege-free CalDAV fixture must be generated.');
+$unknownPrivilegeClient = new FakeCalDAVHttpClient([
+    caldavResponse(207, principalResponseXml('/principals/user/'), 'https://calendar.example/.well-known/caldav'),
+    caldavResponse(207, homeSetResponseXml('/calendars/user/'), 'https://calendar.example/principals/user/'),
+    caldavResponse(207, $calendarXmlWithoutPrivileges, 'https://calendar.example/calendars/user/')
+]);
+$unknownPrivilegeCalendars = (new CalDAVProvider($unknownPrivilegeClient, 'https://calendar.example'))->getCalendars();
+assertCalDAVSame(false, $unknownPrivilegeCalendars[0]['writeAccessKnown'], 'Missing DAV privileges must remain distinguishable from explicit read-only access.');
+assertCalDAVSame(true, $unknownPrivilegeCalendars[0]['capabilities']['create'], 'Missing DAV privileges must not disable event creation optimistically.');
+
 assertCalDAVSame('https://calendar.example/.well-known/caldav', $discoveryClient->requests[0]['url'], 'Root server URLs must start discovery at .well-known/caldav.');
 assertCalDAVSame('https://calendar.example/principals/user/', $discoveryClient->requests[1]['url'], 'The discovered principal must be queried.');
 assertCalDAVSame('https://calendar.example/calendars/user/', $discoveryClient->requests[2]['url'], 'The discovered calendar home set must be queried.');

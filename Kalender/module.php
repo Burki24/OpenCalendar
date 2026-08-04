@@ -56,6 +56,7 @@ class Kalender extends IPSModuleStrict
         $this->RegisterAttributeString('ResolvedCalendarID', '');
         $this->RegisterAttributeString('DetectedCalendarColor', '');
         $this->RegisterAttributeBoolean('DetectedCanWrite', false);
+        $this->RegisterAttributeBoolean('DetectedWriteAccessKnown', false);
         $this->RegisterAttributeBoolean('RuntimeReady', false);
 
         $this->RegisterVariableInteger('EventCount', $this->Translate('Event count'), [], 10);
@@ -387,6 +388,8 @@ class Kalender extends IPSModuleStrict
             $this->refreshCalendarMetadataSafely();
         }
         $metadataAvailable = $this->ReadAttributeBoolean('CalendarMetadataAvailable');
+        $writeAccessKnown = $metadataAvailable
+            && $this->ReadAttributeBoolean('DetectedWriteAccessKnown');
         $detectedColor = $this->ReadAttributeString('DetectedCalendarColor');
 
         return json_encode(
@@ -396,7 +399,10 @@ class Kalender extends IPSModuleStrict
                     ? $detectedColor
                     : $this->ReadPropertyString('CalendarColor'),
                 'canWrite'            => $metadataAvailable
-                    ? $this->ReadAttributeBoolean('DetectedCanWrite')
+                    ? ($writeAccessKnown
+                        ? $this->ReadAttributeBoolean('DetectedCanWrite')
+                        : $this->ReadAttributeBoolean('DetectedCanWrite')
+                            || $this->ReadPropertyBoolean('CanWrite'))
                     : $this->ReadPropertyBoolean('CanWrite'),
                 'eventCount'          => count($this->readEvents()),
                 'lastSynchronization' => $this->ReadAttributeInteger('LastSynchronization'),
@@ -468,6 +474,7 @@ class Kalender extends IPSModuleStrict
 
         if ($availableCalendars !== []) {
             $this->WriteAttributeString('ResolvedCalendarID', '');
+            $this->WriteAttributeBoolean('DetectedWriteAccessKnown', false);
             $this->WriteAttributeBoolean('CalendarMetadataAvailable', false);
         }
     }
@@ -481,9 +488,15 @@ class Kalender extends IPSModuleStrict
         $canWrite = (bool) ($capabilities['create'] ?? false)
             || (bool) ($capabilities['update'] ?? false)
             || (bool) ($capabilities['delete'] ?? false);
+        $writeAccessKnown = array_key_exists('writeAccessKnown', $calendar)
+            ? (bool) $calendar['writeAccessKnown']
+            : array_key_exists('create', $capabilities)
+                || array_key_exists('update', $capabilities)
+                || array_key_exists('delete', $capabilities);
         $this->WriteAttributeString('ResolvedCalendarID', trim((string) ($calendar['id'] ?? '')));
         $this->WriteAttributeString('DetectedCalendarColor', trim((string) ($calendar['color'] ?? '')));
         $this->WriteAttributeBoolean('DetectedCanWrite', $canWrite);
+        $this->WriteAttributeBoolean('DetectedWriteAccessKnown', $writeAccessKnown);
         $this->WriteAttributeBoolean('CalendarMetadataAvailable', true);
     }
 
