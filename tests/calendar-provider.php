@@ -1178,7 +1178,7 @@ assertTrueValue(
         && str_contains($viewScriptSource, "'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8'")
         && !str_contains($viewScriptSource, 'Authorization')
         && !str_contains($viewScriptSource, "'/api/'")
-        && str_contains($viewScriptSource, "return isNativeVisualization() || hasIPSViewActionBridge();")
+        && str_contains($viewScriptSource, 'return isNativeVisualization() || hasIPSViewActionBridge();')
         && str_contains($viewScriptSource, "return calendarVisualization.mode === 'symcon';")
         && str_contains($viewScriptSource, 'async function waitForNativeActionBridge(timeoutMilliseconds = 1500)')
         && str_contains($viewScriptSource, 'if (await sendAction(action, value))')
