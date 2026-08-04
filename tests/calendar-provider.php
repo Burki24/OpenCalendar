@@ -135,6 +135,7 @@ $provider = new GoogleCalendarProvider($calendarClient, 'access-token');
 $calendars = $provider->getCalendars();
 assertSameValue(2, count($calendars), 'Calendar discovery must paginate and exclude free/busy-only entries.');
 assertSameValue('owner@example.com', $calendars[0]['providerId'], 'The primary calendar must be listed first.');
+assertSameValue(true, $calendars[0]['writeAccessKnown'], 'Google access roles must provide authoritative write metadata.');
 assertSameValue(true, $calendars[0]['capabilities']['create'], 'Owners must have write access.');
 assertSameValue(false, $calendars[1]['capabilities']['create'], 'Readers must not have write access.');
 assertTrueValue(str_contains($calendarClient->requests[1]['url'], 'pageToken=page-2'), 'The second calendar page must be requested.');
@@ -305,6 +306,7 @@ $msCalendars = $msProvider->getCalendars();
 assertSameValue(3, count($msCalendars), 'Microsoft calendar discovery must follow trusted Graph pagination.');
 assertSameValue('AQMk-primary', $msCalendars[0]['providerId'], 'The default Microsoft calendar must be listed first.');
 assertSameValue('max@example.com', $msCalendars[0]['owner'], 'Microsoft calendar ownership must be retained for account display.');
+assertSameValue(true, $msCalendars[0]['writeAccessKnown'], 'Microsoft canEdit must provide authoritative write metadata.');
 assertSameValue(true, $msCalendars[0]['capabilities']['create'], 'Editable Microsoft calendars must expose write capabilities.');
 assertSameValue(false, $msCalendars[2]['capabilities']['create'], 'Read-only Microsoft calendars must remain read-only.');
 assertSameValue(
@@ -567,6 +569,7 @@ $provider = new ICalendarFeedProvider($feedClient, 'webcal://calendar.example/pr
 $feedCalendars = $provider->getCalendars();
 assertSameValue('Google Privat', $feedCalendars[0]['name'], 'The feed calendar name must be read from X-WR-CALNAME.');
 assertSameValue('#34AADC', $feedCalendars[0]['color'], 'Eight-digit feed colors must be normalized.');
+assertSameValue(true, $feedCalendars[0]['writeAccessKnown'], 'iCalendar subscriptions must expose authoritative read-only metadata.');
 assertSameValue(false, $feedCalendars[0]['capabilities']['create'], 'iCalendar subscriptions must be read-only.');
 assertSameValue('', $feedCalendars[0]['url'], 'Secret feed URLs must not be copied into child instance properties.');
 $feedEvents = $provider->getEvents(
@@ -1120,9 +1123,10 @@ assertTrueValue(
     is_string($calendarModuleSource)
         && str_contains($calendarModuleSource, "RegisterAttributeBoolean('DetectedWriteAccessKnown', false)")
         && str_contains($calendarModuleSource, "array_key_exists('writeAccessKnown', \$calendar)")
+        && !str_contains($calendarModuleSource, ": array_key_exists('create', \$capabilities)")
         && str_contains($calendarModuleSource, "\$this->ReadAttributeBoolean('DetectedCanWrite')
                             || \$this->ReadPropertyBoolean('CanWrite')"),
-    'Calendar instances must preserve writable CalDAV operation when servers omit privilege metadata.'
+    'Calendar instances must preserve writable operation for legacy caches and incomplete DAV privilege metadata.'
 );
 assertTrueValue(
     is_string($viewModuleSource)

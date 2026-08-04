@@ -488,11 +488,12 @@ class Kalender extends IPSModuleStrict
         $canWrite = (bool) ($capabilities['create'] ?? false)
             || (bool) ($capabilities['update'] ?? false)
             || (bool) ($capabilities['delete'] ?? false);
+        // Cached calendar metadata created before writeAccessKnown existed cannot
+        // distinguish an explicit read-only result from incomplete DAV privilege
+        // discovery. Keep it unknown so the persisted CanWrite value can recover
+        // existing writable calendar instances after an update.
         $writeAccessKnown = array_key_exists('writeAccessKnown', $calendar)
-            ? (bool) $calendar['writeAccessKnown']
-            : array_key_exists('create', $capabilities)
-                || array_key_exists('update', $capabilities)
-                || array_key_exists('delete', $capabilities);
+            && (bool) $calendar['writeAccessKnown'];
         $this->WriteAttributeString('ResolvedCalendarID', trim((string) ($calendar['id'] ?? '')));
         $this->WriteAttributeString('DetectedCalendarColor', trim((string) ($calendar['color'] ?? '')));
         $this->WriteAttributeBoolean('DetectedCanWrite', $canWrite);

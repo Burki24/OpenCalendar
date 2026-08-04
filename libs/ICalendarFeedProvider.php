@@ -86,16 +86,17 @@ final class ICalendarFeedProvider implements CalendarProviderInterface
         }
 
         return [[
-            'id'           => $calendarId,
-            'providerId'   => $calendarId,
-            'reference'    => $this->feedUrl,
-            'url'          => '',
-            'name'         => $name,
-            'description'  => $this->calendarProperty($feed['body'], 'X-WR-CALDESC'),
-            'color'        => $this->normalizeColor($this->calendarProperty($feed['body'], 'X-APPLE-CALENDAR-COLOR')),
-            'etag'         => $feed['etag'],
-            'components'   => ['VEVENT'],
-            'capabilities' => [
+            'id'               => $calendarId,
+            'providerId'       => $calendarId,
+            'reference'        => $this->feedUrl,
+            'url'              => '',
+            'name'             => $name,
+            'description'      => $this->calendarProperty($feed['body'], 'X-WR-CALDESC'),
+            'color'            => $this->normalizeColor($this->calendarProperty($feed['body'], 'X-APPLE-CALENDAR-COLOR')),
+            'etag'             => $feed['etag'],
+            'components'       => ['VEVENT'],
+            'writeAccessKnown' => true,
+            'capabilities'     => [
                 'read'   => true,
                 'create' => false,
                 'update' => false,
