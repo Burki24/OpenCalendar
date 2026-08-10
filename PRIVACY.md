@@ -1,8 +1,8 @@
 # Datenschutzhinweise / Privacy Notice
 
-**Stand / Last updated: 28.07.2026**
+**Stand / Last updated: 10.08.2026**
 
-OpenCalendar ist eine Open-Source-Bibliothek für Symcon. Die Kalenderverarbeitung findet grundsätzlich auf der Symcon-Installation des Anwenders statt. Der Modulautor betreibt keinen eigenen Kalender-Backenddienst und erhält über OpenCalendar keine Kalenderinhalte.
+OpenCalendar ist eine quelloffene, unter der PolyForm Noncommercial License 1.0.0 bereitgestellte Bibliothek für Symcon. Die Kalenderverarbeitung findet grundsätzlich auf der Symcon-Installation des Anwenders statt. Der Modulautor betreibt keinen eigenen Kalender-Backenddienst und erhält über OpenCalendar keine Kalenderinhalte.
 
 Kontakt zum Projekt: [GitHub-Repository OpenCalendar](https://github.com/Burki24/OpenCalendar) und dessen Issue-Bereich.
 
@@ -89,7 +89,7 @@ Diese Datenschutzhinweise werden angepasst, wenn sich die Datenverarbeitung oder
 
 # Privacy Notice (English)
 
-OpenCalendar is an open-source library for Symcon. Calendar processing generally takes place on the user's own Symcon installation. The module author does not operate a calendar backend and does not receive calendar content through OpenCalendar.
+OpenCalendar is a source-available library for Symcon provided under the PolyForm Noncommercial License 1.0.0. Calendar processing generally takes place on the user's own Symcon installation. The module author does not operate a calendar backend and does not receive calendar content through OpenCalendar.
 
 Project contact: [OpenCalendar GitHub repository](https://github.com/Burki24/OpenCalendar) and its issue tracker.
 

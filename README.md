@@ -1,5 +1,12 @@
 # OpenCalendar
 
+[![Symcon](https://img.shields.io/badge/Symcon-PHPModul-555555.svg)](https://www.symcon.de)
+[![Modul Version](https://img.shields.io/badge/Modul%20Version-1.0-blue.svg)](library.json)
+[![Symcon Version](https://img.shields.io/badge/Symcon%20Version-9.0%2B-brightgreen.svg)](https://www.symcon.de)<br>
+[![License](https://img.shields.io/badge/License-PolyForm--Noncommercial--1.0.0-brightgreen.svg)](LICENSE)
+[![Check Style](https://github.com/Burki24/OpenCalendar/actions/workflows/style.yml/badge.svg?branch=main)](https://github.com/Burki24/OpenCalendar/actions/workflows/style.yml?query=branch%3Amain)
+[![Run Tests](https://github.com/Burki24/OpenCalendar/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/Burki24/OpenCalendar/actions/workflows/tests.yml?query=branch%3Amain)
+
 OpenCalendar verbindet Online-Kalender mit Symcon. Unterstützt werden Apple
 iCloud, Google Calendar, Microsoft 365/Outlook.com, generische CalDAV-Server
 sowie schreibgeschützte ICS-/Webcal-Abonnements. Die gefundenen Kalender können
