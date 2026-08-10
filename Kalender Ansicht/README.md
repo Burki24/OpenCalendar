@@ -19,7 +19,8 @@ verwendet werden.
    auswählen und **Aktiviert** einschalten.
 3. Standardansicht, Zeitraum und maximale Terminanzahl festlegen.
 4. Gewünschte Zusatzinformationen wie Kalendername, Ort oder Beschreibung
-   aktivieren.
+   aktivieren. Die Terminanzahl für Agenda, 3-Tage- und Wochenansicht lässt sich
+   gebündelt über **Anzeigeoptionen** je Darstellung ein- oder ausschalten.
 5. Die Konfiguration übernehmen und **Kalender synchronisieren** ausführen.
 6. Die Instanz in der Symcon-Kachelvisualisierung platzieren.
 
@@ -61,9 +62,9 @@ Vergangene/Zukünftige Tage | Zeitraum, aus dem Termine zusammengeführt werden
 Maximale Termine | Obergrenze der in einer Antwort verarbeiteten Termine
 Wochenenden anzeigen | Blendet Samstag und Sonntag ein oder aus
 Tag im Jahr anzeigen | Ergänzt Tagesüberschriften um die fortlaufende Tagesnummer
-Terminanzahl in Agenda anzeigen | Blendet die Terminanzahl je Tag nur in der Agenda ein oder aus
-Terminanzahl in 3-Tage-Ansicht anzeigen | Blendet die Terminanzahl je Tag nur in der 3-Tage-Ansicht ein oder aus
-Terminanzahl in Wochenansicht anzeigen | Blendet die Terminanzahl je Tag nur in der Wochenansicht ein oder aus
+Anzeigeoptionen → Terminanzahl in Agenda | Blendet die Terminanzahl je Tag nur in der Agenda ein oder aus
+Anzeigeoptionen → Terminanzahl in 3-Tage-Ansicht | Blendet die Terminanzahl je Tag nur in der 3-Tage-Ansicht ein oder aus
+Anzeigeoptionen → Terminanzahl in Wochenansicht | Blendet die Terminanzahl je Tag nur in der Wochenansicht ein oder aus
 Kalendername/Ort/Beschreibung | Legt fest, welche Termindetails sichtbar sind
 
 Die ausgewählten Kalender werden intern seitenweise gelesen. Dies geschieht
