@@ -556,8 +556,23 @@ class KalenderKonto extends IPSModuleStrict
      */
     private function registerOAuthHandlers(): void
     {
-        $this->RegisterOAuth(self::GOOGLE_OAUTH_IDENTIFIER);
-        $this->RegisterOAuth(self::MICROSOFT_OAUTH_IDENTIFIER);
+        foreach ([self::GOOGLE_OAUTH_IDENTIFIER, self::MICROSOFT_OAUTH_IDENTIFIER] as $identifier) {
+            try {
+                if (!$this->RegisterOAuth($identifier)) {
+                    $this->SendDebug(
+                        'OAuthRegistration',
+                        sprintf('OAuth handler "%s" could not be registered.', $identifier),
+                        0
+                    );
+                }
+            } catch (Throwable $exception) {
+                $this->SendDebug(
+                    'OAuthRegistration',
+                    $this->sanitizeError($exception->getMessage()),
+                    0
+                );
+            }
+        }
     }
 
     /**

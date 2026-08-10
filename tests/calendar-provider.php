@@ -1087,8 +1087,8 @@ $viewFormSource = file_get_contents(__DIR__ . '/../Kalender Ansicht/form.json');
 $viewLocaleSource = file_get_contents(__DIR__ . '/../Kalender Ansicht/locale.json');
 assertTrueValue(
     is_string($accountModuleSource)
-        && str_contains($accountModuleSource, 'RegisterOAuth(self::GOOGLE_OAUTH_IDENTIFIER)')
-        && str_contains($accountModuleSource, 'RegisterOAuth(self::MICROSOFT_OAUTH_IDENTIFIER)')
+        && str_contains($accountModuleSource, 'self::GOOGLE_OAUTH_IDENTIFIER, self::MICROSOFT_OAUTH_IDENTIFIER')
+        && str_contains($accountModuleSource, '$this->RegisterOAuth($identifier)')
         && str_contains($accountModuleSource, 'RegisterMessage(0, IPS_KERNELSTARTED)')
         && str_contains($accountModuleSource, 'IPS_GetKernelRunlevel() === KR_READY')
         && preg_match(

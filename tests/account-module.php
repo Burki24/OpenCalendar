@@ -84,8 +84,8 @@ assertAccountStructure(
 
 assertAccountStructure(
     is_string($accountSource)
-        && str_contains($accountSource, 'RegisterOAuth(self::GOOGLE_OAUTH_IDENTIFIER)')
-        && str_contains($accountSource, 'RegisterOAuth(self::MICROSOFT_OAUTH_IDENTIFIER)')
+        && str_contains($accountSource, 'self::GOOGLE_OAUTH_IDENTIFIER, self::MICROSOFT_OAUTH_IDENTIFIER')
+        && str_contains($accountSource, '$this->RegisterOAuth($identifier)')
         && str_contains($accountSource, 'RegisterMessage(0, IPS_KERNELSTARTED)')
         && str_contains($accountSource, 'IPS_GetKernelRunlevel() === KR_READY')
         && preg_match(
@@ -99,6 +99,14 @@ assertAccountStructure(
         && !str_contains($accountSource, "RegisterPropertyString('MicrosoftClientID'")
         && !str_contains($accountSource, "RegisterPropertyString('MicrosoftClientSecret'"),
     'Google and Microsoft OAuth must be registered after kernel readiness without per-user client credentials.'
+);
+assertAccountStructure(
+    is_string($accountSource)
+        && str_contains($accountSource, 'foreach ([self::GOOGLE_OAUTH_IDENTIFIER, self::MICROSOFT_OAUTH_IDENTIFIER] as $identifier)')
+        && str_contains($accountSource, 'if (!$this->RegisterOAuth($identifier))')
+        && str_contains($accountSource, 'catch (Throwable $exception)')
+        && str_contains($accountSource, "'OAuthRegistration'"),
+    'A temporarily unavailable OAuth control must not abort account or library initialization.'
 );
 
 $googleOAuthSource = file_get_contents(__DIR__ . '/../Kalender Konto/traits/GoogleOAuthTrait.php');

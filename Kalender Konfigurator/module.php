@@ -18,6 +18,7 @@ class KalenderKonfigurator extends IPSModuleStrict
 
     private const DATA_ID_TO_PARENT = '{4E535B1D-69C7-AC77-1372-0282B21BAEC9}';
     private const CALENDAR_MODULE_ID = '{227B63E4-4223-316B-76E9-FD3849689562}';
+    private const INITIALIZATION_DELAY_MS = 5_000;
 
     private const STATUS_DISCOVERY_FAILED = 201;
     private const STATUS_PARENT_MISSING = 202;
@@ -32,25 +33,58 @@ class KalenderKonfigurator extends IPSModuleStrict
         $this->RegisterAttributeString('CachedCalendars', '[]');
         $this->RegisterAttributeInteger('CachedCalendarParentID', 0);
         $this->RegisterAttributeString('LastError', '');
+        $this->RegisterMessage(0, IPS_KERNELSTARTED);
+        $this->RegisterTimer('InitializationTimer', 0, 'IPSKALCFG_Initialize($_IPS[\'TARGET\']);');
     }
 
     /**
-     * Applies the configurator configuration and marks the instance active.
+     * Applies the configurator configuration and defers parent validation until all modules are loaded.
      */
     public function ApplyChanges(): void
     {
         parent::ApplyChanges();
 
         $this->synchronizeCalendarCacheParent();
+        $this->RegisterMessage(0, IPS_KERNELSTARTED);
+        $this->SetTimerInterval('InitializationTimer', 0);
+        $this->SetStatus(IS_INACTIVE);
 
-        $parentError = $this->parentConnectionError();
-        if ($parentError !== '') {
-            $this->WriteAttributeString('LastError', $parentError);
-            $this->SetStatus(self::STATUS_PARENT_MISSING);
+        if (IPS_GetKernelRunlevel() !== KR_READY) {
             return;
         }
 
-        $this->SetStatus(IS_ACTIVE);
+        $this->scheduleInitialization();
+    }
+
+    /**
+     * Revalidates the parent account after the module reload sequence has settled.
+     *
+     * @return bool True when initialization was processed.
+     */
+    public function Initialize(): bool
+    {
+        $this->SetTimerInterval('InitializationTimer', 0);
+        if (IPS_GetKernelRunlevel() !== KR_READY) {
+            return false;
+        }
+
+        $parentError = $this->parentConnectionError();
+        $this->WriteAttributeString('LastError', $parentError);
+        $this->SetStatus($parentError === '' ? IS_ACTIVE : self::STATUS_PARENT_MISSING);
+
+        return true;
+    }
+
+    /**
+     * Restarts deferred initialization after the Symcon kernel is ready.
+     *
+     * @param array<int, mixed> $Data Message payload supplied by Symcon.
+     */
+    public function MessageSink(int $TimeStamp, int $SenderID, int $Message, array $Data): void
+    {
+        if ($SenderID === 0 && $Message === IPS_KERNELSTARTED) {
+            $this->scheduleInitialization();
+        }
     }
 
     /**
@@ -337,6 +371,13 @@ class KalenderKonfigurator extends IPSModuleStrict
         }
 
         return '';
+    }
+
+    private function scheduleInitialization(): void
+    {
+        if (IPS_GetKernelRunlevel() === KR_READY) {
+            $this->SetTimerInterval('InitializationTimer', self::INITIALIZATION_DELAY_MS);
+        }
     }
 
     private function sanitizeError(string $message): string
