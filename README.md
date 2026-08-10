@@ -7,15 +7,14 @@
 [![Check Style](https://github.com/Burki24/OpenCalendar/actions/workflows/style.yml/badge.svg?branch=main)](https://github.com/Burki24/OpenCalendar/actions/workflows/style.yml?query=branch%3Amain)
 [![Run Tests](https://github.com/Burki24/OpenCalendar/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/Burki24/OpenCalendar/actions/workflows/tests.yml?query=branch%3Amain)
 
-OpenCalendar verbindet Online-Kalender mit Symcon. Unterstützt werden Apple
-iCloud, Google Calendar, Microsoft 365/Outlook.com, generische CalDAV-Server
-sowie schreibgeschützte ICS-/Webcal-Abonnements. Die gefundenen Kalender können
-einzeln synchronisiert, in einer gemeinsamen Kachel angezeigt und optional als
-interaktive HTML-Seite in IPSView verwendet werden.
+OpenCalendar ist eine Anwendung für Symcon, mit der Nutzer ihre Online-Kalender verbinden, synchronisieren, anzeigen und bearbeiten können. Unterstützt werden Apple iCloud, Google Calendar, Microsoft 365/Outlook.com, generische CalDAV-Server sowie schreibgeschützte ICS-/Webcal-Abonnements.
+Die gefundenen Kalender können einzeln synchronisiert, in einer gemeinsamen Kachel angezeigt und optional als interaktive HTML-Seite in IPSView verwendet werden.
 
-Umfangreiche Terminlisten werden intern seitenweise zwischen Konto, Kalender
-und Kalenderansicht übertragen; große ICS-Dateien müssen nicht manuell
+Umfangreiche Terminlisten werden intern seitenweise zwischen Konto, Kalender und Kalenderansicht übertragen; große ICS-Dateien müssen nicht manuell
 aufgeteilt werden.
+
+**Datenschutz:** [Datenschutzhinweise](PRIVACY.md)
+**Nutzungsbedingungen:** [Nutzungsbedingungen](TERMS.md)
 
 ## Voraussetzungen
 
@@ -28,22 +27,12 @@ aufgeteilt werden.
 
 1. OpenCalendar über den Symcon Module Store installieren.
 2. Über **Instanz hinzufügen** eine Instanz **Kalender Konto** anlegen.
-3. Den gewünschten Anbieter auswählen und die angezeigten Zugangsdaten
-   beziehungsweise den OAuth-Login einrichten.
-4. **Verbindung testen** ausführen. Erst bei erfolgreichem Test die
-   Kontokonfiguration übernehmen.
-5. **Jetzt synchronisieren** ausführen, damit die verfügbaren Kalender gefunden
-   werden.
-6. Über **Instanz hinzufügen** einen **Kalender Konfigurator** anlegen. Im Dialog
-   das zuvor eingerichtete **Kalender Konto** als übergeordnete Instanz wählen.
-   Ist bereits ein Konfigurator vorhanden, lässt sich die Verbindung über das
-   Zahnrad und **Gateway ändern** kontrollieren oder anpassen.
-7. Den Konfigurator öffnen und **Kalender aktualisieren** verwenden. In der Liste
-   die gewünschten Kalender über **Erstellen** beziehungsweise **Alle erstellen**
-   anlegen.
-8. Optional eine Instanz **Kalender Ansicht** erstellen, die gewünschten
-   Kalenderinstanzen auswählen und die Ansicht in der Kachelvisualisierung oder
-   in IPSView platzieren.
+3. Den gewünschten Anbieter auswählen und die angezeigten Zugangsdaten beziehungsweise den OAuth-Login einrichten.
+4. **Verbindung testen** ausführen. Erst bei erfolgreichem Test die Kontokonfiguration übernehmen.
+5. **Jetzt synchronisieren** ausführen, damit die verfügbaren Kalender gefunden werden.
+6. Über **Instanz hinzufügen** einen **Kalender Konfigurator** anlegen. Im Dialog das zuvor eingerichtete **Kalender Konto** als übergeordnete Instanz wählen. Ist bereits ein Konfigurator vorhanden, lässt sich die Verbindung über das Zahnrad und **Gateway ändern** kontrollieren oder anpassen.
+7. Den Konfigurator öffnen und **Kalender aktualisieren** verwenden. In der Liste die gewünschten Kalender über **Erstellen** beziehungsweise **Alle erstellen** anlegen.
+8. Optional eine Instanz **Kalender Ansicht** erstellen, die gewünschten Kalenderinstanzen auswählen und die Ansicht in der Kachelvisualisierung oder in IPSView platzieren.
 
 Die ausführlichen Einstellungen der Anbieter sind in der Dokumentation des
 [Kalender Kontos](Kalender%20Konto) beschrieben.
@@ -133,4 +122,4 @@ Drittanbieter.
 
   Führt mehrere Kalender in einer responsiven Kachel- oder IPSView-Ansicht
   zusammen.
-  
+
