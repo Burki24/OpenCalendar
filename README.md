@@ -1,168 +1,140 @@
 # OpenCalendar
 
-## Wichtiger Hinweis zur Einrichtung
+OpenCalendar verbindet Online-Kalender mit Symcon. Unterstützt werden Apple
+iCloud, Google Calendar, Microsoft 365/Outlook.com, generische CalDAV-Server
+sowie schreibgeschützte ICS-/Webcal-Abonnements. Die gefundenen Kalender können
+einzeln synchronisiert, in einer gemeinsamen Kachel angezeigt und optional als
+interaktive HTML-Seite in IPSView verwendet werden.
 
-**Kalender-Instanzen sollen ausschließlich über den zum Konto gehörenden
-Kalender Konfigurator erstellt werden.**
+## Voraussetzungen
+
+- Symcon ab Version 9.0
+- Netzwerkzugriff des Symcon-Servers auf den jeweiligen Kalenderdienst
+- für Google und Microsoft eine aktive Symcon-Connect-Verbindung
+- für Apple iCloud ein anwendungsspezifisches Apple-Passwort
+
+## Schnellstart
+
+1. OpenCalendar über den Symcon Module Store installieren.
+2. Über **Instanz hinzufügen** eine Instanz **Kalender Konto** anlegen.
+3. Den gewünschten Anbieter auswählen und die angezeigten Zugangsdaten
+   beziehungsweise den OAuth-Login einrichten.
+4. **Verbindung testen** ausführen. Erst bei erfolgreichem Test die
+   Kontokonfiguration übernehmen.
+5. **Jetzt synchronisieren** ausführen, damit die verfügbaren Kalender gefunden
+   werden.
+6. Über **Instanz hinzufügen** einen **Kalender Konfigurator** anlegen. Im Dialog
+   das zuvor eingerichtete **Kalender Konto** als übergeordnete Instanz wählen.
+   Ist bereits ein Konfigurator vorhanden, lässt sich die Verbindung über das
+   Zahnrad und **Gateway ändern** kontrollieren oder anpassen.
+7. Den Konfigurator öffnen und **Kalender aktualisieren** verwenden. In der Liste
+   die gewünschten Kalender über **Erstellen** beziehungsweise **Alle erstellen**
+   anlegen.
+8. Optional eine Instanz **Kalender Ansicht** erstellen, die gewünschten
+   Kalenderinstanzen auswählen und die Ansicht in der Kachelvisualisierung oder
+   in IPSView platzieren.
+
+Die ausführlichen Einstellungen der Anbieter sind in der Dokumentation des
+[Kalender Kontos](Kalender%20Konto) beschrieben.
+
+## Anbieter im Überblick
+
+Anbieter | Benötigte Angaben | Zugriff
+--- | --- | ---
+Apple iCloud | Apple-ID und anwendungsspezifisches Passwort | Lesen und Schreiben entsprechend den Kalenderrechten
+Google Calendar | Anmeldung über Symcon OAuth | Lesen und Schreiben entsprechend den Google-Kalenderrechten
+Microsoft 365/Outlook.com | Anmeldung über Symcon OAuth | Lesen und Schreiben entsprechend den Microsoft-Kalenderrechten
+CalDAV | Server-URL, Benutzername und Passwort | Lesen und Schreiben entsprechend den Serverrechten
+ICS/Webcal | Eine oder mehrere Feed-URLs, optional HTTP-Zugangsdaten | Schreibgeschützt
+
+## Kalender immer über den Konfigurator anlegen
+
+**Kalender-Instanzen sollen ausschließlich aus der Liste des Kalender
+Konfigurators erstellt werden.**
 
 Der Konfigurator übernimmt automatisch den Kalendernamen, die interne
 Kalender-ID, die Anbieter-ID, die Farbe, die Schreibrechte und die Verbindung
-zum richtigen Kalender Konto. Werden Kalender-Instanzen stattdessen manuell
-angelegt, kopiert oder nur über **Gateway ändern** verbunden, fehlen diese
-Informationen. Solche Instanzen heißen zunächst lediglich „Kalender“ und
-können insbesondere bei Konten mit mehreren Kalendern nicht eindeutig
-zugeordnet werden.
+zum aktuell gewählten Kalender Konto. Manuell angelegte oder kopierte
+Kalender-Instanzen besitzen diese vollständige Identität nicht. Sie dürfen daher
+nicht lediglich über **Gateway ändern** mit einem Konto verbunden werden.
 
-Empfohlene Reihenfolge:
+Nach der Erstellung dürfen Kalender-Instanzen im Objektbaum beliebig verschoben
+oder umbenannt werden. Ihre technische Zuordnung bleibt dabei erhalten.
 
-1. **Kalender Konto** anlegen und konfigurieren.
-2. Das Konto synchronisieren.
-3. Den zugehörigen **Kalender Konfigurator** öffnen.
-4. Die gewünschten Kalender in der gefundenen Liste auswählen und dort
-   erstellen lassen.
-5. Erst danach die erzeugten Kalender-Instanzen bei Bedarf im Objektbaum
-   verschieben oder umbenennen.
+## Mehrere Kalenderkonten
+
+Für mehrere Konten gibt es zwei unterstützte Arbeitsweisen:
+
+- **Ein Konfigurator je Konto** ist die empfohlene und übersichtlichste Variante.
+  Jeder Konfigurator bleibt dauerhaft mit seinem Kalender Konto verbunden.
+- **Ein gemeinsamer Konfigurator** kann nacheinander für mehrere Konten verwendet
+  werden. Dazu im Konfigurator über das Zahnrad **Gateway ändern** wählen, das
+  gewünschte Kalender Konto verbinden und anschließend zwingend
+  **Kalender aktualisieren** ausführen.
+
+Der Konfigurator zeigt immer nur Kalender und bestehende Kalender-Instanzen des
+aktuell verbundenen Kontos. Bereits erzeugte Kalender-Instanzen bleiben beim
+Wechsel mit ihrem ursprünglichen Konto verbunden und erscheinen wieder, sobald
+der Konfigurator erneut mit diesem Konto verbunden wird.
+
+Diese Wiederverwendung entspricht dem von Symcon vorgesehenen Austausch einer
+übergeordneten Instanz. Die Kalender-Instanzen selbst werden weiterhin nur aus
+der aktuellen Konfiguratorliste erstellt. Weitere Hintergründe enthält die
+[Dokumentation des Kalender Konfigurators](Kalender%20Konfigurator).
+
+## Bekannte Einschränkungen
+
+- Einzelne Vorkommen wiederkehrender Termine werden derzeit nur lesend
+  dargestellt. Dadurch kann nicht versehentlich die vollständige Terminserie
+  überschrieben oder gelöscht werden.
+- ICS-/Webcal-Abonnements sind grundsätzlich schreibgeschützt.
+- Die IPSView-Ausgabe benötigt im HTML-Box-Steuerelement den Renderer
+  **Browser des Clients** oder **Automatisch**, da die Bedienung JavaScript
+  verwendet.
 
 ## Datenschutz und externe Dienste
 
 OpenCalendar verarbeitet Konto-, Kalender- und Termindaten grundsätzlich auf der
 eigenen Symcon-Installation. Das Modul enthält keine eigene Telemetrie und
 übermittelt Kalenderinhalte nicht an einen Backenddienst des Modulautors. Bei
-OAuth-Anbindungen werden jedoch die jeweils notwendigen Dienste von Google,
-Microsoft und Symcon verwendet.
+OAuth-Anbindungen werden die jeweils notwendigen Dienste von Google, Microsoft
+und Symcon verwendet.
 
 Vor dem Verbinden eines externen Kontos sollten die
 [Datenschutzhinweise](PRIVACY.md) gelesen werden. Ergänzend gelten die
 [Nutzungsbedingungen](TERMS.md) sowie die Bedingungen der jeweils verwendeten
 Drittanbieter.
 
-## Google Calendar verbinden
+## Enthaltene Module
 
-Die Google-Anbindung verwendet den zentral registrierten OAuth-Dienst von
-Symcon. Anwender benötigen keine eigene Google-Client-ID und keinen
-Clientschlüssel. Voraussetzung ist lediglich eine aktive
-**Symcon-Connect-Verbindung**.
+- **Kalender Konto** ([Dokumentation](Kalender%20Konto))
 
-Im **Kalender Konto** wird als Anbieter **Google Calendar** gewählt und
-anschließend **Google-Konto verbinden** aufgerufen. Nach der Anmeldung und
-Zustimmung bei Google genügt **Jetzt synchronisieren**. Die gefundenen Kalender
-werden danach über den zugehörigen **Kalender Konfigurator** angelegt.
+  Verbindet die unterstützten Anbieter und stellt deren Kalender bereit.
+- **Kalender Konfigurator** ([Dokumentation](Kalender%20Konfigurator))
 
-Eine mit einer älteren OpenCalendar-Version über einen persönlichen
-Google-OAuth-Client hergestellte Verbindung muss nach dem Update einmal neu
-verbunden werden. Der frühere persönliche Client wird danach nicht mehr
-verwendet.
+  Findet die Kalender des aktuell verbundenen Kontos und legt vollständig
+  konfigurierte Kalender-Instanzen an.
+- **Kalender** ([Dokumentation](Kalender))
 
-OpenCalendar fordert nur
-`https://www.googleapis.com/auth/calendar.calendarlist.readonly` zum Auflisten
-der abonnierten Kalender sowie
-`https://www.googleapis.com/auth/calendar.events` zum Lesen und Verwalten von
-Terminen an. Das benutzerspezifische Aktualisierungstoken wird als internes
-Attribut der Kalender-Konto-Instanz gespeichert; kurzlebige Access-Tokens
-liegen nur im Instanzpuffer.
+  Repräsentiert einen einzelnen Online-Kalender und synchronisiert dessen
+  Termine.
+- **Kalender Ansicht** ([Dokumentation](Kalender%20Ansicht))
 
-### Einmalige Google-Freischaltung für Modulautoren
+  Führt mehrere Kalender in einer responsiven Kachel- oder IPSView-Ansicht
+  zusammen.
 
-Der gemeinsame Google-OAuth-Client wird einmalig außerhalb des Repositorys
-eingerichtet. Diese Einrichtung ist **nicht** von jedem Anwender durchzuführen:
+## Informationen für Entwickler und Modulautoren
 
-1. In einem Google-Cloud-Projekt die **Google Calendar API** aktivieren.
-2. Den OAuth-Zustimmungsbildschirm für eine externe Anwendung konfigurieren und
-   die beiden oben genannten Scopes eintragen.
-3. Eine OAuth-Client-ID vom Typ **Webanwendung** erstellen.
-4. Als autorisierte Redirect-URI
-   `https://oauth.ipmagic.de/forward/opencalendar_google` hinterlegen.
-5. Den Client unter dem Identifier `opencalendar_google` beim
-   Symcon-OAuth-Dienst registrieren lassen.
-6. Vor einer öffentlichen Nutzung die von Google für die angeforderten
-   Kalenderscopes verlangte OAuth-Verifizierung abschließen.
-
-Da die Redirect-URI auf der Symcon-Domain `ipmagic.de` liegt, muss die
-Einrichtung mit Symcon abgestimmt werden. Google erlaubt Redirect-Domains nur,
-wenn der Projektverantwortliche sie besitzt oder ausdrücklich verwenden darf;
-für die Google-Domainprüfung kann daher Unterstützung durch Symcon erforderlich
-sein.
-
-Für einen ersten Entwicklungstest kann die Google-App im Status **Testing**
-bleiben und das verwendete Google-Konto als Testnutzer eingetragen werden.
-Google lässt bei einer externen Test-App mit Kalenderscopes das Refresh-Token
-jedoch nach sieben Tagen ablaufen. Ein dauerhafter Betrieb setzt deshalb den
-Produktivstatus und die gegebenenfalls erforderliche Verifizierung voraus.
-
-Clientschlüssel und andere zentrale App-Zugangsdaten gehören **nicht** in das
-Repository. Google beschreibt den verwendeten
-[OAuth-Ablauf für Webserver-Anwendungen](https://developers.google.com/identity/protocols/oauth2/web-server)
-und die
-[Kalenderberechtigungen](https://developers.google.com/workspace/calendar/api/auth).
-
-## Microsoft 365 / Outlook.com verbinden
-
-Die Microsoft-Anbindung ist für Anwender bewusst ohne eigene App-Registrierung
-aufgebaut. Voraussetzung ist lediglich eine aktive **Symcon-Connect-Verbindung**.
-Im **Kalender Konto** wird als Anbieter **Microsoft 365** gewählt und anschließend
-**Microsoft-Konto verbinden** aufgerufen. Die Anmeldung und Zustimmung erfolgen
-direkt bei Microsoft; Client-ID und Clientschlüssel werden dem Anwender nicht
-angezeigt und müssen nicht in Symcon hinterlegt werden.
-
-OpenCalendar fordert ausschließlich delegierten Kalenderzugriff an. Unterstützt
-werden Microsoft-365-Geschäfts-/Schulkonten sowie persönliche Microsoft-Konten
-wie Outlook.com. Das Modul kann die eigenen Kalender auflisten und – entsprechend
-den von Microsoft gemeldeten Kalenderrechten – Termine lesen, erstellen, ändern
-und löschen. Mail, Kontakte, OneDrive und Teams-APIs werden nicht angefordert.
-
-Der benutzerspezifische Refresh-Token wird als internes Attribut der
-Kalender-Konto-Instanz gespeichert; kurzlebige Access-Tokens werden nur im
-Instanzpuffer gehalten.
-
-### Einmalige Freischaltung für Modulautoren
-
-Für die Veröffentlichung muss der gemeinsame OAuth-Client einmalig außerhalb
-des Repositorys eingerichtet werden. Diese Einrichtung ist **nicht** von jedem
-Anwender durchzuführen:
-
-1. In Microsoft Entra eine Web-App registrieren, die Konten aus beliebigen
-   Organisationsverzeichnissen sowie persönliche Microsoft-Konten akzeptiert.
-2. Als Redirect-URI
-   `https://oauth.ipmagic.de/forward/opencalendar_microsoft` hinterlegen.
-3. Delegiert `Calendars.ReadWrite` sowie den OAuth-Scope `offline_access`
-   freigeben.
-4. Einen Client-Schlüssel erzeugen und den OAuth-Client unter dem Identifier
-   `opencalendar_microsoft` beim Symcon-OAuth-Dienst registrieren lassen. Dabei
-   Client-ID, Client-Schlüssel, Microsoft-Autorisierungs-/Token-Endpunkte und
-   die benötigten Scopes an Symcon übermitteln.
-
-Client-Schlüssel oder andere zentrale App-Zugangsdaten gehören **nicht** in das
-Repository. Erst nach dieser einmaligen serverseitigen Registrierung kann der
-Microsoft-Login produktiv durchlaufen.
-
-Folgende Module beinhaltet das Repository:
-
-- __Kalender Konto__ ([Dokumentation](Kalender%20Konto))  
-	Verbindet Apple-iCloud-, Google-Calendar-, Microsoft-365-/Outlook.com- und CalDAV-Konten, bündelt mehrere iCalendar-Abonnements in einem Konto, hält eine geprüfte Feed-Rückfallebene vor, löst wiederkehrende Feed-Termine lokal auf und stellt die Kalender bereit.
-
-- __Kalender Konfigurator__ ([Dokumentation](Kalender%20Konfigurator))  
-	Findet Kalender eines Kontos und legt Kalenderinstanzen an.
-
-- __Kalender__ ([Dokumentation](Kalender))  
-	Repräsentiert einen einzelnen Online-Kalender.
-
-- __Kalender Ansicht__ ([Dokumentation](Kalender%20Ansicht))  
-	Führt mehrere Kalender in einer modernen Kachelansicht zusammen.
-
-## Entwicklung und Continuous Integration
+Die einmalige Einrichtung der zentralen Google- und Microsoft-OAuth-Clients ist
+keine Aufgabe des Endanwenders. Sie ist getrennt in
+[OAuth-Infrastruktur für Modulautoren](docs/OAUTH-PUBLISHER.md) dokumentiert.
 
 OpenCalendar verwendet die gemeinsamen Prüfaktionen aus
-[`Burki24/Symcon_ModuleCI`](https://github.com/Burki24/Symcon_ModuleCI),
-fest auf Version `v1.0.0` gesetzt. Die verpflichtenden Status-Checks heißen in
-allen angebundenen Repositories einheitlich:
-
-- `tests`
-- `style`
-
-Der zentrale Testlauf richtet PHP 8.5 mit den Erweiterungen cURL und DOM sowie
-Python ein, prüft PHP- und JSON-Dateien und startet anschließend den lokalen
-Einstiegspunkt `php tests/run.php`. Dieser führt sämtliche OpenCalendar-
-Prüfungen einschließlich CalDAV-HTTP-Integration aus.
+[`Burki24/Symcon_ModuleCI`](https://github.com/Burki24/Symcon_ModuleCI), fest auf
+Version `v1.0.0` gesetzt. Die verpflichtenden Status-Checks heißen `tests` und
+`style`. Der Testlauf verwendet PHP 8.5 mit cURL und DOM, prüft PHP- und
+JSON-Dateien und startet anschließend `php tests/run.php` einschließlich der
+CalDAV-HTTP-Integration.
 
 Die offiziellen Symcon-Entwicklungsgrundlagen werden als Git-Submodule geführt:
 

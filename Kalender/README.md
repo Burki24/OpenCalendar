@@ -2,6 +2,21 @@
 
 Das Modul repräsentiert einen einzelnen Online-Kalender.
 
+## Einrichtung
+
+Eine Kalender-Instanz wird nicht über **Instanz hinzufügen** eingerichtet,
+sondern aus der gefundenen Liste des **Kalender Konfigurators** erstellt. Dabei
+werden Name, technische Kalender-ID, Anbieter-ID, Farbe, Schreibrechte und das
+richtige Kalender Konto automatisch übernommen.
+
+Nach der Erstellung:
+
+1. Gewünschten Aktualisierungsplan sowie vergangenen und zukünftigen Zeitraum
+   einstellen.
+2. Die Konfiguration übernehmen.
+3. **Jetzt synchronisieren** ausführen.
+4. Unter **Anzahl Termine** und **Letzte Synchronisation** das Ergebnis prüfen.
+
 > **Kalender-Instanzen nicht manuell anlegen oder lediglich über „Gateway
 > ändern“ mit einem Konto verbinden.** Sie sollen über den zum Konto gehörenden
 > **Kalender Konfigurator** erstellt werden. Nur der Konfigurator trägt den
@@ -116,3 +131,14 @@ $success = IPSKAL_DeleteEvent(12345, json_encode([
 ```
 
 Nach jeder erfolgreichen Schreiboperation wird der lokale Termincache erneut vom Server geladen.
+
+## Fehlerbehebung
+
+Problem | Prüfung
+--- | ---
+Konfiguration unvollständig | Instanz im Kalender Konfigurator löschen und aus der aktuellen Kontoliste neu erstellen; die technischen Identitätsfelder nicht manuell setzen
+Synchronisation fehlgeschlagen | Zuerst im verbundenen Kalender Konto **Verbindung testen**, anschließend Konto und Kalender erneut synchronisieren
+Keine Termine sichtbar | Zeitraum für vergangene und zukünftige Termine prüfen und kontrollieren, ob der Online-Kalender im gewählten Zeitraum Termine enthält
+Kalender ist schreibgeschützt | Schreibrechte beim Anbieter prüfen; ICS/Webcal-Abonnements sind immer schreibgeschützt
+Ändern oder Löschen wird bei einem Serientermin verweigert | Einzelne Vorkommen wiederkehrender Termine sind bewusst noch nicht zum Schreiben freigegeben
+Schreibkonflikt | Kalender erneut synchronisieren; der ETag-Schutz verhindert das Überschreiben einer zwischenzeitlich geänderten Serverversion

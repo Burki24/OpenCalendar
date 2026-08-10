@@ -23,13 +23,14 @@ class KalenderKonfigurator extends IPSModuleStrict
     private const STATUS_PARENT_MISSING = 202;
 
     /**
-     * Registers the configurator cache and error state.
+     * Registers the account-specific configurator cache and error state.
      */
     public function Create(): void
     {
         parent::Create();
 
         $this->RegisterAttributeString('CachedCalendars', '[]');
+        $this->RegisterAttributeInteger('CachedCalendarParentID', 0);
         $this->RegisterAttributeString('LastError', '');
     }
 
@@ -39,6 +40,8 @@ class KalenderKonfigurator extends IPSModuleStrict
     public function ApplyChanges(): void
     {
         parent::ApplyChanges();
+
+        $this->synchronizeCalendarCacheParent();
 
         $parentError = $this->parentConnectionError();
         if ($parentError !== '') {
@@ -184,6 +187,7 @@ class KalenderKonfigurator extends IPSModuleStrict
      */
     private function cacheCalendars(array $calendars): void
     {
+        $parentId = $this->GetParentID();
         $this->WriteAttributeString(
             'CachedCalendars',
             json_encode(
@@ -191,6 +195,7 @@ class KalenderKonfigurator extends IPSModuleStrict
                 JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR
             )
         );
+        $this->WriteAttributeInteger('CachedCalendarParentID', $parentId);
     }
 
     /**
@@ -198,12 +203,34 @@ class KalenderKonfigurator extends IPSModuleStrict
      */
     private function readCachedCalendars(): array
     {
+        if (
+            !$this->HasParent()
+            || $this->ReadAttributeInteger('CachedCalendarParentID') !== $this->GetParentID()
+        ) {
+            return [];
+        }
+
         try {
             $calendars = json_decode($this->ReadAttributeString('CachedCalendars'), true, 512, JSON_THROW_ON_ERROR);
             return is_array($calendars) ? array_values(array_filter($calendars, 'is_array')) : [];
         } catch (JsonException) {
             return [];
         }
+    }
+
+    /**
+     * Invalidates discovered calendars after the physical parent account changes.
+     */
+    private function synchronizeCalendarCacheParent(): void
+    {
+        $parentId = $this->HasParent() ? $this->GetParentID() : 0;
+        if ($this->ReadAttributeInteger('CachedCalendarParentID') === $parentId) {
+            return;
+        }
+
+        $this->WriteAttributeString('CachedCalendars', '[]');
+        $this->WriteAttributeInteger('CachedCalendarParentID', $parentId);
+        $this->WriteAttributeString('LastError', '');
     }
 
     /**

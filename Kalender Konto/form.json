@@ -43,7 +43,7 @@
             "name": "PrivacyPolicy",
             "caption": "Privacy information",
             "link": true,
-            "onClick": "echo 'https://github.com/Burki24/OpenCalendar/blob/legal/PRIVACY.md';"
+            "onClick": "echo 'https://github.com/Burki24/OpenCalendar/blob/main/PRIVACY.md';"
         },
         {
             "type": "ValidationTextBox",
