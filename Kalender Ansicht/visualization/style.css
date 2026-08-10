@@ -196,6 +196,14 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .empty-symbol { display: block; margin-bottom: 8px; font-size: 2em; opacity: .7; }
 
 .agenda-day { margin: 0 0 13px; }
+.agenda-week-separator {
+    margin: 3px 4px 7px;
+    padding-bottom: 4px;
+    border-bottom: var(--cal-line-width, 1px) solid var(--cal-line, var(--cal-border));
+    color: var(--cal-muted);
+    font-size: .72em;
+    font-weight: 650;
+}
 .agenda-date {
     position: sticky;
     top: -8px;
@@ -270,7 +278,11 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 }
 .month-day.outside { opacity: var(--cal-disabled-opacity); }
 .month-day.today { box-shadow: inset 0 0 0 max(2px, var(--cal-border-width)) var(--cal-accent); }
-.day-number { margin-bottom: 4px; font-size: .72em; font-weight: 650; text-align: right; }
+.month-day-header { display: flex; align-items: flex-start; gap: 4px; margin-bottom: 4px; }
+.month-week-number { padding-top: 1px; color: var(--cal-muted); font-size: .56em; font-weight: 650; white-space: nowrap; }
+.month-day-date { min-width: 0; margin-left: auto; line-height: 1.05; text-align: right; }
+.day-number { font-size: .72em; font-weight: 650; }
+.month-day-of-year { display: block; margin-top: 2px; color: var(--cal-muted); font-size: .52em; font-weight: 500; white-space: nowrap; }
 .today .day-number { color: var(--cal-accent); }
 
 .event-chip {

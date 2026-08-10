@@ -19,7 +19,9 @@ verwendet werden.
    auswählen und **Aktiviert** einschalten.
 3. Standardansicht, Zeitraum und maximale Terminanzahl festlegen.
 4. Gewünschte Zusatzinformationen wie Kalendername, Ort oder Beschreibung
-   aktivieren.
+   aktivieren. Über **Anzeigeoptionen** lassen sich Terminanzahl, Kalenderwoche
+   und Tageszahl in einer Matrix für jede unterstützte Darstellung separat
+   ein- oder ausschalten.
 5. Die Konfiguration übernehmen und **Kalender synchronisieren** ausführen.
 6. Die Instanz in der Symcon-Kachelvisualisierung platzieren.
 
@@ -33,9 +35,10 @@ unvollständig ist; eine vorhandene individuelle Auswahl wird dabei ersetzt.
 - Agenda-, 3-Tage-, Wochen- und Monatsansicht
 - unabhängig wählbare horizontale oder vertikale Wochenansicht für Kachel und
   IPSView
-- optionale Anzeige des Tages im Jahr
-- Anzeige der gesamten Terminanzahl je Tag in Agenda-, 3-Tage- und
-  Wochenansicht
+- je Darstellung separat konfigurierbare Anzeige von Kalenderwoche und
+  Tageszahl
+- optional und je Darstellung separat einblendbare Terminanzahl pro Tag in
+  Agenda-, 3-Tage- und Wochenansicht
 - Zusammenführen beliebig vieler ausgewählter Kalender
 - Farben der einzelnen Kalender und Termine
 - optionale Anzeige von Kalendername, Ort und Beschreibung
@@ -60,9 +63,19 @@ Kachel-Wochenausrichtung | Horizontale Wochenspalten oder vertikale Tageszeilen
 Vergangene/Zukünftige Tage | Zeitraum, aus dem Termine zusammengeführt werden
 Maximale Termine | Obergrenze der in einer Antwort verarbeiteten Termine
 Wochenenden anzeigen | Blendet Samstag und Sonntag ein oder aus
-Tag im Jahr anzeigen | Ergänzt Tagesüberschriften um die fortlaufende Tagesnummer
-Terminanzahl je Tag | Wird in Agenda-, 3-Tage- und Wochenansicht automatisch über alle ausgewählten Kalender angezeigt
+Anzeigeoptionen → Terminanzahl | Je Ansicht separat für Agenda, 3 Tage und Woche; im Monat wird keine Tages-Terminanzahl eingeblendet
+Anzeigeoptionen → Kalenderwoche | Je Ansicht separat für Agenda, 3 Tage, Woche und Monat
+Anzeigeoptionen → Tageszahl | Je Ansicht separat für Agenda, 3 Tage, Woche und Monat
 Kalendername/Ort/Beschreibung | Legt fest, welche Termindetails sichtbar sind
+
+Die Kalenderwoche erscheint in der Wochenansicht in der Zeitraumüberschrift.
+In der 3-Tage-Ansicht werden bei einem Wochenwechsel beide Kalenderwochen
+angegeben, beispielsweise **KW 33/34**. Die Agenda erhält beim Beginn einer
+neuen sichtbaren Kalenderwoche einen dezenten KW-Trenner. In der Monatsansicht
+steht die KW am Montag als erstem Tag der jeweiligen ISO-Kalenderwoche, auch
+wenn dieser Montag noch zum Vor- oder bereits zum Folgemonat gehört. Die
+Tageszahl wird in Agenda, 3-Tage- und Wochenansicht in der vorhandenen
+Tagesüberschrift und im Monat dezent beim Tagesdatum dargestellt.
 
 Die ausgewählten Kalender werden intern seitenweise gelesen. Dies geschieht
 automatisch und ermöglicht auch bei umfangreichen Kalendern den Aufbau der

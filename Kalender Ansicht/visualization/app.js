@@ -111,10 +111,16 @@ function updateToolbar() {
     } else if (activeView === 'week') {
         const start = startOfWeek(cursorDate);
         const end = addDays(start, 6);
-        periodTitle.textContent = `${t('CW')} ${isoWeekNumber(start)} · ${formatRange(start, end)}`;
+        const calendarWeek = calendarState.settings.showWeekCalendarWeek !== false
+            ? `${formatCalendarWeekLabel([start])} · `
+            : '';
+        periodTitle.textContent = calendarWeek + formatRange(start, end);
     } else if (activeView === 'threeDays') {
         const days = getThreeVisibleDays(cursorDate);
-        periodTitle.textContent = formatRange(days[0], days[days.length - 1]);
+        const calendarWeek = calendarState.settings.showThreeDaysCalendarWeek === true
+            ? `${formatCalendarWeekLabel(days)} · `
+            : '';
+        periodTitle.textContent = calendarWeek + formatRange(days[0], days[days.length - 1]);
     } else {
         const end = addDays(cursorDate, 13);
         periodTitle.textContent = formatRange(cursorDate, end);
@@ -136,7 +142,17 @@ function renderAgenda() {
         renderEmpty('No events', 'There are no events in this period.');
         return;
     }
+    let previousCalendarWeek = null;
     groups.forEach(group => {
+        if (calendarState.settings.showAgendaCalendarWeek === true) {
+            const calendarWeek = isoWeekKey(group.date);
+            if (calendarWeek !== previousCalendarWeek) {
+                const separator = element('div', 'agenda-week-separator');
+                separator.textContent = formatCalendarWeekLabel([group.date]);
+                content.appendChild(separator);
+                previousCalendarWeek = calendarWeek;
+            }
+        }
         const section = element('section', 'agenda-day');
         const heading = element('div', 'agenda-date');
         const strong = document.createElement('strong');
@@ -145,7 +161,9 @@ function renderAgenda() {
         fullDate.textContent = formatDayHeading(
             group.date,
             { weekday: 'long', day: '2-digit', month: 'long' },
-            group.events.length
+            calendarState.settings.showAgendaDayOfYear !== false,
+            group.events.length,
+            calendarState.settings.showAgendaEventCount !== false
         );
         heading.append(strong, fullDate);
         section.appendChild(heading);
@@ -198,15 +216,22 @@ function renderWeek() {
         days,
         'week-grid'
             + (calendarState.settings.showWeekends === false ? ' hide-weekends' : '')
-            + (vertical ? ' vertical-week-grid' : '')
+            + (vertical ? ' vertical-week-grid' : ''),
+        calendarState.settings.showWeekDayOfYear !== false,
+        calendarState.settings.showWeekEventCount !== false
     );
 }
 
 function renderThreeDays() {
-    renderDayColumns(getThreeVisibleDays(cursorDate), 'week-grid three-day-grid');
+    renderDayColumns(
+        getThreeVisibleDays(cursorDate),
+        'week-grid three-day-grid',
+        calendarState.settings.showThreeDaysDayOfYear !== false,
+        calendarState.settings.showThreeDaysEventCount !== false
+    );
 }
 
-function renderDayColumns(days, className) {
+function renderDayColumns(days, className, showDayOfYear, showEventCount) {
     const grid = element('div', className);
     days.forEach(day => {
         const column = element('section', 'week-column' + (isToday(day) ? ' today' : ''));
@@ -216,7 +241,9 @@ function renderDayColumns(days, className) {
         heading.textContent = formatDayHeading(
             day,
             { weekday: 'short', day: '2-digit', month: '2-digit' },
-            events.length
+            showDayOfYear,
+            events.length,
+            showEventCount
         );
         column.appendChild(heading);
         const eventList = element('div', 'week-events');
@@ -268,9 +295,23 @@ function renderMonth() {
         const cell = element('div', 'month-day');
         if (day.getMonth() !== cursorDate.getMonth()) cell.classList.add('outside');
         if (isToday(day)) cell.classList.add('today');
+        const dayHeader = element('div', 'month-day-header');
+        if (calendarState.settings.showMonthCalendarWeek === true && day.getDay() === 1) {
+            const calendarWeek = element('span', 'month-week-number');
+            calendarWeek.textContent = formatCalendarWeekLabel([day]);
+            dayHeader.appendChild(calendarWeek);
+        }
+        const dateMeta = element('div', 'month-day-date');
         const number = element('div', 'day-number');
         number.textContent = String(day.getDate());
-        cell.appendChild(number);
+        dateMeta.appendChild(number);
+        if (calendarState.settings.showMonthDayOfYear !== false) {
+            const dayOfYearMeta = element('span', 'month-day-of-year');
+            dayOfYearMeta.textContent = `${t('Day')} ${dayOfYear(day)}/${daysInYear(day)}`;
+            dateMeta.appendChild(dayOfYearMeta);
+        }
+        dayHeader.appendChild(dateMeta);
+        cell.appendChild(dayHeader);
         const dayEnd = addDays(day, 1);
         const events = calendarState.events.filter(event => eventOverlaps(event, day, dayEnd));
         events.slice(0, 3).forEach(event => {
@@ -752,12 +793,32 @@ function t(value) {
 function element(tag, className) { const node = document.createElement(tag); node.className = className; return node; }
 function startOfDay(date) { return new Date(date.getFullYear(), date.getMonth(), date.getDate()); }
 function startOfWeek(date) { const result = startOfDay(date); const day = result.getDay() || 7; result.setDate(result.getDate() - day + 1); return result; }
-function isoWeekNumber(date) {
+function isoWeek(date) {
     const target = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
     const weekday = target.getUTCDay() || 7;
     target.setUTCDate(target.getUTCDate() + 4 - weekday);
-    const yearStart = new Date(Date.UTC(target.getUTCFullYear(), 0, 1));
-    return Math.ceil((((target - yearStart) / 86400000) + 1) / 7);
+    const year = target.getUTCFullYear();
+    const yearStart = new Date(Date.UTC(year, 0, 1));
+    return {
+        year,
+        week: Math.ceil((((target - yearStart) / 86400000) + 1) / 7)
+    };
+}
+function isoWeekNumber(date) { return isoWeek(date).week; }
+function isoWeekKey(date) {
+    const value = isoWeek(date);
+    return `${value.year}-${value.week}`;
+}
+function formatCalendarWeekLabel(days) {
+    const calendarWeeks = [];
+    const seen = new Set();
+    days.forEach(day => {
+        const key = isoWeekKey(day);
+        if (seen.has(key)) return;
+        seen.add(key);
+        calendarWeeks.push(isoWeekNumber(day));
+    });
+    return `${t('CW')} ${calendarWeeks.join('/')}`;
 }
 function dayOfYear(date) {
     return Math.floor((
@@ -769,13 +830,15 @@ function daysInYear(date) {
     const year = date.getFullYear();
     return new Date(year, 1, 29).getMonth() === 1 ? 366 : 365;
 }
-function formatDayHeading(date, options, eventCount) {
+function formatDayHeading(date, options, showDayOfYear, eventCount, showEventCount) {
     const formattedDate = new Intl.DateTimeFormat(undefined, options).format(date);
     const parts = [formattedDate];
-    if (calendarState.settings.showDayOfYear !== false) {
+    if (showDayOfYear) {
         parts.push(`${t('Day')} ${dayOfYear(date)}/${daysInYear(date)}`);
     }
-    parts.push(`${eventCount} ${t(eventCount === 1 ? 'Event' : 'Events')}`);
+    if (showEventCount) {
+        parts.push(`${eventCount} ${t(eventCount === 1 ? 'Event' : 'Events')}`);
+    }
     return parts.join(' · ');
 }
 function addDays(date, days) { const result = new Date(date); result.setDate(result.getDate() + days); return result; }

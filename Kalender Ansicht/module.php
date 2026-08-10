@@ -100,7 +100,17 @@ class KalenderAnsicht extends IPSModuleStrict
         $this->RegisterPropertyInteger('FutureDays', 31);
         $this->RegisterPropertyInteger('MaxEvents', 250);
         $this->RegisterPropertyBoolean('ShowWeekends', true);
-        $this->RegisterPropertyBoolean('ShowDayOfYear', true);
+        $this->RegisterPropertyBoolean('ShowAgendaEventCount', true);
+        $this->RegisterPropertyBoolean('ShowThreeDaysEventCount', true);
+        $this->RegisterPropertyBoolean('ShowWeekEventCount', true);
+        $this->RegisterPropertyBoolean('ShowAgendaCalendarWeek', false);
+        $this->RegisterPropertyBoolean('ShowThreeDaysCalendarWeek', false);
+        $this->RegisterPropertyBoolean('ShowWeekCalendarWeek', true);
+        $this->RegisterPropertyBoolean('ShowMonthCalendarWeek', false);
+        $this->RegisterPropertyBoolean('ShowAgendaDayOfYear', true);
+        $this->RegisterPropertyBoolean('ShowThreeDaysDayOfYear', true);
+        $this->RegisterPropertyBoolean('ShowWeekDayOfYear', true);
+        $this->RegisterPropertyBoolean('ShowMonthDayOfYear', true);
         $this->RegisterPropertyBoolean('ShowCalendarName', true);
         $this->RegisterPropertyBoolean('ShowLocation', true);
         $this->RegisterPropertyBoolean('ShowDescription', false);
@@ -154,7 +164,7 @@ class KalenderAnsicht extends IPSModuleStrict
     }
 
     /**
-     * Migrates the former calendar-specific IPSView palette to the shared style system.
+     * Migrates legacy visualization settings to the current per-view and shared style properties.
      */
     public function Migrate(string $JSONData): string
     {
@@ -176,6 +186,22 @@ class KalenderAnsicht extends IPSModuleStrict
 
         $configuration = &$persistence['configuration'];
         $changed = false;
+
+        if (array_key_exists('ShowDayOfYear', $configuration)) {
+            $legacyShowDayOfYear = (bool) $configuration['ShowDayOfYear'];
+            foreach ([
+                'ShowAgendaDayOfYear',
+                'ShowThreeDaysDayOfYear',
+                'ShowWeekDayOfYear',
+                'ShowMonthDayOfYear'
+            ] as $dayOfYearProperty) {
+                if (!array_key_exists($dayOfYearProperty, $configuration)) {
+                    $configuration[$dayOfYearProperty] = $legacyShowDayOfYear;
+                }
+            }
+            unset($configuration['ShowDayOfYear']);
+            $changed = true;
+        }
 
         foreach (self::LEGACY_IPSVIEW_STRING_COLOR_PROPERTIES as $legacyProperty => $integerProperty) {
             if (!array_key_exists($legacyProperty, $configuration)) {
@@ -896,21 +922,31 @@ class KalenderAnsicht extends IPSModuleStrict
     private function viewSettings(): array
     {
         return [
-            'defaultView'            => match ($this->ReadPropertyInteger('DefaultView')) {
+            'defaultView'             => match ($this->ReadPropertyInteger('DefaultView')) {
                 1       => 'week',
                 2       => 'month',
                 3       => 'threeDays',
                 default => 'agenda'
             },
-            'showWeekends'           => $this->ReadPropertyBoolean('ShowWeekends'),
-            'showDayOfYear'          => $this->ReadPropertyBoolean('ShowDayOfYear'),
-            'showCalendarName'       => $this->ReadPropertyBoolean('ShowCalendarName'),
-            'showLocation'           => $this->ReadPropertyBoolean('ShowLocation'),
-            'showDescription'        => $this->ReadPropertyBoolean('ShowDescription'),
-            'tileWeekOrientation'    => $this->ReadPropertyInteger('TileWeekOrientation') === 1
+            'showWeekends'              => $this->ReadPropertyBoolean('ShowWeekends'),
+            'showAgendaEventCount'      => $this->ReadPropertyBoolean('ShowAgendaEventCount'),
+            'showThreeDaysEventCount'   => $this->ReadPropertyBoolean('ShowThreeDaysEventCount'),
+            'showWeekEventCount'        => $this->ReadPropertyBoolean('ShowWeekEventCount'),
+            'showAgendaCalendarWeek'    => $this->ReadPropertyBoolean('ShowAgendaCalendarWeek'),
+            'showThreeDaysCalendarWeek' => $this->ReadPropertyBoolean('ShowThreeDaysCalendarWeek'),
+            'showWeekCalendarWeek'      => $this->ReadPropertyBoolean('ShowWeekCalendarWeek'),
+            'showMonthCalendarWeek'     => $this->ReadPropertyBoolean('ShowMonthCalendarWeek'),
+            'showAgendaDayOfYear'       => $this->ReadPropertyBoolean('ShowAgendaDayOfYear'),
+            'showThreeDaysDayOfYear'    => $this->ReadPropertyBoolean('ShowThreeDaysDayOfYear'),
+            'showWeekDayOfYear'         => $this->ReadPropertyBoolean('ShowWeekDayOfYear'),
+            'showMonthDayOfYear'        => $this->ReadPropertyBoolean('ShowMonthDayOfYear'),
+            'showCalendarName'          => $this->ReadPropertyBoolean('ShowCalendarName'),
+            'showLocation'              => $this->ReadPropertyBoolean('ShowLocation'),
+            'showDescription'           => $this->ReadPropertyBoolean('ShowDescription'),
+            'tileWeekOrientation'       => $this->ReadPropertyInteger('TileWeekOrientation') === 1
                 ? 'vertical'
                 : 'horizontal',
-            'ipsViewWeekOrientation' => $this->ReadPropertyInteger('IPSViewWeekOrientation') === 1
+            'ipsViewWeekOrientation'    => $this->ReadPropertyInteger('IPSViewWeekOrientation') === 1
                 ? 'vertical'
                 : 'horizontal'
         ];
