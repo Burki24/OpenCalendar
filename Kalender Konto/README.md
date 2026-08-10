@@ -1,225 +1,231 @@
 # Kalender Konto
 
-Das Modul verwaltet die Verbindung zu einem Online-Kalenderkonto und stellt die Kalender dieses Kontos den untergeordneten Modulen zur Verfügung.
+Das Modul **Kalender Konto** verwaltet die Verbindung zu einem Kalenderanbieter.
+Es findet die verfügbaren Kalender und stellt sie dem Kalender Konfigurator und
+den erzeugten Kalender-Instanzen zur Verfügung.
 
-## Funktionsumfang
-
-- Apple iCloud über CalDAV und anwendungsspezifisches Passwort
-- Google Calendar über OAuth 2.0 und die Google Calendar API v3
-- Microsoft 365 und Outlook.com über den nativen Symcon-OAuth-Handler und Microsoft Graph
-- generische CalDAV-Server
-- mehrere schreibgeschützte iCalendar-Abonnements über HTTP(S)- oder Webcal-URL in einem Konto
-- CalDAV-Discovery von Principal, Calendar Home Set und Kalendern
-- Erkennung von Kalendername, Beschreibung, Farbe und Zugriffsrechten
-- Zwischenspeicherung der gefundenen Kalender
-- persistenter iCalendar-Feed-Cache mit HTTP-Validierung und Rückfallebene
-- zyklische Synchronisation
-- einheitlicher Datenfluss zum Kalender-Konfigurator und zu Kalenderinstanzen
-- Lesen, Erstellen, Bearbeiten und Löschen von Google- und Microsoft-Terminen entsprechend der Kalenderrechte
+Unterstützt werden Apple iCloud, Google Calendar, Microsoft 365/Outlook.com,
+generische CalDAV-Server sowie mehrere schreibgeschützte ICS-/Webcal-Feeds.
 
 ## Voraussetzungen
 
 - Symcon ab Version 9.0
-- PHP-Erweiterungen cURL und DOM
 - Zugriff des Symcon-Servers auf den jeweiligen Kalenderdienst
-- für Google Calendar eine aktive Symcon-Connect-Verbindung; keine eigenen OAuth-Zugangsdaten des Anwenders
-- für Microsoft 365/Outlook.com eine aktive Symcon-Connect-Verbindung; keine eigenen OAuth-Zugangsdaten des Anwenders
+- für Google und Microsoft eine aktive Symcon-Connect-Verbindung
+- für Apple iCloud ein anwendungsspezifisches Apple-Passwort
 
-Für Apple iCloud wird ein anwendungsspezifisches Passwort benötigt. Das normale Kennwort des Apple Accounts sollte nicht verwendet werden.
+## Schnellstart
 
-## Einrichtung
+1. Über **Instanz hinzufügen** eine Instanz **Kalender Konto** erstellen.
+2. Das Konto sinnvoll benennen, besonders wenn mehrere Konten verwendet werden.
+3. Den Anbieter auswählen und die im passenden Abschnitt beschriebenen Angaben
+   eintragen beziehungsweise den OAuth-Login ausführen.
+4. **Verbindung testen** verwenden. Der Test muss erfolgreich sein und die
+   erwartete Anzahl gefundener Kalender melden.
+5. Die Konfiguration übernehmen und **Jetzt synchronisieren** ausführen.
+6. Anschließend einen **Kalender Konfigurator** öffnen oder erstellen, mit diesem
+   Konto verbinden und dort die gewünschten Kalender-Instanzen anlegen.
 
-Unter **Instanz hinzufügen** das Modul **Kalender Konto** auswählen.
+Mit **Kontostatus anzeigen** lassen sich der Verbindungszustand, die letzte
+Synchronisation und gegebenenfalls bereinigte Fehlermeldungen kontrollieren.
 
-Eigenschaft | Beschreibung
---- | ---
-Aktiv | Aktiviert die regelmäßige Synchronisation
-Anbieter | Apple iCloud, Google Calendar, Microsoft 365, generischer CalDAV-Server oder ICS/Webcal
-Server-URL | Bei Apple vorbelegt; ansonsten URL des CalDAV-Servers. Bei ICS/Webcal bleibt hier ein bereits vorhandenes einzelnes Abonnement aus Kompatibilitätsgründen erhalten
-Kalendername | Optionale Bezeichnung des bisherigen einzelnen iCalendar-Abonnements
-Benutzername | Benutzername beziehungsweise E-Mail-Adresse des Kontos; beim bisherigen einzelnen iCalendar-Abonnement optional
-Passwort | Passwort oder anwendungsspezifisches Passwort; beim bisherigen einzelnen iCalendar-Abonnement optional
-iCalendar-Abonnements | Liste zusätzlicher Feeds mit Aktivierung, Name, URL, optionalen Zugangsdaten, Titelübersetzung, Aktualisierungsplan und optionaler Farbe
-Aktualisierungsplan | Vorgegebener Rhythmus von fünf Minuten bis jährlich oder ausschließlich manuelle Synchronisation; bei ICS/Webcal steuert er die erneute Kontosuche
-Benutzerdefiniertes Intervall | Eigener Abstand in Minuten; wird nur beim Zeitplan „Benutzerdefiniertes Intervall“ angezeigt
-TLS-Zertifikat prüfen | Nur für eigene CalDAV-Server und ICS/Webcal-Feeds einstellbar; für Apple, Google, Microsoft und Symcon OAuth ist die Prüfung immer aktiv
-Zeitlimit der Anfrage | Maximale Dauer einer HTTP-Anfrage
+## Anbieter einrichten
 
-Über **Verbindung testen** wird die Anmeldung geprüft und die Anzahl der gefundenen Kalender ausgegeben. **Jetzt synchronisieren** aktualisiert den internen Kalendercache und informiert die verbundenen Child-Instanzen.
+### Apple iCloud
 
-Bestehende Instanzen behalten ihren bisherigen Minutenwert als benutzerdefiniertes Intervall. Bei ICS/Webcal sollte der Zeitplan des Kontos passend zum Zeitplan der zugehörigen Kalenderinstanz gewählt werden, da beide Instanzen den Feed für unterschiedliche Aufgaben abrufen.
+Für iCloud wird CalDAV über `https://caldav.icloud.com` verwendet. Die
+Server-Adresse wird automatisch gesetzt und kann in diesem Modus nicht geändert
+werden.
 
-### Datenschutz und OAuth
+1. Im Apple-Account ein anwendungsspezifisches Passwort erzeugen. Eine Anleitung
+   bietet [Apple Support](https://support.apple.com/de-de/102654).
+2. Als Anbieter **Apple iCloud** wählen.
+3. Unter **Benutzername** die Apple-ID beziehungsweise deren E-Mail-Adresse
+   eintragen.
+4. Unter **Passwort** das anwendungsspezifische Passwort eintragen, nicht das
+   normale Apple-Account-Passwort.
+5. **Verbindung testen**, die Konfiguration übernehmen und synchronisieren.
 
-Das Konto-Modul verarbeitet Zugangsdaten, OAuth-Tokens sowie Kalender- und
-Termindaten. Die Daten werden grundsätzlich lokal in Symcon gespeichert oder
-zwischengespeichert. Google und Microsoft verwenden den zentralen
-Symcon-OAuth-Dienst. Die eigentlichen Kalenderdaten werden direkt zwischen der
-Symcon-Installation und Google Calendar beziehungsweise Microsoft Graph
-übertragen.
+### Generisches CalDAV
 
-Ausführliche Angaben zu Datenarten, Speicherung, Löschung und Drittanbietern
-finden sich in den [Datenschutzhinweisen](../PRIVACY.md). Vor dem Verbinden eines
-externen Kontos sollten diese Hinweise gelesen werden.
+1. Als Anbieter **CalDAV** wählen.
+2. Unter **Server-URL** die vom Anbieter angegebene vollständige HTTP(S)-Adresse
+   eintragen. Das Modul ermittelt daraus Principal, Calendar Home Set und die
+   verfügbaren Kalender.
+3. Benutzername und Passwort des CalDAV-Kontos eintragen.
+4. Die TLS-Prüfung nur bei einem bewusst verwendeten, selbst signierten Server
+   deaktivieren. Für öffentlich erreichbare Server sollte sie aktiviert bleiben.
+5. **Verbindung testen**, die Konfiguration übernehmen und synchronisieren.
+
+Falls die automatische Ermittlung mit einer allgemeinen Serveradresse nicht
+funktioniert, sollte die vom Anbieter ausdrücklich genannte CalDAV-Basisadresse
+verwendet werden.
 
 ### Google Calendar
 
-Nach Auswahl von **Google Calendar** werden Server-URL, Benutzername und
-Passwort ausgeblendet. Eine eigene Client-ID oder ein Clientschlüssel ist nicht
-erforderlich. Mit **Google-Konto verbinden** öffnet Symcon den zentral
-registrierten OAuth-Ablauf im Browser.
-
-Einrichtung:
+Google wird über den zentral registrierten OAuth-Dienst von Symcon verbunden.
+Anwender benötigen keine eigene Client-ID und keinen Clientschlüssel.
 
 1. Eine aktive Symcon-Connect-Verbindung sicherstellen.
-2. **Google-Konto verbinden** aufrufen.
-3. Bei Google anmelden und den Zugriff auf Kalenderliste und Termine bestätigen.
-4. Anschließend das Konto synchronisieren und die gefundenen Kalender über den
-   zugehörigen **Kalender Konfigurator** anlegen.
+2. Als Anbieter **Google Calendar** wählen und die Konfiguration übernehmen.
+3. **Google-Konto verbinden** aufrufen.
+4. Bei Google anmelden und den Zugriff auf Kalenderliste und Termine bestätigen.
+5. Zur Instanz zurückkehren und **Jetzt synchronisieren** ausführen.
 
-Das Modul speichert den benutzerspezifischen Refresh-Token intern und erneuert
-kurzlebige Access-Tokens über den Symcon-OAuth-Dienst automatisch.
+OpenCalendar fordert nur das Auflisten der abonnierten Kalender und den Zugriff
+auf deren Termine an. Kalender mit den Google-Rollen `owner` und `writer` werden
+als beschreibbar erkannt; `reader` wird schreibgeschützt angeboten.
+`freeBusyReader`-Einträge werden nicht angelegt, weil sie keine Termindetails
+liefern.
+
 **Google-Konto trennen** widerruft den Token nach Möglichkeit bei Google und
-entfernt die lokal gespeicherten OAuth-Daten.
+entfernt die lokal gespeicherten OAuth-Daten. Verbindungen aus älteren
+OpenCalendar-Versionen mit einer persönlichen Google-Client-ID müssen einmal neu
+über **Google-Konto verbinden** autorisiert werden.
 
-Bestehende Verbindungen aus Versionen mit persönlicher Google-Client-ID müssen
-nach dem Modulupdate einmal über **Google-Konto verbinden** neu autorisiert
-werden. Das Modul erkennt solche älteren Tokens und verwendet sie nicht am
-zentralen Symcon-OAuth-Endpunkt.
+### Microsoft 365 und Outlook.com
 
-Der zentrale Google-Client verwendet die Redirect-URI
-`https://oauth.ipmagic.de/forward/opencalendar_google` und die Scopes
-`https://www.googleapis.com/auth/calendar.calendarlist.readonly` sowie
-`https://www.googleapis.com/auth/calendar.events`. Der Identifier
-`opencalendar_google` muss einmalig vom Modulautor beim Symcon-OAuth-Dienst
-registriert werden. Die gegebenenfalls notwendige Google-Verifizierung richtet
-sich nach Nutzerkreis und angeforderten Berechtigungen. Da die Redirect-URI auf
-der Symcon-Domain `ipmagic.de` liegt, ist die Einrichtung einschließlich der
-Google-Domainprüfung mit Symcon abzustimmen.
+Microsoft wird ebenfalls über den zentralen OAuth-Dienst von Symcon verbunden.
+Unterstützt werden Microsoft-365-Geschäfts- und Schulkonten sowie persönliche
+Konten wie Outlook.com.
 
-Eine externe Google-App im Status **Testing** eignet sich nur für die
-Entwicklung: Das verwendete Google-Konto muss als Testnutzer eingetragen sein
-und das Refresh-Token läuft bei den angeforderten Kalenderscopes nach sieben
-Tagen ab. Für den dauerhaften Einsatz muss die App in den Produktivstatus
-überführt und gegebenenfalls von Google verifiziert werden.
+1. Eine aktive Symcon-Connect-Verbindung sicherstellen.
+2. Als Anbieter **Microsoft 365** wählen und die Konfiguration übernehmen.
+3. **Microsoft-Konto verbinden** aufrufen.
+4. Bei Microsoft anmelden und den Kalenderzugriff bestätigen.
+5. Zur Instanz zurückkehren und **Jetzt synchronisieren** ausführen.
 
-Kalender mit den Google-Rollen `owner` und `writer` werden als les- und schreibbar erkannt. `reader` wird schreibgeschützt angeboten. Einträge mit ausschließlich `freeBusyReader` werden nicht angelegt, weil sie keine Termindetails liefern.
-
-### Microsoft 365 / Outlook.com
-
-Nach Auswahl von **Microsoft 365** werden keine Client-ID und kein
-Clientschlüssel abgefragt. Mit **Microsoft-Konto verbinden** öffnet Symcon den
-zentral registrierten OAuth-Ablauf im Browser. Der Anwender meldet sich direkt
-bei Microsoft an und bestätigt ausschließlich den Zugriff auf seine Kalender.
-
-Unterstützt werden Microsoft-365-Geschäfts-/Schulkonten und persönliche
-Microsoft-Konten wie Outlook.com. Das Modul verwendet delegierten
-`Calendars.ReadWrite`-Zugriff und einen Refresh-Token für den Hintergrundbetrieb.
-Mail, Kontakte, OneDrive oder andere Microsoft-Graph-Bereiche werden nicht
-angefordert.
-
-Nach erfolgreicher Anmeldung genügt **Jetzt synchronisieren**. Die gefundenen
-Kalender werden danach wie gewohnt im zugehörigen **Kalender Konfigurator**
-angeboten. Microsofts `canEdit`-Angabe bestimmt, ob eine Kalenderinstanz
-schreibbar oder schreibgeschützt angelegt wird.
-
-Für Terminabfragen verwendet das Modul `calendarView`, sodass einzelne
-Vorkommen von Terminserien im angeforderten Zeitraum aufgelöst geliefert
-werden. Für Outlook-Ressourcen wird `Prefer: IdType="ImmutableId"` gesendet,
-damit gespeicherte Termin-IDs möglichst stabil bleiben. HTTP-Weiterleitungen
-und von Graph gelieferte Folgeseiten werden auf die vertrauenswürdige Origin
-`https://graph.microsoft.com` beschränkt.
+OpenCalendar verwendet delegierten Kalenderzugriff. Mail, Kontakte, OneDrive,
+Teams und andere Microsoft-Graph-Bereiche werden nicht angefordert. Microsofts
+`canEdit`-Angabe bestimmt, ob ein Kalender beschreibbar oder schreibgeschützt
+angelegt wird.
 
 Bei bestehenden Microsoft-Onlinebesprechungen wird die Beschreibung in der
-Kalenderansicht bewusst nicht bearbeitbar angeboten. Microsoft legt darin
-Besprechungsinformationen ab, die bei einem unvollständigen Überschreiben
-verloren gehen könnten. Titel, Ort und Zeit können weiterhin geändert werden.
+Kalenderansicht nicht zur Bearbeitung angeboten. Microsoft speichert darin
+Besprechungsinformationen, die durch ein unvollständiges Überschreiben verloren
+gehen könnten. Titel, Ort und Zeit bleiben bearbeitbar.
 
-Der Refresh-Token wird als internes Attribut gespeichert; Access-Tokens liegen
-nur kurzzeitig im Instanzpuffer. **Microsoft-Konto trennen** löscht die lokal
-gespeicherten Microsoft-Zugangsdaten.
-
-Für die zentrale OAuth-Anbindung muss der Modulautor den Identifier
-`opencalendar_microsoft` einmalig beim Symcon-OAuth-Dienst registrieren lassen.
-Die zugehörige Microsoft-Entra-App verwendet als Redirect-URI
-`https://oauth.ipmagic.de/forward/opencalendar_microsoft`. Diese Einrichtung
-findet einmalig für das Modul statt und ist keine Aufgabe des Endanwenders.
+**Microsoft-Konto trennen** entfernt die lokal gespeicherten Microsoft-
+Zugangsdaten.
 
 ### ICS/Webcal
 
-Nach Auswahl von **ICS/Webcal** können in der Liste
-**iCalendar-Abonnements** mehrere private oder öffentliche Feeds gemeinsam
-verwaltet werden. Jeder Eintrag besitzt:
+ICS-/Webcal-Feeds sind schreibgeschützte Kalenderabonnements. Ein Konto kann
+mehrere voneinander unabhängige Feeds verwalten.
 
-- Aktivierung
-- Kalendername
-- HTTP(S)- oder Webcal-URL
-- optionalen Benutzernamen und optionales Passwort für HTTP-Authentifizierung
-- optionale, profilbasierte Titelübersetzung
-- eigenen Aktualisierungsplan
-- benutzerdefiniertes Intervall für den entsprechenden Zeitplantyp
-- optionale Kalenderfarbe im Format `#RRGGBB`
+Minimaler Ablauf:
 
-Bleibt die Farbe leer, verwendet das Modul – sofern vorhanden – die Farbe aus
-dem Feed. `webcal://` wird automatisch über HTTPS abgerufen. Ein eingetragener
-Kalendername überschreibt die im Feed enthaltene Eigenschaft `X-WR-CALNAME`.
+1. Als Anbieter **ICS/Webcal** wählen.
+2. In der Liste **iCalendar-Abonnements** eine Zeile hinzufügen.
+3. Den Eintrag aktivieren, einen verständlichen Kalendernamen und die vollständige
+   HTTP(S)- oder `webcal://`-URL eintragen.
+4. Nur falls der Feed HTTP-Authentifizierung verlangt, Benutzername und Passwort
+   ergänzen.
+5. Einen passenden Aktualisierungsplan wählen und optional eine Farbe im Format
+   `#RRGGBB` eintragen.
+6. **Verbindung testen**, die Konfiguration übernehmen und synchronisieren.
+7. Jeden gefundenen Feed anschließend im Kalender Konfigurator als eigene
+   Kalender-Instanz erstellen.
 
-Das Profil **Öffentliche Google-Kalender - Deutsch** übersetzt ausschließlich
-bekannte englische Termintitel der Google-Kalender für Mondphasen und
-Kalendertage. Beispielsweise werden `Full Moon` zu `Vollmond` und
-`Day 205 of 2026` zu `Tag 205 von 2026`. Eine gegebenenfalls angehängte
-englische Uhrzeit wird in das deutsche 24-Stunden-Format umgewandelt. Andere
-Termintitel bleiben unverändert. Bei übersetzten Terminen enthält
-`originalSummary` weiterhin den Originaltitel. Der heruntergeladene Feed und
-sein persistenter Cache werden nicht verändert.
+`webcal://` wird automatisch über HTTPS abgerufen. Bleibt die Farbe leer,
+verwendet OpenCalendar – sofern vorhanden – die Farbe aus dem Feed. Der
+eingetragene Kalendername überschreibt `X-WR-CALNAME` aus dem Feed.
 
-Die bisherigen Felder **iCalendar-URL**, **Kalendername**, **Benutzername**,
-**Passwort** und **Titelübersetzung** bleiben für bereits eingerichtete Einzel-Feed-Konten
-rückwärtskompatibel. Der dort konfigurierte Feed wird zusätzlich zu den
-Listeneinträgen angeboten. Ist dieselbe URL bereits in der Liste enthalten,
-wird sie nicht doppelt angelegt.
+Die bisherigen Einzelfelder **iCalendar-URL**, **Kalendername**,
+**Benutzername**, **Passwort** und **Titelübersetzung** bleiben für ältere
+Konfigurationen erhalten. Der dort konfigurierte Feed wird zusätzlich zu den
+Listeneinträgen angeboten. Identische URLs werden nicht doppelt angelegt.
 
-Nach der Kontosynchronisation zeigt der zugehörige Konfigurator alle aktiven
-Abonnements als einzelne Kalender an. Die Kalender-Instanzen müssen dort
-erstellt werden. Der für einen Listeneintrag gewählte Aktualisierungsplan wird
-als Anfangskonfiguration der neu erzeugten Kalender-Instanz übernommen.
-Spätere Änderungen des Instanzzeitplans erfolgen in der jeweiligen
-Kalender-Instanz.
+Eine Feed-URL kann selbst ein Zugangsgeheimnis enthalten, beispielsweise Googles
+„Privatadresse im iCal-Format“. Sie sollte deshalb wie ein Passwort behandelt
+werden. Geheime Feed-Adressen verbleiben in der Konto-Instanz und werden nicht in
+die Konfiguration einer erzeugten Kalender-Instanz übernommen.
 
-iCalendar-Abonnements sind grundsätzlich schreibgeschützt. Die Feed-URL kann – etwa bei Googles „Privatadresse im iCal-Format“ – selbst ein Zugangsgeheimnis enthalten und sollte daher wie ein Passwort behandelt werden.
+#### Titelübersetzung
 
-Terminserien aus einem Feed werden lokal für den von der Kalenderinstanz angeforderten Zeitraum aufgelöst. Unterstützt werden tägliche, wöchentliche, monatliche und jährliche `RRULE`-Serien einschließlich `INTERVAL`, `COUNT`, `UNTIL`, `BYDAY`, `BYMONTH`, `BYMONTHDAY`, `BYSETPOS` und `WKST`. `RDATE` ergänzt einzelne Vorkommen, `EXDATE` entfernt sie und über `RECURRENCE-ID` gelieferte Änderungen oder Absagen ersetzen das zugehörige Serienvorkommen. Lokale Uhrzeiten werden in der angegebenen Zeitzone erzeugt, sodass sie auch über Sommer- und Winterzeitwechsel konstant bleiben.
+Das optionale Profil **Öffentliche Google-Kalender – Deutsch** übersetzt bekannte
+englische Termintitel der öffentlichen Google-Kalender für Mondphasen und
+Kalendertage. Andere Titel bleiben unverändert. Bei übersetzten Terminen enthält
+`originalSummary` weiterhin den ursprünglichen Titel. Der heruntergeladene Feed
+und sein Cache werden nicht verändert.
 
-Geheime Feed-Adressen werden nicht in die Terminvariable oder die Konfiguration einer erzeugten Kalenderinstanz übernommen. Sie verbleiben in der zugehörigen Konto-Instanz.
+#### Terminserien
+
+Terminserien werden lokal für den von der Kalenderinstanz angeforderten Zeitraum
+aufgelöst. Unterstützt werden tägliche, wöchentliche, monatliche und jährliche
+`RRULE`-Serien einschließlich `INTERVAL`, `COUNT`, `UNTIL`, `BYDAY`, `BYMONTH`,
+`BYMONTHDAY`, `BYSETPOS` und `WKST`. `RDATE` ergänzt einzelne Vorkommen,
+`EXDATE` entfernt sie und über `RECURRENCE-ID` gelieferte Änderungen oder Absagen
+ersetzen das zugehörige Serienvorkommen.
 
 #### Robuste Feed-Aktualisierung
 
-Jedes aktive iCalendar-Abonnement besitzt einen eigenen persistenten
-Feed-Cache:
+Jedes aktive Abonnement besitzt einen eigenen persistenten Feed-Cache:
 
-- Liefert der Server `ETag` oder `Last-Modified`, sendet das Modul bei der
-  nächsten Abfrage `If-None-Match` beziehungsweise `If-Modified-Since`.
-- Bei `304 Not Modified` wird die bereits geprüfte lokale Feed-Version
-  wiederverwendet.
-- Bei einer neuen gültigen Antwort werden Downloadzeitpunkt und Zeitpunkt der
-  letzten tatsächlichen Inhaltsänderung getrennt gespeichert.
-- Leere Antworten, HTML-Fehlerseiten oder syntaktisch ungültige
-  iCalendar-Antworten ersetzen niemals den letzten gültigen Feed.
+- `ETag` und `Last-Modified` werden für bedingte HTTP-Abfragen verwendet.
+- Bei `304 Not Modified` wird die bereits geprüfte lokale Version genutzt.
+- Leere Antworten, HTML-Fehlerseiten und ungültige iCalendar-Antworten ersetzen
+  niemals den letzten gültigen Feed.
 - Bei vorübergehenden Netzwerkproblemen, HTTP `408`, `425`, `429` oder
-  Serverfehlern ab `500` werden weiterhin die letzten gültigen Kalenderdaten
-  geliefert und als veraltet markiert.
+  Serverfehlern ab `500` bleiben die letzten gültigen Daten verfügbar und werden
+  als veraltet markiert.
 - Authentifizierungsfehler und dauerhafte Clientfehler wie `404` werden nicht
   durch Cache-Daten verborgen.
 
-**Verbindung testen** prüft immer den aktuellen Serverzustand. Der Test meldet
-einen Fehler, selbst wenn noch eine verwendbare ältere Feed-Version vorhanden
-ist. Dadurch bleibt die Kalenderanzeige robust, ohne Konfigurations- oder
-Zugriffsprobleme zu verschleiern.
-
+**Verbindung testen** prüft immer den aktuellen Serverzustand und meldet einen
+Fehler auch dann, wenn noch eine ältere Feed-Version zur Anzeige verfügbar ist.
 **Kontostatus anzeigen** enthält je Abonnement `lastCheck`, `lastDownload`,
-`lastChange`, `stale` und `lastError`. Feed-Adressen und Feed-Inhalte werden
-dabei nicht ausgegeben. **Cache leeren** entfernt sowohl die gefundenen
-Kalender als auch sämtliche gespeicherten Feed-Versionen.
+`lastChange`, `stale` und `lastError`, aber keine Feed-Adresse oder Feed-Inhalte.
+**Cache leeren** entfernt die gefundenen Kalender und gespeicherten Feed-
+Versionen. Anschließend muss erneut synchronisiert werden.
+
+## Einstellungen
+
+Eigenschaft | Beschreibung
+--- | ---
+Aktiv | Aktiviert die regelmäßige Kontosynchronisation
+Anbieter | Apple iCloud, Google Calendar, Microsoft 365, CalDAV oder ICS/Webcal
+Server-URL | CalDAV-Basisadresse beziehungsweise bei älteren ICS-Konfigurationen eine einzelne Feed-URL
+Benutzername | Kontoname oder E-Mail-Adresse; bei ICS nur für HTTP-Authentifizierung erforderlich
+Passwort | Konto- oder anwendungsspezifisches Passwort; bei ICS nur für HTTP-Authentifizierung erforderlich
+iCalendar-Abonnements | Liste der aktiven Feeds, Namen, URLs, Zugangsdaten, Übersetzungsprofile, Zeitpläne und Farben
+Aktualisierungsplan | Vorgegebener Rhythmus von fünf Minuten bis jährlich oder ausschließlich manuelle Synchronisation
+Benutzerdefiniertes Intervall | Eigener Abstand in Minuten für den entsprechenden Zeitplantyp
+TLS-Zertifikat prüfen | Nur bei eigenen CalDAV- und ICS-Endpunkten änderbar; für Apple, Google, Microsoft und Symcon OAuth immer aktiv
+Zeitlimit der Anfrage | Maximale Dauer einer HTTP-Anfrage
+
+Bei ICS/Webcal steuert der Zeitplan des Kontos die Ermittlung und Pflege der
+Feed-Metadaten. Der Zeitplan der erzeugten Kalender-Instanz bestimmt, wann deren
+Termine für den eingestellten Zeitraum angefordert werden. Beide Abläufe können
+eine Feed-Abfrage auslösen; unnötig kurze Intervalle sollten daher vermieden
+werden.
+
+## Mehrere Konten und der Kalender Konfigurator
+
+Ein eigener Konfigurator je Konto ist die übersichtlichste Variante, aber keine
+technische Pflicht. Ein vorhandener Konfigurator darf über **Gateway ändern** mit
+einem anderen Kalender Konto verbunden werden. Danach muss
+**Kalender aktualisieren** ausgeführt werden. Der Konfigurator zeigt und verwaltet
+nur Kalender des aktuell verbundenen Kontos.
+
+Kalender-Instanzen selbst dürfen nicht manuell angelegt, kopiert oder lediglich
+über **Gateway ändern** einem Konto zugeordnet werden. Sie müssen aus der Liste
+des korrekt verbundenen Konfigurators erstellt werden.
+
+## Datenschutz und OAuth
+
+Zugangsdaten, OAuth-Tokens sowie Kalender- und Termindaten werden grundsätzlich
+lokal in Symcon gespeichert oder zwischengespeichert. Google und Microsoft
+verwenden für den Login den zentralen Symcon-OAuth-Dienst; die Kalenderdaten
+werden direkt zwischen der Symcon-Installation und dem jeweiligen Anbieter
+übertragen.
+
+Ausführliche Angaben enthält die [Datenschutzerklärung](../PRIVACY.md). Die
+einmalige zentrale OAuth-Einrichtung für Herausgeber ist getrennt unter
+[OAuth-Infrastruktur für Modulautoren](../docs/OAUTH-PUBLISHER.md) dokumentiert.
+
+Passwörter, OAuth-Tokens und geheime Feed-Adressen werden weder in öffentliche
+Rückgabewerte noch unbereinigt in Debugmeldungen geschrieben.
 
 ## Datenfluss
 
@@ -234,17 +240,8 @@ Unterstützte Anforderungen von Child-Modulen:
 - `Synchronize`
 - `TestConnection`
 
-Nach einer erfolgreichen Synchronisation sendet das Konto `CalendarsUpdated` an seine Children.
-
-Beispiel einer Anforderung:
-
-```json
-{
-    "DataID": "{4E535B1D-69C7-AC77-1372-0282B21BAEC9}",
-    "Operation": "GetCalendars",
-    "RequestID": "example-1"
-}
-```
+Nach einer erfolgreichen Synchronisation sendet das Konto `CalendarsUpdated` an
+seine Children.
 
 ## PHP-Befehlsreferenz
 
@@ -260,4 +257,4 @@ string IPSKALACC_ConnectMicrosoft(int $InstanzID);
 bool IPSKALACC_DisconnectMicrosoft(int $InstanzID);
 ```
 
-Die Methoden mit komplexen Rückgabewerten liefern JSON. Passwörter und OAuth-Tokens werden weder in Rückgabewerte noch in Debugmeldungen geschrieben.
+Methoden mit komplexen Rückgabewerten liefern JSON.

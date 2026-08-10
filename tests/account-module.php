@@ -72,6 +72,16 @@ assertAccountStructure(
 );
 
 $accountSource = file_get_contents(__DIR__ . '/../Kalender Konto/module.php');
+$accountFormSource = file_get_contents(__DIR__ . '/../Kalender Konto/form.json');
+$accountForm = json_decode((string) $accountFormSource, true, 512, JSON_THROW_ON_ERROR);
+
+assertAccountStructure(
+    is_array($accountForm)
+        && str_contains((string) $accountFormSource, '/blob/main/PRIVACY.md')
+        && !str_contains((string) $accountFormSource, '/blob/legal/PRIVACY.md'),
+    'The privacy button must link to the published privacy policy on the main branch.'
+);
+
 assertAccountStructure(
     is_string($accountSource)
         && str_contains($accountSource, 'RegisterOAuth(self::GOOGLE_OAUTH_IDENTIFIER)')
