@@ -3,6 +3,14 @@
 declare(strict_types=1);
 
 const IS_ACTIVE = 102;
+const IS_INACTIVE = 104;
+const IPS_KERNELSTARTED = 10001;
+const KR_READY = 10103;
+
+function IPS_GetKernelRunlevel(): int
+{
+    return KR_READY;
+}
 
 /** @var array<int,array{ConnectionID:int,InstanceStatus:int}> */
 $configuratorTestInstances = [
@@ -35,6 +43,9 @@ class IPSModuleStrict
 
     private int $status = 0;
 
+    /** @var array<string,int> */
+    private array $timers = [];
+
     public function __construct(int $instanceId)
     {
         $this->InstanceID = $instanceId;
@@ -54,6 +65,16 @@ class IPSModuleStrict
         return $this->attributes[$name] ?? '';
     }
 
+    public function TestStatus(): int
+    {
+        return $this->status;
+    }
+
+    public function TestTimer(string $name): int
+    {
+        return $this->timers[$name] ?? -1;
+    }
+
     /** @param list<array<string,mixed>> $calendars */
     public function SeedCalendarCache(int $parentId, array $calendars): void
     {
@@ -71,6 +92,25 @@ class IPSModuleStrict
     protected function RegisterAttributeString(string $name, string $defaultValue): bool
     {
         $this->attributes[$name] ??= $defaultValue;
+
+        return true;
+    }
+
+    protected function RegisterMessage(int $senderId, int $message): bool
+    {
+        return true;
+    }
+
+    protected function RegisterTimer(string $name, int $milliseconds, string $script): bool
+    {
+        $this->timers[$name] = $milliseconds;
+
+        return true;
+    }
+
+    protected function SetTimerInterval(string $name, int $milliseconds): bool
+    {
+        $this->timers[$name] = $milliseconds;
 
         return true;
     }
@@ -135,6 +175,23 @@ $configurator = new KalenderKonfigurator(100);
 $configurator->Create();
 $configurator->SeedCalendarCache(10, [['id' => 'account-a']]);
 $configurator->ApplyChanges();
+
+assertConfiguratorSame(
+    IS_INACTIVE,
+    $configurator->TestStatus(),
+    'ApplyChanges must keep the configurator inactive until its parent is initialized.'
+);
+assertConfiguratorSame(
+    5_000,
+    $configurator->TestTimer('InitializationTimer'),
+    'Parent validation must be deferred so module reload order cannot leave the configurator in an error state.'
+);
+$configurator->Initialize();
+assertConfiguratorSame(
+    IS_ACTIVE,
+    $configurator->TestStatus(),
+    'Deferred initialization must activate the configurator once its parent account is ready.'
+);
 
 assertConfiguratorSame(
     [['id' => 'account-a']],
