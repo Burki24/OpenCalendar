@@ -36,7 +36,8 @@ beliebig verschoben oder vom Benutzer umbenannt werden.
 - Ändern einzelner, nicht wiederkehrender Termine
 - Löschen einzelner, nicht wiederkehrender Termine
 - ETag-basierter Schutz vor dem Überschreiben zwischenzeitlicher Änderungen
-- Statusvariablen für Terminanzahl und Zeitpunkt der letzten Synchronisation
+- Statusvariablen für die gesamte geladene Terminanzahl, die Termine des
+  aktuellen Tages und den Zeitpunkt der letzten Synchronisation
 
 Das Ändern oder einzelne Löschen von Vorkommen einer Terminserie ist noch nicht freigegeben. Dadurch verhindert das Modul, dass eine komplette Serie versehentlich überschrieben oder gelöscht wird.
 
@@ -64,9 +65,18 @@ Bestehende Instanzen behalten ihren bisherigen Minutenwert als benutzerdefiniert
 Variable | Typ | Beschreibung
 --- | --- | ---
 Anzahl Termine | Integer | Anzahl der aktuell zwischengespeicherten Termine
+Termine heute | Integer | Anzahl der Termine, die den aktuellen lokalen Kalendertag zeitlich überlappen
 Letzte Synchronisation | Integer | Unix-Zeitpunkt der letzten erfolgreichen Abfrage
 
-Die eigentlichen Termindaten werden bewusst nicht in einer Statusvariable gespiegelt, sondern nur im internen Modulcache gehalten. Sie werden über `IPSKAL_GetEvents()` abgerufen. Dadurch werden große JSON-Datenmengen nicht bei jeder Synchronisation als Variablenwert durch Symcon verteilt.
+**Termine heute** berücksichtigt auch ganztägige und mehrtägige Termine. Der
+Wert wird bei jeder Synchronisation und zusätzlich beim lokalen Tageswechsel
+neu berechnet.
+
+Die eigentlichen Termindaten werden bewusst nicht in einer Statusvariable
+gespiegelt, sondern nur im internen Modulcache gehalten. Konto, Kalender und
+Kalenderansicht übertragen große Terminmengen automatisch in begrenzten Seiten.
+Dadurch wird weder bei der Synchronisation noch beim Aufbau der Ansicht eine
+einzelne JSON-Antwort mit sämtlichen Terminen benötigt.
 
 Ein Termin enthält unter anderem `id`, `uid`, `resourceUrl`, `etag`, `summary`, `description`, `location`, `start`, `end`, `startTimestamp`, `endTimestamp`, `allDay`, `status`, `recurrenceRule` und `recurrenceId`. Wurde der Titel durch ein ausgewähltes iCalendar-Übersetzungsprofil angepasst, enthält `originalSummary` zusätzlich den unveränderten Originaltitel.
 
@@ -75,12 +85,21 @@ Ein Termin enthält unter anderem `id`, `uid`, `resourceUrl`, `etag`, `summary`,
 ```php
 bool IPSKAL_Synchronize(int $InstanzID);
 string IPSKAL_GetEvents(int $InstanzID);
+string IPSKAL_BeginEventsTransfer(int $InstanzID, int $StartTimestamp, int $EndTimestamp);
+string IPSKAL_ReadEventsTransferPage(int $InstanzID, string $Token, int $Page);
+bool IPSKAL_FinishEventsTransfer(int $InstanzID, string $Token);
 string IPSKAL_CreateEvent(int $InstanzID, string $EventJSON);
 string IPSKAL_UpdateEvent(int $InstanzID, string $EventJSON);
 bool IPSKAL_DeleteEvent(int $InstanzID, string $EventJSON);
 string IPSKAL_GetCalendarStatus(int $InstanzID);
 void IPSKAL_ClearCache(int $InstanzID);
 ```
+
+`IPSKAL_GetEvents()` bleibt als kompatibler Direktabruf für kleine Datenmengen
+erhalten. Eigene Integrationen mit potenziell vielen Terminen sollten einen
+Transfer beginnen, die Seiten von `0` bis `PageCount - 1` abrufen und den
+Transfer anschließend auch im Fehlerfall beenden. `StartTimestamp` ist inklusiv,
+`EndTimestamp` exklusiv.
 
 ### Termin erstellen
 

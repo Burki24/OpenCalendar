@@ -61,6 +61,7 @@ $helperManifest = json_decode(
     JSON_THROW_ON_ERROR
 );
 foreach ([
+    'ChunkedJsonTransferHelper',
     'PersistentJsonCacheHelper',
     'ConfigurationFormHelper',
     'DataFlowHelper',
@@ -107,6 +108,10 @@ foreach ([
 
 $accountSource = (string) file_get_contents($root . '/Kalender Konto/module.php');
 assertSymconStrict(
+    str_contains($accountSource, 'use ChunkedJsonTransferHelper;'),
+    'The calendar account must use ChunkedJsonTransferHelper for large event responses.'
+);
+assertSymconStrict(
     str_contains($accountSource, 'use HttpResponseHelper;'),
     'The calendar account must use the shared HttpResponseHelper.'
 );
@@ -124,6 +129,10 @@ assertSymconStrict(
 );
 
 $calendarSource = (string) file_get_contents($root . '/Kalender/module.php');
+assertSymconStrict(
+    str_contains($calendarSource, 'use ChunkedJsonTransferHelper;'),
+    'The calendar module must use ChunkedJsonTransferHelper for account and view transfers.'
+);
 assertSymconStrict(
     !str_contains($calendarSource, "RegisterVariableString('Events'"),
     'Calendar event payloads must not be mirrored into a String status variable.'

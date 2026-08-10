@@ -2,20 +2,25 @@
 
 declare(strict_types=1);
 
+use Burki24\SymconModuleHelper\ChunkedJsonTransferHelper;
 use Burki24\SymconModuleHelper\ConfigurationFormHelper;
 use Burki24\SymconModuleHelper\DataFlowHelper;
 use Burki24\SymconModuleHelper\PersistentJsonCacheHelper;
 use Burki24\SymconModuleHelper\VariableHelper;
+use IPSKalender\CalendarEventCounter;
 use IPSKalender\SynchronizationSchedule;
 
+require_once __DIR__ . '/../libs/helper/ChunkedJsonTransferHelper.php';
 require_once __DIR__ . '/../libs/helper/ConfigurationFormHelper.php';
 require_once __DIR__ . '/../libs/helper/DataFlowHelper.php';
 require_once __DIR__ . '/../libs/helper/PersistentJsonCacheHelper.php';
 require_once __DIR__ . '/../libs/helper/VariableHelper.php';
+require_once __DIR__ . '/../libs/CalendarEventCounter.php';
 require_once __DIR__ . '/../libs/SynchronizationSchedule.php';
 
 class Kalender extends IPSModuleStrict
 {
+    use ChunkedJsonTransferHelper;
     use ConfigurationFormHelper;
     use DataFlowHelper;
     use PersistentJsonCacheHelper;
@@ -23,6 +28,7 @@ class Kalender extends IPSModuleStrict
 
     private const DATA_ID_TO_PARENT = '{4E535B1D-69C7-AC77-1372-0282B21BAEC9}';
     private const DATA_ID_FROM_PARENT = '{8ED646DD-88E9-ACE2-95D5-9766EED4B5B0}';
+    private const EVENT_TRANSFER_SCOPE = 'CalendarCachedEvents';
     private const INITIALIZATION_DELAY_MS = 3_000;
 
     private const STATUS_CONFIGURATION_MISSING = 201;
@@ -60,6 +66,7 @@ class Kalender extends IPSModuleStrict
         $this->RegisterAttributeBoolean('RuntimeReady', false);
 
         $this->RegisterVariableInteger('EventCount', $this->Translate('Event count'), [], 10);
+        $this->RegisterVariableInteger('TodayEventCount', $this->Translate("Today's events"), [], 20);
         $this->RegisterVariableInteger(
             'LastSynchronization',
             $this->Translate('Last synchronization'),
@@ -67,11 +74,12 @@ class Kalender extends IPSModuleStrict
                 'PRESENTATION' => VARIABLE_PRESENTATION_DATE_TIME,
                 'TEMPLATE'     => VARIABLE_TEMPLATE_DATE_TIME
             ],
-            20
+            30
         );
 
         $this->RegisterTimer('InitializationTimer', 0, 'IPSKAL_Initialize($_IPS[\'TARGET\']);');
         $this->RegisterTimer('SynchronizationTimer', 0, 'IPSKAL_ScheduledSynchronize($_IPS[\'TARGET\']);');
+        $this->RegisterTimer('DayChangeTimer', 0, 'IPSKAL_RefreshTodayEventCount($_IPS[\'TARGET\']);');
     }
 
     /**
@@ -140,6 +148,12 @@ class Kalender extends IPSModuleStrict
         $this->RegisterMessage(0, IPS_KERNELSTARTED);
         $this->SetTimerInterval('InitializationTimer', 0);
         $this->SetTimerInterval('SynchronizationTimer', 0);
+        $this->SetTimerInterval('DayChangeTimer', 0);
+        $this->updateEventCounters($this->readEvents());
+
+        if (IPS_GetKernelRunlevel() === KR_READY) {
+            $this->scheduleTodayEventCountRefresh();
+        }
 
         $validationError = $this->validateConfiguration();
         if ($validationError !== '') {
@@ -169,6 +183,7 @@ class Kalender extends IPSModuleStrict
     {
         if ($SenderID === 0 && $Message === IPS_KERNELSTARTED) {
             $this->scheduleInitialization();
+            $this->scheduleTodayEventCountRefresh();
         }
     }
 
@@ -195,6 +210,8 @@ class Kalender extends IPSModuleStrict
             )
         );
         $this->refreshCalendarMetadataSafely();
+        $this->updateEventCounters($this->readEvents());
+        $this->scheduleTodayEventCountRefresh();
         $this->SetStatus(IS_ACTIVE);
 
         return true;
@@ -216,6 +233,24 @@ class Kalender extends IPSModuleStrict
         }
 
         return $this->Synchronize();
+    }
+
+    /**
+     * Recalculates the current-day event count after the local day changes.
+     *
+     * @return bool True when the counter was updated.
+     */
+    public function RefreshTodayEventCount(): bool
+    {
+        $this->SetTimerInterval('DayChangeTimer', 0);
+        if (IPS_GetKernelRunlevel() !== KR_READY) {
+            return false;
+        }
+
+        $this->updateEventCounters($this->readEvents());
+        $this->scheduleTodayEventCountRefresh();
+
+        return true;
     }
 
     /**
@@ -278,6 +313,76 @@ class Kalender extends IPSModuleStrict
                 | JSON_PRESERVE_ZERO_FRACTION
                 | JSON_THROW_ON_ERROR
         );
+    }
+
+    /**
+     * Creates a temporary paged transfer for cached events overlapping a time range.
+     *
+     * This is the preferred API for module consumers because each subsequent
+     * response remains safely below Symcon's PHP output limit.
+     *
+     * @param int $StartTimestamp Inclusive start of the requested Unix time range.
+     * @param int $EndTimestamp Exclusive end of the requested Unix time range.
+     * @return string JSON-encoded transfer metadata.
+     */
+    public function BeginEventsTransfer(int $StartTimestamp, int $EndTimestamp): string
+    {
+        if ($StartTimestamp <= 0 || $EndTimestamp <= $StartTimestamp) {
+            throw new InvalidArgumentException('The requested event time range is invalid.');
+        }
+        if (($EndTimestamp - $StartTimestamp) > 6 * 366 * 86400) {
+            throw new InvalidArgumentException('The requested event time range is too large.');
+        }
+
+        $events = array_values(array_filter(
+            $this->readEvents(),
+            static function (array $event) use ($StartTimestamp, $EndTimestamp): bool
+            {
+                $startTimestamp = (int) ($event['startTimestamp'] ?? 0);
+                $endTimestamp = (int) ($event['endTimestamp'] ?? $startTimestamp);
+
+                return $startTimestamp > 0
+                    && $endTimestamp >= $StartTimestamp
+                    && $startTimestamp < $EndTimestamp;
+            }
+        ));
+
+        return json_encode(
+            $this->CreateChunkedJsonTransfer(self::EVENT_TRANSFER_SCOPE, $events),
+            JSON_UNESCAPED_SLASHES
+                | JSON_UNESCAPED_UNICODE
+                | JSON_PRESERVE_ZERO_FRACTION
+                | JSON_THROW_ON_ERROR
+        );
+    }
+
+    /**
+     * Reads one page from a cached event transfer.
+     *
+     * @param string $Token Transfer token returned by BeginEventsTransfer().
+     * @param int $Page Zero-based page number.
+     * @return string JSON-encoded transfer page.
+     */
+    public function ReadEventsTransferPage(string $Token, int $Page): string
+    {
+        return json_encode(
+            $this->ReadChunkedJsonTransferPage(self::EVENT_TRANSFER_SCOPE, $Token, $Page),
+            JSON_UNESCAPED_SLASHES
+                | JSON_UNESCAPED_UNICODE
+                | JSON_PRESERVE_ZERO_FRACTION
+                | JSON_THROW_ON_ERROR
+        );
+    }
+
+    /**
+     * Removes a completed or aborted cached event transfer.
+     *
+     * @param string $Token Transfer token returned by BeginEventsTransfer().
+     * @return bool True when the transfer existed.
+     */
+    public function FinishEventsTransfer(string $Token): bool
+    {
+        return $this->ClearChunkedJsonTransfer(self::EVENT_TRANSFER_SCOPE, $Token);
     }
 
     /**
@@ -391,6 +496,7 @@ class Kalender extends IPSModuleStrict
         $writeAccessKnown = $metadataAvailable
             && $this->ReadAttributeBoolean('DetectedWriteAccessKnown');
         $detectedColor = $this->ReadAttributeString('DetectedCalendarColor');
+        $events = $this->readEvents();
 
         return json_encode(
             [
@@ -404,7 +510,11 @@ class Kalender extends IPSModuleStrict
                         : $this->ReadAttributeBoolean('DetectedCanWrite')
                             || $this->ReadPropertyBoolean('CanWrite'))
                     : $this->ReadPropertyBoolean('CanWrite'),
-                'eventCount'          => count($this->readEvents()),
+                'eventCount'          => count($events),
+                'todayEventCount'     => CalendarEventCounter::countForDay(
+                    $events,
+                    new DateTimeImmutable('today')
+                ),
                 'lastSynchronization' => $this->ReadAttributeInteger('LastSynchronization'),
                 'lastError'           => $this->ReadAttributeString('LastError')
             ],
@@ -511,12 +621,62 @@ class Kalender extends IPSModuleStrict
         $today = new DateTimeImmutable('today');
         $start = $today->modify('-' . $pastDays . ' days');
         $end = $today->modify('+' . ($futureDays + 1) . ' days');
-        $payload = $this->sendRequest(
-            'GetEvents',
+        $transfer = $this->sendRequest(
+            'BeginEventsTransfer',
             ['Start' => $start->getTimestamp(), 'End' => $end->getTimestamp()]
         );
+        $token = trim((string) ($transfer['Token'] ?? ''));
+        $pageCount = (int) ($transfer['PageCount'] ?? 0);
+        $itemCount = (int) ($transfer['ItemCount'] ?? -1);
+        if (preg_match('/^[a-f0-9]{32}$/D', $token) !== 1
+            || $pageCount < 1
+            || $pageCount > 10_000
+            || $itemCount < 0) {
+            throw new UnexpectedValueException('The calendar account returned invalid event transfer metadata.');
+        }
 
-        return array_values(array_filter($payload, 'is_array'));
+        $events = [];
+        try {
+            for ($page = 0; $page < $pageCount; ++$page) {
+                $payload = $this->sendRequest(
+                    'ReadEventsTransferPage',
+                    ['Token' => $token, 'Page' => $page]
+                );
+                if (($payload['Token'] ?? null) !== $token
+                    || (int) ($payload['Page'] ?? -1) !== $page
+                    || (int) ($payload['PageCount'] ?? 0) !== $pageCount
+                    || (int) ($payload['ItemCount'] ?? -1) !== $itemCount
+                    || (bool) ($payload['Complete'] ?? false) !== ($page === $pageCount - 1)
+                    || !is_array($payload['Items'] ?? null)
+                    || !array_is_list($payload['Items'])) {
+                    throw new UnexpectedValueException('The calendar account returned an invalid event transfer page.');
+                }
+
+                foreach ($payload['Items'] as $event) {
+                    if (!is_array($event) || array_is_list($event)) {
+                        throw new UnexpectedValueException('The calendar account returned invalid event data.');
+                    }
+                    $events[] = $event;
+                }
+            }
+        } finally {
+            $this->finishEventTransfer($token);
+        }
+
+        if (count($events) !== $itemCount) {
+            throw new UnexpectedValueException('The calendar account returned an incomplete event transfer.');
+        }
+
+        return $events;
+    }
+
+    private function finishEventTransfer(string $token): void
+    {
+        try {
+            $this->sendRequest('FinishEventsTransfer', ['Token' => $token]);
+        } catch (Throwable $exception) {
+            $this->SendDebug('EventTransferCleanup', $exception->getMessage(), 0);
+        }
     }
 
     /**
@@ -589,8 +749,32 @@ class Kalender extends IPSModuleStrict
         $timestamp = time();
         $this->WritePersistentJsonCache('CachedEvents', $events);
         $this->WriteAttributeInteger('LastSynchronization', $timestamp);
-        $this->SetValue('EventCount', count($events));
+        $this->updateEventCounters($events);
         $this->SetValue('LastSynchronization', $timestamp);
+    }
+
+    /** @param list<array<string, mixed>> $events */
+    private function updateEventCounters(array $events): void
+    {
+        $this->SetValue('EventCount', count($events));
+        $this->SetValue(
+            'TodayEventCount',
+            CalendarEventCounter::countForDay($events, new DateTimeImmutable('today'))
+        );
+    }
+
+    private function scheduleTodayEventCountRefresh(): void
+    {
+        if (IPS_GetKernelRunlevel() !== KR_READY) {
+            return;
+        }
+
+        $now = new DateTimeImmutable();
+        $nextDay = $now->modify('tomorrow')->setTime(0, 0, 1);
+        $this->SetTimerInterval(
+            'DayChangeTimer',
+            max(1_000, ($nextDay->getTimestamp() - $now->getTimestamp()) * 1_000)
+        );
     }
 
     /**
@@ -655,7 +839,9 @@ class Kalender extends IPSModuleStrict
 
         if (str_contains(strtolower($rawMessage), 'changed by another client')) {
             $this->SetStatus(self::STATUS_WRITE_CONFLICT);
-        } elseif ($exception instanceof JsonException || str_contains(strtolower($rawMessage), 'invalid data')) {
+        } elseif ($exception instanceof JsonException
+            || str_contains(strtolower($rawMessage), 'invalid data')
+            || str_contains(strtolower($rawMessage), 'event transfer')) {
             $this->SetStatus(self::STATUS_INVALID_RESPONSE);
         } else {
             $this->SetStatus(self::STATUS_SYNCHRONIZATION_FAILED);

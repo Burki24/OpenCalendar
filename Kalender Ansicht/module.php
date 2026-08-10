@@ -723,6 +723,8 @@ class KalenderAnsicht extends IPSModuleStrict
             'No events',
             'There are no events in this period.',
             'All day',
+            'Event',
+            'Events',
             'Untitled event',
             'more',
             'Create event',
@@ -767,19 +769,17 @@ class KalenderAnsicht extends IPSModuleStrict
 
         foreach ($calendars as $calendar) {
             try {
-                $calendarEvents = json_decode(IPSKAL_GetEvents($calendar['instanceId']), true, 512, JSON_THROW_ON_ERROR);
+                $calendarEvents = $this->readCalendarEventsForRange(
+                    $calendar['instanceId'],
+                    $rangeStart,
+                    $rangeEnd
+                );
             } catch (Throwable $exception) {
                 $this->SendDebug('CalendarData', $exception->getMessage(), 0);
                 continue;
             }
-            if (!is_array($calendarEvents)) {
-                continue;
-            }
 
             foreach ($calendarEvents as $event) {
-                if (!is_array($event)) {
-                    continue;
-                }
                 $startTimestamp = (int) ($event['startTimestamp'] ?? 0);
                 $endTimestamp = (int) ($event['endTimestamp'] ?? $startTimestamp);
                 if ($startTimestamp <= 0 || $endTimestamp < $rangeStart || $startTimestamp >= $rangeEnd) {
@@ -806,6 +806,75 @@ class KalenderAnsicht extends IPSModuleStrict
             'generatedAt' => time(),
             'settings'    => $this->viewSettings()
         ];
+    }
+
+    /**
+     * Reads cached events from one calendar through size-limited transfer pages.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function readCalendarEventsForRange(int $instanceId, int $rangeStart, int $rangeEnd): array
+    {
+        $metadata = json_decode(
+            IPSKAL_BeginEventsTransfer($instanceId, $rangeStart, $rangeEnd),
+            true,
+            512,
+            JSON_THROW_ON_ERROR
+        );
+        if (!is_array($metadata)) {
+            throw new UnexpectedValueException('The calendar returned invalid event transfer metadata.');
+        }
+
+        $token = trim((string) ($metadata['Token'] ?? ''));
+        $pageCount = (int) ($metadata['PageCount'] ?? 0);
+        $itemCount = (int) ($metadata['ItemCount'] ?? -1);
+        if (preg_match('/^[a-f0-9]{32}$/D', $token) !== 1
+            || $pageCount < 1
+            || $pageCount > 10_000
+            || $itemCount < 0) {
+            throw new UnexpectedValueException('The calendar returned invalid event transfer metadata.');
+        }
+
+        $events = [];
+        try {
+            for ($page = 0; $page < $pageCount; ++$page) {
+                $payload = json_decode(
+                    IPSKAL_ReadEventsTransferPage($instanceId, $token, $page),
+                    true,
+                    512,
+                    JSON_THROW_ON_ERROR
+                );
+                if (!is_array($payload)
+                    || ($payload['Token'] ?? null) !== $token
+                    || (int) ($payload['Page'] ?? -1) !== $page
+                    || (int) ($payload['PageCount'] ?? 0) !== $pageCount
+                    || (int) ($payload['ItemCount'] ?? -1) !== $itemCount
+                    || (bool) ($payload['Complete'] ?? false) !== ($page === $pageCount - 1)
+                    || !is_array($payload['Items'] ?? null)
+                    || !array_is_list($payload['Items'])) {
+                    throw new UnexpectedValueException('The calendar returned an invalid event transfer page.');
+                }
+
+                foreach ($payload['Items'] as $event) {
+                    if (!is_array($event) || array_is_list($event)) {
+                        throw new UnexpectedValueException('The calendar returned invalid event data.');
+                    }
+                    $events[] = $event;
+                }
+            }
+        } finally {
+            try {
+                IPSKAL_FinishEventsTransfer($instanceId, $token);
+            } catch (Throwable $exception) {
+                $this->SendDebug('EventTransferCleanup', $exception->getMessage(), 0);
+            }
+        }
+
+        if (count($events) !== $itemCount) {
+            throw new UnexpectedValueException('The calendar returned an incomplete event transfer.');
+        }
+
+        return $events;
     }
 
     /**

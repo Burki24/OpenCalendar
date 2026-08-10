@@ -19,9 +19,14 @@ trait KalenderKontoChildGatewayTrait
             $requestID = (string) ($request['RequestID'] ?? '');
 
             $payload = match ($operation) {
-                'GetCalendars'      => json_decode($this->GetCalendars(), true, 512, JSON_THROW_ON_ERROR),
-                'DiscoverCalendars' => $this->discoverCalendars(),
-                'GetEvents'         => $this->getEventsForChild($request),
+                'GetCalendars'           => json_decode($this->GetCalendars(), true, 512, JSON_THROW_ON_ERROR),
+                'DiscoverCalendars'      => $this->discoverCalendars(),
+                'GetEvents'              => $this->getEventsForChild($request),
+                'BeginEventsTransfer'    => $this->beginEventsTransferForChild($request),
+                'ReadEventsTransferPage' => $this->readEventsTransferPageForChild($request),
+                'FinishEventsTransfer'   => [
+                    'success' => $this->finishEventsTransferForChild($request)
+                ],
                 'CreateEvent'       => $this->createEventForChild($request),
                 'UpdateEvent'       => $this->updateEventForChild($request),
                 'DeleteEvent'       => ['success' => $this->deleteEventForChild($request)],
@@ -66,6 +71,48 @@ trait KalenderKontoChildGatewayTrait
             $this->calendarReference($calendar),
             new DateTimeImmutable('@' . $startTimestamp),
             new DateTimeImmutable('@' . $endTimestamp)
+        );
+    }
+
+    /**
+     * Creates a temporary, paged transfer for the requested calendar events.
+     *
+     * @param array<string, mixed> $request
+     * @return array{Token:string,PageCount:int,ItemCount:int,ExpiresAt:int}
+     */
+    private function beginEventsTransferForChild(array $request): array
+    {
+        return $this->CreateChunkedJsonTransfer(
+            self::EVENT_TRANSFER_SCOPE,
+            $this->getEventsForChild($request)
+        );
+    }
+
+    /**
+     * Reads one page from a previously created event transfer.
+     *
+     * @param array<string, mixed> $request
+     * @return array{Token:string,Page:int,PageCount:int,ItemCount:int,Complete:bool,Items:list<mixed>}
+     */
+    private function readEventsTransferPageForChild(array $request): array
+    {
+        return $this->ReadChunkedJsonTransferPage(
+            self::EVENT_TRANSFER_SCOPE,
+            (string) ($request['Token'] ?? ''),
+            (int) ($request['Page'] ?? -1)
+        );
+    }
+
+    /**
+     * Removes a completed or aborted event transfer.
+     *
+     * @param array<string, mixed> $request
+     */
+    private function finishEventsTransferForChild(array $request): bool
+    {
+        return $this->ClearChunkedJsonTransfer(
+            self::EVENT_TRANSFER_SCOPE,
+            (string) ($request['Token'] ?? '')
         );
     }
 
