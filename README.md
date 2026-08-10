@@ -130,18 +130,6 @@ Drittanbieter.
   Führt mehrere Kalender in einer responsiven Kachel- oder IPSView-Ansicht
   zusammen.
 
-## Informationen für Entwickler und Modulautoren
-
-Die einmalige Einrichtung der zentralen Google- und Microsoft-OAuth-Clients ist
-keine Aufgabe des Endanwenders. Sie ist getrennt in
-[OAuth-Infrastruktur für Modulautoren](docs/OAUTH-PUBLISHER.md) dokumentiert.
-
-OpenCalendar verwendet die gemeinsamen Prüfaktionen aus
-[`Burki24/Symcon_ModuleCI`](https://github.com/Burki24/Symcon_ModuleCI), fest auf
-Version `v1.0.0` gesetzt. Die verpflichtenden Status-Checks heißen `tests` und
-`style`. Der Testlauf verwendet PHP 8.5 mit cURL und DOM, prüft PHP- und
-JSON-Dateien und startet anschließend `php tests/run.php` einschließlich der
-CalDAV-HTTP-Integration.
 
 Die offiziellen Symcon-Entwicklungsgrundlagen werden als Git-Submodule geführt:
 
