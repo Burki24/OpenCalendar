@@ -86,7 +86,7 @@ assertVisualization(
         && str_contains($script, 'calendarState.settings.showWeekCalendarWeek !== false')
         && str_contains($script, 'calendarState.settings.showMonthCalendarWeek === true')
         && str_contains($script, "calendarWeeks.join('/')")
-        && str_contains($script, "day.getDay() === 1"),
+        && str_contains($script, 'day.getDay() === 1'),
     'Agenda, three-day, week and month views must control ISO calendar-week labels independently.'
 );
 assertVisualization(

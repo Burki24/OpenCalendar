@@ -1294,7 +1294,7 @@ assertTrueValue(
         && is_string($viewScriptSource)
         && str_contains($viewScriptSource, 'formatCalendarWeekLabel(days)')
         && str_contains($viewScriptSource, "calendarWeeks.join('/')")
-        && str_contains($viewScriptSource, "day.getDay() === 1")
+        && str_contains($viewScriptSource, 'day.getDay() === 1')
         && str_contains($viewScriptSource, 'Date.UTC'),
     'Agenda, three-day, week and month views must optionally show ISO calendar weeks.'
 );
