@@ -34,8 +34,8 @@ unvollständig ist; eine vorhandene individuelle Auswahl wird dabei ersetzt.
 - unabhängig wählbare horizontale oder vertikale Wochenansicht für Kachel und
   IPSView
 - optionale Anzeige des Tages im Jahr
-- Anzeige der gesamten Terminanzahl je Tag in Agenda-, 3-Tage- und
-  Wochenansicht
+- optional und je Darstellung separat einblendbare Terminanzahl pro Tag in
+  Agenda-, 3-Tage- und Wochenansicht
 - Zusammenführen beliebig vieler ausgewählter Kalender
 - Farben der einzelnen Kalender und Termine
 - optionale Anzeige von Kalendername, Ort und Beschreibung
@@ -61,7 +61,9 @@ Vergangene/Zukünftige Tage | Zeitraum, aus dem Termine zusammengeführt werden
 Maximale Termine | Obergrenze der in einer Antwort verarbeiteten Termine
 Wochenenden anzeigen | Blendet Samstag und Sonntag ein oder aus
 Tag im Jahr anzeigen | Ergänzt Tagesüberschriften um die fortlaufende Tagesnummer
-Terminanzahl je Tag | Wird in Agenda-, 3-Tage- und Wochenansicht automatisch über alle ausgewählten Kalender angezeigt
+Terminanzahl in Agenda anzeigen | Blendet die Terminanzahl je Tag nur in der Agenda ein oder aus
+Terminanzahl in 3-Tage-Ansicht anzeigen | Blendet die Terminanzahl je Tag nur in der 3-Tage-Ansicht ein oder aus
+Terminanzahl in Wochenansicht anzeigen | Blendet die Terminanzahl je Tag nur in der Wochenansicht ein oder aus
 Kalendername/Ort/Beschreibung | Legt fest, welche Termindetails sichtbar sind
 
 Die ausgewählten Kalender werden intern seitenweise gelesen. Dies geschieht

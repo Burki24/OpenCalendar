@@ -1302,13 +1302,20 @@ assertTrueValue(
     'Agenda, three-day and weekly headings must optionally show the day of year.'
 );
 assertTrueValue(
-    is_string($viewScriptSource)
+    is_string($viewModuleSource)
+        && str_contains($viewModuleSource, "RegisterPropertyBoolean('ShowAgendaEventCount', true)")
+        && str_contains($viewModuleSource, "RegisterPropertyBoolean('ShowThreeDaysEventCount', true)")
+        && str_contains($viewModuleSource, "RegisterPropertyBoolean('ShowWeekEventCount', true)")
+        && is_string($viewScriptSource)
         && str_contains($viewScriptSource, 'group.events.length')
-        && str_contains($viewScriptSource, 'formatDayHeading(date, options, eventCount)')
+        && str_contains($viewScriptSource, 'formatDayHeading(date, options, eventCount, showEventCount)')
+        && str_contains($viewScriptSource, 'calendarState.settings.showAgendaEventCount !== false')
+        && str_contains($viewScriptSource, 'calendarState.settings.showThreeDaysEventCount !== false')
+        && str_contains($viewScriptSource, 'calendarState.settings.showWeekEventCount !== false')
         && str_contains($viewScriptSource, "eventCount === 1 ? 'Event' : 'Events'")
         && preg_match('/function renderMonth\(\)[\s\S]*?function renderEmpty/', $viewScriptSource, $monthRenderer) === 1
         && !str_contains($monthRenderer[0], 'formatDayHeading('),
-    'Agenda, three-day and weekly headings must show per-day event totals without changing the month view.'
+    'Agenda, three-day and weekly event totals must be independently configurable without changing the month view.'
 );
 
 assertTrueValue(

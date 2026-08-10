@@ -22,7 +22,12 @@ final class CalendarVisualizationRenderer
             'state'              => [
                 'events'    => [],
                 'calendars' => [],
-                'settings'  => ['defaultView' => 'agenda']
+                'settings'  => [
+                    'defaultView'             => 'agenda',
+                    'showAgendaEventCount'    => false,
+                    'showThreeDaysEventCount' => true,
+                    'showWeekEventCount'      => false
+                ]
             ],
             'runtime'            => $ipsView
                 ? ['endpoint' => '/hook/opencalendar/view/12345', 'token' => '0123456789abcdef0123456789abcdef']
@@ -57,6 +62,26 @@ function assertVisualization(bool $condition, string $message): void
     if (!$condition) {
         throw new RuntimeException($message);
     }
+}
+
+$script = (string) file_get_contents(__DIR__ . '/../Kalender Ansicht/visualization/app.js');
+assertVisualization(
+    str_contains($script, 'calendarState.settings.showAgendaEventCount !== false')
+        && str_contains($script, 'calendarState.settings.showThreeDaysEventCount !== false')
+        && str_contains($script, 'calendarState.settings.showWeekEventCount !== false')
+        && str_contains($script, 'if (showEventCount) {'),
+    'Agenda, three-day and week views must control their event counts independently.'
+);
+
+$formSource = (string) file_get_contents(__DIR__ . '/../Kalender Ansicht/form.json');
+$moduleSource = (string) file_get_contents(__DIR__ . '/../Kalender Ansicht/module.php');
+foreach (['ShowAgendaEventCount', 'ShowThreeDaysEventCount', 'ShowWeekEventCount'] as $property) {
+    assertVisualization(
+        str_contains($formSource, '"name": "' . $property . '"')
+            && str_contains($moduleSource, "RegisterPropertyBoolean('" . $property . "', true)")
+            && str_contains($moduleSource, "ReadPropertyBoolean('" . $property . "')"),
+        sprintf('The %s setting must be configurable, persisted and exposed to the visualization.', $property)
+    );
 }
 
 $style = (string) file_get_contents(__DIR__ . '/../Kalender Ansicht/visualization/style.css');
@@ -104,6 +129,9 @@ foreach ([$native, $ipsView] as $html) {
     assertVisualization(!preg_match('/\{\{[A-Z][A-Z0-9_]*\}\}/', $html), 'No visualization placeholder may remain unresolved.');
     assertVisualization(str_contains($html, 'window.SYMC_VISUALIZATION = '), 'The shared bootstrap object must be embedded.');
     assertVisualization(str_contains($html, 'contractVersion'), 'The bootstrap contract version must be embedded.');
+    assertVisualization(str_contains($html, '"showAgendaEventCount":false'), 'The agenda event-count setting must be serialized.');
+    assertVisualization(str_contains($html, '"showThreeDaysEventCount":true'), 'The three-day event-count setting must be serialized.');
+    assertVisualization(str_contains($html, '"showWeekEventCount":false'), 'The week event-count setting must be serialized.');
     assertVisualization(str_contains($html, 'calendarVisualization.state'), 'The calendar script must consume the shared state contract.');
     assertVisualization(
         str_contains($html, "calendarIPSViewRequest('GetState', null)"),

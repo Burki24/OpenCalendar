@@ -101,6 +101,9 @@ class KalenderAnsicht extends IPSModuleStrict
         $this->RegisterPropertyInteger('MaxEvents', 250);
         $this->RegisterPropertyBoolean('ShowWeekends', true);
         $this->RegisterPropertyBoolean('ShowDayOfYear', true);
+        $this->RegisterPropertyBoolean('ShowAgendaEventCount', true);
+        $this->RegisterPropertyBoolean('ShowThreeDaysEventCount', true);
+        $this->RegisterPropertyBoolean('ShowWeekEventCount', true);
         $this->RegisterPropertyBoolean('ShowCalendarName', true);
         $this->RegisterPropertyBoolean('ShowLocation', true);
         $this->RegisterPropertyBoolean('ShowDescription', false);
@@ -896,21 +899,24 @@ class KalenderAnsicht extends IPSModuleStrict
     private function viewSettings(): array
     {
         return [
-            'defaultView'            => match ($this->ReadPropertyInteger('DefaultView')) {
+            'defaultView'             => match ($this->ReadPropertyInteger('DefaultView')) {
                 1       => 'week',
                 2       => 'month',
                 3       => 'threeDays',
                 default => 'agenda'
             },
-            'showWeekends'           => $this->ReadPropertyBoolean('ShowWeekends'),
-            'showDayOfYear'          => $this->ReadPropertyBoolean('ShowDayOfYear'),
-            'showCalendarName'       => $this->ReadPropertyBoolean('ShowCalendarName'),
-            'showLocation'           => $this->ReadPropertyBoolean('ShowLocation'),
-            'showDescription'        => $this->ReadPropertyBoolean('ShowDescription'),
-            'tileWeekOrientation'    => $this->ReadPropertyInteger('TileWeekOrientation') === 1
+            'showWeekends'            => $this->ReadPropertyBoolean('ShowWeekends'),
+            'showDayOfYear'           => $this->ReadPropertyBoolean('ShowDayOfYear'),
+            'showAgendaEventCount'    => $this->ReadPropertyBoolean('ShowAgendaEventCount'),
+            'showThreeDaysEventCount' => $this->ReadPropertyBoolean('ShowThreeDaysEventCount'),
+            'showWeekEventCount'      => $this->ReadPropertyBoolean('ShowWeekEventCount'),
+            'showCalendarName'        => $this->ReadPropertyBoolean('ShowCalendarName'),
+            'showLocation'            => $this->ReadPropertyBoolean('ShowLocation'),
+            'showDescription'         => $this->ReadPropertyBoolean('ShowDescription'),
+            'tileWeekOrientation'     => $this->ReadPropertyInteger('TileWeekOrientation') === 1
                 ? 'vertical'
                 : 'horizontal',
-            'ipsViewWeekOrientation' => $this->ReadPropertyInteger('IPSViewWeekOrientation') === 1
+            'ipsViewWeekOrientation'  => $this->ReadPropertyInteger('IPSViewWeekOrientation') === 1
                 ? 'vertical'
                 : 'horizontal'
         ];

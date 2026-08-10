@@ -127,6 +127,26 @@
             ]
         },
         {
+            "type": "RowLayout",
+            "items": [
+                {
+                    "type": "CheckBox",
+                    "name": "ShowAgendaEventCount",
+                    "caption": "Show event count in agenda"
+                },
+                {
+                    "type": "CheckBox",
+                    "name": "ShowThreeDaysEventCount",
+                    "caption": "Show event count in 3-day view"
+                },
+                {
+                    "type": "CheckBox",
+                    "name": "ShowWeekEventCount",
+                    "caption": "Show event count in week view"
+                }
+            ]
+        },
+        {
             "type": "ExpansionPanel",
             "caption": "IPSView",
             "expanded": false,

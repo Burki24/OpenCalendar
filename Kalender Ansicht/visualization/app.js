@@ -145,7 +145,8 @@ function renderAgenda() {
         fullDate.textContent = formatDayHeading(
             group.date,
             { weekday: 'long', day: '2-digit', month: 'long' },
-            group.events.length
+            group.events.length,
+            calendarState.settings.showAgendaEventCount !== false
         );
         heading.append(strong, fullDate);
         section.appendChild(heading);
@@ -198,15 +199,20 @@ function renderWeek() {
         days,
         'week-grid'
             + (calendarState.settings.showWeekends === false ? ' hide-weekends' : '')
-            + (vertical ? ' vertical-week-grid' : '')
+            + (vertical ? ' vertical-week-grid' : ''),
+        calendarState.settings.showWeekEventCount !== false
     );
 }
 
 function renderThreeDays() {
-    renderDayColumns(getThreeVisibleDays(cursorDate), 'week-grid three-day-grid');
+    renderDayColumns(
+        getThreeVisibleDays(cursorDate),
+        'week-grid three-day-grid',
+        calendarState.settings.showThreeDaysEventCount !== false
+    );
 }
 
-function renderDayColumns(days, className) {
+function renderDayColumns(days, className, showEventCount) {
     const grid = element('div', className);
     days.forEach(day => {
         const column = element('section', 'week-column' + (isToday(day) ? ' today' : ''));
@@ -216,7 +222,8 @@ function renderDayColumns(days, className) {
         heading.textContent = formatDayHeading(
             day,
             { weekday: 'short', day: '2-digit', month: '2-digit' },
-            events.length
+            events.length,
+            showEventCount
         );
         column.appendChild(heading);
         const eventList = element('div', 'week-events');
@@ -769,13 +776,15 @@ function daysInYear(date) {
     const year = date.getFullYear();
     return new Date(year, 1, 29).getMonth() === 1 ? 366 : 365;
 }
-function formatDayHeading(date, options, eventCount) {
+function formatDayHeading(date, options, eventCount, showEventCount) {
     const formattedDate = new Intl.DateTimeFormat(undefined, options).format(date);
     const parts = [formattedDate];
     if (calendarState.settings.showDayOfYear !== false) {
         parts.push(`${t('Day')} ${dayOfYear(date)}/${daysInYear(date)}`);
     }
-    parts.push(`${eventCount} ${t(eventCount === 1 ? 'Event' : 'Events')}`);
+    if (showEventCount) {
+        parts.push(`${eventCount} ${t(eventCount === 1 ? 'Event' : 'Events')}`);
+    }
     return parts.join(' · ');
 }
 function addDays(date, days) { const result = new Date(date); result.setDate(result.getDate() + days); return result; }
