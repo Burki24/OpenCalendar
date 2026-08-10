@@ -6,12 +6,14 @@ use Burki24\SymconModuleHelper\ConfigurationFormHelper;
 use Burki24\SymconModuleHelper\DataFlowHelper;
 use Burki24\SymconModuleHelper\PersistentJsonCacheHelper;
 use Burki24\SymconModuleHelper\VariableHelper;
+use IPSKalender\CalendarEventCounter;
 use IPSKalender\SynchronizationSchedule;
 
 require_once __DIR__ . '/../libs/helper/ConfigurationFormHelper.php';
 require_once __DIR__ . '/../libs/helper/DataFlowHelper.php';
 require_once __DIR__ . '/../libs/helper/PersistentJsonCacheHelper.php';
 require_once __DIR__ . '/../libs/helper/VariableHelper.php';
+require_once __DIR__ . '/../libs/CalendarEventCounter.php';
 require_once __DIR__ . '/../libs/SynchronizationSchedule.php';
 
 class Kalender extends IPSModuleStrict
@@ -60,6 +62,7 @@ class Kalender extends IPSModuleStrict
         $this->RegisterAttributeBoolean('RuntimeReady', false);
 
         $this->RegisterVariableInteger('EventCount', $this->Translate('Event count'), [], 10);
+        $this->RegisterVariableInteger('TodayEventCount', $this->Translate("Today's events"), [], 20);
         $this->RegisterVariableInteger(
             'LastSynchronization',
             $this->Translate('Last synchronization'),
@@ -67,11 +70,12 @@ class Kalender extends IPSModuleStrict
                 'PRESENTATION' => VARIABLE_PRESENTATION_DATE_TIME,
                 'TEMPLATE'     => VARIABLE_TEMPLATE_DATE_TIME
             ],
-            20
+            30
         );
 
         $this->RegisterTimer('InitializationTimer', 0, 'IPSKAL_Initialize($_IPS[\'TARGET\']);');
         $this->RegisterTimer('SynchronizationTimer', 0, 'IPSKAL_ScheduledSynchronize($_IPS[\'TARGET\']);');
+        $this->RegisterTimer('DayChangeTimer', 0, 'IPSKAL_RefreshTodayEventCount($_IPS[\'TARGET\']);');
     }
 
     /**
@@ -140,6 +144,12 @@ class Kalender extends IPSModuleStrict
         $this->RegisterMessage(0, IPS_KERNELSTARTED);
         $this->SetTimerInterval('InitializationTimer', 0);
         $this->SetTimerInterval('SynchronizationTimer', 0);
+        $this->SetTimerInterval('DayChangeTimer', 0);
+        $this->updateEventCounters($this->readEvents());
+
+        if (IPS_GetKernelRunlevel() === KR_READY) {
+            $this->scheduleTodayEventCountRefresh();
+        }
 
         $validationError = $this->validateConfiguration();
         if ($validationError !== '') {
@@ -169,6 +179,7 @@ class Kalender extends IPSModuleStrict
     {
         if ($SenderID === 0 && $Message === IPS_KERNELSTARTED) {
             $this->scheduleInitialization();
+            $this->scheduleTodayEventCountRefresh();
         }
     }
 
@@ -195,6 +206,8 @@ class Kalender extends IPSModuleStrict
             )
         );
         $this->refreshCalendarMetadataSafely();
+        $this->updateEventCounters($this->readEvents());
+        $this->scheduleTodayEventCountRefresh();
         $this->SetStatus(IS_ACTIVE);
 
         return true;
@@ -216,6 +229,24 @@ class Kalender extends IPSModuleStrict
         }
 
         return $this->Synchronize();
+    }
+
+    /**
+     * Recalculates the current-day event count after the local day changes.
+     *
+     * @return bool True when the counter was updated.
+     */
+    public function RefreshTodayEventCount(): bool
+    {
+        $this->SetTimerInterval('DayChangeTimer', 0);
+        if (IPS_GetKernelRunlevel() !== KR_READY) {
+            return false;
+        }
+
+        $this->updateEventCounters($this->readEvents());
+        $this->scheduleTodayEventCountRefresh();
+
+        return true;
     }
 
     /**
@@ -391,6 +422,7 @@ class Kalender extends IPSModuleStrict
         $writeAccessKnown = $metadataAvailable
             && $this->ReadAttributeBoolean('DetectedWriteAccessKnown');
         $detectedColor = $this->ReadAttributeString('DetectedCalendarColor');
+        $events = $this->readEvents();
 
         return json_encode(
             [
@@ -404,7 +436,11 @@ class Kalender extends IPSModuleStrict
                         : $this->ReadAttributeBoolean('DetectedCanWrite')
                             || $this->ReadPropertyBoolean('CanWrite'))
                     : $this->ReadPropertyBoolean('CanWrite'),
-                'eventCount'          => count($this->readEvents()),
+                'eventCount'          => count($events),
+                'todayEventCount'     => CalendarEventCounter::countForDay(
+                    $events,
+                    new DateTimeImmutable('today')
+                ),
                 'lastSynchronization' => $this->ReadAttributeInteger('LastSynchronization'),
                 'lastError'           => $this->ReadAttributeString('LastError')
             ],
@@ -589,8 +625,32 @@ class Kalender extends IPSModuleStrict
         $timestamp = time();
         $this->WritePersistentJsonCache('CachedEvents', $events);
         $this->WriteAttributeInteger('LastSynchronization', $timestamp);
-        $this->SetValue('EventCount', count($events));
+        $this->updateEventCounters($events);
         $this->SetValue('LastSynchronization', $timestamp);
+    }
+
+    /** @param list<array<string, mixed>> $events */
+    private function updateEventCounters(array $events): void
+    {
+        $this->SetValue('EventCount', count($events));
+        $this->SetValue(
+            'TodayEventCount',
+            CalendarEventCounter::countForDay($events, new DateTimeImmutable('today'))
+        );
+    }
+
+    private function scheduleTodayEventCountRefresh(): void
+    {
+        if (IPS_GetKernelRunlevel() !== KR_READY) {
+            return;
+        }
+
+        $now = new DateTimeImmutable();
+        $nextDay = $now->modify('tomorrow')->setTime(0, 0, 1);
+        $this->SetTimerInterval(
+            'DayChangeTimer',
+            max(1_000, ($nextDay->getTimestamp() - $now->getTimestamp()) * 1_000)
+        );
     }
 
     /**

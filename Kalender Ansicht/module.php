@@ -723,6 +723,8 @@ class KalenderAnsicht extends IPSModuleStrict
             'No events',
             'There are no events in this period.',
             'All day',
+            'Event',
+            'Events',
             'Untitled event',
             'more',
             'Create event',

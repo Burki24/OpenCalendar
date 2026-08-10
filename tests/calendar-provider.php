@@ -1301,6 +1301,23 @@ assertTrueValue(
         && str_contains($viewScriptSource, 'daysInYear(date)'),
     'Agenda, three-day and weekly headings must optionally show the day of year.'
 );
+assertTrueValue(
+    is_string($viewScriptSource)
+        && str_contains($viewScriptSource, 'group.events.length')
+        && str_contains($viewScriptSource, 'formatDayHeading(date, options, eventCount)')
+        && str_contains($viewScriptSource, "eventCount === 1 ? 'Event' : 'Events'")
+        && preg_match('/function renderMonth\(\)[\s\S]*?function renderEmpty/', $viewScriptSource, $monthRenderer) === 1
+        && !str_contains($monthRenderer[0], 'formatDayHeading('),
+    'Agenda, three-day and weekly headings must show per-day event totals without changing the month view.'
+);
+
+assertTrueValue(
+    is_string($calendarModuleSource)
+        && str_contains($calendarModuleSource, "RegisterVariableInteger('TodayEventCount'")
+        && str_contains($calendarModuleSource, "RegisterTimer('DayChangeTimer'")
+        && str_contains($calendarModuleSource, 'CalendarEventCounter::countForDay('),
+    'Each calendar instance must expose and refresh a current-day event count.'
+);
 
 assertTrueValue(
     is_string($calendarModuleSource)

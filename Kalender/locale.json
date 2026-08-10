@@ -37,6 +37,7 @@
             "Invalid calendar response": "Ungültige Kalenderantwort",
             "Event write conflict": "Terminkonflikt beim Schreiben",
             "Event count": "Anzahl Termine",
+            "Today's events": "Termine heute",
             "Last synchronization": "Letzte Synchronisation",
             "The synchronization schedule is invalid.": "Der Aktualisierungsplan ist ungültig.",
             "The calendar ID is missing.": "Die Kalender-ID fehlt.",
