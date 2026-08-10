@@ -1286,20 +1286,31 @@ assertTrueValue(
     'The calendar view must migrate its former IPSView palette and layout properties.'
 );
 assertTrueValue(
-    is_string($viewScriptSource)
-        && str_contains($viewScriptSource, "t('CW')")
-        && str_contains($viewScriptSource, 'isoWeekNumber(start)')
+    is_string($viewModuleSource)
+        && str_contains($viewModuleSource, "RegisterPropertyBoolean('ShowAgendaCalendarWeek', false)")
+        && str_contains($viewModuleSource, "RegisterPropertyBoolean('ShowThreeDaysCalendarWeek', false)")
+        && str_contains($viewModuleSource, "RegisterPropertyBoolean('ShowWeekCalendarWeek', true)")
+        && str_contains($viewModuleSource, "RegisterPropertyBoolean('ShowMonthCalendarWeek', false)")
+        && is_string($viewScriptSource)
+        && str_contains($viewScriptSource, 'formatCalendarWeekLabel(days)')
+        && str_contains($viewScriptSource, "calendarWeeks.join('/')")
+        && str_contains($viewScriptSource, "day.getDay() === 1")
         && str_contains($viewScriptSource, 'Date.UTC'),
-    'The weekly tile and IPSView title must include an ISO calendar week.'
+    'Agenda, three-day, week and month views must optionally show ISO calendar weeks.'
 );
 assertTrueValue(
     is_string($viewModuleSource)
-        && str_contains($viewModuleSource, "RegisterPropertyBoolean('ShowDayOfYear', true)")
+        && str_contains($viewModuleSource, "RegisterPropertyBoolean('ShowAgendaDayOfYear', true)")
+        && str_contains($viewModuleSource, "RegisterPropertyBoolean('ShowThreeDaysDayOfYear', true)")
+        && str_contains($viewModuleSource, "RegisterPropertyBoolean('ShowWeekDayOfYear', true)")
+        && str_contains($viewModuleSource, "RegisterPropertyBoolean('ShowMonthDayOfYear', true)")
+        && !str_contains($viewModuleSource, "RegisterPropertyBoolean('ShowDayOfYear', true)")
         && is_string($viewScriptSource)
         && str_contains($viewScriptSource, 'formatDayHeading(')
         && str_contains($viewScriptSource, 'dayOfYear(date)')
-        && str_contains($viewScriptSource, 'daysInYear(date)'),
-    'Agenda, three-day and weekly headings must optionally show the day of year.'
+        && str_contains($viewScriptSource, 'daysInYear(date)')
+        && str_contains($viewScriptSource, 'calendarState.settings.showMonthDayOfYear !== false'),
+    'Agenda, three-day, week and month views must optionally show the day of year.'
 );
 assertTrueValue(
     is_string($viewModuleSource)
@@ -1308,7 +1319,7 @@ assertTrueValue(
         && str_contains($viewModuleSource, "RegisterPropertyBoolean('ShowWeekEventCount', true)")
         && is_string($viewScriptSource)
         && str_contains($viewScriptSource, 'group.events.length')
-        && str_contains($viewScriptSource, 'formatDayHeading(date, options, eventCount, showEventCount)')
+        && str_contains($viewScriptSource, 'formatDayHeading(date, options, showDayOfYear, eventCount, showEventCount)')
         && str_contains($viewScriptSource, 'calendarState.settings.showAgendaEventCount !== false')
         && str_contains($viewScriptSource, 'calendarState.settings.showThreeDaysEventCount !== false')
         && str_contains($viewScriptSource, 'calendarState.settings.showWeekEventCount !== false')

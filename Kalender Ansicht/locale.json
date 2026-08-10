@@ -19,10 +19,6 @@
             "Future days": "Zukünftige Tage",
             "Maximum events": "Maximale Termine",
             "Show weekends": "Wochenenden anzeigen",
-            "Show day of year": "Tag des Jahres anzeigen",
-            "Show event count in agenda": "Terminanzahl in Agenda anzeigen",
-            "Show event count in 3-day view": "Terminanzahl in 3-Tage-Ansicht anzeigen",
-            "Show event count in week view": "Terminanzahl in Wochenansicht anzeigen",
             "Show calendar name": "Kalendernamen anzeigen",
             "Show location": "Ort anzeigen",
             "Show description": "Beschreibung anzeigen",
@@ -94,7 +90,10 @@
             "In IPSView, use an HTML-Box with the client browser renderer so JavaScript is available.": "In IPSView eine HTML-Box mit dem Renderer „Browser des Clients“ verwenden, damit JavaScript verfügbar ist.",
             "No writable calendar available": "Kein beschreibbarer Kalender verfügbar",
             "Display options": "Anzeigeoptionen",
-            "Event count per view": "Terminanzahl je Ansicht"
+            "Display": "Anzeige",
+            "Event count": "Terminanzahl",
+            "Calendar week": "Kalenderwoche",
+            "Day of year": "Tageszahl"
         }
     }
 }

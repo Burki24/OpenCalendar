@@ -106,11 +106,6 @@
                 },
                 {
                     "type": "CheckBox",
-                    "name": "ShowDayOfYear",
-                    "caption": "Show day of year"
-                },
-                {
-                    "type": "CheckBox",
                     "name": "ShowCalendarName",
                     "caption": "Show calendar name"
                 },
@@ -130,22 +125,138 @@
             "type": "PopupButton",
             "caption": "Display options",
             "popup": {
-                "caption": "Event count per view",
+                "caption": "Display options",
                 "items": [
                     {
-                        "type": "CheckBox",
-                        "name": "ShowAgendaEventCount",
-                        "caption": "Show event count in agenda"
+                        "type": "RowLayout",
+                        "items": [
+                            {
+                                "type": "Label",
+                                "caption": "Display",
+                                "width": "220px"
+                            },
+                            {
+                                "type": "Label",
+                                "caption": "Agenda",
+                                "width": "95px"
+                            },
+                            {
+                                "type": "Label",
+                                "caption": "3 Days",
+                                "width": "95px"
+                            },
+                            {
+                                "type": "Label",
+                                "caption": "Week",
+                                "width": "95px"
+                            },
+                            {
+                                "type": "Label",
+                                "caption": "Month",
+                                "width": "95px"
+                            }
+                        ]
                     },
                     {
-                        "type": "CheckBox",
-                        "name": "ShowThreeDaysEventCount",
-                        "caption": "Show event count in 3-day view"
+                        "type": "RowLayout",
+                        "items": [
+                            {
+                                "type": "Label",
+                                "caption": "Event count",
+                                "width": "220px"
+                            },
+                            {
+                                "type": "CheckBox",
+                                "name": "ShowAgendaEventCount",
+                                "caption": "",
+                                "width": "95px"
+                            },
+                            {
+                                "type": "CheckBox",
+                                "name": "ShowThreeDaysEventCount",
+                                "caption": "",
+                                "width": "95px"
+                            },
+                            {
+                                "type": "CheckBox",
+                                "name": "ShowWeekEventCount",
+                                "caption": "",
+                                "width": "95px"
+                            },
+                            {
+                                "type": "Label",
+                                "caption": "—",
+                                "width": "95px"
+                            }
+                        ]
                     },
                     {
-                        "type": "CheckBox",
-                        "name": "ShowWeekEventCount",
-                        "caption": "Show event count in week view"
+                        "type": "RowLayout",
+                        "items": [
+                            {
+                                "type": "Label",
+                                "caption": "Calendar week",
+                                "width": "220px"
+                            },
+                            {
+                                "type": "CheckBox",
+                                "name": "ShowAgendaCalendarWeek",
+                                "caption": "",
+                                "width": "95px"
+                            },
+                            {
+                                "type": "CheckBox",
+                                "name": "ShowThreeDaysCalendarWeek",
+                                "caption": "",
+                                "width": "95px"
+                            },
+                            {
+                                "type": "CheckBox",
+                                "name": "ShowWeekCalendarWeek",
+                                "caption": "",
+                                "width": "95px"
+                            },
+                            {
+                                "type": "CheckBox",
+                                "name": "ShowMonthCalendarWeek",
+                                "caption": "",
+                                "width": "95px"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "RowLayout",
+                        "items": [
+                            {
+                                "type": "Label",
+                                "caption": "Day of year",
+                                "width": "220px"
+                            },
+                            {
+                                "type": "CheckBox",
+                                "name": "ShowAgendaDayOfYear",
+                                "caption": "",
+                                "width": "95px"
+                            },
+                            {
+                                "type": "CheckBox",
+                                "name": "ShowThreeDaysDayOfYear",
+                                "caption": "",
+                                "width": "95px"
+                            },
+                            {
+                                "type": "CheckBox",
+                                "name": "ShowWeekDayOfYear",
+                                "caption": "",
+                                "width": "95px"
+                            },
+                            {
+                                "type": "CheckBox",
+                                "name": "ShowMonthDayOfYear",
+                                "caption": "",
+                                "width": "95px"
+                            }
+                        ]
                     }
                 ]
             }
