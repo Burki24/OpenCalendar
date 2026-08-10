@@ -126,5 +126,12 @@ assertAccountStructure(
         && str_contains($accountSource, '$this->UpdateFormField(\'VerifyTLS\', \'visible\', $canConfigureTls)'),
     'VerifyTLS must only be user-configurable for custom CalDAV and ICS/Webcal endpoints; iCloud remains verified.'
 );
+assertAccountStructure(
+    is_string($accountSource)
+        && str_contains($accountSource, '$rawMessage = $this->sanitizeError($exception->getMessage());')
+        && str_contains($accountSource, '$this->SendDebug(\'ProviderError\', $rawMessage, 0);')
+        && !str_contains($accountSource, '$this->SendDebug(\'ProviderError\', $exception->getMessage(), 0);'),
+    'Provider debug output must only receive sanitized exception messages.'
+);
 
 fwrite(STDOUT, "KalenderKonto structure tests passed.\n");
