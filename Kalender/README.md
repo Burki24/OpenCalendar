@@ -72,7 +72,11 @@ Letzte Synchronisation | Integer | Unix-Zeitpunkt der letzten erfolgreichen Abfr
 Wert wird bei jeder Synchronisation und zusätzlich beim lokalen Tageswechsel
 neu berechnet.
 
-Die eigentlichen Termindaten werden bewusst nicht in einer Statusvariable gespiegelt, sondern nur im internen Modulcache gehalten. Sie werden über `IPSKAL_GetEvents()` abgerufen. Dadurch werden große JSON-Datenmengen nicht bei jeder Synchronisation als Variablenwert durch Symcon verteilt.
+Die eigentlichen Termindaten werden bewusst nicht in einer Statusvariable
+gespiegelt, sondern nur im internen Modulcache gehalten. Konto, Kalender und
+Kalenderansicht übertragen große Terminmengen automatisch in begrenzten Seiten.
+Dadurch wird weder bei der Synchronisation noch beim Aufbau der Ansicht eine
+einzelne JSON-Antwort mit sämtlichen Terminen benötigt.
 
 Ein Termin enthält unter anderem `id`, `uid`, `resourceUrl`, `etag`, `summary`, `description`, `location`, `start`, `end`, `startTimestamp`, `endTimestamp`, `allDay`, `status`, `recurrenceRule` und `recurrenceId`. Wurde der Titel durch ein ausgewähltes iCalendar-Übersetzungsprofil angepasst, enthält `originalSummary` zusätzlich den unveränderten Originaltitel.
 
@@ -81,12 +85,21 @@ Ein Termin enthält unter anderem `id`, `uid`, `resourceUrl`, `etag`, `summary`,
 ```php
 bool IPSKAL_Synchronize(int $InstanzID);
 string IPSKAL_GetEvents(int $InstanzID);
+string IPSKAL_BeginEventsTransfer(int $InstanzID, int $StartTimestamp, int $EndTimestamp);
+string IPSKAL_ReadEventsTransferPage(int $InstanzID, string $Token, int $Page);
+bool IPSKAL_FinishEventsTransfer(int $InstanzID, string $Token);
 string IPSKAL_CreateEvent(int $InstanzID, string $EventJSON);
 string IPSKAL_UpdateEvent(int $InstanzID, string $EventJSON);
 bool IPSKAL_DeleteEvent(int $InstanzID, string $EventJSON);
 string IPSKAL_GetCalendarStatus(int $InstanzID);
 void IPSKAL_ClearCache(int $InstanzID);
 ```
+
+`IPSKAL_GetEvents()` bleibt als kompatibler Direktabruf für kleine Datenmengen
+erhalten. Eigene Integrationen mit potenziell vielen Terminen sollten einen
+Transfer beginnen, die Seiten von `0` bis `PageCount - 1` abrufen und den
+Transfer anschließend auch im Fehlerfall beenden. `StartTimestamp` ist inklusiv,
+`EndTimestamp` exklusiv.
 
 ### Termin erstellen
 

@@ -4,6 +4,9 @@
     "base_branch": "dev",
     "readme_language": "en",
     "helpers": {
+        "ChunkedJsonTransferHelper": {
+            "target": "libs/helper/ChunkedJsonTransferHelper.php"
+        },
         "ConfigurationFormHelper": {
             "target": "libs/helper/ConfigurationFormHelper.php"
         },

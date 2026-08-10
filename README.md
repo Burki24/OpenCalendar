@@ -13,6 +13,10 @@ sowie schreibgeschützte ICS-/Webcal-Abonnements. Die gefundenen Kalender könne
 einzeln synchronisiert, in einer gemeinsamen Kachel angezeigt und optional als
 interaktive HTML-Seite in IPSView verwendet werden.
 
+Umfangreiche Terminlisten werden intern seitenweise zwischen Konto, Kalender
+und Kalenderansicht übertragen; große ICS-Dateien müssen nicht manuell
+aufgeteilt werden.
+
 ## Voraussetzungen
 
 - Symcon ab Version 9.0

@@ -5,6 +5,7 @@ The files in this directory are vendored from
 
 | File | Upstream version | SHA-256 |
 | --- | --- | --- |
+| `ChunkedJsonTransferHelper.php` | 1.0.0 | `b9922d52dab18a253b1a1b371d93aec1631396741cbd611cf34922219ec6ab30` |
 | `ConfigurationFormHelper.php` | 1.0.0 | `fa87dd4c67f43a3838fe87110387e4c1a1b98685c13403eeb52c189246045678` |
 | `DataFlowHelper.php` | 1.0.0 | `4c25828b283367692d0db1631d2b7d71ba6012883798bc5ffddb8f2d551d6dfb` |
 | `HttpResponseHelper.php` | 1.1.0 | `be4fae4c23f757ab462237d8e74d2a9dca1b504937ed4d4b51c7ff76004cf1cd` |

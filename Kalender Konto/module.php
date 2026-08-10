@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use Burki24\SymconModuleHelper\ChunkedJsonTransferHelper;
 use Burki24\SymconModuleHelper\ConfigurationFormHelper;
 use Burki24\SymconModuleHelper\DataFlowHelper;
 use Burki24\SymconModuleHelper\HttpResponseHelper;
@@ -24,6 +25,7 @@ use IPSKalender\MicrosoftCalendarProviderException;
 use IPSKalender\MicrosoftGraphOriginPolicy;
 use IPSKalender\SynchronizationSchedule;
 
+require_once __DIR__ . '/../libs/helper/ChunkedJsonTransferHelper.php';
 require_once __DIR__ . '/../libs/helper/ConfigurationFormHelper.php';
 require_once __DIR__ . '/../libs/helper/DataFlowHelper.php';
 require_once __DIR__ . '/../libs/helper/HttpResponseHelper.php';
@@ -51,6 +53,7 @@ require_once __DIR__ . '/traits/ChildGatewayTrait.php';
 
 class KalenderKonto extends IPSModuleStrict
 {
+    use ChunkedJsonTransferHelper;
     use ConfigurationFormHelper;
     use DataFlowHelper;
     use HttpResponseHelper;
@@ -62,6 +65,7 @@ class KalenderKonto extends IPSModuleStrict
 
     private const DATA_ID_FROM_CHILD = '{4E535B1D-69C7-AC77-1372-0282B21BAEC9}';
     private const DATA_ID_TO_CHILD = '{8ED646DD-88E9-ACE2-95D5-9766EED4B5B0}';
+    private const EVENT_TRANSFER_SCOPE = 'AccountCalendarEvents';
     private const APPLE_CALDAV_URL = 'https://caldav.icloud.com';
     private const CONNECT_CONTROL_MODULE_ID = '{9486D575-BE8C-4ED8-B5B5-20930E26DE6F}';
     private const GOOGLE_OAUTH_IDENTIFIER = 'opencalendar_google';

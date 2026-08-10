@@ -64,6 +64,10 @@ Tag im Jahr anzeigen | Ergänzt Tagesüberschriften um die fortlaufende Tagesnum
 Terminanzahl je Tag | Wird in Agenda-, 3-Tage- und Wochenansicht automatisch über alle ausgewählten Kalender angezeigt
 Kalendername/Ort/Beschreibung | Legt fest, welche Termindetails sichtbar sind
 
+Die ausgewählten Kalender werden intern seitenweise gelesen. Dies geschieht
+automatisch und ermöglicht auch bei umfangreichen Kalendern den Aufbau der
+Ansicht, ohne Symcons Größenlimit für einzelne PHP-Rückgaben zu überschreiten.
+
 ## Einrichtung in IPSView
 
 1. Den Bereich **IPSView** in der Instanzkonfiguration öffnen.

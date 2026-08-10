@@ -171,6 +171,9 @@ Jedes aktive Abonnement besitzt einen eigenen persistenten Feed-Cache:
   als veraltet markiert.
 - Authentifizierungsfehler und dauerhafte Clientfehler wie `404` werden nicht
   durch Cache-Daten verborgen.
+- Große Terminmengen werden nach dem Parsen automatisch in begrenzten Seiten an
+  die Kalender-Instanz übertragen. Auch umfangreiche ICS-Dateien müssen deshalb
+  nicht manuell geteilt werden.
 
 **Verbindung testen** prüft immer den aktuellen Serverzustand und meldet einen
 Fehler auch dann, wenn noch eine ältere Feed-Version zur Anzeige verfügbar ist.
@@ -234,6 +237,9 @@ Unterstützte Anforderungen von Child-Modulen:
 - `GetCalendars`
 - `DiscoverCalendars`
 - `GetEvents`
+- `BeginEventsTransfer`
+- `ReadEventsTransferPage`
+- `FinishEventsTransfer`
 - `CreateEvent`
 - `UpdateEvent`
 - `DeleteEvent`
@@ -242,6 +248,10 @@ Unterstützte Anforderungen von Child-Modulen:
 
 Nach einer erfolgreichen Synchronisation sendet das Konto `CalendarsUpdated` an
 seine Children.
+
+`GetEvents` bleibt für kompatible kleine Abfragen erhalten. Die Kalender-Instanz
+verwendet für reguläre Synchronisationen den dreistufigen Seitentransfer, damit
+keine einzelne Datenflussantwort das Symcon-Ausgabelimit erreicht.
 
 ## PHP-Befehlsreferenz
 
