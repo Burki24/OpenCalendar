@@ -129,9 +129,4 @@ Drittanbieter.
 
   Führt mehrere Kalender in einer responsiven Kachel- oder IPSView-Ansicht
   zusammen.
-
-
-Die offiziellen Symcon-Entwicklungsgrundlagen werden als Git-Submodule geführt:
-
-- `.style` → `symcon/StylePHP`
-- `tests/stubs` → `symcon/SymconStubs`
+  
