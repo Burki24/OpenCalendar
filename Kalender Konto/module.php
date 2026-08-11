@@ -75,6 +75,7 @@ class KalenderKonto extends IPSModuleStrict
     private const CONNECT_CONTROL_MODULE_ID = '{9486D575-BE8C-4ED8-B5B5-20930E26DE6F}';
     private const GOOGLE_OAUTH_IDENTIFIER = 'opencalendar_google';
     private const MICROSOFT_OAUTH_IDENTIFIER = 'opencalendar_microsoft';
+    private const OAUTH_REGISTRATION_DELAY_MS = 5_000;
 
     private const PROVIDER_APPLE = 0;
     private const PROVIDER_CALDAV = 1;
@@ -123,6 +124,7 @@ class KalenderKonto extends IPSModuleStrict
         $this->RegisterAttributeInteger('PendingOAuthProvider', -1);
 
         $this->RegisterTimer('SynchronizationTimer', 0, 'IPSKALACC_ScheduledSynchronize($_IPS[\'TARGET\']);');
+        $this->RegisterTimer('OAuthRegistrationTimer', 0, 'IPSKALACC_InitializeOAuth($_IPS[\'TARGET\']);');
     }
 
     /**
@@ -319,7 +321,7 @@ class KalenderKonto extends IPSModuleStrict
     public function MessageSink(int $TimeStamp, int $SenderID, int $Message, array $Data): void
     {
         if ($SenderID === 0 && $Message === IPS_KERNELSTARTED) {
-            $this->registerOAuthHandlers();
+            $this->scheduleOAuthRegistration();
         }
     }
 
@@ -385,8 +387,9 @@ class KalenderKonto extends IPSModuleStrict
         };
         $this->SetSummary($username !== '' ? $providerName . ' – ' . $username : $providerName);
 
+        $this->SetTimerInterval('OAuthRegistrationTimer', 0);
         if (IPS_GetKernelRunlevel() === KR_READY) {
-            $this->registerOAuthHandlers();
+            $this->scheduleOAuthRegistration();
         }
 
         if (!$this->ReadPropertyBoolean('Active')) {
@@ -411,6 +414,22 @@ class KalenderKonto extends IPSModuleStrict
             )
         );
         $this->SetStatus(IS_ACTIVE);
+    }
+
+    /**
+     * Registers OAuth handlers after a short delay so module reloads can finish first.
+     *
+     * @return bool True when deferred registration was processed.
+     */
+    public function InitializeOAuth(): bool
+    {
+        $this->SetTimerInterval('OAuthRegistrationTimer', 0);
+        if (IPS_GetKernelRunlevel() !== KR_READY) {
+            return false;
+        }
+
+        $this->registerOAuthHandlers();
+        return true;
     }
 
     /**
@@ -585,6 +604,16 @@ class KalenderKonto extends IPSModuleStrict
                     400,
                     $this->Translate('The selected calendar provider does not support OAuth.')
                 );
+        }
+    }
+
+    /**
+     * Defers OAuth registration until the current module reload sequence has settled.
+     */
+    private function scheduleOAuthRegistration(): void
+    {
+        if (IPS_GetKernelRunlevel() === KR_READY) {
+            $this->SetTimerInterval('OAuthRegistrationTimer', self::OAUTH_REGISTRATION_DELAY_MS);
         }
     }
 
