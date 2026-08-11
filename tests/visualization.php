@@ -140,6 +140,15 @@ assertVisualization(
 
 $formSource = (string) file_get_contents(__DIR__ . '/../Kalender Ansicht/form.json');
 $moduleSource = (string) file_get_contents(__DIR__ . '/../Kalender Ansicht/module.php');
+assertVisualization(
+    str_contains($formSource, '"name": "TileFontScale"')
+        && str_contains($formSource, '"caption": "Tile font size (%)"')
+        && str_contains($moduleSource, "RegisterPropertyInteger('TileFontScale', 100)")
+        && str_contains($moduleSource, "ReadPropertyInteger('TileFontScale')")
+        && str_contains($moduleSource, ": max(50, min(200, \$this->ReadPropertyInteger('TileFontScale'))) . '%'")
+        && str_contains($moduleSource, '? $this->IPSViewStyleRootFontSize()'),
+    'The native tile must expose an independent configurable font scale without changing IPSView scaling.'
+);
 foreach (['ShowAgendaEventCount', 'ShowThreeDaysEventCount', 'ShowWeekEventCount'] as $property) {
     assertVisualization(
         str_contains($formSource, '"name": "' . $property . '"')

@@ -17,7 +17,10 @@ verwendet werden.
 1. Über **Instanz hinzufügen** eine Instanz **Kalender Ansicht** erstellen.
 2. In der Liste **Kalender** für jede gewünschte Zeile eine Kalender-Instanz
    auswählen und **Aktiviert** einschalten.
-3. Standardansicht, geladenen Terminzeitraum und maximale Terminanzahl festlegen.
+3. Standardansicht, Kachel-Wochenausrichtung, Kachel-Schriftgröße, geladenen
+   Terminzeitraum und maximale Terminanzahl festlegen. Die Kachel-Schriftgröße
+   kann zwischen 50 und 200 Prozent eingestellt werden; 100 Prozent entspricht
+   der bisherigen Darstellung.
 4. Den aufklappbaren Bereich **Anzeigeoptionen** öffnen. Dort sind die
    allgemeinen Zusatzinformationen wie Wochenenden, Kalendername, Ort und
    Beschreibung sowie die ansichtsspezifische Matrix für Terminanzahl,
@@ -37,6 +40,8 @@ unvollständig ist; eine vorhandene individuelle Auswahl wird dabei ersetzt.
 - Agenda-, Listen-, 3-Tage-, Wochen- und Monatsansicht
 - unabhängig wählbare horizontale oder vertikale Wochenansicht für Kachel und
   IPSView
+- separat einstellbare Schriftgröße der Kachelvisualisierung von 50 bis 200 Prozent;
+  die IPSView-Schrift-/Stilskalierung bleibt davon unabhängig
 - je Darstellung separat konfigurierbare Anzeige von Kalenderwoche und
   Tageszahl; in der Listenansicht werden beide Angaben als eigene Spalten geführt
 - frei wählbare sichtbare Zeiträume je Ansicht: Tage für Agenda, Liste und

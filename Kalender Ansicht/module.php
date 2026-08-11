@@ -98,6 +98,7 @@ class KalenderAnsicht extends IPSModuleStrict
         $this->RegisterPropertyString('Calendars', '[]');
         $this->RegisterPropertyInteger('DefaultView', 0);
         $this->RegisterPropertyInteger('TileWeekOrientation', 0);
+        $this->RegisterPropertyInteger('TileFontScale', 100);
         $this->RegisterPropertyInteger('PastDays', 0);
         $this->RegisterPropertyInteger('FutureDays', 31);
         $this->RegisterPropertyInteger('MaxEvents', 250);
@@ -725,7 +726,9 @@ class KalenderAnsicht extends IPSModuleStrict
         return $this->RenderVisualizationHTMLPage($ipsView, [
             'language'           => $this->Translate('Today') === 'Heute' ? 'de' : 'en',
             'classes'            => $ipsView ? ['ipsview-mode'] : [],
-            'rootFontSize'       => $ipsView ? $this->IPSViewStyleRootFontSize() : '100%',
+            'rootFontSize'       => $ipsView
+                ? $this->IPSViewStyleRootFontSize()
+                : max(50, min(200, $this->ReadPropertyInteger('TileFontScale'))) . '%',
             'title'              => $this->Translate('Calendar'),
             'visualizationTheme' => $this->VisualizationThemeCSS(),
             'ipsViewStyle'       => $ipsView ? $this->IPSViewStyleCSSVariables(':root') : '',

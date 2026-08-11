@@ -15,6 +15,7 @@
             "Day": "Tag",
             "Month": "Monat",
             "Tile week orientation": "Tile-Wochenausrichtung",
+            "Tile font size (%)": "Kachel-Schriftgröße (%)",
             "Past days": "Vergangene Tage",
             "Future days": "Zukünftige Tage",
             "Maximum events": "Maximale Termine",
