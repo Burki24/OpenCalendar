@@ -8,7 +8,9 @@ use Burki24\SymconModuleHelper\IPSViewStyleHelper;
 use Burki24\SymconModuleHelper\VariableHelper;
 use Burki24\SymconModuleHelper\VisualizationAssetHelper;
 use Burki24\SymconModuleHelper\VisualizationThemeHelper;
+use IPSKalender\CalendarAppointmentRange;
 
+require_once __DIR__ . '/../libs/CalendarAppointmentRange.php';
 require_once __DIR__ . '/../libs/helper/ConfigurationFormHelper.php';
 require_once __DIR__ . '/../libs/helper/IPSViewHTMLPageHelper.php';
 require_once __DIR__ . '/../libs/helper/IPSViewStyleHelper.php';
@@ -507,6 +509,45 @@ class KalenderAnsicht extends IPSModuleStrict
     }
 
     /**
+     * Returns appointments from all selected calendars that overlap one local calendar day.
+     *
+     * The supplied date uses the Symcon server's local timezone. All-day events use their
+     * date-only boundaries so their exclusive provider end date does not spill into the
+     * following day.
+     *
+     * @param string $Date Local date in YYYY-MM-DD format.
+     * @return string JSON-encoded appointment list.
+     */
+    public function GetDayAppointments(string $Date): string
+    {
+        return $this->GetAppointments($Date, $Date);
+    }
+
+    /**
+     * Returns appointments from all selected calendars that overlap an inclusive local date range.
+     *
+     * This API deliberately ignores the visualization properties PastDays, FutureDays and
+     * MaxEvents. It reads the cached events of every calendar selected in this Calendar View
+     * and enriches each result with calendar instance, name, color and write capability.
+     *
+     * @param string $From First local date in YYYY-MM-DD format.
+     * @param string $To Last local date in YYYY-MM-DD format, inclusive.
+     * @return string JSON-encoded appointment list.
+     */
+    public function GetAppointments(string $From, string $To): string
+    {
+        [$rangeStart, $rangeEnd] = CalendarAppointmentRange::fromInclusiveDates($From, $To);
+
+        return json_encode(
+            $this->collectAppointmentsForRange($rangeStart, $rangeEnd),
+            JSON_UNESCAPED_SLASHES
+                | JSON_UNESCAPED_UNICODE
+                | JSON_PRESERVE_ZERO_FRACTION
+                | JSON_THROW_ON_ERROR
+        );
+    }
+
+    /**
      * Renders the standalone HTML representation used by IPSView.
      *
      * @return string Rendered IPSView calendar HTML.
@@ -852,6 +893,47 @@ class KalenderAnsicht extends IPSModuleStrict
             'generatedAt' => time(),
             'settings'    => $this->viewSettings()
         ];
+    }
+
+    /**
+     * Collects provider-independent appointments from every selected calendar.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function collectAppointmentsForRange(
+        DateTimeImmutable $rangeStart,
+        DateTimeImmutable $rangeEnd
+    ): array {
+        $events = [];
+        foreach ($this->getSelectedCalendars() as $calendar) {
+            $calendarEvents = $this->readCalendarEventsForRange(
+                $calendar['instanceId'],
+                $rangeStart->getTimestamp(),
+                $rangeEnd->getTimestamp()
+            );
+
+            foreach ($calendarEvents as $event) {
+                if (!CalendarAppointmentRange::eventOverlaps($event, $rangeStart, $rangeEnd)) {
+                    continue;
+                }
+
+                $event['calendarInstanceId'] = $calendar['instanceId'];
+                $event['calendarName'] = $calendar['name'];
+                $event['calendarColor'] = $calendar['color'];
+                $event['canWrite'] = $calendar['canWrite'];
+                $events[] = $event;
+            }
+        }
+
+        usort(
+            $events,
+            static fn (array $left, array $right): int => ((int) ($left['startTimestamp'] ?? 0)
+                <=> (int) ($right['startTimestamp'] ?? 0))
+                ?: strcasecmp((string) ($left['summary'] ?? ''), (string) ($right['summary'] ?? ''))
+                ?: strcasecmp((string) ($left['calendarName'] ?? ''), (string) ($right['calendarName'] ?? ''))
+        );
+
+        return $events;
     }
 
     /**

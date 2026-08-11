@@ -193,8 +193,37 @@ $success = IPSKALVIEW_SynchronizeCalendars(12345);
 // Die zusammengeführten Termine als JSON abrufen.
 $events = IPSKALVIEW_GetAggregatedEvents(12345);
 
+// Alle Termine eines lokalen Kalendertags providerübergreifend abrufen.
+$appointments = IPSKALVIEW_GetDayAppointments(12345, '2026-08-11');
+
+// Alle Termine eines inklusiven lokalen Datumsbereichs providerübergreifend abrufen.
+$appointments = IPSKALVIEW_GetAppointments(12345, '2026-08-11', '2026-08-17');
+
 // Den aktuellen eigenständigen HTML-Inhalt für IPSView abrufen.
 $html = IPSKALVIEW_GetIPSViewHTML(12345);
+```
+
+
+`GetDayAppointments()` und `GetAppointments()` verwenden ausschließlich die in
+dieser **Kalender Ansicht** ausgewählten Kalender und führen deren lokal
+zwischengespeicherte Termine providerübergreifend zusammen. Der Bereich wird
+unabhängig von den Visualisierungseinstellungen **Vergangene Tage**, **Zukünftige
+Tage** und **Maximale Termine** abgefragt. Verfügbar sind dabei die Termine, die
+die jeweiligen Kalender-Instanzen bereits in ihrem eigenen Synchronisationszeitraum
+gecached haben. `GetAppointments()` behandelt das angegebene Enddatum inklusiv.
+Ganztagstermine berücksichtigen weiterhin das providerseitig exklusive Enddatum
+korrekt. Jeder Eintrag enthält zusätzlich `calendarInstanceId`, `calendarName`,
+`calendarColor` und `canWrite`.
+
+Die Funktionen liefern JSON. Beispiel:
+
+```php
+$appointments = json_decode(
+    IPSKALVIEW_GetDayAppointments(12345, date('Y-m-d')),
+    true,
+    512,
+    JSON_THROW_ON_ERROR
+);
 ```
 
 ## Technische Hinweise
