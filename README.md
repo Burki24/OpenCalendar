@@ -45,7 +45,7 @@ Apple iCloud | Apple-ID und anwendungsspezifisches Passwort | Lesen und Schreibe
 Google Calendar | Anmeldung über Symcon OAuth | Lesen und Schreiben entsprechend den Google-Kalenderrechten
 Microsoft 365/Outlook.com | Anmeldung über Symcon OAuth | Lesen und Schreiben entsprechend den Microsoft-Kalenderrechten
 CalDAV | Server-URL, Benutzername und Passwort | Lesen und Schreiben entsprechend den Serverrechten
-ICS/Webcal | Eine oder mehrere Feed-URLs, optional HTTP-Zugangsdaten | Schreibgeschützt
+ICS/Webcal | Eine oder mehrere Feed-URLs oder lokale ICS-Dateien vom Arbeitsrechner | Schreibgeschützt
 
 ## Kalender immer über den Konfigurator anlegen
 
@@ -87,7 +87,7 @@ der aktuellen Konfiguratorliste erstellt. Weitere Hintergründe enthält die
 - Einzelne Vorkommen wiederkehrender Termine werden derzeit nur lesend
   dargestellt. Dadurch kann nicht versehentlich die vollständige Terminserie
   überschrieben oder gelöscht werden.
-- ICS-/Webcal-Abonnements sind grundsätzlich schreibgeschützt.
+- ICS-/Webcal-Abonnements und lokal importierte ICS-Dateien sind grundsätzlich schreibgeschützt.
 - Die IPSView-Ausgabe benötigt im HTML-Box-Steuerelement den Renderer
   **Browser des Clients** oder **Automatisch**, da die Bedienung JavaScript
   verwendet.

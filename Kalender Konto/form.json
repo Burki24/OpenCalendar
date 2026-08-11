@@ -85,166 +85,255 @@
             ]
         },
         {
-            "type": "Label",
-            "name": "ICalendarSubscriptionsHint",
-            "caption": "Add further read-only iCalendar subscriptions here. The single feed configured above remains available for compatibility.",
-            "visible": false
+            "type": "ExpansionPanel",
+            "name": "ICalendarSubscriptionsPanel",
+            "caption": "Online iCalendar subscriptions",
+            "visible": false,
+            "expanded": false,
+            "items": [
+                {
+                    "type": "Label",
+                    "name": "ICalendarSubscriptionsHint",
+                    "caption": "Add further read-only iCalendar subscriptions here. The single feed configured above remains available for compatibility."
+                },
+                {
+                    "type": "List",
+                    "name": "ICalendarFeeds",
+                    "caption": "iCalendar subscriptions",
+                    "rowCount": 6,
+                    "add": true,
+                    "delete": true,
+                    "changeOrder": true,
+                    "columns": [
+                        {
+                            "caption": "Active",
+                            "name": "Active",
+                            "width": "70px",
+                            "add": true,
+                            "edit": {
+                                "type": "CheckBox"
+                            }
+                        },
+                        {
+                            "caption": "Calendar name",
+                            "name": "Name",
+                            "width": "180px",
+                            "add": "iCalendar",
+                            "edit": {
+                                "type": "ValidationTextBox"
+                            }
+                        },
+                        {
+                            "caption": "iCalendar URL",
+                            "name": "URL",
+                            "width": "auto",
+                            "add": "",
+                            "edit": {
+                                "type": "ValidationTextBox",
+                                "validate": "^(https?|webcal)://.+"
+                            }
+                        },
+                        {
+                            "caption": "Username",
+                            "name": "Username",
+                            "width": "140px",
+                            "add": "",
+                            "edit": {
+                                "type": "ValidationTextBox"
+                            }
+                        },
+                        {
+                            "caption": "Password",
+                            "name": "Password",
+                            "width": "120px",
+                            "add": "",
+                            "edit": {
+                                "type": "PasswordTextBox"
+                            }
+                        },
+                        {
+                            "caption": "Title translation",
+                            "name": "TranslationProfile",
+                            "width": "190px",
+                            "add": 0,
+                            "edit": {
+                                "type": "Select",
+                                "options": [
+                                    {
+                                        "caption": "None",
+                                        "value": 0
+                                    },
+                                    {
+                                        "caption": "Google public calendars - German",
+                                        "value": 1
+                                    }
+                                ]
+                            }
+                        },
+                        {
+                            "caption": "Synchronization schedule",
+                            "name": "UpdateSchedule",
+                            "width": "150px",
+                            "add": 7,
+                            "edit": {
+                                "type": "Select",
+                                "options": [
+                                    {
+                                        "caption": "Custom interval",
+                                        "value": 0
+                                    },
+                                    {
+                                        "caption": "Every 5 minutes",
+                                        "value": 1
+                                    },
+                                    {
+                                        "caption": "Every 15 minutes",
+                                        "value": 2
+                                    },
+                                    {
+                                        "caption": "Every 30 minutes",
+                                        "value": 3
+                                    },
+                                    {
+                                        "caption": "Hourly",
+                                        "value": 4
+                                    },
+                                    {
+                                        "caption": "Every 6 hours",
+                                        "value": 5
+                                    },
+                                    {
+                                        "caption": "Every 12 hours",
+                                        "value": 6
+                                    },
+                                    {
+                                        "caption": "Daily",
+                                        "value": 7
+                                    },
+                                    {
+                                        "caption": "Weekly",
+                                        "value": 8
+                                    },
+                                    {
+                                        "caption": "Monthly",
+                                        "value": 9
+                                    },
+                                    {
+                                        "caption": "Yearly",
+                                        "value": 10
+                                    },
+                                    {
+                                        "caption": "Manual only",
+                                        "value": 11
+                                    }
+                                ]
+                            }
+                        },
+                        {
+                            "caption": "Custom interval",
+                            "name": "UpdateInterval",
+                            "width": "110px",
+                            "add": 15,
+                            "edit": {
+                                "type": "NumberSpinner",
+                                "minimum": 1,
+                                "maximum": 525600,
+                                "suffix": " minutes"
+                            }
+                        },
+                        {
+                            "caption": "Calendar color",
+                            "name": "Color",
+                            "width": "110px",
+                            "add": "",
+                            "edit": {
+                                "type": "ValidationTextBox",
+                                "validate": "^$|^#[0-9A-Fa-f]{6}$"
+                            }
+                        }
+                    ]
+                }
+            ]
         },
         {
-            "type": "List",
-            "name": "ICalendarFeeds",
-            "caption": "iCalendar subscriptions",
+            "type": "ExpansionPanel",
+            "name": "ICalendarFilesPanel",
+            "caption": "Local ICS files",
             "visible": false,
-            "rowCount": 6,
-            "add": true,
-            "delete": true,
-            "changeOrder": true,
-            "columns": [
+            "expanded": false,
+            "items": [
                 {
-                    "caption": "Active",
-                    "name": "Active",
-                    "width": "70px",
+                    "type": "Label",
+                    "name": "ICalendarFilesHint",
+                    "caption": "Upload read-only ICS files from the computer running the Symcon console. A calendar name is required and keeps the calendar assignment stable when the file is replaced. The file content is copied into the OpenCalendar configuration; later changes to the original file are not imported automatically."
+                },
+                {
+                    "type": "List",
+                    "name": "ICalendarFiles",
+                    "caption": "Local ICS files",
+                    "rowCount": 4,
                     "add": true,
-                    "edit": {
-                        "type": "CheckBox"
-                    }
-                },
-                {
-                    "caption": "Calendar name",
-                    "name": "Name",
-                    "width": "180px",
-                    "add": "iCalendar",
-                    "edit": {
-                        "type": "ValidationTextBox"
-                    }
-                },
-                {
-                    "caption": "iCalendar URL",
-                    "name": "URL",
-                    "width": "auto",
-                    "add": "",
-                    "edit": {
-                        "type": "ValidationTextBox",
-                        "validate": "^(https?|webcal)://.+"
-                    }
-                },
-                {
-                    "caption": "Username",
-                    "name": "Username",
-                    "width": "140px",
-                    "add": "",
-                    "edit": {
-                        "type": "ValidationTextBox"
-                    }
-                },
-                {
-                    "caption": "Password",
-                    "name": "Password",
-                    "width": "120px",
-                    "add": "",
-                    "edit": {
-                        "type": "PasswordTextBox"
-                    }
-                },
-                {
-                    "caption": "Title translation",
-                    "name": "TranslationProfile",
-                    "width": "190px",
-                    "add": 0,
-                    "edit": {
-                        "type": "Select",
-                        "options": [
-                            {
-                                "caption": "None",
-                                "value": 0
-                            },
-                            {
-                                "caption": "Google public calendars - German",
-                                "value": 1
+                    "delete": true,
+                    "changeOrder": true,
+                    "columns": [
+                        {
+                            "caption": "Active",
+                            "name": "Active",
+                            "width": "70px",
+                            "add": true,
+                            "edit": {
+                                "type": "CheckBox"
                             }
-                        ]
-                    }
-                },
-                {
-                    "caption": "Synchronization schedule",
-                    "name": "UpdateSchedule",
-                    "width": "150px",
-                    "add": 7,
-                    "edit": {
-                        "type": "Select",
-                        "options": [
-                            {
-                                "caption": "Custom interval",
-                                "value": 0
-                            },
-                            {
-                                "caption": "Every 5 minutes",
-                                "value": 1
-                            },
-                            {
-                                "caption": "Every 15 minutes",
-                                "value": 2
-                            },
-                            {
-                                "caption": "Every 30 minutes",
-                                "value": 3
-                            },
-                            {
-                                "caption": "Hourly",
-                                "value": 4
-                            },
-                            {
-                                "caption": "Every 6 hours",
-                                "value": 5
-                            },
-                            {
-                                "caption": "Every 12 hours",
-                                "value": 6
-                            },
-                            {
-                                "caption": "Daily",
-                                "value": 7
-                            },
-                            {
-                                "caption": "Weekly",
-                                "value": 8
-                            },
-                            {
-                                "caption": "Monthly",
-                                "value": 9
-                            },
-                            {
-                                "caption": "Yearly",
-                                "value": 10
-                            },
-                            {
-                                "caption": "Manual only",
-                                "value": 11
+                        },
+                        {
+                            "caption": "Calendar name",
+                            "name": "Name",
+                            "width": "180px",
+                            "add": "",
+                            "edit": {
+                                "type": "ValidationTextBox"
                             }
-                        ]
-                    }
-                },
-                {
-                    "caption": "Custom interval",
-                    "name": "UpdateInterval",
-                    "width": "110px",
-                    "add": 15,
-                    "edit": {
-                        "type": "NumberSpinner",
-                        "minimum": 1,
-                        "maximum": 525600,
-                        "suffix": " minutes"
-                    }
-                },
-                {
-                    "caption": "Calendar color",
-                    "name": "Color",
-                    "width": "110px",
-                    "add": "",
-                    "edit": {
-                        "type": "ValidationTextBox",
-                        "validate": "^$|^#[0-9A-Fa-f]{6}$"
-                    }
+                        },
+                        {
+                            "caption": "ICS file",
+                            "name": "FileData",
+                            "width": "auto",
+                            "add": "",
+                            "edit": {
+                                "type": "SelectFile",
+                                "extensions": ".ics"
+                            }
+                        },
+                        {
+                            "caption": "Title translation",
+                            "name": "TranslationProfile",
+                            "width": "190px",
+                            "add": 0,
+                            "edit": {
+                                "type": "Select",
+                                "options": [
+                                    {
+                                        "caption": "None",
+                                        "value": 0
+                                    },
+                                    {
+                                        "caption": "Google public calendars - German",
+                                        "value": 1
+                                    }
+                                ]
+                            }
+                        },
+                        {
+                            "caption": "Calendar color",
+                            "name": "Color",
+                            "width": "110px",
+                            "add": "",
+                            "edit": {
+                                "type": "ValidationTextBox",
+                                "validate": "^$|^#[0-9A-Fa-f]{6}$"
+                            }
+                        }
+                    ]
                 }
             ]
         },

@@ -110,8 +110,8 @@ Zugangsdaten.
 
 ### ICS/Webcal
 
-ICS-/Webcal-Feeds sind schreibgeschützte Kalenderabonnements. Ein Konto kann
-mehrere voneinander unabhängige Feeds verwalten.
+ICS-/Webcal-Quellen sind schreibgeschützt. Ein Konto kann mehrere voneinander
+unabhängige Online-Abonnements und lokal hochgeladene ICS-Dateien verwalten.
 
 Minimaler Ablauf:
 
@@ -140,6 +140,27 @@ Eine Feed-URL kann selbst ein Zugangsgeheimnis enthalten, beispielsweise Googles
 „Privatadresse im iCal-Format“. Sie sollte deshalb wie ein Passwort behandelt
 werden. Geheime Feed-Adressen verbleiben in der Konto-Instanz und werden nicht in
 die Konfiguration einer erzeugten Kalender-Instanz übernommen.
+
+#### Lokale ICS-Dateien
+
+Im aufklappbaren Bereich **Lokale ICS-Dateien** können `.ics`-Dateien direkt vom
+Rechner ausgewählt werden, auf dem die Symcon-Konsole geöffnet ist. Symcon
+überträgt den Dateiinhalt dabei Base64-codiert in die Instanzkonfiguration; ein
+Dateipfad auf dem Symcon-Server ist nicht erforderlich.
+
+Für jede lokale Datei werden **Aktiv**, ein eindeutiger **Kalendername**, die
+**ICS-Datei**, optional eine **Titelübersetzung** und eine **Kalenderfarbe**
+konfiguriert. Der Kalendername dient zugleich als stabile technische Zuordnung:
+Wird eine aktualisierte Datei unter demselben Kalendernamen erneut ausgewählt,
+bleibt die bereits erzeugte Kalender-Instanz zugeordnet.
+
+Lokale ICS-Dateien werden nur beim Auswählen beziehungsweise Ersetzen in die
+OpenCalendar-Konfiguration übernommen. Änderungen an der Originaldatei auf dem
+Arbeitsrechner werden nicht automatisch erkannt. Zum Aktualisieren muss die Datei
+erneut ausgewählt und die Konfiguration übernommen werden. Die Dateien bleiben
+schreibgeschützt und werden mit derselben Terminserienlogik wie Online-Feeds
+ausgewertet. Dateien über 16 MiB oder Inhalte ohne gültigen `VCALENDAR`-Rahmen
+werden abgewiesen.
 
 #### Titelübersetzung
 
@@ -191,7 +212,8 @@ Anbieter | Apple iCloud, Google Calendar, Microsoft 365, CalDAV oder ICS/Webcal
 Server-URL | CalDAV-Basisadresse beziehungsweise bei älteren ICS-Konfigurationen eine einzelne Feed-URL
 Benutzername | Kontoname oder E-Mail-Adresse; bei ICS nur für HTTP-Authentifizierung erforderlich
 Passwort | Konto- oder anwendungsspezifisches Passwort; bei ICS nur für HTTP-Authentifizierung erforderlich
-iCalendar-Abonnements | Liste der aktiven Feeds, Namen, URLs, Zugangsdaten, Übersetzungsprofile, Zeitpläne und Farben
+iCalendar-Abonnements | Liste der aktiven Online-Feeds, Namen, URLs, Zugangsdaten, Übersetzungsprofile, Zeitpläne und Farben
+Lokale ICS-Dateien | Vom Arbeitsrechner hochgeladene `.ics`-Dateien mit Kalendername, Übersetzungsprofil und Farbe
 Aktualisierungsplan | Vorgegebener Rhythmus von fünf Minuten bis jährlich oder ausschließlich manuelle Synchronisation
 Benutzerdefiniertes Intervall | Eigener Abstand in Minuten für den entsprechenden Zeitplantyp
 TLS-Zertifikat prüfen | Nur bei eigenen CalDAV- und ICS-Endpunkten änderbar; für Apple, Google, Microsoft und Symcon OAuth immer aktiv

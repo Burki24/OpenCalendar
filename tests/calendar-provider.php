@@ -6,12 +6,15 @@ use Burki24\SymconModuleHelper\SymconOAuthClient;
 use IPSKalender\CalendarEventTranslation;
 use IPSKalender\CalendarHttpClientInterface;
 use IPSKalender\CalendarHttpResponse;
+use IPSKalender\CalendarProviderInterface;
 use IPSKalender\GoogleCalendarOriginPolicy;
 use IPSKalender\GoogleCalendarProvider;
 use IPSKalender\GoogleOAuthOriginPolicy;
 use IPSKalender\ICalendarCodec;
 use IPSKalender\ICalendarFeedProvider;
 use IPSKalender\ICalendarFeedProviderException;
+use IPSKalender\ICalendarFileProvider;
+use IPSKalender\ICalendarFileProviderException;
 use IPSKalender\ICalendarSubscriptionProvider;
 use IPSKalender\MicrosoftCalendarProvider;
 use IPSKalender\MicrosoftCalendarProviderException;
@@ -28,6 +31,7 @@ require_once __DIR__ . '/../libs/helper/SymconOAuthHelper.php';
 require_once __DIR__ . '/../libs/SymconOAuthOriginPolicy.php';
 require_once __DIR__ . '/../libs/CalendarEventTranslation.php';
 require_once __DIR__ . '/../libs/ICalendarFeedProvider.php';
+require_once __DIR__ . '/../libs/ICalendarFileProvider.php';
 require_once __DIR__ . '/../libs/ICalendarSubscriptionProvider.php';
 require_once __DIR__ . '/../libs/SynchronizationSchedule.php';
 
@@ -742,6 +746,44 @@ assertTrueValue(
     'Unchanged events must not receive an original title field.'
 );
 
+$localFileProvider = new ICalendarFileProvider(
+    base64_encode($icalFeed),
+    'Imported calendar',
+    'local-calendar-test'
+);
+$localFileCalendars = $localFileProvider->getCalendars();
+assertSameValue(1, count($localFileCalendars), 'A local ICS file must expose exactly one calendar.');
+assertSameValue('Imported calendar', $localFileCalendars[0]['name'], 'The configured local file name must override X-WR-CALNAME.');
+assertSameValue(false, $localFileCalendars[0]['capabilities']['create'], 'Local ICS files must be read-only.');
+assertTrueValue(
+    str_starts_with($localFileCalendars[0]['reference'], 'urn:ips-kalender:ics-file:'),
+    'Local ICS files must use an internal reference instead of a server path.'
+);
+$localFileEvents = $localFileProvider->getEvents(
+    $localFileCalendars[0]['reference'],
+    new DateTimeImmutable('2026-07-19T00:00:00Z'),
+    new DateTimeImmutable('2026-07-22T00:00:00Z')
+);
+assertSameValue(1, count($localFileEvents), 'A local ICS file must return events from the requested range.');
+try {
+    new ICalendarFileProvider('not-base64', 'Broken file', 'broken-file');
+    throw new RuntimeException('Invalid Base64 file content was unexpectedly accepted.');
+} catch (ICalendarFileProviderException $exception) {
+    assertTrueValue(
+        str_contains($exception->getMessage(), 'decoded'),
+        'Invalid Base64 file content must produce an actionable validation error.'
+    );
+}
+try {
+    new ICalendarFileProvider(base64_encode('not an iCalendar file'), 'Broken file', 'broken-calendar');
+    throw new RuntimeException('Invalid local iCalendar content was unexpectedly accepted.');
+} catch (ICalendarFileProviderException $exception) {
+    assertTrueValue(
+        str_contains($exception->getMessage(), 'valid iCalendar'),
+        'Invalid local iCalendar content must produce an actionable validation error.'
+    );
+}
+
 $secondIcalFeed = str_replace(
     ['Google Privat', '#34AADCFF', 'inside@example.com', 'Included event'],
     ['Moon phases', '#6D3A38FF', 'moon@example.com', 'First quarter 11:06am'],
@@ -860,6 +902,71 @@ try {
         'Invalid title translation profiles must produce an actionable validation error.'
     );
 }
+
+$mixedSourceProvider = new ICalendarSubscriptionProvider(
+    [
+        [
+            'url'            => 'https://calendar.example/mixed.ics',
+            'name'           => 'Online',
+            'updateSchedule' => SynchronizationSchedule::DAILY,
+            'updateInterval' => 15
+        ],
+        [
+            'sourceType'     => 'file',
+            'fileData'       => base64_encode($secondIcalFeed),
+            'name'           => 'Local file',
+            'updateSchedule' => SynchronizationSchedule::DAILY,
+            'updateInterval' => 15
+        ]
+    ],
+    static function (array $source) use ($icalFeed): CalendarProviderInterface
+    {
+        if (($source['sourceType'] ?? 'url') === 'file') {
+            return new ICalendarFileProvider(
+                (string) $source['fileData'],
+                (string) $source['name'],
+                (string) $source['id']
+            );
+        }
+
+        return new ICalendarFeedProvider(
+            new FakeHttpClient([
+                new CalendarHttpResponse(200, [], $icalFeed, (string) $source['url'])
+            ]),
+            (string) $source['url'],
+            (string) $source['name']
+        );
+    }
+);
+$mixedCalendars = $mixedSourceProvider->getCalendars();
+assertSameValue(2, count($mixedCalendars), 'Online subscriptions and local ICS files must coexist in one account.');
+assertSameValue('Local file', $mixedCalendars[1]['name'], 'The local source must be exposed with its configured name.');
+$mixedLocalEvents = $mixedSourceProvider->getEvents(
+    $mixedCalendars[1]['reference'],
+    new DateTimeImmutable('2026-07-19T00:00:00Z'),
+    new DateTimeImmutable('2026-07-22T00:00:00Z')
+);
+assertSameValue(1, count($mixedLocalEvents), 'The composite provider must route local file calendar references correctly.');
+
+$replacementSourceProvider = new ICalendarSubscriptionProvider(
+    [[
+        'sourceType'     => 'file',
+        'fileData'       => base64_encode(str_replace('Included event', 'Updated event', $icalFeed)),
+        'name'           => 'Local file',
+        'updateSchedule' => SynchronizationSchedule::DAILY,
+        'updateInterval' => 15
+    ]],
+    static fn (array $source): CalendarProviderInterface => new ICalendarFileProvider(
+        (string) $source['fileData'],
+        (string) $source['name'],
+        (string) $source['id']
+    )
+);
+assertSameValue(
+    $mixedCalendars[1]['id'],
+    $replacementSourceProvider->getCalendars()[0]['id'],
+    'Replacing a local ICS file must keep the calendar identity stable while its configured name is unchanged.'
+);
 
 $recurringFeed = "BEGIN:VCALENDAR\r\n"
     . "VERSION:2.0\r\n"
