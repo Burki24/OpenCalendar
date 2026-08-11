@@ -1357,6 +1357,7 @@ assertTrueValue(
         && str_contains($viewModuleSource, 'hash_equals($this->ipsViewToken(), $token)')
         && str_contains($viewModuleSource, "case 'CreateEvent':")
         && str_contains($viewModuleSource, "case 'UpdateEvent':")
+        && str_contains($viewModuleSource, "case 'MoveEvent':")
         && str_contains($viewModuleSource, "case 'DeleteEvent':")
         && str_contains($viewModuleSource, "return 'opencalendar/view/' . \$this->InstanceID;")
         && str_contains($viewModuleSource, "'endpoint' => '/hook/' . \$this->ipsViewHookAddress()")
@@ -1375,9 +1376,20 @@ assertTrueValue(
         && str_contains($viewScriptSource, "return calendarVisualization.mode === 'symcon';")
         && str_contains($viewScriptSource, 'async function waitForNativeActionBridge(timeoutMilliseconds = 1500)')
         && str_contains($viewScriptSource, 'if (await sendAction(action, value))')
+        && str_contains($viewScriptSource, "const action = moving ? 'MoveEvent' : (selectedEvent ? 'UpdateEvent' : 'CreateEvent');")
         && str_contains($viewScriptSource, "await sendAction('DeleteEvent',"),
-    'The shared calendar interface must create, update, delete and refresh through either requestAction or the IPSView WebHook.'
+    'The shared calendar interface must create, update, move, delete and refresh through either requestAction or the IPSView WebHook.'
 );
+assertTrueValue(
+    is_string($viewModuleSource)
+        && str_contains($viewModuleSource, "case 'MoveEvent':")
+        && str_contains($viewModuleSource, 'IPSKAL_CreateEvent(')
+        && str_contains($viewModuleSource, 'IPSKAL_DeleteEvent(')
+        && str_contains($viewModuleSource, "'Event moved.'")
+        && str_contains($viewModuleSource, 'The event was created in the target calendar, but could not be deleted from the source calendar.'),
+    'Moving an event must create the target copy before deleting the source and report partial failures without risking event loss.'
+);
+
 assertTrueValue(
     is_string($viewModuleSource)
         && is_string($viewScriptSource)
