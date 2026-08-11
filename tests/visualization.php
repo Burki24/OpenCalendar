@@ -96,6 +96,13 @@ assertVisualization(
     'All-day events must use their date-only boundaries so exclusive end dates cannot spill into the next local day.'
 );
 assertVisualization(
+    str_contains($script, 'setDateInputs(eventStart(event), eventEnd(event), Boolean(event.allDay), Boolean(event.allDay));')
+        && str_contains($script, 'const displayEnd = allDay && allDayEndExclusive && end > start ? addDays(end, -1) : end;')
+        && str_contains($script, "end: inputDateValue(document.getElementById('event-end').value, allDay, allDay)")
+        && str_contains($script, 'return localDate(exclusiveEnd ? addDays(date, 1) : date);'),
+    'The all-day event dialog must show an inclusive end date and convert it back to an exclusive provider end date.'
+);
+assertVisualization(
     str_contains($script, 'calendarState.settings.showAgendaEventCount !== false')
         && str_contains($script, 'calendarState.settings.showThreeDaysEventCount !== false')
         && str_contains($script, 'calendarState.settings.showWeekEventCount !== false')
