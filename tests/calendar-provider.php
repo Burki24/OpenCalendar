@@ -1251,19 +1251,36 @@ assertTrueValue(
         && str_contains($accountModuleSource, 'self::GOOGLE_OAUTH_IDENTIFIER, self::MICROSOFT_OAUTH_IDENTIFIER')
         && str_contains($accountModuleSource, '$this->RegisterOAuth($identifier)')
         && str_contains($accountModuleSource, 'RegisterMessage(0, IPS_KERNELSTARTED)')
-        && str_contains($accountModuleSource, 'IPS_GetKernelRunlevel() === KR_READY')
+        && str_contains($accountModuleSource, "RegisterTimer('OAuthRegistrationTimer'")
+        && str_contains($accountModuleSource, 'IPSKALACC_InitializeOAuth')
+        && str_contains($accountModuleSource, 'OAUTH_REGISTRATION_DELAY_MS = 5_000')
+        && str_contains($accountModuleSource, 'private function scheduleOAuthRegistration(): void')
         && preg_match(
             '/public function Create\(\): void[\s\S]*?public function GetConfigurationForm/',
             $accountModuleSource,
             $accountCreateMethod
         ) === 1
         && !str_contains($accountCreateMethod[0], 'RegisterOAuth(')
+        && preg_match(
+            '/public function ApplyChanges\(\): void[\s\S]*?public function InitializeOAuth/',
+            $accountModuleSource,
+            $accountApplyChangesMethod
+        ) === 1
+        && !str_contains($accountApplyChangesMethod[0], 'registerOAuthHandlers()')
+        && str_contains($accountApplyChangesMethod[0], 'scheduleOAuthRegistration()')
+        && preg_match(
+            '/public function MessageSink\([\s\S]*?public function RequestAction/',
+            $accountModuleSource,
+            $accountMessageSinkMethod
+        ) === 1
+        && !str_contains($accountMessageSinkMethod[0], 'registerOAuthHandlers()')
+        && str_contains($accountMessageSinkMethod[0], 'scheduleOAuthRegistration()')
         && !str_contains($accountModuleSource, "RegisterPropertyString('GoogleClientID'")
         && !str_contains($accountModuleSource, "RegisterPropertyString('GoogleClientSecret'")
         && !str_contains($accountModuleSource, 'RegisterHook(')
         && is_string($accountGoogleOAuthSource)
         && str_contains($accountGoogleOAuthSource, 'private function processGoogleOAuthData(): void'),
-    'OAuth handlers must be registered after kernel readiness without per-user client credentials.'
+    'OAuth registration must be deferred beyond ApplyChanges so module reloads can settle first.'
 );
 assertTrueValue(
     is_string($calendarModuleSource)

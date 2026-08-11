@@ -45,6 +45,7 @@ foreach ([
     'ConnectMicrosoft',
     'DisconnectMicrosoft',
     'ApplyChanges',
+    'InitializeOAuth',
     'ScheduledSynchronize',
     'ForwardData',
     'TestConnection',
@@ -112,18 +113,36 @@ assertAccountStructure(
         && str_contains($accountSource, 'self::GOOGLE_OAUTH_IDENTIFIER, self::MICROSOFT_OAUTH_IDENTIFIER')
         && str_contains($accountSource, '$this->RegisterOAuth($identifier)')
         && str_contains($accountSource, 'RegisterMessage(0, IPS_KERNELSTARTED)')
+        && str_contains($accountSource, "RegisterTimer('OAuthRegistrationTimer'")
+        && str_contains($accountSource, 'IPSKALACC_InitializeOAuth')
+        && str_contains($accountSource, 'OAUTH_REGISTRATION_DELAY_MS = 5_000')
         && str_contains($accountSource, 'IPS_GetKernelRunlevel() === KR_READY')
+        && str_contains($accountSource, 'private function scheduleOAuthRegistration(): void')
         && preg_match(
             '/public function Create\(\): void[\s\S]*?public function GetConfigurationForm/',
             $accountSource,
             $createMethod
         ) === 1
         && !str_contains($createMethod[0], 'RegisterOAuth(')
+        && preg_match(
+            '/public function ApplyChanges\(\): void[\s\S]*?public function InitializeOAuth/',
+            $accountSource,
+            $applyChangesMethod
+        ) === 1
+        && !str_contains($applyChangesMethod[0], 'registerOAuthHandlers()')
+        && str_contains($applyChangesMethod[0], 'scheduleOAuthRegistration()')
+        && preg_match(
+            '/public function MessageSink\([\s\S]*?public function RequestAction/',
+            $accountSource,
+            $messageSinkMethod
+        ) === 1
+        && !str_contains($messageSinkMethod[0], 'registerOAuthHandlers()')
+        && str_contains($messageSinkMethod[0], 'scheduleOAuthRegistration()')
         && !str_contains($accountSource, "RegisterPropertyString('GoogleClientID'")
         && !str_contains($accountSource, "RegisterPropertyString('GoogleClientSecret'")
         && !str_contains($accountSource, "RegisterPropertyString('MicrosoftClientID'")
         && !str_contains($accountSource, "RegisterPropertyString('MicrosoftClientSecret'"),
-    'Google and Microsoft OAuth must be registered after kernel readiness without per-user client credentials.'
+    'Google and Microsoft OAuth registration must be deferred beyond ApplyChanges during module reloads.'
 );
 assertAccountStructure(
     is_string($accountSource)
