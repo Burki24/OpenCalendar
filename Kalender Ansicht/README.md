@@ -22,7 +22,7 @@ verwendet werden.
    allgemeinen Zusatzinformationen wie Wochenenden, Kalendername, Ort und
    Beschreibung sowie die ansichtsspezifische Matrix für Terminanzahl,
    Kalenderwoche und Tageszahl gebündelt. Für die Listenansicht werden dort
-   zusätzlich die gewünschten Listenspalten gewählt.
+   zusätzlich die gewünschten Listenspalten und die Bedienelemente der Listenansicht gewählt.
 5. Über **Ansichtszeiträume** die sichtbare Länge jeder Darstellung festlegen.
 6. Die Konfiguration übernehmen und **Kalender synchronisieren** ausführen.
 7. Die Instanz in der Symcon-Kachelvisualisierung platzieren.
@@ -42,7 +42,8 @@ unvollständig ist; eine vorhandene individuelle Auswahl wird dabei ersetzt.
 - frei wählbare sichtbare Zeiträume je Ansicht: Tage für Agenda, Liste und
   3-Tage-Ansicht, Wochen für die Wochenansicht und Monate für die Monatsansicht
 - reduzierte Listenansicht mit Kalenderfarben und frei auswählbaren Spalten für
-  Datum, Beginn, Ende, Titel, Kalender, Ort und Beschreibung
+  Datum, Beginn, Ende, Titel, Kalender, Ort und Beschreibung; Navigation,
+  Termin-Erstellung und Aktualisieren können dort optional ausgeblendet werden
 - optional und je Darstellung separat einblendbare Terminanzahl pro Tag in
   Agenda-, 3-Tage- und Wochenansicht
 - Zusammenführen beliebig vieler ausgewählter Kalender
@@ -72,6 +73,7 @@ Anzeigeoptionen → Allgemein | Wochenenden, Kalendername, Ort und Beschreibung 
 Anzeigeoptionen → Terminanzahl | Je Ansicht separat für Agenda, 3 Tage und Woche; im Monat wird keine Tages-Terminanzahl eingeblendet
 Anzeigeoptionen → Kalenderwoche | Je Ansicht separat für Agenda, Liste, 3 Tage, Woche und Monat
 Anzeigeoptionen → Tageszahl | Je Ansicht separat für Agenda, Liste, 3 Tage, Woche und Monat
+Anzeigeoptionen → Listenansicht | Bedienelemente der Listenansicht ein-/ausblenden; Zeitraum und Ansichtswechsel bleiben sichtbar
 Anzeigeoptionen → Listenspalten | Legt fest, welche Datenfelder in der Listenansicht als Spalten erscheinen
 Ansichtszeiträume | Sichtbare Länge jeder Ansicht im aufklappbaren Bereich; Agenda/Liste/3 Tage in Tagen, Woche in Wochen und Monat in Monaten
 
@@ -90,7 +92,10 @@ Die **Listenansicht** verzichtet bewusst auf Karten und zusätzliche
 Gruppierungen. Jeder Termin wird in einer einfachen Tabellenzeile dargestellt;
 der schmale Farbbalken übernimmt die Farbe des jeweiligen Kalenders. Datum,
 Beginn, Ende, Titel, Kalendername, Ort und Beschreibung können unabhängig
-voneinander als Spalten ein- oder ausgeblendet werden.
+voneinander als Spalten ein- oder ausgeblendet werden. Optional lassen sich in
+dieser Ansicht die Schaltflächen für Zurück, Heute, Weiter, Termin erstellen und
+Aktualisieren ausblenden. Die Zeitraumüberschrift und die Auswahl der Ansichten
+bleiben dabei sichtbar, damit die Listenansicht jederzeit verlassen werden kann.
 
 Der aufklappbare Bereich **Ansichtszeiträume** steuert die sichtbare Länge der einzelnen
 Darstellungen und gleichzeitig die Schrittweite der Vor-/Zurück-Navigation.

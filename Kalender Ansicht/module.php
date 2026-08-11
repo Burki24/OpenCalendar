@@ -125,6 +125,7 @@ class KalenderAnsicht extends IPSModuleStrict
         $this->RegisterPropertyBoolean('ShowListCalendarName', true);
         $this->RegisterPropertyBoolean('ShowListLocation', false);
         $this->RegisterPropertyBoolean('ShowListDescription', false);
+        $this->RegisterPropertyBoolean('ShowListControls', true);
         $this->RegisterPropertyBoolean('ShowCalendarName', true);
         $this->RegisterPropertyBoolean('ShowLocation', true);
         $this->RegisterPropertyBoolean('ShowDescription', false);
@@ -971,6 +972,7 @@ class KalenderAnsicht extends IPSModuleStrict
             'showListCalendarName'      => $this->ReadPropertyBoolean('ShowListCalendarName'),
             'showListLocation'          => $this->ReadPropertyBoolean('ShowListLocation'),
             'showListDescription'       => $this->ReadPropertyBoolean('ShowListDescription'),
+            'showListControls'          => $this->ReadPropertyBoolean('ShowListControls'),
             'showCalendarName'          => $this->ReadPropertyBoolean('ShowCalendarName'),
             'showLocation'              => $this->ReadPropertyBoolean('ShowLocation'),
             'showDescription'           => $this->ReadPropertyBoolean('ShowDescription'),

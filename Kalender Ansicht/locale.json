@@ -106,7 +106,9 @@
             "List columns": "Listenspalten",
             "The displayed period is independent of the loaded past/future event range.": "Der dargestellte Zeitraum ist unabhängig vom geladenen Terminzeitraum für vergangene/zukünftige Tage.",
             "General options": "Allgemeine Optionen",
-            "Per-view options": "Ansichtsspezifische Optionen"
+            "Per-view options": "Ansichtsspezifische Optionen",
+            "List view": "Listenansicht",
+            "Show controls": "Bedienelemente anzeigen"
         }
     }
 }

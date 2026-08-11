@@ -48,7 +48,8 @@ final class CalendarVisualizationRenderer
                     'showListTitle'             => true,
                     'showListCalendarName'      => true,
                     'showListLocation'          => false,
-                    'showListDescription'       => true
+                    'showListDescription'       => true,
+                    'showListControls'          => false
                 ]
             ],
             'runtime'            => $ipsView
@@ -207,6 +208,17 @@ foreach ([
         sprintf('The %s list-column setting must be configurable and persisted.', $property)
     );
 }
+assertVisualization(
+    str_contains($formSource, '"name": "ShowListControls"')
+        && str_contains($moduleSource, "RegisterPropertyBoolean('ShowListControls', true)")
+        && str_contains($moduleSource, "ReadPropertyBoolean('ShowListControls')")
+        && str_contains($script, 'function listControlsVisible()')
+        && str_contains($script, "activeView !== 'list' || calendarState.settings.showListControls !== false")
+        && str_contains($script, "document.getElementById('previous-button').parentElement.classList.toggle('hidden', !showControls)")
+        && str_contains($script, "document.getElementById('refresh-button').classList.toggle('hidden', !showControls)")
+        && str_contains($script, 'actionBridgeAvailable && listControlsVisible()'),
+    'The list-view controls setting must hide navigation, event creation and refresh while preserving the period and view selector.'
+);
 foreach ([
     'AgendaPeriodDays'    => 14,
     'ListPeriodDays'      => 14,
@@ -318,6 +330,7 @@ foreach ([$native, $ipsView] as $html) {
     assertVisualization(str_contains($html, '"showListCalendarWeek":true'), 'The list calendar-week setting must be serialized.');
     assertVisualization(str_contains($html, '"showListDayOfYear":true'), 'The list day-of-year setting must be serialized.');
     assertVisualization(str_contains($html, '"showListDescription":true'), 'The list column settings must be serialized.');
+    assertVisualization(str_contains($html, '"showListControls":false'), 'The list controls setting must be serialized.');
     assertVisualization(str_contains($html, 'calendarVisualization.state'), 'The calendar script must consume the shared state contract.');
     assertVisualization(
         str_contains($html, "calendarIPSViewRequest('GetState', null)"),

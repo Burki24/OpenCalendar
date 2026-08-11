@@ -293,6 +293,20 @@
                 },
                 {
                     "type": "Label",
+                    "caption": "List view"
+                },
+                {
+                    "type": "RowLayout",
+                    "items": [
+                        {
+                            "type": "CheckBox",
+                            "name": "ShowListControls",
+                            "caption": "Show controls"
+                        }
+                    ]
+                },
+                {
+                    "type": "Label",
                     "caption": "List columns"
                 },
                 {
