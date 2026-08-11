@@ -73,7 +73,7 @@ Anzeigeoptionen → Terminanzahl | Je Ansicht separat für Agenda, 3 Tage und Wo
 Anzeigeoptionen → Kalenderwoche | Je Ansicht separat für Agenda, Liste, 3 Tage, Woche und Monat
 Anzeigeoptionen → Tageszahl | Je Ansicht separat für Agenda, Liste, 3 Tage, Woche und Monat
 Anzeigeoptionen → Listenspalten | Legt fest, welche Datenfelder in der Listenansicht als Spalten erscheinen
-Ansichtszeiträume | Sichtbare Länge jeder Ansicht; Agenda/Liste/3 Tage in Tagen, Woche in Wochen und Monat in Monaten
+Ansichtszeiträume | Sichtbare Länge jeder Ansicht im aufklappbaren Bereich; Agenda/Liste/3 Tage in Tagen, Woche in Wochen und Monat in Monaten
 
 Die Kalenderwoche erscheint in der Wochenansicht in der Zeitraumüberschrift.
 In der 3-Tage-Ansicht werden bei einem Wochenwechsel beide Kalenderwochen
@@ -92,7 +92,7 @@ der schmale Farbbalken übernimmt die Farbe des jeweiligen Kalenders. Datum,
 Beginn, Ende, Titel, Kalendername, Ort und Beschreibung können unabhängig
 voneinander als Spalten ein- oder ausgeblendet werden.
 
-Die **Ansichtszeiträume** steuern die sichtbare Länge der einzelnen
+Der aufklappbare Bereich **Ansichtszeiträume** steuert die sichtbare Länge der einzelnen
 Darstellungen und gleichzeitig die Schrittweite der Vor-/Zurück-Navigation.
 Agenda, Liste und 3-Tage-Ansicht verwenden Tage, die Wochenansicht verwendet
 Wochen und die Monatsansicht Monate. Der sichtbare Zeitraum und der oben

@@ -343,152 +343,150 @@
             ]
         },
         {
-            "type": "PopupButton",
+            "type": "ExpansionPanel",
             "caption": "View periods",
-            "popup": {
-                "caption": "View periods",
-                "items": [
-                    {
-                        "type": "RowLayout",
-                        "items": [
-                            {
-                                "type": "Label",
-                                "caption": "View",
-                                "width": "190px"
-                            },
-                            {
-                                "type": "Label",
-                                "caption": "Period",
-                                "width": "120px"
-                            },
-                            {
-                                "type": "Label",
-                                "caption": "Unit",
-                                "width": "120px"
-                            }
-                        ]
-                    },
-                    {
-                        "type": "RowLayout",
-                        "items": [
-                            {
-                                "type": "Label",
-                                "caption": "Agenda",
-                                "width": "190px"
-                            },
-                            {
-                                "type": "NumberSpinner",
-                                "name": "AgendaPeriodDays",
-                                "caption": "",
-                                "minimum": 1,
-                                "maximum": 366,
-                                "width": "120px"
-                            },
-                            {
-                                "type": "Label",
-                                "caption": "Days",
-                                "width": "120px"
-                            }
-                        ]
-                    },
-                    {
-                        "type": "RowLayout",
-                        "items": [
-                            {
-                                "type": "Label",
-                                "caption": "List",
-                                "width": "190px"
-                            },
-                            {
-                                "type": "NumberSpinner",
-                                "name": "ListPeriodDays",
-                                "caption": "",
-                                "minimum": 1,
-                                "maximum": 366,
-                                "width": "120px"
-                            },
-                            {
-                                "type": "Label",
-                                "caption": "Days",
-                                "width": "120px"
-                            }
-                        ]
-                    },
-                    {
-                        "type": "RowLayout",
-                        "items": [
-                            {
-                                "type": "Label",
-                                "caption": "3 Days",
-                                "width": "190px"
-                            },
-                            {
-                                "type": "NumberSpinner",
-                                "name": "ThreeDaysPeriodDays",
-                                "caption": "",
-                                "minimum": 1,
-                                "maximum": 31,
-                                "width": "120px"
-                            },
-                            {
-                                "type": "Label",
-                                "caption": "Days",
-                                "width": "120px"
-                            }
-                        ]
-                    },
-                    {
-                        "type": "RowLayout",
-                        "items": [
-                            {
-                                "type": "Label",
-                                "caption": "Week",
-                                "width": "190px"
-                            },
-                            {
-                                "type": "NumberSpinner",
-                                "name": "WeekPeriodWeeks",
-                                "caption": "",
-                                "minimum": 1,
-                                "maximum": 12,
-                                "width": "120px"
-                            },
-                            {
-                                "type": "Label",
-                                "caption": "Weeks",
-                                "width": "120px"
-                            }
-                        ]
-                    },
-                    {
-                        "type": "RowLayout",
-                        "items": [
-                            {
-                                "type": "Label",
-                                "caption": "Month",
-                                "width": "190px"
-                            },
-                            {
-                                "type": "NumberSpinner",
-                                "name": "MonthPeriodMonths",
-                                "caption": "",
-                                "minimum": 1,
-                                "maximum": 12,
-                                "width": "120px"
-                            },
-                            {
-                                "type": "Label",
-                                "caption": "Months",
-                                "width": "120px"
-                            }
-                        ]
-                    },
-                    {
-                        "type": "Label",
-                        "caption": "The displayed period is independent of the loaded past/future event range."
-                    }
-                ]
-            }
+            "expanded": false,
+            "items": [
+                {
+                    "type": "RowLayout",
+                    "items": [
+                        {
+                            "type": "Label",
+                            "caption": "View",
+                            "width": "190px"
+                        },
+                        {
+                            "type": "Label",
+                            "caption": "Period",
+                            "width": "120px"
+                        },
+                        {
+                            "type": "Label",
+                            "caption": "Unit",
+                            "width": "120px"
+                        }
+                    ]
+                },
+                {
+                    "type": "RowLayout",
+                    "items": [
+                        {
+                            "type": "Label",
+                            "caption": "Agenda",
+                            "width": "190px"
+                        },
+                        {
+                            "type": "NumberSpinner",
+                            "name": "AgendaPeriodDays",
+                            "caption": "",
+                            "minimum": 1,
+                            "maximum": 366,
+                            "width": "120px"
+                        },
+                        {
+                            "type": "Label",
+                            "caption": "Days",
+                            "width": "120px"
+                        }
+                    ]
+                },
+                {
+                    "type": "RowLayout",
+                    "items": [
+                        {
+                            "type": "Label",
+                            "caption": "List",
+                            "width": "190px"
+                        },
+                        {
+                            "type": "NumberSpinner",
+                            "name": "ListPeriodDays",
+                            "caption": "",
+                            "minimum": 1,
+                            "maximum": 366,
+                            "width": "120px"
+                        },
+                        {
+                            "type": "Label",
+                            "caption": "Days",
+                            "width": "120px"
+                        }
+                    ]
+                },
+                {
+                    "type": "RowLayout",
+                    "items": [
+                        {
+                            "type": "Label",
+                            "caption": "3 Days",
+                            "width": "190px"
+                        },
+                        {
+                            "type": "NumberSpinner",
+                            "name": "ThreeDaysPeriodDays",
+                            "caption": "",
+                            "minimum": 1,
+                            "maximum": 31,
+                            "width": "120px"
+                        },
+                        {
+                            "type": "Label",
+                            "caption": "Days",
+                            "width": "120px"
+                        }
+                    ]
+                },
+                {
+                    "type": "RowLayout",
+                    "items": [
+                        {
+                            "type": "Label",
+                            "caption": "Week",
+                            "width": "190px"
+                        },
+                        {
+                            "type": "NumberSpinner",
+                            "name": "WeekPeriodWeeks",
+                            "caption": "",
+                            "minimum": 1,
+                            "maximum": 12,
+                            "width": "120px"
+                        },
+                        {
+                            "type": "Label",
+                            "caption": "Weeks",
+                            "width": "120px"
+                        }
+                    ]
+                },
+                {
+                    "type": "RowLayout",
+                    "items": [
+                        {
+                            "type": "Label",
+                            "caption": "Month",
+                            "width": "190px"
+                        },
+                        {
+                            "type": "NumberSpinner",
+                            "name": "MonthPeriodMonths",
+                            "caption": "",
+                            "minimum": 1,
+                            "maximum": 12,
+                            "width": "120px"
+                        },
+                        {
+                            "type": "Label",
+                            "caption": "Months",
+                            "width": "120px"
+                        }
+                    ]
+                },
+                {
+                    "type": "Label",
+                    "caption": "The displayed period is independent of the loaded past/future event range."
+                }
+            ]
         },
         {
             "type": "ExpansionPanel",
