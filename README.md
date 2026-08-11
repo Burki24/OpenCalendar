@@ -121,5 +121,6 @@ Drittanbieter.
 - **Kalender Ansicht** ([Dokumentation](Kalender%20Ansicht))
 
   Führt mehrere Kalender in einer responsiven Kachel- oder IPSView-Ansicht
-  zusammen.
+  zusammen und stellt die ausgewählten Kalender zusätzlich providerübergreifend
+  über PHP-Funktionen für Tages- und Datumsbereichsabfragen bereit.
 

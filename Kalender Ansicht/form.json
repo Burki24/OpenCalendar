@@ -75,6 +75,14 @@
             ]
         },
         {
+            "type": "NumberSpinner",
+            "name": "TileFontScale",
+            "caption": "Tile font size (%)",
+            "minimum": 50,
+            "maximum": 200,
+            "suffix": "%"
+        },
+        {
             "type": "RowLayout",
             "items": [
                 {

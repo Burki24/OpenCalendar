@@ -9,6 +9,7 @@ $commands = [
     ['Verify DataFlowHelper integration', ['python3', 'tests/data_flow_integration.py']],
     ['Verify chunked event transfers', [PHP_BINARY, 'tests/chunked-event-transfer.php']],
     ['Verify current-day event counting', [PHP_BINARY, 'tests/calendar-event-counter.php']],
+    ['Verify Calendar View PHP API', [PHP_BINARY, 'tests/calendar-view-api.php']],
     ['Verify calendar configurator cache isolation', [PHP_BINARY, 'tests/configurator-cache.php']],
     ['Run OpenCalendar provider and integration tests', [PHP_BINARY, 'tests/calendar-provider.php']],
     ['Check shared visualization contract', [PHP_BINARY, 'tests/visualization.php']],
