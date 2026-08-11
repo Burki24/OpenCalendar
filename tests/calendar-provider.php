@@ -1362,6 +1362,18 @@ assertTrueValue(
     'The shared calendar interface must create, update, delete and refresh through either requestAction or the IPSView WebHook.'
 );
 assertTrueValue(
+    is_string($viewModuleSource)
+        && is_string($viewScriptSource)
+        && str_contains($viewModuleSource, "'instanceId'           => \$this->InstanceID")
+        && str_contains($viewScriptSource, 'const calendarViewStateStorageKey = Number(calendarOptions.instanceId) > 0')
+        && str_contains($viewScriptSource, 'restoreClientViewState(calendarState.settings.defaultView')
+        && str_contains($viewScriptSource, 'window.localStorage.getItem(calendarViewStateStorageKey)')
+        && str_contains($viewScriptSource, 'window.localStorage.setItem(calendarViewStateStorageKey, value)')
+        && str_contains($viewScriptSource, 'persistClientViewState();'),
+    'The calendar visualization must preserve the selected view and cursor date client-side per instance.'
+);
+
+assertTrueValue(
     is_string($viewTemplateSource)
         && is_string($viewStyleSource)
         && is_string($viewScriptSource)

@@ -15,6 +15,10 @@ const calendarRuntime = calendarVisualization.runtime && typeof calendarVisualiz
 const calendarIPSViewConfig = calendarVisualization.mode === 'ipsview' ? calendarRuntime : null;
 const calendarAgendaColorBarWidth = Math.max(2, Math.min(16, Number(calendarOptions.agendaColorBarWidth) || 5));
 const calendarCompactColorBarWidth = Math.max(2, Math.min(16, Number(calendarOptions.compactColorBarWidth) || 3));
+const calendarViewStateStorageKey = Number(calendarOptions.instanceId) > 0
+    ? `OpenCalendar.ViewState.${Number(calendarOptions.instanceId)}`
+    : '';
+const calendarViews = new Set(['agenda', 'list', 'threeDays', 'week', 'month']);
 document.documentElement.style.setProperty('--agenda-color-bar-width', `${calendarAgendaColorBarWidth}px`);
 document.documentElement.style.setProperty('--compact-color-bar-width', `${calendarCompactColorBarWidth}px`);
 
@@ -56,7 +60,7 @@ function handleMessage(data) {
     calendarState.calendars = Array.isArray(calendarState.calendars) ? calendarState.calendars : [];
     calendarState.settings = calendarState.settings || {};
     if (!initialized) {
-        activeView = calendarState.settings.defaultView || 'agenda';
+        restoreClientViewState(calendarState.settings.defaultView || 'agenda');
         applyStaticTranslations();
         initialized = true;
     }
@@ -765,11 +769,16 @@ document.getElementById('dialog-close').addEventListener('click', () => eventDia
 document.getElementById('cancel-button').addEventListener('click', () => eventDialog.close());
 document.getElementById('add-button').addEventListener('click', openNewEvent);
 document.getElementById('refresh-button').addEventListener('click', () => sendAction('Refresh', true));
-document.getElementById('today-button').addEventListener('click', () => { cursorDate = startOfDay(new Date()); render(); });
+document.getElementById('today-button').addEventListener('click', () => {
+    cursorDate = startOfDay(new Date());
+    persistClientViewState();
+    render();
+});
 document.getElementById('previous-button').addEventListener('click', () => navigate(-1));
 document.getElementById('next-button').addEventListener('click', () => navigate(1));
 document.querySelectorAll('.view-button').forEach(button => button.addEventListener('click', () => {
     activeView = button.dataset.view;
+    persistClientViewState();
     render();
 }));
 document.addEventListener('wheel', containWheelInsideTile, { capture: true, passive: false });
@@ -815,7 +824,106 @@ function navigate(direction) {
     } else {
         cursorDate = addDays(cursorDate, direction * viewPeriod(activeView === 'list' ? 'list' : 'agenda'));
     }
+    persistClientViewState();
     render();
+}
+
+function restoreClientViewState(defaultView) {
+    activeView = calendarViews.has(defaultView) ? defaultView : 'agenda';
+    cursorDate = startOfDay(new Date());
+
+    const storedState = readClientViewState();
+    if (!storedState || typeof storedState !== 'object') return;
+
+    if (calendarViews.has(storedState.activeView)) {
+        activeView = storedState.activeView;
+    }
+    const storedDate = parseStoredViewDate(storedState.cursorDate);
+    if (storedDate) {
+        cursorDate = storedDate;
+    }
+}
+
+function persistClientViewState() {
+    if (calendarViewStateStorageKey === '') return;
+
+    const value = JSON.stringify({
+        activeView,
+        cursorDate: formatStoredViewDate(cursorDate)
+    });
+    try {
+        window.localStorage.setItem(calendarViewStateStorageKey, value);
+        return;
+    } catch (error) {
+        // Some embedded WebViews expose an opaque origin and reject Web Storage.
+    }
+    writeWindowNameViewState(value);
+}
+
+function readClientViewState() {
+    if (calendarViewStateStorageKey === '') return null;
+
+    let value = null;
+    try {
+        value = window.localStorage.getItem(calendarViewStateStorageKey);
+    } catch (error) {
+        // Fall back to window.name for embedded WebViews without Web Storage.
+    }
+    if (typeof value !== 'string' || value === '') {
+        value = readWindowNameViewState();
+    }
+    if (typeof value !== 'string' || value === '') return null;
+
+    try {
+        return JSON.parse(value);
+    } catch (error) {
+        return null;
+    }
+}
+
+function writeWindowNameViewState(value) {
+    try {
+        if (window.name && !window.name.startsWith('OpenCalendar:')) return;
+        const state = window.name
+            ? JSON.parse(window.name.slice('OpenCalendar:'.length))
+            : {};
+        state[calendarViewStateStorageKey] = value;
+        window.name = `OpenCalendar:${JSON.stringify(state)}`;
+    } catch (error) {
+        // Client persistence is optional; rendering must continue without it.
+    }
+}
+
+function readWindowNameViewState() {
+    try {
+        if (!window.name || !window.name.startsWith('OpenCalendar:')) return null;
+        const state = JSON.parse(window.name.slice('OpenCalendar:'.length));
+        return typeof state[calendarViewStateStorageKey] === 'string'
+            ? state[calendarViewStateStorageKey]
+            : null;
+    } catch (error) {
+        return null;
+    }
+}
+
+function formatStoredViewDate(date) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+}
+
+function parseStoredViewDate(value) {
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value || ''));
+    if (!match) return null;
+
+    const date = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+    if (date.getFullYear() !== Number(match[1])
+        || date.getMonth() !== Number(match[2]) - 1
+        || date.getDate() !== Number(match[3])) {
+        return null;
+    }
+    return startOfDay(date);
 }
 
 function moveVisibleDays(start, amount) {

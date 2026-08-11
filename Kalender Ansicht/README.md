@@ -52,7 +52,7 @@ unvollständig ist; eine vorhandene individuelle Auswahl wird dabei ersetzt.
 - Navigation innerhalb des dargestellten Zeitraums
 - manuelle Synchronisation aller ausgewählten Kalender
 - Erstellen, Bearbeiten und Löschen von Terminen in beschreibbaren Kalendern
-- automatische Aktualisierung nach einer Kalendersynchronisation
+- automatische Aktualisierung nach einer Kalendersynchronisation, ohne die am jeweiligen Client gewählte Ansicht oder das Bezugsdatum zurückzusetzen
 - responsive Bedienung auf großen Kacheln und schmalen Mobilansichten
 - optionale IPSView-Ausgabe über eine WebContent-Variable
 
@@ -65,7 +65,7 @@ Terminserie verändert werden.
 Eigenschaft | Beschreibung
 --- | ---
 Kalender | Ausgewählte Kalender-Instanzen und ihre Aktivierung
-Standardansicht | Agenda, Liste, 3 Tage, Woche oder Monat
+Standardansicht | Agenda, Liste, 3 Tage, Woche oder Monat; wird nur verwendet, solange der jeweilige Client noch keinen eigenen Ansichtsstand gespeichert hat
 Kachel-Wochenausrichtung | Horizontale Wochenspalten oder vertikale Tageszeilen
 Vergangene/Zukünftige Tage | Datenzeitraum, aus dem Termine für alle Darstellungen geladen und zusammengeführt werden
 Maximale Termine | Obergrenze der in einer Antwort verarbeiteten Termine
@@ -87,6 +87,8 @@ Tageszahl wird in Agenda, 3-Tage- und Wochenansicht in der vorhandenen
 Tagesüberschrift und im Monat dezent beim Tagesdatum dargestellt. In der
 Listenansicht werden Kalenderwoche und Tageszahl bei Aktivierung als eigene,
 schmale Spalten ausgegeben.
+
+Die zuletzt am jeweiligen Browser/Monitor gewählte Ansicht und das zugehörige Bezugsdatum werden clientseitig und instanzbezogen gespeichert. Dadurch bleiben beispielsweise Liste und gewählter Zeitraum auch erhalten, wenn eine Kalendersynchronisation die IPSView-Seite neu lädt. Unterschiedliche Monitore können unabhängig voneinander verschiedene Ansichten verwenden. Die konfigurierte Standardansicht dient weiterhin als Ausgangswert für neue Clients.
 
 Die **Listenansicht** verzichtet bewusst auf Karten und zusätzliche
 Gruppierungen. Jeder Termin wird in einer einfachen Tabellenzeile dargestellt;
