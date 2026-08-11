@@ -93,7 +93,18 @@
             "Display": "Anzeige",
             "Event count": "Terminanzahl",
             "Calendar week": "Kalenderwoche",
-            "Day of year": "Tageszahl"
+            "Day of year": "Tageszahl",
+            "List": "Liste",
+            "Date": "Datum",
+            "View periods": "Ansichtszeiträume",
+            "View": "Ansicht",
+            "Period": "Zeitraum",
+            "Unit": "Einheit",
+            "Days": "Tage",
+            "Weeks": "Wochen",
+            "Months": "Monate",
+            "List columns": "Listenspalten",
+            "The displayed period is independent of the loaded past/future event range.": "Der dargestellte Zeitraum ist unabhängig vom geladenen Terminzeitraum für vergangene/zukünftige Tage."
         }
     }
 }
