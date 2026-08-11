@@ -59,7 +59,7 @@ try {
     );
     assertCalendarViewApi(
         CalendarAppointmentRange::eventOverlaps([
-            'allDay'        => false,
+            'allDay'         => false,
             'startTimestamp' => (new DateTimeImmutable('2026-08-10T23:30:00+02:00'))->getTimestamp(),
             'endTimestamp'   => (new DateTimeImmutable('2026-08-11T00:30:00+02:00'))->getTimestamp()
         ], $dayStart, $dayEnd),
