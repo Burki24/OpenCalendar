@@ -216,7 +216,7 @@ assertVisualization(
         && str_contains($script, "activeView !== 'list' || calendarState.settings.showListControls !== false")
         && str_contains($script, "document.getElementById('previous-button').parentElement.classList.toggle('hidden', !showControls)")
         && str_contains($script, "document.getElementById('refresh-button').classList.toggle('hidden', !showControls)")
-        && str_contains($script, "actionBridgeAvailable && listControlsVisible()"),
+        && str_contains($script, 'actionBridgeAvailable && listControlsVisible()'),
     'The list-view controls setting must hide navigation, event creation and refresh while preserving the period and view selector.'
 );
 foreach ([

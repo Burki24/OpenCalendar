@@ -1501,7 +1501,7 @@ assertTrueValue(
         && str_contains($viewScriptSource, "activeView !== 'list' || calendarState.settings.showListControls !== false")
         && str_contains($viewScriptSource, "document.getElementById('previous-button').parentElement.classList.toggle('hidden', !showControls)")
         && str_contains($viewScriptSource, "document.getElementById('refresh-button').classList.toggle('hidden', !showControls)")
-        && str_contains($viewScriptSource, "actionBridgeAvailable && listControlsVisible()"),
+        && str_contains($viewScriptSource, 'actionBridgeAvailable && listControlsVisible()'),
     'List controls must be independently configurable without hiding the period title or view selector.'
 );
 
