@@ -548,7 +548,7 @@ function openExistingEvent(event) {
     document.getElementById('event-location').value = event.location || '';
     document.getElementById('event-description').value = event.description || '';
     document.getElementById('event-all-day').checked = Boolean(event.allDay);
-    setDateInputs(eventStart(event), eventEnd(event), Boolean(event.allDay));
+    setDateInputs(eventStart(event), eventEnd(event), Boolean(event.allDay), Boolean(event.allDay));
     const editable = hasActionBridge()
         && Boolean(event.canWrite) && !event.recurring && !event.recurrenceId;
     const descriptionEditable = editable && !Boolean(event.onlineMeeting);
@@ -671,13 +671,14 @@ function setDialogEditable(editable, descriptionEditable = editable) {
     document.getElementById('save-button').classList.toggle('hidden', !editable);
 }
 
-function setDateInputs(start, end, allDay) {
+function setDateInputs(start, end, allDay, allDayEndExclusive = false) {
     const startInput = document.getElementById('event-start');
     const endInput = document.getElementById('event-end');
     startInput.type = allDay ? 'date' : 'datetime-local';
     endInput.type = allDay ? 'date' : 'datetime-local';
     startInput.value = allDay ? localDate(start) : localDateTime(start);
-    endInput.value = allDay ? localDate(end) : localDateTime(end);
+    const displayEnd = allDay && allDayEndExclusive && end > start ? addDays(end, -1) : end;
+    endInput.value = allDay ? localDate(displayEnd) : localDateTime(displayEnd);
 }
 
 function updateDialogColor() {
@@ -696,7 +697,7 @@ eventForm.addEventListener('submit', async event => {
         location: document.getElementById('event-location').value.trim(),
         allDay,
         start: inputDateValue(document.getElementById('event-start').value, allDay),
-        end: inputDateValue(document.getElementById('event-end').value, allDay)
+        end: inputDateValue(document.getElementById('event-end').value, allDay, allDay)
     };
     if (!calendarInstanceId || !eventData.summary || !eventData.start || !eventData.end) return;
     if (selectedEvent?.onlineMeeting) delete eventData.description;
@@ -738,7 +739,11 @@ document.getElementById('delete-button').addEventListener('click', async () => {
 document.getElementById('event-all-day').addEventListener('change', event => {
     const start = readInputDate(document.getElementById('event-start').value) || new Date();
     let end = readInputDate(document.getElementById('event-end').value) || addDays(start, 1);
-    if (event.target.checked && end <= start) end = addDays(start, 1);
+    if (event.target.checked) {
+        if (end < start) end = start;
+    } else if (end <= start) {
+        end = new Date(start.getTime() + 60 * 60 * 1000);
+    }
     setDateInputs(start, end, event.target.checked);
 });
 eventCalendarInput.addEventListener('change', updateDialogColor);
@@ -1131,8 +1136,19 @@ function isToday(date) { return dayKey(date) === dayKey(new Date()); }
 function dayKey(date) { return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`; }
 function localDate(date) { return dayKey(date); }
 function localDateTime(date) { return `${localDate(date)}T${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`; }
-function readInputDate(value) { const date = value ? new Date(value) : null; return date && !Number.isNaN(date.getTime()) ? date : null; }
-function inputDateValue(value, allDay) { if (!value) return ''; return allDay ? value.slice(0, 10) : new Date(value).toISOString(); }
+function readInputDate(value) {
+    const dateOnly = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (dateOnly) return new Date(Number(dateOnly[1]), Number(dateOnly[2]) - 1, Number(dateOnly[3]));
+    const date = value ? new Date(value) : null;
+    return date && !Number.isNaN(date.getTime()) ? date : null;
+}
+function inputDateValue(value, allDay, exclusiveEnd = false) {
+    if (!value) return '';
+    if (!allDay) return new Date(value).toISOString();
+    const date = readInputDate(value.slice(0, 10));
+    if (!date) return '';
+    return localDate(exclusiveEnd ? addDays(date, 1) : date);
+}
 function eventStart(event) {
     return event.allDay ? allDayDate(event.start, event.startTimestamp) : new Date(Number(event.startTimestamp || 0) * 1000);
 }
