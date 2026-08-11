@@ -108,7 +108,13 @@
             "General options": "Allgemeine Optionen",
             "Per-view options": "Ansichtsspezifische Optionen",
             "List view": "Listenansicht",
-            "Show controls": "Bedienelemente anzeigen"
+            "Show controls": "Bedienelemente anzeigen",
+            "Move": "Verschieben",
+            "Event moved.": "Termin verschoben.",
+            "Event move failed.": "Der Termin konnte nicht verschoben werden.",
+            "The source and target calendars must be different.": "Quell- und Zielkalender müssen unterschiedlich sein.",
+            "Recurring events cannot be moved yet.": "Wiederkehrende Termine können derzeit noch nicht verschoben werden.",
+            "The event was created in the target calendar, but could not be deleted from the source calendar. Please check both calendars.": "Der Termin wurde im Zielkalender erstellt, konnte aber nicht aus dem Quellkalender gelöscht werden. Bitte prüfen Sie beide Kalender."
         }
     }
 }

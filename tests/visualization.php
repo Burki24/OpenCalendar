@@ -102,6 +102,15 @@ assertVisualization(
         && str_contains($script, 'return localDate(exclusiveEnd ? addDays(date, 1) : date);'),
     'The all-day event dialog must show an inclusive end date and convert it back to an exclusive provider end date.'
 );
+
+assertVisualization(
+    str_contains($script, "const action = moving ? 'MoveEvent' : (selectedEvent ? 'UpdateEvent' : 'CreateEvent');")
+        && str_contains($script, 'targetCalendarInstanceId: calendarInstanceId')
+        && str_contains($script, "document.getElementById('save-button').textContent = t(moving ? 'Move' : 'Save');")
+        && str_contains($script, 'calendarState.calendars.filter(calendar => calendar.canWrite || calendar.instanceId === event.calendarInstanceId)'),
+    'Editable events must allow selecting another writable calendar and submit a dedicated move action.'
+);
+
 assertVisualization(
     str_contains($script, 'calendarState.settings.showAgendaEventCount !== false')
         && str_contains($script, 'calendarState.settings.showThreeDaysEventCount !== false')

@@ -51,7 +51,7 @@ unvollständig ist; eine vorhandene individuelle Auswahl wird dabei ersetzt.
 - optionale Anzeige von Kalendername, Ort und Beschreibung
 - Navigation innerhalb des dargestellten Zeitraums
 - manuelle Synchronisation aller ausgewählten Kalender
-- Erstellen, Bearbeiten und Löschen von Terminen in beschreibbaren Kalendern
+- Erstellen, Bearbeiten, Verschieben und Löschen von Terminen in beschreibbaren Kalendern
 - automatische Aktualisierung nach einer Kalendersynchronisation, ohne die am jeweiligen Client gewählte Ansicht oder das Bezugsdatum zurückzusetzen
 - responsive Bedienung auf großen Kacheln und schmalen Mobilansichten
 - optionale IPSView-Ausgabe über eine WebContent-Variable
@@ -59,6 +59,18 @@ unvollständig ist; eine vorhandene individuelle Auswahl wird dabei ersetzt.
 Wiederkehrende, vom Anbieter expandierte Einzelvorkommen werden derzeit nur
 lesend dargestellt. Dadurch kann nicht versehentlich die vollständige
 Terminserie verändert werden.
+
+Normale Einzeltermine können im Bearbeitungsdialog in einen anderen, in dieser
+Kalender Ansicht ausgewählten und beschreibbaren Kalender verschoben werden.
+Dazu wird im Feld **Kalender** einfach ein anderes Ziel gewählt; die
+Schaltfläche **Speichern** wechselt dann auf **Verschieben**. OpenCalendar legt
+den Termin zuerst im Zielkalender an und löscht ihn erst anschließend im
+Quellkalender. Scheitert das Löschen, bleibt die Zielkopie bewusst erhalten und
+der Anwender wird aufgefordert, beide Kalender zu prüfen, damit kein Termin
+durch einen unsicheren Rollback verloren geht. Providerübergreifendes
+Verschieben, beispielsweise Google → Microsoft oder CalDAV → Google, ist damit
+möglich. Provider-spezifische Zusatzdaten, die OpenCalendar nicht im gemeinsamen
+Terminmodell führt, werden dabei nicht übertragen.
 
 ## Einstellungen
 
@@ -137,7 +149,7 @@ Ansicht, ohne Symcons Größenlimit für einzelne PHP-Rückgaben zu überschreit
 
 Agenda, Listen-, 3-Tage-, Wochen- und Monatsansicht funktionieren direkt in der
 IPSView-HTML-Box. In beschreibbaren Kalendern lassen sich dort außerdem Termine
-erstellen, bearbeiten und löschen. Die kompakte Schaltfläche **＋ Termin** bleibt
+erstellen, bearbeiten, zwischen beschreibbaren Kalendern verschieben und löschen. Die kompakte Schaltfläche **＋ Termin** bleibt
 sichtbar, ist ohne beschreibbaren Kalender jedoch deaktiviert.
 
 Wird die IPSView-Ausgabe später deaktiviert, bleibt die vorhandene Variable mit

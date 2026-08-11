@@ -536,21 +536,25 @@ function openNewEvent() {
     document.getElementById('delete-button').classList.add('hidden');
     document.getElementById('dialog-note').classList.add('hidden');
     updateDialogColor();
+    updateSaveButtonLabel();
     eventDialog.showModal();
 }
 
 function openExistingEvent(event) {
     selectedEvent = event;
-    populateCalendarSelect(calendarState.calendars, event.calendarInstanceId);
-    setCalendarSelectDisabled(true);
+    const editable = hasActionBridge()
+        && Boolean(event.canWrite) && !event.recurring && !event.recurrenceId;
+    const availableCalendars = editable
+        ? calendarState.calendars.filter(calendar => calendar.canWrite || calendar.instanceId === event.calendarInstanceId)
+        : calendarState.calendars;
+    populateCalendarSelect(availableCalendars, event.calendarInstanceId);
+    setCalendarSelectDisabled(!editable);
     document.getElementById('dialog-title').textContent = t('Event details');
     document.getElementById('event-summary').value = event.summary || '';
     document.getElementById('event-location').value = event.location || '';
     document.getElementById('event-description').value = event.description || '';
     document.getElementById('event-all-day').checked = Boolean(event.allDay);
     setDateInputs(eventStart(event), eventEnd(event), Boolean(event.allDay), Boolean(event.allDay));
-    const editable = hasActionBridge()
-        && Boolean(event.canWrite) && !event.recurring && !event.recurrenceId;
     const descriptionEditable = editable && !Boolean(event.onlineMeeting);
     setDialogEditable(editable, descriptionEditable);
     document.getElementById('delete-button').classList.toggle('hidden', !editable);
@@ -569,6 +573,7 @@ function openExistingEvent(event) {
         note.classList.add('hidden');
     }
     updateDialogColor();
+    updateSaveButtonLabel();
     eventDialog.showModal();
 }
 
@@ -687,6 +692,14 @@ function updateDialogColor() {
     document.getElementById('dialog-color').style.background = safeColor(calendar?.color);
 }
 
+function updateSaveButtonLabel() {
+    const targetCalendarInstanceId = Number(eventCalendarInput.value);
+    const moving = selectedEvent
+        && targetCalendarInstanceId > 0
+        && targetCalendarInstanceId !== Number(selectedEvent.calendarInstanceId);
+    document.getElementById('save-button').textContent = t(moving ? 'Move' : 'Save');
+}
+
 eventForm.addEventListener('submit', async event => {
     event.preventDefault();
     const allDay = document.getElementById('event-all-day').checked;
@@ -700,21 +713,36 @@ eventForm.addEventListener('submit', async event => {
         end: inputDateValue(document.getElementById('event-end').value, allDay, allDay)
     };
     if (!calendarInstanceId || !eventData.summary || !eventData.start || !eventData.end) return;
-    if (selectedEvent?.onlineMeeting) delete eventData.description;
+    const sourceCalendarInstanceId = Number(selectedEvent?.calendarInstanceId || 0);
+    const moving = Boolean(selectedEvent) && calendarInstanceId !== sourceCalendarInstanceId;
+    if (selectedEvent?.onlineMeeting && !moving) delete eventData.description;
 
-    const action = selectedEvent ? 'UpdateEvent' : 'CreateEvent';
-    const value = selectedEvent
+    const action = moving ? 'MoveEvent' : (selectedEvent ? 'UpdateEvent' : 'CreateEvent');
+    const value = moving
         ? {
-            calendarInstanceId,
-            event: {
+            sourceCalendarInstanceId,
+            targetCalendarInstanceId: calendarInstanceId,
+            sourceEvent: {
                 uid: selectedEvent.uid,
                 resourceUrl: selectedEvent.resourceUrl,
                 etag: selectedEvent.etag,
                 recurrenceId: selectedEvent.recurrenceId || '',
-                changes: eventData
-            }
+                recurring: Boolean(selectedEvent.recurring)
+            },
+            event: eventData
         }
-        : { calendarInstanceId, event: eventData };
+        : (selectedEvent
+            ? {
+                calendarInstanceId,
+                event: {
+                    uid: selectedEvent.uid,
+                    resourceUrl: selectedEvent.resourceUrl,
+                    etag: selectedEvent.etag,
+                    recurrenceId: selectedEvent.recurrenceId || '',
+                    changes: eventData
+                }
+            }
+            : { calendarInstanceId, event: eventData });
 
     if (await sendAction(action, value)) {
         eventDialog.close();
@@ -746,7 +774,10 @@ document.getElementById('event-all-day').addEventListener('change', event => {
     }
     setDateInputs(start, end, event.target.checked);
 });
-eventCalendarInput.addEventListener('change', updateDialogColor);
+eventCalendarInput.addEventListener('change', () => {
+    updateDialogColor();
+    updateSaveButtonLabel();
+});
 eventCalendarTrigger.addEventListener('click', event => {
     event.stopPropagation();
     toggleCalendarPicker();

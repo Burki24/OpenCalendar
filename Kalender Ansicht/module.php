@@ -782,6 +782,8 @@ class KalenderAnsicht extends IPSModuleStrict
             'Description',
             'Cancel',
             'Save',
+            'Move',
+            'Event moved.',
             'Delete',
             'Close',
             'Tomorrow',
@@ -1179,6 +1181,57 @@ class KalenderAnsicht extends IPSModuleStrict
                     throw new RuntimeException((string) ($result['error'] ?? $this->Translate('Event update failed.')));
                 }
                 $message = 'Event updated.';
+                break;
+
+            case 'MoveEvent':
+                $request = $this->decodeActionValue($value);
+                $sourceInstanceId = $this->requireWritableCalendar([
+                    'calendarInstanceId' => (int) ($request['sourceCalendarInstanceId'] ?? 0)
+                ]);
+                $targetInstanceId = $this->requireWritableCalendar([
+                    'calendarInstanceId' => (int) ($request['targetCalendarInstanceId'] ?? 0)
+                ]);
+                if ($sourceInstanceId === $targetInstanceId) {
+                    throw new InvalidArgumentException($this->Translate('The source and target calendars must be different.'));
+                }
+                $sourceEvent = $request['sourceEvent'] ?? null;
+                $event = $request['event'] ?? null;
+                if (!is_array($sourceEvent) || !is_array($event)) {
+                    throw new InvalidArgumentException($this->Translate('The event data is invalid.'));
+                }
+                if (($sourceEvent['recurring'] ?? false) || trim((string) ($sourceEvent['recurrenceId'] ?? '')) !== '') {
+                    throw new RuntimeException($this->Translate('Recurring events cannot be moved yet.'));
+                }
+
+                $creationResult = json_decode(
+                    IPSKAL_CreateEvent(
+                        $targetInstanceId,
+                        json_encode($event, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR)
+                    ),
+                    true,
+                    512,
+                    JSON_THROW_ON_ERROR
+                );
+                if (!is_array($creationResult) || !($creationResult['success'] ?? false)) {
+                    throw new RuntimeException((string) ($creationResult['error'] ?? $this->Translate('Event move failed.')));
+                }
+
+                if (!IPSKAL_DeleteEvent(
+                    $sourceInstanceId,
+                    json_encode(
+                        [
+                            'resourceUrl'  => (string) ($sourceEvent['resourceUrl'] ?? ''),
+                            'etag'         => (string) ($sourceEvent['etag'] ?? ''),
+                            'recurrenceId' => (string) ($sourceEvent['recurrenceId'] ?? '')
+                        ],
+                        JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR
+                    )
+                )) {
+                    throw new RuntimeException($this->Translate(
+                        'The event was created in the target calendar, but could not be deleted from the source calendar. Please check both calendars.'
+                    ));
+                }
+                $message = 'Event moved.';
                 break;
 
             case 'DeleteEvent':
