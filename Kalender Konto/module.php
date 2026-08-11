@@ -19,6 +19,8 @@ use IPSKalender\GoogleCalendarProvider;
 use IPSKalender\GoogleCalendarProviderException;
 use IPSKalender\ICalendarFeedProvider;
 use IPSKalender\ICalendarFeedProviderException;
+use IPSKalender\ICalendarFileProvider;
+use IPSKalender\ICalendarFileProviderException;
 use IPSKalender\ICalendarSubscriptionProvider;
 use IPSKalender\MicrosoftCalendarProvider;
 use IPSKalender\MicrosoftCalendarProviderException;
@@ -40,6 +42,7 @@ require_once __DIR__ . '/../libs/GoogleCalendarProvider.php';
 require_once __DIR__ . '/../libs/GoogleCalendarOriginPolicy.php';
 require_once __DIR__ . '/../libs/GoogleOAuthOriginPolicy.php';
 require_once __DIR__ . '/../libs/ICalendarFeedProvider.php';
+require_once __DIR__ . '/../libs/ICalendarFileProvider.php';
 require_once __DIR__ . '/../libs/ICalendarSubscriptionProvider.php';
 require_once __DIR__ . '/../libs/MicrosoftCalendarProvider.php';
 require_once __DIR__ . '/../libs/MicrosoftGraphOriginPolicy.php';
@@ -98,6 +101,7 @@ class KalenderKonto extends IPSModuleStrict
         $this->RegisterPropertyString('CalendarName', '');
         $this->RegisterPropertyInteger('ICalendarTranslationProfile', CalendarEventTranslation::NONE);
         $this->RegisterPropertyString('ICalendarFeeds', '[]');
+        $this->RegisterPropertyString('ICalendarFiles', '[]');
         $this->RegisterPropertyInteger('UpdateSchedule', SynchronizationSchedule::CUSTOM);
         $this->RegisterPropertyInteger('UpdateInterval', 15);
         $this->RegisterPropertyBoolean('VerifyTLS', true);
@@ -146,7 +150,7 @@ class KalenderKonto extends IPSModuleStrict
                 $element['visible'] = $isPasswordProvider;
             } elseif (in_array($name, ['CalendarName', 'ICalendarTranslationProfile'], true)) {
                 $element['visible'] = $isIcs;
-            } elseif (in_array($name, ['ICalendarFeeds', 'ICalendarSubscriptionsHint'], true)) {
+            } elseif (in_array($name, ['ICalendarSubscriptionsPanel', 'ICalendarFilesPanel'], true)) {
                 $element['visible'] = $isIcs;
             } elseif ($name === 'UpdateSchedule') {
                 $element['caption'] = $isIcs
@@ -212,8 +216,8 @@ class KalenderKonto extends IPSModuleStrict
         $this->UpdateFormField('Password', 'visible', $isPasswordProvider);
         $this->UpdateFormField('CalendarName', 'visible', $isIcs);
         $this->UpdateFormField('ICalendarTranslationProfile', 'visible', $isIcs);
-        $this->UpdateFormField('ICalendarFeeds', 'visible', $isIcs);
-        $this->UpdateFormField('ICalendarSubscriptionsHint', 'visible', $isIcs);
+        $this->UpdateFormField('ICalendarSubscriptionsPanel', 'visible', $isIcs);
+        $this->UpdateFormField('ICalendarFilesPanel', 'visible', $isIcs);
         $this->UpdateFormField('VerifyTLS', 'visible', $canConfigureTls);
         $this->UpdateFormField(
             'UpdateSchedule',
@@ -662,10 +666,18 @@ class KalenderKonto extends IPSModuleStrict
 
         if ($provider === self::PROVIDER_ICS) {
             return new ICalendarSubscriptionProvider(
-                $this->iCalendarSubscriptions(),
-                function (array $subscription): ICalendarFeedProvider
+                $this->iCalendarSources(),
+                function (array $subscription): CalendarProviderInterface
                 {
                     $subscriptionId = (string) ($subscription['id'] ?? '');
+                    if (($subscription['sourceType'] ?? 'url') === 'file') {
+                        return new ICalendarFileProvider(
+                            (string) ($subscription['fileData'] ?? ''),
+                            (string) ($subscription['name'] ?? ''),
+                            $subscriptionId
+                        );
+                    }
+
                     return new ICalendarFeedProvider(
                         new CalendarHttpClient(
                             max(5, min(120, $this->ReadPropertyInteger('RequestTimeout'))),
@@ -742,8 +754,9 @@ class KalenderKonto extends IPSModuleStrict
 
         if ($provider === self::PROVIDER_ICS) {
             $subscriptions = $this->iCalendarSubscriptions();
-            if ($subscriptions === []) {
-                return $this->Translate('At least one active iCalendar subscription is required.');
+            $localFiles = $this->iCalendarLocalFiles();
+            if ($subscriptions === [] && $localFiles === []) {
+                return $this->Translate('At least one active iCalendar subscription or local file is required.');
             }
             $subscriptionUrls = [];
             foreach ($subscriptions as $subscription) {
@@ -782,6 +795,51 @@ class KalenderKonto extends IPSModuleStrict
                     return sprintf(
                         $this->Translate('The title translation profile for iCalendar subscription "%s" is invalid.'),
                         trim((string) ($subscription['name'] ?? ''))
+                    );
+                }
+            }
+
+            $localFileNames = [];
+            foreach ($localFiles as $localFile) {
+                $name = trim((string) ($localFile['name'] ?? ''));
+                if ($name === '') {
+                    return $this->Translate('A calendar name is required for each local iCalendar file.');
+                }
+                if (isset($localFileNames[$name])) {
+                    return sprintf(
+                        $this->Translate('The local iCalendar file name "%s" is configured more than once.'),
+                        $name
+                    );
+                }
+                $localFileNames[$name] = true;
+
+                $color = strtoupper(trim((string) ($localFile['color'] ?? '')));
+                if ($color !== '' && preg_match('/^#[0-9A-F]{6}$/', $color) !== 1) {
+                    return sprintf(
+                        $this->Translate('The color for local iCalendar file "%s" is invalid.'),
+                        $name
+                    );
+                }
+                if (!CalendarEventTranslation::isValidProfile(
+                    (int) ($localFile['translationProfile'] ?? -1)
+                )) {
+                    return sprintf(
+                        $this->Translate('The title translation profile for local iCalendar file "%s" is invalid.'),
+                        $name
+                    );
+                }
+
+                try {
+                    new ICalendarFileProvider(
+                        (string) ($localFile['fileData'] ?? ''),
+                        $name,
+                        hash('sha256', 'ics-file|' . $name)
+                    );
+                } catch (ICalendarFileProviderException $exception) {
+                    return sprintf(
+                        $this->Translate('The local iCalendar file "%s" is invalid: %s'),
+                        $name,
+                        $this->translateErrorMessage($exception->getMessage())
                     );
                 }
             }
@@ -832,7 +890,8 @@ class KalenderKonto extends IPSModuleStrict
             $this->SetStatus(in_array($exception->httpStatus, [401, 403], true)
                 ? self::STATUS_AUTHENTICATION_FAILED
                 : self::STATUS_CONNECTION_FAILED);
-        } elseif ($exception instanceof ICalendarFeedProviderException) {
+        } elseif ($exception instanceof ICalendarFeedProviderException
+            || $exception instanceof ICalendarFileProviderException) {
             $this->SetStatus(in_array($exception->httpStatus, [401, 403], true)
                 ? self::STATUS_AUTHENTICATION_FAILED
                 : self::STATUS_CONNECTION_FAILED);
@@ -897,6 +956,9 @@ class KalenderKonto extends IPSModuleStrict
             '/^The iCalendar URL for subscription "(.+)" is invalid\.$/'                       => ['The iCalendar URL for subscription "%s" is invalid.', [1]],
             '/^The iCalendar URL for subscription "(.+)" is configured more than once\.$/'     => ['The iCalendar URL for subscription "%s" is configured more than once.', [1]],
             '/^The color for iCalendar subscription "(.+)" is invalid\.$/'                     => ['The color for iCalendar subscription "%s" is invalid.', [1]],
+            '/^The local iCalendar file name "(.+)" is configured more than once\.$/'          => ['The local iCalendar file name "%s" is configured more than once.', [1]],
+            '/^The color for local iCalendar file "(.+)" is invalid\.$/'                       => ['The color for local iCalendar file "%s" is invalid.', [1]],
+            '/^The title translation profile for local iCalendar file "(.+)" is invalid\.$/'   => ['The title translation profile for local iCalendar file "%s" is invalid.', [1]],
         ];
 
         foreach ($patterns as $pattern => [$template, $groups]) {

@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use IPSKalender\CalendarEventTranslation;
+use IPSKalender\SynchronizationSchedule;
 
 trait KalenderKontoICalendarAccountTrait
 {
@@ -85,14 +86,78 @@ trait KalenderKontoICalendarAccountTrait
         return $subscriptions;
     }
 
-    private function iCalendarSummary(): string
+    /**
+     * @return list<array{
+     *     sourceType: string,
+     *     fileData: string,
+     *     name: string,
+     *     username: string,
+     *     password: string,
+     *     color: string,
+     *     translationProfile: int,
+     *     updateSchedule: int,
+     *     updateInterval: int
+     * }>
+     */
+    private function iCalendarLocalFiles(): array
     {
-        $subscriptions = $this->iCalendarSubscriptions();
-        if (count($subscriptions) > 1) {
-            return sprintf($this->Translate('%d subscriptions'), count($subscriptions));
+        try {
+            $configured = json_decode(
+                $this->ReadPropertyString('ICalendarFiles'),
+                true,
+                512,
+                JSON_THROW_ON_ERROR
+            );
+        } catch (JsonException) {
+            $configured = [];
         }
 
-        return trim((string) ($subscriptions[0]['name'] ?? ''));
+        $files = [];
+        if (!is_array($configured)) {
+            return $files;
+        }
+
+        foreach ($configured as $file) {
+            if (!is_array($file)
+                || !(bool) ($file['Active'] ?? $file['active'] ?? true)) {
+                continue;
+            }
+            $files[] = [
+                'sourceType'         => 'file',
+                'fileData'           => (string) ($file['FileData'] ?? $file['fileData'] ?? ''),
+                'name'               => trim((string) ($file['Name'] ?? $file['name'] ?? '')),
+                'username'           => '',
+                'password'           => '',
+                'color'              => trim((string) ($file['Color'] ?? $file['color'] ?? '')),
+                'translationProfile' => (int) (
+                    $file['TranslationProfile']
+                    ?? $file['translationProfile']
+                    ?? CalendarEventTranslation::NONE
+                ),
+                'updateSchedule'     => SynchronizationSchedule::DAILY,
+                'updateInterval'     => 15
+            ];
+        }
+
+        return $files;
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    private function iCalendarSources(): array
+    {
+        return array_merge($this->iCalendarSubscriptions(), $this->iCalendarLocalFiles());
+    }
+
+    private function iCalendarSummary(): string
+    {
+        $sources = $this->iCalendarSources();
+        if (count($sources) > 1) {
+            return sprintf($this->Translate('%d iCalendar sources'), count($sources));
+        }
+
+        return trim((string) ($sources[0]['name'] ?? ''));
     }
 
     private function iCalendarUrlKey(string $url): string

@@ -216,7 +216,27 @@
             "A Google Calendar redirect to an untrusted origin was blocked.": "Eine Google-Kalender-Weiterleitung zu einer nicht vertrauenswürdigen Origin wurde blockiert.",
             "The Google OAuth request URL belongs to an untrusted origin.": "Die Google-OAuth-Anfrage gehört zu einer nicht vertrauenswürdigen Origin.",
             "The Google OAuth redirect URL is invalid.": "Die Google-OAuth-Weiterleitungs-URL ist ungültig.",
-            "A Google OAuth redirect to an untrusted origin was blocked.": "Eine Google-OAuth-Weiterleitung zu einer nicht vertrauenswürdigen Origin wurde blockiert."
+            "A Google OAuth redirect to an untrusted origin was blocked.": "Eine Google-OAuth-Weiterleitung zu einer nicht vertrauenswürdigen Origin wurde blockiert.",
+            "Online iCalendar subscriptions": "Online-iCalendar-Abonnements",
+            "Local ICS files": "Lokale ICS-Dateien",
+            "ICS file": "ICS-Datei",
+            "%d iCalendar sources": "%d iCalendar-Quellen",
+            "At least one active iCalendar subscription or local file is required.": "Mindestens ein aktives iCalendar-Abonnement oder eine lokale ICS-Datei ist erforderlich.",
+            "At least one active iCalendar source is required.": "Mindestens eine aktive iCalendar-Quelle ist erforderlich.",
+            "A calendar name is required for each local iCalendar file.": "Für jede lokale ICS-Datei ist ein Kalendername erforderlich.",
+            "A calendar name is required for a local iCalendar file.": "Für eine lokale ICS-Datei ist ein Kalendername erforderlich.",
+            "The local iCalendar file name \"%s\" is configured more than once.": "Der Kalendername der lokalen ICS-Datei \"%s\" ist mehrfach konfiguriert.",
+            "The color for local iCalendar file \"%s\" is invalid.": "Die Farbe für die lokale ICS-Datei \"%s\" ist ungültig.",
+            "The title translation profile for local iCalendar file \"%s\" is invalid.": "Das Titelübersetzungsprofil für die lokale ICS-Datei \"%s\" ist ungültig.",
+            "The local iCalendar file \"%s\" is invalid: %s": "Die lokale ICS-Datei \"%s\" ist ungültig: %s",
+            "No local iCalendar file was selected.": "Es wurde keine lokale ICS-Datei ausgewählt.",
+            "The selected local iCalendar file could not be decoded.": "Die ausgewählte lokale ICS-Datei konnte nicht dekodiert werden.",
+            "The selected local iCalendar file is too large.": "Die ausgewählte lokale ICS-Datei ist zu groß.",
+            "The selected file is not a valid iCalendar file.": "Die ausgewählte Datei ist keine gültige iCalendar-Datei.",
+            "The requested calendar does not belong to this local iCalendar file.": "Der angeforderte Kalender gehört nicht zu dieser lokalen ICS-Datei.",
+            "Local iCalendar files are read-only.": "Lokale ICS-Dateien sind schreibgeschützt.",
+            "Local iCalendar file is valid.": "Die lokale ICS-Datei ist gültig.",
+            "Upload read-only ICS files from the computer running the Symcon console. A calendar name is required and keeps the calendar assignment stable when the file is replaced. The file content is copied into the OpenCalendar configuration; later changes to the original file are not imported automatically.": "Hier können schreibgeschützte ICS-Dateien vom Rechner hochgeladen werden, auf dem die Symcon-Konsole geöffnet ist. Ein Kalendername ist erforderlich und hält die Kalenderzuordnung beim Ersetzen der Datei stabil. Der Dateiinhalt wird in die OpenCalendar-Konfiguration übernommen; spätere Änderungen an der Originaldatei werden nicht automatisch importiert."
         }
     }
 }

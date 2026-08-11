@@ -53,7 +53,7 @@ Beim Trennen eines Microsoft-Kontos entfernt OpenCalendar die lokal gespeicherte
 
 Bei Apple iCloud und anderen CalDAV-Servern werden die vom Anwender eingetragenen Zugangsdaten ausschließlich für den Zugriff auf den konfigurierten Server verwendet. Bei iCalendar-Abonnements können Feed-URLs selbst geheime Zugriffsinformationen enthalten und sollten wie Passwörter behandelt werden.
 
-OpenCalendar speichert konfigurierte Zugangsdaten und URLs lokal in der Symcon-Instanz. iCalendar-Feeds können einschließlich ihrer Termindaten persistent zwischengespeichert werden, um ETag-/Last-Modified-Prüfungen und eine Rückfallebene bei vorübergehenden Serverfehlern zu ermöglichen.
+OpenCalendar speichert konfigurierte Zugangsdaten und URLs lokal in der Symcon-Instanz. iCalendar-Feeds können einschließlich ihrer Termindaten persistent zwischengespeichert werden, um ETag-/Last-Modified-Prüfungen und eine Rückfallebene bei vorübergehenden Serverfehlern zu ermöglichen. Lokal ausgewählte ICS-Dateien werden von der Symcon-Konsole als Base64-codierter Dateiinhalt in die Instanzkonfiguration übertragen und dort zusammen mit den übrigen Moduleigenschaften gespeichert. Dadurch kann der Import auch erfolgen, wenn sich die Datei nur auf dem Arbeitsrechner und nicht auf dem Symcon-Server befindet.
 
 ## 5. Symcon Connect und Symcon OAuth
 
@@ -133,7 +133,7 @@ Disconnecting a Microsoft account removes the locally stored Microsoft OAuth dat
 
 Credentials configured for Apple iCloud or another CalDAV server are used only to access the configured server. iCalendar feed URLs may themselves contain secret access information and should be treated like passwords.
 
-Configured credentials and URLs are stored locally in the Symcon installation. iCalendar feeds, including event data, may be cached persistently to support HTTP validation and fallback to the last valid feed during temporary server failures.
+Configured credentials and URLs are stored locally in the Symcon installation. iCalendar feeds, including event data, may be cached persistently to support HTTP validation and fallback to the last valid feed during temporary server failures. Locally selected ICS files are transferred by the Symcon console as Base64-encoded file content into the instance configuration and stored there with the other module properties. This allows importing a file that exists only on the workstation and not on the Symcon server.
 
 ## 5. Symcon Connect and Symcon OAuth
 

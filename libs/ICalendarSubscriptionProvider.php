@@ -8,27 +8,27 @@ use Closure;
 use DateTimeImmutable;
 use InvalidArgumentException;
 
-require_once __DIR__ . '/CalendarProviderInterface.php';
 require_once __DIR__ . '/CalendarEventTranslation.php';
+require_once __DIR__ . '/CalendarProviderInterface.php';
 require_once __DIR__ . '/ICalendarFeedProvider.php';
 require_once __DIR__ . '/SynchronizationSchedule.php';
 
 /**
- * Combines multiple independent read-only iCalendar feeds into one account.
+ * Combines multiple independent read-only iCalendar sources into one account.
  */
 final class ICalendarSubscriptionProvider implements CalendarProviderInterface
 {
     /** @var array<string, array<string, mixed>> */
     private array $subscriptions = [];
 
-    /** @var Closure(array<string, mixed>): ICalendarFeedProvider */
+    /** @var Closure(array<string, mixed>): CalendarProviderInterface */
     private Closure $providerFactory;
 
     /**
-     * Creates a read-only provider that exposes multiple independent iCalendar subscriptions.
+     * Creates a read-only provider that exposes multiple independent iCalendar sources.
      *
      * @param list<array<string, mixed>> $subscriptions
-     * @param callable(array<string, mixed>): ICalendarFeedProvider $providerFactory
+     * @param callable(array<string, mixed>): CalendarProviderInterface $providerFactory
      */
     public function __construct(array $subscriptions, callable $providerFactory)
     {
@@ -40,16 +40,16 @@ final class ICalendarSubscriptionProvider implements CalendarProviderInterface
             }
             $normalized = $this->normalizeSubscription($subscription);
             if (isset($this->subscriptions[$normalized['id']])) {
-                throw new InvalidArgumentException(sprintf(
-                    'The iCalendar subscription URL for "%s" is configured more than once.',
-                    $normalized['name']
-                ));
+                $message = $normalized['sourceType'] === 'file'
+                    ? 'The local iCalendar file name "%s" is configured more than once.'
+                    : 'The iCalendar subscription URL for "%s" is configured more than once.';
+                throw new InvalidArgumentException(sprintf($message, $normalized['name']));
             }
             $this->subscriptions[$normalized['id']] = $normalized;
         }
 
         if ($this->subscriptions === []) {
-            throw new InvalidArgumentException('At least one active iCalendar subscription is required.');
+            throw new InvalidArgumentException('At least one active iCalendar source is required.');
         }
     }
 
@@ -104,7 +104,7 @@ final class ICalendarSubscriptionProvider implements CalendarProviderInterface
         $subscription = $this->resolveSubscription($calendarReference);
 
         return CalendarEventTranslation::translateEvents(
-            $this->provider($subscription)->getEvents($subscription['url'], $start, $end),
+            $this->provider($subscription)->getEvents($subscription['providerReference'], $start, $end),
             (int) $subscription['translationProfile']
         );
     }
@@ -140,7 +140,10 @@ final class ICalendarSubscriptionProvider implements CalendarProviderInterface
      * @param array<string, mixed> $subscription
      * @return array{
      *     id: string,
+     *     sourceType: string,
+     *     providerReference: string,
      *     url: string,
+     *     fileData: string,
      *     name: string,
      *     username: string,
      *     password: string,
@@ -152,13 +155,30 @@ final class ICalendarSubscriptionProvider implements CalendarProviderInterface
      */
     private function normalizeSubscription(array $subscription): array
     {
-        $url = $this->normalizeUrl((string) ($subscription['url'] ?? ''));
-        $id = hash('sha256', 'ics|' . $url);
+        $sourceType = strtolower(trim((string) ($subscription['sourceType'] ?? 'url')));
+        $name = trim((string) ($subscription['name'] ?? ''));
+        $url = '';
+        $fileData = '';
+
+        if ($sourceType === 'file') {
+            if ($name === '') {
+                throw new InvalidArgumentException('A calendar name is required for a local iCalendar file.');
+            }
+            $id = hash('sha256', 'ics-file|' . $name);
+            $fileData = (string) ($subscription['fileData'] ?? '');
+            $providerReference = 'urn:ips-kalender:ics-file:' . $id;
+        } else {
+            $sourceType = 'url';
+            $url = $this->normalizeUrl((string) ($subscription['url'] ?? ''));
+            $id = hash('sha256', 'ics|' . $url);
+            $providerReference = $url;
+        }
+
         $color = strtoupper(trim((string) ($subscription['color'] ?? '')));
         if ($color !== '' && preg_match('/^#[0-9A-F]{6}$/', $color) !== 1) {
             throw new InvalidArgumentException(sprintf(
                 'The configured color for iCalendar subscription "%s" is invalid.',
-                trim((string) ($subscription['name'] ?? ''))
+                $name
             ));
         }
 
@@ -166,21 +186,24 @@ final class ICalendarSubscriptionProvider implements CalendarProviderInterface
         if (!SynchronizationSchedule::isValid($updateSchedule)) {
             throw new InvalidArgumentException(sprintf(
                 'The synchronization schedule for iCalendar subscription "%s" is invalid.',
-                trim((string) ($subscription['name'] ?? ''))
+                $name
             ));
         }
         $translationProfile = (int) ($subscription['translationProfile'] ?? CalendarEventTranslation::NONE);
         if (!CalendarEventTranslation::isValidProfile($translationProfile)) {
             throw new InvalidArgumentException(sprintf(
                 'The title translation profile for iCalendar subscription "%s" is invalid.',
-                trim((string) ($subscription['name'] ?? ''))
+                $name
             ));
         }
 
         return [
             'id'                 => $id,
+            'sourceType'         => $sourceType,
+            'providerReference'  => $providerReference,
             'url'                => $url,
-            'name'               => trim((string) ($subscription['name'] ?? '')),
+            'fileData'           => $fileData,
+            'name'               => $name,
             'username'           => trim((string) ($subscription['username'] ?? '')),
             'password'           => (string) ($subscription['password'] ?? ''),
             'color'              => $color,
@@ -215,10 +238,10 @@ final class ICalendarSubscriptionProvider implements CalendarProviderInterface
     /**
      * @param array<string, mixed> $subscription
      */
-    private function provider(array $subscription): ICalendarFeedProvider
+    private function provider(array $subscription): CalendarProviderInterface
     {
         $provider = ($this->providerFactory)($subscription);
-        if (!$provider instanceof ICalendarFeedProvider) {
+        if (!$provider instanceof CalendarProviderInterface) {
             throw new ICalendarFeedProviderException('The iCalendar subscription provider could not be created.');
         }
 

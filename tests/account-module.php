@@ -84,6 +84,19 @@ assertAccountStructure(
 
 assertAccountStructure(
     is_string($accountSource)
+        && str_contains($accountSource, "RegisterPropertyString('ICalendarFiles', '[]')")
+        && str_contains($accountSource, 'new ICalendarFileProvider(')
+        && str_contains($accountSource, '$this->iCalendarSources()')
+        && is_string($accountFormSource)
+        && str_contains($accountFormSource, '"name": "ICalendarFilesPanel"')
+        && str_contains($accountFormSource, '"name": "ICalendarFiles"')
+        && str_contains($accountFormSource, '"type": "SelectFile"')
+        && str_contains($accountFormSource, '"extensions": ".ics"'),
+    'ICS/Webcal must support local ICS uploads from the client through a SelectFile-backed list.'
+);
+
+assertAccountStructure(
+    is_string($accountSource)
         && str_contains($accountSource, 'self::GOOGLE_OAUTH_IDENTIFIER, self::MICROSOFT_OAUTH_IDENTIFIER')
         && str_contains($accountSource, '$this->RegisterOAuth($identifier)')
         && str_contains($accountSource, 'RegisterMessage(0, IPS_KERNELSTARTED)')
