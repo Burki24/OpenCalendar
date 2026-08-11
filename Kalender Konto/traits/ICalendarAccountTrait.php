@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use IPSKalender\CalendarEventTranslation;
+use IPSKalender\ICalendarAuthentication;
 use IPSKalender\SynchronizationSchedule;
 
 trait KalenderKontoICalendarAccountTrait
@@ -11,6 +12,7 @@ trait KalenderKontoICalendarAccountTrait
      * @return list<array{
      *     url: string,
      *     name: string,
+     *     authenticationMode: int,
      *     username: string,
      *     password: string,
      *     color: string,
@@ -44,6 +46,11 @@ trait KalenderKontoICalendarAccountTrait
                 $subscriptions[] = [
                     'url'                => $url,
                     'name'               => trim((string) ($feed['Name'] ?? $feed['name'] ?? '')),
+                    'authenticationMode' => (int) (
+                        $feed['AuthenticationMode']
+                        ?? $feed['authenticationMode']
+                        ?? ICalendarAuthentication::AUTOMATIC
+                    ),
                     'username'           => trim((string) ($feed['Username'] ?? $feed['username'] ?? '')),
                     'password'           => (string) ($feed['Password'] ?? $feed['password'] ?? ''),
                     'color'              => trim((string) ($feed['Color'] ?? $feed['color'] ?? '')),
@@ -74,6 +81,7 @@ trait KalenderKontoICalendarAccountTrait
             array_unshift($subscriptions, [
                 'url'                => $legacyUrl,
                 'name'               => trim($this->ReadPropertyString('CalendarName')),
+                'authenticationMode' => $this->ReadPropertyInteger('ICalendarAuthenticationMode'),
                 'username'           => trim($this->ReadPropertyString('Username')),
                 'password'           => $this->ReadPropertyString('Password'),
                 'color'              => '',
@@ -91,6 +99,7 @@ trait KalenderKontoICalendarAccountTrait
      *     sourceType: string,
      *     fileData: string,
      *     name: string,
+     *     authenticationMode: int,
      *     username: string,
      *     password: string,
      *     color: string,
@@ -126,6 +135,7 @@ trait KalenderKontoICalendarAccountTrait
                 'sourceType'         => 'file',
                 'fileData'           => (string) ($file['FileData'] ?? $file['fileData'] ?? ''),
                 'name'               => trim((string) ($file['Name'] ?? $file['name'] ?? '')),
+                'authenticationMode' => ICalendarAuthentication::URL_ACCESS_KEY,
                 'username'           => '',
                 'password'           => '',
                 'color'              => trim((string) ($file['Color'] ?? $file['color'] ?? '')),

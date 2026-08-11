@@ -10,6 +10,7 @@ use IPSKalender\CalendarProviderInterface;
 use IPSKalender\GoogleCalendarOriginPolicy;
 use IPSKalender\GoogleCalendarProvider;
 use IPSKalender\GoogleOAuthOriginPolicy;
+use IPSKalender\ICalendarAuthentication;
 use IPSKalender\ICalendarCodec;
 use IPSKalender\ICalendarFeedProvider;
 use IPSKalender\ICalendarFeedProviderException;
@@ -30,6 +31,7 @@ require_once __DIR__ . '/../libs/MicrosoftGraphOriginPolicy.php';
 require_once __DIR__ . '/../libs/helper/SymconOAuthHelper.php';
 require_once __DIR__ . '/../libs/SymconOAuthOriginPolicy.php';
 require_once __DIR__ . '/../libs/CalendarEventTranslation.php';
+require_once __DIR__ . '/../libs/ICalendarAuthentication.php';
 require_once __DIR__ . '/../libs/ICalendarFeedProvider.php';
 require_once __DIR__ . '/../libs/ICalendarFileProvider.php';
 require_once __DIR__ . '/../libs/ICalendarSubscriptionProvider.php';
@@ -570,6 +572,57 @@ $feedClient = new FakeHttpClient([
     new CalendarHttpResponse(200, ['etag' => '"feed-1"'], $icalFeed, 'https://calendar.example/private.ics'),
     new CalendarHttpResponse(200, ['etag' => '"feed-1"'], $icalFeed, 'https://calendar.example/private.ics')
 ]);
+$urlKeyCredentials = ICalendarAuthentication::credentials(
+    ICalendarAuthentication::URL_ACCESS_KEY,
+    'must-not-be-sent',
+    'must-not-be-sent'
+);
+assertSameValue('', $urlKeyCredentials['username'], 'URL/access-key ICS feeds must never send an HTTP username.');
+assertSameValue('', $urlKeyCredentials['password'], 'URL/access-key ICS feeds must never send an HTTP password.');
+
+$automaticIncompleteCredentials = ICalendarAuthentication::credentials(
+    ICalendarAuthentication::AUTOMATIC,
+    'left-over-user',
+    ''
+);
+assertSameValue('', $automaticIncompleteCredentials['username'], 'Automatic ICS authentication must not send incomplete credentials.');
+assertSameValue('', $automaticIncompleteCredentials['password'], 'Automatic ICS authentication must not send incomplete credentials.');
+
+$automaticCredentials = ICalendarAuthentication::credentials(
+    ICalendarAuthentication::AUTOMATIC,
+    'calendar-user',
+    'calendar-password'
+);
+assertSameValue('calendar-user', $automaticCredentials['username'], 'Automatic ICS authentication must retain complete credentials.');
+assertSameValue('calendar-password', $automaticCredentials['password'], 'Automatic ICS authentication must retain complete credentials.');
+
+$explicitCredentials = ICalendarAuthentication::credentials(
+    ICalendarAuthentication::USERNAME_PASSWORD,
+    'calendar-user',
+    'calendar-password'
+);
+assertSameValue('calendar-user', $explicitCredentials['username'], 'Explicit username/password mode must retain the username.');
+assertSameValue('calendar-password', $explicitCredentials['password'], 'Explicit username/password mode must retain the password.');
+
+$diveraIcs = <<<'ICS'
+BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:DIVERA247//DIVERA GmbH//Terminkalender//DE
+X-WR-CALNAME:DIVERA247
+X-WR-TIMEZONE:Europe/Berlin
+BEGIN:VEVENT
+UID:2225701
+DTSTART;TZID=Europe/Berlin:20260809T170000
+DTEND;TZID=Europe/Berlin:20260809T220000
+SUMMARY:DIVERA Test
+END:VEVENT
+END:VCALENDAR
+ICS;
+$diveraEvents = ICalendarCodec::parseEvents($diveraIcs, 'urn:test:divera', '');
+assertSameValue(1, count($diveraEvents), 'DIVERA247-style ICS data must be parsed as a normal iCalendar feed.');
+assertSameValue('2026-08-09T17:00:00+02:00', $diveraEvents[0]['start'], 'DIVERA247 TZID values must retain Europe/Berlin local time.');
+assertSameValue('2026-08-09T22:00:00+02:00', $diveraEvents[0]['end'], 'DIVERA247 TZID end values must retain Europe/Berlin local time.');
+
 $provider = new ICalendarFeedProvider($feedClient, 'webcal://calendar.example/private.ics');
 $feedCalendars = $provider->getCalendars();
 assertSameValue('Google Privat', $feedCalendars[0]['name'], 'The feed calendar name must be read from X-WR-CALNAME.');

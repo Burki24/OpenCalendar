@@ -45,7 +45,7 @@ Apple iCloud | Apple-ID und anwendungsspezifisches Passwort | Lesen und Schreibe
 Google Calendar | Anmeldung über Symcon OAuth | Lesen und Schreiben entsprechend den Google-Kalenderrechten
 Microsoft 365/Outlook.com | Anmeldung über Symcon OAuth | Lesen und Schreiben entsprechend den Microsoft-Kalenderrechten
 CalDAV | Server-URL, Benutzername und Passwort | Lesen und Schreiben entsprechend den Serverrechten
-ICS/Webcal | Eine oder mehrere Feed-URLs oder lokale ICS-Dateien vom Arbeitsrechner | Schreibgeschützt
+ICS/Webcal | Eine oder mehrere Feed-URLs (öffentlich, Zugriffsschlüssel oder Benutzername/Passwort) oder lokale ICS-Dateien vom Arbeitsrechner | Schreibgeschützt
 
 ## Kalender immer über den Konfigurator anlegen
 

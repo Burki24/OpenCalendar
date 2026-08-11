@@ -53,6 +53,27 @@
             "validate": "^$|^(https?|webcal)://.+"
         },
         {
+            "type": "Select",
+            "name": "ICalendarAuthenticationMode",
+            "caption": "Authentication",
+            "visible": false,
+            "onChange": "IPSKALACC_UpdateICalendarAuthenticationForm($id, $ICalendarAuthenticationMode);",
+            "options": [
+                {
+                    "caption": "Automatic (legacy compatible)",
+                    "value": 0
+                },
+                {
+                    "caption": "URL / access key",
+                    "value": 1
+                },
+                {
+                    "caption": "Username / password",
+                    "value": 2
+                }
+            ]
+        },
+        {
             "type": "ValidationTextBox",
             "name": "Username",
             "caption": "Username"
@@ -94,7 +115,7 @@
                 {
                     "type": "Label",
                     "name": "ICalendarSubscriptionsHint",
-                    "caption": "Add further read-only iCalendar subscriptions here. The single feed configured above remains available for compatibility."
+                    "caption": "Add further read-only iCalendar subscriptions here. Select URL / access key for feeds such as DIVERA247 and include the key in the feed URL. Username and password are only sent when that authentication mode is selected. The single feed configured above remains available for compatibility."
                 },
                 {
                     "type": "List",
@@ -131,6 +152,29 @@
                             "edit": {
                                 "type": "ValidationTextBox",
                                 "validate": "^(https?|webcal)://.+"
+                            }
+                        },
+                        {
+                            "caption": "Authentication",
+                            "name": "AuthenticationMode",
+                            "width": "170px",
+                            "add": 1,
+                            "edit": {
+                                "type": "Select",
+                                "options": [
+                                    {
+                                        "caption": "Automatic",
+                                        "value": 0
+                                    },
+                                    {
+                                        "caption": "URL / access key",
+                                        "value": 1
+                                    },
+                                    {
+                                        "caption": "Username / password",
+                                        "value": 2
+                                    }
+                                ]
                             }
                         },
                         {
