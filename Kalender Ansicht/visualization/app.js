@@ -1025,8 +1025,21 @@ function localDate(date) { return dayKey(date); }
 function localDateTime(date) { return `${localDate(date)}T${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`; }
 function readInputDate(value) { const date = value ? new Date(value) : null; return date && !Number.isNaN(date.getTime()) ? date : null; }
 function inputDateValue(value, allDay) { if (!value) return ''; return allDay ? value.slice(0, 10) : new Date(value).toISOString(); }
-function eventStart(event) { return new Date(Number(event.startTimestamp || 0) * 1000); }
-function eventEnd(event) { return new Date(Number(event.endTimestamp || event.startTimestamp || 0) * 1000); }
+function eventStart(event) {
+    return event.allDay ? allDayDate(event.start, event.startTimestamp) : new Date(Number(event.startTimestamp || 0) * 1000);
+}
+function eventEnd(event) {
+    return event.allDay
+        ? allDayDate(event.end, event.endTimestamp || event.startTimestamp)
+        : new Date(Number(event.endTimestamp || event.startTimestamp || 0) * 1000);
+}
+function allDayDate(value, fallbackTimestamp) {
+    const match = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (match) {
+        return new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+    }
+    return new Date(Number(fallbackTimestamp || 0) * 1000);
+}
 function eventOverlaps(event, start, end) { const eventStartDate = eventStart(event); let eventEndDate = eventEnd(event); if (eventEndDate <= eventStartDate) eventEndDate = new Date(eventStartDate.getTime() + 1); return eventStartDate < end && eventEndDate > start; }
 function formatTime(date) { return new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit' }).format(date); }
 function viewPeriod(view) {

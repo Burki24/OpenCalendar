@@ -398,8 +398,9 @@ assertTrueValue(
 );
 assertTrueValue(
     str_contains($msEventClient->requests[0]['headers']['Prefer'] ?? '', 'outlook.body-content-type="text"')
+        && str_contains($msEventClient->requests[0]['headers']['Prefer'] ?? '', 'outlook.timezone="UTC"')
         && str_contains($msEventClient->requests[0]['headers']['Prefer'] ?? '', 'IdType="ImmutableId"'),
-    'Microsoft event reads must request text bodies and immutable IDs.'
+    'Microsoft event reads must request text bodies, UTC event times and immutable IDs.'
 );
 
 $msWriteClient = new FakeHttpClient([

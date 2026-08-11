@@ -89,6 +89,12 @@ function assertVisualization(bool $condition, string $message): void
 
 $script = (string) file_get_contents(__DIR__ . '/../Kalender Ansicht/visualization/app.js');
 assertVisualization(
+    str_contains($script, 'return event.allDay ? allDayDate(event.start, event.startTimestamp)')
+        && str_contains($script, 'allDayDate(event.end, event.endTimestamp || event.startTimestamp)')
+        && str_contains($script, 'function allDayDate(value, fallbackTimestamp)'),
+    'All-day events must use their date-only boundaries so exclusive end dates cannot spill into the next local day.'
+);
+assertVisualization(
     str_contains($script, 'calendarState.settings.showAgendaEventCount !== false')
         && str_contains($script, 'calendarState.settings.showThreeDaysEventCount !== false')
         && str_contains($script, 'calendarState.settings.showWeekEventCount !== false')
