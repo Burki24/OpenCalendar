@@ -99,18 +99,32 @@ class KalenderAnsicht extends IPSModuleStrict
         $this->RegisterPropertyInteger('PastDays', 0);
         $this->RegisterPropertyInteger('FutureDays', 31);
         $this->RegisterPropertyInteger('MaxEvents', 250);
+        $this->RegisterPropertyInteger('AgendaPeriodDays', 14);
+        $this->RegisterPropertyInteger('ListPeriodDays', 14);
+        $this->RegisterPropertyInteger('ThreeDaysPeriodDays', 3);
+        $this->RegisterPropertyInteger('WeekPeriodWeeks', 1);
+        $this->RegisterPropertyInteger('MonthPeriodMonths', 1);
         $this->RegisterPropertyBoolean('ShowWeekends', true);
         $this->RegisterPropertyBoolean('ShowAgendaEventCount', true);
         $this->RegisterPropertyBoolean('ShowThreeDaysEventCount', true);
         $this->RegisterPropertyBoolean('ShowWeekEventCount', true);
         $this->RegisterPropertyBoolean('ShowAgendaCalendarWeek', false);
+        $this->RegisterPropertyBoolean('ShowListCalendarWeek', false);
         $this->RegisterPropertyBoolean('ShowThreeDaysCalendarWeek', false);
         $this->RegisterPropertyBoolean('ShowWeekCalendarWeek', true);
         $this->RegisterPropertyBoolean('ShowMonthCalendarWeek', false);
         $this->RegisterPropertyBoolean('ShowAgendaDayOfYear', true);
+        $this->RegisterPropertyBoolean('ShowListDayOfYear', false);
         $this->RegisterPropertyBoolean('ShowThreeDaysDayOfYear', true);
         $this->RegisterPropertyBoolean('ShowWeekDayOfYear', true);
         $this->RegisterPropertyBoolean('ShowMonthDayOfYear', true);
+        $this->RegisterPropertyBoolean('ShowListDate', true);
+        $this->RegisterPropertyBoolean('ShowListStart', true);
+        $this->RegisterPropertyBoolean('ShowListEnd', true);
+        $this->RegisterPropertyBoolean('ShowListTitle', true);
+        $this->RegisterPropertyBoolean('ShowListCalendarName', true);
+        $this->RegisterPropertyBoolean('ShowListLocation', false);
+        $this->RegisterPropertyBoolean('ShowListDescription', false);
         $this->RegisterPropertyBoolean('ShowCalendarName', true);
         $this->RegisterPropertyBoolean('ShowLocation', true);
         $this->RegisterPropertyBoolean('ShowDescription', false);
@@ -735,6 +749,7 @@ class KalenderAnsicht extends IPSModuleStrict
     {
         return [
             'Agenda',
+            'List',
             '3 Days',
             'Week',
             'Month',
@@ -757,6 +772,7 @@ class KalenderAnsicht extends IPSModuleStrict
             'No writable calendar available',
             'Event details',
             'Calendar',
+            'Date',
             'Title',
             'Start',
             'End',
@@ -926,20 +942,35 @@ class KalenderAnsicht extends IPSModuleStrict
                 1       => 'week',
                 2       => 'month',
                 3       => 'threeDays',
+                4       => 'list',
                 default => 'agenda'
             },
+            'agendaPeriodDays'          => max(1, min(366, $this->ReadPropertyInteger('AgendaPeriodDays'))),
+            'listPeriodDays'            => max(1, min(366, $this->ReadPropertyInteger('ListPeriodDays'))),
+            'threeDaysPeriodDays'       => max(1, min(31, $this->ReadPropertyInteger('ThreeDaysPeriodDays'))),
+            'weekPeriodWeeks'           => max(1, min(12, $this->ReadPropertyInteger('WeekPeriodWeeks'))),
+            'monthPeriodMonths'         => max(1, min(12, $this->ReadPropertyInteger('MonthPeriodMonths'))),
             'showWeekends'              => $this->ReadPropertyBoolean('ShowWeekends'),
             'showAgendaEventCount'      => $this->ReadPropertyBoolean('ShowAgendaEventCount'),
             'showThreeDaysEventCount'   => $this->ReadPropertyBoolean('ShowThreeDaysEventCount'),
             'showWeekEventCount'        => $this->ReadPropertyBoolean('ShowWeekEventCount'),
             'showAgendaCalendarWeek'    => $this->ReadPropertyBoolean('ShowAgendaCalendarWeek'),
+            'showListCalendarWeek'      => $this->ReadPropertyBoolean('ShowListCalendarWeek'),
             'showThreeDaysCalendarWeek' => $this->ReadPropertyBoolean('ShowThreeDaysCalendarWeek'),
             'showWeekCalendarWeek'      => $this->ReadPropertyBoolean('ShowWeekCalendarWeek'),
             'showMonthCalendarWeek'     => $this->ReadPropertyBoolean('ShowMonthCalendarWeek'),
             'showAgendaDayOfYear'       => $this->ReadPropertyBoolean('ShowAgendaDayOfYear'),
+            'showListDayOfYear'         => $this->ReadPropertyBoolean('ShowListDayOfYear'),
             'showThreeDaysDayOfYear'    => $this->ReadPropertyBoolean('ShowThreeDaysDayOfYear'),
             'showWeekDayOfYear'         => $this->ReadPropertyBoolean('ShowWeekDayOfYear'),
             'showMonthDayOfYear'        => $this->ReadPropertyBoolean('ShowMonthDayOfYear'),
+            'showListDate'              => $this->ReadPropertyBoolean('ShowListDate'),
+            'showListStart'             => $this->ReadPropertyBoolean('ShowListStart'),
+            'showListEnd'               => $this->ReadPropertyBoolean('ShowListEnd'),
+            'showListTitle'             => $this->ReadPropertyBoolean('ShowListTitle'),
+            'showListCalendarName'      => $this->ReadPropertyBoolean('ShowListCalendarName'),
+            'showListLocation'          => $this->ReadPropertyBoolean('ShowListLocation'),
+            'showListDescription'       => $this->ReadPropertyBoolean('ShowListDescription'),
             'showCalendarName'          => $this->ReadPropertyBoolean('ShowCalendarName'),
             'showLocation'              => $this->ReadPropertyBoolean('ShowLocation'),
             'showDescription'           => $this->ReadPropertyBoolean('ShowDescription'),

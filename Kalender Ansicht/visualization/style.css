@@ -250,6 +250,69 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 }
 .event-calendar { font-weight: 600; }
 
+.list-view {
+    width: 100%;
+    min-width: 0;
+    overflow: auto;
+}
+.list-table {
+    width: 100%;
+    min-width: max-content;
+    border-collapse: collapse;
+    background: transparent;
+    font-size: .74em;
+}
+.list-table th,
+.list-table td {
+    padding: 6px 9px;
+    border-bottom: var(--cal-line-width, 1px) solid var(--cal-line, var(--cal-border));
+    text-align: left;
+    vertical-align: top;
+    white-space: nowrap;
+}
+.list-table th {
+    position: sticky;
+    top: -8px;
+    z-index: 2;
+    background: var(--cal-view-background);
+    color: var(--cal-muted);
+    font-size: .92em;
+    font-weight: 650;
+}
+.list-row {
+    cursor: pointer;
+}
+.list-row:hover,
+.list-row:focus-visible {
+    background: color-mix(in srgb, var(--cal-surface-hover) 65%, transparent);
+    outline: none;
+}
+.list-color-column {
+    width: max(4px, var(--compact-color-bar-width));
+    min-width: max(4px, var(--compact-color-bar-width));
+    padding: 0 !important;
+    background: var(--event-color, transparent);
+}
+.list-cell-title { font-weight: 650; }
+.list-cell-location,
+.list-cell-description {
+    max-width: 32em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.month-section { margin-bottom: 14px; }
+.month-section:last-child { margin-bottom: 0; }
+.month-section-title {
+    position: sticky;
+    top: -8px;
+    z-index: 3;
+    padding: 6px 5px;
+    background: var(--cal-view-background);
+    color: var(--cal-muted);
+    font-size: .78em;
+    font-weight: 650;
+}
+
 .calendar-grid {
     display: grid;
     grid-template-columns: repeat(7, minmax(0, 1fr));
@@ -312,7 +375,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
     gap: 7px;
 }
 .week-grid.hide-weekends { grid-template-columns: repeat(5, minmax(0, 1fr)); }
-.week-grid.three-day-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.week-grid.three-day-grid { grid-template-columns: repeat(var(--day-grid-columns, 3), minmax(0, 1fr)); }
 .week-column { min-width: 0; min-height: 180px; padding: 7px; border: var(--cal-border-width, 1px) solid var(--cal-border); border-radius: var(--cal-radius); background: var(--cal-surface); }
 .week-column.today { border-color: var(--cal-accent); }
 .week-heading { margin-bottom: 8px; padding-bottom: 6px; border-bottom: var(--cal-line-width, 1px) solid var(--cal-line, var(--cal-border)); font-size: .74em; font-weight: 650; text-align: center; }
@@ -545,7 +608,7 @@ dialog::backdrop {
     #view-buttons {
         display: grid;
         grid-area: views;
-        grid-template-columns: repeat(4, 1fr);
+        grid-template-columns: repeat(5, 1fr);
     }
     #refresh-button { grid-area: refresh; }
     html.ipsview-mode .floating-add {

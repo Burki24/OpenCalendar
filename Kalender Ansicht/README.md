@@ -17,13 +17,15 @@ verwendet werden.
 1. Über **Instanz hinzufügen** eine Instanz **Kalender Ansicht** erstellen.
 2. In der Liste **Kalender** für jede gewünschte Zeile eine Kalender-Instanz
    auswählen und **Aktiviert** einschalten.
-3. Standardansicht, Zeitraum und maximale Terminanzahl festlegen.
+3. Standardansicht, geladenen Terminzeitraum und maximale Terminanzahl festlegen.
 4. Gewünschte Zusatzinformationen wie Kalendername, Ort oder Beschreibung
    aktivieren. Über **Anzeigeoptionen** lassen sich Terminanzahl, Kalenderwoche
    und Tageszahl in einer Matrix für jede unterstützte Darstellung separat
-   ein- oder ausschalten.
-5. Die Konfiguration übernehmen und **Kalender synchronisieren** ausführen.
-6. Die Instanz in der Symcon-Kachelvisualisierung platzieren.
+   ein- oder ausschalten. Für die neue Listenansicht werden dort zusätzlich die
+   gewünschten Listenspalten gewählt.
+5. Über **Ansichtszeiträume** die sichtbare Länge jeder Darstellung festlegen.
+6. Die Konfiguration übernehmen und **Kalender synchronisieren** ausführen.
+7. Die Instanz in der Symcon-Kachelvisualisierung platzieren.
 
 Mit **Alle Kalenderinstanzen wiederherstellen** werden alle im System
 vorhandenen Kalender-Instanzen erneut ausgewählt und aktiviert. Die Aktion ist
@@ -32,11 +34,15 @@ unvollständig ist; eine vorhandene individuelle Auswahl wird dabei ersetzt.
 
 ## Funktionsumfang
 
-- Agenda-, 3-Tage-, Wochen- und Monatsansicht
+- Agenda-, Listen-, 3-Tage-, Wochen- und Monatsansicht
 - unabhängig wählbare horizontale oder vertikale Wochenansicht für Kachel und
   IPSView
 - je Darstellung separat konfigurierbare Anzeige von Kalenderwoche und
-  Tageszahl
+  Tageszahl; in der Listenansicht werden beide Angaben als eigene Spalten geführt
+- frei wählbare sichtbare Zeiträume je Ansicht: Tage für Agenda, Liste und
+  3-Tage-Ansicht, Wochen für die Wochenansicht und Monate für die Monatsansicht
+- reduzierte Listenansicht mit Kalenderfarben und frei auswählbaren Spalten für
+  Datum, Beginn, Ende, Titel, Kalender, Ort und Beschreibung
 - optional und je Darstellung separat einblendbare Terminanzahl pro Tag in
   Agenda-, 3-Tage- und Wochenansicht
 - Zusammenführen beliebig vieler ausgewählter Kalender
@@ -58,15 +64,17 @@ Terminserie verändert werden.
 Eigenschaft | Beschreibung
 --- | ---
 Kalender | Ausgewählte Kalender-Instanzen und ihre Aktivierung
-Standardansicht | Agenda, 3 Tage, Woche oder Monat
+Standardansicht | Agenda, Liste, 3 Tage, Woche oder Monat
 Kachel-Wochenausrichtung | Horizontale Wochenspalten oder vertikale Tageszeilen
-Vergangene/Zukünftige Tage | Zeitraum, aus dem Termine zusammengeführt werden
+Vergangene/Zukünftige Tage | Datenzeitraum, aus dem Termine für alle Darstellungen geladen und zusammengeführt werden
 Maximale Termine | Obergrenze der in einer Antwort verarbeiteten Termine
 Wochenenden anzeigen | Blendet Samstag und Sonntag ein oder aus
 Anzeigeoptionen → Terminanzahl | Je Ansicht separat für Agenda, 3 Tage und Woche; im Monat wird keine Tages-Terminanzahl eingeblendet
-Anzeigeoptionen → Kalenderwoche | Je Ansicht separat für Agenda, 3 Tage, Woche und Monat
-Anzeigeoptionen → Tageszahl | Je Ansicht separat für Agenda, 3 Tage, Woche und Monat
-Kalendername/Ort/Beschreibung | Legt fest, welche Termindetails sichtbar sind
+Anzeigeoptionen → Kalenderwoche | Je Ansicht separat für Agenda, Liste, 3 Tage, Woche und Monat
+Anzeigeoptionen → Tageszahl | Je Ansicht separat für Agenda, Liste, 3 Tage, Woche und Monat
+Anzeigeoptionen → Listenspalten | Legt fest, welche Datenfelder in der Listenansicht als Spalten erscheinen
+Ansichtszeiträume | Sichtbare Länge jeder Ansicht; Agenda/Liste/3 Tage in Tagen, Woche in Wochen und Monat in Monaten
+Kalendername/Ort/Beschreibung | Legt fest, welche Termindetails in der Agenda sichtbar sind
 
 Die Kalenderwoche erscheint in der Wochenansicht in der Zeitraumüberschrift.
 In der 3-Tage-Ansicht werden bei einem Wochenwechsel beide Kalenderwochen
@@ -75,7 +83,23 @@ neuen sichtbaren Kalenderwoche einen dezenten KW-Trenner. In der Monatsansicht
 steht die KW am Montag als erstem Tag der jeweiligen ISO-Kalenderwoche, auch
 wenn dieser Montag noch zum Vor- oder bereits zum Folgemonat gehört. Die
 Tageszahl wird in Agenda, 3-Tage- und Wochenansicht in der vorhandenen
-Tagesüberschrift und im Monat dezent beim Tagesdatum dargestellt.
+Tagesüberschrift und im Monat dezent beim Tagesdatum dargestellt. In der
+Listenansicht werden Kalenderwoche und Tageszahl bei Aktivierung als eigene,
+schmale Spalten ausgegeben.
+
+Die **Listenansicht** verzichtet bewusst auf Karten und zusätzliche
+Gruppierungen. Jeder Termin wird in einer einfachen Tabellenzeile dargestellt;
+der schmale Farbbalken übernimmt die Farbe des jeweiligen Kalenders. Datum,
+Beginn, Ende, Titel, Kalendername, Ort und Beschreibung können unabhängig
+voneinander als Spalten ein- oder ausgeblendet werden.
+
+Die **Ansichtszeiträume** steuern die sichtbare Länge der einzelnen
+Darstellungen und gleichzeitig die Schrittweite der Vor-/Zurück-Navigation.
+Agenda, Liste und 3-Tage-Ansicht verwenden Tage, die Wochenansicht verwendet
+Wochen und die Monatsansicht Monate. Der sichtbare Zeitraum und der oben
+konfigurierte Datenzeitraum sind unabhängig voneinander. Sollen Termine im
+gesamten sichtbaren Zeitraum vorhanden sein, muss der Datenzeitraum
+**Vergangene/Zukünftige Tage** diesen Bereich ebenfalls abdecken.
 
 Die ausgewählten Kalender werden intern seitenweise gelesen. Dies geschieht
 automatisch und ermöglicht auch bei umfangreichen Kalendern den Aufbau der
@@ -105,7 +129,7 @@ Ansicht, ohne Symcons Größenlimit für einzelne PHP-Rückgaben zu überschreit
     einfache native HTML-Renderer genügt nicht, weil Navigation, Ansichtswechsel
     und Terminbearbeitung JavaScript verwenden.
 
-Agenda, 3-Tage-, Wochen- und Monatsansicht funktionieren direkt in der
+Agenda, Listen-, 3-Tage-, Wochen- und Monatsansicht funktionieren direkt in der
 IPSView-HTML-Box. In beschreibbaren Kalendern lassen sich dort außerdem Termine
 erstellen, bearbeiten und löschen. Die kompakte Schaltfläche **＋ Termin** bleibt
 sichtbar, ist ohne beschreibbaren Kalender jedoch deaktiviert.

@@ -74,6 +74,8 @@ function render() {
         renderWeek();
     } else if (activeView === 'threeDays') {
         renderThreeDays();
+    } else if (activeView === 'list') {
+        renderList();
     } else {
         renderAgenda();
     }
@@ -90,7 +92,7 @@ function render() {
 }
 
 function updateToolbar() {
-    const viewLabels = { agenda: 'Agenda', threeDays: '3 Days', week: 'Week', month: 'Month' };
+    const viewLabels = { agenda: 'Agenda', list: 'List', threeDays: '3 Days', week: 'Week', month: 'Month' };
     document.querySelectorAll('.view-button').forEach(button => {
         button.classList.toggle('active', button.dataset.view === activeView);
         button.textContent = t(viewLabels[button.dataset.view] || button.dataset.view);
@@ -107,29 +109,35 @@ function updateToolbar() {
     });
 
     if (activeView === 'month') {
-        periodTitle.textContent = new Intl.DateTimeFormat(undefined, { month: 'long', year: 'numeric' }).format(cursorDate);
+        const monthCount = viewPeriod('month');
+        const start = new Date(cursorDate.getFullYear(), cursorDate.getMonth(), 1);
+        const end = new Date(start.getFullYear(), start.getMonth() + monthCount - 1, 1);
+        periodTitle.textContent = monthCount === 1
+            ? formatMonth(start)
+            : `${formatMonth(start)} – ${formatMonth(end)}`;
     } else if (activeView === 'week') {
         const start = startOfWeek(cursorDate);
-        const end = addDays(start, 6);
+        const end = addDays(start, (viewPeriod('week') * 7) - 1);
         const calendarWeek = calendarState.settings.showWeekCalendarWeek !== false
-            ? `${formatCalendarWeekLabel([start])} · `
+            ? `${formatCalendarWeekLabel(daysBetween(start, end))} · `
             : '';
         periodTitle.textContent = calendarWeek + formatRange(start, end);
     } else if (activeView === 'threeDays') {
-        const days = getThreeVisibleDays(cursorDate);
+        const days = getVisibleDays(cursorDate, viewPeriod('threeDays'));
         const calendarWeek = calendarState.settings.showThreeDaysCalendarWeek === true
             ? `${formatCalendarWeekLabel(days)} · `
             : '';
         periodTitle.textContent = calendarWeek + formatRange(days[0], days[days.length - 1]);
     } else {
-        const end = addDays(cursorDate, 13);
+        const days = viewPeriod(activeView === 'list' ? 'list' : 'agenda');
+        const end = addDays(cursorDate, days - 1);
         periodTitle.textContent = formatRange(cursorDate, end);
     }
 }
 
 function renderAgenda() {
     const rangeStart = startOfDay(cursorDate);
-    const rangeEnd = addDays(rangeStart, 14);
+    const rangeEnd = addDays(rangeStart, viewPeriod('agenda'));
     const events = calendarState.events.filter(event => eventOverlaps(event, rangeStart, rangeEnd));
     const groups = new Map();
     events.forEach(event => {
@@ -202,9 +210,136 @@ function createAgendaEvent(event) {
     return card;
 }
 
+function renderList() {
+    const rangeStart = startOfDay(cursorDate);
+    const rangeEnd = addDays(rangeStart, viewPeriod('list'));
+    const events = calendarState.events.filter(event => eventOverlaps(event, rangeStart, rangeEnd));
+    if (events.length === 0) {
+        renderEmpty('No events', 'There are no events in this period.');
+        return;
+    }
+
+    const columns = listColumns();
+    const wrapper = element('div', 'list-view');
+    const table = document.createElement('table');
+    table.className = 'list-table';
+    const head = document.createElement('thead');
+    const headerRow = document.createElement('tr');
+    const colorHeader = document.createElement('th');
+    colorHeader.className = 'list-color-column';
+    colorHeader.setAttribute('aria-hidden', 'true');
+    headerRow.appendChild(colorHeader);
+    columns.forEach(column => {
+        const header = document.createElement('th');
+        header.scope = 'col';
+        header.textContent = t(column.label);
+        headerRow.appendChild(header);
+    });
+    head.appendChild(headerRow);
+    table.appendChild(head);
+
+    const body = document.createElement('tbody');
+    events.forEach(event => {
+        const row = document.createElement('tr');
+        row.className = 'list-row';
+        row.tabIndex = 0;
+        row.addEventListener('click', () => openExistingEvent(event));
+        row.addEventListener('keydown', key => { if (key.key === 'Enter') openExistingEvent(event); });
+
+        const color = document.createElement('td');
+        color.className = 'list-color-column';
+        color.style.setProperty('--event-color', safeColor(event.calendarColor));
+        color.setAttribute('aria-hidden', 'true');
+        row.appendChild(color);
+
+        columns.forEach(column => {
+            const cell = document.createElement('td');
+            cell.className = `list-cell list-cell-${column.key}`;
+            cell.textContent = column.value(event);
+            row.appendChild(cell);
+        });
+        body.appendChild(row);
+    });
+    table.appendChild(body);
+    wrapper.appendChild(table);
+    content.appendChild(wrapper);
+}
+
+function listColumns() {
+    const columns = [];
+    if (calendarState.settings.showListCalendarWeek === true) {
+        columns.push({
+            key: 'calendar-week',
+            label: 'CW',
+            value: event => String(isoWeekNumber(eventStart(event)))
+        });
+    }
+    if (calendarState.settings.showListDate !== false) {
+        columns.push({
+            key: 'date',
+            label: 'Date',
+            value: event => new Intl.DateTimeFormat(
+                undefined,
+                { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' }
+            ).format(eventStart(event))
+        });
+    }
+    if (calendarState.settings.showListDayOfYear === true) {
+        columns.push({
+            key: 'day-of-year',
+            label: 'Day',
+            value: event => `${dayOfYear(eventStart(event))}/${daysInYear(eventStart(event))}`
+        });
+    }
+    if (calendarState.settings.showListStart !== false) {
+        columns.push({
+            key: 'start',
+            label: 'Start',
+            value: event => event.allDay ? t('All day') : formatTime(eventStart(event))
+        });
+    }
+    if (calendarState.settings.showListEnd !== false) {
+        columns.push({
+            key: 'end',
+            label: 'End',
+            value: event => event.allDay ? '' : formatTime(eventEnd(event))
+        });
+    }
+    if (calendarState.settings.showListTitle !== false) {
+        columns.push({
+            key: 'title',
+            label: 'Title',
+            value: event => event.summary || t('Untitled event')
+        });
+    }
+    if (calendarState.settings.showListCalendarName !== false) {
+        columns.push({
+            key: 'calendar',
+            label: 'Calendar',
+            value: event => event.calendarName || ''
+        });
+    }
+    if (calendarState.settings.showListLocation === true) {
+        columns.push({
+            key: 'location',
+            label: 'Location',
+            value: event => event.location || ''
+        });
+    }
+    if (calendarState.settings.showListDescription === true) {
+        columns.push({
+            key: 'description',
+            label: 'Description',
+            value: event => event.description || ''
+        });
+    }
+    return columns;
+}
+
 function renderWeek() {
     const weekStart = startOfWeek(cursorDate);
-    const days = Array.from({ length: 7 }, (_, index) => addDays(weekStart, index))
+    const periodDays = viewPeriod('week') * 7;
+    const days = Array.from({ length: periodDays }, (_, index) => addDays(weekStart, index))
         .filter(day => calendarState.settings.showWeekends !== false || !isWeekend(day));
     const ipsView = document.documentElement.classList.contains('ipsview-mode');
     const vertical = (
@@ -223,12 +358,14 @@ function renderWeek() {
 }
 
 function renderThreeDays() {
-    renderDayColumns(
-        getThreeVisibleDays(cursorDate),
+    const days = getVisibleDays(cursorDate, viewPeriod('threeDays'));
+    const grid = renderDayColumns(
+        days,
         'week-grid three-day-grid',
         calendarState.settings.showThreeDaysDayOfYear !== false,
         calendarState.settings.showThreeDaysEventCount !== false
     );
+    grid.style.setProperty('--day-grid-columns', String(Math.min(days.length, 7)));
 }
 
 function renderDayColumns(days, className, showDayOfYear, showEventCount) {
@@ -264,12 +401,13 @@ function renderDayColumns(days, className, showDayOfYear, showEventCount) {
         grid.appendChild(column);
     });
     content.appendChild(grid);
+    return grid;
 }
 
-function getThreeVisibleDays(start) {
+function getVisibleDays(start, count) {
     const days = [];
     let day = startOfDay(start);
-    while (days.length < 3) {
+    while (days.length < count) {
         if (calendarState.settings.showWeekends !== false || !isWeekend(day)) {
             days.push(day);
         }
@@ -279,7 +417,22 @@ function getThreeVisibleDays(start) {
 }
 
 function renderMonth() {
-    const first = new Date(cursorDate.getFullYear(), cursorDate.getMonth(), 1);
+    const monthCount = viewPeriod('month');
+    for (let offset = 0; offset < monthCount; offset++) {
+        const month = new Date(cursorDate.getFullYear(), cursorDate.getMonth() + offset, 1);
+        const section = element('section', 'month-section');
+        if (monthCount > 1) {
+            const heading = element('div', 'month-section-title');
+            heading.textContent = formatMonth(month);
+            section.appendChild(heading);
+        }
+        section.appendChild(createMonthGrid(month, monthCount === 1));
+        content.appendChild(section);
+    }
+}
+
+function createMonthGrid(month, showOutsideDetails) {
+    const first = new Date(month.getFullYear(), month.getMonth(), 1);
     const gridStart = startOfWeek(first);
     const days = Array.from({ length: 42 }, (_, index) => addDays(gridStart, index));
     const visibleDays = days.filter(day => calendarState.settings.showWeekends !== false || !isWeekend(day));
@@ -293,43 +446,48 @@ function renderMonth() {
     });
     visibleDays.forEach(day => {
         const cell = element('div', 'month-day');
-        if (day.getMonth() !== cursorDate.getMonth()) cell.classList.add('outside');
-        if (isToday(day)) cell.classList.add('today');
+        const outside = day.getMonth() !== month.getMonth();
+        if (outside) cell.classList.add('outside');
+        if (isToday(day) && (!outside || showOutsideDetails)) cell.classList.add('today');
         const dayHeader = element('div', 'month-day-header');
         if (calendarState.settings.showMonthCalendarWeek === true && day.getDay() === 1) {
             const calendarWeek = element('span', 'month-week-number');
             calendarWeek.textContent = formatCalendarWeekLabel([day]);
             dayHeader.appendChild(calendarWeek);
         }
-        const dateMeta = element('div', 'month-day-date');
-        const number = element('div', 'day-number');
-        number.textContent = String(day.getDate());
-        dateMeta.appendChild(number);
-        if (calendarState.settings.showMonthDayOfYear !== false) {
-            const dayOfYearMeta = element('span', 'month-day-of-year');
-            dayOfYearMeta.textContent = `${t('Day')} ${dayOfYear(day)}/${daysInYear(day)}`;
-            dateMeta.appendChild(dayOfYearMeta);
+        if (!outside || showOutsideDetails) {
+            const dateMeta = element('div', 'month-day-date');
+            const number = element('div', 'day-number');
+            number.textContent = String(day.getDate());
+            dateMeta.appendChild(number);
+            if (calendarState.settings.showMonthDayOfYear !== false) {
+                const dayOfYearMeta = element('span', 'month-day-of-year');
+                dayOfYearMeta.textContent = `${t('Day')} ${dayOfYear(day)}/${daysInYear(day)}`;
+                dateMeta.appendChild(dayOfYearMeta);
+            }
+            dayHeader.appendChild(dateMeta);
         }
-        dayHeader.appendChild(dateMeta);
         cell.appendChild(dayHeader);
-        const dayEnd = addDays(day, 1);
-        const events = calendarState.events.filter(event => eventOverlaps(event, day, dayEnd));
-        events.slice(0, 3).forEach(event => {
-            const chip = element('button', 'event-chip');
-            chip.type = 'button';
-            chip.style.setProperty('--event-color', safeColor(event.calendarColor));
-            chip.textContent = (event.allDay ? '' : formatTime(eventStart(event)) + ' ') + (event.summary || t('Untitled event'));
-            chip.addEventListener('click', () => openExistingEvent(event));
-            cell.appendChild(chip);
-        });
-        if (events.length > 3) {
-            const more = element('div', 'more-events');
-            more.textContent = '+' + (events.length - 3) + ' ' + t('more');
-            cell.appendChild(more);
+        if (!outside || showOutsideDetails) {
+            const dayEnd = addDays(day, 1);
+            const events = calendarState.events.filter(event => eventOverlaps(event, day, dayEnd));
+            events.slice(0, 3).forEach(event => {
+                const chip = element('button', 'event-chip');
+                chip.type = 'button';
+                chip.style.setProperty('--event-color', safeColor(event.calendarColor));
+                chip.textContent = (event.allDay ? '' : formatTime(eventStart(event)) + ' ') + (event.summary || t('Untitled event'));
+                chip.addEventListener('click', () => openExistingEvent(event));
+                cell.appendChild(chip);
+            });
+            if (events.length > 3) {
+                const more = element('div', 'more-events');
+                more.textContent = '+' + (events.length - 3) + ' ' + t('more');
+                cell.appendChild(more);
+            }
         }
         grid.appendChild(cell);
     });
-    content.appendChild(grid);
+    return grid;
 }
 
 function renderEmpty(title, description) {
@@ -636,9 +794,20 @@ function containWheelInsideTile(event) {
 }
 
 function navigate(direction) {
-    if (activeView === 'month') cursorDate = new Date(cursorDate.getFullYear(), cursorDate.getMonth() + direction, 1);
-    else if (activeView === 'threeDays') cursorDate = moveVisibleDays(getThreeVisibleDays(cursorDate)[0], direction * 3);
-    else cursorDate = addDays(cursorDate, direction * (activeView === 'week' ? 7 : 14));
+    if (activeView === 'month') {
+        cursorDate = new Date(
+            cursorDate.getFullYear(),
+            cursorDate.getMonth() + (direction * viewPeriod('month')),
+            1
+        );
+    } else if (activeView === 'threeDays') {
+        const firstVisibleDay = getVisibleDays(cursorDate, 1)[0];
+        cursorDate = moveVisibleDays(firstVisibleDay, direction * viewPeriod('threeDays'));
+    } else if (activeView === 'week') {
+        cursorDate = addDays(startOfWeek(cursorDate), direction * viewPeriod('week') * 7);
+    } else {
+        cursorDate = addDays(cursorDate, direction * viewPeriod(activeView === 'list' ? 'list' : 'agenda'));
+    }
     render();
 }
 
@@ -853,6 +1022,31 @@ function eventStart(event) { return new Date(Number(event.startTimestamp || 0) *
 function eventEnd(event) { return new Date(Number(event.endTimestamp || event.startTimestamp || 0) * 1000); }
 function eventOverlaps(event, start, end) { const eventStartDate = eventStart(event); let eventEndDate = eventEnd(event); if (eventEndDate <= eventStartDate) eventEndDate = new Date(eventStartDate.getTime() + 1); return eventStartDate < end && eventEndDate > start; }
 function formatTime(date) { return new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit' }).format(date); }
+function viewPeriod(view) {
+    const periods = {
+        agenda: ['agendaPeriodDays', 14, 1, 366],
+        list: ['listPeriodDays', 14, 1, 366],
+        threeDays: ['threeDaysPeriodDays', 3, 1, 31],
+        week: ['weekPeriodWeeks', 1, 1, 12],
+        month: ['monthPeriodMonths', 1, 1, 12]
+    };
+    const [setting, fallback, minimum, maximum] = periods[view] || periods.agenda;
+    const value = Number(calendarState.settings[setting]);
+    return Number.isFinite(value) ? Math.max(minimum, Math.min(maximum, Math.round(value))) : fallback;
+}
+function daysBetween(start, end) {
+    const days = [];
+    let current = startOfDay(start);
+    const last = startOfDay(end);
+    while (current <= last) {
+        days.push(current);
+        current = addDays(current, 1);
+    }
+    return days;
+}
+function formatMonth(date) {
+    return new Intl.DateTimeFormat(undefined, { month: 'long', year: 'numeric' }).format(date);
+}
 function formatRange(start, end) { return new Intl.DateTimeFormat(undefined, { day: '2-digit', month: 'short' }).format(start) + ' – ' + new Intl.DateTimeFormat(undefined, { day: '2-digit', month: 'short', year: 'numeric' }).format(end); }
 function relativeDay(date) { if (isToday(date)) return t('Today'); if (dayKey(date) === dayKey(addDays(new Date(), 1))) return t('Tomorrow'); if (dayKey(date) === dayKey(addDays(new Date(), -1))) return t('Yesterday'); return new Intl.DateTimeFormat(undefined, { weekday: 'long' }).format(date); }
 function safeColor(value) {

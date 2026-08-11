@@ -23,18 +23,32 @@ final class CalendarVisualizationRenderer
                 'events'    => [],
                 'calendars' => [],
                 'settings'  => [
-                    'defaultView'               => 'agenda',
+                    'defaultView'               => 'list',
+                    'agendaPeriodDays'          => 14,
+                    'listPeriodDays'            => 21,
+                    'threeDaysPeriodDays'       => 5,
+                    'weekPeriodWeeks'           => 2,
+                    'monthPeriodMonths'         => 2,
                     'showAgendaEventCount'      => false,
                     'showThreeDaysEventCount'   => true,
                     'showWeekEventCount'        => false,
                     'showAgendaCalendarWeek'    => true,
+                    'showListCalendarWeek'      => true,
                     'showThreeDaysCalendarWeek' => false,
                     'showWeekCalendarWeek'      => true,
                     'showMonthCalendarWeek'     => true,
                     'showAgendaDayOfYear'       => false,
+                    'showListDayOfYear'         => true,
                     'showThreeDaysDayOfYear'    => true,
                     'showWeekDayOfYear'         => false,
-                    'showMonthDayOfYear'        => true
+                    'showMonthDayOfYear'        => true,
+                    'showListDate'              => true,
+                    'showListStart'             => true,
+                    'showListEnd'               => false,
+                    'showListTitle'             => true,
+                    'showListCalendarName'      => true,
+                    'showListLocation'          => false,
+                    'showListDescription'       => true
                 ]
             ],
             'runtime'            => $ipsView
@@ -82,20 +96,22 @@ assertVisualization(
 );
 assertVisualization(
     str_contains($script, 'calendarState.settings.showAgendaCalendarWeek === true')
+        && str_contains($script, 'calendarState.settings.showListCalendarWeek === true')
         && str_contains($script, 'calendarState.settings.showThreeDaysCalendarWeek === true')
         && str_contains($script, 'calendarState.settings.showWeekCalendarWeek !== false')
         && str_contains($script, 'calendarState.settings.showMonthCalendarWeek === true')
         && str_contains($script, "calendarWeeks.join('/')")
         && str_contains($script, 'day.getDay() === 1'),
-    'Agenda, three-day, week and month views must control ISO calendar-week labels independently.'
+    'Agenda, list, three-day, week and month views must control ISO calendar-week labels independently.'
 );
 assertVisualization(
     str_contains($script, 'calendarState.settings.showAgendaDayOfYear !== false')
+        && str_contains($script, 'calendarState.settings.showListDayOfYear === true')
         && str_contains($script, 'calendarState.settings.showThreeDaysDayOfYear !== false')
         && str_contains($script, 'calendarState.settings.showWeekDayOfYear !== false')
         && str_contains($script, 'calendarState.settings.showMonthDayOfYear !== false')
         && str_contains($script, 'function formatDayHeading(date, options, showDayOfYear, eventCount, showEventCount)'),
-    'Agenda, three-day, week and month views must control their day-of-year labels independently.'
+    'Agenda, list, three-day, week and month views must control their day-of-year labels independently.'
 );
 
 $formSource = (string) file_get_contents(__DIR__ . '/../Kalender Ansicht/form.json');
@@ -110,6 +126,7 @@ foreach (['ShowAgendaEventCount', 'ShowThreeDaysEventCount', 'ShowWeekEventCount
 }
 foreach ([
     'ShowAgendaCalendarWeek'    => false,
+    'ShowListCalendarWeek'      => false,
     'ShowThreeDaysCalendarWeek' => false,
     'ShowWeekCalendarWeek'      => true,
     'ShowMonthCalendarWeek'     => false
@@ -133,6 +150,12 @@ foreach (['ShowAgendaDayOfYear', 'ShowThreeDaysDayOfYear', 'ShowWeekDayOfYear', 
     );
 }
 assertVisualization(
+    str_contains($formSource, '"name": "ShowListDayOfYear"')
+        && str_contains($moduleSource, "RegisterPropertyBoolean('ShowListDayOfYear', false)")
+        && str_contains($moduleSource, "ReadPropertyBoolean('ShowListDayOfYear')"),
+    'The list day-of-year setting must be configurable, persisted and exposed to the visualization.'
+);
+assertVisualization(
     str_contains($formSource, '"caption": "Event count"')
         && str_contains($formSource, '"caption": "Calendar week"')
         && str_contains($formSource, '"caption": "Day of year"')
@@ -143,6 +166,70 @@ assertVisualization(
     str_contains($moduleSource, "array_key_exists('ShowDayOfYear', \$configuration)")
         && str_contains($moduleSource, "unset(\$configuration['ShowDayOfYear'])"),
     'The former global day-of-year setting must migrate to the per-view settings.'
+);
+
+assertVisualization(
+    str_contains($formSource, '"caption": "List columns"')
+        && str_contains($script, 'function renderList()')
+        && str_contains($script, 'function listColumns()')
+        && str_contains($script, "label: 'Date'")
+        && str_contains($script, "label: 'Start'")
+        && str_contains($script, "label: 'End'")
+        && str_contains($script, "label: 'Title'")
+        && str_contains($script, "label: 'Calendar'")
+        && str_contains($script, "label: 'Location'")
+        && str_contains($script, "label: 'Description'"),
+    'The list view must expose configurable data columns.'
+);
+foreach ([
+    'ShowListDate'         => true,
+    'ShowListStart'        => true,
+    'ShowListEnd'          => true,
+    'ShowListTitle'        => true,
+    'ShowListCalendarName' => true,
+    'ShowListLocation'     => false,
+    'ShowListDescription'  => false
+] as $property => $default) {
+    assertVisualization(
+        str_contains($formSource, '"name": "' . $property . '"')
+            && str_contains(
+                $moduleSource,
+                "RegisterPropertyBoolean('" . $property . "', " . ($default ? 'true' : 'false') . ')'
+            )
+            && str_contains($moduleSource, "ReadPropertyBoolean('" . $property . "')"),
+        sprintf('The %s list-column setting must be configurable and persisted.', $property)
+    );
+}
+foreach ([
+    'AgendaPeriodDays'    => 14,
+    'ListPeriodDays'      => 14,
+    'ThreeDaysPeriodDays' => 3,
+    'WeekPeriodWeeks'     => 1,
+    'MonthPeriodMonths'   => 1
+] as $property => $default) {
+    assertVisualization(
+        str_contains($formSource, '"name": "' . $property . '"')
+            && str_contains($moduleSource, "RegisterPropertyInteger('" . $property . "', " . $default . ')')
+            && str_contains($moduleSource, "ReadPropertyInteger('" . $property . "')"),
+        sprintf('The %s view-period setting must be configurable, persisted and exposed.', $property)
+    );
+}
+assertVisualization(
+    str_contains($formSource, '"caption": "View periods"')
+        && str_contains($script, "viewPeriod('agenda')")
+        && str_contains($script, "viewPeriod('list')")
+        && str_contains($script, "viewPeriod('threeDays')")
+        && str_contains($script, "viewPeriod('week')")
+        && str_contains($script, "viewPeriod('month')")
+        && str_contains($script, 'function viewPeriod(view)'),
+    'Every visualization view must use its independently configured display period.'
+);
+assertVisualization(
+    str_contains($script, "activeView === 'list'")
+        && str_contains($script, "list: 'List'")
+        && str_contains($formSource, '"caption": "List"')
+        && str_contains($formSource, '"value": 4'),
+    'The shared client and default-view selector must provide the list view.'
 );
 
 $style = (string) file_get_contents(__DIR__ . '/../Kalender Ansicht/visualization/style.css');
@@ -163,6 +250,13 @@ assertVisualization(
         && str_contains($style, '.month-week-number {')
         && str_contains($style, '.month-day-of-year {'),
     'Calendar-week separators and month day-of-year metadata must have dedicated visualization styles.'
+);
+assertVisualization(
+    str_contains($style, '.list-table {')
+        && str_contains($style, '.list-color-column {')
+        && str_contains($style, '.list-row:hover,')
+        && str_contains($style, 'grid-template-columns: repeat(5, 1fr);'),
+    'The list view must remain minimal, preserve calendar colors and fit into the responsive view selector.'
 );
 
 assertVisualization(
@@ -208,6 +302,14 @@ foreach ([$native, $ipsView] as $html) {
     assertVisualization(str_contains($html, '"showThreeDaysDayOfYear":true'), 'The three-day day-of-year setting must be serialized.');
     assertVisualization(str_contains($html, '"showWeekDayOfYear":false'), 'The week day-of-year setting must be serialized.');
     assertVisualization(str_contains($html, '"showMonthDayOfYear":true'), 'The month day-of-year setting must be serialized.');
+    assertVisualization(str_contains($html, '"defaultView":"list"'), 'The list view must be serializable as the default view.');
+    assertVisualization(str_contains($html, '"listPeriodDays":21'), 'The list period must be serialized.');
+    assertVisualization(str_contains($html, '"threeDaysPeriodDays":5'), 'The multi-day period must be serialized.');
+    assertVisualization(str_contains($html, '"weekPeriodWeeks":2'), 'The week period must be serialized.');
+    assertVisualization(str_contains($html, '"monthPeriodMonths":2'), 'The month period must be serialized.');
+    assertVisualization(str_contains($html, '"showListCalendarWeek":true'), 'The list calendar-week setting must be serialized.');
+    assertVisualization(str_contains($html, '"showListDayOfYear":true'), 'The list day-of-year setting must be serialized.');
+    assertVisualization(str_contains($html, '"showListDescription":true'), 'The list column settings must be serialized.');
     assertVisualization(str_contains($html, 'calendarVisualization.state'), 'The calendar script must consume the shared state contract.');
     assertVisualization(
         str_contains($html, "calendarIPSViewRequest('GetState', null)"),

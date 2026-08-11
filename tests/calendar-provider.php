@@ -1288,6 +1288,7 @@ assertTrueValue(
 assertTrueValue(
     is_string($viewModuleSource)
         && str_contains($viewModuleSource, "RegisterPropertyBoolean('ShowAgendaCalendarWeek', false)")
+        && str_contains($viewModuleSource, "RegisterPropertyBoolean('ShowListCalendarWeek', false)")
         && str_contains($viewModuleSource, "RegisterPropertyBoolean('ShowThreeDaysCalendarWeek', false)")
         && str_contains($viewModuleSource, "RegisterPropertyBoolean('ShowWeekCalendarWeek', true)")
         && str_contains($viewModuleSource, "RegisterPropertyBoolean('ShowMonthCalendarWeek', false)")
@@ -1296,11 +1297,12 @@ assertTrueValue(
         && str_contains($viewScriptSource, "calendarWeeks.join('/')")
         && str_contains($viewScriptSource, 'day.getDay() === 1')
         && str_contains($viewScriptSource, 'Date.UTC'),
-    'Agenda, three-day, week and month views must optionally show ISO calendar weeks.'
+    'Agenda, list, three-day, week and month views must optionally show ISO calendar weeks.'
 );
 assertTrueValue(
     is_string($viewModuleSource)
         && str_contains($viewModuleSource, "RegisterPropertyBoolean('ShowAgendaDayOfYear', true)")
+        && str_contains($viewModuleSource, "RegisterPropertyBoolean('ShowListDayOfYear', false)")
         && str_contains($viewModuleSource, "RegisterPropertyBoolean('ShowThreeDaysDayOfYear', true)")
         && str_contains($viewModuleSource, "RegisterPropertyBoolean('ShowWeekDayOfYear', true)")
         && str_contains($viewModuleSource, "RegisterPropertyBoolean('ShowMonthDayOfYear', true)")
@@ -1309,8 +1311,9 @@ assertTrueValue(
         && str_contains($viewScriptSource, 'formatDayHeading(')
         && str_contains($viewScriptSource, 'dayOfYear(date)')
         && str_contains($viewScriptSource, 'daysInYear(date)')
+        && str_contains($viewScriptSource, 'calendarState.settings.showListDayOfYear === true')
         && str_contains($viewScriptSource, 'calendarState.settings.showMonthDayOfYear !== false'),
-    'Agenda, three-day, week and month views must optionally show the day of year.'
+    'Agenda, list, three-day, week and month views must optionally show the day of year.'
 );
 assertTrueValue(
     is_string($viewModuleSource)
@@ -1328,6 +1331,56 @@ assertTrueValue(
         && !str_contains($monthRenderer[0], 'formatDayHeading('),
     'Agenda, three-day and weekly event totals must be independently configurable without changing the month view.'
 );
+
+assertTrueValue(
+    is_string($viewModuleSource)
+        && is_string($viewFormSource)
+        && is_string($viewScriptSource)
+        && str_contains($viewModuleSource, "RegisterPropertyInteger('AgendaPeriodDays', 14)")
+        && str_contains($viewModuleSource, "RegisterPropertyInteger('ListPeriodDays', 14)")
+        && str_contains($viewModuleSource, "RegisterPropertyInteger('ThreeDaysPeriodDays', 3)")
+        && str_contains($viewModuleSource, "RegisterPropertyInteger('WeekPeriodWeeks', 1)")
+        && str_contains($viewModuleSource, "RegisterPropertyInteger('MonthPeriodMonths', 1)")
+        && str_contains($viewFormSource, '"caption": "View periods"')
+        && str_contains($viewScriptSource, 'function viewPeriod(view)')
+        && str_contains($viewScriptSource, "viewPeriod('list')")
+        && str_contains($viewScriptSource, "viewPeriod('month')"),
+    'All calendar views must expose an independently configurable visible period.'
+);
+assertTrueValue(
+    is_string($viewModuleSource)
+        && is_string($viewFormSource)
+        && is_string($viewTemplateSource)
+        && is_string($viewScriptSource)
+        && is_string($viewStyleSource)
+        && str_contains($viewModuleSource, "4       => 'list'")
+        && str_contains($viewFormSource, '"caption": "List"')
+        && str_contains($viewTemplateSource, 'data-view="list"')
+        && str_contains($viewScriptSource, 'function renderList()')
+        && str_contains($viewScriptSource, 'function listColumns()')
+        && str_contains($viewStyleSource, '.list-table {')
+        && str_contains($viewStyleSource, '.list-color-column {'),
+    'Calendar View must provide the shared minimal list view for Tile and IPSView.'
+);
+foreach ([
+    'ShowListDate'         => true,
+    'ShowListStart'        => true,
+    'ShowListEnd'          => true,
+    'ShowListTitle'        => true,
+    'ShowListCalendarName' => true,
+    'ShowListLocation'     => false,
+    'ShowListDescription'  => false
+] as $property => $default) {
+    assertTrueValue(
+        str_contains($viewFormSource, '"name": "' . $property . '"')
+            && str_contains(
+                $viewModuleSource,
+                "RegisterPropertyBoolean('" . $property . "', " . ($default ? 'true' : 'false') . ')'
+            )
+            && str_contains($viewModuleSource, "ReadPropertyBoolean('" . $property . "')"),
+        sprintf('List column %s must be configurable, persisted and exposed.', $property)
+    );
+}
 
 assertTrueValue(
     is_string($calendarModuleSource)
