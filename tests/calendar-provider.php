@@ -1491,6 +1491,21 @@ foreach ([
 }
 
 assertTrueValue(
+    is_string($viewModuleSource)
+        && is_string($viewFormSource)
+        && is_string($viewScriptSource)
+        && str_contains($viewFormSource, '"name": "ShowListControls"')
+        && str_contains($viewModuleSource, "RegisterPropertyBoolean('ShowListControls', true)")
+        && str_contains($viewModuleSource, "ReadPropertyBoolean('ShowListControls')")
+        && str_contains($viewScriptSource, 'function listControlsVisible()')
+        && str_contains($viewScriptSource, "activeView !== 'list' || calendarState.settings.showListControls !== false")
+        && str_contains($viewScriptSource, "document.getElementById('previous-button').parentElement.classList.toggle('hidden', !showControls)")
+        && str_contains($viewScriptSource, "document.getElementById('refresh-button').classList.toggle('hidden', !showControls)")
+        && str_contains($viewScriptSource, "actionBridgeAvailable && listControlsVisible()"),
+    'List controls must be independently configurable without hiding the period title or view selector.'
+);
+
+assertTrueValue(
     is_string($calendarModuleSource)
         && str_contains($calendarModuleSource, "RegisterVariableInteger('TodayEventCount'")
         && str_contains($calendarModuleSource, "RegisterTimer('DayChangeTimer'")

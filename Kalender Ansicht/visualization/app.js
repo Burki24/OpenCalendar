@@ -83,7 +83,7 @@ function render() {
     const hasWritableCalendar = actionBridgeAvailable
         && calendarState.calendars.some(calendar => calendar.canWrite);
     const addButton = document.getElementById('add-button');
-    addButton.classList.toggle('visible', actionBridgeAvailable);
+    addButton.classList.toggle('visible', actionBridgeAvailable && listControlsVisible());
     addButton.disabled = !hasWritableCalendar;
     addButton.setAttribute('aria-disabled', String(!hasWritableCalendar));
     const addButtonText = hasWritableCalendar ? 'Create event' : 'No writable calendar available';
@@ -91,8 +91,15 @@ function render() {
     addButton.setAttribute('aria-label', t(addButtonText));
 }
 
+function listControlsVisible() {
+    return activeView !== 'list' || calendarState.settings.showListControls !== false;
+}
+
 function updateToolbar() {
     const viewLabels = { agenda: 'Agenda', list: 'List', threeDays: '3 Days', week: 'Week', month: 'Month' };
+    const showControls = listControlsVisible();
+    document.getElementById('previous-button').parentElement.classList.toggle('hidden', !showControls);
+    document.getElementById('refresh-button').classList.toggle('hidden', !showControls);
     document.querySelectorAll('.view-button').forEach(button => {
         button.classList.toggle('active', button.dataset.view === activeView);
         button.textContent = t(viewLabels[button.dataset.view] || button.dataset.view);
