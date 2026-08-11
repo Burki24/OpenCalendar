@@ -135,7 +135,12 @@ final class MicrosoftCalendarProvider implements CalendarProviderInterface
         $events = [];
 
         while ($url !== '') {
-            $data = $this->requestJsonUrl('GET', $url, null, ['Prefer' => 'outlook.body-content-type="text"']);
+            $data = $this->requestJsonUrl(
+                'GET',
+                $url,
+                null,
+                ['Prefer' => 'outlook.body-content-type="text", outlook.timezone="UTC"']
+            );
             foreach (($data['value'] ?? []) as $item) {
                 if (!is_array($item) || (bool) ($item['isCancelled'] ?? false)) {
                     continue;

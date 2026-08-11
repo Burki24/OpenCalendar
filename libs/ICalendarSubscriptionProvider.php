@@ -10,6 +10,7 @@ use InvalidArgumentException;
 
 require_once __DIR__ . '/CalendarEventTranslation.php';
 require_once __DIR__ . '/CalendarProviderInterface.php';
+require_once __DIR__ . '/ICalendarAuthentication.php';
 require_once __DIR__ . '/ICalendarFeedProvider.php';
 require_once __DIR__ . '/SynchronizationSchedule.php';
 
@@ -145,6 +146,7 @@ final class ICalendarSubscriptionProvider implements CalendarProviderInterface
      *     url: string,
      *     fileData: string,
      *     name: string,
+     *     authenticationMode: int,
      *     username: string,
      *     password: string,
      *     color: string,
@@ -197,6 +199,14 @@ final class ICalendarSubscriptionProvider implements CalendarProviderInterface
             ));
         }
 
+        $authenticationMode = (int) ($subscription['authenticationMode'] ?? ICalendarAuthentication::AUTOMATIC);
+        if (!ICalendarAuthentication::isValidMode($authenticationMode)) {
+            throw new InvalidArgumentException(sprintf(
+                'The authentication mode for iCalendar subscription "%s" is invalid.',
+                $name
+            ));
+        }
+
         return [
             'id'                 => $id,
             'sourceType'         => $sourceType,
@@ -204,6 +214,7 @@ final class ICalendarSubscriptionProvider implements CalendarProviderInterface
             'url'                => $url,
             'fileData'           => $fileData,
             'name'               => $name,
+            'authenticationMode' => $authenticationMode,
             'username'           => trim((string) ($subscription['username'] ?? '')),
             'password'           => (string) ($subscription['password'] ?? ''),
             'color'              => $color,

@@ -25,6 +25,18 @@ final class CalendarEventCounter
         $count = 0;
 
         foreach ($events as $event) {
+            if ((bool) ($event['allDay'] ?? false)) {
+                $eventStartDate = self::dateOnly((string) ($event['start'] ?? ''));
+                $eventEndDate = self::dateOnly((string) ($event['end'] ?? ''));
+                if ($eventStartDate !== '' && $eventEndDate !== '') {
+                    $dayDate = $dayStart->format('Y-m-d');
+                    if ($eventStartDate <= $dayDate && $eventEndDate > $dayDate) {
+                        $count++;
+                    }
+                    continue;
+                }
+            }
+
             $startTimestamp = (int) ($event['startTimestamp'] ?? 0);
             if ($startTimestamp <= 0) {
                 continue;
@@ -41,5 +53,11 @@ final class CalendarEventCounter
         }
 
         return $count;
+    }
+
+    private static function dateOnly(string $value): string
+    {
+        $value = trim($value);
+        return preg_match('/^\d{4}-\d{2}-\d{2}$/', $value) === 1 ? $value : '';
     }
 }

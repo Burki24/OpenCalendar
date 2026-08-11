@@ -36,6 +36,7 @@ foreach ([
     'Create',
     'GetConfigurationForm',
     'UpdateProviderForm',
+    'UpdateICalendarAuthenticationForm',
     'UpdateScheduleForm',
     'MessageSink',
     'RequestAction',
@@ -93,6 +94,17 @@ assertAccountStructure(
         && str_contains($accountFormSource, '"type": "SelectFile"')
         && str_contains($accountFormSource, '"extensions": ".ics"'),
     'ICS/Webcal must support local ICS uploads from the client through a SelectFile-backed list.'
+);
+assertAccountStructure(
+    is_string($accountSource)
+        && str_contains($accountSource, "RegisterPropertyInteger('ICalendarAuthenticationMode'")
+        && str_contains($accountSource, 'ICalendarAuthentication::credentials(')
+        && is_string($accountFormSource)
+        && str_contains($accountFormSource, '"name": "ICalendarAuthenticationMode"')
+        && str_contains($accountFormSource, '"name": "AuthenticationMode"')
+        && str_contains($accountFormSource, '"caption": "URL / access key"')
+        && str_contains($accountFormSource, '"caption": "Username / password"'),
+    'ICS/Webcal must distinguish URL/access-key feeds from username/password authentication.'
 );
 
 assertAccountStructure(

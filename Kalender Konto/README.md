@@ -119,8 +119,13 @@ Minimaler Ablauf:
 2. In der Liste **iCalendar-Abonnements** eine Zeile hinzufügen.
 3. Den Eintrag aktivieren, einen verständlichen Kalendernamen und die vollständige
    HTTP(S)- oder `webcal://`-URL eintragen.
-4. Nur falls der Feed HTTP-Authentifizierung verlangt, Benutzername und Passwort
-   ergänzen.
+4. Unter **Authentifizierung** die passende Variante wählen:
+   - **URL / Zugriffsschlüssel** für öffentliche oder schlüsselbasierte Feeds. Der
+     Schlüssel bleibt Bestandteil der Feed-URL, z. B. `?accesskey=...`; OpenCalendar
+     sendet dann ausdrücklich keine HTTP-Zugangsdaten.
+   - **Benutzername / Passwort** nur für Feeds mit HTTP-Authentifizierung.
+   - **Automatisch** dient der Abwärtskompatibilität und verwendet HTTP-
+     Authentifizierung nur, wenn Benutzername und Passwort gemeinsam vorhanden sind.
 5. Einen passenden Aktualisierungsplan wählen und optional eine Farbe im Format
    `#RRGGBB` eintragen.
 6. **Verbindung testen**, die Konfiguration übernehmen und synchronisieren.
@@ -130,6 +135,11 @@ Minimaler Ablauf:
 `webcal://` wird automatisch über HTTPS abgerufen. Bleibt die Farbe leer,
 verwendet OpenCalendar – sofern vorhanden – die Farbe aus dem Feed. Der
 eingetragene Kalendername überschreibt `X-WR-CALNAME` aus dem Feed.
+
+Schlüsselbasierte Dienste wie DIVERA247 liefern den Zugriffsschlüssel als Teil der
+URL. Für solche Feeds **URL / Zugriffsschlüssel** wählen. Dadurch werden eventuell
+noch gespeicherte Benutzername-/Passwortwerte nicht als HTTP-Authentifizierung an
+den Feed gesendet.
 
 Die bisherigen Einzelfelder **iCalendar-URL**, **Kalendername**,
 **Benutzername**, **Passwort** und **Titelübersetzung** bleiben für ältere
@@ -210,9 +220,10 @@ Eigenschaft | Beschreibung
 Aktiv | Aktiviert die regelmäßige Kontosynchronisation
 Anbieter | Apple iCloud, Google Calendar, Microsoft 365, CalDAV oder ICS/Webcal
 Server-URL | CalDAV-Basisadresse beziehungsweise bei älteren ICS-Konfigurationen eine einzelne Feed-URL
-Benutzername | Kontoname oder E-Mail-Adresse; bei ICS nur für HTTP-Authentifizierung erforderlich
-Passwort | Konto- oder anwendungsspezifisches Passwort; bei ICS nur für HTTP-Authentifizierung erforderlich
-iCalendar-Abonnements | Liste der aktiven Online-Feeds, Namen, URLs, Zugangsdaten, Übersetzungsprofile, Zeitpläne und Farben
+Authentifizierung | Bei ICS Auswahl zwischen URL/Zugriffsschlüssel, Benutzername/Passwort und automatischem Kompatibilitätsmodus
+Benutzername | Kontoname oder E-Mail-Adresse; bei ICS nur im Modus Benutzername/Passwort erforderlich
+Passwort | Konto- oder anwendungsspezifisches Passwort; bei ICS nur im Modus Benutzername/Passwort erforderlich
+iCalendar-Abonnements | Liste der aktiven Online-Feeds, Namen, URLs, Authentifizierungsarten, Zugangsdaten, Übersetzungsprofile, Zeitpläne und Farben
 Lokale ICS-Dateien | Vom Arbeitsrechner hochgeladene `.ics`-Dateien mit Kalendername, Übersetzungsprofil und Farbe
 Aktualisierungsplan | Vorgegebener Rhythmus von fünf Minuten bis jährlich oder ausschließlich manuelle Synchronisation
 Benutzerdefiniertes Intervall | Eigener Abstand in Minuten für den entsprechenden Zeitplantyp

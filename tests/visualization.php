@@ -57,6 +57,7 @@ final class CalendarVisualizationRenderer
                 : null,
             'translations'       => ['Today' => 'Heute'],
             'options'            => [
+                'instanceId'           => 12345,
                 'agendaColorBarWidth'  => 7,
                 'compactColorBarWidth' => 7
             ]
@@ -88,6 +89,12 @@ function assertVisualization(bool $condition, string $message): void
 }
 
 $script = (string) file_get_contents(__DIR__ . '/../Kalender Ansicht/visualization/app.js');
+assertVisualization(
+    str_contains($script, 'return event.allDay ? allDayDate(event.start, event.startTimestamp)')
+        && str_contains($script, 'allDayDate(event.end, event.endTimestamp || event.startTimestamp)')
+        && str_contains($script, 'function allDayDate(value, fallbackTimestamp)'),
+    'All-day events must use their date-only boundaries so exclusive end dates cannot spill into the next local day.'
+);
 assertVisualization(
     str_contains($script, 'calendarState.settings.showAgendaEventCount !== false')
         && str_contains($script, 'calendarState.settings.showThreeDaysEventCount !== false')
@@ -244,6 +251,19 @@ assertVisualization(
         && str_contains($script, 'function viewPeriod(view)'),
     'View periods must use a collapsible section and every visualization view must use its independently configured display period.'
 );
+assertVisualization(
+    str_contains($moduleSource, "'instanceId'           => \$this->InstanceID")
+        && str_contains($script, 'const calendarViewStateStorageKey = Number(calendarOptions.instanceId) > 0')
+        && str_contains($script, 'restoreClientViewState(calendarState.settings.defaultView')
+        && str_contains($script, 'window.localStorage.getItem(calendarViewStateStorageKey)')
+        && str_contains($script, 'window.localStorage.setItem(calendarViewStateStorageKey, value)')
+        && str_contains($script, 'function readWindowNameViewState()')
+        && str_contains($script, 'function writeWindowNameViewState(value)')
+        && str_contains($script, 'cursorDate: formatStoredViewDate(cursorDate)')
+        && str_contains($script, 'persistClientViewState();'),
+    'The selected view and cursor date must persist per visualization instance on the client across page reloads.'
+);
+
 assertVisualization(
     str_contains($script, "activeView === 'list'")
         && str_contains($script, "list: 'List'")

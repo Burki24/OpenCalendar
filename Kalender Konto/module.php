@@ -17,6 +17,7 @@ use IPSKalender\CalendarProviderInterface;
 use IPSKalender\GoogleCalendarOriginPolicy;
 use IPSKalender\GoogleCalendarProvider;
 use IPSKalender\GoogleCalendarProviderException;
+use IPSKalender\ICalendarAuthentication;
 use IPSKalender\ICalendarFeedProvider;
 use IPSKalender\ICalendarFeedProviderException;
 use IPSKalender\ICalendarFileProvider;
@@ -41,6 +42,7 @@ require_once __DIR__ . '/../libs/CalDAVOriginPolicy.php';
 require_once __DIR__ . '/../libs/GoogleCalendarProvider.php';
 require_once __DIR__ . '/../libs/GoogleCalendarOriginPolicy.php';
 require_once __DIR__ . '/../libs/GoogleOAuthOriginPolicy.php';
+require_once __DIR__ . '/../libs/ICalendarAuthentication.php';
 require_once __DIR__ . '/../libs/ICalendarFeedProvider.php';
 require_once __DIR__ . '/../libs/ICalendarFileProvider.php';
 require_once __DIR__ . '/../libs/ICalendarSubscriptionProvider.php';
@@ -99,6 +101,7 @@ class KalenderKonto extends IPSModuleStrict
         $this->RegisterPropertyString('Username', '');
         $this->RegisterPropertyString('Password', '');
         $this->RegisterPropertyString('CalendarName', '');
+        $this->RegisterPropertyInteger('ICalendarAuthenticationMode', ICalendarAuthentication::AUTOMATIC);
         $this->RegisterPropertyInteger('ICalendarTranslationProfile', CalendarEventTranslation::NONE);
         $this->RegisterPropertyString('ICalendarFeeds', '[]');
         $this->RegisterPropertyString('ICalendarFiles', '[]');
@@ -132,6 +135,10 @@ class KalenderKonto extends IPSModuleStrict
         $form = $this->LoadConfigurationForm();
         $provider = $this->ReadPropertyInteger('Provider');
         $isPasswordProvider = in_array($provider, [self::PROVIDER_APPLE, self::PROVIDER_CALDAV, self::PROVIDER_ICS], true);
+        $iCalendarAuthenticationMode = $this->ReadPropertyInteger('ICalendarAuthenticationMode');
+        $showIcsCredentials = $iCalendarAuthenticationMode === ICalendarAuthentication::USERNAME_PASSWORD
+            || ($iCalendarAuthenticationMode === ICalendarAuthentication::AUTOMATIC
+                && (trim($this->ReadPropertyString('Username')) !== '' || $this->ReadPropertyString('Password') !== ''));
         $isGoogle = $provider === self::PROVIDER_GOOGLE;
         $isMicrosoft = $provider === self::PROVIDER_MICROSOFT;
         $isIcs = $provider === self::PROVIDER_ICS;
@@ -146,8 +153,11 @@ class KalenderKonto extends IPSModuleStrict
                 if ($provider === self::PROVIDER_APPLE) {
                     $element['value'] = self::APPLE_CALDAV_URL;
                 }
+            } elseif ($name === 'ICalendarAuthenticationMode') {
+                $element['visible'] = $isIcs;
             } elseif (in_array($name, ['Username', 'Password'], true)) {
-                $element['visible'] = $isPasswordProvider;
+                $element['visible'] = in_array($provider, [self::PROVIDER_APPLE, self::PROVIDER_CALDAV], true)
+                    || ($isIcs && $showIcsCredentials);
             } elseif (in_array($name, ['CalendarName', 'ICalendarTranslationProfile'], true)) {
                 $element['visible'] = $isIcs;
             } elseif (in_array($name, ['ICalendarSubscriptionsPanel', 'ICalendarFilesPanel'], true)) {
@@ -209,11 +219,18 @@ class KalenderKonto extends IPSModuleStrict
         $isGoogle = $provider === self::PROVIDER_GOOGLE;
         $isMicrosoft = $provider === self::PROVIDER_MICROSOFT;
         $isIcs = $provider === self::PROVIDER_ICS;
+        $iCalendarAuthenticationMode = $this->ReadPropertyInteger('ICalendarAuthenticationMode');
+        $showIcsCredentials = $iCalendarAuthenticationMode === ICalendarAuthentication::USERNAME_PASSWORD
+            || ($iCalendarAuthenticationMode === ICalendarAuthentication::AUTOMATIC
+                && (trim($this->ReadPropertyString('Username')) !== '' || $this->ReadPropertyString('Password') !== ''));
         $canConfigureTls = in_array($provider, [self::PROVIDER_CALDAV, self::PROVIDER_ICS], true);
         $this->UpdateFormField('ServerURL', 'visible', $isPasswordProvider);
         $this->UpdateFormField('ServerURL', 'caption', $isIcs ? $this->Translate('iCalendar URL') : $this->Translate('Server URL'));
-        $this->UpdateFormField('Username', 'visible', $isPasswordProvider);
-        $this->UpdateFormField('Password', 'visible', $isPasswordProvider);
+        $this->UpdateFormField('ICalendarAuthenticationMode', 'visible', $isIcs);
+        $showCredentials = in_array($provider, [self::PROVIDER_APPLE, self::PROVIDER_CALDAV], true)
+            || ($isIcs && $showIcsCredentials);
+        $this->UpdateFormField('Username', 'visible', $showCredentials);
+        $this->UpdateFormField('Password', 'visible', $showCredentials);
         $this->UpdateFormField('CalendarName', 'visible', $isIcs);
         $this->UpdateFormField('ICalendarTranslationProfile', 'visible', $isIcs);
         $this->UpdateFormField('ICalendarSubscriptionsPanel', 'visible', $isIcs);
@@ -268,6 +285,18 @@ class KalenderKonto extends IPSModuleStrict
         }
 
         $this->UpdateFormField('ServerURL', 'enabled', false);
+    }
+
+    /**
+     * Updates the legacy ICS credential fields for the selected authentication mode.
+     */
+    public function UpdateICalendarAuthenticationForm(int $authenticationMode): void
+    {
+        $showCredentials = $authenticationMode === ICalendarAuthentication::USERNAME_PASSWORD
+            || ($authenticationMode === ICalendarAuthentication::AUTOMATIC
+                && (trim($this->ReadPropertyString('Username')) !== '' || $this->ReadPropertyString('Password') !== ''));
+        $this->UpdateFormField('Username', 'visible', $showCredentials);
+        $this->UpdateFormField('Password', 'visible', $showCredentials);
     }
 
     /**
@@ -678,12 +707,18 @@ class KalenderKonto extends IPSModuleStrict
                         );
                     }
 
+                    $credentials = ICalendarAuthentication::credentials(
+                        (int) ($subscription['authenticationMode'] ?? ICalendarAuthentication::AUTOMATIC),
+                        (string) ($subscription['username'] ?? ''),
+                        (string) ($subscription['password'] ?? '')
+                    );
+
                     return new ICalendarFeedProvider(
                         new CalendarHttpClient(
                             max(5, min(120, $this->ReadPropertyInteger('RequestTimeout'))),
                             $this->ReadPropertyBoolean('VerifyTLS'),
-                            (string) ($subscription['username'] ?? ''),
-                            (string) ($subscription['password'] ?? '')
+                            $credentials['username'],
+                            $credentials['password']
                         ),
                         (string) ($subscription['url'] ?? ''),
                         (string) ($subscription['name'] ?? ''),
@@ -776,6 +811,30 @@ class KalenderKonto extends IPSModuleStrict
                     );
                 }
                 $subscriptionUrls[$urlKey] = true;
+                $authenticationMode = (int) (
+                    $subscription['authenticationMode']
+                    ?? ICalendarAuthentication::AUTOMATIC
+                );
+                if (!ICalendarAuthentication::isValidMode($authenticationMode)) {
+                    return sprintf(
+                        $this->Translate('The authentication mode for iCalendar subscription "%s" is invalid.'),
+                        trim((string) ($subscription['name'] ?? ''))
+                    );
+                }
+                if ($authenticationMode === ICalendarAuthentication::USERNAME_PASSWORD) {
+                    if (trim((string) ($subscription['username'] ?? '')) === '') {
+                        return sprintf(
+                            $this->Translate('The username for iCalendar subscription "%s" is missing.'),
+                            trim((string) ($subscription['name'] ?? ''))
+                        );
+                    }
+                    if ((string) ($subscription['password'] ?? '') === '') {
+                        return sprintf(
+                            $this->Translate('The password for iCalendar subscription "%s" is missing.'),
+                            trim((string) ($subscription['name'] ?? ''))
+                        );
+                    }
+                }
                 $color = strtoupper(trim((string) ($subscription['color'] ?? '')));
                 if ($color !== '' && preg_match('/^#[0-9A-F]{6}$/', $color) !== 1) {
                     return sprintf(

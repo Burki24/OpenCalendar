@@ -692,6 +692,7 @@ class KalenderAnsicht extends IPSModuleStrict
             'runtime'            => $runtime,
             'translations'       => $translations,
             'options'            => [
+                'instanceId'           => $this->InstanceID,
                 'agendaColorBarWidth'  => $ipsView
                     ? max(2, min(16, $this->ReadPropertyInteger('IPSViewColorBarWidth')))
                     : 5,
