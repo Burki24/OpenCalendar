@@ -1341,7 +1341,8 @@ assertTrueValue(
         && str_contains($viewModuleSource, "RegisterPropertyInteger('ThreeDaysPeriodDays', 3)")
         && str_contains($viewModuleSource, "RegisterPropertyInteger('WeekPeriodWeeks', 1)")
         && str_contains($viewModuleSource, "RegisterPropertyInteger('MonthPeriodMonths', 1)")
-        && str_contains($viewFormSource, '"caption": "View periods"')
+        && preg_match('/"type": "ExpansionPanel",\s*"caption": "View periods"/', $viewFormSource) === 1
+        && preg_match('/"type": "PopupButton",\s*"caption": "View periods"/', $viewFormSource) === 0
         && str_contains($viewScriptSource, 'function viewPeriod(view)')
         && str_contains($viewScriptSource, "viewPeriod('list')")
         && str_contains($viewScriptSource, "viewPeriod('month')"),

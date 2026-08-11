@@ -18,11 +18,11 @@ verwendet werden.
 2. In der Liste **Kalender** für jede gewünschte Zeile eine Kalender-Instanz
    auswählen und **Aktiviert** einschalten.
 3. Standardansicht, geladenen Terminzeitraum und maximale Terminanzahl festlegen.
-4. Gewünschte Zusatzinformationen wie Kalendername, Ort oder Beschreibung
-   aktivieren. Über **Anzeigeoptionen** lassen sich Terminanzahl, Kalenderwoche
-   und Tageszahl in einer Matrix für jede unterstützte Darstellung separat
-   ein- oder ausschalten. Für die neue Listenansicht werden dort zusätzlich die
-   gewünschten Listenspalten gewählt.
+4. Den aufklappbaren Bereich **Anzeigeoptionen** öffnen. Dort sind die
+   allgemeinen Zusatzinformationen wie Wochenenden, Kalendername, Ort und
+   Beschreibung sowie die ansichtsspezifische Matrix für Terminanzahl,
+   Kalenderwoche und Tageszahl gebündelt. Für die Listenansicht werden dort
+   zusätzlich die gewünschten Listenspalten gewählt.
 5. Über **Ansichtszeiträume** die sichtbare Länge jeder Darstellung festlegen.
 6. Die Konfiguration übernehmen und **Kalender synchronisieren** ausführen.
 7. Die Instanz in der Symcon-Kachelvisualisierung platzieren.
@@ -68,13 +68,12 @@ Standardansicht | Agenda, Liste, 3 Tage, Woche oder Monat
 Kachel-Wochenausrichtung | Horizontale Wochenspalten oder vertikale Tageszeilen
 Vergangene/Zukünftige Tage | Datenzeitraum, aus dem Termine für alle Darstellungen geladen und zusammengeführt werden
 Maximale Termine | Obergrenze der in einer Antwort verarbeiteten Termine
-Wochenenden anzeigen | Blendet Samstag und Sonntag ein oder aus
+Anzeigeoptionen → Allgemein | Wochenenden, Kalendername, Ort und Beschreibung zentral im aufklappbaren Bereich konfigurieren
 Anzeigeoptionen → Terminanzahl | Je Ansicht separat für Agenda, 3 Tage und Woche; im Monat wird keine Tages-Terminanzahl eingeblendet
 Anzeigeoptionen → Kalenderwoche | Je Ansicht separat für Agenda, Liste, 3 Tage, Woche und Monat
 Anzeigeoptionen → Tageszahl | Je Ansicht separat für Agenda, Liste, 3 Tage, Woche und Monat
 Anzeigeoptionen → Listenspalten | Legt fest, welche Datenfelder in der Listenansicht als Spalten erscheinen
-Ansichtszeiträume | Sichtbare Länge jeder Ansicht; Agenda/Liste/3 Tage in Tagen, Woche in Wochen und Monat in Monaten
-Kalendername/Ort/Beschreibung | Legt fest, welche Termindetails in der Agenda sichtbar sind
+Ansichtszeiträume | Sichtbare Länge jeder Ansicht im aufklappbaren Bereich; Agenda/Liste/3 Tage in Tagen, Woche in Wochen und Monat in Monaten
 
 Die Kalenderwoche erscheint in der Wochenansicht in der Zeitraumüberschrift.
 In der 3-Tage-Ansicht werden bei einem Wochenwechsel beide Kalenderwochen
@@ -93,7 +92,7 @@ der schmale Farbbalken übernimmt die Farbe des jeweiligen Kalenders. Datum,
 Beginn, Ende, Titel, Kalendername, Ort und Beschreibung können unabhängig
 voneinander als Spalten ein- oder ausgeblendet werden.
 
-Die **Ansichtszeiträume** steuern die sichtbare Länge der einzelnen
+Der aufklappbare Bereich **Ansichtszeiträume** steuert die sichtbare Länge der einzelnen
 Darstellungen und gleichzeitig die Schrittweite der Vor-/Zurück-Navigation.
 Agenda, Liste und 3-Tage-Ansicht verwenden Tage, die Wochenansicht verwendet
 Wochen und die Monatsansicht Monate. Der sichtbare Zeitraum und der oben

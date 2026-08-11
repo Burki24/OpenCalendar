@@ -163,6 +163,13 @@ assertVisualization(
     'Display options must be grouped as an event-count, calendar-week and day-of-year matrix.'
 );
 assertVisualization(
+    preg_match('/"type": "ExpansionPanel",\s*"caption": "Display options"/', $formSource) === 1
+        && preg_match('/"type": "PopupButton",\s*"caption": "Display options"/', $formSource) === 0
+        && str_contains($formSource, '"caption": "General options"')
+        && str_contains($formSource, '"caption": "Per-view options"'),
+    'Display options must use a collapsible configuration section instead of a popup.'
+);
+assertVisualization(
     str_contains($moduleSource, "array_key_exists('ShowDayOfYear', \$configuration)")
         && str_contains($moduleSource, "unset(\$configuration['ShowDayOfYear'])"),
     'The former global day-of-year setting must migrate to the per-view settings.'
@@ -215,14 +222,15 @@ foreach ([
     );
 }
 assertVisualization(
-    str_contains($formSource, '"caption": "View periods"')
+    preg_match('/"type": "ExpansionPanel",\s*"caption": "View periods"/', $formSource) === 1
+        && preg_match('/"type": "PopupButton",\s*"caption": "View periods"/', $formSource) === 0
         && str_contains($script, "viewPeriod('agenda')")
         && str_contains($script, "viewPeriod('list')")
         && str_contains($script, "viewPeriod('threeDays')")
         && str_contains($script, "viewPeriod('week')")
         && str_contains($script, "viewPeriod('month')")
         && str_contains($script, 'function viewPeriod(view)'),
-    'Every visualization view must use its independently configured display period.'
+    'View periods must use a collapsible section and every visualization view must use its independently configured display period.'
 );
 assertVisualization(
     str_contains($script, "activeView === 'list'")
