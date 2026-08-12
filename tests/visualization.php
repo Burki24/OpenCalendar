@@ -316,8 +316,22 @@ assertVisualization(
         && str_contains($script, 'function readWindowNameViewState()')
         && str_contains($script, 'function writeWindowNameViewState(value)')
         && str_contains($script, 'cursorDate: formatStoredViewDate(cursorDate)')
+        && str_contains($script, 'visibleCalendarIds: visibleCalendarIds instanceof Set')
+        && str_contains($script, 'Array.isArray(storedState.visibleCalendarIds)')
         && str_contains($script, 'persistClientViewState();'),
-    'The selected view and cursor date must persist per visualization instance on the client across page reloads.'
+    'The selected view, cursor date and temporary calendar filter must persist per visualization instance on the client across page reloads.'
+);
+
+assertVisualization(
+    str_contains($indexSource, 'id="calendar-filter-dialog"')
+        && str_contains($indexSource, 'id="calendar-filter-button"')
+        && str_contains($script, 'function openCalendarFilter()')
+        && str_contains($script, 'function applyCalendarFilter()')
+        && str_contains($script, 'function visibleCalendarEvents()')
+        && str_contains($script, 'visibleCalendarEvents().filter(event => eventOverlaps(event, rangeStart, rangeEnd))')
+        && str_contains($script, 'visibleCalendarEvents().filter(event => eventOverlaps(event, day, dayEnd))')
+        && str_contains($script, 'visibleCalendarIds.has(Number(event.calendarInstanceId))'),
+    'The shared visualization must provide a client-side calendar filter and apply it consistently to all rendered events.'
 );
 
 assertVisualization(
@@ -427,6 +441,12 @@ foreach ([$native, $ipsView] as $html) {
     );
     assertVisualization(str_contains($html, 'id="add-button-label"'), 'The event creation control must expose a visible text label for touch users.');
 
+    assertVisualization(
+        str_contains($html, 'id="calendar-filter-dialog"')
+            && str_contains($html, 'id="calendar-filter-options"')
+            && str_contains($html, 'id="calendar-filter-apply"'),
+        'The rendered visualization must include the temporary calendar-filter modal.'
+    );
     assertVisualization(
         str_contains($html, 'id="day-events-dialog"')
             && str_contains($html, 'id="day-events-list"'),

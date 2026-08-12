@@ -27,6 +27,8 @@ let activeView = 'agenda';
 let cursorDate = startOfDay(new Date());
 let initialized = false;
 let selectedEvent = null;
+let visibleCalendarIds = null;
+let pendingCalendarFilterIds = new Set();
 let toastTimer = null;
 let monthLayoutFrame = null;
 const monthEventData = new WeakMap();
@@ -41,6 +43,8 @@ const eventCalendarTrigger = document.getElementById('event-calendar-trigger');
 const eventCalendarValue = document.getElementById('event-calendar-value');
 const eventCalendarOptions = document.getElementById('event-calendar-options');
 const dayEventsDialog = document.getElementById('day-events-dialog');
+const calendarFilterDialog = document.getElementById('calendar-filter-dialog');
+const calendarFilterOptions = document.getElementById('calendar-filter-options');
 const monthResizeObserver = typeof ResizeObserver === 'function'
     ? new ResizeObserver(() => {
         if (activeView === 'month') scheduleMonthEventLayout();
@@ -68,6 +72,7 @@ function handleMessage(data) {
     calendarState.events = Array.isArray(calendarState.events) ? calendarState.events : [];
     calendarState.calendars = Array.isArray(calendarState.calendars) ? calendarState.calendars : [];
     calendarState.settings = calendarState.settings || {};
+    normalizeVisibleCalendarIds();
     applyTileFontScale();
     if (!initialized) {
         restoreClientViewState(calendarState.settings.defaultView || 'agenda');
@@ -89,6 +94,8 @@ function render() {
     content.replaceChildren();
     if (calendarState.calendars.length === 0) {
         renderEmpty('No calendars selected', 'Select at least one calendar in the instance configuration.');
+    } else if (visibleCalendarCount() === 0) {
+        renderEmpty('No calendars visible', 'Select one or more calendars in the calendar filter.');
     } else if (activeView === 'month') {
         renderMonth();
     } else if (activeView === 'week') {
@@ -110,6 +117,7 @@ function render() {
     const addButtonText = hasWritableCalendar ? 'Create event' : 'No writable calendar available';
     addButton.title = t(addButtonText);
     addButton.setAttribute('aria-label', t(addButtonText));
+    updateCalendarFilterButton();
     if (activeView === 'month') scheduleMonthEventLayout();
 }
 
@@ -130,7 +138,8 @@ function updateToolbar() {
         ['previous-button', 'Previous'],
         ['today-button', 'Today'],
         ['next-button', 'Next'],
-        ['refresh-button', 'Refresh']
+        ['refresh-button', 'Refresh'],
+        ['calendar-filter-button', 'Filter calendars']
     ].forEach(([id, text]) => {
         const button = document.getElementById(id);
         button.title = t(text);
@@ -167,7 +176,7 @@ function updateToolbar() {
 function renderAgenda() {
     const rangeStart = startOfDay(cursorDate);
     const rangeEnd = addDays(rangeStart, viewPeriod('agenda'));
-    const events = calendarState.events.filter(event => eventOverlaps(event, rangeStart, rangeEnd));
+    const events = visibleCalendarEvents().filter(event => eventOverlaps(event, rangeStart, rangeEnd));
     const groups = new Map();
     events.forEach(event => {
         const date = eventStart(event);
@@ -242,7 +251,7 @@ function createAgendaEvent(event) {
 function renderList() {
     const rangeStart = startOfDay(cursorDate);
     const rangeEnd = addDays(rangeStart, viewPeriod('list'));
-    const events = calendarState.events.filter(event => eventOverlaps(event, rangeStart, rangeEnd));
+    const events = visibleCalendarEvents().filter(event => eventOverlaps(event, rangeStart, rangeEnd));
     if (events.length === 0) {
         renderEmpty('No events', 'There are no events in this period.');
         return;
@@ -402,7 +411,7 @@ function renderDayColumns(days, className, showDayOfYear, showEventCount) {
     days.forEach(day => {
         const column = element('section', 'week-column' + (isToday(day) ? ' today' : ''));
         const dayEnd = addDays(day, 1);
-        const events = calendarState.events.filter(event => eventOverlaps(event, day, dayEnd));
+        const events = visibleCalendarEvents().filter(event => eventOverlaps(event, day, dayEnd));
         const heading = element('div', 'week-heading');
         heading.textContent = formatDayHeading(
             day,
@@ -499,7 +508,7 @@ function createMonthGrid(month, showOutsideDetails) {
         cell.appendChild(dayHeader);
         if (!outside || showOutsideDetails) {
             const dayEnd = addDays(day, 1);
-            const events = calendarState.events
+            const events = visibleCalendarEvents()
                 .filter(event => eventOverlaps(event, day, dayEnd))
                 .sort(compareEventsForDisplay);
             const eventList = element('div', 'month-events');
@@ -627,6 +636,100 @@ function renderEmpty(title, description) {
     inner.append(symbol, heading, text);
     box.appendChild(inner);
     content.appendChild(box);
+}
+
+function allCalendarInstanceIds() {
+    return calendarState.calendars
+        .map(calendar => Number(calendar.instanceId))
+        .filter(instanceId => instanceId > 0);
+}
+
+function normalizeVisibleCalendarIds() {
+    if (!(visibleCalendarIds instanceof Set)) return;
+
+    const availableIds = new Set(allCalendarInstanceIds());
+    visibleCalendarIds = new Set(
+        Array.from(visibleCalendarIds).filter(instanceId => availableIds.has(instanceId))
+    );
+    if (visibleCalendarIds.size === availableIds.size) visibleCalendarIds = null;
+}
+
+function effectiveVisibleCalendarIds() {
+    return visibleCalendarIds instanceof Set
+        ? new Set(visibleCalendarIds)
+        : new Set(allCalendarInstanceIds());
+}
+
+function visibleCalendarCount() {
+    return effectiveVisibleCalendarIds().size;
+}
+
+function calendarFilterActive() {
+    return visibleCalendarIds instanceof Set;
+}
+
+function visibleCalendarEvents() {
+    if (!calendarFilterActive()) return calendarState.events;
+    return calendarState.events.filter(event => visibleCalendarIds.has(Number(event.calendarInstanceId)));
+}
+
+function updateCalendarFilterButton() {
+    const button = document.getElementById('calendar-filter-button');
+    const total = calendarState.calendars.length;
+    const visible = visibleCalendarCount();
+    const active = calendarFilterActive();
+    button.disabled = total === 0;
+    button.classList.toggle('filter-active', active);
+    const label = active
+        ? `${t('Filter calendars')} (${visible}/${total})`
+        : t('Filter calendars');
+    button.title = label;
+    button.setAttribute('aria-label', label);
+    button.setAttribute('aria-pressed', String(active));
+}
+
+function openCalendarFilter() {
+    pendingCalendarFilterIds = effectiveVisibleCalendarIds();
+    renderCalendarFilterOptions();
+    calendarFilterDialog.showModal();
+}
+
+function renderCalendarFilterOptions() {
+    calendarFilterOptions.replaceChildren();
+    calendarState.calendars.forEach(calendar => {
+        const instanceId = Number(calendar.instanceId);
+        const option = element('label', 'calendar-filter-option');
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.checked = pendingCalendarFilterIds.has(instanceId);
+        checkbox.addEventListener('change', () => {
+            if (checkbox.checked) pendingCalendarFilterIds.add(instanceId);
+            else pendingCalendarFilterIds.delete(instanceId);
+        });
+        const color = element('span', 'calendar-filter-color');
+        color.style.setProperty('--event-color', safeColor(calendar.color));
+        const name = element('span', 'calendar-filter-name');
+        name.textContent = calendar.name || t('Calendar');
+        option.append(checkbox, color, name);
+        calendarFilterOptions.appendChild(option);
+    });
+}
+
+function setPendingCalendarFilter(selectAll) {
+    pendingCalendarFilterIds = selectAll
+        ? new Set(allCalendarInstanceIds())
+        : new Set();
+    renderCalendarFilterOptions();
+}
+
+function applyCalendarFilter() {
+    const allIds = allCalendarInstanceIds();
+    visibleCalendarIds = pendingCalendarFilterIds.size === allIds.length
+        ? null
+        : new Set(pendingCalendarFilterIds);
+    calendarFilterDialog.close();
+    persistClientViewState();
+    render();
 }
 
 function openNewEvent() {
@@ -918,6 +1021,12 @@ document.getElementById('day-events-close-button').addEventListener('click', () 
 document.getElementById('dialog-close').addEventListener('click', () => eventDialog.close());
 document.getElementById('cancel-button').addEventListener('click', () => eventDialog.close());
 document.getElementById('add-button').addEventListener('click', openNewEvent);
+document.getElementById('calendar-filter-button').addEventListener('click', openCalendarFilter);
+document.getElementById('calendar-filter-close').addEventListener('click', () => calendarFilterDialog.close());
+document.getElementById('calendar-filter-cancel').addEventListener('click', () => calendarFilterDialog.close());
+document.getElementById('calendar-filter-all').addEventListener('click', () => setPendingCalendarFilter(true));
+document.getElementById('calendar-filter-none').addEventListener('click', () => setPendingCalendarFilter(false));
+document.getElementById('calendar-filter-apply').addEventListener('click', applyCalendarFilter);
 document.getElementById('refresh-button').addEventListener('click', () => sendAction('Refresh', true));
 document.getElementById('today-button').addEventListener('click', () => {
     cursorDate = startOfDay(new Date());
@@ -995,6 +1104,14 @@ function restoreClientViewState(defaultView) {
     if (storedDate) {
         cursorDate = storedDate;
     }
+    if (Array.isArray(storedState.visibleCalendarIds)) {
+        visibleCalendarIds = new Set(
+            storedState.visibleCalendarIds
+                .map(instanceId => Number(instanceId))
+                .filter(instanceId => instanceId > 0)
+        );
+        normalizeVisibleCalendarIds();
+    }
 }
 
 function persistClientViewState() {
@@ -1002,7 +1119,10 @@ function persistClientViewState() {
 
     const value = JSON.stringify({
         activeView,
-        cursorDate: formatStoredViewDate(cursorDate)
+        cursorDate: formatStoredViewDate(cursorDate),
+        visibleCalendarIds: visibleCalendarIds instanceof Set
+            ? Array.from(visibleCalendarIds).sort((left, right) => left - right)
+            : null
     });
     try {
         window.localStorage.setItem(calendarViewStateStorageKey, value);
@@ -1182,15 +1302,22 @@ function applyStaticTranslations() {
         ['delete-button', 'Delete'],
         ['cancel-button', 'Cancel'],
         ['save-button', 'Save'],
-        ['day-events-close-button', 'Close']
+        ['day-events-close-button', 'Close'],
+        ['calendar-filter-all', 'Select all'],
+        ['calendar-filter-none', 'Select none'],
+        ['calendar-filter-cancel', 'Cancel'],
+        ['calendar-filter-apply', 'Apply']
     ].forEach(([id, text]) => { document.getElementById(id).textContent = t(text); });
     document.getElementById('all-day-label').textContent = t('All day');
     document.getElementById('dialog-title').textContent = t('Event');
     document.getElementById('day-events-dialog-title').textContent = t('Day events');
+    document.getElementById('calendar-filter-dialog-title').textContent = t('Filter calendars');
+    document.getElementById('calendar-filter-note').textContent = t('This filter only changes the current view on this browser or monitor.');
     document.getElementById('add-button-label').textContent = t('New event');
     [
         ['dialog-close', 'Close'],
         ['day-events-close', 'Close'],
+        ['calendar-filter-close', 'Close'],
         ['add-button', 'Create event']
     ].forEach(([id, text]) => {
         const button = document.getElementById(id);

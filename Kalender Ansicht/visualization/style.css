@@ -158,6 +158,13 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
     font-size: 1.05em;
 }
 
+.calendar-filter-icon { width: 17px; height: 17px; fill: currentColor; }
+#calendar-filter-button.filter-active {
+    border-color: var(--cal-accent);
+    background: var(--cal-gradient-accent);
+    color: var(--cal-text-active, var(--cal-text));
+}
+
 .view-button {
     min-height: 32px;
     padding: 5px 9px;
@@ -596,6 +603,27 @@ dialog::backdrop {
     box-shadow: inset 3px 0 0 var(--cal-accent);
 }
 .form-row textarea { min-height: 62px; resize: vertical; }
+.calendar-filter-dialog { width: min(430px, calc(100% - 24px)); }
+.calendar-filter-body { gap: 12px; }
+.calendar-filter-selection-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.calendar-filter-options { display: grid; gap: 6px; }
+.calendar-filter-option {
+    display: grid;
+    grid-template-columns: auto 12px minmax(0, 1fr);
+    gap: 9px;
+    align-items: center;
+    min-height: 38px;
+    padding: 7px 9px;
+    border: var(--cal-border-width, 1px) solid var(--cal-border);
+    border-radius: var(--cal-radius);
+    background: var(--cal-surface);
+    cursor: pointer;
+}
+.calendar-filter-option:hover { background: var(--cal-surface-hover); }
+.calendar-filter-option input { width: auto; margin: 0; }
+.calendar-filter-color { width: 10px; height: 10px; border-radius: 50%; background: var(--event-color); }
+.calendar-filter-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
 .day-events-dialog { width: min(520px, calc(100% - 24px)); }
 .day-events-body { gap: 8px; }
 .day-events-list { display: grid; gap: 6px; }
@@ -635,7 +663,7 @@ dialog::backdrop {
         grid-area: views;
         grid-template-columns: repeat(5, 1fr);
     }
-    #refresh-button { grid-area: refresh; }
+    .toolbar-actions { grid-area: refresh; justify-self: end; }
     html.ipsview-mode .floating-add {
         position: absolute;
         right: 12px;

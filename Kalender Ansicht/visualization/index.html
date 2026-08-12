@@ -29,7 +29,14 @@
             <span class="floating-add-symbol" aria-hidden="true">＋</span>
             <span class="floating-add-label" id="add-button-label">New event</span>
         </button>
-        <button class="icon-button" id="refresh-button" title="Refresh" aria-label="Refresh">↻</button>
+        <div class="toolbar-group toolbar-actions">
+            <button class="icon-button" id="calendar-filter-button" title="Filter calendars" aria-label="Filter calendars">
+                <svg class="calendar-filter-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                    <path d="M3 5h18l-7 8v5.5l-4 2V13L3 5z"></path>
+                </svg>
+            </button>
+            <button class="icon-button" id="refresh-button" title="Refresh" aria-label="Refresh">↻</button>
+        </div>
     </div>
     <main class="content" id="calendar-content"></main>
     <div class="toast" id="toast" role="status"></div>
@@ -102,6 +109,26 @@
         <button type="button" class="secondary-button" id="day-events-close-button">Close</button>
     </div>
 </dialog>
+<dialog id="calendar-filter-dialog" class="calendar-filter-dialog">
+    <div class="dialog-header">
+        <span style="width:10px;height:10px;border-radius:50%;background:var(--cal-accent)"></span>
+        <h2 id="calendar-filter-dialog-title">Filter calendars</h2>
+        <button type="button" class="icon-button" id="calendar-filter-close" aria-label="Close">×</button>
+    </div>
+    <div class="dialog-body calendar-filter-body">
+        <div class="calendar-filter-selection-actions">
+            <button type="button" class="secondary-button" id="calendar-filter-all">Select all</button>
+            <button type="button" class="secondary-button" id="calendar-filter-none">Select none</button>
+        </div>
+        <div class="calendar-filter-options" id="calendar-filter-options"></div>
+        <div class="dialog-note" id="calendar-filter-note">This filter only changes the current view on this browser or monitor.</div>
+    </div>
+    <div class="dialog-actions">
+        <button type="button" class="secondary-button" id="calendar-filter-cancel">Cancel</button>
+        <button type="button" class="primary-button" id="calendar-filter-apply">Apply</button>
+    </div>
+</dialog>
+
 <script>
 window.SYMC_VISUALIZATION = {{BOOTSTRAP_JSON}};
 {{MODULE_SCRIPT}}
