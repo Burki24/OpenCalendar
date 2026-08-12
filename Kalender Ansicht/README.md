@@ -107,6 +107,8 @@ schmale Spalten ausgegeben.
 
 Die zuletzt am jeweiligen Browser/Monitor gewählte Ansicht und das zugehörige Bezugsdatum werden clientseitig und instanzbezogen gespeichert. Dadurch bleiben beispielsweise Liste und gewählter Zeitraum auch erhalten, wenn eine Kalendersynchronisation die IPSView-Seite neu lädt. Unterschiedliche Monitore können unabhängig voneinander verschiedene Ansichten verwenden. Die konfigurierte Standardansicht dient weiterhin als Ausgangswert für neue Clients.
 
+Über das **Kalenderfilter-Symbol** in der Toolbar lassen sich die in der Kalender-Ansicht konfigurierten Kalender clientseitig ein- oder ausblenden. Es können einzelne, mehrere, alle oder keine Kalender gewählt werden. Der Filter verändert weder die Instanzkonfiguration noch die Synchronisation und wird pro Browser/Monitor zusammen mit dem Ansichtsstand gespeichert. Dadurch können Kachel und unterschiedliche IPSView-Clients unabhängig voneinander verschiedene Kalenderkombinationen anzeigen.
+
 Die **Listenansicht** verzichtet bewusst auf Karten und zusätzliche
 Gruppierungen. Jeder Termin wird in einer einfachen Tabellenzeile dargestellt;
 der schmale Farbbalken übernimmt die Farbe des jeweiligen Kalenders. Datum,

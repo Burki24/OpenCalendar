@@ -117,7 +117,14 @@
             "Recurring events cannot be moved yet.": "Wiederkehrende Termine können derzeit noch nicht verschoben werden.",
             "The event was created in the target calendar, but could not be deleted from the source calendar. Please check both calendars.": "Der Termin wurde im Zielkalender erstellt, konnte aber nicht aus dem Quellkalender gelöscht werden. Bitte prüfen Sie beide Kalender.",
             "Day events": "Termine des Tages",
-            "Events on": "Termine am"
+            "Events on": "Termine am",
+            "Filter calendars": "Kalender filtern",
+            "Select all": "Alle auswählen",
+            "Select none": "Keine auswählen",
+            "Apply": "Übernehmen",
+            "No calendars visible": "Keine Kalender sichtbar",
+            "Select one or more calendars in the calendar filter.": "Wählen Sie im Kalenderfilter einen oder mehrere Kalender aus.",
+            "This filter only changes the current view on this browser or monitor.": "Dieser Filter ändert nur die aktuelle Ansicht auf diesem Browser oder Monitor."
         }
     }
 }
