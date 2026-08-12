@@ -101,7 +101,7 @@ button { color: inherit; }
 
 #calendar-app {
     position: relative;
-    font-size: var(--cal-root-font-size, 100%);
+    font-size: 1rem;
     display: flex;
     flex-direction: column;
     height: 100%;
@@ -336,6 +336,8 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
     text-transform: uppercase;
 }
 .month-day {
+    display: flex;
+    flex-direction: column;
     height: var(--month-row-height);
     min-height: 0;
     padding: 5px;
@@ -350,6 +352,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .day-number { font-size: .72em; font-weight: 650; }
 .month-day-of-year { display: block; margin-top: 2px; color: var(--cal-muted); font-size: .52em; font-weight: 500; white-space: nowrap; }
 .today .day-number { color: var(--cal-accent); }
+.month-events { flex: 1 1 auto; min-height: 0; overflow: hidden; }
 
 .event-chip {
     display: block;

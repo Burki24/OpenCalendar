@@ -28,6 +28,8 @@ let cursorDate = startOfDay(new Date());
 let initialized = false;
 let selectedEvent = null;
 let toastTimer = null;
+let monthLayoutFrame = null;
+const monthEventData = new WeakMap();
 
 const content = document.getElementById('calendar-content');
 const periodTitle = document.getElementById('period-title');
@@ -39,6 +41,12 @@ const eventCalendarTrigger = document.getElementById('event-calendar-trigger');
 const eventCalendarValue = document.getElementById('event-calendar-value');
 const eventCalendarOptions = document.getElementById('event-calendar-options');
 const dayEventsDialog = document.getElementById('day-events-dialog');
+const monthResizeObserver = typeof ResizeObserver === 'function'
+    ? new ResizeObserver(() => {
+        if (activeView === 'month') scheduleMonthEventLayout();
+    })
+    : null;
+monthResizeObserver?.observe(content);
 
 applySymconColorScheme();
 
@@ -60,12 +68,20 @@ function handleMessage(data) {
     calendarState.events = Array.isArray(calendarState.events) ? calendarState.events : [];
     calendarState.calendars = Array.isArray(calendarState.calendars) ? calendarState.calendars : [];
     calendarState.settings = calendarState.settings || {};
+    applyTileFontScale();
     if (!initialized) {
         restoreClientViewState(calendarState.settings.defaultView || 'agenda');
         applyStaticTranslations();
         initialized = true;
     }
     render();
+}
+
+
+function applyTileFontScale() {
+    if (calendarVisualization.mode === 'ipsview') return;
+    const scale = Math.max(50, Math.min(200, Number(calendarState.settings.tileFontScale) || 100));
+    document.documentElement.style.fontSize = `${scale}%`;
 }
 
 function render() {
@@ -94,6 +110,7 @@ function render() {
     const addButtonText = hasWritableCalendar ? 'Create event' : 'No writable calendar available';
     addButton.title = t(addButtonText);
     addButton.setAttribute('aria-label', t(addButtonText));
+    if (activeView === 'month') scheduleMonthEventLayout();
 }
 
 function listControlsVisible() {
@@ -485,25 +502,78 @@ function createMonthGrid(month, showOutsideDetails) {
             const events = calendarState.events
                 .filter(event => eventOverlaps(event, day, dayEnd))
                 .sort(compareEventsForDisplay);
-            events.slice(0, 3).forEach(event => {
-                const chip = element('button', 'event-chip');
-                chip.type = 'button';
-                chip.style.setProperty('--event-color', safeColor(event.calendarColor));
-                chip.textContent = (event.allDay ? '' : formatTime(eventStart(event)) + ' ') + (event.summary || t('Untitled event'));
-                chip.addEventListener('click', () => openExistingEvent(event));
-                cell.appendChild(chip);
-            });
-            if (events.length > 3) {
-                const more = element('button', 'more-events');
-                more.type = 'button';
-                more.textContent = '+' + (events.length - 3) + ' ' + t('more');
-                more.addEventListener('click', () => openDayEvents(day, events));
-                cell.appendChild(more);
-            }
+            const eventList = element('div', 'month-events');
+            cell.appendChild(eventList);
+            monthEventData.set(eventList, { day, events });
+            renderMonthEventPreview(eventList, day, events);
         }
         grid.appendChild(cell);
     });
     return grid;
+}
+
+function renderMonthEventPreview(container, day, events) {
+    container.replaceChildren();
+    const visibleCount = Math.min(3, events.length);
+    events.slice(0, visibleCount).forEach(event => container.appendChild(createMonthEventChip(event)));
+    if (events.length > visibleCount) {
+        container.appendChild(createMoreEventsButton(day, events, events.length - visibleCount));
+    }
+}
+
+function scheduleMonthEventLayout() {
+    if (monthLayoutFrame !== null) cancelAnimationFrame(monthLayoutFrame);
+    monthLayoutFrame = requestAnimationFrame(() => {
+        monthLayoutFrame = null;
+        document.querySelectorAll('.month-events').forEach(container => {
+            const data = monthEventData.get(container);
+            if (data) fitMonthEventContainer(container, data.day, data.events);
+        });
+    });
+}
+
+function fitMonthEventContainer(container, day, events) {
+    if (container.clientHeight <= 0) return;
+
+    container.replaceChildren();
+    const visibleChips = [];
+
+    for (const event of events) {
+        const chip = createMonthEventChip(event);
+        container.appendChild(chip);
+        if (container.scrollHeight > container.clientHeight) {
+            chip.remove();
+            break;
+        }
+        visibleChips.push(chip);
+    }
+
+    if (visibleChips.length >= events.length) return;
+
+    const more = createMoreEventsButton(day, events, events.length - visibleChips.length);
+    container.appendChild(more);
+    while (container.scrollHeight > container.clientHeight && visibleChips.length > 0) {
+        visibleChips.pop().remove();
+        more.textContent = '+' + (events.length - visibleChips.length) + ' ' + t('more');
+    }
+}
+
+function createMonthEventChip(event) {
+    const chip = element('button', 'event-chip');
+    chip.type = 'button';
+    chip.style.setProperty('--event-color', safeColor(event.calendarColor));
+    chip.textContent = (event.allDay ? '' : formatTime(eventStart(event)) + ' ')
+        + (event.summary || t('Untitled event'));
+    chip.addEventListener('click', () => openExistingEvent(event));
+    return chip;
+}
+
+function createMoreEventsButton(day, events, hiddenCount) {
+    const more = element('button', 'more-events');
+    more.type = 'button';
+    more.textContent = '+' + hiddenCount + ' ' + t('more');
+    more.addEventListener('click', () => openDayEvents(day, events));
+    return more;
 }
 
 
@@ -861,6 +931,9 @@ document.querySelectorAll('.view-button').forEach(button => button.addEventListe
     persistClientViewState();
     render();
 }));
+window.addEventListener('resize', () => {
+    if (activeView === 'month') scheduleMonthEventLayout();
+});
 document.addEventListener('wheel', containWheelInsideTile, { capture: true, passive: false });
 
 function containWheelInsideTile(event) {
