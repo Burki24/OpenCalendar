@@ -112,6 +112,14 @@ assertVisualization(
 );
 
 assertVisualization(
+    str_contains($script, 'function openDayEvents(day, events)')
+        && str_contains($script, "more.addEventListener('click', () => openDayEvents(day, events));")
+        && str_contains($script, 'dayEventsDialog.showModal();')
+        && str_contains($script, 'openExistingEvent(event);'),
+    'The month view must open a day-events modal from the additional-events indicator and route selected events to the editor.'
+);
+
+assertVisualization(
     str_contains($script, 'calendarState.settings.showAgendaEventCount !== false')
         && str_contains($script, 'calendarState.settings.showThreeDaysEventCount !== false')
         && str_contains($script, 'calendarState.settings.showWeekEventCount !== false')
@@ -382,6 +390,12 @@ foreach ([$native, $ipsView] as $html) {
         'IPSView must refresh the embedded calendar state from its authenticated action bridge on page load.'
     );
     assertVisualization(str_contains($html, 'id="add-button-label"'), 'The event creation control must expose a visible text label for touch users.');
+
+    assertVisualization(
+        str_contains($html, 'id="day-events-dialog"')
+            && str_contains($html, 'id="day-events-list"'),
+        'The rendered visualization must include the day-events modal markup.'
+    );
     assertVisualization(
         str_contains($html, 'id="event-calendar-options" role="listbox"')
             && str_contains($html, 'class="calendar-picker-trigger"')

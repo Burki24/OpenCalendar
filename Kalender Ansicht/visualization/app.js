@@ -38,6 +38,7 @@ const eventCalendarPicker = document.getElementById('event-calendar-picker');
 const eventCalendarTrigger = document.getElementById('event-calendar-trigger');
 const eventCalendarValue = document.getElementById('event-calendar-value');
 const eventCalendarOptions = document.getElementById('event-calendar-options');
+const dayEventsDialog = document.getElementById('day-events-dialog');
 
 applySymconColorScheme();
 
@@ -481,7 +482,9 @@ function createMonthGrid(month, showOutsideDetails) {
         cell.appendChild(dayHeader);
         if (!outside || showOutsideDetails) {
             const dayEnd = addDays(day, 1);
-            const events = calendarState.events.filter(event => eventOverlaps(event, day, dayEnd));
+            const events = calendarState.events
+                .filter(event => eventOverlaps(event, day, dayEnd))
+                .sort(compareEventsForDisplay);
             events.slice(0, 3).forEach(event => {
                 const chip = element('button', 'event-chip');
                 chip.type = 'button';
@@ -491,14 +494,53 @@ function createMonthGrid(month, showOutsideDetails) {
                 cell.appendChild(chip);
             });
             if (events.length > 3) {
-                const more = element('div', 'more-events');
+                const more = element('button', 'more-events');
+                more.type = 'button';
                 more.textContent = '+' + (events.length - 3) + ' ' + t('more');
+                more.addEventListener('click', () => openDayEvents(day, events));
                 cell.appendChild(more);
             }
         }
         grid.appendChild(cell);
     });
     return grid;
+}
+
+
+function openDayEvents(day, events) {
+    document.getElementById('day-events-dialog-title').textContent = formatDayEventsTitle(day);
+    const list = document.getElementById('day-events-list');
+    list.replaceChildren();
+    events.forEach(event => {
+        const item = element('button', 'day-event-item');
+        item.type = 'button';
+        item.style.setProperty('--event-color', safeColor(event.calendarColor));
+        const time = element('span', 'day-event-time');
+        time.textContent = event.allDay ? t('All day') : `${formatTime(eventStart(event))} – ${formatTime(eventEnd(event))}`;
+        const summary = element('span', 'day-event-summary');
+        summary.textContent = event.summary || t('Untitled event');
+        item.append(time, summary);
+        if (calendarState.settings.showCalendarName !== false && event.calendarName) {
+            const calendar = element('span', 'day-event-calendar');
+            calendar.textContent = event.calendarName;
+            item.appendChild(calendar);
+        }
+        item.addEventListener('click', () => {
+            dayEventsDialog.close();
+            openExistingEvent(event);
+        });
+        list.appendChild(item);
+    });
+    dayEventsDialog.showModal();
+}
+
+function compareEventsForDisplay(left, right) {
+    if (Boolean(left.allDay) !== Boolean(right.allDay)) return left.allDay ? -1 : 1;
+    return eventStart(left).getTime() - eventStart(right).getTime();
+}
+
+function formatDayEventsTitle(day) {
+    return `${t('Events on')} ${new Intl.DateTimeFormat(undefined, { dateStyle: 'full' }).format(day)}`;
 }
 
 function renderEmpty(title, description) {
@@ -801,6 +843,8 @@ eventDialog.addEventListener('cancel', event => {
     }
 });
 eventDialog.addEventListener('close', closeCalendarPicker);
+document.getElementById('day-events-close').addEventListener('click', () => dayEventsDialog.close());
+document.getElementById('day-events-close-button').addEventListener('click', () => dayEventsDialog.close());
 document.getElementById('dialog-close').addEventListener('click', () => eventDialog.close());
 document.getElementById('cancel-button').addEventListener('click', () => eventDialog.close());
 document.getElementById('add-button').addEventListener('click', openNewEvent);
@@ -1064,13 +1108,16 @@ function applyStaticTranslations() {
     [
         ['delete-button', 'Delete'],
         ['cancel-button', 'Cancel'],
-        ['save-button', 'Save']
+        ['save-button', 'Save'],
+        ['day-events-close-button', 'Close']
     ].forEach(([id, text]) => { document.getElementById(id).textContent = t(text); });
     document.getElementById('all-day-label').textContent = t('All day');
     document.getElementById('dialog-title').textContent = t('Event');
+    document.getElementById('day-events-dialog-title').textContent = t('Day events');
     document.getElementById('add-button-label').textContent = t('New event');
     [
         ['dialog-close', 'Close'],
+        ['day-events-close', 'Close'],
         ['add-button', 'Create event']
     ].forEach(([id, text]) => {
         const button = document.getElementById(id);

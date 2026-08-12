@@ -365,7 +365,8 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
     text-overflow: ellipsis;
     white-space: nowrap;
 }
-.more-events { padding: 2px 4px; color: var(--cal-muted); font-size: .63em; }
+.more-events { width: 100%; padding: 2px 4px; border: 0; background: transparent; color: var(--cal-muted); font-size: .63em; text-align: left; cursor: pointer; }
+.more-events:hover, .more-events:focus-visible { color: var(--cal-accent); text-decoration: underline; }
 
 .week-grid {
     display: grid;
@@ -579,6 +580,14 @@ dialog::backdrop {
     box-shadow: inset 3px 0 0 var(--cal-accent);
 }
 .form-row textarea { min-height: 62px; resize: vertical; }
+.day-events-dialog { width: min(520px, calc(100% - 24px)); }
+.day-events-body { gap: 8px; }
+.day-events-list { display: grid; gap: 6px; }
+.day-event-item { display: grid; grid-template-columns: minmax(70px, auto) minmax(0, 1fr); gap: 8px 12px; align-items: center; width: 100%; padding: 8px 10px; border: var(--cal-border-width, 1px) solid var(--cal-border); border-left: var(--compact-color-bar-width) solid var(--event-color); border-radius: var(--cal-radius); background: color-mix(in srgb, var(--event-color) 12%, var(--cal-surface)); color: var(--cal-text); text-align: left; }
+.day-event-item:hover, .day-event-item:focus-visible { background: color-mix(in srgb, var(--event-color) 20%, var(--cal-surface-hover)); }
+.day-event-time { color: var(--cal-muted); font-size: .72em; white-space: nowrap; }
+.day-event-summary { min-width: 0; font-weight: 650; overflow-wrap: anywhere; }
+.day-event-calendar { grid-column: 2; color: var(--cal-muted); font-size: .72em; }
 .checkbox-row { display: flex; align-items: center; gap: 8px; }
 .checkbox-row input { width: auto; }
 .dialog-note { padding: 8px 10px; border-radius: var(--cal-radius); background: var(--cal-information-soft); color: var(--cal-muted); font-size: .72em; }

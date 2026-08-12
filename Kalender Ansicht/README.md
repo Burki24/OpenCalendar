@@ -265,3 +265,7 @@ Kachel und IPSView-Seite werden aus derselben Asset-Struktur unter
 Symcon-Designvariablen, IPSView-Stilrollen und die kontrollierte Verwaltung der
 WebContent-Variable. Kalender- und Terminfarben bleiben davon unabhängige
 fachliche Inhaltsfarben.
+
+### Tagesübersicht der Monatsansicht
+
+In der Monatsansicht ist der Hinweis `+ weitere` anklickbar. Er öffnet eine Tagesübersicht mit allen Terminen dieses Tages; ein Klick auf einen Termin öffnet den bestehenden Bearbeitungsdialog.

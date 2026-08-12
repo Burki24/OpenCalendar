@@ -88,6 +88,20 @@
         </div>
     </form>
 </dialog>
+
+<dialog id="day-events-dialog" class="day-events-dialog">
+    <div class="dialog-header">
+        <span style="width:10px;height:10px;border-radius:50%;background:var(--cal-accent)"></span>
+        <h2 id="day-events-dialog-title">Day events</h2>
+        <button type="button" class="icon-button" id="day-events-close" aria-label="Close">×</button>
+    </div>
+    <div class="dialog-body day-events-body">
+        <div class="day-events-list" id="day-events-list"></div>
+    </div>
+    <div class="dialog-actions">
+        <button type="button" class="secondary-button" id="day-events-close-button">Close</button>
+    </div>
+</dialog>
 <script>
 window.SYMC_VISUALIZATION = {{BOOTSTRAP_JSON}};
 {{MODULE_SCRIPT}}
