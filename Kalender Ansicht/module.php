@@ -1223,6 +1223,7 @@ class KalenderAnsicht extends IPSModuleStrict
             'showCalendarName'          => $this->ReadPropertyBoolean('ShowCalendarName'),
             'showLocation'              => $this->ReadPropertyBoolean('ShowLocation'),
             'showDescription'           => $this->ReadPropertyBoolean('ShowDescription'),
+            'tileFontScale'             => max(50, min(200, $this->ReadPropertyInteger('TileFontScale'))),
             'tileWeekOrientation'       => $this->ReadPropertyInteger('TileWeekOrientation') === 1
                 ? 'vertical'
                 : 'horizontal',

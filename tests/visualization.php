@@ -89,6 +89,7 @@ function assertVisualization(bool $condition, string $message): void
 }
 
 $script = (string) file_get_contents(__DIR__ . '/../Kalender Ansicht/visualization/app.js');
+$indexSource = (string) file_get_contents(__DIR__ . '/../Kalender Ansicht/visualization/index.html');
 assertVisualization(
     str_contains($script, 'return event.allDay ? allDayDate(event.start, event.startTimestamp)')
         && str_contains($script, 'allDayDate(event.end, event.endTimestamp || event.startTimestamp)')
@@ -117,6 +118,16 @@ assertVisualization(
         && str_contains($script, 'dayEventsDialog.showModal();')
         && str_contains($script, 'openExistingEvent(event);'),
     'The month view must open a day-events modal from the additional-events indicator and route selected events to the editor.'
+);
+
+assertVisualization(
+    str_contains($script, "const eventList = element('div', 'month-events');")
+        && str_contains($script, 'function fitMonthEventContainer(container, day, events)')
+        && str_contains($script, 'container.scrollHeight > container.clientHeight')
+        && str_contains($script, "more.textContent = '+' + (events.length - visibleChips.length) + ' ' + t('more');")
+        && str_contains($script, "window.addEventListener('resize'")
+        && str_contains($script, 'new ResizeObserver(() => {'),
+    'The month view must dynamically fit event chips to the available row height and reserve space for the additional-events control.'
 );
 
 assertVisualization(
@@ -153,9 +164,13 @@ assertVisualization(
         && str_contains($formSource, '"caption": "Tile font size (%)"')
         && str_contains($moduleSource, "RegisterPropertyInteger('TileFontScale', 100)")
         && str_contains($moduleSource, "ReadPropertyInteger('TileFontScale')")
+        && str_contains($moduleSource, "'tileFontScale'             => max(50, min(200, \$this->ReadPropertyInteger('TileFontScale')))")
         && str_contains($moduleSource, ": max(50, min(200, \$this->ReadPropertyInteger('TileFontScale'))) . '%'")
-        && str_contains($moduleSource, '? $this->IPSViewStyleRootFontSize()'),
-    'The native tile must expose an independent configurable font scale without changing IPSView scaling.'
+        && str_contains($moduleSource, '? $this->IPSViewStyleRootFontSize()')
+        && str_contains($indexSource, 'style="font-size: {{ROOT_FONT_SIZE}};"')
+        && str_contains($script, 'function applyTileFontScale()')
+        && str_contains($script, 'document.documentElement.style.fontSize = `${scale}%`;'),
+    'The native tile must apply its independent configurable font scale initially and on live state updates without changing IPSView scaling.'
 );
 foreach (['ShowAgendaEventCount', 'ShowThreeDaysEventCount', 'ShowWeekEventCount'] as $property) {
     assertVisualization(
@@ -327,8 +342,9 @@ assertVisualization(
 assertVisualization(
     preg_match('/--month-row-height:\s*\d+px;/', $style) === 1
         && str_contains($style, 'grid-template-rows: auto repeat(6, var(--month-row-height));')
-        && str_contains($style, 'height: var(--month-row-height);'),
-    'The month view must keep all six calendar week rows at a fixed, uniform height.'
+        && str_contains($style, 'height: var(--month-row-height);')
+        && str_contains($style, '.month-events { flex: 1 1 auto; min-height: 0; overflow: hidden; }'),
+    'The month view must keep all six calendar week rows at a fixed, uniform height while reserving a measurable area for events.'
 );
 assertVisualization(
     str_contains($style, '.list-table {')
@@ -364,6 +380,9 @@ assertVisualization(
 $renderer = new CalendarVisualizationRenderer();
 $native = $renderer->render(false);
 $ipsView = $renderer->render(true);
+
+assertVisualization(str_contains($native, 'style="font-size: 100%;"'), 'The native renderer must apply the configured font scale to the document root.');
+assertVisualization(str_contains($ipsView, 'style="font-size: 18px;"'), 'IPSView must keep its independently resolved root font size.');
 
 foreach ([$native, $ipsView] as $html) {
     assertVisualization(str_starts_with($html, '<!DOCTYPE html>'), 'The rendered page must be a complete HTML document.');
