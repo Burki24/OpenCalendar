@@ -325,7 +325,7 @@ assertVisualization(
     'Calendar-week separators and month day-of-year metadata must have dedicated visualization styles.'
 );
 assertVisualization(
-    str_contains($style, '--month-row-height: 98px;')
+    preg_match('/--month-row-height:\s*\d+px;/', $style) === 1
         && str_contains($style, 'grid-template-rows: auto repeat(6, var(--month-row-height));')
         && str_contains($style, 'height: var(--month-row-height);'),
     'The month view must keep all six calendar week rows at a fixed, uniform height.'

@@ -36,7 +36,7 @@
     --cal-radius: var(--symc-radius-medium);
     --agenda-color-bar-width: 5px;
     --compact-color-bar-width: 3px;
-    --month-row-height: 98px;
+    --month-row-height: 105px;
 }
 
 * { box-sizing: border-box; }
