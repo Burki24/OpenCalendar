@@ -36,6 +36,7 @@
     --cal-radius: var(--symc-radius-medium);
     --agenda-color-bar-width: 5px;
     --compact-color-bar-width: 3px;
+    --month-row-height: 98px;
 }
 
 * { box-sizing: border-box; }
@@ -316,6 +317,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .calendar-grid {
     display: grid;
     grid-template-columns: repeat(7, minmax(0, 1fr));
+    grid-template-rows: auto repeat(6, var(--month-row-height));
     gap: 1px;
     min-width: 460px;
     overflow: hidden;
@@ -334,7 +336,8 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
     text-transform: uppercase;
 }
 .month-day {
-    min-height: 82px;
+    height: var(--month-row-height);
+    min-height: 0;
     padding: 5px;
     overflow: hidden;
     background: color-mix(in srgb, var(--cal-card) 95%, transparent);
