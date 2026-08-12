@@ -122,5 +122,6 @@ Drittanbieter.
 
   Führt mehrere Kalender in einer responsiven Kachel- oder IPSView-Ansicht
   zusammen und stellt die ausgewählten Kalender zusätzlich providerübergreifend
-  über PHP-Funktionen für Tages- und Datumsbereichsabfragen bereit.
+  über PHP-Funktionen für Tages- und Datumsbereichsabfragen bereit. Neben der
+  vollständigen Ausgabe stehen kompakte Varianten für einfache Skripte zur Verfügung.
 

@@ -204,6 +204,12 @@ $appointments = IPSKALVIEW_GetDayAppointments(12345, '2026-08-11');
 // Alle Termine eines inklusiven lokalen Datumsbereichs providerübergreifend abrufen.
 $appointments = IPSKALVIEW_GetAppointments(12345, '2026-08-11', '2026-08-17');
 
+// Kompakte Tagesliste: summary, start, end, startTime und endTime.
+$appointments = IPSKALVIEW_GetDayAppointmentsCompact(12345, '2026-08-11');
+
+// Kompakte Terminliste für einen inklusiven Datumsbereich.
+$appointments = IPSKALVIEW_GetAppointmentsCompact(12345, '2026-08-11', '2026-08-17');
+
 // Den aktuellen eigenständigen HTML-Inhalt für IPSView abrufen.
 $html = IPSKALVIEW_GetIPSViewHTML(12345);
 ```
@@ -230,6 +236,14 @@ $appointments = json_decode(
     JSON_THROW_ON_ERROR
 );
 ```
+
+Für einfache Skripte stehen zusätzlich `GetDayAppointmentsCompact()` und
+`GetAppointmentsCompact()` bereit. Sie verwenden dieselbe Kalenderauswahl und
+dieselben Bereichsregeln, liefern pro Termin aber ausschließlich `summary`,
+`start`, `end`, `startTime` und `endTime`. Bei zeitgebundenen Terminen enthalten
+`startTime` und `endTime` die lokale Uhrzeit im Format `HH:MM`. Ganztagstermine
+liefern die lokalisierte Bezeichnung `Ganztägig`/`All day` als `startTime` und einen
+leeren `endTime`-Wert.
 
 ## Technische Hinweise
 

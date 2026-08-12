@@ -98,4 +98,75 @@ assertCalendarViewApi(
     'Calendar View appointment results must identify their source calendar.'
 );
 
+assertCalendarViewApi(
+    str_contains($moduleSource, 'public function GetDayAppointmentsCompact(string $Date): string')
+        && str_contains($moduleSource, 'return $this->GetAppointmentsCompact($Date, $Date);'),
+    'Calendar View must expose a compact provider-independent day appointment function.'
+);
+assertCalendarViewApi(
+    str_contains($moduleSource, 'public function GetAppointmentsCompact(string $From, string $To): string')
+        && str_contains($moduleSource, '$this->compactAppointments($this->collectAppointmentsForRange($rangeStart, $rangeEnd))'),
+    'Calendar View must expose a compact provider-independent appointment range function.'
+);
+assertCalendarViewApi(
+    str_contains($moduleSource, "'summary'   =>")
+        && str_contains($moduleSource, "'start'     =>")
+        && str_contains($moduleSource, "'end'       =>")
+        && str_contains($moduleSource, "'startTime' =>")
+        && str_contains($moduleSource, "'endTime'   =>")
+        && str_contains($moduleSource, "Translate('All day')")
+        && str_contains($moduleSource, "->format('H:i');"),
+    'Compact appointment results must contain only script-friendly dates and readable local clock values.'
+);
+
+require_once __DIR__ . '/stubs/ModuleStrictStubs.php';
+require_once __DIR__ . '/../Kalender Ansicht/module.php';
+
+$compactMethod = new ReflectionMethod(KalenderAnsicht::class, 'compactAppointments');
+$compactMethod->setAccessible(true);
+$calendarView = new KalenderAnsicht(1);
+$previousTimezone = date_default_timezone_get();
+date_default_timezone_set('Europe/Berlin');
+
+try {
+    $compact = $compactMethod->invoke($calendarView, [[
+        'summary'        => 'Timed event',
+        'start'          => '2026-08-12T09:00:00+02:00',
+        'end'            => '2026-08-12T10:30:00+02:00',
+        'startTimestamp' => (new DateTimeImmutable('2026-08-12T09:00:00+02:00'))->getTimestamp(),
+        'endTimestamp'   => (new DateTimeImmutable('2026-08-12T10:30:00+02:00'))->getTimestamp(),
+        'allDay'         => false
+    ], [
+        'summary'        => 'All-day event',
+        'start'          => '2026-08-12',
+        'end'            => '2026-08-13',
+        'startTimestamp' => (new DateTimeImmutable('2026-08-12T00:00:00+02:00'))->getTimestamp(),
+        'endTimestamp'   => (new DateTimeImmutable('2026-08-13T00:00:00+02:00'))->getTimestamp(),
+        'allDay'         => true
+    ]]);
+} finally {
+    date_default_timezone_set($previousTimezone);
+}
+
+assertCalendarViewApi(
+    $compact[0] === [
+        'summary'   => 'Timed event',
+        'start'     => '2026-08-12T09:00:00+02:00',
+        'end'       => '2026-08-12T10:30:00+02:00',
+        'startTime' => '09:00',
+        'endTime'   => '10:30'
+    ],
+    'Compact timed appointments must expose local readable start and end times.'
+);
+assertCalendarViewApi(
+    $compact[1] === [
+        'summary'   => 'All-day event',
+        'start'     => '2026-08-12',
+        'end'       => '2026-08-13',
+        'startTime' => 'All day',
+        'endTime'   => ''
+    ],
+    'Compact all-day appointments must not invent clock times.'
+);
+
 fwrite(STDOUT, 'Calendar View PHP API checks passed.' . PHP_EOL);

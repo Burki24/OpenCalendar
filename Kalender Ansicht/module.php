@@ -549,6 +549,43 @@ class KalenderAnsicht extends IPSModuleStrict
     }
 
     /**
+     * Returns a compact appointment list for one local calendar day.
+     *
+     * Each result contains only summary, start, end, startTime and endTime.
+     * Timed appointments use local HH:MM values while all-day appointments use
+     * the localized "All day" label as startTime and an empty endTime.
+     *
+     * @param string $Date Local date in YYYY-MM-DD format.
+     * @return string JSON-encoded compact appointment list.
+     */
+    public function GetDayAppointmentsCompact(string $Date): string
+    {
+        return $this->GetAppointmentsCompact($Date, $Date);
+    }
+
+    /**
+     * Returns a compact appointment list for an inclusive local date range.
+     *
+     * The selected calendars and range semantics are identical to GetAppointments(),
+     * but provider metadata and technical timestamps are omitted.
+     *
+     * @param string $From First local date in YYYY-MM-DD format.
+     * @param string $To Last local date in YYYY-MM-DD format, inclusive.
+     * @return string JSON-encoded compact appointment list.
+     */
+    public function GetAppointmentsCompact(string $From, string $To): string
+    {
+        [$rangeStart, $rangeEnd] = CalendarAppointmentRange::fromInclusiveDates($From, $To);
+
+        return json_encode(
+            $this->compactAppointments($this->collectAppointmentsForRange($rangeStart, $rangeEnd)),
+            JSON_UNESCAPED_SLASHES
+                | JSON_UNESCAPED_UNICODE
+                | JSON_THROW_ON_ERROR
+        );
+    }
+
+    /**
      * Renders the standalone HTML representation used by IPSView.
      *
      * @return string Rendered IPSView calendar HTML.
@@ -937,6 +974,46 @@ class KalenderAnsicht extends IPSModuleStrict
         );
 
         return $events;
+    }
+
+    /**
+     * Reduces full appointment data to the compact scripting representation.
+     *
+     * @param list<array<string, mixed>> $appointments Full normalized appointments.
+     * @return list<array{summary: string, start: string, end: string, startTime: string, endTime: string}>
+     */
+    private function compactAppointments(array $appointments): array
+    {
+        $timezone = new DateTimeZone(date_default_timezone_get());
+        $result = [];
+
+        foreach ($appointments as $appointment) {
+            $allDay = (bool) ($appointment['allDay'] ?? false);
+            $startTimestamp = (int) ($appointment['startTimestamp'] ?? 0);
+            $endTimestamp = (int) ($appointment['endTimestamp'] ?? 0);
+
+            $result[] = [
+                'summary'   => (string) ($appointment['summary'] ?? ''),
+                'start'     => (string) ($appointment['start'] ?? ''),
+                'end'       => (string) ($appointment['end'] ?? ''),
+                'startTime' => $allDay ? $this->Translate('All day') : $this->formatAppointmentTime($startTimestamp, $timezone),
+                'endTime'   => $allDay ? '' : $this->formatAppointmentTime($endTimestamp, $timezone)
+            ];
+        }
+
+        return $result;
+    }
+
+    /**
+     * Formats a Unix timestamp as a local 24-hour clock value.
+     */
+    private function formatAppointmentTime(int $timestamp, DateTimeZone $timezone): string
+    {
+        if ($timestamp <= 0) {
+            return '';
+        }
+
+        return (new DateTimeImmutable('@' . $timestamp))->setTimezone($timezone)->format('H:i');
     }
 
     /**
