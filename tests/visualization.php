@@ -111,7 +111,6 @@ assertVisualization(
     'Editable events must allow selecting another writable calendar and submit a dedicated move action.'
 );
 
-
 assertVisualization(
     str_contains($script, 'function openDayEvents(day, events)')
         && str_contains($script, "more.addEventListener('click', () => openDayEvents(day, events));")
