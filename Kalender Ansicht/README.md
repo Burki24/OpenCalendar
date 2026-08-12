@@ -240,10 +240,12 @@ $appointments = json_decode(
 Für einfache Skripte stehen zusätzlich `GetDayAppointmentsCompact()` und
 `GetAppointmentsCompact()` bereit. Sie verwenden dieselbe Kalenderauswahl und
 dieselben Bereichsregeln, liefern pro Termin aber ausschließlich `summary`,
-`start`, `end`, `startTime` und `endTime`. Bei zeitgebundenen Terminen enthalten
+`start`, `end`, `startTime` und `endTime`. `start` und `end` sind dabei immer
+lokale Datumswerte im Format `YYYY-MM-DD`. Bei zeitgebundenen Terminen enthalten
 `startTime` und `endTime` die lokale Uhrzeit im Format `HH:MM`. Ganztagstermine
-liefern die lokalisierte Bezeichnung `Ganztägig`/`All day` als `startTime` und einen
-leeren `endTime`-Wert.
+liefern die lokalisierte Bezeichnung `Ganztägig`/`All day` als `startTime`, einen
+leeren `endTime`-Wert und in `end` das sichtbare inklusive Enddatum statt der
+providerseitig technischen exklusiven Endgrenze.
 
 ## Technische Hinweise
 
