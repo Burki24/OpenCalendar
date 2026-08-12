@@ -115,6 +115,8 @@ assertCalendarViewApi(
         && str_contains($moduleSource, "'startTime' =>")
         && str_contains($moduleSource, "'endTime'   =>")
         && str_contains($moduleSource, "Translate('All day')")
+        && str_contains($moduleSource, "->format('Y-m-d');")
+        && str_contains($moduleSource, "->modify('-1 day')->format('Y-m-d');")
         && str_contains($moduleSource, "->format('H:i');"),
     'Compact appointment results must contain only script-friendly dates and readable local clock values.'
 );
@@ -143,6 +145,20 @@ try {
         'startTimestamp' => (new DateTimeImmutable('2026-08-12T00:00:00+02:00'))->getTimestamp(),
         'endTimestamp'   => (new DateTimeImmutable('2026-08-13T00:00:00+02:00'))->getTimestamp(),
         'allDay'         => true
+    ], [
+        'summary'        => 'Overnight event',
+        'start'          => '2026-08-12T23:30:00+02:00',
+        'end'            => '2026-08-13T00:30:00+02:00',
+        'startTimestamp' => (new DateTimeImmutable('2026-08-12T23:30:00+02:00'))->getTimestamp(),
+        'endTimestamp'   => (new DateTimeImmutable('2026-08-13T00:30:00+02:00'))->getTimestamp(),
+        'allDay'         => false
+    ], [
+        'summary'        => 'Multi-day all-day event',
+        'start'          => '2026-08-12',
+        'end'            => '2026-08-15',
+        'startTimestamp' => (new DateTimeImmutable('2026-08-12T00:00:00+02:00'))->getTimestamp(),
+        'endTimestamp'   => (new DateTimeImmutable('2026-08-15T00:00:00+02:00'))->getTimestamp(),
+        'allDay'         => true
     ]]);
 } finally {
     date_default_timezone_set($previousTimezone);
@@ -151,22 +167,42 @@ try {
 assertCalendarViewApi(
     $compact[0] === [
         'summary'   => 'Timed event',
-        'start'     => '2026-08-12T09:00:00+02:00',
-        'end'       => '2026-08-12T10:30:00+02:00',
+        'start'     => '2026-08-12',
+        'end'       => '2026-08-12',
         'startTime' => '09:00',
         'endTime'   => '10:30'
     ],
-    'Compact timed appointments must expose local readable start and end times.'
+    'Compact timed appointments must expose local dates and readable start and end times.'
 );
 assertCalendarViewApi(
     $compact[1] === [
         'summary'   => 'All-day event',
         'start'     => '2026-08-12',
-        'end'       => '2026-08-13',
+        'end'       => '2026-08-12',
         'startTime' => 'All day',
         'endTime'   => ''
     ],
-    'Compact all-day appointments must not invent clock times.'
+    'Compact all-day appointments must expose the visible inclusive end date and not invent clock times.'
+);
+assertCalendarViewApi(
+    $compact[2] === [
+        'summary'   => 'Overnight event',
+        'start'     => '2026-08-12',
+        'end'       => '2026-08-13',
+        'startTime' => '23:30',
+        'endTime'   => '00:30'
+    ],
+    'Compact overnight appointments must keep separate local start and end dates.'
+);
+assertCalendarViewApi(
+    $compact[3] === [
+        'summary'   => 'Multi-day all-day event',
+        'start'     => '2026-08-12',
+        'end'       => '2026-08-14',
+        'startTime' => 'All day',
+        'endTime'   => ''
+    ],
+    'Compact multi-day all-day appointments must convert the exclusive provider end to the visible inclusive end date.'
 );
 
 fwrite(STDOUT, 'Calendar View PHP API checks passed.' . PHP_EOL);

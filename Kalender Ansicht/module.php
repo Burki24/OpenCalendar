@@ -552,8 +552,9 @@ class KalenderAnsicht extends IPSModuleStrict
      * Returns a compact appointment list for one local calendar day.
      *
      * Each result contains only summary, start, end, startTime and endTime.
-     * Timed appointments use local HH:MM values while all-day appointments use
-     * the localized "All day" label as startTime and an empty endTime.
+     * Start and end are local YYYY-MM-DD dates. Timed appointments use local
+     * HH:MM values while all-day appointments use the localized "All day"
+     * label as startTime, an empty endTime and an inclusive visible end date.
      *
      * @param string $Date Local date in YYYY-MM-DD format.
      * @return string JSON-encoded compact appointment list.
@@ -991,17 +992,74 @@ class KalenderAnsicht extends IPSModuleStrict
             $allDay = (bool) ($appointment['allDay'] ?? false);
             $startTimestamp = (int) ($appointment['startTimestamp'] ?? 0);
             $endTimestamp = (int) ($appointment['endTimestamp'] ?? 0);
+            $startDate = $allDay
+                ? $this->formatAllDayAppointmentDate((string) ($appointment['start'] ?? ''), $startTimestamp, $timezone)
+                : $this->formatAppointmentDate($startTimestamp, $timezone);
+            $endDate = $allDay
+                ? $this->formatAllDayAppointmentEndDate(
+                    (string) ($appointment['end'] ?? ''),
+                    $endTimestamp,
+                    $startDate,
+                    $timezone
+                )
+                : $this->formatAppointmentDate($endTimestamp, $timezone);
 
             $result[] = [
                 'summary'   => (string) ($appointment['summary'] ?? ''),
-                'start'     => (string) ($appointment['start'] ?? ''),
-                'end'       => (string) ($appointment['end'] ?? ''),
+                'start'     => $startDate,
+                'end'       => $endDate,
                 'startTime' => $allDay ? $this->Translate('All day') : $this->formatAppointmentTime($startTimestamp, $timezone),
                 'endTime'   => $allDay ? '' : $this->formatAppointmentTime($endTimestamp, $timezone)
             ];
         }
 
         return $result;
+    }
+
+    /**
+     * Formats a Unix timestamp as a local calendar date.
+     */
+    private function formatAppointmentDate(int $timestamp, DateTimeZone $timezone): string
+    {
+        if ($timestamp <= 0) {
+            return '';
+        }
+
+        return (new DateTimeImmutable('@' . $timestamp))->setTimezone($timezone)->format('Y-m-d');
+    }
+
+    /**
+     * Returns the provider date of an all-day boundary without timezone shifting.
+     */
+    private function formatAllDayAppointmentDate(string $value, int $timestamp, DateTimeZone $timezone): string
+    {
+        $date = DateTimeImmutable::createFromFormat('!Y-m-d', $value, $timezone);
+        $errors = DateTimeImmutable::getLastErrors();
+        if ($date !== false && ($errors === false || ($errors['warning_count'] === 0 && $errors['error_count'] === 0))) {
+            return $date->format('Y-m-d');
+        }
+
+        return $this->formatAppointmentDate($timestamp, $timezone);
+    }
+
+    /**
+     * Converts an all-day provider end boundary from exclusive to inclusive.
+     */
+    private function formatAllDayAppointmentEndDate(
+        string $value,
+        int $timestamp,
+        string $startDate,
+        DateTimeZone $timezone
+    ): string {
+        $endDate = $this->formatAllDayAppointmentDate($value, $timestamp, $timezone);
+        if ($endDate === '') {
+            return $startDate;
+        }
+        if ($startDate !== '' && $endDate <= $startDate) {
+            return $startDate;
+        }
+
+        return (new DateTimeImmutable($endDate, $timezone))->modify('-1 day')->format('Y-m-d');
     }
 
     /**
