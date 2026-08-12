@@ -557,11 +557,12 @@ class KalenderAnsicht extends IPSModuleStrict
      * label as startTime, an empty endTime and an inclusive visible end date.
      *
      * @param string $Date Local date in YYYY-MM-DD format.
+     * @param int $CalendarInstanceID Optional selected calendar instance ID. Zero includes all selected calendars.
      * @return string JSON-encoded compact appointment list.
      */
-    public function GetDayAppointmentsCompact(string $Date): string
+    public function GetDayAppointmentsCompact(string $Date, int $CalendarInstanceID = 0): string
     {
-        return $this->GetAppointmentsCompact($Date, $Date);
+        return $this->GetAppointmentsCompact($Date, $Date, $CalendarInstanceID);
     }
 
     /**
@@ -572,14 +573,16 @@ class KalenderAnsicht extends IPSModuleStrict
      *
      * @param string $From First local date in YYYY-MM-DD format.
      * @param string $To Last local date in YYYY-MM-DD format, inclusive.
+     * @param int $CalendarInstanceID Optional selected calendar instance ID. Zero includes all selected calendars.
      * @return string JSON-encoded compact appointment list.
      */
-    public function GetAppointmentsCompact(string $From, string $To): string
+    public function GetAppointmentsCompact(string $From, string $To, int $CalendarInstanceID = 0): string
     {
         [$rangeStart, $rangeEnd] = CalendarAppointmentRange::fromInclusiveDates($From, $To);
+        $appointments = $this->collectAppointmentsForRange($rangeStart, $rangeEnd);
 
         return json_encode(
-            $this->compactAppointments($this->collectAppointmentsForRange($rangeStart, $rangeEnd)),
+            $this->compactAppointments($this->filterAppointmentsByCalendarInstanceId($appointments, $CalendarInstanceID)),
             JSON_UNESCAPED_SLASHES
                 | JSON_UNESCAPED_UNICODE
                 | JSON_THROW_ON_ERROR
@@ -975,6 +978,27 @@ class KalenderAnsicht extends IPSModuleStrict
         );
 
         return $events;
+    }
+
+    /**
+     * Filters appointments by their selected Calendar instance ID.
+     *
+     * A zero ID keeps all appointments for backwards-compatible compact API calls.
+     * Any other ID only keeps appointments originating from that selected calendar.
+     *
+     * @param list<array<string, mixed>> $appointments Full normalized appointments.
+     * @return list<array<string, mixed>>
+     */
+    private function filterAppointmentsByCalendarInstanceId(array $appointments, int $CalendarInstanceID): array
+    {
+        if ($CalendarInstanceID === 0) {
+            return $appointments;
+        }
+
+        return array_values(array_filter(
+            $appointments,
+            static fn (array $appointment): bool => (int) ($appointment['calendarInstanceId'] ?? 0) === $CalendarInstanceID
+        ));
     }
 
     /**

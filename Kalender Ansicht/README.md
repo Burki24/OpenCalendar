@@ -207,8 +207,14 @@ $appointments = IPSKALVIEW_GetAppointments(12345, '2026-08-11', '2026-08-17');
 // Kompakte Tagesliste: summary, start, end, startTime und endTime.
 $appointments = IPSKALVIEW_GetDayAppointmentsCompact(12345, '2026-08-11');
 
+// Optional nur Termine einer ausgewählten Kalenderinstanz (z. B. ID 23456).
+$appointments = IPSKALVIEW_GetDayAppointmentsCompact(12345, '2026-08-11', 23456);
+
 // Kompakte Terminliste für einen inklusiven Datumsbereich.
 $appointments = IPSKALVIEW_GetAppointmentsCompact(12345, '2026-08-11', '2026-08-17');
+
+// Auch beim Datumsbereich kann optional nach Kalenderinstanz gefiltert werden.
+$appointments = IPSKALVIEW_GetAppointmentsCompact(12345, '2026-08-11', '2026-08-17', 23456);
 
 // Den aktuellen eigenständigen HTML-Inhalt für IPSView abrufen.
 $html = IPSKALVIEW_GetIPSViewHTML(12345);
@@ -245,7 +251,11 @@ lokale Datumswerte im Format `YYYY-MM-DD`. Bei zeitgebundenen Terminen enthalten
 `startTime` und `endTime` die lokale Uhrzeit im Format `HH:MM`. Ganztagstermine
 liefern die lokalisierte Bezeichnung `Ganztägig`/`All day` als `startTime`, einen
 leeren `endTime`-Wert und in `end` das sichtbare inklusive Enddatum statt der
-providerseitig technischen exklusiven Endgrenze.
+providerseitig technischen exklusiven Endgrenze. Als letztes optionales Argument
+kann bei beiden Compact-Funktionen die Instanz-ID eines in dieser Kalender Ansicht
+ausgewählten Kalenders angegeben werden. Der Standardwert `0` liefert wie bisher
+alle ausgewählten Kalender. Eine konkrete ID filtert ausschließlich auf diesen
+Kalender; eine nicht ausgewählte oder unbekannte ID liefert ein leeres JSON-Array.
 
 ## Technische Hinweise
 

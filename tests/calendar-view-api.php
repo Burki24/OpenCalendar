@@ -99,13 +99,13 @@ assertCalendarViewApi(
 );
 
 assertCalendarViewApi(
-    str_contains($moduleSource, 'public function GetDayAppointmentsCompact(string $Date): string')
-        && str_contains($moduleSource, 'return $this->GetAppointmentsCompact($Date, $Date);'),
+    str_contains($moduleSource, 'public function GetDayAppointmentsCompact(string $Date, int $CalendarInstanceID = 0): string')
+        && str_contains($moduleSource, 'return $this->GetAppointmentsCompact($Date, $Date, $CalendarInstanceID);'),
     'Calendar View must expose a compact provider-independent day appointment function.'
 );
 assertCalendarViewApi(
-    str_contains($moduleSource, 'public function GetAppointmentsCompact(string $From, string $To): string')
-        && str_contains($moduleSource, '$this->compactAppointments($this->collectAppointmentsForRange($rangeStart, $rangeEnd))'),
+    str_contains($moduleSource, 'public function GetAppointmentsCompact(string $From, string $To, int $CalendarInstanceID = 0): string')
+        && str_contains($moduleSource, '$this->filterAppointmentsByCalendarInstanceId($appointments, $CalendarInstanceID)'),
     'Calendar View must expose a compact provider-independent appointment range function.'
 );
 assertCalendarViewApi(
@@ -121,11 +121,20 @@ assertCalendarViewApi(
     'Compact appointment results must contain only script-friendly dates and readable local clock values.'
 );
 
+assertCalendarViewApi(
+    str_contains($moduleSource, 'private function filterAppointmentsByCalendarInstanceId(array $appointments, int $CalendarInstanceID): array')
+        && str_contains($moduleSource, 'if ($CalendarInstanceID === 0)')
+        && str_contains($moduleSource, '(int) ($appointment[\'calendarInstanceId\'] ?? 0) === $CalendarInstanceID'),
+    'Compact appointment APIs must optionally filter by selected calendar instance ID while zero keeps all calendars.'
+);
+
 require_once __DIR__ . '/stubs/ModuleStrictStubs.php';
 require_once __DIR__ . '/../Kalender Ansicht/module.php';
 
 $compactMethod = new ReflectionMethod(KalenderAnsicht::class, 'compactAppointments');
 $compactMethod->setAccessible(true);
+$filterMethod = new ReflectionMethod(KalenderAnsicht::class, 'filterAppointmentsByCalendarInstanceId');
+$filterMethod->setAccessible(true);
 $calendarView = new KalenderAnsicht(1);
 $previousTimezone = date_default_timezone_get();
 date_default_timezone_set('Europe/Berlin');
@@ -163,6 +172,24 @@ try {
 } finally {
     date_default_timezone_set($previousTimezone);
 }
+
+$filterSource = [
+    ['summary' => 'Calendar A', 'calendarInstanceId' => 111],
+    ['summary' => 'Calendar B', 'calendarInstanceId' => 222],
+    ['summary' => 'Calendar A second', 'calendarInstanceId' => 111]
+];
+assertCalendarViewApi(
+    $filterMethod->invoke($calendarView, $filterSource, 0) === $filterSource,
+    'Calendar instance ID zero must keep all compact appointments.'
+);
+assertCalendarViewApi(
+    $filterMethod->invoke($calendarView, $filterSource, 111) === [$filterSource[0], $filterSource[2]],
+    'A compact calendar filter must keep only appointments from the requested calendar instance.'
+);
+assertCalendarViewApi(
+    $filterMethod->invoke($calendarView, $filterSource, 999) === [],
+    'An unknown compact calendar filter must return an empty appointment list.'
+);
 
 assertCalendarViewApi(
     $compact[0] === [
