@@ -193,11 +193,11 @@ function renderAgenda() {
         const section = element('section', 'agenda-day');
         const heading = element('div', 'agenda-date');
         const strong = document.createElement('strong');
-        strong.textContent = relativeDay(group.date);
+        strong.textContent = new Intl.DateTimeFormat(undefined, { weekday: 'long' }).format(group.date);
         const fullDate = document.createElement('span');
         fullDate.textContent = formatDayHeading(
             group.date,
-            { weekday: 'long', day: '2-digit', month: 'long' },
+            { day: '2-digit', month: 'long' },
             calendarState.settings.showAgendaDayOfYear !== false,
             group.events.length,
             calendarState.settings.showAgendaEventCount !== false
@@ -1343,7 +1343,6 @@ function formatMonth(date) {
     return new Intl.DateTimeFormat(undefined, { month: 'long', year: 'numeric' }).format(date);
 }
 function formatRange(start, end) { return new Intl.DateTimeFormat(undefined, { day: '2-digit', month: 'short' }).format(start) + ' – ' + new Intl.DateTimeFormat(undefined, { day: '2-digit', month: 'short', year: 'numeric' }).format(end); }
-function relativeDay(date) { if (isToday(date)) return t('Today'); if (dayKey(date) === dayKey(addDays(new Date(), 1))) return t('Tomorrow'); if (dayKey(date) === dayKey(addDays(new Date(), -1))) return t('Yesterday'); return new Intl.DateTimeFormat(undefined, { weekday: 'long' }).format(date); }
 function safeColor(value) {
     if (/^#[0-9a-f]{6}$/i.test(value || '')) return value;
     return getComputedStyle(document.documentElement).getPropertyValue('--cal-accent').trim() || 'currentColor';

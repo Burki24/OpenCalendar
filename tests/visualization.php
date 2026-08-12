@@ -131,6 +131,14 @@ assertVisualization(
 );
 
 assertVisualization(
+    str_contains($script, 'strong.textContent = new Intl.DateTimeFormat(undefined, { weekday: \'long\' }).format(group.date);')
+        && str_contains($script, '{ day: \'2-digit\', month: \'long\' },')
+        && !str_contains($script, 'relativeDay(group.date)')
+        && !str_contains($script, 'function relativeDay(date)'),
+    'Agenda day headings must show the weekday without Today, Tomorrow or Yesterday prefixes.'
+);
+
+assertVisualization(
     str_contains($script, 'calendarState.settings.showAgendaEventCount !== false')
         && str_contains($script, 'calendarState.settings.showThreeDaysEventCount !== false')
         && str_contains($script, 'calendarState.settings.showWeekEventCount !== false')
