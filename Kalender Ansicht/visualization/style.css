@@ -36,7 +36,6 @@
     --cal-radius: var(--symc-radius-medium);
     --agenda-color-bar-width: 5px;
     --compact-color-bar-width: 3px;
-    --month-row-height: 105px;
 }
 
 * { box-sizing: border-box; }
@@ -317,13 +316,25 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .calendar-grid {
     display: grid;
     grid-template-columns: repeat(7, minmax(0, 1fr));
-    grid-template-rows: auto repeat(6, var(--month-row-height));
+    grid-template-rows: auto repeat(6, minmax(82px, 1fr));
     gap: 1px;
     min-width: 460px;
     overflow: hidden;
     border: var(--cal-border-width, 1px) solid var(--cal-border);
     border-radius: var(--cal-radius);
     background: var(--cal-border);
+}
+.month-section:only-child {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-height: 0;
+    margin-bottom: 0;
+}
+.month-section:only-child .calendar-grid {
+    flex: 1 1 auto;
+    min-height: 0;
+    grid-template-rows: auto repeat(6, minmax(0, 1fr));
 }
 .calendar-grid.hide-weekends { grid-template-columns: repeat(5, minmax(0, 1fr)); min-width: 360px; }
 .weekday {
@@ -338,7 +349,6 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .month-day {
     display: flex;
     flex-direction: column;
-    height: var(--month-row-height);
     min-height: 0;
     padding: 5px;
     overflow: hidden;
