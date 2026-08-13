@@ -224,6 +224,26 @@ $appointments = IPSKALVIEW_GetAppointmentsCompact(12345, '2026-08-11', '2026-08-
 // Auch beim Datumsbereich kann optional nach Kalenderinstanz gefiltert werden.
 $appointments = IPSKALVIEW_GetAppointmentsCompact(12345, '2026-08-11', '2026-08-17', 23456);
 
+// Anzahl der Termine eines Tages oder Datumsbereichs ermitteln.
+$count = IPSKALVIEW_GetDayAppointmentCount(12345, '2026-08-11');
+$count = IPSKALVIEW_GetAppointmentCount(12345, '2026-08-11', '2026-08-17');
+
+// Optional kann auch bei den Zählfunktionen nach Kalenderinstanz gefiltert werden.
+$count = IPSKALVIEW_GetDayAppointmentCount(12345, '2026-08-11', 23456);
+
+// Alle heute noch laufenden oder bevorstehenden Termine abrufen bzw. zählen.
+$appointments = IPSKALVIEW_GetRemainingDayAppointments(12345);
+$count = IPSKALVIEW_GetRemainingDayAppointmentCount(12345);
+
+// Den nächsten noch nicht begonnenen Termin abrufen.
+$appointment = IPSKALVIEW_GetNextAppointment(12345);
+
+// Alle aktuell laufenden Termine abrufen.
+$appointments = IPSKALVIEW_GetCurrentAppointments(12345);
+
+// Metadaten aller in dieser Ansicht ausgewählten Kalender abrufen.
+$calendars = IPSKALVIEW_GetSelectedCalendars(12345);
+
 // Den aktuellen eigenständigen HTML-Inhalt für IPSView abrufen.
 $html = IPSKALVIEW_GetIPSViewHTML(12345);
 ```
@@ -264,6 +284,28 @@ kann bei beiden Compact-Funktionen die Instanz-ID eines in dieser Kalender Ansic
 ausgewählten Kalenders angegeben werden. Der Standardwert `0` liefert wie bisher
 alle ausgewählten Kalender. Eine konkrete ID filtert ausschließlich auf diesen
 Kalender; eine nicht ausgewählte oder unbekannte ID liefert ein leeres JSON-Array.
+
+Für typische Symcon-Skripte stehen zusätzlich Komfortfunktionen zur Verfügung.
+`GetDayAppointmentCount()` und `GetAppointmentCount()` liefern direkt eine Zahl,
+ohne dass die Terminliste zuvor in PHP dekodiert werden muss. Beide akzeptieren
+optional eine ausgewählte Kalenderinstanz als Filter.
+
+`GetRemainingDayAppointments()` liefert alle Termine des heutigen Tages, die zum
+Abfragezeitpunkt noch nicht beendet sind. Laufende und ganztägige Termine werden
+dabei mit berücksichtigt. `GetRemainingDayAppointmentCount()` liefert für dieselbe
+Auswahl direkt die Anzahl. Auch diese beiden Funktionen können optional auf eine
+ausgewählte Kalenderinstanz eingeschränkt werden.
+
+`GetCurrentAppointments()` liefert ausschließlich Termine, die gerade laufen.
+`GetNextAppointment()` ist bewusst davon getrennt und liefert den nächsten noch
+nicht begonnenen Termin aus dem lokal synchronisierten Zukunftsbestand. Ist kein
+kommender Termin im Cache vorhanden, wird JSON `null` zurückgegeben. Beide
+Funktionen unterstützen ebenfalls den optionalen Kalenderfilter.
+
+`GetSelectedCalendars()` liefert die in der Instanz ausgewählten und aktivierten
+Kalender als JSON mit `instanceId`, `name`, `color` und `canWrite`. Der nur im
+Browser gesetzte temporäre Kalenderfilter verändert diese konfigurierte Auswahl
+nicht.
 
 ## Technische Hinweise
 

@@ -29,6 +29,7 @@ class KalenderAnsicht extends IPSModuleStrict
 
     private const CALENDAR_MODULE_ID = '{227B63E4-4223-316B-76E9-FD3849689562}';
     private const INITIALIZATION_DELAY_MS = 5_000;
+    private const APPOINTMENT_LOOKAHEAD_DAYS = 1095;
     private const ATTRIBUTE_IPSVIEW_TOKEN_1 = 'IPSViewToken1';
     private const ATTRIBUTE_IPSVIEW_TOKEN_2 = 'IPSViewToken2';
     private const ATTRIBUTE_IPSVIEW_TOKEN_3 = 'IPSViewToken3';
@@ -351,7 +352,7 @@ class KalenderAnsicht extends IPSModuleStrict
 
         $this->WriteAttributeBoolean('RuntimeReady', true);
         try {
-            $calendars = $this->getSelectedCalendars();
+            $calendars = $this->loadSelectedCalendars();
             foreach ($calendars as $calendar) {
                 $instanceId = $calendar['instanceId'];
                 $this->RegisterMessage($instanceId, OM_CHANGENAME);
@@ -589,6 +590,149 @@ class KalenderAnsicht extends IPSModuleStrict
 
         return json_encode(
             $this->compactAppointments($this->filterAppointmentsByCalendarInstanceId($appointments, $CalendarInstanceID)),
+            JSON_UNESCAPED_SLASHES
+                | JSON_UNESCAPED_UNICODE
+                | JSON_THROW_ON_ERROR
+        );
+    }
+
+    /**
+     * Counts appointments that overlap one inclusive local calendar day.
+     *
+     * @param string $Date Local date in YYYY-MM-DD format.
+     * @param int $CalendarInstanceID Optional selected calendar instance ID. Zero includes all selected calendars.
+     * @return int Number of matching appointments.
+     */
+    public function GetDayAppointmentCount(string $Date, int $CalendarInstanceID = 0): int
+    {
+        return $this->GetAppointmentCount($Date, $Date, $CalendarInstanceID);
+    }
+
+    /**
+     * Counts appointments that overlap an inclusive local date range.
+     *
+     * @param string $From First local date in YYYY-MM-DD format.
+     * @param string $To Last local date in YYYY-MM-DD format, inclusive.
+     * @param int $CalendarInstanceID Optional selected calendar instance ID. Zero includes all selected calendars.
+     * @return int Number of matching appointments.
+     */
+    public function GetAppointmentCount(string $From, string $To, int $CalendarInstanceID = 0): int
+    {
+        [$rangeStart, $rangeEnd] = CalendarAppointmentRange::fromInclusiveDates($From, $To);
+        $appointments = $this->collectAppointmentsForRange($rangeStart, $rangeEnd);
+
+        return count($this->filterAppointmentsByCalendarInstanceId($appointments, $CalendarInstanceID));
+    }
+
+    /**
+     * Returns today's appointments that have not ended yet.
+     *
+     * Appointments currently in progress and all-day appointments are included.
+     * Appointments that already ended are omitted.
+     *
+     * @param int $CalendarInstanceID Optional selected calendar instance ID. Zero includes all selected calendars.
+     * @return string JSON-encoded appointment list.
+     */
+    public function GetRemainingDayAppointments(int $CalendarInstanceID = 0): string
+    {
+        $now = new DateTimeImmutable('now');
+        [$rangeStart, $rangeEnd] = CalendarAppointmentRange::fromInclusiveDates(
+            $now->format('Y-m-d'),
+            $now->format('Y-m-d')
+        );
+        $appointments = $this->collectAppointmentsForRange($rangeStart, $rangeEnd);
+        $appointments = $this->filterAppointmentsByCalendarInstanceId($appointments, $CalendarInstanceID);
+
+        return $this->encodeAppointmentList(
+            $this->filterRemainingAppointments($appointments, $now->getTimestamp())
+        );
+    }
+
+    /**
+     * Counts today's appointments that have not ended yet.
+     *
+     * Appointments currently in progress and all-day appointments are included.
+     * Appointments that already ended are omitted.
+     *
+     * @param int $CalendarInstanceID Optional selected calendar instance ID. Zero includes all selected calendars.
+     * @return int Number of remaining appointments today.
+     */
+    public function GetRemainingDayAppointmentCount(int $CalendarInstanceID = 0): int
+    {
+        $now = new DateTimeImmutable('now');
+        [$rangeStart, $rangeEnd] = CalendarAppointmentRange::fromInclusiveDates(
+            $now->format('Y-m-d'),
+            $now->format('Y-m-d')
+        );
+        $appointments = $this->collectAppointmentsForRange($rangeStart, $rangeEnd);
+        $appointments = $this->filterAppointmentsByCalendarInstanceId($appointments, $CalendarInstanceID);
+
+        return count($this->filterRemainingAppointments($appointments, $now->getTimestamp()));
+    }
+
+    /**
+     * Returns the next appointment that has not started yet.
+     *
+     * Currently running appointments are intentionally excluded and can be queried with
+     * GetCurrentAppointments(). The search covers the maximum synchronized future range
+     * supported by Calendar instances. If no upcoming appointment is cached, JSON null is returned.
+     *
+     * @param int $CalendarInstanceID Optional selected calendar instance ID. Zero includes all selected calendars.
+     * @return string JSON-encoded appointment object or null.
+     */
+    public function GetNextAppointment(int $CalendarInstanceID = 0): string
+    {
+        $now = new DateTimeImmutable('now');
+        $today = $now->format('Y-m-d');
+        $lastDay = $now->modify('+' . self::APPOINTMENT_LOOKAHEAD_DAYS . ' days')->format('Y-m-d');
+        [$rangeStart, $rangeEnd] = CalendarAppointmentRange::fromInclusiveDates($today, $lastDay);
+        $appointments = $this->collectAppointmentsForRange($rangeStart, $rangeEnd);
+        $appointments = $this->filterAppointmentsByCalendarInstanceId($appointments, $CalendarInstanceID);
+
+        return json_encode(
+            $this->findNextAppointment($appointments, $now->getTimestamp()),
+            JSON_UNESCAPED_SLASHES
+                | JSON_UNESCAPED_UNICODE
+                | JSON_PRESERVE_ZERO_FRACTION
+                | JSON_THROW_ON_ERROR
+        );
+    }
+
+    /**
+     * Returns appointments that are in progress right now.
+     *
+     * All-day appointments covering the current day are considered current.
+     *
+     * @param int $CalendarInstanceID Optional selected calendar instance ID. Zero includes all selected calendars.
+     * @return string JSON-encoded appointment list.
+     */
+    public function GetCurrentAppointments(int $CalendarInstanceID = 0): string
+    {
+        $now = new DateTimeImmutable('now');
+        [$rangeStart, $rangeEnd] = CalendarAppointmentRange::fromInclusiveDates(
+            $now->format('Y-m-d'),
+            $now->format('Y-m-d')
+        );
+        $appointments = $this->collectAppointmentsForRange($rangeStart, $rangeEnd);
+        $appointments = $this->filterAppointmentsByCalendarInstanceId($appointments, $CalendarInstanceID);
+
+        return $this->encodeAppointmentList(
+            $this->filterCurrentAppointments($appointments, $now->getTimestamp())
+        );
+    }
+
+    /**
+     * Returns the calendar instances selected and enabled in this Calendar View.
+     *
+     * The result contains instanceId, name, color and canWrite for each selected calendar.
+     * Client-side temporary calendar filters do not alter this configured selection.
+     *
+     * @return string JSON-encoded selected calendar list.
+     */
+    public function GetSelectedCalendars(): string
+    {
+        return json_encode(
+            $this->loadSelectedCalendars(),
             JSON_UNESCAPED_SLASHES
                 | JSON_UNESCAPED_UNICODE
                 | JSON_THROW_ON_ERROR
@@ -919,7 +1063,7 @@ class KalenderAnsicht extends IPSModuleStrict
             return $this->emptyState();
         }
 
-        $calendars = $this->getSelectedCalendars();
+        $calendars = $this->loadSelectedCalendars();
         $events = [];
         $pastDays = max(0, min(1095, $this->ReadPropertyInteger('PastDays')));
         $futureDays = max(1, min(1095, $this->ReadPropertyInteger('FutureDays')));
@@ -977,7 +1121,7 @@ class KalenderAnsicht extends IPSModuleStrict
         DateTimeImmutable $rangeEnd
     ): array {
         $events = [];
-        foreach ($this->getSelectedCalendars() as $calendar) {
+        foreach ($this->loadSelectedCalendars() as $calendar) {
             $calendarEvents = $this->readCalendarEventsForRange(
                 $calendar['instanceId'],
                 $rangeStart->getTimestamp(),
@@ -1027,6 +1171,89 @@ class KalenderAnsicht extends IPSModuleStrict
             $appointments,
             static fn (array $appointment): bool => (int) ($appointment['calendarInstanceId'] ?? 0) === $CalendarInstanceID
         ));
+    }
+
+    /**
+     * Keeps appointments that have not ended at the supplied timestamp.
+     *
+     * @param list<array<string, mixed>> $appointments Full normalized appointments.
+     * @return list<array<string, mixed>>
+     */
+    private function filterRemainingAppointments(array $appointments, int $now): array
+    {
+        return array_values(array_filter(
+            $appointments,
+            fn (array $appointment): bool => $this->appointmentEndTimestamp($appointment) > $now
+        ));
+    }
+
+    /**
+     * Keeps appointments that are in progress at the supplied timestamp.
+     *
+     * @param list<array<string, mixed>> $appointments Full normalized appointments.
+     * @return list<array<string, mixed>>
+     */
+    private function filterCurrentAppointments(array $appointments, int $now): array
+    {
+        return array_values(array_filter(
+            $appointments,
+            fn (array $appointment): bool => (int) ($appointment['startTimestamp'] ?? 0) > 0
+                && (int) ($appointment['startTimestamp'] ?? 0) <= $now
+                && $this->appointmentEndTimestamp($appointment) > $now
+        ));
+    }
+
+    /**
+     * Finds the first appointment whose start is still in the future.
+     *
+     * @param list<array<string, mixed>> $appointments Chronologically sorted normalized appointments.
+     * @return array<string, mixed>|null
+     */
+    private function findNextAppointment(array $appointments, int $now): ?array
+    {
+        foreach ($appointments as $appointment) {
+            if ((int) ($appointment['startTimestamp'] ?? 0) > $now) {
+                return $appointment;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Returns a safe exclusive end timestamp for appointment state comparisons.
+     *
+     * Zero-duration appointments are treated as one-second events, matching the
+     * overlap semantics of CalendarAppointmentRange.
+     *
+     * @param array<string, mixed> $appointment Full normalized appointment.
+     */
+    private function appointmentEndTimestamp(array $appointment): int
+    {
+        $startTimestamp = (int) ($appointment['startTimestamp'] ?? 0);
+        if ($startTimestamp <= 0) {
+            return 0;
+        }
+
+        $endTimestamp = (int) ($appointment['endTimestamp'] ?? $startTimestamp);
+
+        return $endTimestamp > $startTimestamp ? $endTimestamp : $startTimestamp + 1;
+    }
+
+    /**
+     * Encodes a full provider-independent appointment list for PHP callers.
+     *
+     * @param list<array<string, mixed>> $appointments Full normalized appointments.
+     */
+    private function encodeAppointmentList(array $appointments): string
+    {
+        return json_encode(
+            $appointments,
+            JSON_UNESCAPED_SLASHES
+                | JSON_UNESCAPED_UNICODE
+                | JSON_PRESERVE_ZERO_FRACTION
+                | JSON_THROW_ON_ERROR
+        );
     }
 
     /**
@@ -1277,7 +1504,7 @@ class KalenderAnsicht extends IPSModuleStrict
     /**
      * @return list<array{instanceId: int, name: string, color: string, canWrite: bool}>
      */
-    private function getSelectedCalendars(): array
+    private function loadSelectedCalendars(): array
     {
         $configuration = $this->effectiveCalendarConfiguration();
 
@@ -1543,7 +1770,7 @@ class KalenderAnsicht extends IPSModuleStrict
     private function synchronizeSelectedCalendars(): bool
     {
         $success = true;
-        foreach ($this->getSelectedCalendars() as $calendar) {
+        foreach ($this->loadSelectedCalendars() as $calendar) {
             if (!IPSKAL_Synchronize($calendar['instanceId'])) {
                 $success = false;
             }
@@ -1634,7 +1861,7 @@ class KalenderAnsicht extends IPSModuleStrict
     private function requireWritableCalendar(array $request): int
     {
         $instanceId = (int) ($request['calendarInstanceId'] ?? 0);
-        foreach ($this->getSelectedCalendars() as $calendar) {
+        foreach ($this->loadSelectedCalendars() as $calendar) {
             if ($calendar['instanceId'] === $instanceId && $calendar['canWrite']) {
                 return $instanceId;
             }
