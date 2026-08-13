@@ -524,10 +524,19 @@ function createMonthGrid(month, showOutsideDetails) {
             cell.appendChild(eventList);
             monthEventData.set(eventList, { day, events });
             renderMonthEventPreview(eventList, day, events);
+            bindMonthDayOverview(cell, day, events);
         }
         grid.appendChild(cell);
     });
     return grid;
+}
+
+function bindMonthDayOverview(cell, day, events) {
+    cell.classList.add('month-day-overview-enabled');
+    cell.addEventListener('click', clickEvent => {
+        if (clickEvent.target.closest?.('button, a, input, select, textarea, label')) return;
+        openDayEvents(day, events);
+    });
 }
 
 function renderMonthEventPreview(container, day, events) {

@@ -366,6 +366,8 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 }
 .month-day.outside { opacity: var(--cal-disabled-opacity); }
 .month-day.today { box-shadow: inset 0 0 0 max(2px, var(--cal-border-width)) var(--cal-accent); }
+.month-day.month-day-overview-enabled { cursor: pointer; }
+.month-day.month-day-overview-enabled:hover .day-number { color: var(--cal-accent); }
 .month-day-header { display: flex; align-items: flex-start; gap: 4px; margin-bottom: 4px; }
 .month-week-number { padding-top: 1px; color: var(--cal-muted); font-size: .56em; font-weight: 650; white-space: nowrap; }
 .month-day-date { min-width: 0; margin-left: auto; line-height: 1.05; text-align: right; }

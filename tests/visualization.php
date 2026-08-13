@@ -125,9 +125,13 @@ assertVisualization(
 assertVisualization(
     str_contains($script, 'function openDayEvents(day, events)')
         && str_contains($script, "more.addEventListener('click', () => openDayEvents(day, events));")
+        && str_contains($script, 'bindMonthDayOverview(cell, day, events);')
+        && str_contains($script, "cell.classList.add('month-day-overview-enabled');")
+        && str_contains($script, "clickEvent.target.closest?.('button, a, input, select, textarea, label')")
+        && str_contains($script, 'openDayEvents(day, events);')
         && str_contains($script, 'dayEventsDialog.showModal();')
         && str_contains($script, 'openEventDetails(event);'),
-    'The month view must open a day-events modal from the additional-events indicator and route selected events to the details modal.'
+    'The month view must open the day-events modal from the day cell or additional-events indicator without intercepting event buttons.'
 );
 
 assertVisualization(
