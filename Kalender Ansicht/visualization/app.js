@@ -178,11 +178,10 @@ function renderAgenda() {
     const rangeEnd = addDays(rangeStart, viewPeriod('agenda'));
     const events = visibleCalendarEvents().filter(event => eventOverlaps(event, rangeStart, rangeEnd));
     const groups = new Map();
-    events.forEach(event => {
-        const date = eventStart(event);
-        const key = dayKey(date);
-        if (!groups.has(key)) groups.set(key, { date: startOfDay(date), events: [] });
-        groups.get(key).events.push(event);
+    dailyViewEntries(events, rangeStart, rangeEnd).forEach(entry => {
+        const key = dayKey(entry.date);
+        if (!groups.has(key)) groups.set(key, { date: startOfDay(entry.date), events: [] });
+        groups.get(key).events.push(entry.event);
     });
     if (groups.size === 0) {
         renderEmpty('No events', 'There are no events in this period.');
@@ -252,7 +251,8 @@ function renderList() {
     const rangeStart = startOfDay(cursorDate);
     const rangeEnd = addDays(rangeStart, viewPeriod('list'));
     const events = visibleCalendarEvents().filter(event => eventOverlaps(event, rangeStart, rangeEnd));
-    if (events.length === 0) {
+    const entries = dailyViewEntries(events, rangeStart, rangeEnd);
+    if (entries.length === 0) {
         renderEmpty('No events', 'There are no events in this period.');
         return;
     }
@@ -277,7 +277,8 @@ function renderList() {
     table.appendChild(head);
 
     const body = document.createElement('tbody');
-    events.forEach(event => {
+    entries.forEach(entry => {
+        const event = entry.event;
         const row = document.createElement('tr');
         row.className = 'list-row';
         row.tabIndex = 0;
@@ -293,7 +294,7 @@ function renderList() {
         columns.forEach(column => {
             const cell = document.createElement('td');
             cell.className = `list-cell list-cell-${column.key}`;
-            cell.textContent = column.value(event);
+            cell.textContent = column.value(event, entry.date);
             row.appendChild(cell);
         });
         body.appendChild(row);
@@ -309,24 +310,27 @@ function listColumns() {
         columns.push({
             key: 'calendar-week',
             label: 'CW',
-            value: event => String(isoWeekNumber(eventStart(event)))
+            value: (event, displayDate) => String(isoWeekNumber(displayDate || eventStart(event)))
         });
     }
     if (calendarState.settings.showListDate !== false) {
         columns.push({
             key: 'date',
             label: 'Date',
-            value: event => new Intl.DateTimeFormat(
+            value: (event, displayDate) => new Intl.DateTimeFormat(
                 undefined,
                 { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' }
-            ).format(eventStart(event))
+            ).format(displayDate || eventStart(event))
         });
     }
     if (calendarState.settings.showListDayOfYear === true) {
         columns.push({
             key: 'day-of-year',
             label: 'Day',
-            value: event => `${dayOfYear(eventStart(event))}/${daysInYear(eventStart(event))}`
+            value: (event, displayDate) => {
+                const date = displayDate || eventStart(event);
+                return `${dayOfYear(date)}/${daysInYear(date)}`;
+            }
         });
     }
     if (calendarState.settings.showListStart !== false) {
@@ -671,6 +675,28 @@ function calendarFilterActive() {
 function visibleCalendarEvents() {
     if (!calendarFilterActive()) return calendarState.events;
     return calendarState.events.filter(event => visibleCalendarIds.has(Number(event.calendarInstanceId)));
+}
+
+function dailyViewEntries(events, rangeStart, rangeEnd) {
+    const entries = [];
+    events.forEach(event => {
+        if (!event.allDay) {
+            const date = eventStart(event);
+            entries.push({ event, date: date < rangeStart ? startOfDay(rangeStart) : date });
+            return;
+        }
+
+        let day = eventStart(event);
+        const end = eventEnd(event);
+        if (day < rangeStart) day = startOfDay(rangeStart);
+        while (day < end && day < rangeEnd) {
+            entries.push({ event, date: startOfDay(day) });
+            day = addDays(day, 1);
+        }
+    });
+    entries.sort((left, right) => left.date.getTime() - right.date.getTime()
+        || compareEventsForDisplay(left.event, right.event));
+    return entries;
 }
 
 function updateCalendarFilterButton() {

@@ -493,11 +493,46 @@ final class MicrosoftCalendarProvider implements CalendarProviderInterface
 
     private function timezone(string $name): DateTimeZone
     {
-        try {
-            return new DateTimeZone($name !== '' ? $name : 'UTC');
-        } catch (Throwable) {
+        $name = trim($name);
+        if ($name === '') {
             return new DateTimeZone('UTC');
         }
+
+        try {
+            return new DateTimeZone($name);
+        } catch (Throwable) {
+            $ianaName = $this->windowsTimezoneToIana($name);
+            if ($ianaName !== '') {
+                return new DateTimeZone($ianaName);
+            }
+            return new DateTimeZone('UTC');
+        }
+    }
+
+    private function windowsTimezoneToIana(string $name): string
+    {
+        $timezones = [
+            'GMT Standard Time'              => 'Europe/London',
+            'W. Europe Standard Time'        => 'Europe/Berlin',
+            'Central Europe Standard Time'   => 'Europe/Budapest',
+            'Romance Standard Time'          => 'Europe/Paris',
+            'Central European Standard Time' => 'Europe/Warsaw',
+            'GTB Standard Time'              => 'Europe/Bucharest',
+            'FLE Standard Time'              => 'Europe/Kyiv',
+            'Turkey Standard Time'           => 'Europe/Istanbul',
+            'Russian Standard Time'          => 'Europe/Moscow',
+            'Eastern Standard Time'          => 'America/New_York',
+            'Central Standard Time'          => 'America/Chicago',
+            'Mountain Standard Time'         => 'America/Denver',
+            'Pacific Standard Time'          => 'America/Los_Angeles',
+            'Tokyo Standard Time'            => 'Asia/Tokyo',
+            'China Standard Time'            => 'Asia/Shanghai',
+            'India Standard Time'            => 'Asia/Kolkata',
+            'AUS Eastern Standard Time'      => 'Australia/Sydney',
+            'New Zealand Standard Time'      => 'Pacific/Auckland'
+        ];
+
+        return $timezones[$name] ?? '';
     }
 
     /**

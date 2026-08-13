@@ -149,6 +149,15 @@ assertVisualization(
 );
 
 assertVisualization(
+    str_contains($script, 'function dailyViewEntries(events, rangeStart, rangeEnd)')
+        && substr_count($script, 'dailyViewEntries(events, rangeStart, rangeEnd)') >= 3
+        && str_contains($script, 'while (day < end && day < rangeEnd)')
+        && str_contains($script, 'entries.push({ event, date: startOfDay(day) });')
+        && str_contains($script, 'cell.textContent = column.value(event, entry.date);'),
+    'Agenda and list views must expand multi-day all-day events to every visible day in their range.'
+);
+
+assertVisualization(
     str_contains($script, 'calendarState.settings.showAgendaEventCount !== false')
         && str_contains($script, 'calendarState.settings.showThreeDaysEventCount !== false')
         && str_contains($script, 'calendarState.settings.showWeekEventCount !== false')
