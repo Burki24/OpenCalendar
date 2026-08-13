@@ -121,6 +121,7 @@
             "The event was created in the target calendar, but could not be deleted from the source calendar. Please check both calendars.": "Der Termin wurde im Zielkalender erstellt, konnte aber nicht aus dem Quellkalender gelöscht werden. Bitte prüfen Sie beide Kalender.",
             "Day events": "Termine des Tages",
             "Events on": "Termine am",
+            "Create event on this day": "Termin an diesem Tag erstellen",
             "Filter calendars": "Kalender filtern",
             "Select all": "Alle auswählen",
             "Select none": "Keine auswählen",

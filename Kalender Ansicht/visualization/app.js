@@ -32,6 +32,7 @@ let visibleCalendarIds = null;
 let pendingCalendarFilterIds = new Set();
 let toastTimer = null;
 let monthLayoutFrame = null;
+let selectedDayEventsDate = null;
 const monthEventData = new WeakMap();
 
 const content = document.getElementById('calendar-content');
@@ -595,10 +596,19 @@ function createMoreEventsButton(day, events, hiddenCount) {
 
 
 function openDayEvents(day, events) {
+    selectedDayEventsDate = startOfDay(day);
     document.getElementById('day-events-dialog-title').textContent = formatDayEventsTitle(day);
+    const visibleEvents = [...events].sort(compareEventsForDisplay);
+    const count = visibleEvents.length;
+    document.getElementById('day-events-count').textContent = `${count} ${t(count === 1 ? 'Event' : 'Events')}`;
+
+    const createButton = document.getElementById('day-events-create-button');
+    const canCreate = hasActionBridge() && calendarState.calendars.some(calendar => calendar.canWrite);
+    createButton.classList.toggle('hidden', !canCreate);
+
     const list = document.getElementById('day-events-list');
     list.replaceChildren();
-    events.forEach(event => {
+    visibleEvents.forEach(event => {
         const item = element('button', 'day-event-item');
         item.type = 'button';
         item.style.setProperty('--event-color', safeColor(event.calendarColor));
@@ -627,7 +637,7 @@ function compareEventsForDisplay(left, right) {
 }
 
 function formatDayEventsTitle(day) {
-    return `${t('Events on')} ${new Intl.DateTimeFormat(undefined, { dateStyle: 'full' }).format(day)}`;
+    return new Intl.DateTimeFormat(undefined, { dateStyle: 'full' }).format(day);
 }
 
 function renderEmpty(title, description) {
@@ -762,7 +772,7 @@ function applyCalendarFilter() {
     render();
 }
 
-function openNewEvent() {
+function openNewEvent(preferredDay = null) {
     const writable = calendarState.calendars.filter(calendar => calendar.canWrite);
     if (!writable.length) return;
     selectedEvent = null;
@@ -772,9 +782,26 @@ function openNewEvent() {
     document.getElementById('event-location').value = '';
     document.getElementById('event-description').value = '';
     document.getElementById('event-all-day').checked = false;
-    const start = new Date(Math.max(Date.now(), cursorDate.getTime()));
-    start.setMinutes(0, 0, 0);
-    start.setHours(start.getHours() + 1);
+    let start;
+    if (preferredDay instanceof Date && !Number.isNaN(preferredDay.getTime())) {
+        start = startOfDay(preferredDay);
+        const today = startOfDay(new Date());
+        if (dayKey(start) === dayKey(today)) {
+            start = new Date();
+            start.setMinutes(0, 0, 0);
+            start.setHours(start.getHours() + 1);
+            if (dayKey(start) !== dayKey(today)) {
+                start = startOfDay(preferredDay);
+                start.setHours(23, 0, 0, 0);
+            }
+        } else {
+            start.setHours(9, 0, 0, 0);
+        }
+    } else {
+        start = new Date(Math.max(Date.now(), cursorDate.getTime()));
+        start.setMinutes(0, 0, 0);
+        start.setHours(start.getHours() + 1);
+    }
     const end = new Date(start.getTime() + 60 * 60 * 1000);
     setDateInputs(start, end, false);
     setDialogEditable(true);
@@ -1190,6 +1217,11 @@ deleteConfirmDialog.addEventListener('close', () => {
 });
 document.getElementById('day-events-close').addEventListener('click', () => dayEventsDialog.close());
 document.getElementById('day-events-close-button').addEventListener('click', () => dayEventsDialog.close());
+document.getElementById('day-events-create-button').addEventListener('click', () => {
+    const day = selectedDayEventsDate;
+    dayEventsDialog.close();
+    if (day) openNewEvent(day);
+});
 document.getElementById('dialog-close').addEventListener('click', () => eventDialog.close());
 document.getElementById('cancel-button').addEventListener('click', () => eventDialog.close());
 document.getElementById('add-button').addEventListener('click', openNewEvent);
@@ -1479,6 +1511,7 @@ function applyStaticTranslations() {
         ['details-edit-button', 'Edit'],
         ['delete-confirm-cancel', 'Cancel'],
         ['delete-confirm-button', 'Delete'],
+        ['day-events-create-button', 'Create event on this day'],
         ['day-events-close-button', 'Close'],
         ['calendar-filter-all', 'Select all'],
         ['calendar-filter-none', 'Select none'],

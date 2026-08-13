@@ -403,6 +403,22 @@ assertVisualization(
 );
 
 assertVisualization(
+    str_contains($indexSource, 'id="day-events-count"')
+        && str_contains($indexSource, 'id="day-events-create-button"')
+        && str_contains($script, 'const visibleEvents = [...events].sort(compareEventsForDisplay);')
+        && str_contains($script, 'function openNewEvent(preferredDay = null)')
+        && str_contains($script, 'if (day) openNewEvent(day);')
+        && str_contains($script, 'calendarState.calendars.some(calendar => calendar.canWrite)')
+        && str_contains($moduleSource, '\'Create event on this day\'')
+        && str_contains($moduleSource, '\'New event\'')
+        && str_contains($moduleSource, '\'Edit event\'')
+        && str_contains($moduleSource, '\'Edit\'')
+        && str_contains($moduleSource, '\'Filter calendars\'')
+        && str_contains($moduleSource, '\'Select all\''),
+    'The month day overview must sort its events, show the event count and allow creating an event directly for the selected day when a writable calendar is available.'
+);
+
+assertVisualization(
     str_contains($script, "activeView === 'list'")
         && str_contains($script, "list: 'List'")
         && str_contains($formSource, '"caption": "List"')

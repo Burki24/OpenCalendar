@@ -695,6 +695,8 @@ html.ipsview-mode .danger-button { min-height: 48px; padding-inline: 18px; }
 .calendar-filter-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .day-events-body { gap: 8px; }
+.day-events-count { color: var(--cal-muted); font-size: .76em; font-weight: 600; }
+.day-events-create-button::before { content: '＋'; margin-right: 5px; }
 .day-events-list { display: grid; gap: 6px; }
 .day-event-item { display: grid; grid-template-columns: minmax(70px, auto) minmax(0, 1fr); gap: 8px 12px; align-items: center; width: 100%; padding: 8px 10px; border: var(--cal-border-width, 1px) solid var(--cal-border); border-left: var(--compact-color-bar-width) solid var(--event-color); border-radius: var(--cal-radius); background: color-mix(in srgb, var(--event-color) 12%, var(--cal-surface)); color: var(--cal-text); text-align: left; }
 .day-event-item:hover, .day-event-item:focus-visible { background: color-mix(in srgb, var(--event-color) 20%, var(--cal-surface-hover)); }
