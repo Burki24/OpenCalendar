@@ -378,11 +378,28 @@ assertVisualization(
     str_contains($indexSource, 'id="event-dialog" class="oc-dialog oc-dialog-large"')
         && str_contains($indexSource, 'id="event-form" class="dialog-layout"')
         && str_contains($indexSource, 'id="event-details-dialog" class="oc-dialog oc-dialog-medium event-details-dialog"')
+        && str_contains($indexSource, 'id="delete-confirm-dialog" class="oc-dialog oc-dialog-small delete-confirm-dialog"')
         && str_contains($indexSource, 'id="day-events-dialog" class="oc-dialog oc-dialog-large day-events-dialog"')
         && str_contains($indexSource, 'id="calendar-filter-dialog" class="oc-dialog oc-dialog-medium calendar-filter-dialog"')
-        && substr_count($indexSource, 'class="icon-button dialog-close-button"') === 4
-        && substr_count($indexSource, 'class="dialog-actions-end"') === 4,
+        && substr_count($indexSource, 'class="icon-button dialog-close-button"') === 5
+        && substr_count($indexSource, 'class="dialog-actions-end"') === 5,
     'All calendar dialogs must use the shared OpenCalendar modal structure and action layout.'
+);
+
+assertVisualization(
+    str_contains($indexSource, 'id="delete-confirm-summary"')
+        && str_contains($indexSource, 'id="delete-confirm-period"')
+        && str_contains($indexSource, 'id="delete-confirm-question"')
+        && str_contains($script, 'function requestDelete(sourceDialog)')
+        && str_contains($script, 'function confirmDeleteEvent()')
+        && str_contains($script, 'requestDelete(eventDialog)')
+        && str_contains($script, 'requestDelete(eventDetailsDialog)')
+        && str_contains($script, 'deleteConfirmButton.addEventListener(\'click\', confirmDeleteEvent)')
+        && !str_contains($script, 'confirm(')
+        && str_contains($moduleSource, '\'Delete event\'')
+        && str_contains($moduleSource, '\'Do you really want to delete this event?\'')
+        && !str_contains($moduleSource, '\'Delete this event?\''),
+    'Deleting an event must use the styled OpenCalendar confirmation modal from both details and edit dialogs instead of the native browser confirmation.'
 );
 
 assertVisualization(
@@ -516,6 +533,11 @@ foreach ([$native, $ipsView] as $html) {
         str_contains($html, 'id="day-events-dialog"')
             && str_contains($html, 'id="day-events-list"'),
         'The rendered visualization must include the day-events modal markup.'
+    );
+    assertVisualization(
+        str_contains($html, 'id="delete-confirm-dialog"')
+            && str_contains($html, 'id="delete-confirm-button"'),
+        'The rendered visualization must include the styled delete-confirmation modal.'
     );
     assertVisualization(
         str_contains($html, 'id="event-calendar-options" role="listbox"')

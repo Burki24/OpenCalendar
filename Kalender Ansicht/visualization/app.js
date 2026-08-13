@@ -27,6 +27,7 @@ let activeView = 'agenda';
 let cursorDate = startOfDay(new Date());
 let initialized = false;
 let selectedEvent = null;
+let deleteSourceDialog = null;
 let visibleCalendarIds = null;
 let pendingCalendarFilterIds = new Set();
 let toastTimer = null;
@@ -37,6 +38,8 @@ const content = document.getElementById('calendar-content');
 const periodTitle = document.getElementById('period-title');
 const eventDialog = document.getElementById('event-dialog');
 const eventDetailsDialog = document.getElementById('event-details-dialog');
+const deleteConfirmDialog = document.getElementById('delete-confirm-dialog');
+const deleteConfirmButton = document.getElementById('delete-confirm-button');
 const eventForm = document.getElementById('event-form');
 const eventCalendarInput = document.getElementById('event-calendar');
 const eventCalendarPicker = document.getElementById('event-calendar-picker');
@@ -813,6 +816,54 @@ function openEventDetails(event) {
     eventDetailsDialog.showModal();
 }
 
+function requestDelete(sourceDialog) {
+    if (!selectedEvent || !eventIsEditable(selectedEvent)) return;
+    deleteSourceDialog = sourceDialog;
+    document.getElementById('delete-confirm-summary').textContent = selectedEvent.summary || t('Untitled event');
+    document.getElementById('delete-confirm-period').textContent = formatDeleteEventPeriod(selectedEvent);
+    deleteConfirmDialog.showModal();
+}
+
+function formatDeleteEventPeriod(event) {
+    const start = eventStart(event);
+    const end = eventEnd(event);
+    if (event.allDay) {
+        const displayEnd = end > start ? addDays(end, -1) : start;
+        const dateRange = dayKey(displayEnd) === dayKey(start)
+            ? formatDetailDate(start)
+            : `${formatDetailDate(start)} – ${formatDetailDate(displayEnd)}`;
+        return `${dateRange} · ${t('All day')}`;
+    }
+    return `${formatDetailDateTime(start)} – ${formatDetailDateTime(end)}`;
+}
+
+async function confirmDeleteEvent() {
+    if (!selectedEvent || !eventIsEditable(selectedEvent)) {
+        deleteConfirmDialog.close();
+        return;
+    }
+
+    const event = selectedEvent;
+    const sourceDialog = deleteSourceDialog;
+    deleteConfirmButton.disabled = true;
+    try {
+        const success = await sendAction('DeleteEvent', {
+            calendarInstanceId: event.calendarInstanceId,
+            event: {
+                resourceUrl: event.resourceUrl,
+                etag: event.etag,
+                recurrenceId: event.recurrenceId || ''
+            }
+        });
+        if (success) {
+            deleteConfirmDialog.close();
+            sourceDialog?.close();
+        }
+    } finally {
+        deleteConfirmButton.disabled = false;
+    }
+}
+
 function eventIsEditable(event) {
     return hasActionBridge() && Boolean(event.canWrite) && !event.recurring && !event.recurrenceId;
 }
@@ -1081,20 +1132,7 @@ eventForm.addEventListener('submit', async event => {
     }
 });
 
-document.getElementById('delete-button').addEventListener('click', async () => {
-    if (!selectedEvent || !confirm(t('Delete this event?'))) return;
-    const success = await sendAction('DeleteEvent', {
-        calendarInstanceId: selectedEvent.calendarInstanceId,
-        event: {
-            resourceUrl: selectedEvent.resourceUrl,
-            etag: selectedEvent.etag,
-            recurrenceId: selectedEvent.recurrenceId || ''
-        }
-    });
-    if (success) {
-        eventDialog.close();
-    }
-});
+document.getElementById('delete-button').addEventListener('click', () => requestDelete(eventDialog));
 
 document.getElementById('event-start').addEventListener('change', updateEndFromStart);
 
@@ -1143,17 +1181,12 @@ document.getElementById('details-edit-button').addEventListener('click', () => {
     eventDetailsDialog.close();
     openExistingEvent(event);
 });
-document.getElementById('details-delete-button').addEventListener('click', async () => {
-    if (!selectedEvent || !eventIsEditable(selectedEvent) || !confirm(t('Delete this event?'))) return;
-    const success = await sendAction('DeleteEvent', {
-        calendarInstanceId: selectedEvent.calendarInstanceId,
-        event: {
-            resourceUrl: selectedEvent.resourceUrl,
-            etag: selectedEvent.etag,
-            recurrenceId: selectedEvent.recurrenceId || ''
-        }
-    });
-    if (success) eventDetailsDialog.close();
+document.getElementById('details-delete-button').addEventListener('click', () => requestDelete(eventDetailsDialog));
+document.getElementById('delete-confirm-close').addEventListener('click', () => deleteConfirmDialog.close());
+document.getElementById('delete-confirm-cancel').addEventListener('click', () => deleteConfirmDialog.close());
+deleteConfirmButton.addEventListener('click', confirmDeleteEvent);
+deleteConfirmDialog.addEventListener('close', () => {
+    deleteSourceDialog = null;
 });
 document.getElementById('day-events-close').addEventListener('click', () => dayEventsDialog.close());
 document.getElementById('day-events-close-button').addEventListener('click', () => dayEventsDialog.close());
@@ -1444,6 +1477,8 @@ function applyStaticTranslations() {
         ['details-delete-button', 'Delete'],
         ['details-close-button', 'Close'],
         ['details-edit-button', 'Edit'],
+        ['delete-confirm-cancel', 'Cancel'],
+        ['delete-confirm-button', 'Delete'],
         ['day-events-close-button', 'Close'],
         ['calendar-filter-all', 'Select all'],
         ['calendar-filter-none', 'Select none'],
@@ -1453,6 +1488,8 @@ function applyStaticTranslations() {
     document.getElementById('all-day-label').textContent = t('All day');
     document.getElementById('dialog-title').textContent = t('Event');
     document.getElementById('details-dialog-title').textContent = t('Event details');
+    document.getElementById('delete-confirm-dialog-title').textContent = t('Delete event');
+    document.getElementById('delete-confirm-question').textContent = t('Do you really want to delete this event?');
     document.getElementById('day-events-dialog-title').textContent = t('Day events');
     document.getElementById('calendar-filter-dialog-title').textContent = t('Filter calendars');
     document.getElementById('calendar-filter-note').textContent = t('This filter only changes the current view on this browser or monitor.');
@@ -1464,6 +1501,7 @@ function applyStaticTranslations() {
     [
         ['dialog-close', 'Close'],
         ['details-close', 'Close'],
+        ['delete-confirm-close', 'Close'],
         ['day-events-close', 'Close'],
         ['calendar-filter-close', 'Close'],
         ['add-button', 'Create event']

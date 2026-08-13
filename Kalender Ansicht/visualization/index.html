@@ -143,6 +143,25 @@
     </div>
 </dialog>
 
+<dialog id="delete-confirm-dialog" class="oc-dialog oc-dialog-small delete-confirm-dialog">
+    <div class="dialog-header">
+        <span class="dialog-accent" style="--dialog-accent-color:var(--cal-danger)"></span>
+        <h2 id="delete-confirm-dialog-title">Delete event</h2>
+        <button type="button" class="icon-button dialog-close-button" id="delete-confirm-close" aria-label="Close">×</button>
+    </div>
+    <div class="dialog-body delete-confirm-body">
+        <div class="delete-confirm-summary" id="delete-confirm-summary"></div>
+        <div class="delete-confirm-period" id="delete-confirm-period"></div>
+        <p class="delete-confirm-question" id="delete-confirm-question">Do you really want to delete this event?</p>
+    </div>
+    <div class="dialog-actions">
+        <div class="dialog-actions-end">
+            <button type="button" class="secondary-button" id="delete-confirm-cancel">Cancel</button>
+            <button type="button" class="danger-button" id="delete-confirm-button">Delete</button>
+        </div>
+    </div>
+</dialog>
+
 <dialog id="day-events-dialog" class="oc-dialog oc-dialog-large day-events-dialog">
     <div class="dialog-header">
         <span class="dialog-accent" style="--dialog-accent-color:var(--cal-accent)"></span>

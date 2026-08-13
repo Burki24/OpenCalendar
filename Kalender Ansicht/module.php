@@ -885,6 +885,8 @@ class KalenderAnsicht extends IPSModuleStrict
             'Move',
             'Event moved.',
             'Delete',
+            'Delete event',
+            'Do you really want to delete this event?',
             'Close',
             'Tomorrow',
             'Yesterday',
@@ -892,8 +894,7 @@ class KalenderAnsicht extends IPSModuleStrict
             'This calendar is read-only.',
             'Editing events is unavailable because no action bridge is configured.',
             'Action failed.',
-            'The description of Microsoft online meetings is protected and cannot be edited here.',
-            'Delete this event?'
+            'The description of Microsoft online meetings is protected and cannot be edited here.'
         ];
     }
 
