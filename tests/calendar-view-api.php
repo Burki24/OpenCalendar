@@ -80,15 +80,16 @@ try {
 
 $moduleSource = (string) file_get_contents(__DIR__ . '/../Kalender Ansicht/module.php');
 assertCalendarViewApi(
-    str_contains($moduleSource, 'public function GetDayAppointments(string $Date): string')
-        && str_contains($moduleSource, 'return $this->GetAppointments($Date, $Date);'),
-    'Calendar View must expose a provider-independent GetDayAppointments PHP function.'
+    str_contains($moduleSource, 'public function GetDayAppointments(string $Date, int $CalendarInstanceID = 0): string')
+        && str_contains($moduleSource, 'return $this->GetAppointments($Date, $Date, $CalendarInstanceID);'),
+    'Calendar View must expose a provider-independent GetDayAppointments PHP function with optional calendar filtering.'
 );
 assertCalendarViewApi(
-    str_contains($moduleSource, 'public function GetAppointments(string $From, string $To): string')
+    str_contains($moduleSource, 'public function GetAppointments(string $From, string $To, int $CalendarInstanceID = 0): string')
         && str_contains($moduleSource, 'CalendarAppointmentRange::fromInclusiveDates($From, $To)')
-        && str_contains($moduleSource, '$this->collectAppointmentsForRange($rangeStart, $rangeEnd)'),
-    'Calendar View must expose an inclusive provider-independent appointment range function.'
+        && str_contains($moduleSource, '$this->collectAppointmentsForRange($rangeStart, $rangeEnd)')
+        && str_contains($moduleSource, '$this->filterAppointmentsByCalendarInstanceId($appointments, $CalendarInstanceID)'),
+    'Calendar View must expose an inclusive provider-independent appointment range function with optional calendar filtering.'
 );
 assertCalendarViewApi(
     str_contains($moduleSource, '$event[\'calendarInstanceId\'] = $calendar[\'instanceId\'];')
@@ -125,7 +126,7 @@ assertCalendarViewApi(
     str_contains($moduleSource, 'private function filterAppointmentsByCalendarInstanceId(array $appointments, int $CalendarInstanceID): array')
         && str_contains($moduleSource, 'if ($CalendarInstanceID === 0)')
         && str_contains($moduleSource, '(int) ($appointment[\'calendarInstanceId\'] ?? 0) === $CalendarInstanceID'),
-    'Compact appointment APIs must optionally filter by selected calendar instance ID while zero keeps all calendars.'
+    'Appointment APIs must optionally filter by selected calendar instance ID while zero keeps all calendars.'
 );
 
 assertCalendarViewApi(
@@ -148,8 +149,21 @@ assertCalendarViewApi(
 );
 assertCalendarViewApi(
     str_contains($moduleSource, 'public function GetCurrentAppointments(int $CalendarInstanceID = 0): string')
-        && str_contains($moduleSource, '$this->filterCurrentAppointments($appointments, $now->getTimestamp())'),
-    'Calendar View must expose appointments that are currently in progress.'
+        && str_contains($moduleSource, '$this->filterCurrentAppointments($appointments, $now->getTimestamp())')
+        && str_contains($moduleSource, 'public function GetCurrentAppointmentCount(int $CalendarInstanceID = 0): int'),
+    'Calendar View must expose appointments that are currently in progress and their count.'
+);
+assertCalendarViewApi(
+    str_contains($moduleSource, 'public function GetUpcomingAppointments(int $Hours, int $CalendarInstanceID = 0): string')
+        && str_contains($moduleSource, 'public function GetUpcomingAppointmentCount(int $Hours, int $CalendarInstanceID = 0): int')
+        && str_contains($moduleSource, '$this->filterUpcomingAppointments(')
+        && str_contains($moduleSource, '$this->validateUpcomingHours($Hours);'),
+    'Calendar View must expose upcoming appointment list and count functions with a bounded hour window.'
+);
+assertCalendarViewApi(
+    str_contains($moduleSource, 'public function GetNextAppointments(int $Count, int $CalendarInstanceID = 0): string')
+        && str_contains($moduleSource, 'array_slice($this->filterFutureAppointments($appointments, $now->getTimestamp()), 0, $Count)'),
+    'Calendar View must expose a configurable list of the next future appointments.'
 );
 assertCalendarViewApi(
     str_contains($moduleSource, 'public function GetSelectedCalendars(): string')
@@ -171,6 +185,12 @@ $currentMethod = new ReflectionMethod(KalenderAnsicht::class, 'filterCurrentAppo
 $currentMethod->setAccessible(true);
 $nextMethod = new ReflectionMethod(KalenderAnsicht::class, 'findNextAppointment');
 $nextMethod->setAccessible(true);
+$futureMethod = new ReflectionMethod(KalenderAnsicht::class, 'filterFutureAppointments');
+$futureMethod->setAccessible(true);
+$upcomingMethod = new ReflectionMethod(KalenderAnsicht::class, 'filterUpcomingAppointments');
+$upcomingMethod->setAccessible(true);
+$validateUpcomingHoursMethod = new ReflectionMethod(KalenderAnsicht::class, 'validateUpcomingHours');
+$validateUpcomingHoursMethod->setAccessible(true);
 $calendarView = new KalenderAnsicht(1);
 $previousTimezone = date_default_timezone_get();
 date_default_timezone_set('Europe/Berlin');
@@ -325,6 +345,30 @@ assertCalendarViewApi(
 assertCalendarViewApi(
     $nextMethod->invoke($calendarView, [$stateAppointments[0], $stateAppointments[1]], $now) === null,
     'Next appointment lookup must return null when no future appointment is available.'
+);
+
+$future = $futureMethod->invoke($calendarView, $chronologicalAppointments, $now);
+assertCalendarViewApi(
+    array_column($future, 'summary') === ['Next', 'Later'],
+    'Future appointment filtering must exclude ended and currently running appointments.'
+);
+
+$upcomingUntil = (new DateTimeImmutable('2026-08-12T15:00:00+02:00'))->getTimestamp();
+$upcoming = $upcomingMethod->invoke($calendarView, $chronologicalAppointments, $now, $upcomingUntil);
+assertCalendarViewApi(
+    array_column($upcoming, 'summary') === ['Next'],
+    'Upcoming appointment filtering must keep only future starts inside the requested hour window.'
+);
+
+$validateUpcomingHoursMethod->invoke($calendarView, 1);
+$validateUpcomingHoursMethod->invoke($calendarView, 1095 * 24);
+assertCalendarViewApiThrows(
+    static fn (): mixed => $validateUpcomingHoursMethod->invoke($calendarView, 0),
+    'Upcoming appointment queries must reject a zero-hour window.'
+);
+assertCalendarViewApiThrows(
+    static fn (): mixed => $validateUpcomingHoursMethod->invoke($calendarView, (1095 * 24) + 1),
+    'Upcoming appointment queries must reject windows beyond the maximum synchronized future range.'
 );
 
 fwrite(STDOUT, 'Calendar View PHP API checks passed.' . PHP_EOL);
