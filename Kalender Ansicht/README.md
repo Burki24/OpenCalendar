@@ -57,6 +57,7 @@ unvollständig ist; eine vorhandene individuelle Auswahl wird dabei ersetzt.
 - Navigation innerhalb des dargestellten Zeitraums
 - manuelle Synchronisation aller ausgewählten Kalender
 - Erstellen, Bearbeiten, Verschieben und Löschen von Terminen in beschreibbaren Kalendern
+- Komfortable Zeiteingabe: Wird beim Beginn nur das Datum geändert, folgt das Enddatum automatisch auf denselben Tag und behält seine Uhrzeit bei. Bei einer geänderten Beginn-Uhrzeit wird das Ende automatisch auf eine Stunde später gesetzt; Ganztagstermine bleiben auf demselben sichtbaren Tag.
 - automatische Aktualisierung nach einer Kalendersynchronisation, ohne die am jeweiligen Client gewählte Ansicht oder das Bezugsdatum zurückzusetzen
 - responsive Bedienung auf großen Kacheln und schmalen Mobilansichten
 - optionale IPSView-Ausgabe über eine WebContent-Variable
