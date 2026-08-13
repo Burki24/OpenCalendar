@@ -36,6 +36,7 @@ const monthEventData = new WeakMap();
 const content = document.getElementById('calendar-content');
 const periodTitle = document.getElementById('period-title');
 const eventDialog = document.getElementById('event-dialog');
+const eventDetailsDialog = document.getElementById('event-details-dialog');
 const eventForm = document.getElementById('event-form');
 const eventCalendarInput = document.getElementById('event-calendar');
 const eventCalendarPicker = document.getElementById('event-calendar-picker');
@@ -220,7 +221,7 @@ function renderAgenda() {
 function createAgendaEvent(event) {
     const card = element('button', 'event-card');
     card.type = 'button';
-    card.addEventListener('click', () => openExistingEvent(event));
+    card.addEventListener('click', () => openEventDetails(event));
     const color = element('span', 'event-color');
     color.style.background = safeColor(event.calendarColor);
     const time = element('span', 'event-time');
@@ -282,8 +283,8 @@ function renderList() {
         const row = document.createElement('tr');
         row.className = 'list-row';
         row.tabIndex = 0;
-        row.addEventListener('click', () => openExistingEvent(event));
-        row.addEventListener('keydown', key => { if (key.key === 'Enter') openExistingEvent(event); });
+        row.addEventListener('click', () => openEventDetails(event));
+        row.addEventListener('keydown', key => { if (key.key === 'Enter') openEventDetails(event); });
 
         const color = document.createElement('td');
         color.className = 'list-color-column';
@@ -430,8 +431,8 @@ function renderDayColumns(days, className, showDayOfYear, showEventCount) {
             const item = element('div', 'week-event');
             item.style.setProperty('--event-color', safeColor(event.calendarColor));
             item.tabIndex = 0;
-            item.addEventListener('click', () => openExistingEvent(event));
-            item.addEventListener('keydown', key => { if (key.key === 'Enter') openExistingEvent(event); });
+            item.addEventListener('click', () => openEventDetails(event));
+            item.addEventListener('keydown', key => { if (key.key === 'Enter') openEventDetails(event); });
             const title = document.createElement('strong');
             title.textContent = event.summary || t('Untitled event');
             const time = document.createElement('span');
@@ -577,7 +578,7 @@ function createMonthEventChip(event) {
     chip.style.setProperty('--event-color', safeColor(event.calendarColor));
     chip.textContent = (event.allDay ? '' : formatTime(eventStart(event)) + ' ')
         + (event.summary || t('Untitled event'));
-    chip.addEventListener('click', () => openExistingEvent(event));
+    chip.addEventListener('click', () => openEventDetails(event));
     return chip;
 }
 
@@ -610,7 +611,7 @@ function openDayEvents(day, events) {
         }
         item.addEventListener('click', () => {
             dayEventsDialog.close();
-            openExistingEvent(event);
+            openEventDetails(event);
         });
         list.appendChild(item);
     });
@@ -781,16 +782,73 @@ function openNewEvent() {
     eventDialog.showModal();
 }
 
+function openEventDetails(event) {
+    selectedEvent = event;
+    const editable = eventIsEditable(event);
+    document.getElementById('details-dialog-title').textContent = t('Event details');
+    document.getElementById('details-summary').textContent = event.summary || t('Untitled event');
+    document.getElementById('details-calendar').textContent = event.calendarName || '';
+    document.getElementById('details-color').style.setProperty('--dialog-accent-color', safeColor(event.calendarColor));
+
+    const start = eventStart(event);
+    const end = eventEnd(event);
+    if (event.allDay) {
+        const displayEnd = end > start ? addDays(end, -1) : start;
+        document.getElementById('details-start').textContent = `${formatDetailDate(start)} · ${t('All day')}`;
+        document.getElementById('details-end').textContent = formatDetailDate(displayEnd);
+    } else {
+        document.getElementById('details-start').textContent = formatDetailDateTime(start);
+        document.getElementById('details-end').textContent = formatDetailDateTime(end);
+    }
+
+    setOptionalDetail('location', event.location);
+    setOptionalDetail('description', event.description);
+    document.getElementById('details-edit-button').classList.toggle('hidden', !editable);
+    document.getElementById('details-delete-button').classList.toggle('hidden', !editable);
+
+    const note = document.getElementById('details-note');
+    const reason = eventReadOnlyReason(event);
+    note.textContent = reason ? t(reason) : '';
+    note.classList.toggle('hidden', reason === '');
+    eventDetailsDialog.showModal();
+}
+
+function eventIsEditable(event) {
+    return hasActionBridge() && Boolean(event.canWrite) && !event.recurring && !event.recurrenceId;
+}
+
+function eventReadOnlyReason(event) {
+    if (eventIsEditable(event)) return '';
+    if (!hasActionBridge()) return 'Editing events is unavailable because no action bridge is configured.';
+    if (event.recurring || event.recurrenceId) return 'Recurring occurrences are currently read-only.';
+    return 'This calendar is read-only.';
+}
+
+function setOptionalDetail(name, value) {
+    const row = document.getElementById(`details-${name}-row`);
+    const target = document.getElementById(`details-${name}`);
+    const text = String(value || '').trim();
+    target.textContent = text;
+    row.classList.toggle('hidden', text === '');
+}
+
+function formatDetailDate(date) {
+    return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(date);
+}
+
+function formatDetailDateTime(date) {
+    return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(date);
+}
+
 function openExistingEvent(event) {
     selectedEvent = event;
-    const editable = hasActionBridge()
-        && Boolean(event.canWrite) && !event.recurring && !event.recurrenceId;
+    const editable = eventIsEditable(event);
     const availableCalendars = editable
         ? calendarState.calendars.filter(calendar => calendar.canWrite || calendar.instanceId === event.calendarInstanceId)
         : calendarState.calendars;
     populateCalendarSelect(availableCalendars, event.calendarInstanceId);
     setCalendarSelectDisabled(!editable);
-    document.getElementById('dialog-title').textContent = t('Event details');
+    document.getElementById('dialog-title').textContent = t('Edit event');
     document.getElementById('event-summary').value = event.summary || '';
     document.getElementById('event-location').value = event.location || '';
     document.getElementById('event-description').value = event.description || '';
@@ -801,11 +859,7 @@ function openExistingEvent(event) {
     document.getElementById('delete-button').classList.toggle('hidden', !editable);
     const note = document.getElementById('dialog-note');
     if (!editable) {
-        note.textContent = !hasActionBridge()
-            ? t('Editing events is unavailable because no action bridge is configured.')
-            : (event.recurring || event.recurrenceId
-                ? t('Recurring occurrences are currently read-only.')
-                : t('This calendar is read-only.'));
+        note.textContent = t(eventReadOnlyReason(event));
         note.classList.remove('hidden');
     } else if (!descriptionEditable) {
         note.textContent = t('The description of Microsoft online meetings is protected and cannot be edited here.');
@@ -1081,6 +1135,26 @@ eventDialog.addEventListener('cancel', event => {
     }
 });
 eventDialog.addEventListener('close', closeCalendarPicker);
+document.getElementById('details-close').addEventListener('click', () => eventDetailsDialog.close());
+document.getElementById('details-close-button').addEventListener('click', () => eventDetailsDialog.close());
+document.getElementById('details-edit-button').addEventListener('click', () => {
+    if (!selectedEvent || !eventIsEditable(selectedEvent)) return;
+    const event = selectedEvent;
+    eventDetailsDialog.close();
+    openExistingEvent(event);
+});
+document.getElementById('details-delete-button').addEventListener('click', async () => {
+    if (!selectedEvent || !eventIsEditable(selectedEvent) || !confirm(t('Delete this event?'))) return;
+    const success = await sendAction('DeleteEvent', {
+        calendarInstanceId: selectedEvent.calendarInstanceId,
+        event: {
+            resourceUrl: selectedEvent.resourceUrl,
+            etag: selectedEvent.etag,
+            recurrenceId: selectedEvent.recurrenceId || ''
+        }
+    });
+    if (success) eventDetailsDialog.close();
+});
 document.getElementById('day-events-close').addEventListener('click', () => dayEventsDialog.close());
 document.getElementById('day-events-close-button').addEventListener('click', () => dayEventsDialog.close());
 document.getElementById('dialog-close').addEventListener('click', () => eventDialog.close());
@@ -1116,9 +1190,9 @@ function containWheelInsideTile(event) {
     const calendarOptionList = event.target instanceof Element
         ? event.target.closest('.calendar-picker-options')
         : null;
-    const scrollTarget = calendarOptionList || (eventDialog.open
-        ? document.querySelector('.dialog-body')
-        : content);
+    const openDialog = [eventDialog, eventDetailsDialog, dayEventsDialog, calendarFilterDialog]
+        .find(dialog => dialog.open);
+    const scrollTarget = calendarOptionList || openDialog?.querySelector('.dialog-body') || content;
     const factor = event.deltaMode === WheelEvent.DOM_DELTA_LINE
         ? 16
         : (event.deltaMode === WheelEvent.DOM_DELTA_PAGE ? scrollTarget.clientHeight : 1);
@@ -1367,6 +1441,9 @@ function applyStaticTranslations() {
         ['delete-button', 'Delete'],
         ['cancel-button', 'Cancel'],
         ['save-button', 'Save'],
+        ['details-delete-button', 'Delete'],
+        ['details-close-button', 'Close'],
+        ['details-edit-button', 'Edit'],
         ['day-events-close-button', 'Close'],
         ['calendar-filter-all', 'Select all'],
         ['calendar-filter-none', 'Select none'],
@@ -1375,12 +1452,18 @@ function applyStaticTranslations() {
     ].forEach(([id, text]) => { document.getElementById(id).textContent = t(text); });
     document.getElementById('all-day-label').textContent = t('All day');
     document.getElementById('dialog-title').textContent = t('Event');
+    document.getElementById('details-dialog-title').textContent = t('Event details');
     document.getElementById('day-events-dialog-title').textContent = t('Day events');
     document.getElementById('calendar-filter-dialog-title').textContent = t('Filter calendars');
     document.getElementById('calendar-filter-note').textContent = t('This filter only changes the current view on this browser or monitor.');
+    ['calendar', 'start', 'end', 'location', 'description'].forEach(name => {
+        const label = document.getElementById(`details-${name}-label`);
+        label.textContent = t(label.textContent.trim());
+    });
     document.getElementById('add-button-label').textContent = t('New event');
     [
         ['dialog-close', 'Close'],
+        ['details-close', 'Close'],
         ['day-events-close', 'Close'],
         ['calendar-filter-close', 'Close'],
         ['add-button', 'Create event']

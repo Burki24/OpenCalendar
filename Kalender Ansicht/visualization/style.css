@@ -661,6 +661,14 @@ html.ipsview-mode .danger-button { min-height: 48px; padding-inline: 18px; }
     box-shadow: inset 3px 0 0 var(--cal-accent);
 }
 .form-row textarea { min-height: 62px; resize: vertical; }
+.event-details-body { gap: 14px; }
+.event-details-summary { font-size: 1.08em; font-weight: 700; line-height: 1.35; overflow-wrap: anywhere; }
+.event-details-list { display: grid; gap: 0; margin: 0; }
+.event-details-row { display: grid; grid-template-columns: minmax(82px, .34fr) minmax(0, 1fr); gap: 12px; padding: 8px 0; border-top: var(--cal-line-width, 1px) solid var(--cal-line, var(--cal-border)); }
+.event-details-row:first-child { border-top: 0; }
+.event-details-row dt { color: var(--cal-label-text); font-size: .7em; font-weight: 600; }
+.event-details-row dd { margin: 0; line-height: 1.45; overflow-wrap: anywhere; white-space: pre-wrap; }
+
 .calendar-filter-body { gap: 12px; }
 .calendar-filter-selection-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .calendar-filter-options { display: grid; gap: 6px; }
@@ -729,6 +737,7 @@ html.ipsview-mode .danger-button { min-height: 48px; padding-inline: 18px; }
 
 @media (max-width: 420px) {
     .form-row.two { grid-template-columns: 1fr; }
+    .event-details-row { grid-template-columns: 1fr; gap: 3px; }
     .dialog-actions { align-items: stretch; }
     .dialog-actions-start, .dialog-actions-end { width: 100%; }
     .dialog-actions-end { justify-content: flex-end; }

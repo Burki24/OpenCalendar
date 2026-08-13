@@ -100,6 +100,49 @@
     </form>
 </dialog>
 
+<dialog id="event-details-dialog" class="oc-dialog oc-dialog-medium event-details-dialog">
+    <div class="dialog-header">
+        <span id="details-color" class="dialog-accent" style="--dialog-accent-color:var(--cal-accent)"></span>
+        <h2 id="details-dialog-title">Event details</h2>
+        <button type="button" class="icon-button dialog-close-button" id="details-close" aria-label="Close">×</button>
+    </div>
+    <div class="dialog-body event-details-body">
+        <div class="event-details-summary" id="details-summary"></div>
+        <dl class="event-details-list">
+            <div class="event-details-row">
+                <dt id="details-calendar-label">Calendar</dt>
+                <dd id="details-calendar"></dd>
+            </div>
+            <div class="event-details-row">
+                <dt id="details-start-label">Start</dt>
+                <dd id="details-start"></dd>
+            </div>
+            <div class="event-details-row">
+                <dt id="details-end-label">End</dt>
+                <dd id="details-end"></dd>
+            </div>
+            <div class="event-details-row hidden" id="details-location-row">
+                <dt id="details-location-label">Location</dt>
+                <dd id="details-location"></dd>
+            </div>
+            <div class="event-details-row hidden" id="details-description-row">
+                <dt id="details-description-label">Description</dt>
+                <dd id="details-description"></dd>
+            </div>
+        </dl>
+        <div class="dialog-note hidden" id="details-note"></div>
+    </div>
+    <div class="dialog-actions">
+        <div class="dialog-actions-start">
+            <button type="button" class="danger-button hidden" id="details-delete-button">Delete</button>
+        </div>
+        <div class="dialog-actions-end">
+            <button type="button" class="secondary-button" id="details-close-button">Close</button>
+            <button type="button" class="primary-button hidden" id="details-edit-button">Edit</button>
+        </div>
+    </div>
+</dialog>
+
 <dialog id="day-events-dialog" class="oc-dialog oc-dialog-large day-events-dialog">
     <div class="dialog-header">
         <span class="dialog-accent" style="--dialog-accent-color:var(--cal-accent)"></span>
