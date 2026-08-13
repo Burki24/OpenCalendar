@@ -362,6 +362,16 @@ assertVisualization(
 );
 
 assertVisualization(
+    str_contains($indexSource, 'id="event-dialog" class="oc-dialog oc-dialog-large"')
+        && str_contains($indexSource, 'id="event-form" class="dialog-layout"')
+        && str_contains($indexSource, 'id="day-events-dialog" class="oc-dialog oc-dialog-large day-events-dialog"')
+        && str_contains($indexSource, 'id="calendar-filter-dialog" class="oc-dialog oc-dialog-medium calendar-filter-dialog"')
+        && substr_count($indexSource, 'class="icon-button dialog-close-button"') === 3
+        && substr_count($indexSource, 'class="dialog-actions-end"') === 3,
+    'All existing calendar dialogs must use the shared OpenCalendar modal structure and action layout.'
+);
+
+assertVisualization(
     str_contains($script, "activeView === 'list'")
         && str_contains($script, "list: 'List'")
         && str_contains($formSource, '"caption": "List"')
@@ -382,6 +392,20 @@ assertVisualization(
         && str_contains($style, '--cal-icon: var(--ipsview-role-icon);'),
     'The calendar stylesheet must map every text, icon and page role to the configurable IPSView roles, including inactive text for muted content.'
 );
+assertVisualization(
+    str_contains($style, '--cal-dialog-small-width: 360px;')
+        && str_contains($style, '--cal-dialog-medium-width: 440px;')
+        && str_contains($style, '--cal-dialog-large-width: 560px;')
+        && str_contains($style, '.oc-dialog[open] { display: flex; flex-direction: column; }')
+        && str_contains($style, '.oc-dialog > .dialog-layout {')
+        && str_contains($style, 'flex: 1 1 auto;')
+        && str_contains($style, 'scrollbar-gutter: stable;')
+        && str_contains($style, '.dialog-actions-start, .dialog-actions-end {')
+        && str_contains($style, '.dialog-close-button {')
+        && str_contains($style, '@media (max-width: 420px) {'),
+    'All OpenCalendar modals must share responsive size classes, fixed header/footer layout and a scrollable content area.'
+);
+
 assertVisualization(
     str_contains($style, '.agenda-week-separator {')
         && str_contains($style, '.month-week-number {')

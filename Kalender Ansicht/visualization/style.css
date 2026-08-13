@@ -34,6 +34,9 @@
     --cal-popup-shadow: 0 18px 50px color-mix(in srgb, var(--symc-text) 22%, transparent);
     --cal-font-family: var(--symc-font-family);
     --cal-radius: var(--symc-radius-medium);
+    --cal-dialog-small-width: 360px;
+    --cal-dialog-medium-width: 440px;
+    --cal-dialog-large-width: 560px;
     --agenda-color-bar-width: 5px;
     --compact-color-bar-width: 3px;
 }
@@ -516,9 +519,11 @@ html.ipsview-mode .danger-button { min-height: 48px; padding-inline: 18px; }
 .toast.visible { opacity: 1; transform: translate(-50%, 0); }
 .toast.error { background: var(--cal-danger); color: var(--cal-danger-contrast); }
 
-dialog {
-    width: min(440px, calc(100% - 24px));
-    max-height: calc(100% - var(--tile-title-clearance) - 24px);
+.oc-dialog {
+    --dialog-width: var(--cal-dialog-medium-width);
+    width: min(var(--dialog-width), calc(100% - 24px));
+    max-height: calc(100vh - var(--tile-title-clearance) - 24px);
+    max-height: calc(100dvh - var(--tile-title-clearance) - 24px);
     margin: calc(var(--tile-title-clearance) + 12px) auto 12px;
     padding: 0;
     overflow: hidden;
@@ -528,13 +533,66 @@ dialog {
     color: var(--cal-text);
     box-shadow: var(--cal-popup-shadow);
 }
-dialog::backdrop {
-    background: color-mix(in srgb, var(--cal-text) 45%, transparent);
-    backdrop-filter: blur(2px);
+.oc-dialog-small { --dialog-width: var(--cal-dialog-small-width); }
+.oc-dialog-medium { --dialog-width: var(--cal-dialog-medium-width); }
+.oc-dialog-large { --dialog-width: var(--cal-dialog-large-width); }
+.oc-dialog[open] { display: flex; flex-direction: column; }
+.oc-dialog > .dialog-layout {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    min-height: 0;
+    max-height: inherit;
 }
-.dialog-header { display: flex; align-items: center; gap: 8px; padding: 13px 15px; border-bottom: var(--cal-line-width, 1px) solid var(--cal-line, var(--cal-border)); }
-.dialog-header h2 { flex: 1; margin: 0; font-size: 1em; }
-.dialog-body { display: grid; gap: 10px; max-height: calc(100vh - var(--tile-title-clearance) - 165px); padding: 14px 15px; overflow: auto; overscroll-behavior: contain; }
+.oc-dialog::backdrop {
+    background: color-mix(in srgb, var(--cal-text) 42%, transparent);
+    backdrop-filter: blur(3px);
+}
+.dialog-header {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 9px;
+    min-height: 54px;
+    padding: 10px 11px 10px 15px;
+    border-bottom: var(--cal-line-width, 1px) solid var(--cal-line, var(--cal-border));
+    background: color-mix(in srgb, var(--cal-surface) 24%, var(--cal-dialog));
+}
+.dialog-accent {
+    flex: 0 0 auto;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--dialog-accent-color, var(--cal-accent));
+}
+.dialog-header h2 {
+    flex: 1;
+    min-width: 0;
+    margin: 0;
+    overflow: hidden;
+    font-size: 1em;
+    font-weight: 700;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.dialog-close-button {
+    flex: 0 0 auto;
+    width: 36px;
+    min-width: 36px;
+    height: 36px;
+    padding: 0;
+}
+.dialog-body {
+    display: grid;
+    flex: 1 1 auto;
+    gap: 12px;
+    min-height: 0;
+    max-height: none;
+    padding: 15px;
+    overflow: auto;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
+}
 .form-row { display: grid; gap: 5px; }
 .form-row.two { grid-template-columns: 1fr 1fr; gap: 10px; }
 .form-row label { color: var(--cal-label-text); font-size: .7em; font-weight: 600; }
@@ -603,7 +661,6 @@ dialog::backdrop {
     box-shadow: inset 3px 0 0 var(--cal-accent);
 }
 .form-row textarea { min-height: 62px; resize: vertical; }
-.calendar-filter-dialog { width: min(430px, calc(100% - 24px)); }
 .calendar-filter-body { gap: 12px; }
 .calendar-filter-selection-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .calendar-filter-options { display: grid; gap: 6px; }
@@ -624,7 +681,6 @@ dialog::backdrop {
 .calendar-filter-color { width: 10px; height: 10px; border-radius: 50%; background: var(--event-color); }
 .calendar-filter-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-.day-events-dialog { width: min(520px, calc(100% - 24px)); }
 .day-events-body { gap: 8px; }
 .day-events-list { display: grid; gap: 6px; }
 .day-event-item { display: grid; grid-template-columns: minmax(70px, auto) minmax(0, 1fr); gap: 8px 12px; align-items: center; width: 100%; padding: 8px 10px; border: var(--cal-border-width, 1px) solid var(--cal-border); border-left: var(--compact-color-bar-width) solid var(--event-color); border-radius: var(--cal-radius); background: color-mix(in srgb, var(--event-color) 12%, var(--cal-surface)); color: var(--cal-text); text-align: left; }
@@ -634,13 +690,49 @@ dialog::backdrop {
 .day-event-calendar { grid-column: 2; color: var(--cal-muted); font-size: .72em; }
 .checkbox-row { display: flex; align-items: center; gap: 8px; }
 .checkbox-row input { width: auto; }
-.dialog-note { padding: 8px 10px; border-radius: var(--cal-radius); background: var(--cal-information-soft); color: var(--cal-muted); font-size: .72em; }
-.dialog-actions { display: flex; gap: 8px; padding: 11px 15px 14px; border-top: var(--cal-line-width, 1px) solid var(--cal-line, var(--cal-border)); }
-.primary-button, .secondary-button, .danger-button { min-height: 34px; padding: 7px 12px; }
-.primary-button { margin-left: auto; border-color: var(--cal-accent); background: var(--cal-gradient-accent); color: var(--cal-text-active, var(--cal-text)); }
+.dialog-note { padding: 9px 10px; border-radius: var(--cal-radius); background: var(--cal-information-soft); color: var(--cal-muted); font-size: .72em; line-height: 1.45; }
+.dialog-actions {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 11px 15px 14px;
+    border-top: var(--cal-line-width, 1px) solid var(--cal-line, var(--cal-border));
+    background: color-mix(in srgb, var(--cal-surface) 16%, var(--cal-dialog));
+}
+.dialog-actions-start, .dialog-actions-end { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.dialog-actions-end { margin-left: auto; justify-content: flex-end; }
+.primary-button, .secondary-button, .danger-button { min-height: 36px; padding: 7px 12px; }
+.primary-button { border-color: var(--cal-accent); background: var(--cal-gradient-accent); color: var(--cal-text-active, var(--cal-text)); }
 .danger-button { border-color: color-mix(in srgb, var(--cal-danger) 60%, transparent); background: var(--cal-danger-soft); color: var(--cal-danger); }
 .danger-button:hover { background: var(--cal-danger); color: var(--cal-danger-contrast); }
+.oc-dialog button:focus-visible,
+.oc-dialog input:focus-visible,
+.oc-dialog textarea:focus-visible {
+    outline: 2px solid var(--cal-accent);
+    outline-offset: 1px;
+}
 .hidden { display: none !important; }
+
+@media (max-width: 560px) {
+    .oc-dialog {
+        width: calc(100% - 16px);
+        max-height: calc(100vh - var(--tile-title-clearance) - 16px);
+        max-height: calc(100dvh - var(--tile-title-clearance) - 16px);
+        margin: calc(var(--tile-title-clearance) + 8px) auto 8px;
+    }
+    .dialog-header { min-height: 50px; padding: 8px 9px 8px 12px; }
+    .dialog-body { padding: 12px; }
+    .dialog-actions { padding: 10px 12px 12px; }
+}
+
+@media (max-width: 420px) {
+    .form-row.two { grid-template-columns: 1fr; }
+    .dialog-actions { align-items: stretch; }
+    .dialog-actions-start, .dialog-actions-end { width: 100%; }
+    .dialog-actions-end { justify-content: flex-end; }
+}
 
 :fullscreen {
     --tile-title-clearance: 0px;
