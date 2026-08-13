@@ -59,7 +59,7 @@ html.ipsview-mode {
     --cal-text-active: var(--ipsview-role-text-active);
     --cal-text-inactive: var(--ipsview-role-text-inactive);
     --cal-label-text: var(--ipsview-role-text-label);
-    --cal-muted: var(--ipsview-role-text-secondary);
+    --cal-muted: var(--ipsview-role-text-inactive);
     --cal-faint: var(--ipsview-role-text-faint);
     --cal-icon: var(--ipsview-role-icon);
     --cal-card: var(--ipsview-role-page-background);

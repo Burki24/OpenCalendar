@@ -350,10 +350,10 @@ assertVisualization(
         && str_contains($style, '--cal-text-active: var(--ipsview-role-text-active);')
         && str_contains($style, '--cal-text-inactive: var(--ipsview-role-text-inactive);')
         && str_contains($style, '--cal-label-text: var(--ipsview-role-text-label);')
-        && str_contains($style, '--cal-muted: var(--ipsview-role-text-secondary);')
+        && str_contains($style, '--cal-muted: var(--ipsview-role-text-inactive);')
         && str_contains($style, '--cal-faint: var(--ipsview-role-text-faint);')
         && str_contains($style, '--cal-icon: var(--ipsview-role-icon);'),
-    'The calendar stylesheet must map every text, icon and page role to the canonical IPSView contract.'
+    'The calendar stylesheet must map every text, icon and page role to the configurable IPSView roles, including inactive text for muted content.'
 );
 assertVisualization(
     str_contains($style, '.agenda-week-separator {')
