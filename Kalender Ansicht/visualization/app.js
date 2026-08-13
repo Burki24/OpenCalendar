@@ -19,6 +19,7 @@ const calendarViewStateStorageKey = Number(calendarOptions.instanceId) > 0
     ? `OpenCalendar.ViewState.${Number(calendarOptions.instanceId)}`
     : '';
 const calendarViews = new Set(['agenda', 'list', 'threeDays', 'week', 'month']);
+const calendarViewLabels = { agenda: 'Agenda', list: 'List', threeDays: '3 Days', week: 'Week', month: 'Month' };
 document.documentElement.style.setProperty('--agenda-color-bar-width', `${calendarAgendaColorBarWidth}px`);
 document.documentElement.style.setProperty('--compact-color-bar-width', `${calendarCompactColorBarWidth}px`);
 
@@ -48,6 +49,9 @@ const eventCalendarTrigger = document.getElementById('event-calendar-trigger');
 const eventCalendarValue = document.getElementById('event-calendar-value');
 const eventCalendarOptions = document.getElementById('event-calendar-options');
 const dayEventsDialog = document.getElementById('day-events-dialog');
+const viewSelectorDialog = document.getElementById('view-selector-dialog');
+const viewSelectorButton = document.getElementById('view-selector-button');
+const viewSelectorLabel = document.getElementById('view-selector-label');
 const calendarFilterDialog = document.getElementById('calendar-filter-dialog');
 const calendarFilterOptions = document.getElementById('calendar-filter-options');
 const monthResizeObserver = typeof ResizeObserver === 'function'
@@ -131,15 +135,32 @@ function listControlsVisible() {
     return activeView !== 'list' || calendarState.settings.showListControls !== false;
 }
 
+function updateViewSelectorOptions() {
+    document.querySelectorAll('.view-selector-option').forEach(button => {
+        const selected = button.dataset.view === activeView;
+        button.classList.toggle('active', selected);
+        button.setAttribute('aria-checked', String(selected));
+        button.textContent = t(calendarViewLabels[button.dataset.view] || button.dataset.view);
+    });
+}
+
+function openViewSelector() {
+    updateViewSelectorOptions();
+    if (!viewSelectorDialog.open) {
+        viewSelectorButton.setAttribute('aria-expanded', 'true');
+        viewSelectorDialog.showModal();
+    }
+}
+
 function updateToolbar() {
-    const viewLabels = { agenda: 'Agenda', list: 'List', threeDays: '3 Days', week: 'Week', month: 'Month' };
     const showControls = listControlsVisible();
     document.getElementById('previous-button').parentElement.classList.toggle('hidden', !showControls);
     document.getElementById('refresh-button').classList.toggle('hidden', !showControls);
-    document.querySelectorAll('.view-button').forEach(button => {
-        button.classList.toggle('active', button.dataset.view === activeView);
-        button.textContent = t(viewLabels[button.dataset.view] || button.dataset.view);
-    });
+    const activeViewLabel = t(calendarViewLabels[activeView] || activeView);
+    viewSelectorLabel.textContent = activeViewLabel;
+    viewSelectorButton.title = `${t('View')}: ${activeViewLabel}`;
+    viewSelectorButton.setAttribute('aria-label', `${t('View')}: ${activeViewLabel}`);
+    updateViewSelectorOptions();
     [
         ['previous-button', 'Previous'],
         ['today-button', 'Today'],
@@ -1235,6 +1256,10 @@ document.getElementById('day-events-create-button').addEventListener('click', ()
 document.getElementById('dialog-close').addEventListener('click', () => eventDialog.close());
 document.getElementById('cancel-button').addEventListener('click', () => eventDialog.close());
 document.getElementById('add-button').addEventListener('click', openNewEvent);
+viewSelectorButton.addEventListener('click', openViewSelector);
+document.getElementById('view-selector-close').addEventListener('click', () => viewSelectorDialog.close());
+document.getElementById('view-selector-close-button').addEventListener('click', () => viewSelectorDialog.close());
+viewSelectorDialog.addEventListener('close', () => viewSelectorButton.setAttribute('aria-expanded', 'false'));
 document.getElementById('calendar-filter-button').addEventListener('click', openCalendarFilter);
 document.getElementById('calendar-filter-close').addEventListener('click', () => calendarFilterDialog.close());
 document.getElementById('calendar-filter-cancel').addEventListener('click', () => calendarFilterDialog.close());
@@ -1249,9 +1274,11 @@ document.getElementById('today-button').addEventListener('click', () => {
 });
 document.getElementById('previous-button').addEventListener('click', () => navigate(-1));
 document.getElementById('next-button').addEventListener('click', () => navigate(1));
-document.querySelectorAll('.view-button').forEach(button => button.addEventListener('click', () => {
+document.querySelectorAll('.view-selector-option').forEach(button => button.addEventListener('click', () => {
+    if (!calendarViews.has(button.dataset.view)) return;
     activeView = button.dataset.view;
     persistClientViewState();
+    viewSelectorDialog.close();
     render();
 }));
 window.addEventListener('resize', () => {
@@ -1265,7 +1292,7 @@ function containWheelInsideTile(event) {
     const calendarOptionList = event.target instanceof Element
         ? event.target.closest('.calendar-picker-options')
         : null;
-    const openDialog = [eventDialog, eventDetailsDialog, dayEventsDialog, calendarFilterDialog]
+    const openDialog = [eventDialog, eventDetailsDialog, dayEventsDialog, viewSelectorDialog, calendarFilterDialog]
         .find(dialog => dialog.open);
     const scrollTarget = calendarOptionList || openDialog?.querySelector('.dialog-body') || content;
     const factor = event.deltaMode === WheelEvent.DOM_DELTA_LINE
@@ -1523,6 +1550,7 @@ function applyStaticTranslations() {
         ['delete-confirm-button', 'Delete'],
         ['day-events-create-button', 'Create event on this day'],
         ['day-events-close-button', 'Close'],
+        ['view-selector-close-button', 'Close'],
         ['calendar-filter-all', 'Select all'],
         ['calendar-filter-none', 'Select none'],
         ['calendar-filter-cancel', 'Cancel'],
@@ -1534,6 +1562,8 @@ function applyStaticTranslations() {
     document.getElementById('delete-confirm-dialog-title').textContent = t('Delete event');
     document.getElementById('delete-confirm-question').textContent = t('Do you really want to delete this event?');
     document.getElementById('day-events-dialog-title').textContent = t('Day events');
+    document.getElementById('view-selector-dialog-title').textContent = t('View');
+    updateViewSelectorOptions();
     document.getElementById('calendar-filter-dialog-title').textContent = t('Filter calendars');
     document.getElementById('calendar-filter-note').textContent = t('This filter only changes the current view on this browser or monitor.');
     ['calendar', 'start', 'end', 'location', 'description'].forEach(name => {
@@ -1546,6 +1576,7 @@ function applyStaticTranslations() {
         ['details-close', 'Close'],
         ['delete-confirm-close', 'Close'],
         ['day-events-close', 'Close'],
+        ['view-selector-close', 'Close'],
         ['calendar-filter-close', 'Close'],
         ['add-button', 'Create event']
     ].forEach(([id, text]) => {

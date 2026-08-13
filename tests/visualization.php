@@ -384,10 +384,22 @@ assertVisualization(
         && str_contains($indexSource, 'id="event-details-dialog" class="oc-dialog oc-dialog-medium event-details-dialog"')
         && str_contains($indexSource, 'id="delete-confirm-dialog" class="oc-dialog oc-dialog-small delete-confirm-dialog"')
         && str_contains($indexSource, 'id="day-events-dialog" class="oc-dialog oc-dialog-large day-events-dialog"')
+        && str_contains($indexSource, 'id="view-selector-dialog" class="oc-dialog oc-dialog-small view-selector-dialog"')
         && str_contains($indexSource, 'id="calendar-filter-dialog" class="oc-dialog oc-dialog-medium calendar-filter-dialog"')
-        && substr_count($indexSource, 'class="icon-button dialog-close-button"') === 5
-        && substr_count($indexSource, 'class="dialog-actions-end"') === 5,
+        && substr_count($indexSource, 'class="icon-button dialog-close-button"') === 6
+        && substr_count($indexSource, 'class="dialog-actions-end"') === 6,
     'All calendar dialogs must use the shared OpenCalendar modal structure and action layout.'
+);
+
+assertVisualization(
+    str_contains($indexSource, 'id="view-selector-button"')
+        && str_contains($indexSource, 'id="view-selector-options"')
+        && substr_count($indexSource, 'class="view-selector-option"') === 5
+        && str_contains($script, 'function openViewSelector()')
+        && str_contains($script, 'document.querySelectorAll(\'.view-selector-option\')')
+        && str_contains($script, 'viewSelectorDialog.showModal()')
+        && str_contains($script, 'viewSelectorDialog.close()'),
+    'The calendar view switcher must open a compact modal and keep all five views selectable.'
 );
 
 assertVisualization(
@@ -477,8 +489,8 @@ assertVisualization(
     str_contains($style, '.list-table {')
         && str_contains($style, '.list-color-column {')
         && str_contains($style, '.list-row:hover,')
-        && str_contains($style, 'grid-template-columns: repeat(5, 1fr);'),
-    'The list view must remain minimal, preserve calendar colors and fit into the responsive view selector.'
+        && str_contains($style, '.view-selector-options { display: grid; gap: 5px; }'),
+    'The list view must remain minimal, preserve calendar colors and remain available through the compact view selector modal.'
 );
 
 assertVisualization(

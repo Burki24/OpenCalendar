@@ -18,13 +18,17 @@
         </div>
         <div class="toolbar-title" id="period-title"></div>
         <div class="toolbar-spacer"></div>
-        <div class="toolbar-group" id="view-buttons">
-            <button class="view-button" data-view="agenda">Agenda</button>
-            <button class="view-button" data-view="list">List</button>
-            <button class="view-button" data-view="threeDays">3 Days</button>
-            <button class="view-button" data-view="week">Week</button>
-            <button class="view-button" data-view="month">Month</button>
-        </div>
+        <button class="view-selector-button" id="view-selector-button" type="button" aria-haspopup="dialog"
+            aria-controls="view-selector-dialog" aria-expanded="false">
+            <svg class="view-selector-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <rect x="4" y="4" width="6" height="6" rx="1"></rect>
+                <rect x="14" y="4" width="6" height="6" rx="1"></rect>
+                <rect x="4" y="14" width="6" height="6" rx="1"></rect>
+                <rect x="14" y="14" width="6" height="6" rx="1"></rect>
+            </svg>
+            <span class="view-selector-label" id="view-selector-label">Agenda</span>
+            <span class="view-selector-chevron" aria-hidden="true">⌄</span>
+        </button>
         <button class="floating-add" id="add-button" title="Create event" aria-label="Create event">
             <span class="floating-add-symbol" aria-hidden="true">＋</span>
             <span class="floating-add-label" id="add-button-label">New event</span>
@@ -41,6 +45,28 @@
     <main class="content" id="calendar-content"></main>
     <div class="toast" id="toast" role="status"></div>
 </div>
+
+<dialog id="view-selector-dialog" class="oc-dialog oc-dialog-small view-selector-dialog">
+    <div class="dialog-header">
+        <span class="dialog-accent" style="--dialog-accent-color:var(--cal-accent)"></span>
+        <h2 id="view-selector-dialog-title">View</h2>
+        <button type="button" class="icon-button dialog-close-button" id="view-selector-close" aria-label="Close">×</button>
+    </div>
+    <div class="dialog-body view-selector-body">
+        <div class="view-selector-options" id="view-selector-options" role="radiogroup" aria-labelledby="view-selector-dialog-title">
+            <button type="button" class="view-selector-option" data-view="agenda" role="radio" aria-checked="false">Agenda</button>
+            <button type="button" class="view-selector-option" data-view="list" role="radio" aria-checked="false">List</button>
+            <button type="button" class="view-selector-option" data-view="threeDays" role="radio" aria-checked="false">3 Days</button>
+            <button type="button" class="view-selector-option" data-view="week" role="radio" aria-checked="false">Week</button>
+            <button type="button" class="view-selector-option" data-view="month" role="radio" aria-checked="false">Month</button>
+        </div>
+    </div>
+    <div class="dialog-actions">
+        <div class="dialog-actions-end">
+            <button type="button" class="secondary-button" id="view-selector-close-button">Close</button>
+        </div>
+    </div>
+</dialog>
 
 <dialog id="event-dialog" class="oc-dialog oc-dialog-large">
     <form id="event-form" class="dialog-layout">
