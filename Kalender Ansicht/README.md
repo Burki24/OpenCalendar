@@ -113,6 +113,7 @@ Die zuletzt am jeweiligen Browser/Monitor gewählte Ansicht und das zugehörige 
 Alle eingebetteten Dialoge verwenden ein gemeinsames responsives OpenCalendar-Modaldesign. Kopf- und Aktionsbereich bleiben bei kleinen Darstellungsflächen sichtbar, während nur der Inhaltsbereich scrollt. Einheitliche Größenklassen, Abstände, Schließen-Schaltflächen, Fokusdarstellung, Popup-Farben, Rahmen und Schatten gelten gleichermaßen für Kachelvisualisierung und IPSView.
 
 Ein Klick auf einen Termin öffnet zunächst eine reine Termindetail-Ansicht mit Kalender, Beginn, Ende, Ort und Beschreibung. Schreibbare Einzeltermine können von dort gezielt bearbeitet oder gelöscht werden; schreibgeschützte und wiederkehrende Termine bleiben in der Detailansicht lesbar.
+Beim Löschen erscheint eine eigene OpenCalendar-Bestätigung mit Terminname und Zeitraum. Die native Browser-Abfrage wird nicht verwendet; Abbrechen kehrt zum zuvor geöffneten Detail- oder Bearbeitungsdialog zurück.
 
 Die **Listenansicht** verzichtet bewusst auf Karten und zusätzliche
 Gruppierungen. Jeder Termin wird in einer einfachen Tabellenzeile dargestellt;
@@ -275,4 +276,4 @@ fachliche Inhaltsfarben.
 
 ### Tagesübersicht der Monatsansicht
 
-In der Monatsansicht ist der Hinweis `+ weitere` anklickbar. Er öffnet eine Tagesübersicht mit allen Terminen dieses Tages; ein Klick auf einen Termin öffnet zunächst die Termindetail-Ansicht. Von dort kann ein schreibbarer Einzeltermin gezielt bearbeitet werden.
+In der Monatsansicht öffnet ein Klick auf die Tageszahl oder einen freien Bereich der Tageszelle die Tagesübersicht; der Hinweis `+ weitere` bleibt ebenfalls direkt anklickbar. Die Übersicht zeigt alle Termine des Tages, ganztägige zuerst und anschließend zeitgebundene chronologisch, sowie die Terminanzahl. Ein Klick auf einen Termin öffnet zunächst die Termindetail-Ansicht. Von dort kann ein schreibbarer Einzeltermin gezielt bearbeitet werden. Ist mindestens ein beschreibbarer Kalender verfügbar, kann über **Termin an diesem Tag erstellen** direkt ein neuer Termin für den ausgewählten Tag angelegt werden. Der zusätzliche Floating-Button zum Erstellen eines Termins wird deshalb in der Monatsansicht ausgeblendet und bleibt nur in Agenda, Liste, 3 Tage und Woche verfügbar.

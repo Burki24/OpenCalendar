@@ -125,9 +125,13 @@ assertVisualization(
 assertVisualization(
     str_contains($script, 'function openDayEvents(day, events)')
         && str_contains($script, "more.addEventListener('click', () => openDayEvents(day, events));")
+        && str_contains($script, 'bindMonthDayOverview(cell, day, events);')
+        && str_contains($script, "cell.classList.add('month-day-overview-enabled');")
+        && str_contains($script, "clickEvent.target.closest?.('button, a, input, select, textarea, label')")
+        && str_contains($script, 'openDayEvents(day, events);')
         && str_contains($script, 'dayEventsDialog.showModal();')
         && str_contains($script, 'openEventDetails(event);'),
-    'The month view must open a day-events modal from the additional-events indicator and route selected events to the details modal.'
+    'The month view must open the day-events modal from the day cell or additional-events indicator without intercepting event buttons.'
 );
 
 assertVisualization(
@@ -378,11 +382,56 @@ assertVisualization(
     str_contains($indexSource, 'id="event-dialog" class="oc-dialog oc-dialog-large"')
         && str_contains($indexSource, 'id="event-form" class="dialog-layout"')
         && str_contains($indexSource, 'id="event-details-dialog" class="oc-dialog oc-dialog-medium event-details-dialog"')
+        && str_contains($indexSource, 'id="delete-confirm-dialog" class="oc-dialog oc-dialog-small delete-confirm-dialog"')
         && str_contains($indexSource, 'id="day-events-dialog" class="oc-dialog oc-dialog-large day-events-dialog"')
+        && str_contains($indexSource, 'id="view-selector-dialog" class="oc-dialog oc-dialog-small view-selector-dialog"')
         && str_contains($indexSource, 'id="calendar-filter-dialog" class="oc-dialog oc-dialog-medium calendar-filter-dialog"')
-        && substr_count($indexSource, 'class="icon-button dialog-close-button"') === 4
-        && substr_count($indexSource, 'class="dialog-actions-end"') === 4,
+        && substr_count($indexSource, 'class="icon-button dialog-close-button"') === 6
+        && substr_count($indexSource, 'class="dialog-actions-end"') === 6,
     'All calendar dialogs must use the shared OpenCalendar modal structure and action layout.'
+);
+
+assertVisualization(
+    str_contains($indexSource, 'id="view-selector-button"')
+        && str_contains($indexSource, 'id="view-selector-options"')
+        && substr_count($indexSource, 'class="view-selector-option"') === 5
+        && str_contains($script, 'function openViewSelector()')
+        && str_contains($script, 'document.querySelectorAll(\'.view-selector-option\')')
+        && str_contains($script, 'viewSelectorDialog.showModal()')
+        && str_contains($script, 'viewSelectorDialog.close()'),
+    'The calendar view switcher must open a compact modal and keep all five views selectable.'
+);
+
+assertVisualization(
+    str_contains($indexSource, 'id="delete-confirm-summary"')
+        && str_contains($indexSource, 'id="delete-confirm-period"')
+        && str_contains($indexSource, 'id="delete-confirm-question"')
+        && str_contains($script, 'function requestDelete(sourceDialog)')
+        && str_contains($script, 'function confirmDeleteEvent()')
+        && str_contains($script, 'requestDelete(eventDialog)')
+        && str_contains($script, 'requestDelete(eventDetailsDialog)')
+        && str_contains($script, 'deleteConfirmButton.addEventListener(\'click\', confirmDeleteEvent)')
+        && !str_contains($script, 'confirm(')
+        && str_contains($moduleSource, '\'Delete event\'')
+        && str_contains($moduleSource, '\'Do you really want to delete this event?\'')
+        && !str_contains($moduleSource, '\'Delete this event?\''),
+    'Deleting an event must use the styled OpenCalendar confirmation modal from both details and edit dialogs instead of the native browser confirmation.'
+);
+
+assertVisualization(
+    str_contains($indexSource, 'id="day-events-count"')
+        && str_contains($indexSource, 'id="day-events-create-button"')
+        && str_contains($script, 'const visibleEvents = [...events].sort(compareEventsForDisplay);')
+        && str_contains($script, 'function openNewEvent(preferredDay = null)')
+        && str_contains($script, 'if (day) openNewEvent(day);')
+        && str_contains($script, 'calendarState.calendars.some(calendar => calendar.canWrite)')
+        && str_contains($moduleSource, '\'Create event on this day\'')
+        && str_contains($moduleSource, '\'New event\'')
+        && str_contains($moduleSource, '\'Edit event\'')
+        && str_contains($moduleSource, '\'Edit\'')
+        && str_contains($moduleSource, '\'Filter calendars\'')
+        && str_contains($moduleSource, '\'Select all\''),
+    'The month day overview must sort its events, show the event count and allow creating an event directly for the selected day when a writable calendar is available.'
 );
 
 assertVisualization(
@@ -440,8 +489,8 @@ assertVisualization(
     str_contains($style, '.list-table {')
         && str_contains($style, '.list-color-column {')
         && str_contains($style, '.list-row:hover,')
-        && str_contains($style, 'grid-template-columns: repeat(5, 1fr);'),
-    'The list view must remain minimal, preserve calendar colors and fit into the responsive view selector.'
+        && str_contains($style, '.view-selector-options { display: grid; gap: 5px; }'),
+    'The list view must remain minimal, preserve calendar colors and remain available through the compact view selector modal.'
 );
 
 assertVisualization(
@@ -454,6 +503,12 @@ assertVisualization(
         && str_contains($style, 'color: var(--cal-label-text);')
         && str_contains($style, 'color: var(--cal-icon);'),
     'The calendar viewport must use the view background so transparency works, while inner pages consume the page background role.'
+);
+
+assertVisualization(
+    str_contains($script, 'const showAddButton = actionBridgeAvailable && listControlsVisible() && activeView !== \'month\';')
+        && str_contains($script, 'addButton.classList.toggle(\'visible\', showAddButton);'),
+    'The floating event creation button must stay available in non-month views and remain hidden in the month view.'
 );
 
 assertVisualization(
@@ -516,6 +571,11 @@ foreach ([$native, $ipsView] as $html) {
         str_contains($html, 'id="day-events-dialog"')
             && str_contains($html, 'id="day-events-list"'),
         'The rendered visualization must include the day-events modal markup.'
+    );
+    assertVisualization(
+        str_contains($html, 'id="delete-confirm-dialog"')
+            && str_contains($html, 'id="delete-confirm-button"'),
+        'The rendered visualization must include the styled delete-confirmation modal.'
     );
     assertVisualization(
         str_contains($html, 'id="event-calendar-options" role="listbox"')
