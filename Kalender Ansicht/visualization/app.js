@@ -897,8 +897,45 @@ function setDateInputs(start, end, allDay, allDayEndExclusive = false) {
     startInput.type = allDay ? 'date' : 'datetime-local';
     endInput.type = allDay ? 'date' : 'datetime-local';
     startInput.value = allDay ? localDate(start) : localDateTime(start);
+    startInput.dataset.previousValue = startInput.value;
     const displayEnd = allDay && allDayEndExclusive && end > start ? addDays(end, -1) : end;
     endInput.value = allDay ? localDate(displayEnd) : localDateTime(displayEnd);
+}
+
+function updateEndFromStart() {
+    const allDay = document.getElementById('event-all-day').checked;
+    const startInput = document.getElementById('event-start');
+    const endInput = document.getElementById('event-end');
+    const start = readInputDate(startInput.value);
+    if (!start) return;
+
+    const previousStart = readInputDate(startInput.dataset.previousValue || '');
+    let end;
+    if (allDay) {
+        end = start;
+    } else {
+        const dateChanged = previousStart && dayKey(previousStart) !== dayKey(start);
+        const timeChanged = previousStart
+            && (previousStart.getHours() !== start.getHours()
+                || previousStart.getMinutes() !== start.getMinutes());
+        const currentEnd = readInputDate(endInput.value);
+
+        if (dateChanged && !timeChanged && currentEnd) {
+            end = new Date(
+                start.getFullYear(),
+                start.getMonth(),
+                start.getDate(),
+                currentEnd.getHours(),
+                currentEnd.getMinutes()
+            );
+            if (end <= start) end = new Date(start.getTime() + 60 * 60 * 1000);
+        } else {
+            end = new Date(start.getTime() + 60 * 60 * 1000);
+        }
+    }
+
+    endInput.value = allDay ? localDate(end) : localDateTime(end);
+    startInput.dataset.previousValue = startInput.value;
 }
 
 function updateDialogColor() {
@@ -978,6 +1015,8 @@ document.getElementById('delete-button').addEventListener('click', async () => {
         eventDialog.close();
     }
 });
+
+document.getElementById('event-start').addEventListener('change', updateEndFromStart);
 
 document.getElementById('event-all-day').addEventListener('change', event => {
     const start = readInputDate(document.getElementById('event-start').value) || new Date();

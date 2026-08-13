@@ -103,6 +103,16 @@ assertVisualization(
         && str_contains($script, 'return localDate(exclusiveEnd ? addDays(date, 1) : date);'),
     'The all-day event dialog must show an inclusive end date and convert it back to an exclusive provider end date.'
 );
+assertVisualization(
+    str_contains($script, 'function updateEndFromStart()')
+        && str_contains($script, 'startInput.dataset.previousValue = startInput.value;')
+        && str_contains($script, 'const dateChanged = previousStart && dayKey(previousStart) !== dayKey(start);')
+        && str_contains($script, 'if (dateChanged && !timeChanged && currentEnd) {')
+        && str_contains($script, 'currentEnd.getHours(),')
+        && str_contains($script, 'new Date(start.getTime() + 60 * 60 * 1000)')
+        && str_contains($script, 'document.getElementById(\'event-start\').addEventListener(\'change\', updateEndFromStart);'),
+    'Changing only the start date must move the end to that date while preserving its time; changing the start time must use a one-hour duration.'
+);
 
 assertVisualization(
     str_contains($script, "const action = moving ? 'MoveEvent' : (selectedEvent ? 'UpdateEvent' : 'CreateEvent');")
