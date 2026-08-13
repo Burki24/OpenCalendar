@@ -405,6 +405,49 @@ assertTrueValue(
     'Microsoft event reads must request text bodies, UTC event times and immutable IDs.'
 );
 
+$previousTimezone = date_default_timezone_get();
+date_default_timezone_set('Europe/Berlin');
+try {
+    $msWindowsTimezoneClient = new FakeHttpClient([
+        response(200, [
+            'value' => [[
+                'id'       => 'berlin-timezone-id',
+                'subject'  => 'Berlin meeting',
+                'isAllDay' => false,
+                'start'    => [
+                    'dateTime' => '2026-07-20T18:00:00.0000000',
+                    'timeZone' => 'W. Europe Standard Time'
+                ],
+                'end'      => [
+                    'dateTime' => '2026-07-20T19:00:00.0000000',
+                    'timeZone' => 'W. Europe Standard Time'
+                ],
+                'type'     => 'singleInstance'
+            ]]
+        ])
+    ]);
+    $msWindowsTimezoneEvents = (new MicrosoftCalendarProvider(
+        $msWindowsTimezoneClient,
+        'ms-access-token'
+    ))->getEvents(
+        'AQMk-primary',
+        new DateTimeImmutable('2026-07-20T00:00:00+02:00'),
+        new DateTimeImmutable('2026-07-21T00:00:00+02:00')
+    );
+    assertSameValue(
+        '2026-07-20T18:00:00+02:00',
+        $msWindowsTimezoneEvents[0]['start'],
+        'Microsoft Windows time zones must be normalized without applying the local UTC offset twice.'
+    );
+    assertSameValue(
+        (new DateTimeImmutable('2026-07-20T18:00:00+02:00'))->getTimestamp(),
+        $msWindowsTimezoneEvents[0]['startTimestamp'],
+        'Microsoft Windows time-zone normalization must preserve the actual event instant.'
+    );
+} finally {
+    date_default_timezone_set($previousTimezone);
+}
+
 $msWriteClient = new FakeHttpClient([
     response(201, [
         'id'          => 'created-id',
