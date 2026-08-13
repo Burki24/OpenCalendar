@@ -524,11 +524,12 @@ class KalenderAnsicht extends IPSModuleStrict
      * following day.
      *
      * @param string $Date Local date in YYYY-MM-DD format.
+     * @param int $CalendarInstanceID Optional selected calendar instance ID. Zero includes all selected calendars.
      * @return string JSON-encoded appointment list.
      */
-    public function GetDayAppointments(string $Date): string
+    public function GetDayAppointments(string $Date, int $CalendarInstanceID = 0): string
     {
-        return $this->GetAppointments($Date, $Date);
+        return $this->GetAppointments($Date, $Date, $CalendarInstanceID);
     }
 
     /**
@@ -540,18 +541,16 @@ class KalenderAnsicht extends IPSModuleStrict
      *
      * @param string $From First local date in YYYY-MM-DD format.
      * @param string $To Last local date in YYYY-MM-DD format, inclusive.
+     * @param int $CalendarInstanceID Optional selected calendar instance ID. Zero includes all selected calendars.
      * @return string JSON-encoded appointment list.
      */
-    public function GetAppointments(string $From, string $To): string
+    public function GetAppointments(string $From, string $To, int $CalendarInstanceID = 0): string
     {
         [$rangeStart, $rangeEnd] = CalendarAppointmentRange::fromInclusiveDates($From, $To);
+        $appointments = $this->collectAppointmentsForRange($rangeStart, $rangeEnd);
 
-        return json_encode(
-            $this->collectAppointmentsForRange($rangeStart, $rangeEnd),
-            JSON_UNESCAPED_SLASHES
-                | JSON_UNESCAPED_UNICODE
-                | JSON_PRESERVE_ZERO_FRACTION
-                | JSON_THROW_ON_ERROR
+        return $this->encodeAppointmentList(
+            $this->filterAppointmentsByCalendarInstanceId($appointments, $CalendarInstanceID)
         );
     }
 
@@ -718,6 +717,112 @@ class KalenderAnsicht extends IPSModuleStrict
 
         return $this->encodeAppointmentList(
             $this->filterCurrentAppointments($appointments, $now->getTimestamp())
+        );
+    }
+
+    /**
+     * Counts appointments that are in progress right now.
+     *
+     * All-day appointments covering the current day are considered current.
+     *
+     * @param int $CalendarInstanceID Optional selected calendar instance ID. Zero includes all selected calendars.
+     * @return int Number of appointments currently in progress.
+     */
+    public function GetCurrentAppointmentCount(int $CalendarInstanceID = 0): int
+    {
+        $now = new DateTimeImmutable('now');
+        [$rangeStart, $rangeEnd] = CalendarAppointmentRange::fromInclusiveDates(
+            $now->format('Y-m-d'),
+            $now->format('Y-m-d')
+        );
+        $appointments = $this->collectAppointmentsForRange($rangeStart, $rangeEnd);
+        $appointments = $this->filterAppointmentsByCalendarInstanceId($appointments, $CalendarInstanceID);
+
+        return count($this->filterCurrentAppointments($appointments, $now->getTimestamp()));
+    }
+
+    /**
+     * Returns appointments starting within the next number of hours.
+     *
+     * Appointments already in progress are intentionally excluded. The time window starts
+     * at the current timestamp and may extend across local calendar-day boundaries.
+     *
+     * @param int $Hours Number of hours to look ahead, from 1 up to the maximum synchronized future range.
+     * @param int $CalendarInstanceID Optional selected calendar instance ID. Zero includes all selected calendars.
+     * @return string JSON-encoded appointment list.
+     */
+    public function GetUpcomingAppointments(int $Hours, int $CalendarInstanceID = 0): string
+    {
+        $this->validateUpcomingHours($Hours);
+
+        $now = new DateTimeImmutable('now');
+        $until = $now->modify('+' . $Hours . ' hours');
+        [$rangeStart, $rangeEnd] = CalendarAppointmentRange::fromInclusiveDates(
+            $now->format('Y-m-d'),
+            $until->format('Y-m-d')
+        );
+        $appointments = $this->collectAppointmentsForRange($rangeStart, $rangeEnd);
+        $appointments = $this->filterAppointmentsByCalendarInstanceId($appointments, $CalendarInstanceID);
+
+        return $this->encodeAppointmentList(
+            $this->filterUpcomingAppointments($appointments, $now->getTimestamp(), $until->getTimestamp())
+        );
+    }
+
+    /**
+     * Counts appointments starting within the next number of hours.
+     *
+     * Appointments already in progress are intentionally excluded.
+     *
+     * @param int $Hours Number of hours to look ahead, from 1 up to the maximum synchronized future range.
+     * @param int $CalendarInstanceID Optional selected calendar instance ID. Zero includes all selected calendars.
+     * @return int Number of upcoming appointments in the requested time window.
+     */
+    public function GetUpcomingAppointmentCount(int $Hours, int $CalendarInstanceID = 0): int
+    {
+        $this->validateUpcomingHours($Hours);
+
+        $now = new DateTimeImmutable('now');
+        $until = $now->modify('+' . $Hours . ' hours');
+        [$rangeStart, $rangeEnd] = CalendarAppointmentRange::fromInclusiveDates(
+            $now->format('Y-m-d'),
+            $until->format('Y-m-d')
+        );
+        $appointments = $this->collectAppointmentsForRange($rangeStart, $rangeEnd);
+        $appointments = $this->filterAppointmentsByCalendarInstanceId($appointments, $CalendarInstanceID);
+
+        return count($this->filterUpcomingAppointments(
+            $appointments,
+            $now->getTimestamp(),
+            $until->getTimestamp()
+        ));
+    }
+
+    /**
+     * Returns the next requested number of appointments that have not started yet.
+     *
+     * Currently running appointments are intentionally excluded. The search covers the
+     * maximum synchronized future range supported by Calendar instances.
+     *
+     * @param int $Count Number of future appointments to return, between 1 and 1000.
+     * @param int $CalendarInstanceID Optional selected calendar instance ID. Zero includes all selected calendars.
+     * @return string JSON-encoded appointment list.
+     */
+    public function GetNextAppointments(int $Count, int $CalendarInstanceID = 0): string
+    {
+        if ($Count < 1 || $Count > 1000) {
+            throw new InvalidArgumentException('Count must be between 1 and 1000.');
+        }
+
+        $now = new DateTimeImmutable('now');
+        $today = $now->format('Y-m-d');
+        $lastDay = $now->modify('+' . self::APPOINTMENT_LOOKAHEAD_DAYS . ' days')->format('Y-m-d');
+        [$rangeStart, $rangeEnd] = CalendarAppointmentRange::fromInclusiveDates($today, $lastDay);
+        $appointments = $this->collectAppointmentsForRange($rangeStart, $rangeEnd);
+        $appointments = $this->filterAppointmentsByCalendarInstanceId($appointments, $CalendarInstanceID);
+
+        return $this->encodeAppointmentList(
+            array_slice($this->filterFutureAppointments($appointments, $now->getTimestamp()), 0, $Count)
         );
     }
 
@@ -1155,7 +1260,7 @@ class KalenderAnsicht extends IPSModuleStrict
     /**
      * Filters appointments by their selected Calendar instance ID.
      *
-     * A zero ID keeps all appointments for backwards-compatible compact API calls.
+     * A zero ID keeps all appointments for backwards-compatible API calls.
      * Any other ID only keeps appointments originating from that selected calendar.
      *
      * @param list<array<string, mixed>> $appointments Full normalized appointments.
@@ -1211,13 +1316,48 @@ class KalenderAnsicht extends IPSModuleStrict
      */
     private function findNextAppointment(array $appointments, int $now): ?array
     {
-        foreach ($appointments as $appointment) {
-            if ((int) ($appointment['startTimestamp'] ?? 0) > $now) {
-                return $appointment;
-            }
-        }
+        return $this->filterFutureAppointments($appointments, $now)[0] ?? null;
+    }
 
-        return null;
+    /**
+     * Keeps appointments whose start is still in the future.
+     *
+     * @param list<array<string, mixed>> $appointments Chronologically sorted normalized appointments.
+     * @return list<array<string, mixed>>
+     */
+    private function filterFutureAppointments(array $appointments, int $now): array
+    {
+        return array_values(array_filter(
+            $appointments,
+            static fn (array $appointment): bool => (int) ($appointment['startTimestamp'] ?? 0) > $now
+        ));
+    }
+
+    /**
+     * Keeps future appointments starting no later than the supplied end timestamp.
+     *
+     * @param list<array<string, mixed>> $appointments Chronologically sorted normalized appointments.
+     * @return list<array<string, mixed>>
+     */
+    private function filterUpcomingAppointments(array $appointments, int $now, int $until): array
+    {
+        return array_values(array_filter(
+            $appointments,
+            static fn (array $appointment): bool => (int) ($appointment['startTimestamp'] ?? 0) > $now
+                && (int) ($appointment['startTimestamp'] ?? 0) <= $until
+        ));
+    }
+
+    /**
+     * Validates the requested upcoming appointment time window.
+     */
+    private function validateUpcomingHours(int $Hours): void
+    {
+        if ($Hours < 1 || $Hours > self::APPOINTMENT_LOOKAHEAD_DAYS * 24) {
+            throw new InvalidArgumentException(
+                'Hours must be between 1 and ' . (self::APPOINTMENT_LOOKAHEAD_DAYS * 24) . '.'
+            );
+        }
     }
 
     /**

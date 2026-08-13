@@ -209,8 +209,14 @@ $events = IPSKALVIEW_GetAggregatedEvents(12345);
 // Alle Termine eines lokalen Kalendertags providerübergreifend abrufen.
 $appointments = IPSKALVIEW_GetDayAppointments(12345, '2026-08-11');
 
+// Optional nur Termine einer ausgewählten Kalenderinstanz (z. B. ID 23456).
+$appointments = IPSKALVIEW_GetDayAppointments(12345, '2026-08-11', 23456);
+
 // Alle Termine eines inklusiven lokalen Datumsbereichs providerübergreifend abrufen.
 $appointments = IPSKALVIEW_GetAppointments(12345, '2026-08-11', '2026-08-17');
+
+// Auch die vollständige Bereichsabfrage kann nach Kalenderinstanz gefiltert werden.
+$appointments = IPSKALVIEW_GetAppointments(12345, '2026-08-11', '2026-08-17', 23456);
 
 // Kompakte Tagesliste: summary, start, end, startTime und endTime.
 $appointments = IPSKALVIEW_GetDayAppointmentsCompact(12345, '2026-08-11');
@@ -238,8 +244,16 @@ $count = IPSKALVIEW_GetRemainingDayAppointmentCount(12345);
 // Den nächsten noch nicht begonnenen Termin abrufen.
 $appointment = IPSKALVIEW_GetNextAppointment(12345);
 
-// Alle aktuell laufenden Termine abrufen.
+// Alle aktuell laufenden Termine abrufen oder direkt zählen.
 $appointments = IPSKALVIEW_GetCurrentAppointments(12345);
+$count = IPSKALVIEW_GetCurrentAppointmentCount(12345);
+
+// Alle Termine abrufen bzw. zählen, die innerhalb der nächsten 24 Stunden beginnen.
+$appointments = IPSKALVIEW_GetUpcomingAppointments(12345, 24);
+$count = IPSKALVIEW_GetUpcomingAppointmentCount(12345, 24);
+
+// Die nächsten drei noch nicht begonnenen Termine abrufen.
+$appointments = IPSKALVIEW_GetNextAppointments(12345, 3);
 
 // Metadaten aller in dieser Ansicht ausgewählten Kalender abrufen.
 $calendars = IPSKALVIEW_GetSelectedCalendars(12345);
@@ -258,7 +272,9 @@ die jeweiligen Kalender-Instanzen bereits in ihrem eigenen Synchronisationszeitr
 gecached haben. `GetAppointments()` behandelt das angegebene Enddatum inklusiv.
 Ganztagstermine berücksichtigen weiterhin das providerseitig exklusive Enddatum
 korrekt. Jeder Eintrag enthält zusätzlich `calendarInstanceId`, `calendarName`,
-`calendarColor` und `canWrite`.
+`calendarColor` und `canWrite`. Als letztes optionales Argument kann bei beiden
+Funktionen die Instanz-ID eines ausgewählten Kalenders angegeben werden. Der
+Standardwert `0` liefert alle ausgewählten Kalender.
 
 Die Funktionen liefern JSON. Beispiel:
 
@@ -297,10 +313,20 @@ Auswahl direkt die Anzahl. Auch diese beiden Funktionen können optional auf ein
 ausgewählte Kalenderinstanz eingeschränkt werden.
 
 `GetCurrentAppointments()` liefert ausschließlich Termine, die gerade laufen.
+`GetCurrentAppointmentCount()` liefert für dieselbe Auswahl direkt die Anzahl.
 `GetNextAppointment()` ist bewusst davon getrennt und liefert den nächsten noch
 nicht begonnenen Termin aus dem lokal synchronisierten Zukunftsbestand. Ist kein
-kommender Termin im Cache vorhanden, wird JSON `null` zurückgegeben. Beide
-Funktionen unterstützen ebenfalls den optionalen Kalenderfilter.
+kommender Termin im Cache vorhanden, wird JSON `null` zurückgegeben.
+`GetNextAppointments()` liefert entsprechend die nächsten 1 bis 1000 noch nicht
+begonnenen Termine als Liste. Alle Funktionen unterstützen den optionalen
+Kalenderfilter.
+
+`GetUpcomingAppointments()` liefert Termine, die innerhalb der angegebenen nächsten
+Stunden beginnen. Bereits laufende Termine werden bewusst nicht berücksichtigt und
+können über `GetCurrentAppointments()` abgefragt werden. Das Zeitfenster darf 1 bis
+26280 Stunden betragen und kann über Mitternacht sowie mehrere Kalendertage reichen.
+`GetUpcomingAppointmentCount()` liefert für dieselbe Auswahl direkt die Anzahl.
+Beide Funktionen unterstützen den optionalen Kalenderfilter.
 
 `GetSelectedCalendars()` liefert die in der Instanz ausgewählten und aktivierten
 Kalender als JSON mit `instanceId`, `name`, `color` und `canWrite`. Der nur im
