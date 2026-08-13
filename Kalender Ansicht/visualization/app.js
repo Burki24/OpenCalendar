@@ -116,7 +116,8 @@ function render() {
     const hasWritableCalendar = actionBridgeAvailable
         && calendarState.calendars.some(calendar => calendar.canWrite);
     const addButton = document.getElementById('add-button');
-    addButton.classList.toggle('visible', actionBridgeAvailable && listControlsVisible());
+    const showAddButton = actionBridgeAvailable && listControlsVisible() && activeView !== 'month';
+    addButton.classList.toggle('visible', showAddButton);
     addButton.disabled = !hasWritableCalendar;
     addButton.setAttribute('aria-disabled', String(!hasWritableCalendar));
     const addButtonText = hasWritableCalendar ? 'Create event' : 'No writable calendar available';

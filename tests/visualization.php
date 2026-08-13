@@ -494,6 +494,12 @@ assertVisualization(
 );
 
 assertVisualization(
+    str_contains($script, 'const showAddButton = actionBridgeAvailable && listControlsVisible() && activeView !== \'month\';')
+        && str_contains($script, 'addButton.classList.toggle(\'visible\', showAddButton);'),
+    'The floating event creation button must stay available in non-month views and remain hidden in the month view.'
+);
+
+assertVisualization(
     !str_contains($style, 'html.ipsview-mode #add-button { display: none !important; }')
         && str_contains($style, 'html.ipsview-mode .floating-add {')
         && str_contains($style, 'height: 46px;')
