@@ -112,6 +112,8 @@ Die zuletzt am jeweiligen Browser/Monitor gewählte Ansicht und das zugehörige 
 
 Alle eingebetteten Dialoge verwenden ein gemeinsames responsives OpenCalendar-Modaldesign. Kopf- und Aktionsbereich bleiben bei kleinen Darstellungsflächen sichtbar, während nur der Inhaltsbereich scrollt. Einheitliche Größenklassen, Abstände, Schließen-Schaltflächen, Fokusdarstellung, Popup-Farben, Rahmen und Schatten gelten gleichermaßen für Kachelvisualisierung und IPSView.
 
+Ein Klick auf einen Termin öffnet zunächst eine reine Termindetail-Ansicht mit Kalender, Beginn, Ende, Ort und Beschreibung. Schreibbare Einzeltermine können von dort gezielt bearbeitet oder gelöscht werden; schreibgeschützte und wiederkehrende Termine bleiben in der Detailansicht lesbar.
+
 Die **Listenansicht** verzichtet bewusst auf Karten und zusätzliche
 Gruppierungen. Jeder Termin wird in einer einfachen Tabellenzeile dargestellt;
 der schmale Farbbalken übernimmt die Farbe des jeweiligen Kalenders. Datum,
@@ -273,4 +275,4 @@ fachliche Inhaltsfarben.
 
 ### Tagesübersicht der Monatsansicht
 
-In der Monatsansicht ist der Hinweis `+ weitere` anklickbar. Er öffnet eine Tagesübersicht mit allen Terminen dieses Tages; ein Klick auf einen Termin öffnet den bestehenden Bearbeitungsdialog.
+In der Monatsansicht ist der Hinweis `+ weitere` anklickbar. Er öffnet eine Tagesübersicht mit allen Terminen dieses Tages; ein Klick auf einen Termin öffnet zunächst die Termindetail-Ansicht. Von dort kann ein schreibbarer Einzeltermin gezielt bearbeitet werden.

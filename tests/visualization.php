@@ -126,8 +126,21 @@ assertVisualization(
     str_contains($script, 'function openDayEvents(day, events)')
         && str_contains($script, "more.addEventListener('click', () => openDayEvents(day, events));")
         && str_contains($script, 'dayEventsDialog.showModal();')
-        && str_contains($script, 'openExistingEvent(event);'),
-    'The month view must open a day-events modal from the additional-events indicator and route selected events to the editor.'
+        && str_contains($script, 'openEventDetails(event);'),
+    'The month view must open a day-events modal from the additional-events indicator and route selected events to the details modal.'
+);
+
+assertVisualization(
+    str_contains($indexSource, 'id="event-details-dialog" class="oc-dialog oc-dialog-medium event-details-dialog"')
+        && str_contains($script, 'function openEventDetails(event)')
+        && str_contains($script, 'card.addEventListener(\'click\', () => openEventDetails(event));')
+        && str_contains($script, 'document.getElementById(\'details-edit-button\').addEventListener(\'click\'')
+        && str_contains($script, 'eventDetailsDialog.close();')
+        && str_contains($script, 'openExistingEvent(event);')
+        && str_contains($script, 'document.getElementById(\'dialog-title\').textContent = t(\'Edit event\');')
+        && str_contains($script, 'const displayEnd = end > start ? addDays(end, -1) : start;')
+        && str_contains($script, 'if (event.recurring || event.recurrenceId) return \'Recurring occurrences are currently read-only.\';'),
+    'Event clicks must open a read-first details modal and route editable events to the existing editor only on request.'
 );
 
 assertVisualization(
@@ -364,11 +377,12 @@ assertVisualization(
 assertVisualization(
     str_contains($indexSource, 'id="event-dialog" class="oc-dialog oc-dialog-large"')
         && str_contains($indexSource, 'id="event-form" class="dialog-layout"')
+        && str_contains($indexSource, 'id="event-details-dialog" class="oc-dialog oc-dialog-medium event-details-dialog"')
         && str_contains($indexSource, 'id="day-events-dialog" class="oc-dialog oc-dialog-large day-events-dialog"')
         && str_contains($indexSource, 'id="calendar-filter-dialog" class="oc-dialog oc-dialog-medium calendar-filter-dialog"')
-        && substr_count($indexSource, 'class="icon-button dialog-close-button"') === 3
-        && substr_count($indexSource, 'class="dialog-actions-end"') === 3,
-    'All existing calendar dialogs must use the shared OpenCalendar modal structure and action layout.'
+        && substr_count($indexSource, 'class="icon-button dialog-close-button"') === 4
+        && substr_count($indexSource, 'class="dialog-actions-end"') === 4,
+    'All calendar dialogs must use the shared OpenCalendar modal structure and action layout.'
 );
 
 assertVisualization(
