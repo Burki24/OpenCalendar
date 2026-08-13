@@ -445,7 +445,13 @@ class KalenderAnsicht extends IPSModuleStrict
 
                 default:
                     $result = $this->executeVisualizationAction($Ident, $Value);
-                    $this->sendToast($result['level'], $result['message']);
+                    $this->UpdateVisualizationValue($this->getFullUpdateMessage(
+                        $result['state'],
+                        [
+                            'level'   => $result['level'],
+                            'message' => $result['message']
+                        ]
+                    ));
                     break;
             }
         } catch (Throwable $exception) {
@@ -738,12 +744,21 @@ class KalenderAnsicht extends IPSModuleStrict
     }
 
     /**
-     * @param array<string, mixed>|null $state
+     * @param array<string, mixed>|null $state Current visualization state.
+     * @param array{level: string, message: string}|null $toast Optional toast included in the same native update.
      */
-    private function getFullUpdateMessage(?array $state = null): string
+    private function getFullUpdateMessage(?array $state = null, ?array $toast = null): string
     {
+        $message = [
+            'type'    => 'state',
+            'payload' => $state ?? $this->buildState()
+        ];
+        if ($toast !== null) {
+            $message['toast'] = $toast;
+        }
+
         return json_encode(
-            ['type' => 'state', 'payload' => $state ?? $this->buildState()],
+            $message,
             JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR
         );
     }

@@ -178,6 +178,14 @@ assertVisualization(
 $formSource = (string) file_get_contents(__DIR__ . '/../Kalender Ansicht/form.json');
 $moduleSource = (string) file_get_contents(__DIR__ . '/../Kalender Ansicht/module.php');
 assertVisualization(
+    str_contains($moduleSource, 'private function getFullUpdateMessage(?array $state = null, ?array $toast = null): string')
+        && str_contains($moduleSource, '$message[\'toast\'] = $toast;')
+        && str_contains($moduleSource, '$this->UpdateVisualizationValue($this->getFullUpdateMessage(')
+        && str_contains($moduleSource, "'level'   => \$result['level']")
+        && str_contains($moduleSource, "'message' => \$result['message']"),
+    'Native visualization actions must send refreshed state and toast together so the tile cannot remain stale after an action.'
+);
+assertVisualization(
     str_contains($formSource, '"name": "TileFontScale"')
         && str_contains($formSource, '"caption": "Tile font size (%)"')
         && str_contains($moduleSource, "RegisterPropertyInteger('TileFontScale', 100)")
