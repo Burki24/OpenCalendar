@@ -128,6 +128,36 @@ assertCalendarViewApi(
     'Compact appointment APIs must optionally filter by selected calendar instance ID while zero keeps all calendars.'
 );
 
+assertCalendarViewApi(
+    str_contains($moduleSource, 'public function GetDayAppointmentCount(string $Date, int $CalendarInstanceID = 0): int')
+        && str_contains($moduleSource, 'return $this->GetAppointmentCount($Date, $Date, $CalendarInstanceID);')
+        && str_contains($moduleSource, 'public function GetAppointmentCount(string $From, string $To, int $CalendarInstanceID = 0): int'),
+    'Calendar View must expose provider-independent appointment count functions with optional calendar filtering.'
+);
+assertCalendarViewApi(
+    str_contains($moduleSource, 'public function GetRemainingDayAppointments(int $CalendarInstanceID = 0): string')
+        && str_contains($moduleSource, 'public function GetRemainingDayAppointmentCount(int $CalendarInstanceID = 0): int')
+        && str_contains($moduleSource, '$this->filterRemainingAppointments($appointments, $now->getTimestamp())'),
+    'Calendar View must expose remaining-today appointment list and count functions.'
+);
+assertCalendarViewApi(
+    str_contains($moduleSource, 'public function GetNextAppointment(int $CalendarInstanceID = 0): string')
+        && str_contains($moduleSource, 'self::APPOINTMENT_LOOKAHEAD_DAYS')
+        && str_contains($moduleSource, '$this->findNextAppointment($appointments, $now->getTimestamp())'),
+    'Calendar View must expose the next cached appointment with optional calendar filtering.'
+);
+assertCalendarViewApi(
+    str_contains($moduleSource, 'public function GetCurrentAppointments(int $CalendarInstanceID = 0): string')
+        && str_contains($moduleSource, '$this->filterCurrentAppointments($appointments, $now->getTimestamp())'),
+    'Calendar View must expose appointments that are currently in progress.'
+);
+assertCalendarViewApi(
+    str_contains($moduleSource, 'public function GetSelectedCalendars(): string')
+        && str_contains($moduleSource, '$this->loadSelectedCalendars()')
+        && str_contains($moduleSource, 'private function loadSelectedCalendars(): array'),
+    'Calendar View must expose selected calendar metadata without colliding with its internal loader.'
+);
+
 require_once __DIR__ . '/stubs/ModuleStrictStubs.php';
 require_once __DIR__ . '/../Kalender Ansicht/module.php';
 
@@ -135,6 +165,12 @@ $compactMethod = new ReflectionMethod(KalenderAnsicht::class, 'compactAppointmen
 $compactMethod->setAccessible(true);
 $filterMethod = new ReflectionMethod(KalenderAnsicht::class, 'filterAppointmentsByCalendarInstanceId');
 $filterMethod->setAccessible(true);
+$remainingMethod = new ReflectionMethod(KalenderAnsicht::class, 'filterRemainingAppointments');
+$remainingMethod->setAccessible(true);
+$currentMethod = new ReflectionMethod(KalenderAnsicht::class, 'filterCurrentAppointments');
+$currentMethod->setAccessible(true);
+$nextMethod = new ReflectionMethod(KalenderAnsicht::class, 'findNextAppointment');
+$nextMethod->setAccessible(true);
 $calendarView = new KalenderAnsicht(1);
 $previousTimezone = date_default_timezone_get();
 date_default_timezone_set('Europe/Berlin');
@@ -230,6 +266,65 @@ assertCalendarViewApi(
         'endTime'   => ''
     ],
     'Compact multi-day all-day appointments must convert the exclusive provider end to the visible inclusive end date.'
+);
+
+$now = (new DateTimeImmutable('2026-08-12T12:00:00+02:00'))->getTimestamp();
+$stateAppointments = [
+    [
+        'summary'        => 'Ended',
+        'startTimestamp' => (new DateTimeImmutable('2026-08-12T09:00:00+02:00'))->getTimestamp(),
+        'endTimestamp'   => (new DateTimeImmutable('2026-08-12T10:00:00+02:00'))->getTimestamp()
+    ],
+    [
+        'summary'        => 'Current',
+        'startTimestamp' => (new DateTimeImmutable('2026-08-12T11:30:00+02:00'))->getTimestamp(),
+        'endTimestamp'   => (new DateTimeImmutable('2026-08-12T12:30:00+02:00'))->getTimestamp()
+    ],
+    [
+        'summary'        => 'All day',
+        'startTimestamp' => (new DateTimeImmutable('2026-08-12T00:00:00+02:00'))->getTimestamp(),
+        'endTimestamp'   => (new DateTimeImmutable('2026-08-13T00:00:00+02:00'))->getTimestamp(),
+        'allDay'         => true
+    ],
+    [
+        'summary'        => 'Next',
+        'startTimestamp' => (new DateTimeImmutable('2026-08-12T14:00:00+02:00'))->getTimestamp(),
+        'endTimestamp'   => (new DateTimeImmutable('2026-08-12T15:00:00+02:00'))->getTimestamp()
+    ],
+    [
+        'summary'        => 'Later',
+        'startTimestamp' => (new DateTimeImmutable('2026-08-12T16:00:00+02:00'))->getTimestamp(),
+        'endTimestamp'   => (new DateTimeImmutable('2026-08-12T17:00:00+02:00'))->getTimestamp()
+    ]
+];
+
+$remaining = $remainingMethod->invoke($calendarView, $stateAppointments, $now);
+assertCalendarViewApi(
+    array_column($remaining, 'summary') === ['Current', 'All day', 'Next', 'Later'],
+    'Remaining-day filtering must keep current, all-day and future appointments while excluding ended appointments.'
+);
+
+$current = $currentMethod->invoke($calendarView, $stateAppointments, $now);
+assertCalendarViewApi(
+    array_column($current, 'summary') === ['Current', 'All day'],
+    'Current appointment filtering must include timed and all-day appointments covering the supplied timestamp.'
+);
+
+$chronologicalAppointments = [
+    $stateAppointments[2],
+    $stateAppointments[0],
+    $stateAppointments[1],
+    $stateAppointments[3],
+    $stateAppointments[4]
+];
+$next = $nextMethod->invoke($calendarView, $chronologicalAppointments, $now);
+assertCalendarViewApi(
+    is_array($next) && ($next['summary'] ?? '') === 'Next',
+    'Next appointment lookup must skip ended and currently running appointments and return the next future start.'
+);
+assertCalendarViewApi(
+    $nextMethod->invoke($calendarView, [$stateAppointments[0], $stateAppointments[1]], $now) === null,
+    'Next appointment lookup must return null when no future appointment is available.'
 );
 
 fwrite(STDOUT, 'Calendar View PHP API checks passed.' . PHP_EOL);
