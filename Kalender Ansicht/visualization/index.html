@@ -42,12 +42,12 @@
     <div class="toast" id="toast" role="status"></div>
 </div>
 
-<dialog id="event-dialog">
-    <form id="event-form">
+<dialog id="event-dialog" class="oc-dialog oc-dialog-large">
+    <form id="event-form" class="dialog-layout">
         <div class="dialog-header">
-            <span id="dialog-color" style="width:10px;height:10px;border-radius:50%;background:var(--cal-accent)"></span>
+            <span id="dialog-color" class="dialog-accent" style="--dialog-accent-color:var(--cal-accent)"></span>
             <h2 id="dialog-title">Event</h2>
-            <button type="button" class="icon-button" id="dialog-close" aria-label="Close">×</button>
+            <button type="button" class="icon-button dialog-close-button" id="dialog-close" aria-label="Close">×</button>
         </div>
         <div class="dialog-body">
             <div class="form-row">
@@ -89,31 +89,37 @@
             <div class="dialog-note hidden" id="dialog-note"></div>
         </div>
         <div class="dialog-actions">
-            <button type="button" class="danger-button hidden" id="delete-button">Delete</button>
-            <button type="button" class="secondary-button" id="cancel-button">Cancel</button>
-            <button type="submit" class="primary-button" id="save-button">Save</button>
+            <div class="dialog-actions-start">
+                <button type="button" class="danger-button hidden" id="delete-button">Delete</button>
+            </div>
+            <div class="dialog-actions-end">
+                <button type="button" class="secondary-button" id="cancel-button">Cancel</button>
+                <button type="submit" class="primary-button" id="save-button">Save</button>
+            </div>
         </div>
     </form>
 </dialog>
 
-<dialog id="day-events-dialog" class="day-events-dialog">
+<dialog id="day-events-dialog" class="oc-dialog oc-dialog-large day-events-dialog">
     <div class="dialog-header">
-        <span style="width:10px;height:10px;border-radius:50%;background:var(--cal-accent)"></span>
+        <span class="dialog-accent" style="--dialog-accent-color:var(--cal-accent)"></span>
         <h2 id="day-events-dialog-title">Day events</h2>
-        <button type="button" class="icon-button" id="day-events-close" aria-label="Close">×</button>
+        <button type="button" class="icon-button dialog-close-button" id="day-events-close" aria-label="Close">×</button>
     </div>
     <div class="dialog-body day-events-body">
         <div class="day-events-list" id="day-events-list"></div>
     </div>
     <div class="dialog-actions">
-        <button type="button" class="secondary-button" id="day-events-close-button">Close</button>
+        <div class="dialog-actions-end">
+            <button type="button" class="secondary-button" id="day-events-close-button">Close</button>
+        </div>
     </div>
 </dialog>
-<dialog id="calendar-filter-dialog" class="calendar-filter-dialog">
+<dialog id="calendar-filter-dialog" class="oc-dialog oc-dialog-medium calendar-filter-dialog">
     <div class="dialog-header">
-        <span style="width:10px;height:10px;border-radius:50%;background:var(--cal-accent)"></span>
+        <span class="dialog-accent" style="--dialog-accent-color:var(--cal-accent)"></span>
         <h2 id="calendar-filter-dialog-title">Filter calendars</h2>
-        <button type="button" class="icon-button" id="calendar-filter-close" aria-label="Close">×</button>
+        <button type="button" class="icon-button dialog-close-button" id="calendar-filter-close" aria-label="Close">×</button>
     </div>
     <div class="dialog-body calendar-filter-body">
         <div class="calendar-filter-selection-actions">
@@ -124,8 +130,10 @@
         <div class="dialog-note" id="calendar-filter-note">This filter only changes the current view on this browser or monitor.</div>
     </div>
     <div class="dialog-actions">
-        <button type="button" class="secondary-button" id="calendar-filter-cancel">Cancel</button>
-        <button type="button" class="primary-button" id="calendar-filter-apply">Apply</button>
+        <div class="dialog-actions-end">
+            <button type="button" class="secondary-button" id="calendar-filter-cancel">Cancel</button>
+            <button type="button" class="primary-button" id="calendar-filter-apply">Apply</button>
+        </div>
     </div>
 </dialog>
 
