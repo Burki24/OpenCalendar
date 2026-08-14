@@ -1,8 +1,8 @@
 # Datenschutzhinweise / Privacy Notice
 
-**Stand / Last updated: 12.08.2026**
+**Stand / Last updated: 14.08.2026**
 
-OpenCalendar ist eine quelloffene, unter der PolyForm Noncommercial License 1.0.0 bereitgestellte Bibliothek für Symcon. Die Kalenderverarbeitung findet grundsätzlich auf der Symcon-Installation des Anwenders statt. Der Modulautor betreibt keinen eigenen Kalender-Backenddienst und erhält über OpenCalendar keine Kalenderinhalte.
+OpenCalendar ist eine quellverfügbare, unter der PolyForm Noncommercial License 1.0.0 bereitgestellte Bibliothek für Symcon. Die Kalenderverarbeitung findet grundsätzlich auf der Symcon-Installation des Anwenders statt. Der Modulautor betreibt keinen eigenen Kalender-Backenddienst und erhält über OpenCalendar keine Kalenderinhalte.
 
 Kontakt zum Projekt: [GitHub-Repository OpenCalendar](https://github.com/Burki24/OpenCalendar) und dessen Issue-Bereich.
 
@@ -23,7 +23,7 @@ OpenCalendar enthält keine eigene Telemetrie, Werbung oder Nutzeranalyse. Kalen
 
 ### 2.1 Zugriff auf Google-Nutzerdaten
 
-Die Google-Anbindung verwendet einen persönlichen OAuth-Webclient des Anwenders. Client-ID und Clientschlüssel werden in der jeweiligen Symcon-Installation konfiguriert.
+Die Google-Anbindung verwendet eine zentral registrierte und von Google für die öffentliche Nutzung verifizierte OAuth-Anwendung sowie den zentralen OAuth-Dienst von Symcon. Anwender müssen keine eigene Client-ID und keinen eigenen Clientschlüssel hinterlegen.
 
 OpenCalendar fordert ausschließlich folgende Google-Berechtigungen an:
 
@@ -71,7 +71,7 @@ OpenCalendar übermittelt Google-Kalender- und Termindaten nicht an einen Backen
 
 Der eigentliche Austausch von Kalender- und Termindaten erfolgt direkt zwischen der Symcon-Installation des Anwenders und den Google-Calendar-APIs.
 
-Für die OAuth-Anmeldung wird die persönliche Symcon-Connect-Verbindung des Anwenders als technischer Rückkanal für den OAuth-Callback verwendet. Symcon Connect wird von der Symcon GmbH betrieben. Über diesen Dienst können für den OAuth-Ablauf erforderliche technische Verbindungsdaten verarbeitet werden. Die eigentlichen Kalender- und Termininhalte werden von OpenCalendar nicht über einen Server des Modulautors geleitet.
+Für die OAuth-Anmeldung und die Token-Aktualisierung werden die dafür erforderlichen OAuth-Daten über den zentralen Symcon-OAuth-Dienst unter `https://oauth.ipmagic.de` verarbeitet. Dazu gehören insbesondere Autorisierungscodes und Refresh-Tokens, die für den Austausch mit Google erforderlich sind. Für den OAuth-Callback wird eine aktive Symcon-Connect-Verbindung des Anwenders benötigt. Diese Dienste werden von der Symcon GmbH betrieben. Die eigentlichen Kalender- und Termininhalte werden von OpenCalendar nicht über einen Server des Modulautors geleitet.
 
 Der Modulautor erhält keinen automatischen Zugriff auf:
 
@@ -150,9 +150,7 @@ iCalendar-Feeds können einschließlich ihrer Termindaten persistent zwischenges
 
 ## 5. Symcon Connect und Symcon OAuth
 
-Google OAuth benötigt für den Callback eine aktive Symcon-Connect-Verbindung.
-
-Microsoft OAuth verwendet zusätzlich den zentralen Symcon-OAuth-Dienst.
+Google OAuth und Microsoft OAuth verwenden den zentralen Symcon-OAuth-Dienst. Für den jeweiligen OAuth-Callback wird eine aktive Symcon-Connect-Verbindung benötigt.
 
 Diese Dienste werden von der Symcon GmbH betrieben und unterliegen deren eigenen Datenschutzbestimmungen.
 
@@ -220,9 +218,9 @@ Diese Datenschutzhinweise werden angepasst, wenn sich die Datenverarbeitung, die
 
 # Privacy Notice (English)
 
-**Last updated: 12 August 2026**
+**Last updated: 14 August 2026**
 
-OpenCalendar is an open-source library for Symcon. Calendar processing generally takes place on the user's own Symcon installation. The module author does not operate a calendar backend service and does not receive calendar content through OpenCalendar.
+OpenCalendar is a source-available library for Symcon distributed under the PolyForm Noncommercial License 1.0.0. Calendar processing generally takes place on the user's own Symcon installation. The module author does not operate a calendar backend service and does not receive calendar content through OpenCalendar.
 
 Project contact: [OpenCalendar GitHub repository](https://github.com/Burki24/OpenCalendar) and its issue tracker.
 
@@ -243,7 +241,7 @@ OpenCalendar contains no proprietary telemetry, advertising or user analytics. C
 
 ### 2.1 Google user data accessed
 
-Google integration uses a personal OAuth web client configured by the user. The client ID and client secret are configured in the user's Symcon installation.
+Google integration uses a centrally registered OAuth application verified by Google for public use together with Symcon's central OAuth service. Users do not need to provide their own client ID or client secret.
 
 OpenCalendar requests only the following Google permissions:
 
@@ -293,7 +291,7 @@ OpenCalendar does not transmit Google calendar or event data to a backend servic
 
 Actual calendar and event data is exchanged directly between the user's Symcon installation and the Google Calendar APIs.
 
-For OAuth authorization, the user's personal Symcon Connect connection is used as the technical callback channel. Symcon Connect is operated by Symcon GmbH. Technical connection data required for the OAuth process may be processed through this service. OpenCalendar does not route actual calendar and event content through a server operated by the module author.
+OAuth data required for authorization and token renewal is processed through Symcon's central OAuth service at `https://oauth.ipmagic.de`. This includes in particular authorization codes and refresh tokens required for the exchange with Google. An active Symcon Connect connection is required for the OAuth callback. These services are operated by Symcon GmbH. OpenCalendar does not route actual calendar and event content through a server operated by the module author.
 
 The module author does not automatically receive access to:
 
@@ -372,9 +370,7 @@ iCalendar feeds, including event data, may be cached persistently to support ETa
 
 ## 5. Symcon Connect and Symcon OAuth
 
-Google OAuth requires an active Symcon Connect connection for the callback.
-
-Microsoft OAuth additionally uses the central Symcon OAuth service.
+Google OAuth and Microsoft OAuth use the central Symcon OAuth service. An active Symcon Connect connection is required for the respective OAuth callback.
 
 These services are operated by Symcon GmbH and are subject to Symcon's own privacy policy.
 

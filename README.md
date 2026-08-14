@@ -10,8 +10,10 @@
 OpenCalendar ist eine Anwendung für Symcon, mit der Nutzer ihre Online-Kalender verbinden, synchronisieren, anzeigen und bearbeiten können. Unterstützt werden Apple iCloud, Google Calendar, Microsoft 365/Outlook.com, generische CalDAV-Server sowie schreibgeschützte ICS-/Webcal-Abonnements.
 Die gefundenen Kalender können einzeln synchronisiert, in einer gemeinsamen Kachel angezeigt und optional als interaktive HTML-Seite in IPSView verwendet werden.
 
-Umfangreiche Terminlisten werden intern seitenweise zwischen Konto, Kalender und Kalenderansicht übertragen; große ICS-Dateien müssen nicht manuell
-aufgeteilt werden.
+Umfangreiche Terminlisten werden intern seitenweise zwischen Konto, Kalender und
+Kalenderansicht übertragen. Online-ICS-/Webcal-Feeds und lokal importierte
+ICS-Dateien dürfen jeweils höchstens 16 MiB groß sein. Innerhalb dieser Grenze
+müssen umfangreiche Kalenderdateien nicht manuell aufgeteilt werden.
 
 **Datenschutz:** [Datenschutzhinweise](PRIVACY.md)
 **Nutzungsbedingungen:** [Nutzungsbedingungen](TERMS.md)
@@ -20,7 +22,8 @@ aufgeteilt werden.
 
 - Symcon ab Version 9.0
 - Netzwerkzugriff des Symcon-Servers auf den jeweiligen Kalenderdienst
-- für Google und Microsoft eine aktive Symcon-Connect-Verbindung
+- für Google und Microsoft eine aktive Symcon-Connect-Verbindung; eine eigene
+  OAuth-Client-ID oder ein eigener Clientschlüssel ist nicht erforderlich
 - für Apple iCloud ein anwendungsspezifisches Apple-Passwort
 
 ## Schnellstart
@@ -42,8 +45,8 @@ Die ausführlichen Einstellungen der Anbieter sind in der Dokumentation des
 Anbieter | Benötigte Angaben | Zugriff
 --- | --- | ---
 Apple iCloud | Apple-ID und anwendungsspezifisches Passwort | Lesen und Schreiben entsprechend den Kalenderrechten
-Google Calendar | Anmeldung über Symcon OAuth | Lesen und Schreiben entsprechend den Google-Kalenderrechten
-Microsoft 365/Outlook.com | Anmeldung über Symcon OAuth | Lesen und Schreiben entsprechend den Microsoft-Kalenderrechten
+Google Calendar | Öffentlich freigegebene und von Google verifizierte OpenCalendar-OAuth-Anwendung über Symcon | Lesen und Schreiben entsprechend den Google-Kalenderrechten
+Microsoft 365/Outlook.com | Zentrale OpenCalendar-OAuth-Anwendung über Symcon | Lesen und Schreiben entsprechend den Microsoft-Kalenderrechten
 CalDAV | Server-URL, Benutzername und Passwort | Lesen und Schreiben entsprechend den Serverrechten
 ICS/Webcal | Eine oder mehrere Feed-URLs (öffentlich, Zugriffsschlüssel oder Benutzername/Passwort) oder lokale ICS-Dateien vom Arbeitsrechner | Schreibgeschützt
 
@@ -98,7 +101,13 @@ OpenCalendar verarbeitet Konto-, Kalender- und Termindaten grundsätzlich auf de
 eigenen Symcon-Installation. Das Modul enthält keine eigene Telemetrie und
 übermittelt Kalenderinhalte nicht an einen Backenddienst des Modulautors. Bei
 OAuth-Anbindungen werden die jeweils notwendigen Dienste von Google, Microsoft
-und Symcon verwendet.
+und Symcon verwendet. Die Google-OAuth-Anwendung von OpenCalendar ist öffentlich
+freigegeben und von Google verifiziert. Anwender benötigen weder ein eigenes
+Google-Cloud-Projekt noch eine eigene Client-ID oder einen Clientschlüssel. Für
+Google und Microsoft werden die für Anmeldung und Token-Aktualisierung
+erforderlichen OAuth-Daten über den zentralen Symcon-OAuth-Dienst verarbeitet;
+Kalender- und Termininhalte werden direkt zwischen der lokalen
+Symcon-Installation und dem jeweiligen Kalenderanbieter übertragen.
 
 Vor dem Verbinden eines externen Kontos sollten die
 [Datenschutzhinweise](PRIVACY.md) gelesen werden. Ergänzend gelten die
@@ -124,4 +133,3 @@ Drittanbieter.
   zusammen und stellt die ausgewählten Kalender zusätzlich providerübergreifend
   über PHP-Funktionen für Tages- und Datumsbereichsabfragen bereit. Neben der
   vollständigen Ausgabe stehen kompakte Varianten für einfache Skripte zur Verfügung.
-
