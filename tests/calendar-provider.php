@@ -123,7 +123,8 @@ $calendarClient = new FakeHttpClient([
                 'summary'         => 'Primary',
                 'backgroundColor' => '#1a73e8',
                 'accessRole'      => 'owner',
-                'primary'         => true
+                'primary'         => true,
+                'timeZone'        => 'Europe/Berlin'
             ],
             [
                 'id'         => 'availability@example.com',
@@ -148,6 +149,8 @@ assertSameValue(2, count($calendars), 'Calendar discovery must paginate and excl
 assertSameValue('owner@example.com', $calendars[0]['providerId'], 'The primary calendar must be listed first.');
 assertSameValue(true, $calendars[0]['writeAccessKnown'], 'Google access roles must provide authoritative write metadata.');
 assertSameValue(true, $calendars[0]['capabilities']['create'], 'Owners must have write access.');
+assertSameValue(true, $calendars[0]['capabilities']['createRecurrence'], 'Writable Google calendars must advertise recurrence creation support.');
+assertSameValue('Europe/Berlin', $calendars[0]['timezone'], 'Google calendar timezones must be retained for recurring events.');
 assertSameValue(false, $calendars[1]['capabilities']['create'], 'Readers must not have write access.');
 assertTrueValue(str_contains($calendarClient->requests[1]['url'], 'pageToken=page-2'), 'The second calendar page must be requested.');
 
@@ -234,6 +237,68 @@ assertSameValue('created-id', $created['eventReference'], 'The created Google ev
 assertSameValue('POST', $writeClient->requests[0]['method'], 'Events must be created via POST.');
 $createBody = json_decode($writeClient->requests[0]['body'], true, 512, JSON_THROW_ON_ERROR);
 assertSameValue('Test', $createBody['summary'], 'The event summary must be sent.');
+
+$recurringCreateClient = new FakeHttpClient([
+    response(200, ['id' => 'series-id', 'iCalUID' => 'series@example.com', 'etag' => '"series"'])
+]);
+$recurringProvider = new GoogleCalendarProvider($recurringCreateClient, 'access-token');
+$recurringProvider->createEvent('owner@example.com', [
+    'summary'    => 'Weekly meeting',
+    'allDay'     => false,
+    'start'      => '2026-10-19T08:00:00Z',
+    'end'        => '2026-10-19T09:00:00Z',
+    'timezone'   => 'Europe/Berlin',
+    'recurrence' => [
+        'frequency' => 'weekly',
+        'interval'  => 2,
+        'byDay'     => ['TH', 'MO'],
+        'endMode'   => 'until',
+        'until'     => '2026-11-30'
+    ]
+]);
+$recurringCreateBody = json_decode(
+    $recurringCreateClient->requests[0]['body'],
+    true,
+    512,
+    JSON_THROW_ON_ERROR
+);
+assertSameValue(
+    '2026-10-19T10:00:00+02:00',
+    $recurringCreateBody['start']['dateTime'],
+    'Recurring Google events must preserve the local wall-clock start time.'
+);
+assertSameValue(
+    'Europe/Berlin',
+    $recurringCreateBody['start']['timeZone'],
+    'Recurring Google events must send an explicit IANA timezone.'
+);
+assertSameValue(
+    ['RRULE:FREQ=WEEKLY;INTERVAL=2;BYDAY=MO,TH;UNTIL=20261130T090000Z'],
+    $recurringCreateBody['recurrence'],
+    'Recurring Google events must serialize normalized recurrence settings as RFC 5545 RRULE lines.'
+);
+
+$allDayRecurringClient = new FakeHttpClient([
+    response(200, ['id' => 'all-day-series', 'iCalUID' => 'all-day-series@example.com', 'etag' => '"series"'])
+]);
+(new GoogleCalendarProvider($allDayRecurringClient, 'access-token'))->createEvent('owner@example.com', [
+    'summary'    => 'Yearly day',
+    'allDay'     => true,
+    'start'      => '2026-08-14',
+    'end'        => '2026-08-15',
+    'recurrence' => [
+        'frequency' => 'yearly',
+        'interval'  => 1,
+        'endMode'   => 'count',
+        'count'     => 3
+    ]
+]);
+$allDayRecurringBody = json_decode($allDayRecurringClient->requests[0]['body'], true, 512, JSON_THROW_ON_ERROR);
+assertSameValue(
+    ['RRULE:FREQ=YEARLY;COUNT=3'],
+    $allDayRecurringBody['recurrence'],
+    'All-day recurring Google events must support count-based series without a timezone.'
+);
 $provider->updateEvent(
     'owner@example.com',
     $created['resourceUrl'],
@@ -1481,6 +1546,22 @@ assertTrueValue(
         && str_contains($calendarModuleSource, "\$this->ReadAttributeBoolean('DetectedCanWrite')
                             || \$this->ReadPropertyBoolean('CanWrite')"),
     'Calendar instances must preserve writable operation for legacy caches and incomplete DAV privilege metadata.'
+);
+assertTrueValue(
+    is_string($calendarModuleSource)
+        && str_contains($calendarModuleSource, "RegisterAttributeBoolean('DetectedCanCreateRecurrence', false)")
+        && str_contains($calendarModuleSource, "RegisterAttributeString('DetectedCalendarTimezone', '')")
+        && str_contains($calendarModuleSource, "\$capabilities['createRecurrence'] ?? false")
+        && str_contains($calendarModuleSource, "'canCreateRecurrence' => \$metadataAvailable")
+        && str_contains($calendarModuleSource, "'timezone'            => \$metadataAvailable")
+        && str_contains($calendarModuleSource, 'Recurring event creation is not supported by this calendar.'),
+    'Calendar instances must expose recurrence creation capability and calendar timezone while blocking unsupported recurring writes.'
+);
+assertTrueValue(
+    is_string($viewModuleSource)
+        && str_contains($viewModuleSource, "'canCreateRecurrence' => (bool) (\$calendarStatus['canCreateRecurrence'] ?? false)")
+        && str_contains($viewModuleSource, "'timezone'            => trim((string) (\$calendarStatus['timezone'] ?? ''))"),
+    'Calendar views must pass recurrence capability and timezone metadata to Tile and IPSView clients.'
 );
 assertTrueValue(
     is_string($viewModuleSource)

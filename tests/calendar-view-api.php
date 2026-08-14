@@ -168,8 +168,10 @@ assertCalendarViewApi(
 assertCalendarViewApi(
     str_contains($moduleSource, 'public function GetSelectedCalendars(): string')
         && str_contains($moduleSource, '$this->loadSelectedCalendars()')
-        && str_contains($moduleSource, 'private function loadSelectedCalendars(): array'),
-    'Calendar View must expose selected calendar metadata without colliding with its internal loader.'
+        && str_contains($moduleSource, 'private function loadSelectedCalendars(): array')
+        && str_contains($moduleSource, "'timezone'            => trim((string) (\$calendarStatus['timezone'] ?? ''))")
+        && str_contains($moduleSource, "'canCreateRecurrence' => (bool) (\$calendarStatus['canCreateRecurrence'] ?? false)"),
+    'Calendar View must expose selected calendar metadata including recurrence capability and timezone without colliding with its internal loader.'
 );
 
 require_once __DIR__ . '/stubs/ModuleStrictStubs.php';

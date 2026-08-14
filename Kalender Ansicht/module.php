@@ -837,7 +837,7 @@ class KalenderAnsicht extends IPSModuleStrict
     /**
      * Returns the calendar instances selected and enabled in this Calendar View.
      *
-     * The result contains instanceId, name, color and canWrite for each selected calendar.
+     * The result contains instanceId, name, color, canWrite, timezone and canCreateRecurrence for each selected calendar.
      * Client-side temporary calendar filters do not alter this configured selection.
      *
      * @return string JSON-encoded selected calendar list.
@@ -1143,6 +1143,22 @@ class KalenderAnsicht extends IPSModuleStrict
             'End',
             'Location',
             'Description',
+            'Repeat',
+            'Does not repeat',
+            'Daily',
+            'Weekly',
+            'Monthly',
+            'Yearly',
+            'Interval',
+            'Ends',
+            'Never',
+            'After occurrences',
+            'On date',
+            'Weekdays',
+            'Occurrences',
+            'End date',
+            'Year',
+            'Years',
             'Cancel',
             'Save',
             'Move',
@@ -1161,6 +1177,7 @@ class KalenderAnsicht extends IPSModuleStrict
             'This filter only changes the current view on this browser or monitor.',
             'Tomorrow',
             'Yesterday',
+            'Recurring event creation is not supported by this calendar.',
             'Recurring occurrences are currently read-only.',
             'Only this occurrence of the recurring event will be changed.',
             'This calendar is read-only.',
@@ -1653,7 +1670,7 @@ class KalenderAnsicht extends IPSModuleStrict
     }
 
     /**
-     * @return list<array{instanceId: int, name: string, color: string, canWrite: bool}>
+     * @return list<array{instanceId: int, name: string, color: string, canWrite: bool, timezone: string, canCreateRecurrence: bool}>
      */
     private function loadSelectedCalendars(): array
     {
@@ -1692,11 +1709,13 @@ class KalenderAnsicht extends IPSModuleStrict
             }
 
             $result[] = [
-                'instanceId' => $instanceId,
-                'name'       => IPS_GetName($instanceId),
-                'color'      => $color,
-                'canWrite'   => (bool) ($calendarStatus['canWrite']
-                    ?? IPS_GetProperty($instanceId, 'CanWrite'))
+                'instanceId'          => $instanceId,
+                'name'                => IPS_GetName($instanceId),
+                'color'               => $color,
+                'canWrite'            => (bool) ($calendarStatus['canWrite']
+                    ?? IPS_GetProperty($instanceId, 'CanWrite')),
+                'timezone'            => trim((string) ($calendarStatus['timezone'] ?? '')),
+                'canCreateRecurrence' => (bool) ($calendarStatus['canCreateRecurrence'] ?? false)
             ];
         }
 

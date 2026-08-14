@@ -114,6 +114,55 @@
                     <input id="event-end" type="datetime-local" required>
                 </div>
             </div>
+            <div class="form-row recurrence-section" id="event-recurrence-row">
+                <label for="event-recurrence-frequency">Repeat</label>
+                <select id="event-recurrence-frequency">
+                    <option value="none" data-i18n="Does not repeat">Does not repeat</option>
+                    <option value="daily" data-i18n="Daily">Daily</option>
+                    <option value="weekly" data-i18n="Weekly">Weekly</option>
+                    <option value="monthly" data-i18n="Monthly">Monthly</option>
+                    <option value="yearly" data-i18n="Yearly">Yearly</option>
+                </select>
+            </div>
+            <div class="recurrence-options hidden" id="event-recurrence-options">
+                <div class="form-row two">
+                    <div class="form-row">
+                        <label for="event-recurrence-interval">Interval</label>
+                        <div class="recurrence-interval-control">
+                            <input id="event-recurrence-interval" type="number" min="1" max="999" value="1">
+                            <span id="event-recurrence-interval-unit"></span>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <label for="event-recurrence-end-mode">Ends</label>
+                        <select id="event-recurrence-end-mode">
+                            <option value="never" data-i18n="Never">Never</option>
+                            <option value="count" data-i18n="After occurrences">After occurrences</option>
+                            <option value="until" data-i18n="On date">On date</option>
+                        </select>
+                    </div>
+                </div>
+                <fieldset class="recurrence-weekdays hidden" id="event-recurrence-weekdays">
+                    <legend data-i18n="Weekdays">Weekdays</legend>
+                    <div class="recurrence-weekday-grid">
+                        <label><input type="checkbox" value="MO"><span data-weekday="1">Mo</span></label>
+                        <label><input type="checkbox" value="TU"><span data-weekday="2">Tu</span></label>
+                        <label><input type="checkbox" value="WE"><span data-weekday="3">We</span></label>
+                        <label><input type="checkbox" value="TH"><span data-weekday="4">Th</span></label>
+                        <label><input type="checkbox" value="FR"><span data-weekday="5">Fr</span></label>
+                        <label><input type="checkbox" value="SA"><span data-weekday="6">Sa</span></label>
+                        <label><input type="checkbox" value="SU"><span data-weekday="7">Su</span></label>
+                    </div>
+                </fieldset>
+                <div class="form-row hidden" id="event-recurrence-count-row">
+                    <label for="event-recurrence-count">Occurrences</label>
+                    <input id="event-recurrence-count" type="number" min="1" max="9999" value="10">
+                </div>
+                <div class="form-row hidden" id="event-recurrence-until-row">
+                    <label for="event-recurrence-until">End date</label>
+                    <input id="event-recurrence-until" type="date">
+                </div>
+            </div>
             <div class="form-row">
                 <label for="event-location">Location</label>
                 <input id="event-location" maxlength="500">

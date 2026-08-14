@@ -128,7 +128,24 @@
             "Apply": "Übernehmen",
             "No calendars visible": "Keine Kalender sichtbar",
             "Select one or more calendars in the calendar filter.": "Wählen Sie im Kalenderfilter einen oder mehrere Kalender aus.",
-            "This filter only changes the current view on this browser or monitor.": "Dieser Filter ändert nur die aktuelle Ansicht auf diesem Browser oder Monitor."
+            "This filter only changes the current view on this browser or monitor.": "Dieser Filter ändert nur die aktuelle Ansicht auf diesem Browser oder Monitor.",
+            "Repeat": "Wiederholen",
+            "Does not repeat": "Nicht wiederholen",
+            "Daily": "Täglich",
+            "Weekly": "Wöchentlich",
+            "Monthly": "Monatlich",
+            "Yearly": "Jährlich",
+            "Interval": "Intervall",
+            "Ends": "Endet",
+            "Never": "Nie",
+            "After occurrences": "Nach Anzahl",
+            "On date": "Am Datum",
+            "Weekdays": "Wochentage",
+            "Occurrences": "Anzahl Termine",
+            "End date": "Enddatum",
+            "Year": "Jahr",
+            "Years": "Jahre",
+            "Recurring event creation is not supported by this calendar.": "Dieser Kalender unterstützt das Anlegen von Serienterminen nicht."
         }
     }
 }

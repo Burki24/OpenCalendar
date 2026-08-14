@@ -110,8 +110,20 @@ assertVisualization(
         && str_contains($script, 'if (dateChanged && !timeChanged && currentEnd) {')
         && str_contains($script, 'currentEnd.getHours(),')
         && str_contains($script, 'new Date(start.getTime() + 60 * 60 * 1000)')
-        && str_contains($script, 'document.getElementById(\'event-start\').addEventListener(\'change\', updateEndFromStart);'),
+        && str_contains($script, "document.getElementById('event-start').addEventListener('change', () => {")
+        && str_contains($script, 'updateRecurrenceEndDateMinimum();'),
     'Changing only the start date must move the end to that date while preserving its time; changing the start time must use a one-hour duration.'
+);
+
+assertVisualization(
+    str_contains($indexSource, 'id="event-recurrence-frequency"')
+        && str_contains($indexSource, 'id="event-recurrence-weekdays"')
+        && str_contains($indexSource, 'id="event-recurrence-end-mode"')
+        && str_contains($script, 'Boolean(calendar?.canCreateRecurrence)')
+        && str_contains($script, 'function recurrenceEditorValue()')
+        && str_contains($script, 'eventData.recurrence = recurrence;')
+        && str_contains($script, 'eventData.timezone = timezone;'),
+    'The event dialog must expose recurrence creation only for recurrence-capable calendars and submit normalized recurrence data with the calendar timezone.'
 );
 
 assertVisualization(

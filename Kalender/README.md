@@ -32,7 +32,7 @@ beliebig verschoben oder vom Benutzer umbenannt werden.
 - Abruf von CalDAV-Terminen über einen konfigurierbaren Zeitraum
 - Auflösen wiederkehrender Termine für die lokale Anzeige
 - lokaler JSON-Cache und zyklische Synchronisation
-- Erstellen neuer Termine
+- Erstellen neuer Termine sowie neuer Google-Serientermine
 - Ändern und Löschen einzelner Termine sowie einzelner Google-Serienvorkommnisse
 - ETag-basierter Schutz vor dem Überschreiben zwischenzeitlicher Änderungen
 - Statusvariablen für die gesamte geladene Terminanzahl, die Termine des
@@ -103,6 +103,10 @@ Transfer beginnen, die Seiten von `0` bis `PageCount - 1` abrufen und den
 Transfer anschließend auch im Fehlerfall beenden. `StartTimestamp` ist inklusiv,
 `EndTimestamp` exklusiv.
 
+`IPSKAL_GetCalendarStatus()` liefert neben Synchronisations- und Zählerinformationen
+auch `calendarColor`, `canWrite`, `timezone` und `canCreateRecurrence`. Die beiden
+letzten Felder werden aus den vom Provider erkannten Kalender-Metadaten übernommen.
+
 ### Termin erstellen
 
 ```php
@@ -125,6 +129,31 @@ $result = IPSKAL_CreateEvent(12345, json_encode([
     'allDay'  => true
 ]));
 ```
+
+Für beschreibbare Google-Kalender können beim Erstellen zusätzlich providerneutrale
+Serienangaben übergeben werden. Bei zeitgebundenen Serien verwendet OpenCalendar
+die Zeitzone des ausgewählten Kalenders, damit die lokale Uhrzeit auch über
+Sommer-/Winterzeitwechsel erhalten bleibt:
+
+```php
+$result = IPSKAL_CreateEvent(12345, json_encode([
+    'summary'  => 'Jour fixe',
+    'start'    => '2026-08-17T10:00:00+02:00',
+    'end'      => '2026-08-17T11:00:00+02:00',
+    'recurrence' => [
+        'frequency' => 'WEEKLY',
+        'interval'  => 1,
+        'byDay'     => ['MO'],
+        'endMode'   => 'until',
+        'until'     => '2026-12-31'
+    ]
+]));
+```
+
+Unterstützt werden `DAILY`, `WEEKLY`, `MONTHLY` und `YEARLY`, ein Intervall,
+bei wöchentlichen Serien optionale Wochentage sowie die Endarten `never`,
+`count` und `until`. Das Ändern einer vollständigen Serie ist weiterhin bewusst
+nicht freigegeben.
 
 ### Termin ändern
 

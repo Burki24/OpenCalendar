@@ -117,6 +117,9 @@ Die zuletzt am jeweiligen Browser/Monitor gewählte Ansicht und das zugehörige 
 Alle eingebetteten Dialoge verwenden ein gemeinsames responsives OpenCalendar-Modaldesign. Kopf- und Aktionsbereich bleiben bei kleinen Darstellungsflächen sichtbar, während nur der Inhaltsbereich scrollt. Einheitliche Größenklassen, Abstände, Schließen-Schaltflächen, Fokusdarstellung, Popup-Farben, Rahmen und Schatten gelten gleichermaßen für Kachelvisualisierung und IPSView.
 
 Ein Klick auf einen Termin öffnet zunächst eine reine Termindetail-Ansicht mit Kalender, Beginn, Ende, Ort und Beschreibung. Schreibbare Einzeltermine und einzelne Google-Serienvorkommnisse können von dort gezielt bearbeitet oder gelöscht werden. Vollständige Serien, Microsoft- und CalDAV-Vorkommnisse sowie schreibgeschützte Kalender bleiben in der Detailansicht lesbar.
+
+Beim Erstellen eines Termins bietet ein beschreibbarer Google-Kalender zusätzlich den Bereich **Wiederholen**. Unterstützt werden tägliche, wöchentliche, monatliche und jährliche Serien, ein frei wählbares Intervall, bei wöchentlichen Serien mehrere Wochentage sowie die Endarten **Nie**, **Nach Anzahl** und **Am Datum**. Die Serienoption erscheint nur bei Kalendern, deren Provider das Anlegen von Serienterminen ausdrücklich unterstützt. Für zeitgebundene Google-Serien wird die Kalenderzeitzone verwendet.
+
 Beim Löschen erscheint eine eigene OpenCalendar-Bestätigung mit Terminname und Zeitraum. Die native Browser-Abfrage wird nicht verwendet; Abbrechen kehrt zum zuvor geöffneten Detail- oder Bearbeitungsdialog zurück.
 
 Die **Listenansicht** verzichtet bewusst auf Karten und zusätzliche
@@ -340,7 +343,7 @@ können über `GetCurrentAppointments()` abgefragt werden. Das Zeitfenster darf 
 Beide Funktionen unterstützen den optionalen Kalenderfilter.
 
 `GetSelectedCalendars()` liefert die in der Instanz ausgewählten und aktivierten
-Kalender als JSON mit `instanceId`, `name`, `color` und `canWrite`. Der nur im
+Kalender als JSON mit `instanceId`, `name`, `color`, `canWrite`, `timezone` und `canCreateRecurrence`. Der nur im
 Browser gesetzte temporäre Kalenderfilter verändert diese konfigurierte Auswahl
 nicht.
 

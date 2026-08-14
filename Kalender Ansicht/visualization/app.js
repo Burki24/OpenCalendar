@@ -48,6 +48,17 @@ const eventCalendarPicker = document.getElementById('event-calendar-picker');
 const eventCalendarTrigger = document.getElementById('event-calendar-trigger');
 const eventCalendarValue = document.getElementById('event-calendar-value');
 const eventCalendarOptions = document.getElementById('event-calendar-options');
+const eventRecurrenceRow = document.getElementById('event-recurrence-row');
+const eventRecurrenceFrequency = document.getElementById('event-recurrence-frequency');
+const eventRecurrenceOptions = document.getElementById('event-recurrence-options');
+const eventRecurrenceInterval = document.getElementById('event-recurrence-interval');
+const eventRecurrenceIntervalUnit = document.getElementById('event-recurrence-interval-unit');
+const eventRecurrenceWeekdays = document.getElementById('event-recurrence-weekdays');
+const eventRecurrenceEndMode = document.getElementById('event-recurrence-end-mode');
+const eventRecurrenceCountRow = document.getElementById('event-recurrence-count-row');
+const eventRecurrenceCount = document.getElementById('event-recurrence-count');
+const eventRecurrenceUntilRow = document.getElementById('event-recurrence-until-row');
+const eventRecurrenceUntil = document.getElementById('event-recurrence-until');
 const dayEventsDialog = document.getElementById('day-events-dialog');
 const viewSelectorDialog = document.getElementById('view-selector-dialog');
 const viewSelectorButton = document.getElementById('view-selector-button');
@@ -842,6 +853,7 @@ function openNewEvent(preferredDay = null) {
     }
     const end = new Date(start.getTime() + 60 * 60 * 1000);
     setDateInputs(start, end, false);
+    resetRecurrenceEditor(start);
     setDialogEditable(true);
     document.getElementById('delete-button').classList.add('hidden');
     document.getElementById('dialog-note').classList.add('hidden');
@@ -995,6 +1007,7 @@ function openExistingEvent(event) {
     document.getElementById('event-description').value = event.description || '';
     document.getElementById('event-all-day').checked = Boolean(event.allDay);
     setDateInputs(eventStart(event), eventEnd(event), Boolean(event.allDay), Boolean(event.allDay));
+    updateRecurrenceAvailability();
     const descriptionEditable = editable && !Boolean(event.onlineMeeting);
     setDialogEditable(editable, descriptionEditable);
     document.getElementById('delete-button').classList.toggle('hidden', !eventCanDelete(event));
@@ -1107,6 +1120,115 @@ function handleCalendarOptionKeydown(event) {
     options[nextIndex]?.focus();
 }
 
+function selectedCalendarEntry() {
+    const instanceId = Number(eventCalendarInput.value);
+    return calendarState.calendars.find(calendar => Number(calendar.instanceId) === instanceId) || null;
+}
+
+function resetRecurrenceEditor(start) {
+    eventRecurrenceFrequency.value = 'none';
+    eventRecurrenceInterval.value = '1';
+    eventRecurrenceEndMode.value = 'never';
+    eventRecurrenceCount.value = '10';
+    eventRecurrenceUntil.value = '';
+    eventRecurrenceWeekdays.querySelectorAll('input[type="checkbox"]').forEach(input => {
+        input.checked = false;
+    });
+    selectDefaultRecurrenceWeekday(start);
+    updateRecurrenceAvailability();
+}
+
+function selectDefaultRecurrenceWeekday(start) {
+    if (!(start instanceof Date) || Number.isNaN(start.getTime())) return;
+    const weekday = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'][start.getDay()];
+    const input = eventRecurrenceWeekdays.querySelector(`input[value="${weekday}"]`);
+    if (input) input.checked = true;
+}
+
+function updateRecurrenceAvailability() {
+    const calendar = selectedCalendarEntry();
+    const available = selectedEvent === null
+        && Boolean(calendar?.canWrite)
+        && Boolean(calendar?.canCreateRecurrence);
+    eventRecurrenceRow.classList.toggle('hidden', !available);
+    eventRecurrenceFrequency.disabled = !available;
+    if (!available) eventRecurrenceFrequency.value = 'none';
+    updateRecurrenceControls();
+}
+
+function updateRecurrenceControls() {
+    const frequency = eventRecurrenceFrequency.value;
+    const enabled = !eventRecurrenceFrequency.disabled && frequency !== 'none';
+    eventRecurrenceOptions.classList.toggle('hidden', !enabled);
+    eventRecurrenceWeekdays.classList.toggle('hidden', !enabled || frequency !== 'weekly');
+
+    const endMode = eventRecurrenceEndMode.value;
+    const countVisible = enabled && endMode === 'count';
+    const untilVisible = enabled && endMode === 'until';
+    eventRecurrenceCountRow.classList.toggle('hidden', !countVisible);
+    eventRecurrenceUntilRow.classList.toggle('hidden', !untilVisible);
+    eventRecurrenceCount.disabled = !countVisible;
+    eventRecurrenceUntil.disabled = !untilVisible;
+    eventRecurrenceCount.required = countVisible;
+    eventRecurrenceUntil.required = untilVisible;
+
+    const interval = Math.max(1, Number(eventRecurrenceInterval.value) || 1);
+    const units = {
+        daily: interval === 1 ? 'Day' : 'Days',
+        weekly: interval === 1 ? 'Week' : 'Weeks',
+        monthly: interval === 1 ? 'Month' : 'Months',
+        yearly: interval === 1 ? 'Year' : 'Years'
+    };
+    eventRecurrenceIntervalUnit.textContent = enabled ? t(units[frequency] || 'Days') : '';
+    updateRecurrenceEndDateMinimum();
+}
+
+function updateRecurrenceEndDateMinimum() {
+    const start = readInputDate(document.getElementById('event-start').value);
+    if (!start) return;
+    eventRecurrenceUntil.min = localDate(start);
+    if (eventRecurrenceUntil.value && eventRecurrenceUntil.value < eventRecurrenceUntil.min) {
+        eventRecurrenceUntil.value = eventRecurrenceUntil.min;
+    }
+}
+
+function recurrenceEditorValue() {
+    if (selectedEvent !== null || eventRecurrenceFrequency.disabled) return null;
+    const frequency = eventRecurrenceFrequency.value;
+    if (frequency === 'none') return null;
+
+    const recurrence = {
+        frequency: frequency.toUpperCase(),
+        interval: Math.max(1, Math.min(999, Number(eventRecurrenceInterval.value) || 1)),
+        endMode: eventRecurrenceEndMode.value
+    };
+    if (frequency === 'weekly') {
+        let byDay = Array.from(eventRecurrenceWeekdays.querySelectorAll('input[type="checkbox"]:checked'))
+            .map(input => input.value);
+        if (!byDay.length) {
+            const start = readInputDate(document.getElementById('event-start').value);
+            if (start) byDay = [['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'][start.getDay()]];
+        }
+        recurrence.byDay = byDay;
+    }
+    if (recurrence.endMode === 'count') {
+        recurrence.count = Math.max(1, Math.min(9999, Number(eventRecurrenceCount.value) || 1));
+    } else if (recurrence.endMode === 'until') {
+        recurrence.until = eventRecurrenceUntil.value;
+    }
+
+    return recurrence;
+}
+
+function updateRecurrenceWeekdayLabels() {
+    const monday = new Date(2026, 7, 17);
+    eventRecurrenceWeekdays.querySelectorAll('[data-weekday]').forEach(label => {
+        const offset = Math.max(0, Math.min(6, Number(label.dataset.weekday) - 1));
+        label.textContent = new Intl.DateTimeFormat(undefined, { weekday: 'short' })
+            .format(addDays(monday, offset));
+    });
+}
+
 function setDialogEditable(editable, descriptionEditable = editable) {
     ['event-summary', 'event-all-day', 'event-start', 'event-end', 'event-location'].forEach(id => {
         document.getElementById(id).disabled = !editable;
@@ -1188,6 +1310,12 @@ eventForm.addEventListener('submit', async event => {
         start: inputDateValue(document.getElementById('event-start').value, allDay),
         end: inputDateValue(document.getElementById('event-end').value, allDay, allDay)
     };
+    const recurrence = recurrenceEditorValue();
+    if (recurrence) {
+        eventData.recurrence = recurrence;
+        const timezone = String(selectedCalendarEntry()?.timezone || '').trim();
+        if (timezone) eventData.timezone = timezone;
+    }
     if (!calendarInstanceId || !eventData.summary || !eventData.start || !eventData.end) return;
     const sourceCalendarInstanceId = Number(selectedEvent?.calendarInstanceId || 0);
     const moving = Boolean(selectedEvent) && calendarInstanceId !== sourceCalendarInstanceId;
@@ -1227,7 +1355,10 @@ eventForm.addEventListener('submit', async event => {
 
 document.getElementById('delete-button').addEventListener('click', () => requestDelete(eventDialog));
 
-document.getElementById('event-start').addEventListener('change', updateEndFromStart);
+document.getElementById('event-start').addEventListener('change', () => {
+    updateEndFromStart();
+    updateRecurrenceEndDateMinimum();
+});
 
 document.getElementById('event-all-day').addEventListener('change', event => {
     const start = readInputDate(document.getElementById('event-start').value) || new Date();
@@ -1242,7 +1373,11 @@ document.getElementById('event-all-day').addEventListener('change', event => {
 eventCalendarInput.addEventListener('change', () => {
     updateDialogColor();
     updateSaveButtonLabel();
+    updateRecurrenceAvailability();
 });
+eventRecurrenceFrequency.addEventListener('change', updateRecurrenceControls);
+eventRecurrenceInterval.addEventListener('input', updateRecurrenceControls);
+eventRecurrenceEndMode.addEventListener('change', updateRecurrenceControls);
 eventCalendarTrigger.addEventListener('click', event => {
     event.stopPropagation();
     toggleCalendarPicker();
@@ -1574,6 +1709,10 @@ function applyStaticTranslations() {
     document.querySelectorAll('label[for]').forEach(label => {
         label.textContent = t(label.textContent.trim());
     });
+    document.querySelectorAll('[data-i18n]').forEach(element => {
+        element.textContent = t(element.dataset.i18n || element.textContent.trim());
+    });
+    updateRecurrenceWeekdayLabels();
     [
         ['delete-button', 'Delete'],
         ['cancel-button', 'Cancel'],

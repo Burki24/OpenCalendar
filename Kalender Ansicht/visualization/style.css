@@ -504,6 +504,7 @@ html.ipsview-mode .floating-add {
 html.ipsview-mode .floating-add-symbol { font-size: 1.25em; line-height: 1; }
 html.ipsview-mode .floating-add-label { display: inline; }
 html.ipsview-mode .form-row input,
+html.ipsview-mode .form-row select,
 html.ipsview-mode .form-row textarea,
 html.ipsview-mode .calendar-picker-trigger { min-height: 46px; }
 html.ipsview-mode .primary-button,
@@ -610,7 +611,7 @@ html.ipsview-mode .danger-button { min-height: 48px; padding-inline: 18px; }
 .form-row { display: grid; min-width: 0; gap: 5px; }
 .form-row.two { grid-template-columns: 1fr 1fr; gap: 10px; }
 .form-row label { color: var(--cal-label-text); font-weight: 600; }
-.form-row input, .form-row textarea {
+.form-row input, .form-row select, .form-row textarea {
     width: 100%;
     min-width: 0;
     max-width: 100%;
@@ -677,6 +678,44 @@ html.ipsview-mode .danger-button { min-height: 48px; padding-inline: 18px; }
     box-shadow: inset 3px 0 0 var(--cal-accent);
 }
 .form-row textarea { min-height: 62px; resize: vertical; }
+.recurrence-options {
+    display: grid;
+    gap: 12px;
+    padding: 12px;
+    border: var(--cal-border-width, 1px) solid var(--cal-border);
+    border-radius: var(--cal-radius);
+    background: color-mix(in srgb, var(--cal-surface) 45%, transparent);
+}
+.recurrence-interval-control { display: grid; grid-template-columns: minmax(70px, .42fr) minmax(0, 1fr); gap: 8px; align-items: center; }
+.recurrence-interval-control span { color: var(--cal-muted); font-size: .78em; }
+.recurrence-weekdays { min-width: 0; margin: 0; padding: 0; border: 0; }
+.recurrence-weekdays legend { margin-bottom: 6px; color: var(--cal-label-text); font-size: .7em; font-weight: 600; }
+.recurrence-weekday-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 5px; }
+.recurrence-weekday-grid label { display: grid; min-width: 0; cursor: pointer; }
+.recurrence-weekday-grid input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.recurrence-weekday-grid span {
+    display: grid;
+    min-width: 0;
+    min-height: 34px;
+    place-items: center;
+    overflow: hidden;
+    border: var(--cal-border-width, 1px) solid var(--cal-border);
+    border-radius: var(--cal-radius);
+    background: var(--cal-surface);
+    font-size: .75em;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.recurrence-weekday-grid input:checked + span {
+    border-color: var(--cal-accent);
+    background: var(--cal-gradient-accent);
+    color: var(--cal-text-active, var(--cal-text));
+    font-weight: 650;
+}
+.recurrence-weekday-grid input:focus-visible + span {
+    outline: 2px solid var(--cal-accent);
+    outline-offset: 1px;
+}
 .event-details-body { gap: 14px; }
 .event-details-summary { font-size: 1.08em; font-weight: 700; line-height: 1.35; overflow-wrap: anywhere; }
 .event-details-list { display: grid; gap: 0; margin: 0; }

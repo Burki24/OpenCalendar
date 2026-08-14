@@ -14,6 +14,7 @@ use Throwable;
 require_once __DIR__ . '/CalendarProviderInterface.php';
 require_once __DIR__ . '/CalendarHttpClient.php';
 require_once __DIR__ . '/CalendarEventRecurrence.php';
+require_once __DIR__ . '/CalendarRecurrenceRule.php';
 
 final class GoogleCalendarProviderException extends RuntimeException
 {
@@ -112,10 +113,11 @@ final class GoogleCalendarProvider implements CalendarProviderInterface
                     'components'       => ['VEVENT'],
                     'writeAccessKnown' => true,
                     'capabilities'     => [
-                        'read'   => true,
-                        'create' => $canWrite,
-                        'update' => $canWrite,
-                        'delete' => $canWrite
+                        'read'             => true,
+                        'create'           => $canWrite,
+                        'update'           => $canWrite,
+                        'delete'           => $canWrite,
+                        'createRecurrence' => $canWrite
                     ]
                 ];
                 if (count($calendars) > self::MAX_CALENDARS) {
@@ -402,6 +404,19 @@ final class GoogleCalendarProvider implements CalendarProviderInterface
             $payload['status'] = $status;
         }
 
+        $recurrence = null;
+        if (array_key_exists('recurrence', $data)) {
+            if (!is_array($data['recurrence']) || array_is_list($data['recurrence'])) {
+                throw new InvalidArgumentException('The recurrence settings are invalid.');
+            }
+            if ($data['recurrence'] !== []) {
+                if (!$creating) {
+                    throw new InvalidArgumentException('Recurring series can currently only be created as new events.');
+                }
+                $recurrence = $data['recurrence'];
+            }
+        }
+
         $hasStart = array_key_exists('start', $data);
         $hasEnd = array_key_exists('end', $data);
         if ($creating && !$hasStart) {
@@ -417,15 +432,38 @@ final class GoogleCalendarProvider implements CalendarProviderInterface
             if ($end <= $start) {
                 throw new InvalidArgumentException('The event end must be later than the start.');
             }
+
+            $eventTimezone = trim((string) ($data['timezone'] ?? ''));
+            if ($recurrence !== null && !$allDay) {
+                $zone = $this->inputTimezone($eventTimezone);
+                $start = $start->setTimezone($zone);
+                $end = $end->setTimezone($zone);
+            }
+
             if ($allDay) {
                 $payload['start'] = ['date' => $start->format('Y-m-d')];
                 $payload['end'] = ['date' => $end->format('Y-m-d')];
             } else {
                 $payload['start'] = ['dateTime' => $start->format(DATE_RFC3339)];
                 $payload['end'] = ['dateTime' => $end->format(DATE_RFC3339)];
+                if ($recurrence !== null) {
+                    $payload['start']['timeZone'] = $eventTimezone;
+                    $payload['end']['timeZone'] = $eventTimezone;
+                }
+            }
+
+            if ($recurrence !== null) {
+                $payload['recurrence'] = CalendarRecurrenceRule::toGoogleLines(
+                    $recurrence,
+                    $start,
+                    $allDay,
+                    $eventTimezone
+                );
             }
         } elseif (array_key_exists('allDay', $data)) {
             throw new InvalidArgumentException('Changing all-day mode requires a start and end.');
+        } elseif ($recurrence !== null) {
+            throw new InvalidArgumentException('Creating a recurring event requires a start and end.');
         }
 
         if ($payload === []) {
@@ -433,6 +471,20 @@ final class GoogleCalendarProvider implements CalendarProviderInterface
         }
 
         return $payload;
+    }
+
+    private function inputTimezone(string $name): DateTimeZone
+    {
+        $name = trim($name);
+        if ($name === '') {
+            throw new InvalidArgumentException('The recurring event timezone is missing.');
+        }
+
+        try {
+            return new DateTimeZone($name);
+        } catch (Throwable) {
+            throw new InvalidArgumentException('The recurring event timezone is invalid.');
+        }
     }
 
     /**

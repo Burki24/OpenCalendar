@@ -64,6 +64,8 @@ class Kalender extends IPSModuleStrict
         $this->RegisterAttributeString('ResolvedCalendarID', '');
         $this->RegisterAttributeString('DetectedCalendarColor', '');
         $this->RegisterAttributeBoolean('DetectedCanWrite', false);
+        $this->RegisterAttributeBoolean('DetectedCanCreateRecurrence', false);
+        $this->RegisterAttributeString('DetectedCalendarTimezone', '');
         $this->RegisterAttributeBoolean('DetectedWriteAccessKnown', false);
         $this->RegisterAttributeBoolean('RuntimeReady', false);
 
@@ -397,6 +399,26 @@ class Kalender extends IPSModuleStrict
     {
         try {
             $event = $this->decodeObject($EventJSON, 'event');
+            $recurrence = $event['recurrence'] ?? null;
+            if ($recurrence !== null && $recurrence !== []) {
+                if (!is_array($recurrence) || array_is_list($recurrence)) {
+                    throw new InvalidArgumentException('The recurrence settings are invalid.');
+                }
+                if (!$this->ReadAttributeBoolean('CalendarMetadataAvailable')
+                    || !$this->ReadAttributeBoolean('DetectedCanCreateRecurrence')) {
+                    $this->refreshCalendarMetadataSafely();
+                }
+                if (!$this->ReadAttributeBoolean('DetectedCanCreateRecurrence')) {
+                    throw new InvalidArgumentException('Recurring event creation is not supported by this calendar.');
+                }
+                if (trim((string) ($event['timezone'] ?? '')) === '') {
+                    $timezone = trim($this->ReadAttributeString('DetectedCalendarTimezone'));
+                    if ($timezone === '') {
+                        $timezone = date_default_timezone_get();
+                    }
+                    $event['timezone'] = $timezone;
+                }
+            }
             $created = $this->sendRequest('CreateEvent', ['Event' => $event]);
             $this->refreshAfterWrite();
 
@@ -529,6 +551,11 @@ class Kalender extends IPSModuleStrict
                         : $this->ReadAttributeBoolean('DetectedCanWrite')
                             || $this->ReadPropertyBoolean('CanWrite'))
                     : $this->ReadPropertyBoolean('CanWrite'),
+                'timezone'            => $metadataAvailable
+                    ? $this->ReadAttributeString('DetectedCalendarTimezone')
+                    : '',
+                'canCreateRecurrence' => $metadataAvailable
+                    && $this->ReadAttributeBoolean('DetectedCanCreateRecurrence'),
                 'eventCount'          => count($events),
                 'todayEventCount'     => CalendarEventCounter::countForDay(
                     $events,
@@ -603,6 +630,8 @@ class Kalender extends IPSModuleStrict
 
         if ($availableCalendars !== []) {
             $this->WriteAttributeString('ResolvedCalendarID', '');
+            $this->WriteAttributeBoolean('DetectedCanCreateRecurrence', false);
+            $this->WriteAttributeString('DetectedCalendarTimezone', '');
             $this->WriteAttributeBoolean('DetectedWriteAccessKnown', false);
             $this->WriteAttributeBoolean('CalendarMetadataAvailable', false);
         }
@@ -617,6 +646,8 @@ class Kalender extends IPSModuleStrict
         $canWrite = (bool) ($capabilities['create'] ?? false)
             || (bool) ($capabilities['update'] ?? false)
             || (bool) ($capabilities['delete'] ?? false);
+        $canCreateRecurrence = (bool) ($capabilities['createRecurrence'] ?? false);
+        $timezone = trim((string) ($calendar['timezone'] ?? ''));
         // Cached calendar metadata created before writeAccessKnown existed cannot
         // distinguish an explicit read-only result from incomplete DAV privilege
         // discovery. Keep it unknown so the persisted CanWrite value can recover
@@ -626,6 +657,8 @@ class Kalender extends IPSModuleStrict
         $this->WriteAttributeString('ResolvedCalendarID', trim((string) ($calendar['id'] ?? '')));
         $this->WriteAttributeString('DetectedCalendarColor', trim((string) ($calendar['color'] ?? '')));
         $this->WriteAttributeBoolean('DetectedCanWrite', $canWrite);
+        $this->WriteAttributeBoolean('DetectedCanCreateRecurrence', $canCreateRecurrence);
+        $this->WriteAttributeString('DetectedCalendarTimezone', $timezone);
         $this->WriteAttributeBoolean('DetectedWriteAccessKnown', $writeAccessKnown);
         $this->WriteAttributeBoolean('CalendarMetadataAvailable', true);
     }

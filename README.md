@@ -87,11 +87,11 @@ der aktuellen Konfiguratorliste erstellt. Weitere Hintergründe enthält die
 
 ## Bekannte Einschränkungen
 
-- Einzelne Vorkommen einer Google-Terminserie können bearbeitet und gelöscht
-  werden. Die vollständige Serie, „dieses und folgende“ sowie Vorkommnisse von
-  Microsoft- und CalDAV-Serien bleiben derzeit schreibgeschützt. Dadurch kann
-  nicht versehentlich die vollständige Terminserie überschrieben oder gelöscht
-  werden.
+- Neue Google-Terminserien können erstellt werden; einzelne Vorkommen einer
+  Google-Terminserie können außerdem bearbeitet und gelöscht werden. Die
+  vollständige Serie, „dieses und folgende“ sowie Vorkommnisse von Microsoft-
+  und CalDAV-Serien bleiben derzeit schreibgeschützt. Dadurch kann nicht
+  versehentlich die vollständige Terminserie überschrieben oder gelöscht werden.
 - ICS-/Webcal-Abonnements und lokal importierte ICS-Dateien sind grundsätzlich schreibgeschützt.
 - Die IPSView-Ausgabe benötigt im HTML-Box-Steuerelement den Renderer
   **Browser des Clients** oder **Automatisch**, da die Bedienung JavaScript
