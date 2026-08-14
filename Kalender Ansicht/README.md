@@ -31,9 +31,11 @@ verwendet werden.
 7. Die Instanz in der Symcon-Kachelvisualisierung platzieren.
 
 Mit **Alle Kalenderinstanzen wiederherstellen** werden alle im System
-vorhandenen Kalender-Instanzen erneut ausgewählt und aktiviert. Die Aktion ist
-hilfreich, wenn die Auswahlliste nach einer Änderung oder Wiederherstellung
-unvollständig ist; eine vorhandene individuelle Auswahl wird dabei ersetzt.
+vorhandenen Kalender-Instanzen im aktuell geöffneten Konfigurationsformular zur
+Auswahl vorbereitet und aktiviert. Die Aktion ist hilfreich, wenn die
+Auswahlliste nach einer Änderung oder Wiederherstellung unvollständig ist; eine
+vorhandene individuelle Auswahl wird dabei ersetzt. Die Änderung wird erst mit
+**Übernehmen** dauerhaft in der Instanzkonfiguration gespeichert.
 
 ## Funktionsumfang
 
@@ -195,13 +197,17 @@ Synchronisation schlägt fehl | Jede ausgewählte Kalender-Instanz einzeln synch
 Schaltfläche „＋ Termin“ ist deaktiviert | Mindestens einen ausgewählten Kalender mit Schreibrechten verwenden; ICS/Webcal ist immer schreibgeschützt
 IPSView zeigt nur statisches oder unvollständiges HTML | Im IPSView-Steuerelement **Browser des Clients** oder **Automatisch** als Renderer wählen
 IPSView-Inhalt ist veraltet | **IPSView-HTML neu generieren** ausführen und prüfen, ob die Ausgabe aktiviert ist
-Kalenderauswahl ist leer oder beschädigt | **Alle Kalenderinstanzen wiederherstellen** verwenden und die gewünschte Auswahl anschließend anpassen
+Kalenderauswahl ist leer oder beschädigt | **Alle Kalenderinstanzen wiederherstellen** verwenden, die gewünschte Auswahl anpassen und anschließend **Übernehmen**
 
 ## PHP-Befehlsreferenz
 
 ```php
 // Alle ausgewählten Kalender synchronisieren.
 $success = IPSKALVIEW_SynchronizeCalendars(12345);
+
+// Im geöffneten Konfigurationsformular alle Kalenderinstanzen zur Auswahl vorbereiten.
+// Anschließend muss die Konfiguration mit „Übernehmen“ gespeichert werden.
+$success = IPSKALVIEW_SelectAllCalendars(12345);
 
 // Die zusammengeführten Termine als JSON abrufen.
 $events = IPSKALVIEW_GetAggregatedEvents(12345);
@@ -260,6 +266,9 @@ $calendars = IPSKALVIEW_GetSelectedCalendars(12345);
 
 // Den aktuellen eigenständigen HTML-Inhalt für IPSView abrufen.
 $html = IPSKALVIEW_GetIPSViewHTML(12345);
+
+// Die vorhandene IPSView-WebContent-Variable unter Beibehaltung ihrer Objekt-ID neu rendern.
+$success = IPSKALVIEW_RegenerateIPSViewHTML(12345);
 ```
 
 
@@ -332,6 +341,17 @@ Beide Funktionen unterstützen den optionalen Kalenderfilter.
 Kalender als JSON mit `instanceId`, `name`, `color` und `canWrite`. Der nur im
 Browser gesetzte temporäre Kalenderfilter verändert diese konfigurierte Auswahl
 nicht.
+
+`SelectAllCalendars()` trägt alle vorhandenen Kalender-Instanzen ausschließlich
+in das aktuell geöffnete Konfigurationsformular ein und aktiviert sie dort. Die
+Auswahl wird erst durch **Übernehmen** dauerhaft gespeichert. Die Funktion
+liefert `false`, wenn keine Kalender-Instanz vorhanden ist.
+
+`RegenerateIPSViewHTML()` rendert den Inhalt der bestehenden
+IPSView-WebContent-Variable neu, ohne deren Objekt-ID, Position oder bestehende
+Verknüpfungen zu verändern. Die Funktion liefert `false`, wenn die
+IPSView-HTML-Ausgabe deaktiviert ist oder der Inhalt nicht aktualisiert werden
+konnte.
 
 ## Technische Hinweise
 

@@ -11,7 +11,8 @@ generische CalDAV-Server sowie mehrere schreibgeschützte ICS-/Webcal-Feeds.
 
 - Symcon ab Version 9.0
 - Zugriff des Symcon-Servers auf den jeweiligen Kalenderdienst
-- für Google und Microsoft eine aktive Symcon-Connect-Verbindung
+- für Google und Microsoft eine aktive Symcon-Connect-Verbindung; eine eigene
+  OAuth-Client-ID oder ein eigener Clientschlüssel ist nicht erforderlich
 - für Apple iCloud ein anwendungsspezifisches Apple-Passwort
 
 ## Schnellstart
@@ -63,8 +64,11 @@ verwendet werden.
 
 ### Google Calendar
 
-Google wird über den zentral registrierten OAuth-Dienst von Symcon verbunden.
-Anwender benötigen keine eigene Client-ID und keinen Clientschlüssel.
+Google wird über die öffentlich freigegebene und von Google verifizierte
+OpenCalendar-OAuth-Anwendung sowie den zentralen OAuth-Dienst von Symcon
+verbunden. Anwender benötigen weder ein eigenes Google-Cloud-Projekt noch eine
+eigene Client-ID oder einen Clientschlüssel. Es besteht keine Beschränkung auf
+vorab eingetragene Google-Testnutzer.
 
 1. Eine aktive Symcon-Connect-Verbindung sicherstellen.
 2. Als Anbieter **Google Calendar** wählen und die Konfiguration übernehmen.
@@ -252,9 +256,11 @@ des korrekt verbundenen Konfigurators erstellt werden.
 
 Zugangsdaten, OAuth-Tokens sowie Kalender- und Termindaten werden grundsätzlich
 lokal in Symcon gespeichert oder zwischengespeichert. Google und Microsoft
-verwenden für den Login den zentralen Symcon-OAuth-Dienst; die Kalenderdaten
-werden direkt zwischen der Symcon-Installation und dem jeweiligen Anbieter
-übertragen.
+verwenden für Anmeldung und Token-Aktualisierung den zentralen
+Symcon-OAuth-Dienst. Die Google-OAuth-Anwendung ist öffentlich freigegeben und
+von Google verifiziert; anwenderseitige OAuth-Zugangsdaten sind nicht
+erforderlich. Kalender- und Termindaten werden direkt zwischen der
+Symcon-Installation und dem jeweiligen Anbieter übertragen.
 
 Ausführliche Angaben enthält die [Datenschutzerklärung](../PRIVACY.md). Die
 einmalige zentrale OAuth-Einrichtung für Herausgeber ist getrennt unter
