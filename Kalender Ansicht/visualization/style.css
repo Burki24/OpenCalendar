@@ -621,6 +621,15 @@ html.ipsview-mode .danger-button { min-height: 48px; padding-inline: 18px; }
     background: var(--cal-surface);
     color: inherit;
 }
+.form-row select option,
+.form-row select optgroup {
+    background: var(--cal-dialog);
+    color: var(--cal-text);
+}
+.form-row select option:checked {
+    background: var(--cal-surface-hover);
+    color: var(--cal-text-active, var(--cal-text));
+}
 .calendar-picker { display: grid; gap: 4px; min-width: 0; }
 .calendar-picker-trigger {
     display: flex;

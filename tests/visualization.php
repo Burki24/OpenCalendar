@@ -125,7 +125,6 @@ assertVisualization(
         && str_contains($script, 'eventData.timezone = timezone;'),
     'The event dialog must expose recurrence creation only for recurrence-capable calendars and submit normalized recurrence data with the calendar timezone.'
 );
-
 assertVisualization(
     str_contains($script, "const action = moving ? 'MoveEvent' : (selectedEvent ? 'UpdateEvent' : 'CreateEvent');")
         && str_contains($script, 'targetCalendarInstanceId: calendarInstanceId')
@@ -473,6 +472,13 @@ assertVisualization(
 );
 
 $style = (string) file_get_contents(__DIR__ . '/../Kalender Ansicht/visualization/style.css');
+assertVisualization(
+    str_contains($style, '.form-row select option,')
+        && str_contains($style, 'background: var(--cal-dialog);')
+        && str_contains($style, '.form-row select option:checked')
+        && str_contains($style, 'background: var(--cal-surface-hover);'),
+    'Native select options in event dialogs must use the active OpenCalendar theme instead of the browser default popup colors.'
+);
 assertVisualization(
     str_contains($style, '--cal-view-background: var(--ipsview-role-view-background);')
         && str_contains($style, '--cal-page-background: var(--ipsview-role-page-background);')
