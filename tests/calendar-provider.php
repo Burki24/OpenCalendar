@@ -217,6 +217,8 @@ assertSameValue('2026-07-20T09:00:00+02:00', $events[1]['originalStart'], 'The o
 assertSameValue('', $events[1]['recurrenceId'], 'Google series IDs must not be exposed as RFC recurrence IDs.');
 assertSameValue(true, $events[1]['canUpdateOccurrence'], 'Google occurrences must advertise update support.');
 assertSameValue(true, $events[1]['canDeleteOccurrence'], 'Google occurrences must advertise delete support.');
+assertSameValue(false, $events[1]['canUpdateSeries'], 'Google series updates must remain disabled until scoped series editing is implemented.');
+assertSameValue(true, $events[1]['canDeleteSeries'], 'Google occurrences must advertise parent-series delete support.');
 assertTrueValue(str_contains($eventClient->requests[0]['url'], 'owner%40example.com'), 'Calendar IDs must be URL encoded.');
 assertSameValue('Bearer access-token', $eventClient->requests[0]['headers']['Authorization'], 'API requests must use Bearer authorization.');
 
@@ -326,7 +328,9 @@ $googleOccurrence = [
     'originalStart'       => '2026-07-20T09:00:00+02:00',
     'recurring'           => true,
     'canUpdateOccurrence' => true,
-    'canDeleteOccurrence' => true
+    'canDeleteOccurrence' => true,
+    'canUpdateSeries'      => false,
+    'canDeleteSeries'      => true
 ];
 $occurrenceProvider->updateEvent(
     'owner@example.com',
@@ -349,6 +353,29 @@ assertTrueValue(
         $googleOccurrence
     ),
     'Google occurrences must be deletable by their concrete occurrence ID.'
+);
+
+$seriesDeleteClient = new FakeHttpClient([response(204)]);
+$seriesDeleteProvider = new GoogleCalendarProvider($seriesDeleteClient, 'access-token');
+$seriesDeleteIdentity = $googleOccurrence;
+$seriesDeleteIdentity['writeScope'] = 'series';
+assertTrueValue(
+    $seriesDeleteProvider->deleteEvent(
+        'owner@example.com',
+        'https://www.googleapis.com/calendar/v3/calendars/owner%40example.com/events/instance-id',
+        '"occurrence-etag"',
+        '',
+        $seriesDeleteIdentity
+    ),
+    'A verified Google occurrence must allow deleting its complete recurring series.'
+);
+assertTrueValue(
+    str_ends_with($seriesDeleteClient->requests[0]['url'], '/events/series-id'),
+    'Deleting a complete Google series must target the parent recurring event ID.'
+);
+assertTrueValue(
+    !array_key_exists('If-Match', $seriesDeleteClient->requests[0]['headers']),
+    'A concrete occurrence ETag must not be sent when deleting the parent recurring series.'
 );
 
 $seriesWriteClient = new FakeHttpClient([]);

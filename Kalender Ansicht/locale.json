@@ -145,7 +145,10 @@
             "End date": "Enddatum",
             "Year": "Jahr",
             "Years": "Jahre",
-            "Recurring event creation is not supported by this calendar.": "Dieser Kalender unterstützt das Anlegen von Serienterminen nicht."
+            "Recurring event creation is not supported by this calendar.": "Dieser Kalender unterstützt das Anlegen von Serienterminen nicht.",
+            "Recurring event": "Serientermin",
+            "Only this event": "Nur diesen Termin",
+            "Entire series": "Gesamte Serie"
         }
     }
 }

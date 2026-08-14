@@ -737,6 +737,11 @@ html.ipsview-mode .danger-button { min-height: 48px; padding-inline: 18px; }
 .delete-confirm-summary { font-size: 1.02em; font-weight: 700; line-height: 1.35; overflow-wrap: anywhere; }
 .delete-confirm-period { color: var(--cal-muted); line-height: 1.4; overflow-wrap: anywhere; }
 .delete-confirm-question { margin: 4px 0 0; line-height: 1.45; }
+.delete-scope { display: grid; gap: 7px; margin: 4px 0 0; padding: 10px; border: var(--cal-border-width, 1px) solid var(--cal-border); border-radius: var(--cal-radius); }
+.delete-scope legend { padding: 0 4px; color: var(--cal-label-text); font-size: var(--cal-dialog-label-font-size); font-weight: 650; }
+.delete-scope-option { display: flex; align-items: center; gap: 9px; min-height: 34px; padding: 6px 8px; border-radius: var(--cal-radius); cursor: pointer; }
+.delete-scope-option:hover { background: var(--cal-surface-hover); }
+.delete-scope-option input { width: auto; margin: 0; accent-color: var(--cal-accent); }
 
 .view-selector-body { padding: 12px; }
 .view-selector-options { display: grid; gap: 7px; }

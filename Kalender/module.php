@@ -455,6 +455,9 @@ class Kalender extends IPSModuleStrict
                 'recurring',
                 'canUpdateOccurrence',
                 'canDeleteOccurrence',
+                'canUpdateSeries',
+                'canDeleteSeries',
+                'writeScope',
                 'changes'
             ] as $metadataKey) {
                 unset($changes[$metadataKey]);
@@ -857,11 +860,17 @@ class Kalender extends IPSModuleStrict
             $cachedOccurrenceId = trim((string) ($cachedEvent['occurrenceId'] ?? ''));
             if (($resourceUrl !== '' && hash_equals($cachedResourceUrl, $resourceUrl))
                 || ($occurrenceId !== '' && hash_equals($cachedOccurrenceId, $occurrenceId))) {
+                $cachedEvent['writeScope'] = (string) ($event['writeScope'] ?? '');
                 return CalendarEventRecurrence::fromEvent($cachedEvent);
             }
         }
 
-        return CalendarEventRecurrence::fromEvent($event);
+        $identity = CalendarEventRecurrence::fromEvent($event);
+        if (($identity['writeScope'] ?? '') === CalendarEventRecurrence::WRITE_SCOPE_SERIES) {
+            throw new InvalidArgumentException('The recurring series could not be verified from the synchronized event cache.');
+        }
+
+        return $identity;
     }
 
     private function removeLegacyEventsVariable(): void

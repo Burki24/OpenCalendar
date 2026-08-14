@@ -238,6 +238,17 @@
         <div class="delete-confirm-summary" id="delete-confirm-summary"></div>
         <div class="delete-confirm-period" id="delete-confirm-period"></div>
         <p class="delete-confirm-question" id="delete-confirm-question">Do you really want to delete this event?</p>
+        <fieldset class="delete-scope hidden" id="delete-scope">
+            <legend data-i18n="Recurring event">Recurring event</legend>
+            <label class="delete-scope-option" id="delete-scope-occurrence-option">
+                <input type="radio" name="delete-scope" value="occurrence" checked>
+                <span data-i18n="Only this event">Only this event</span>
+            </label>
+            <label class="delete-scope-option" id="delete-scope-series-option">
+                <input type="radio" name="delete-scope" value="series">
+                <span data-i18n="Entire series">Entire series</span>
+            </label>
+        </fieldset>
     </div>
     <div class="dialog-actions">
         <div class="dialog-actions-end">

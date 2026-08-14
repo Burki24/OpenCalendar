@@ -34,14 +34,12 @@ beliebig verschoben oder vom Benutzer umbenannt werden.
 - lokaler JSON-Cache und zyklische Synchronisation
 - Erstellen neuer Termine sowie neuer Google-Serientermine
 - Ändern und Löschen einzelner Termine sowie einzelner Google-Serienvorkommnisse
+- Löschen einer vollständigen Google-Terminserie über ein synchronisiertes Serienvorkommnis
 - ETag-basierter Schutz vor dem Überschreiben zwischenzeitlicher Änderungen
 - Statusvariablen für die gesamte geladene Terminanzahl, die Termine des
   aktuellen Tages und den Zeitpunkt der letzten Synchronisation
 
-Das Ändern oder Löschen der vollständigen Serie, „dieses und folgende“ sowie
-einzelner Microsoft- und CalDAV-Vorkommnisse ist noch nicht freigegeben. Einzelne
-Google-Vorkommnisse können anhand ihrer konkreten Instanz-ID sicher bearbeitet
-oder gelöscht werden.
+Das Ändern der vollständigen Serie, „dieses und folgende“ sowie einzelne Microsoft- und CalDAV-Vorkommnisse sind noch nicht freigegeben. Einzelne Google-Vorkommnisse können anhand ihrer konkreten Instanz-ID sicher bearbeitet oder gelöscht werden; beim Löschen kann alternativ die zugehörige vollständige Google-Serie entfernt werden.
 
 ## Voraussetzungen
 
@@ -152,8 +150,7 @@ $result = IPSKAL_CreateEvent(12345, json_encode([
 
 Unterstützt werden `DAILY`, `WEEKLY`, `MONTHLY` und `YEARLY`, ein Intervall,
 bei wöchentlichen Serien optionale Wochentage sowie die Endarten `never`,
-`count` und `until`. Das Ändern einer vollständigen Serie ist weiterhin bewusst
-nicht freigegeben.
+`count` und `until`. Das Ändern einer vollständigen Serie ist weiterhin bewusst nicht freigegeben; das Löschen der vollständigen Google-Serie ist dagegen über ein synchronisiertes Serienvorkommnis möglich.
 
 ### Termin ändern
 

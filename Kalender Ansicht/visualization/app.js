@@ -899,7 +899,30 @@ function requestDelete(sourceDialog) {
     deleteSourceDialog = sourceDialog;
     document.getElementById('delete-confirm-summary').textContent = selectedEvent.summary || t('Untitled event');
     document.getElementById('delete-confirm-period').textContent = formatDeleteEventPeriod(selectedEvent);
+    updateDeleteScope(selectedEvent);
     deleteConfirmDialog.showModal();
+}
+
+function updateDeleteScope(event) {
+    const scope = document.getElementById('delete-scope');
+    const occurrenceOption = document.getElementById('delete-scope-occurrence-option');
+    const seriesOption = document.getElementById('delete-scope-series-option');
+    const occurrenceAllowed = Boolean(event.recurring) && Boolean(event.canDeleteOccurrence);
+    const seriesAllowed = Boolean(event.recurring) && Boolean(event.canDeleteSeries);
+    occurrenceOption.classList.toggle('hidden', !occurrenceAllowed);
+    seriesOption.classList.toggle('hidden', !seriesAllowed);
+    scope.classList.toggle('hidden', !event.recurring || (!occurrenceAllowed && !seriesAllowed));
+
+    const defaultValue = occurrenceAllowed ? 'occurrence' : 'series';
+    scope.querySelectorAll('input[name="delete-scope"]').forEach(input => {
+        input.checked = input.value === defaultValue;
+    });
+}
+
+function selectedDeleteScope(event) {
+    if (!event?.recurring) return '';
+    const selected = document.querySelector('input[name="delete-scope"]:checked');
+    return selected?.value === 'series' ? 'series' : 'occurrence';
 }
 
 function formatDeleteEventPeriod(event) {
@@ -930,7 +953,7 @@ async function confirmDeleteEvent() {
             event: {
                 resourceUrl: event.resourceUrl,
                 etag: event.etag,
-                ...recurrencePayload(event)
+                ...recurrencePayload(event, selectedDeleteScope(event))
             }
         });
         if (success) {
@@ -951,10 +974,10 @@ function eventCanUpdate(event) {
 function eventCanDelete(event) {
     return hasActionBridge()
         && Boolean(event.canWrite)
-        && (!event.recurring || Boolean(event.canDeleteOccurrence));
+        && (!event.recurring || Boolean(event.canDeleteOccurrence) || Boolean(event.canDeleteSeries));
 }
 
-function recurrencePayload(event) {
+function recurrencePayload(event, writeScope = '') {
     return {
         recurrenceType: event.recurrenceType || (event.recurring ? 'unknown' : 'single'),
         seriesId: event.seriesId || '',
@@ -963,7 +986,10 @@ function recurrencePayload(event) {
         recurrenceId: event.recurrenceId || '',
         recurring: Boolean(event.recurring),
         canUpdateOccurrence: Boolean(event.canUpdateOccurrence),
-        canDeleteOccurrence: Boolean(event.canDeleteOccurrence)
+        canDeleteOccurrence: Boolean(event.canDeleteOccurrence),
+        canUpdateSeries: Boolean(event.canUpdateSeries),
+        canDeleteSeries: Boolean(event.canDeleteSeries),
+        writeScope
     };
 }
 

@@ -240,11 +240,18 @@ final class GoogleCalendarProvider implements CalendarProviderInterface
     ): bool {
         $calendarId = $this->calendarId($calendarReference);
         $eventId = $this->eventId($eventReference);
-        $this->assertWritableRecurrence($recurrence, false, $eventId);
-        $headers = $etag !== '' ? ['If-Match' => $etag] : [];
+        $identity = $this->assertWritableRecurrence($recurrence, false, $eventId);
+        $seriesDelete = ($identity['writeScope'] ?? '') === CalendarEventRecurrence::WRITE_SCOPE_SERIES;
+        $targetEventId = $seriesDelete
+            ? trim((string) ($identity['seriesId'] ?? ''))
+            : $eventId;
+        if ($targetEventId === '') {
+            throw new GoogleCalendarProviderException('The recurring series ID is missing.');
+        }
+        $headers = !$seriesDelete && $etag !== '' ? ['If-Match' => $etag] : [];
         $this->requestJson(
             'DELETE',
-            '/calendars/' . rawurlencode($calendarId) . '/events/' . rawurlencode($eventId),
+            '/calendars/' . rawurlencode($calendarId) . '/events/' . rawurlencode($targetEventId),
             null,
             $headers,
             [204]
@@ -323,10 +330,13 @@ final class GoogleCalendarProvider implements CalendarProviderInterface
                 $eventId,
                 $originalStart,
                 '',
+                true,
+                false,
+                false,
                 true
             )
             : ($recurrence !== []
-                ? CalendarEventRecurrence::master($eventId)
+                ? CalendarEventRecurrence::master($eventId, false, true)
                 : CalendarEventRecurrence::single());
         $resourceUrl = $this->eventUrl($calendarId, $eventId);
 
@@ -354,21 +364,34 @@ final class GoogleCalendarProvider implements CalendarProviderInterface
         ], $recurrenceIdentity);
     }
 
-    /** @param array<string, mixed> $recurrence */
-    private function assertWritableRecurrence(array $recurrence, bool $updating, string $eventId): void
+    /**
+     * @param array<string, mixed> $recurrence
+     * @return array<string, mixed> Normalized recurrence identity.
+     */
+    private function assertWritableRecurrence(array $recurrence, bool $updating, string $eventId): array
     {
         if ($recurrence === []) {
-            return;
+            return CalendarEventRecurrence::single();
         }
 
         $identity = CalendarEventRecurrence::fromEvent($recurrence);
         if (($identity['recurrenceType'] ?? '') === CalendarEventRecurrence::SINGLE) {
-            return;
+            return $identity;
         }
+        $writeScope = (string) ($identity['writeScope'] ?? CalendarEventRecurrence::WRITE_SCOPE_OCCURRENCE);
+        if ($writeScope === CalendarEventRecurrence::WRITE_SCOPE_SERIES) {
+            $capability = $updating ? 'canUpdateSeries' : 'canDeleteSeries';
+            if ((bool) ($identity[$capability] ?? false) && trim((string) ($identity['seriesId'] ?? '')) !== '') {
+                return $identity;
+            }
+
+            throw new GoogleCalendarProviderException('The recurring series cannot be modified by this calendar.');
+        }
+
         $capability = $updating ? 'canUpdateOccurrence' : 'canDeleteOccurrence';
         if (CalendarEventRecurrence::isOccurrence($identity) && (bool) ($identity[$capability] ?? false)) {
             if ($eventId !== '' && hash_equals((string) ($identity['occurrenceId'] ?? ''), $eventId)) {
-                return;
+                return $identity;
             }
 
             throw new GoogleCalendarProviderException('The recurring occurrence identity does not match the event.');

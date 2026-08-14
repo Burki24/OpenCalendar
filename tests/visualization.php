@@ -440,6 +440,13 @@ assertVisualization(
         && str_contains($script, 'requestDelete(eventDialog)')
         && str_contains($script, 'requestDelete(eventDetailsDialog)')
         && str_contains($script, 'deleteConfirmButton.addEventListener(\'click\', confirmDeleteEvent)')
+        && str_contains($indexSource, 'id="delete-scope"')
+        && str_contains($indexSource, 'value="occurrence" checked')
+        && str_contains($indexSource, 'value="series"')
+        && str_contains($script, 'function updateDeleteScope(event)')
+        && str_contains($script, 'function selectedDeleteScope(event)')
+        && str_contains($script, 'Boolean(event.canDeleteSeries)')
+        && str_contains($script, 'recurrencePayload(event, selectedDeleteScope(event))')
         && !str_contains($script, 'confirm(')
         && str_contains($moduleSource, '\'Delete event\'')
         && str_contains($moduleSource, '\'Do you really want to delete this event?\'')
@@ -504,6 +511,8 @@ assertVisualization(
         && str_contains($style, 'scrollbar-gutter: stable;')
         && str_contains($style, '.dialog-actions-start, .dialog-actions-end {')
         && str_contains($style, '.dialog-close-button {')
+        && str_contains($style, '.delete-scope { display: grid;')
+        && str_contains($style, '.delete-scope-option:hover { background: var(--cal-surface-hover); }')
         && str_contains($style, '@media (max-width: 420px) {'),
     'All OpenCalendar modals must share responsive size classes, fixed header/footer layout and a scrollable content area.'
 );
