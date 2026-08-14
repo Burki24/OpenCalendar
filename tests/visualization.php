@@ -395,11 +395,24 @@ assertVisualization(
     str_contains($indexSource, 'id="view-selector-button"')
         && str_contains($indexSource, 'id="view-selector-options"')
         && substr_count($indexSource, 'class="view-selector-option"') === 5
+        && substr_count($indexSource, 'class="view-selector-option-period"') === 5
+        && str_contains($indexSource, 'data-view="threeDays"')
+        && str_contains($indexSource, '<span class="view-selector-option-label">Days</span>')
+        && str_contains($script, "threeDays: 'Days'")
+        && str_contains($script, 'function formatViewPeriod(view)')
+        && str_contains($script, "agenda: ['Day', 'Days']")
+        && str_contains($script, "week: ['Week', 'Weeks']")
+        && str_contains($script, "month: ['Month', 'Months']")
+        && str_contains($script, "button.querySelector('.view-selector-option-period')")
+        && !str_contains($formSource, '"caption": "3 Days"')
+        && substr_count($formSource, '"caption": "Days"') >= 3
+        && str_contains($moduleSource, "'Weeks'")
+        && str_contains($moduleSource, "'Months'")
         && str_contains($script, 'function openViewSelector()')
         && str_contains($script, 'document.querySelectorAll(\'.view-selector-option\')')
         && str_contains($script, 'viewSelectorDialog.showModal()')
         && str_contains($script, 'viewSelectorDialog.close()'),
-    'The calendar view switcher must open a compact modal and keep all five views selectable.'
+    'The calendar view switcher must show all five views with their configured periods and use a generic days label for the configurable multi-day view.'
 );
 
 assertVisualization(

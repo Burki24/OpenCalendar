@@ -1101,9 +1101,11 @@ class KalenderAnsicht extends IPSModuleStrict
         return [
             'Agenda',
             'List',
-            '3 Days',
+            'Days',
             'Week',
+            'Weeks',
             'Month',
+            'Months',
             'CW',
             'Day',
             'Previous',

@@ -681,6 +681,10 @@ html.ipsview-mode .danger-button { min-height: 48px; padding-inline: 18px; }
 .view-selector-body { padding: 10px; }
 .view-selector-options { display: grid; gap: 5px; }
 .view-selector-option {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    align-items: center;
+    gap: 10px;
     width: 100%;
     min-height: 40px;
     padding: 8px 11px;
@@ -689,17 +693,16 @@ html.ipsview-mode .danger-button { min-height: 48px; padding-inline: 18px; }
     font-size: .8em;
     text-align: left;
 }
+.view-selector-option-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.view-selector-option-period { color: var(--cal-muted); font-size: .92em; font-weight: 500; white-space: nowrap; }
 .view-selector-option.active {
     border-color: var(--cal-accent);
     background: var(--cal-gradient-accent);
     color: var(--cal-text-active, var(--cal-text));
     font-weight: 650;
 }
-.view-selector-option.active::after {
-    content: '✓';
-    float: right;
-    margin-left: 12px;
-}
+.view-selector-option.active .view-selector-option-period { color: inherit; opacity: .82; }
+.view-selector-option.active::after { content: '✓'; }
 
 .calendar-filter-body { gap: 12px; }
 .calendar-filter-selection-actions { display: flex; flex-wrap: wrap; gap: 8px; }
