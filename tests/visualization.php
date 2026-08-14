@@ -502,8 +502,10 @@ assertVisualization(
     str_contains($style, '.list-table {')
         && str_contains($style, '.list-color-column {')
         && str_contains($style, '.list-row:hover,')
-        && str_contains($style, '.view-selector-options { display: grid; gap: 5px; }'),
-    'The list view must remain minimal, preserve calendar colors and remain available through the compact view selector modal.'
+        && str_contains($style, '.view-selector-options { display: grid;')
+        && str_contains($style, '.view-selector-dialog { font-size: var(--cal-view-selector-font-size); }')
+        && str_contains($style, 'html.ipsview-mode .view-selector-option { min-height: 48px; padding: 10px 13px; }'),
+    'The list view must remain minimal, preserve calendar colors and remain available through the readable responsive view selector modal in native and IPSView modes.'
 );
 
 assertVisualization(
