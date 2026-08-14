@@ -197,7 +197,8 @@ assertSymconStrict(
 assertSymconStrict(
     !str_contains($viewSource, 'IPS_SetProperty(')
         && !str_contains($viewSource, 'IPS_ApplyChanges(')
-        && str_contains($viewSource, "UpdateFormField('Calendars', 'values', \$selection)")
+        && str_contains($viewSource, "'Calendars',\n            'values',\n            json_encode(")
+        && str_contains($viewSource, 'JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR')
         && str_contains($viewSource, 'HandleIPSViewHTMLPageAction($Ident, $Value)')
         && !str_contains($ipsViewPageHelperSource, 'IPS_SetProperty(')
         && !str_contains($ipsViewPageHelperSource, 'IPS_ApplyChanges(')

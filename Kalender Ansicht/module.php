@@ -479,7 +479,10 @@ class KalenderAnsicht extends IPSModuleStrict
     }
 
     /**
-     * Proposes every available calendar instance in the open configuration form.
+     * Selects every available calendar instance in the currently open configuration form.
+     *
+     * The form selection is only changed in the editor and remains pending until the user
+     * confirms it with Apply. Existing rows in the open form are replaced.
      *
      * @return bool False when no calendar instances are available.
      */
@@ -496,7 +499,14 @@ class KalenderAnsicht extends IPSModuleStrict
             return false;
         }
 
-        $this->UpdateFormField('Calendars', 'values', $selection);
+        $this->UpdateFormField(
+            'Calendars',
+            'values',
+            json_encode(
+                $selection,
+                JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR
+            )
+        );
 
         return true;
     }

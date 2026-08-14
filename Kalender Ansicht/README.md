@@ -30,12 +30,14 @@ verwendet werden.
 6. Die Konfiguration übernehmen und **Kalender synchronisieren** ausführen.
 7. Die Instanz in der Symcon-Kachelvisualisierung platzieren.
 
-Mit **Alle Kalenderinstanzen wiederherstellen** werden alle im System
-vorhandenen Kalender-Instanzen im aktuell geöffneten Konfigurationsformular zur
-Auswahl vorbereitet und aktiviert. Die Aktion ist hilfreich, wenn die
-Auswahlliste nach einer Änderung oder Wiederherstellung unvollständig ist; eine
-vorhandene individuelle Auswahl wird dabei ersetzt. Die Änderung wird erst mit
-**Übernehmen** dauerhaft in der Instanzkonfiguration gespeichert.
+Mit **Alle Kalenderinstanzen auswählen** werden alle im System vorhandenen
+Kalender-Instanzen im aktuell geöffneten Konfigurationsformular eingetragen und
+aktiviert. Die Aktion ist eine Komfortfunktion, wenn viele Kalender auf einmal
+ausgewählt werden sollen oder die Liste unvollständig ist. Eine vorhandene
+individuelle Auswahl im Formular wird dabei ersetzt. Die Änderung wird erst mit
+**Übernehmen** dauerhaft in der Instanzkonfiguration gespeichert. Eine verlorene
+gespeicherte Auswahl wird unabhängig davon bereits automatisch aus der internen
+Sicherung wiederhergestellt, soweit diese verfügbar ist.
 
 ## Funktionsumfang
 
@@ -197,7 +199,7 @@ Synchronisation schlägt fehl | Jede ausgewählte Kalender-Instanz einzeln synch
 Schaltfläche „＋ Termin“ ist deaktiviert | Mindestens einen ausgewählten Kalender mit Schreibrechten verwenden; ICS/Webcal ist immer schreibgeschützt
 IPSView zeigt nur statisches oder unvollständiges HTML | Im IPSView-Steuerelement **Browser des Clients** oder **Automatisch** als Renderer wählen
 IPSView-Inhalt ist veraltet | **IPSView-HTML neu generieren** ausführen und prüfen, ob die Ausgabe aktiviert ist
-Kalenderauswahl ist leer oder beschädigt | **Alle Kalenderinstanzen wiederherstellen** verwenden, die gewünschte Auswahl anpassen und anschließend **Übernehmen**
+Kalenderauswahl ist leer oder unvollständig | **Alle Kalenderinstanzen auswählen** verwenden, die gewünschte Auswahl anpassen und anschließend **Übernehmen**
 
 ## PHP-Befehlsreferenz
 
@@ -343,9 +345,10 @@ Browser gesetzte temporäre Kalenderfilter verändert diese konfigurierte Auswah
 nicht.
 
 `SelectAllCalendars()` trägt alle vorhandenen Kalender-Instanzen ausschließlich
-in das aktuell geöffnete Konfigurationsformular ein und aktiviert sie dort. Die
-Auswahl wird erst durch **Übernehmen** dauerhaft gespeichert. Die Funktion
-liefert `false`, wenn keine Kalender-Instanz vorhanden ist.
+in das aktuell geöffnete Konfigurationsformular ein und aktiviert sie dort. Eine
+bereits im Formular vorhandene individuelle Auswahl wird ersetzt. Die Auswahl
+wird erst durch **Übernehmen** dauerhaft gespeichert. Die Funktion liefert
+`false`, wenn keine Kalender-Instanz vorhanden ist.
 
 `RegenerateIPSViewHTML()` rendert den Inhalt der bestehenden
 IPSView-WebContent-Variable neu, ohne deren Objekt-ID, Position oder bestehende

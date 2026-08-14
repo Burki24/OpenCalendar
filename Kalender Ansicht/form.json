@@ -566,7 +566,7 @@
         },
         {
             "type": "Button",
-            "caption": "Restore all calendar instances",
+            "caption": "Select all calendar instances",
             "onClick": "IPS_RequestAction($id, 'FormRestoreCalendars', '');"
         },
         {
@@ -603,7 +603,7 @@
                 "items": [
                     {
                         "type": "Label",
-                        "caption": "All calendar instances were added. Confirm the selection with Apply."
+                        "caption": "All calendar instances were selected in the form. Existing rows were replaced. Review the selection and confirm it with Apply."
                     }
                 ]
             }
