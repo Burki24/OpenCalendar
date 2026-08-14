@@ -19,7 +19,7 @@ const calendarViewStateStorageKey = Number(calendarOptions.instanceId) > 0
     ? `OpenCalendar.ViewState.${Number(calendarOptions.instanceId)}`
     : '';
 const calendarViews = new Set(['agenda', 'list', 'threeDays', 'week', 'month']);
-const calendarViewLabels = { agenda: 'Agenda', list: 'List', threeDays: '3 Days', week: 'Week', month: 'Month' };
+const calendarViewLabels = { agenda: 'Agenda', list: 'List', threeDays: 'Days', week: 'Week', month: 'Month' };
 document.documentElement.style.setProperty('--agenda-color-bar-width', `${calendarAgendaColorBarWidth}px`);
 document.documentElement.style.setProperty('--compact-color-bar-width', `${calendarCompactColorBarWidth}px`);
 
@@ -137,10 +137,17 @@ function listControlsVisible() {
 
 function updateViewSelectorOptions() {
     document.querySelectorAll('.view-selector-option').forEach(button => {
-        const selected = button.dataset.view === activeView;
+        const view = button.dataset.view;
+        const selected = view === activeView;
+        const label = t(calendarViewLabels[view] || view);
+        const period = formatViewPeriod(view);
+        const labelElement = button.querySelector('.view-selector-option-label');
+        const periodElement = button.querySelector('.view-selector-option-period');
         button.classList.toggle('active', selected);
         button.setAttribute('aria-checked', String(selected));
-        button.textContent = t(calendarViewLabels[button.dataset.view] || button.dataset.view);
+        button.setAttribute('aria-label', `${label}, ${period}`);
+        if (labelElement) labelElement.textContent = label;
+        if (periodElement) periodElement.textContent = period;
     });
 }
 
@@ -1715,6 +1722,18 @@ function viewPeriod(view) {
     const [setting, fallback, minimum, maximum] = periods[view] || periods.agenda;
     const value = Number(calendarState.settings[setting]);
     return Number.isFinite(value) ? Math.max(minimum, Math.min(maximum, Math.round(value))) : fallback;
+}
+function formatViewPeriod(view) {
+    const count = viewPeriod(view);
+    const units = {
+        agenda: ['Day', 'Days'],
+        list: ['Day', 'Days'],
+        threeDays: ['Day', 'Days'],
+        week: ['Week', 'Weeks'],
+        month: ['Month', 'Months']
+    };
+    const [singular, plural] = units[view] || units.agenda;
+    return `${count} ${t(count === 1 ? singular : plural)}`;
 }
 function daysBetween(start, end) {
     const days = [];

@@ -37,7 +37,7 @@ unvollständig ist; eine vorhandene individuelle Auswahl wird dabei ersetzt.
 
 ## Funktionsumfang
 
-- Agenda-, Listen-, 3-Tage-, Wochen- und Monatsansicht
+- Agenda-, Listen-, Tage-, Wochen- und Monatsansicht
 - unabhängig wählbare horizontale oder vertikale Wochenansicht für Kachel und
   IPSView
 - separat einstellbare Schriftgröße der Kachelvisualisierung von 50 bis 200 Prozent;
@@ -45,12 +45,12 @@ unvollständig ist; eine vorhandene individuelle Auswahl wird dabei ersetzt.
 - je Darstellung separat konfigurierbare Anzeige von Kalenderwoche und
   Tageszahl; in der Listenansicht werden beide Angaben als eigene Spalten geführt
 - frei wählbare sichtbare Zeiträume je Ansicht: Tage für Agenda, Liste und
-  3-Tage-Ansicht, Wochen für die Wochenansicht und Monate für die Monatsansicht
+  Tage-Ansicht, Wochen für die Wochenansicht und Monate für die Monatsansicht
 - reduzierte Listenansicht mit Kalenderfarben und frei auswählbaren Spalten für
   Datum, Beginn, Ende, Titel, Kalender, Ort und Beschreibung; Navigation,
   Termin-Erstellung und Aktualisieren können dort optional ausgeblendet werden
 - optional und je Darstellung separat einblendbare Terminanzahl pro Tag in
-  Agenda-, 3-Tage- und Wochenansicht
+  Agenda-, Tage- und Wochenansicht
 - Zusammenführen beliebig vieler ausgewählter Kalender
 - Farben der einzelnen Kalender und Termine
 - optionale Anzeige von Kalendername, Ort und Beschreibung
@@ -83,25 +83,25 @@ Terminmodell führt, werden dabei nicht übertragen.
 Eigenschaft | Beschreibung
 --- | ---
 Kalender | Ausgewählte Kalender-Instanzen und ihre Aktivierung
-Standardansicht | Agenda, Liste, 3 Tage, Woche oder Monat; wird nur verwendet, solange der jeweilige Client noch keinen eigenen Ansichtsstand gespeichert hat
+Standardansicht | Agenda, Liste, Tage, Woche oder Monat; wird nur verwendet, solange der jeweilige Client noch keinen eigenen Ansichtsstand gespeichert hat
 Kachel-Wochenausrichtung | Horizontale Wochenspalten oder vertikale Tageszeilen
 Vergangene/Zukünftige Tage | Datenzeitraum, aus dem Termine für alle Darstellungen geladen und zusammengeführt werden
 Maximale Termine | Obergrenze der in einer Antwort verarbeiteten Termine
 Anzeigeoptionen → Allgemein | Wochenenden, Kalendername, Ort und Beschreibung zentral im aufklappbaren Bereich konfigurieren
-Anzeigeoptionen → Terminanzahl | Je Ansicht separat für Agenda, 3 Tage und Woche; im Monat wird keine Tages-Terminanzahl eingeblendet
-Anzeigeoptionen → Kalenderwoche | Je Ansicht separat für Agenda, Liste, 3 Tage, Woche und Monat
-Anzeigeoptionen → Tageszahl | Je Ansicht separat für Agenda, Liste, 3 Tage, Woche und Monat
+Anzeigeoptionen → Terminanzahl | Je Ansicht separat für Agenda, Tage und Woche; im Monat wird keine Tages-Terminanzahl eingeblendet
+Anzeigeoptionen → Kalenderwoche | Je Ansicht separat für Agenda, Liste, Tage, Woche und Monat
+Anzeigeoptionen → Tageszahl | Je Ansicht separat für Agenda, Liste, Tage, Woche und Monat
 Anzeigeoptionen → Listenansicht | Bedienelemente der Listenansicht ein-/ausblenden; Zeitraum und Ansichtswechsel bleiben sichtbar
 Anzeigeoptionen → Listenspalten | Legt fest, welche Datenfelder in der Listenansicht als Spalten erscheinen
-Ansichtszeiträume | Sichtbare Länge jeder Ansicht im aufklappbaren Bereich; Agenda/Liste/3 Tage in Tagen, Woche in Wochen und Monat in Monaten
+Ansichtszeiträume | Sichtbare Länge jeder Ansicht im aufklappbaren Bereich; Agenda/Liste/Tage in Tagen, Woche in Wochen und Monat in Monaten
 
 Die Kalenderwoche erscheint in der Wochenansicht in der Zeitraumüberschrift.
-In der 3-Tage-Ansicht werden bei einem Wochenwechsel beide Kalenderwochen
+In der Tage-Ansicht werden bei einem Wochenwechsel beide Kalenderwochen
 angegeben, beispielsweise **KW 33/34**. Die Agenda erhält beim Beginn einer
 neuen sichtbaren Kalenderwoche einen dezenten KW-Trenner. In der Monatsansicht
 steht die KW am Montag als erstem Tag der jeweiligen ISO-Kalenderwoche, auch
 wenn dieser Montag noch zum Vor- oder bereits zum Folgemonat gehört. Die
-Tageszahl wird in Agenda, 3-Tage- und Wochenansicht in der vorhandenen
+Tageszahl wird in Agenda, Tage- und Wochenansicht in der vorhandenen
 Tagesüberschrift und im Monat dezent beim Tagesdatum dargestellt. In der
 Listenansicht werden Kalenderwoche und Tageszahl bei Aktivierung als eigene,
 schmale Spalten ausgegeben.
@@ -126,7 +126,7 @@ bleiben dabei sichtbar, damit die Listenansicht jederzeit verlassen werden kann.
 
 Der aufklappbare Bereich **Ansichtszeiträume** steuert die sichtbare Länge der einzelnen
 Darstellungen und gleichzeitig die Schrittweite der Vor-/Zurück-Navigation.
-Agenda, Liste und 3-Tage-Ansicht verwenden Tage, die Wochenansicht verwendet
+Agenda, Liste und Tage-Ansicht verwenden Tage, die Wochenansicht verwendet
 Wochen und die Monatsansicht Monate. Der sichtbare Zeitraum und der oben
 konfigurierte Datenzeitraum sind unabhängig voneinander. Sollen Termine im
 gesamten sichtbaren Zeitraum vorhanden sein, muss der Datenzeitraum
@@ -160,7 +160,7 @@ Ansicht, ohne Symcons Größenlimit für einzelne PHP-Rückgaben zu überschreit
     einfache native HTML-Renderer genügt nicht, weil Navigation, Ansichtswechsel
     und Terminbearbeitung JavaScript verwenden.
 
-Agenda, Listen-, 3-Tage-, Wochen- und Monatsansicht funktionieren direkt in der
+Agenda, Listen-, Tage-, Wochen- und Monatsansicht funktionieren direkt in der
 IPSView-HTML-Box. In beschreibbaren Kalendern lassen sich dort außerdem Termine
 erstellen, bearbeiten, zwischen beschreibbaren Kalendern verschieben und löschen. Die kompakte Schaltfläche **＋ Termin** bleibt
 sichtbar, ist ohne beschreibbaren Kalender jedoch deaktiviert.
@@ -344,4 +344,4 @@ fachliche Inhaltsfarben.
 
 ### Tagesübersicht der Monatsansicht
 
-In der Monatsansicht öffnet ein Klick auf die Tageszahl oder einen freien Bereich der Tageszelle die Tagesübersicht; der Hinweis `+ weitere` bleibt ebenfalls direkt anklickbar. Die Übersicht zeigt alle Termine des Tages, ganztägige zuerst und anschließend zeitgebundene chronologisch, sowie die Terminanzahl. Ein Klick auf einen Termin öffnet zunächst die Termindetail-Ansicht. Von dort kann ein schreibbarer Einzeltermin gezielt bearbeitet werden. Ist mindestens ein beschreibbarer Kalender verfügbar, kann über **Termin an diesem Tag erstellen** direkt ein neuer Termin für den ausgewählten Tag angelegt werden. Der zusätzliche Floating-Button zum Erstellen eines Termins wird deshalb in der Monatsansicht ausgeblendet und bleibt nur in Agenda, Liste, 3 Tage und Woche verfügbar.
+In der Monatsansicht öffnet ein Klick auf die Tageszahl oder einen freien Bereich der Tageszelle die Tagesübersicht; der Hinweis `+ weitere` bleibt ebenfalls direkt anklickbar. Die Übersicht zeigt alle Termine des Tages, ganztägige zuerst und anschließend zeitgebundene chronologisch, sowie die Terminanzahl. Ein Klick auf einen Termin öffnet zunächst die Termindetail-Ansicht. Von dort kann ein schreibbarer Einzeltermin gezielt bearbeitet werden. Ist mindestens ein beschreibbarer Kalender verfügbar, kann über **Termin an diesem Tag erstellen** direkt ein neuer Termin für den ausgewählten Tag angelegt werden. Der zusätzliche Floating-Button zum Erstellen eines Termins wird deshalb in der Monatsansicht ausgeblendet und bleibt nur in Agenda, Liste, Tage und Woche verfügbar.

@@ -39,6 +39,7 @@
     --cal-dialog-large-width: 560px;
     --agenda-color-bar-width: 5px;
     --compact-color-bar-width: 3px;
+    --cal-view-selector-font-size: clamp(0.95rem, 0.9rem + 0.25vw, 1.06rem);
 }
 
 * { box-sizing: border-box; }
@@ -91,6 +92,7 @@ html.ipsview-mode {
     --cal-popup-shadow: var(--ipsview-role-popup-shadow);
     --cal-disabled-opacity: var(--ipsview-role-disabled-opacity);
     --cal-font-family: var(--ipsview-role-font-family);
+    --cal-view-selector-font-size: clamp(1rem, 0.96rem + 0.28vw, 1.12rem);
 }
 html.ipsview-mode button:disabled,
 html.ipsview-mode [aria-disabled="true"] {
@@ -678,28 +680,34 @@ html.ipsview-mode .danger-button { min-height: 48px; padding-inline: 18px; }
 .delete-confirm-period { color: var(--cal-muted); font-size: .76em; line-height: 1.4; overflow-wrap: anywhere; }
 .delete-confirm-question { margin: 4px 0 0; line-height: 1.45; }
 
-.view-selector-body { padding: 10px; }
-.view-selector-options { display: grid; gap: 5px; }
+.view-selector-dialog { font-size: var(--cal-view-selector-font-size); }
+.view-selector-dialog .dialog-header h2 { font-size: 1.04em; }
+.view-selector-body { padding: 12px; }
+.view-selector-options { display: grid; gap: 7px; }
 .view-selector-option {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    align-items: center;
+    gap: 10px;
     width: 100%;
-    min-height: 40px;
-    padding: 8px 11px;
+    min-height: 44px;
+    padding: 9px 12px;
     background: var(--cal-surface);
     color: var(--cal-text);
-    font-size: .8em;
+    font-size: 1em;
     text-align: left;
 }
+.view-selector-option-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.view-selector-option-period { color: var(--cal-muted); font-size: .95em; font-weight: 500; white-space: nowrap; }
+html.ipsview-mode .view-selector-option { min-height: 48px; padding: 10px 13px; }
 .view-selector-option.active {
     border-color: var(--cal-accent);
     background: var(--cal-gradient-accent);
     color: var(--cal-text-active, var(--cal-text));
     font-weight: 650;
 }
-.view-selector-option.active::after {
-    content: '✓';
-    float: right;
-    margin-left: 12px;
-}
+.view-selector-option.active .view-selector-option-period { color: inherit; opacity: .82; }
+.view-selector-option.active::after { content: '✓'; }
 
 .calendar-filter-body { gap: 12px; }
 .calendar-filter-selection-actions { display: flex; flex-wrap: wrap; gap: 8px; }

@@ -46,7 +46,7 @@
                     "value": 4
                 },
                 {
-                    "caption": "3 Days",
+                    "caption": "Days",
                     "value": 3
                 },
                 {
@@ -166,7 +166,7 @@
                         },
                         {
                             "type": "Label",
-                            "caption": "3 Days",
+                            "caption": "Days",
                             "width": "85px"
                         },
                         {
@@ -440,7 +440,7 @@
                     "items": [
                         {
                             "type": "Label",
-                            "caption": "3 Days",
+                            "caption": "Days",
                             "width": "190px"
                         },
                         {
