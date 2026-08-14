@@ -31,6 +31,9 @@ final class MicrosoftCalendarProviderException extends RuntimeException
 final class MicrosoftCalendarProvider implements CalendarProviderInterface
 {
     private const API_URL = 'https://graph.microsoft.com/v1.0';
+    private const MAX_PAGES = 100;
+    private const MAX_CALENDARS = 10_000;
+    private const MAX_EVENTS = 100_000;
 
     /**
      * Creates a Microsoft Graph calendar provider using a delegated OAuth access token.
@@ -61,8 +64,11 @@ final class MicrosoftCalendarProvider implements CalendarProviderInterface
     {
         $calendars = [];
         $url = self::API_URL . '/me/calendars?$top=100';
+        $pageCount = 0;
+        $seenPageUrls = [];
 
         while ($url !== '') {
+            $this->assertPageUrlProgress($url, $seenPageUrls, ++$pageCount);
             $data = $this->requestJsonUrl('GET', $url);
             foreach (($data['value'] ?? []) as $item) {
                 if (!is_array($item)) {
@@ -99,6 +105,9 @@ final class MicrosoftCalendarProvider implements CalendarProviderInterface
                         'delete' => $canWrite
                     ]
                 ];
+                if (count($calendars) > self::MAX_CALENDARS) {
+                    throw new MicrosoftCalendarProviderException('Microsoft Calendar returned too many calendars.');
+                }
             }
 
             $url = $this->nextLink($data);
@@ -133,8 +142,11 @@ final class MicrosoftCalendarProvider implements CalendarProviderInterface
         );
         $url = self::API_URL . '/me/calendars/' . rawurlencode($calendarId) . '/calendarView?' . $query;
         $events = [];
+        $pageCount = 0;
+        $seenPageUrls = [];
 
         while ($url !== '') {
+            $this->assertPageUrlProgress($url, $seenPageUrls, ++$pageCount);
             $data = $this->requestJsonUrl(
                 'GET',
                 $url,
@@ -148,6 +160,9 @@ final class MicrosoftCalendarProvider implements CalendarProviderInterface
                 $mapped = $this->mapEvent($calendarId, $item);
                 if ($mapped !== null) {
                     $events[] = $mapped;
+                    if (count($events) > self::MAX_EVENTS) {
+                        throw new MicrosoftCalendarProviderException('Microsoft Calendar returned too many events.');
+                    }
                 }
             }
             $url = $this->nextLink($data);
@@ -221,6 +236,19 @@ final class MicrosoftCalendarProvider implements CalendarProviderInterface
         );
 
         return true;
+    }
+
+    /** @param array<string, true> $seenPageUrls */
+    private function assertPageUrlProgress(string $url, array &$seenPageUrls, int $pageCount): void
+    {
+        if ($pageCount > self::MAX_PAGES) {
+            throw new MicrosoftCalendarProviderException('Microsoft Calendar pagination exceeded the safe page limit.');
+        }
+        if (isset($seenPageUrls[$url])) {
+            throw new MicrosoftCalendarProviderException('Microsoft Calendar returned a repeated pagination link.');
+        }
+
+        $seenPageUrls[$url] = true;
     }
 
     /**

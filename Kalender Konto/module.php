@@ -70,12 +70,15 @@ class KalenderKonto extends IPSModuleStrict
 
     private const DATA_ID_FROM_CHILD = '{4E535B1D-69C7-AC77-1372-0282B21BAEC9}';
     private const DATA_ID_TO_CHILD = '{8ED646DD-88E9-ACE2-95D5-9766EED4B5B0}';
+    private const MODULE_ID = '{966D6119-7FF3-5CA5-06C3-536FBF8100C4}';
     private const EVENT_TRANSFER_SCOPE = 'AccountCalendarEvents';
     private const APPLE_CALDAV_URL = 'https://caldav.icloud.com';
     private const CONNECT_CONTROL_MODULE_ID = '{9486D575-BE8C-4ED8-B5B5-20930E26DE6F}';
     private const GOOGLE_OAUTH_IDENTIFIER = 'opencalendar_google';
     private const MICROSOFT_OAUTH_IDENTIFIER = 'opencalendar_microsoft';
     private const OAUTH_REGISTRATION_DELAY_MS = 5_000;
+    private const OAUTH_DISPATCHER_RECHECK_MS = 60_000;
+    private const OAUTH_PENDING_TIMEOUT_SECONDS = 900;
 
     private const PROVIDER_APPLE = 0;
     private const PROVIDER_CALDAV = 1;
@@ -122,6 +125,8 @@ class KalenderKonto extends IPSModuleStrict
         $this->RegisterAttributeString('MicrosoftRefreshToken', '');
         $this->RegisterAttributeString('MicrosoftAccount', '');
         $this->RegisterAttributeInteger('PendingOAuthProvider', -1);
+        $this->RegisterAttributeInteger('PendingOAuthInstanceID', 0);
+        $this->RegisterAttributeInteger('PendingOAuthStartedAt', 0);
 
         $this->RegisterTimer('SynchronizationTimer', 0, 'IPSKALACC_ScheduledSynchronize($_IPS[\'TARGET\']);');
         $this->RegisterTimer('OAuthRegistrationTimer', 0, 'IPSKALACC_InitializeOAuth($_IPS[\'TARGET\']);');
@@ -366,6 +371,18 @@ class KalenderKonto extends IPSModuleStrict
                 $this->UpdateFormField('MicrosoftAuthorizationFailedPopup', 'visible', true);
                 break;
 
+            case 'InternalOAuthBegin':
+                $this->beginOAuthDispatch($Value);
+                break;
+
+            case 'InternalOAuthCancel':
+                $this->cancelOAuthDispatch($Value);
+                break;
+
+            case 'InternalOAuthComplete':
+                $this->completeOAuthDispatch($Value);
+                break;
+
             default:
                 throw new InvalidArgumentException('Unsupported form action: ' . $Ident);
         }
@@ -425,6 +442,11 @@ class KalenderKonto extends IPSModuleStrict
     {
         $this->SetTimerInterval('OAuthRegistrationTimer', 0);
         if (IPS_GetKernelRunlevel() !== KR_READY) {
+            return false;
+        }
+
+        if (!$this->isOAuthDispatcher()) {
+            $this->SetTimerInterval('OAuthRegistrationTimer', self::OAUTH_DISPATCHER_RECHECK_MS);
             return false;
         }
 
@@ -584,26 +606,39 @@ class KalenderKonto extends IPSModuleStrict
      */
     protected function ProcessOAuthData(): void
     {
-        $pendingProvider = $this->ReadAttributeInteger('PendingOAuthProvider');
-        $this->WriteAttributeInteger('PendingOAuthProvider', -1);
-        $provider = in_array($pendingProvider, [self::PROVIDER_GOOGLE, self::PROVIDER_MICROSOFT], true)
-            ? $pendingProvider
-            : $this->ReadPropertyInteger('Provider');
+        if (!$this->isOAuthDispatcher()) {
+            $this->SendHtmlTextResponse(409, $this->Translate('The OAuth callback was received by the wrong account instance.'));
+            return;
+        }
 
-        switch ($provider) {
-            case self::PROVIDER_GOOGLE:
-                $this->processGoogleOAuthData();
-                break;
+        $targetInstanceId = $this->ReadAttributeInteger('PendingOAuthInstanceID');
+        $provider = $this->ReadAttributeInteger('PendingOAuthProvider');
+        $startedAt = $this->ReadAttributeInteger('PendingOAuthStartedAt');
+        $this->clearOAuthDispatch();
 
-            case self::PROVIDER_MICROSOFT:
-                $this->processMicrosoftOAuthData();
-                break;
+        if (!$this->isValidOAuthProvider($provider)
+            || $targetInstanceId <= 0
+            || time() - $startedAt > self::OAUTH_PENDING_TIMEOUT_SECONDS
+            || !$this->isCalendarAccountInstance($targetInstanceId)) {
+            $this->SendHtmlTextResponse(400, $this->Translate('The pending calendar authorization is missing or expired.'));
+            return;
+        }
 
-            default:
-                $this->SendHtmlTextResponse(
-                    400,
-                    $this->Translate('The selected calendar provider does not support OAuth.')
-                );
+        try {
+            IPS_RequestAction(
+                $targetInstanceId,
+                'InternalOAuthComplete',
+                json_encode(
+                    ['provider' => $provider, 'data' => $this->readSymconOAuthData()],
+                    JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE
+                )
+            );
+        } catch (Throwable $exception) {
+            $this->SendHtmlTextResponse(
+                400,
+                $this->Translate('Calendar authorization could not be completed') . ': '
+                    . $this->sanitizeError($exception->getMessage())
+            );
         }
     }
 
@@ -612,6 +647,7 @@ class KalenderKonto extends IPSModuleStrict
      */
     private function scheduleOAuthRegistration(): void
     {
+        $this->SetTimerInterval('OAuthRegistrationTimer', 0);
         if (IPS_GetKernelRunlevel() === KR_READY) {
             $this->SetTimerInterval('OAuthRegistrationTimer', self::OAUTH_REGISTRATION_DELAY_MS);
         }
@@ -622,6 +658,10 @@ class KalenderKonto extends IPSModuleStrict
      */
     private function registerOAuthHandlers(): void
     {
+        if (!$this->isOAuthDispatcher()) {
+            return;
+        }
+
         foreach ([self::GOOGLE_OAUTH_IDENTIFIER, self::MICROSOFT_OAUTH_IDENTIFIER] as $identifier) {
             try {
                 if (!$this->RegisterOAuth($identifier)) {
@@ -639,6 +679,157 @@ class KalenderKonto extends IPSModuleStrict
                 );
             }
         }
+    }
+
+    private function beginOAuthDispatch(mixed $value): void
+    {
+        if (!$this->isOAuthDispatcher()) {
+            throw new SymconOAuthException('The OAuth dispatcher is unavailable.');
+        }
+
+        $payload = $this->decodeOAuthActionPayload($value);
+        $targetInstanceId = (int) ($payload['instanceId'] ?? 0);
+        $provider = (int) ($payload['provider'] ?? -1);
+        if (!$this->isValidOAuthProvider($provider) || !$this->isCalendarAccountInstance($targetInstanceId)) {
+            throw new SymconOAuthException('The calendar OAuth request is invalid.');
+        }
+
+        $pendingInstanceId = $this->ReadAttributeInteger('PendingOAuthInstanceID');
+        $pendingStartedAt = $this->ReadAttributeInteger('PendingOAuthStartedAt');
+        $pendingIsCurrent = $pendingInstanceId > 0
+            && time() - $pendingStartedAt <= self::OAUTH_PENDING_TIMEOUT_SECONDS;
+        if ($pendingIsCurrent && $pendingInstanceId !== $targetInstanceId) {
+            throw new SymconOAuthException('Another calendar account authorization is already in progress.');
+        }
+
+        $this->WriteAttributeInteger('PendingOAuthInstanceID', $targetInstanceId);
+        $this->WriteAttributeInteger('PendingOAuthProvider', $provider);
+        $this->WriteAttributeInteger('PendingOAuthStartedAt', time());
+        $this->registerOAuthHandlers();
+    }
+
+    private function cancelOAuthDispatch(mixed $value): void
+    {
+        if (!$this->isOAuthDispatcher()) {
+            return;
+        }
+
+        $payload = $this->decodeOAuthActionPayload($value);
+        $targetInstanceId = (int) ($payload['instanceId'] ?? 0);
+        if ($targetInstanceId === $this->ReadAttributeInteger('PendingOAuthInstanceID')) {
+            $this->clearOAuthDispatch();
+        }
+    }
+
+    private function completeOAuthDispatch(mixed $value): void
+    {
+        $payload = $this->decodeOAuthActionPayload($value);
+        $provider = (int) ($payload['provider'] ?? -1);
+        $oauthData = $payload['data'] ?? null;
+        if (!$this->isValidOAuthProvider($provider) || !is_array($oauthData)) {
+            throw new SymconOAuthException('The calendar OAuth callback is invalid.');
+        }
+
+        $normalizedData = [];
+        foreach ($oauthData as $key => $item) {
+            if (is_scalar($item)) {
+                $normalizedData[(string) $key] = (string) $item;
+            }
+        }
+
+        if ($provider === self::PROVIDER_GOOGLE) {
+            $this->processGoogleOAuthData($normalizedData);
+            return;
+        }
+
+        $this->processMicrosoftOAuthData($normalizedData);
+    }
+
+    private function requestOAuthDispatch(int $provider): void
+    {
+        $dispatcherId = $this->oauthDispatcherId();
+        if ($dispatcherId <= 0) {
+            throw new SymconOAuthException('The OAuth dispatcher is unavailable.');
+        }
+
+        IPS_RequestAction(
+            $dispatcherId,
+            'InternalOAuthBegin',
+            json_encode(
+                ['instanceId' => $this->InstanceID, 'provider' => $provider],
+                JSON_THROW_ON_ERROR
+            )
+        );
+    }
+
+    private function releaseOAuthDispatch(): void
+    {
+        $dispatcherId = $this->oauthDispatcherId();
+        if ($dispatcherId <= 0) {
+            return;
+        }
+
+        try {
+            IPS_RequestAction(
+                $dispatcherId,
+                'InternalOAuthCancel',
+                json_encode(['instanceId' => $this->InstanceID], JSON_THROW_ON_ERROR)
+            );
+        } catch (Throwable) {
+            // Cleanup is best effort; an abandoned request expires automatically.
+        }
+    }
+
+    /** @return array<string, mixed> */
+    private function decodeOAuthActionPayload(mixed $value): array
+    {
+        if (is_array($value)) {
+            return $value;
+        }
+        if (!is_string($value) || trim($value) === '') {
+            return [];
+        }
+
+        $decoded = json_decode($value, true, 32, JSON_THROW_ON_ERROR);
+        return is_array($decoded) ? $decoded : [];
+    }
+
+    private function clearOAuthDispatch(): void
+    {
+        $this->WriteAttributeInteger('PendingOAuthProvider', -1);
+        $this->WriteAttributeInteger('PendingOAuthInstanceID', 0);
+        $this->WriteAttributeInteger('PendingOAuthStartedAt', 0);
+    }
+
+    private function oauthDispatcherId(): int
+    {
+        $instanceIds = array_values(array_filter(
+            IPS_GetInstanceListByModuleID(self::MODULE_ID),
+            static fn (int $instanceId): bool => $instanceId > 0 && IPS_InstanceExists($instanceId)
+        ));
+        sort($instanceIds, SORT_NUMERIC);
+
+        return $instanceIds[0] ?? 0;
+    }
+
+    private function isOAuthDispatcher(): bool
+    {
+        return $this->InstanceID === $this->oauthDispatcherId();
+    }
+
+    private function isCalendarAccountInstance(int $instanceId): bool
+    {
+        if ($instanceId <= 0 || !IPS_InstanceExists($instanceId)) {
+            return false;
+        }
+
+        $instance = IPS_GetInstance($instanceId);
+        return ($instance['ModuleInfo']['ModuleID'] ?? '') === self::MODULE_ID;
+    }
+
+    private function isValidOAuthProvider(int $provider): bool
+    {
+        return in_array($provider, [self::PROVIDER_GOOGLE, self::PROVIDER_MICROSOFT], true);
     }
 
     /**
@@ -1032,6 +1223,7 @@ class KalenderKonto extends IPSModuleStrict
 
         $patterns = [
             '/^HTTP request failed \((\d+)\): (.+)$/'                                          => ['HTTP request failed (%d): %s', [1, 2]],
+            '/^HTTP response exceeds the maximum size of (\d+) bytes\.$/'                      => ['HTTP response exceeds the maximum size of %d bytes.', [1]],
             '/^Unexpected CalDAV response: HTTP (\d+)\.$/'                                     => ['Unexpected CalDAV response: HTTP %d.', [1]],
             '/^Google Calendar request failed with HTTP (\d+)\.$/'                             => ['Google Calendar request failed with HTTP %d.', [1]],
             '/^Microsoft Calendar request failed with HTTP (\d+)\.$/'                          => ['Microsoft Calendar request failed with HTTP %d.', [1]],

@@ -112,11 +112,21 @@ assertAccountStructure(
     is_string($accountSource)
         && str_contains($accountSource, 'self::GOOGLE_OAUTH_IDENTIFIER, self::MICROSOFT_OAUTH_IDENTIFIER')
         && str_contains($accountSource, '$this->RegisterOAuth($identifier)')
+        && str_contains($accountSource, "RegisterAttributeInteger('PendingOAuthInstanceID', 0)")
+        && str_contains($accountSource, "RegisterAttributeInteger('PendingOAuthStartedAt', 0)")
         && str_contains($accountSource, 'RegisterMessage(0, IPS_KERNELSTARTED)')
         && str_contains($accountSource, "RegisterTimer('OAuthRegistrationTimer'")
         && str_contains($accountSource, 'IPSKALACC_InitializeOAuth')
         && str_contains($accountSource, 'OAUTH_REGISTRATION_DELAY_MS = 5_000')
+        && str_contains($accountSource, 'OAUTH_DISPATCHER_RECHECK_MS = 60_000')
         && str_contains($accountSource, 'IPS_GetKernelRunlevel() === KR_READY')
+        && str_contains($accountSource, "SetTimerInterval('OAuthRegistrationTimer', self::OAUTH_DISPATCHER_RECHECK_MS)")
+        && str_contains($accountSource, 'private function oauthDispatcherId(): int')
+        && str_contains($accountSource, 'IPS_GetInstanceListByModuleID(self::MODULE_ID)')
+        && str_contains($accountSource, 'OAUTH_PENDING_TIMEOUT_SECONDS = 900')
+        && str_contains($accountSource, "case 'InternalOAuthBegin':")
+        && str_contains($accountSource, "case 'InternalOAuthComplete':")
+        && str_contains($accountSource, "'InternalOAuthComplete',")
         && str_contains($accountSource, 'private function scheduleOAuthRegistration(): void')
         && preg_match(
             '/public function Create\(\): void[\s\S]*?public function GetConfigurationForm/',
@@ -142,7 +152,7 @@ assertAccountStructure(
         && !str_contains($accountSource, "RegisterPropertyString('GoogleClientSecret'")
         && !str_contains($accountSource, "RegisterPropertyString('MicrosoftClientID'")
         && !str_contains($accountSource, "RegisterPropertyString('MicrosoftClientSecret'"),
-    'Google and Microsoft OAuth registration must be deferred beyond ApplyChanges during module reloads.'
+    'Google and Microsoft OAuth registration must be deferred and routed through one deterministic dispatcher.'
 );
 assertAccountStructure(
     is_string($accountSource)
@@ -156,6 +166,17 @@ assertAccountStructure(
 $googleOAuthSource = file_get_contents(__DIR__ . '/../Kalender Konto/traits/GoogleOAuthTrait.php');
 $microsoftOAuthSource = file_get_contents(__DIR__ . '/../Kalender Konto/traits/MicrosoftOAuthTrait.php');
 $sharedOAuthSource = file_get_contents(__DIR__ . '/../Kalender Konto/traits/SymconOAuthTrait.php');
+assertAccountStructure(
+    is_string($googleOAuthSource)
+        && is_string($microsoftOAuthSource)
+        && !str_contains($googleOAuthSource, 'RegisterOAuth(')
+        && !str_contains($microsoftOAuthSource, 'RegisterOAuth(')
+        && str_contains($googleOAuthSource, 'requestOAuthDispatch(self::PROVIDER_GOOGLE)')
+        && str_contains($microsoftOAuthSource, 'requestOAuthDispatch(self::PROVIDER_MICROSOFT)')
+        && str_contains($googleOAuthSource, 'processGoogleOAuthData(array $oauthData): void')
+        && str_contains($microsoftOAuthSource, 'processMicrosoftOAuthData(array $oauthData): void'),
+    'Provider traits must delegate OAuth registration and callback routing to the account dispatcher.'
+);
 assertAccountStructure(
     is_string($accountSource)
         && str_contains($accountSource, "require_once __DIR__ . '/../libs/helper/SymconOAuthHelper.php';")

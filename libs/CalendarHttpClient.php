@@ -33,14 +33,22 @@ interface CalendarHttpClientInterface
     /**
      * Executes an HTTP request and returns the normalized response.
      *
-     * @param array<string, string> $headers Request headers keyed by header name.
+     * @param array<string, string> $headers          Request headers keyed by header name.
+     * @param int                   $maxResponseBytes Maximum decompressed response size in bytes.
      */
-    public function request(string $method, string $url, array $headers = [], string $body = ''): CalendarHttpResponse;
+    public function request(
+        string $method,
+        string $url,
+        array $headers = [],
+        string $body = '',
+        int $maxResponseBytes = 67_108_864
+    ): CalendarHttpResponse;
 }
 
 final class CalendarHttpClient implements CalendarHttpClientInterface
 {
     private const MAX_REDIRECTS = 5;
+    private const DEFAULT_MAX_RESPONSE_BYTES = 67_108_864;
 
     /**
      * Creates an HTTP client for calendar provider requests.
@@ -63,12 +71,22 @@ final class CalendarHttpClient implements CalendarHttpClientInterface
     /**
      * Executes an HTTP request while enforcing the configured origin policy when present.
      *
-     * @param array<string, string> $headers Request headers keyed by header name.
+     * @param array<string, string> $headers          Request headers keyed by header name.
+     * @param int                   $maxResponseBytes Maximum decompressed response size in bytes.
      */
-    public function request(string $method, string $url, array $headers = [], string $body = ''): CalendarHttpResponse
-    {
+    public function request(
+        string $method,
+        string $url,
+        array $headers = [],
+        string $body = '',
+        int $maxResponseBytes = self::DEFAULT_MAX_RESPONSE_BYTES
+    ): CalendarHttpResponse {
+        if ($maxResponseBytes < 1) {
+            throw new CalendarHttpException('The HTTP response size limit must be positive.');
+        }
+
         if ($this->originPolicy === null) {
-            return $this->executeRequest($method, $url, $headers, $body, true);
+            return $this->executeRequest($method, $url, $headers, $body, true, $maxResponseBytes);
         }
 
         if (!$this->originPolicy->isAllowedUrl($url)) {
@@ -77,7 +95,7 @@ final class CalendarHttpClient implements CalendarHttpClientInterface
 
         $currentUrl = $url;
         for ($redirectCount = 0; ; $redirectCount++) {
-            $response = $this->executeRequest($method, $currentUrl, $headers, $body, false);
+            $response = $this->executeRequest($method, $currentUrl, $headers, $body, false, $maxResponseBytes);
             if (!in_array($response->statusCode, [301, 302, 303, 307, 308], true)) {
                 return $response;
             }
@@ -115,7 +133,8 @@ final class CalendarHttpClient implements CalendarHttpClientInterface
         string $url,
         array $headers,
         string $body,
-        bool $followRedirects
+        bool $followRedirects,
+        int $maxResponseBytes
     ): CalendarHttpResponse {
         if (!function_exists('curl_init')) {
             throw new CalendarHttpException('The PHP cURL extension is not available.');
@@ -127,6 +146,8 @@ final class CalendarHttpClient implements CalendarHttpClientInterface
         }
 
         $responseHeaders = [];
+        $responseBody = '';
+        $responseTooLarge = false;
         $headerLines = [];
         foreach ($headers as $name => $value) {
             $headerLines[] = $name . ': ' . $value;
@@ -135,7 +156,6 @@ final class CalendarHttpClient implements CalendarHttpClientInterface
         $options = [
             CURLOPT_URL            => $url,
             CURLOPT_CUSTOMREQUEST  => strtoupper($method),
-            CURLOPT_RETURNTRANSFER => true,
             CURLOPT_FOLLOWLOCATION => $followRedirects,
             CURLOPT_MAXREDIRS      => self::MAX_REDIRECTS,
             CURLOPT_CONNECTTIMEOUT => min($this->timeout, 15),
@@ -145,6 +165,20 @@ final class CalendarHttpClient implements CalendarHttpClientInterface
             CURLOPT_HTTPHEADER     => $headerLines,
             CURLOPT_ENCODING       => '',
             CURLOPT_USERAGENT      => 'OpenCalendar/1.0',
+            CURLOPT_WRITEFUNCTION  => static function ($curl, string $chunk) use (
+                &$responseBody,
+                &$responseTooLarge,
+                $maxResponseBytes
+            ): int {
+                $length = strlen($chunk);
+                if (strlen($responseBody) + $length > $maxResponseBytes) {
+                    $responseTooLarge = true;
+                    return 0;
+                }
+
+                $responseBody .= $chunk;
+                return $length;
+            },
             CURLOPT_HEADERFUNCTION => static function ($curl, string $line) use (&$responseHeaders): int
             {
                 $length = strlen($line);
@@ -183,9 +217,15 @@ final class CalendarHttpClient implements CalendarHttpClientInterface
         }
 
         curl_setopt_array($handle, $options);
-        $responseBody = curl_exec($handle);
+        $result = curl_exec($handle);
 
-        if ($responseBody === false) {
+        if ($result === false) {
+            if ($responseTooLarge) {
+                throw new CalendarHttpException(sprintf(
+                    'HTTP response exceeds the maximum size of %d bytes.',
+                    $maxResponseBytes
+                ));
+            }
             $message = curl_error($handle);
             $errorCode = curl_errno($handle);
             throw new CalendarHttpException(sprintf('HTTP request failed (%d): %s', $errorCode, $message));
@@ -194,6 +234,6 @@ final class CalendarHttpClient implements CalendarHttpClientInterface
         $statusCode = (int) curl_getinfo($handle, CURLINFO_RESPONSE_CODE);
         $effectiveUrl = (string) curl_getinfo($handle, CURLINFO_EFFECTIVE_URL);
 
-        return new CalendarHttpResponse($statusCode, $responseHeaders, (string) $responseBody, $effectiveUrl);
+        return new CalendarHttpResponse($statusCode, $responseHeaders, $responseBody, $effectiveUrl);
     }
 }

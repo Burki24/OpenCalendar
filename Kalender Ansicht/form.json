@@ -603,7 +603,7 @@
                 "items": [
                     {
                         "type": "Label",
-                        "caption": "Calendar selection restored."
+                        "caption": "All calendar instances were added. Confirm the selection with Apply."
                     }
                 ]
             }

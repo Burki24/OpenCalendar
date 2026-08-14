@@ -61,6 +61,12 @@ switch ($path) {
         echo '<?xml version="1.0"?><d:multistatus xmlns:d="DAV:"/>';
         break;
 
+    case '/large-response':
+        header('Content-Type: application/octet-stream');
+        http_response_code(200);
+        echo str_repeat('x', 2048);
+        break;
+
     default:
         http_response_code(404);
         echo 'Not found';

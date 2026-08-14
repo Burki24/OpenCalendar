@@ -178,7 +178,13 @@ final class ICalendarFeedProvider implements CalendarProviderInterface
         }
 
         try {
-            $response = $this->httpClient->request('GET', $this->feedUrl, $headers);
+            $response = $this->httpClient->request(
+                'GET',
+                $this->feedUrl,
+                $headers,
+                '',
+                self::MAX_FEED_SIZE
+            );
         } catch (Throwable $exception) {
             return $this->cachedFeedOrThrow(
                 'The calendar feed could not be refreshed: ' . $exception->getMessage(),

@@ -19,7 +19,7 @@ require_once __DIR__ . '/HelperTranslationHelper.php';
  * visual implementation in style.css/app.js. The helper owns asset loading,
  * bootstrap encoding, page metadata, fixed placeholders and validation.
  *
- * @version 1.2.1
+ * @version 1.3.0
  */
 trait IPSViewHTMLPageHelper
 {
@@ -28,10 +28,9 @@ trait IPSViewHTMLPageHelper
     public const IPSVIEW_HTML_CONTRACT_VERSION = 1;
 
     private const IPSVIEW_HTML_ENABLE_PROPERTY = 'EnableIPSView';
-    private const IPSVIEW_HTML_DELETE_REQUEST_PROPERTY = 'IPSViewHTMLDeleteRequest';
     private const IPSVIEW_HTML_VARIABLE_REGISTRY_ATTRIBUTE = 'IPSViewHTMLVariableRegistry';
-    private const IPSVIEW_HTML_DELETE_STATE_ATTRIBUTE = 'IPSViewHTMLDeleteState';
     private const IPSVIEW_HTML_FORM_MARKER = 'Configure optional IPSView HTML output.';
+    private const IPSVIEW_HTML_DELETE_ACTION = 'IPSViewHTMLDeleteVariables';
 
     /** @var array<string,string> */
     private const IPSVIEW_HTML_TRANSLATION_SOURCES = [
@@ -78,13 +77,27 @@ trait IPSViewHTMLPageHelper
         'replacements'
     ];
 
-    /** Registers the common switch and internal deletion state for optional IPSView HTML output. */
+    /** Registers the common switch and variable registry for optional IPSView HTML output. */
     protected function RegisterIPSViewHTMLPageProperties(): void
     {
         $this->RegisterPropertyBoolean(self::IPSVIEW_HTML_ENABLE_PROPERTY, false);
-        $this->RegisterPropertyString(self::IPSVIEW_HTML_DELETE_REQUEST_PROPERTY, '');
         $this->RegisterAttributeString(self::IPSVIEW_HTML_VARIABLE_REGISTRY_ATTRIBUTE, '[]');
-        $this->RegisterAttributeString(self::IPSVIEW_HTML_DELETE_STATE_ATTRIBUTE, '{}');
+    }
+
+    /**
+     * Handles helper-owned configuration form actions.
+     *
+     * Consumers should call this method at the beginning of RequestAction() and
+     * return immediately when it reports a handled action.
+     */
+    protected function HandleIPSViewHTMLPageAction(string $ident, mixed $value): bool
+    {
+        if ($ident !== self::IPSVIEW_HTML_DELETE_ACTION) {
+            return false;
+        }
+
+        $this->DeleteRetainedIPSViewHTMLVariables();
+        return true;
     }
 
     /**
@@ -215,8 +228,6 @@ trait IPSViewHTMLPageHelper
         $this->RememberIPSViewHTMLVariable($ident, $caption);
 
         if (!$this->IsIPSViewHTMLPageEnabled()) {
-            $this->DeleteIPSViewHTMLVariableWhenRequested($ident);
-
             return false;
         }
         if (!method_exists($this, 'MaintainVariable') || !method_exists($this, 'SetValue')) {
@@ -683,8 +694,7 @@ trait IPSViewHTMLPageHelper
                     [
                         'caption' => $this->IPSViewHTMLPageText('action.confirm_delete'),
                         'onClick' => [
-                            'IPS_SetProperty($id, ' . var_export(self::IPSVIEW_HTML_DELETE_REQUEST_PROPERTY, true) . ', bin2hex(random_bytes(16)));',
-                            'IPS_ApplyChanges($id);',
+                            'IPS_RequestAction($id, ' . var_export(self::IPSVIEW_HTML_DELETE_ACTION, true) . ', "");',
                             'return ' . var_export($message, true) . ';'
                         ]
                     ]
@@ -708,43 +718,25 @@ trait IPSViewHTMLPageHelper
         );
     }
 
-    private function DeleteIPSViewHTMLVariableWhenRequested(string $ident): void
+    private function DeleteRetainedIPSViewHTMLVariables(): void
     {
-        $request = trim($this->ReadPropertyString(self::IPSVIEW_HTML_DELETE_REQUEST_PROPERTY));
-        if ($request === '') {
-            return;
+        if (!method_exists($this, 'UnregisterVariable')) {
+            throw new RuntimeException('IPSViewHTMLPageHelper requires UnregisterVariable() for confirmed deletion.');
         }
 
-        $state = $this->ReadIPSViewHTMLDeleteState();
-        if (($state[$ident] ?? null) === $request) {
-            return;
-        }
-        if ($this->IPSViewHTMLVariableExists($ident)) {
-            if (!method_exists($this, 'UnregisterVariable')) {
-                throw new RuntimeException('IPSViewHTMLPageHelper requires UnregisterVariable() for confirmed deletion.');
+        foreach (array_keys($this->ReadIPSViewHTMLVariableRegistry()) as $ident) {
+            if ($this->IPSViewHTMLVariableExists($ident)) {
+                $this->UnregisterVariable($ident);
             }
-
-            $this->UnregisterVariable($ident);
         }
 
-        $state[$ident] = $request;
-        ksort($state, SORT_STRING);
-        $this->WriteAttributeString(
-            self::IPSVIEW_HTML_DELETE_STATE_ATTRIBUTE,
-            json_encode($state, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)
-        );
+        $this->WriteAttributeString(self::IPSVIEW_HTML_VARIABLE_REGISTRY_ATTRIBUTE, '[]');
     }
 
     /** @return array<string,string> */
     private function ReadIPSViewHTMLVariableRegistry(): array
     {
         return $this->ReadIPSViewHTMLStringMapAttribute(self::IPSVIEW_HTML_VARIABLE_REGISTRY_ATTRIBUTE);
-    }
-
-    /** @return array<string,string> */
-    private function ReadIPSViewHTMLDeleteState(): array
-    {
-        return $this->ReadIPSViewHTMLStringMapAttribute(self::IPSVIEW_HTML_DELETE_STATE_ATTRIBUTE);
     }
 
     /** @return array<string,string> */

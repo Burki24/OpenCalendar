@@ -16,19 +16,15 @@ trait KalenderKontoGoogleOAuthTrait
     {
         try {
             $this->assertSymconConnectAvailable();
-            if (!$this->RegisterOAuth(self::GOOGLE_OAUTH_IDENTIFIER)) {
-                throw new SymconOAuthException('Google OAuth could not be registered in Symcon.');
-            }
-
             $this->SetBuffer('GoogleAccessToken', '');
-            $this->WriteAttributeInteger('PendingOAuthProvider', self::PROVIDER_GOOGLE);
+            $this->requestOAuthDispatch(self::PROVIDER_GOOGLE);
 
             return $this->createSymconOAuthClient(
                 self::GOOGLE_OAUTH_IDENTIFIER,
                 'Google Calendar'
             )->getAuthorizationUrl((string) IPS_GetLicensee());
         } catch (Throwable $exception) {
-            $this->WriteAttributeInteger('PendingOAuthProvider', -1);
+            $this->releaseOAuthDispatch();
             return $this->Translate('Google authorization could not be started') . ': '
                 . $this->handleProviderError($exception);
         }
@@ -59,7 +55,7 @@ trait KalenderKontoGoogleOAuthTrait
         $this->WriteAttributeString('GoogleRefreshToken', '');
         $this->WriteAttributeString('GoogleAccount', '');
         $this->WriteAttributeString('GoogleTokenClientID', '');
-        $this->WriteAttributeInteger('PendingOAuthProvider', -1);
+        $this->releaseOAuthDispatch();
         $this->SetBuffer('GoogleAccessToken', '');
         $this->ClearCache();
         $this->SetStatus($this->ReadPropertyBoolean('Active') ? self::STATUS_CONFIGURATION_MISSING : IS_INACTIVE);
@@ -71,10 +67,9 @@ trait KalenderKontoGoogleOAuthTrait
     /**
      * Handles a Google callback forwarded by the native Symcon OAuth handler.
      */
-    private function processGoogleOAuthData(): void
+    private function processGoogleOAuthData(array $oauthData): void
     {
         try {
-            $oauthData = $this->readSymconOAuthData();
             $error = trim((string) ($oauthData['error_description'] ?? $oauthData['error'] ?? ''));
             if ($error !== '') {
                 throw new SymconOAuthException($error);

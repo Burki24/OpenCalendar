@@ -39,7 +39,7 @@ require_once __DIR__ . '/../libs/SynchronizationSchedule.php';
 
 final class FakeHttpClient implements CalendarHttpClientInterface
 {
-    /** @var list<array{method: string, url: string, headers: array<string, string>, body: string}> */
+    /** @var list<array{method: string, url: string, headers: array<string, string>, body: string, maxResponseBytes: int}> */
     public array $requests = [];
 
     /** @var list<CalendarHttpResponse|Throwable> */
@@ -51,9 +51,14 @@ final class FakeHttpClient implements CalendarHttpClientInterface
         $this->responses = $responses;
     }
 
-    public function request(string $method, string $url, array $headers = [], string $body = ''): CalendarHttpResponse
-    {
-        $this->requests[] = compact('method', 'url', 'headers', 'body');
+    public function request(
+        string $method,
+        string $url,
+        array $headers = [],
+        string $body = '',
+        int $maxResponseBytes = 67_108_864
+    ): CalendarHttpResponse {
+        $this->requests[] = compact('method', 'url', 'headers', 'body', 'maxResponseBytes');
         if ($this->responses === []) {
             throw new RuntimeException('No fake response was queued.');
         }
@@ -145,6 +150,20 @@ assertSameValue(true, $calendars[0]['writeAccessKnown'], 'Google access roles mu
 assertSameValue(true, $calendars[0]['capabilities']['create'], 'Owners must have write access.');
 assertSameValue(false, $calendars[1]['capabilities']['create'], 'Readers must not have write access.');
 assertTrueValue(str_contains($calendarClient->requests[1]['url'], 'pageToken=page-2'), 'The second calendar page must be requested.');
+
+$googleRepeatedPageClient = new FakeHttpClient([
+    response(200, ['items' => [], 'nextPageToken' => 'repeated-token']),
+    response(200, ['items' => [], 'nextPageToken' => 'repeated-token'])
+]);
+try {
+    (new GoogleCalendarProvider($googleRepeatedPageClient, 'access-token'))->getCalendars();
+    throw new RuntimeException('A repeated Google page token was accepted.');
+} catch (RuntimeException $exception) {
+    assertTrueValue(
+        str_contains($exception->getMessage(), 'repeated page token'),
+        'Repeated Google page tokens must stop pagination.'
+    );
+}
 
 $eventClient = new FakeHttpClient([
     response(200, [
@@ -343,6 +362,21 @@ try {
     assertTrueValue(
         str_contains($exception->getMessage(), 'untrusted URL'),
         'Untrusted Microsoft Graph pagination URLs must be rejected before the next request.'
+    );
+}
+
+$msRepeatedPageUrl = 'https://graph.microsoft.com/v1.0/me/calendars?$skiptoken=repeated';
+$msRepeatedPageClient = new FakeHttpClient([
+    response(200, ['value' => [], '@odata.nextLink' => $msRepeatedPageUrl]),
+    response(200, ['value' => [], '@odata.nextLink' => $msRepeatedPageUrl])
+]);
+try {
+    (new MicrosoftCalendarProvider($msRepeatedPageClient, 'ms-access-token'))->getCalendars();
+    throw new RuntimeException('A repeated Microsoft pagination link was accepted.');
+} catch (MicrosoftCalendarProviderException $exception) {
+    assertTrueValue(
+        str_contains($exception->getMessage(), 'repeated pagination link'),
+        'Repeated Microsoft pagination links must stop pagination.'
     );
 }
 
@@ -685,6 +719,11 @@ assertTrueValue(
     'Secret feed URLs must not be copied into event data.'
 );
 assertSameValue('https://calendar.example/private.ics', $feedClient->requests[0]['url'], 'Webcal URLs must be fetched over HTTPS.');
+assertSameValue(
+    16 * 1024 * 1024,
+    $feedClient->requests[0]['maxResponseBytes'],
+    'Remote iCalendar feeds must enforce their size limit while downloading.'
+);
 try {
     $provider->createEvent($feedCalendars[0]['reference'], ['summary' => 'Not allowed']);
     throw new RuntimeException('The read-only feed unexpectedly accepted an event.');
@@ -1297,6 +1336,10 @@ assertTrueValue(
         && str_contains($accountModuleSource, "RegisterTimer('OAuthRegistrationTimer'")
         && str_contains($accountModuleSource, 'IPSKALACC_InitializeOAuth')
         && str_contains($accountModuleSource, 'OAUTH_REGISTRATION_DELAY_MS = 5_000')
+        && str_contains($accountModuleSource, 'OAUTH_DISPATCHER_RECHECK_MS = 60_000')
+        && str_contains($accountModuleSource, 'OAUTH_PENDING_TIMEOUT_SECONDS = 900')
+        && str_contains($accountModuleSource, 'private function oauthDispatcherId(): int')
+        && str_contains($accountModuleSource, "case 'InternalOAuthComplete':")
         && str_contains($accountModuleSource, 'private function scheduleOAuthRegistration(): void')
         && preg_match(
             '/public function Create\(\): void[\s\S]*?public function GetConfigurationForm/',
@@ -1322,8 +1365,10 @@ assertTrueValue(
         && !str_contains($accountModuleSource, "RegisterPropertyString('GoogleClientSecret'")
         && !str_contains($accountModuleSource, 'RegisterHook(')
         && is_string($accountGoogleOAuthSource)
-        && str_contains($accountGoogleOAuthSource, 'private function processGoogleOAuthData(): void'),
-    'OAuth registration must be deferred beyond ApplyChanges so module reloads can settle first.'
+        && !str_contains($accountGoogleOAuthSource, 'RegisterOAuth(')
+        && str_contains($accountGoogleOAuthSource, 'requestOAuthDispatch(self::PROVIDER_GOOGLE)')
+        && str_contains($accountGoogleOAuthSource, 'private function processGoogleOAuthData(array $oauthData): void'),
+    'OAuth registration must be deferred and callbacks must be routed through one account dispatcher.'
 );
 assertTrueValue(
     is_string($calendarModuleSource)
