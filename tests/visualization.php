@@ -503,9 +503,13 @@ assertVisualization(
         && str_contains($style, '.list-color-column {')
         && str_contains($style, '.list-row:hover,')
         && str_contains($style, '.view-selector-options { display: grid;')
-        && str_contains($style, '.view-selector-dialog { font-size: var(--cal-view-selector-font-size); }')
+        && str_contains($style, '--cal-dialog-font-size: clamp(0.98rem, 0.94rem + 0.12vw, 1.04rem);')
+        && str_contains($style, '--cal-dialog-font-size: clamp(1rem, 0.96rem + 0.14vw, 1.06rem);')
+        && str_contains($style, 'font-size: var(--cal-dialog-font-size);')
+        && !str_contains($style, '--cal-view-selector-font-size:')
+        && !str_contains($style, '.view-selector-dialog { font-size:')
         && str_contains($style, 'html.ipsview-mode .view-selector-option { min-height: 48px; padding: 10px 13px; }'),
-    'The list view must remain minimal, preserve calendar colors and remain available through the readable responsive view selector modal in native and IPSView modes.'
+    'All dialogs must share responsive typography while the list view remains available through the readable view selector in native and IPSView modes.'
 );
 
 assertVisualization(

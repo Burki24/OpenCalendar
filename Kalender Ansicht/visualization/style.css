@@ -39,7 +39,7 @@
     --cal-dialog-large-width: 560px;
     --agenda-color-bar-width: 5px;
     --compact-color-bar-width: 3px;
-    --cal-view-selector-font-size: clamp(0.95rem, 0.9rem + 0.25vw, 1.06rem);
+    --cal-dialog-font-size: clamp(0.98rem, 0.94rem + 0.12vw, 1.04rem);
 }
 
 * { box-sizing: border-box; }
@@ -92,7 +92,7 @@ html.ipsview-mode {
     --cal-popup-shadow: var(--ipsview-role-popup-shadow);
     --cal-disabled-opacity: var(--ipsview-role-disabled-opacity);
     --cal-font-family: var(--ipsview-role-font-family);
-    --cal-view-selector-font-size: clamp(1rem, 0.96rem + 0.28vw, 1.12rem);
+    --cal-dialog-font-size: clamp(1rem, 0.96rem + 0.14vw, 1.06rem);
 }
 html.ipsview-mode button:disabled,
 html.ipsview-mode [aria-disabled="true"] {
@@ -538,6 +538,7 @@ html.ipsview-mode .danger-button { min-height: 48px; padding-inline: 18px; }
     background: var(--cal-dialog);
     color: var(--cal-text);
     box-shadow: var(--cal-popup-shadow);
+    font-size: var(--cal-dialog-font-size);
 }
 .oc-dialog-small { --dialog-width: var(--cal-dialog-small-width); }
 .oc-dialog-medium { --dialog-width: var(--cal-dialog-medium-width); }
@@ -680,8 +681,6 @@ html.ipsview-mode .danger-button { min-height: 48px; padding-inline: 18px; }
 .delete-confirm-period { color: var(--cal-muted); font-size: .76em; line-height: 1.4; overflow-wrap: anywhere; }
 .delete-confirm-question { margin: 4px 0 0; line-height: 1.45; }
 
-.view-selector-dialog { font-size: var(--cal-view-selector-font-size); }
-.view-selector-dialog .dialog-header h2 { font-size: 1.04em; }
 .view-selector-body { padding: 12px; }
 .view-selector-options { display: grid; gap: 7px; }
 .view-selector-option {
