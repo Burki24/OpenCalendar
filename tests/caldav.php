@@ -16,7 +16,7 @@ if (!class_exists(DOMDocument::class)) {
 
 final class FakeCalDAVHttpClient implements CalendarHttpClientInterface
 {
-    /** @var list<array{method: string, url: string, headers: array<string, string>, body: string}> */
+    /** @var list<array{method: string, url: string, headers: array<string, string>, body: string, maxResponseBytes: int}> */
     public array $requests = [];
 
     /** @var list<CalendarHttpResponse|Throwable> */
@@ -28,9 +28,14 @@ final class FakeCalDAVHttpClient implements CalendarHttpClientInterface
         $this->responses = $responses;
     }
 
-    public function request(string $method, string $url, array $headers = [], string $body = ''): CalendarHttpResponse
-    {
-        $this->requests[] = compact('method', 'url', 'headers', 'body');
+    public function request(
+        string $method,
+        string $url,
+        array $headers = [],
+        string $body = '',
+        int $maxResponseBytes = 67_108_864
+    ): CalendarHttpResponse {
+        $this->requests[] = compact('method', 'url', 'headers', 'body', 'maxResponseBytes');
         if ($this->responses === []) {
             throw new RuntimeException('No fake CalDAV response was queued.');
         }

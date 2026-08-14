@@ -35,7 +35,7 @@
             "IPSView HTML could not be regenerated. Enable IPSView output and apply the instance configuration first.": "IPSView-HTML konnte nicht neu generiert werden. Aktivieren Sie zuerst die IPSView-Ausgabe und übernehmen Sie die Instanzkonfiguration.",
             "Synchronize calendars": "Kalender synchronisieren",
             "Restore all calendar instances": "Alle Kalenderinstanzen wiederherstellen",
-            "Calendar selection restored.": "Kalenderauswahl wiederhergestellt.",
+            "All calendar instances were added. Confirm the selection with Apply.": "Alle Kalenderinstanzen wurden eingetragen. Bestätige die Auswahl mit Übernehmen.",
             "No calendar instances found.": "Keine Kalenderinstanzen gefunden.",
             "Synchronization successful.": "Synchronisation erfolgreich.",
             "Synchronization failed.": "Synchronisation fehlgeschlagen.",

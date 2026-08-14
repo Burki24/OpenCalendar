@@ -31,6 +31,9 @@ final class GoogleCalendarProviderException extends RuntimeException
 final class GoogleCalendarProvider implements CalendarProviderInterface
 {
     private const API_URL = 'https://www.googleapis.com/calendar/v3';
+    private const MAX_PAGES = 100;
+    private const MAX_CALENDARS = 10_000;
+    private const MAX_EVENTS = 100_000;
 
     /**
      * Creates a Google Calendar provider using an OAuth access token.
@@ -61,8 +64,11 @@ final class GoogleCalendarProvider implements CalendarProviderInterface
     {
         $calendars = [];
         $pageToken = '';
+        $pageCount = 0;
+        $seenPageTokens = [];
 
         do {
+            $pageCount++;
             $query = ['maxResults' => '250'];
             if ($pageToken !== '') {
                 $query['pageToken'] = $pageToken;
@@ -111,9 +117,12 @@ final class GoogleCalendarProvider implements CalendarProviderInterface
                         'delete' => $canWrite
                     ]
                 ];
+                if (count($calendars) > self::MAX_CALENDARS) {
+                    throw new GoogleCalendarProviderException('Google Calendar returned too many calendars.');
+                }
             }
 
-            $pageToken = trim((string) ($data['nextPageToken'] ?? ''));
+            $pageToken = $this->validatedNextPageToken($data, $seenPageTokens, $pageCount);
         } while ($pageToken !== '');
 
         usort($calendars, static function (array $left, array $right): int
@@ -135,7 +144,10 @@ final class GoogleCalendarProvider implements CalendarProviderInterface
         $calendarId = $this->calendarId($calendarReference);
         $events = [];
         $pageToken = '';
+        $pageCount = 0;
+        $seenPageTokens = [];
         do {
+            $pageCount++;
             $query = [
                 'timeMin'      => $start->setTimezone(new DateTimeZone('UTC'))->format('Y-m-d\TH:i:s\Z'),
                 'timeMax'      => $end->setTimezone(new DateTimeZone('UTC'))->format('Y-m-d\TH:i:s\Z'),
@@ -158,9 +170,12 @@ final class GoogleCalendarProvider implements CalendarProviderInterface
                 $mapped = $this->mapEvent($calendarId, $item, (string) ($data['timeZone'] ?? ''));
                 if ($mapped !== null) {
                     $events[] = $mapped;
+                    if (count($events) > self::MAX_EVENTS) {
+                        throw new GoogleCalendarProviderException('Google Calendar returned too many events.');
+                    }
                 }
             }
-            $pageToken = trim((string) ($data['nextPageToken'] ?? ''));
+            $pageToken = $this->validatedNextPageToken($data, $seenPageTokens, $pageCount);
         } while ($pageToken !== '');
 
         usort(
@@ -229,6 +244,27 @@ final class GoogleCalendarProvider implements CalendarProviderInterface
         );
 
         return true;
+    }
+
+    /**
+     * @param array<string, mixed> $data
+     * @param array<string, true>  $seenPageTokens
+     */
+    private function validatedNextPageToken(array $data, array &$seenPageTokens, int $pageCount): string
+    {
+        $pageToken = trim((string) ($data['nextPageToken'] ?? ''));
+        if ($pageToken === '') {
+            return '';
+        }
+        if ($pageCount >= self::MAX_PAGES) {
+            throw new GoogleCalendarProviderException('Google Calendar pagination exceeded the safe page limit.');
+        }
+        if (isset($seenPageTokens[$pageToken])) {
+            throw new GoogleCalendarProviderException('Google Calendar returned a repeated page token.');
+        }
+
+        $seenPageTokens[$pageToken] = true;
+        return $pageToken;
     }
 
     /**

@@ -169,6 +169,7 @@ assertSymconStrict(
 );
 
 $viewSource = (string) file_get_contents($root . '/Kalender Ansicht/module.php');
+$ipsViewPageHelperSource = (string) file_get_contents($root . '/libs/helper/IPSViewHTMLPageHelper.php');
 assertSymconStrict(
     str_contains($calendarSource, 'use VariableHelper;')
         && str_contains($calendarSource, '$this->VariableExists(\'Events\')')
@@ -192,6 +193,18 @@ assertSymconStrict(
         && !str_contains($viewSource, "RegisterPropertyBoolean('EnableIPSView'")
         && !str_contains($viewSource, '$this->MaintainVariable('),
     'The calendar view must manage its optional IPSView output through IPSViewHTMLPageHelper.'
+);
+assertSymconStrict(
+    !str_contains($viewSource, 'IPS_SetProperty(')
+        && !str_contains($viewSource, 'IPS_ApplyChanges(')
+        && str_contains($viewSource, "UpdateFormField('Calendars', 'values', \$selection)")
+        && str_contains($viewSource, 'HandleIPSViewHTMLPageAction($Ident, $Value)')
+        && !str_contains($ipsViewPageHelperSource, 'IPS_SetProperty(')
+        && !str_contains($ipsViewPageHelperSource, 'IPS_ApplyChanges(')
+        && str_contains($ipsViewPageHelperSource, "IPS_RequestAction(\$id, '")
+        && str_contains($ipsViewPageHelperSource, 'self::IPSVIEW_HTML_DELETE_ACTION')
+        && str_contains($ipsViewPageHelperSource, 'protected function HandleIPSViewHTMLPageAction('),
+    'Form actions must not persist properties or apply instance changes behind the user interface.'
 );
 assertSymconStrict(
     str_contains($viewSource, '$this->RegisterHook($this->ipsViewHookAddress());')

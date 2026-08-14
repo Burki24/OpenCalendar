@@ -15,19 +15,15 @@ trait KalenderKontoMicrosoftOAuthTrait
     {
         try {
             $this->assertSymconConnectAvailable();
-            if (!$this->RegisterOAuth(self::MICROSOFT_OAUTH_IDENTIFIER)) {
-                throw new SymconOAuthException('Microsoft OAuth could not be registered in Symcon.');
-            }
-
             $this->SetBuffer('MicrosoftAccessToken', '');
-            $this->WriteAttributeInteger('PendingOAuthProvider', self::PROVIDER_MICROSOFT);
+            $this->requestOAuthDispatch(self::PROVIDER_MICROSOFT);
 
             return $this->createSymconOAuthClient(
                 self::MICROSOFT_OAUTH_IDENTIFIER,
                 'Microsoft 365'
             )->getAuthorizationUrl((string) IPS_GetLicensee());
         } catch (Throwable $exception) {
-            $this->WriteAttributeInteger('PendingOAuthProvider', -1);
+            $this->releaseOAuthDispatch();
             return $this->Translate('Microsoft authorization could not be started') . ': '
                 . $this->handleProviderError($exception);
         }
@@ -42,7 +38,7 @@ trait KalenderKontoMicrosoftOAuthTrait
     {
         $this->WriteAttributeString('MicrosoftRefreshToken', '');
         $this->WriteAttributeString('MicrosoftAccount', '');
-        $this->WriteAttributeInteger('PendingOAuthProvider', -1);
+        $this->releaseOAuthDispatch();
         $this->SetBuffer('MicrosoftAccessToken', '');
         $this->ClearCache();
         $this->SetStatus($this->ReadPropertyBoolean('Active') ? self::STATUS_CONFIGURATION_MISSING : IS_INACTIVE);
@@ -54,10 +50,9 @@ trait KalenderKontoMicrosoftOAuthTrait
     /**
      * Handles a Microsoft callback forwarded by the native Symcon OAuth handler.
      */
-    private function processMicrosoftOAuthData(): void
+    private function processMicrosoftOAuthData(array $oauthData): void
     {
         try {
-            $oauthData = $this->readSymconOAuthData();
             $error = trim((string) ($oauthData['error_description'] ?? $oauthData['error'] ?? ''));
             if ($error !== '') {
                 throw new SymconOAuthException($error);

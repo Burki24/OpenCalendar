@@ -113,4 +113,15 @@ try {
     );
 }
 
+// Oversized decompressed responses must be stopped while cURL is receiving them.
+try {
+    $client->request('GET', $primaryUrl . '/large-response', [], '', 1024);
+    throw new RuntimeException('The oversized HTTP response unexpectedly succeeded.');
+} catch (CalendarHttpException $exception) {
+    assertHttpTrue(
+        str_contains($exception->getMessage(), 'exceeds the maximum size of 1024 bytes'),
+        'Oversized HTTP responses must be rejected at the configured byte limit.'
+    );
+}
+
 echo "All CalDAV HTTP integration tests passed.\n";

@@ -416,6 +416,10 @@ class KalenderAnsicht extends IPSModuleStrict
      */
     public function RequestAction(string $Ident, mixed $Value): void
     {
+        if ($this->HandleIPSViewHTMLPageAction($Ident, $Value)) {
+            return;
+        }
+
         try {
             switch ($Ident) {
                 case 'FormSynchronizeCalendars':
@@ -475,7 +479,7 @@ class KalenderAnsicht extends IPSModuleStrict
     }
 
     /**
-     * Selects every available calendar instance and reapplies the visualization configuration.
+     * Proposes every available calendar instance in the open configuration form.
      *
      * @return bool False when no calendar instances are available.
      */
@@ -492,13 +496,7 @@ class KalenderAnsicht extends IPSModuleStrict
             return false;
         }
 
-        $encoded = json_encode(
-            $selection,
-            JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR
-        );
-        IPS_SetProperty($this->InstanceID, 'Calendars', $encoded);
-        $this->WriteAttributeString('CalendarSelectionBackup', $encoded);
-        IPS_ApplyChanges($this->InstanceID);
+        $this->UpdateFormField('Calendars', 'values', $selection);
 
         return true;
     }
