@@ -558,7 +558,61 @@ class KalenderKonto extends IPSModuleStrict
      */
     public function GetCalendars(): string
     {
-        return $this->ReadAttributeString('CachedCalendars');
+        $cachedCalendars = $this->ReadAttributeString('CachedCalendars');
+        if ($this->ReadPropertyInteger('Provider') !== self::PROVIDER_GOOGLE) {
+            return $cachedCalendars;
+        }
+
+        try {
+            $calendars = json_decode($cachedCalendars, true, 512, JSON_THROW_ON_ERROR);
+            if (!is_array($calendars) || !array_is_list($calendars)) {
+                return $cachedCalendars;
+            }
+
+            return json_encode(
+                self::normalizeCachedCalendarCapabilities($calendars, self::PROVIDER_GOOGLE),
+                JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR
+            );
+        } catch (JsonException) {
+            return $cachedCalendars;
+        }
+    }
+
+    /**
+     * Adds capabilities introduced after calendar discovery to compatible cached entries.
+     *
+     * Existing account caches survive module updates. Google calendars discovered before
+     * recurring-event creation support was added therefore do not yet contain the
+     * createRecurrence capability. Derive it from the already cached write permission so
+     * child calendar instances can use the new feature without requiring a manual account
+     * resynchronization.
+     *
+     * @param list<array<string, mixed>> $calendars Cached account calendars.
+     * @return list<array<string, mixed>> Normalized calendars.
+     */
+    private static function normalizeCachedCalendarCapabilities(array $calendars, int $provider): array
+    {
+        if ($provider !== self::PROVIDER_GOOGLE) {
+            return $calendars;
+        }
+
+        foreach ($calendars as &$calendar) {
+            $capabilities = is_array($calendar['capabilities'] ?? null)
+                ? $calendar['capabilities']
+                : [];
+            if (array_key_exists('createRecurrence', $capabilities)) {
+                continue;
+            }
+
+            $accessRole = strtolower(trim((string) ($calendar['accessRole'] ?? '')));
+            $canWrite = (bool) ($capabilities['create'] ?? false)
+                || in_array($accessRole, ['writer', 'owner'], true);
+            $capabilities['createRecurrence'] = $canWrite;
+            $calendar['capabilities'] = $capabilities;
+        }
+        unset($calendar);
+
+        return $calendars;
     }
 
     /**

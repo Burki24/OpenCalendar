@@ -73,6 +73,35 @@ assertAccountStructure(
     'OAuth callbacks must retain their pending provider across form changes and restarts.'
 );
 
+
+$normalizeCapabilities = $reflection->getMethod('normalizeCachedCalendarCapabilities');
+$normalizeCapabilities->setAccessible(true);
+$legacyGoogleCalendars = [[
+    'id'           => 'legacy-google-calendar',
+    'accessRole'   => 'writer',
+    'capabilities' => [
+        'read'   => true,
+        'create' => true,
+        'update' => true,
+        'delete' => true
+    ]
+], [
+    'id'           => 'legacy-google-read-only',
+    'accessRole'   => 'reader',
+    'capabilities' => [
+        'read'   => true,
+        'create' => false,
+        'update' => false,
+        'delete' => false
+    ]
+]];
+$normalizedGoogleCalendars = $normalizeCapabilities->invoke(null, $legacyGoogleCalendars, 2);
+assertAccountStructure(
+    ($normalizedGoogleCalendars[0]['capabilities']['createRecurrence'] ?? false) === true
+        && ($normalizedGoogleCalendars[1]['capabilities']['createRecurrence'] ?? true) === false,
+    'Legacy Google calendar caches must derive recurring-event creation support from cached write access.'
+);
+
 $accountSource = file_get_contents(__DIR__ . '/../Kalender Konto/module.php');
 $accountFormSource = file_get_contents(__DIR__ . '/../Kalender Konto/form.json');
 $accountForm = json_decode((string) $accountFormSource, true, 512, JSON_THROW_ON_ERROR);
