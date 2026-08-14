@@ -143,7 +143,12 @@ assertVisualization(
         && str_contains($script, 'openExistingEvent(event);')
         && str_contains($script, 'document.getElementById(\'dialog-title\').textContent = t(\'Edit event\');')
         && str_contains($script, 'const displayEnd = end > start ? addDays(end, -1) : start;')
-        && str_contains($script, 'if (event.recurring || event.recurrenceId) return \'Recurring occurrences are currently read-only.\';'),
+        && str_contains($script, 'function eventCanUpdate(event)')
+        && str_contains($script, 'Boolean(event.canUpdateOccurrence)')
+        && str_contains($script, 'function eventCanDelete(event)')
+        && str_contains($script, 'Boolean(event.canDeleteOccurrence)')
+        && str_contains($script, '...recurrencePayload(selectedEvent)')
+        && str_contains($script, "t('Only this occurrence of the recurring event will be changed.')"),
     'Event clicks must open a read-first details modal and route editable events to the existing editor only on request.'
 );
 

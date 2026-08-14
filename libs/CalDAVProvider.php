@@ -13,6 +13,7 @@ use DOMXPath;
 use RuntimeException;
 
 require_once __DIR__ . '/CalendarProviderInterface.php';
+require_once __DIR__ . '/CalendarEventRecurrence.php';
 require_once __DIR__ . '/CalendarHttpClient.php';
 require_once __DIR__ . '/CalDAVOriginPolicy.php';
 require_once __DIR__ . '/ICalendarCodec.php';
@@ -181,8 +182,13 @@ final class CalDAVProvider implements CalendarProviderInterface
         string $resourceUrl,
         string $etag,
         string $uid,
-        array $event
+        array $event,
+        array $recurrence = []
     ): array {
+        if ($recurrence !== []
+            && ($recurrence['recurrenceType'] ?? CalendarEventRecurrence::SINGLE) !== CalendarEventRecurrence::SINGLE) {
+            throw new CalDAVProviderException('Individual occurrences of recurring events cannot be updated yet.');
+        }
         $calendarUrl = $this->normalizeAbsoluteUrl($calendarUrl);
         $resourceUrl = $this->normalizeAbsoluteUrl($resourceUrl);
         $this->assertResourceBelongsToCalendar($calendarUrl, $resourceUrl);
@@ -218,9 +224,12 @@ final class CalDAVProvider implements CalendarProviderInterface
         string $calendarUrl,
         string $resourceUrl,
         string $etag,
-        string $recurrenceId = ''
+        string $recurrenceId = '',
+        array $recurrence = []
     ): bool {
-        if ($recurrenceId !== '') {
+        if ($recurrenceId !== ''
+            || ($recurrence !== []
+                && ($recurrence['recurrenceType'] ?? CalendarEventRecurrence::SINGLE) !== CalendarEventRecurrence::SINGLE)) {
             throw new CalDAVProviderException('Individual occurrences of recurring events cannot be deleted yet.');
         }
 

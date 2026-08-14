@@ -185,6 +185,7 @@ $eventClient = new FakeHttpClient([
                 'summary'          => 'Meeting',
                 'status'           => 'confirmed',
                 'recurringEventId' => 'series-id',
+                'originalStartTime'=> ['dateTime' => '2026-07-20T09:00:00+02:00', 'timeZone' => 'Europe/Berlin'],
                 'start'            => ['dateTime' => '2026-07-20T10:00:00+02:00', 'timeZone' => 'Europe/Berlin'],
                 'end'              => ['dateTime' => '2026-07-20T11:00:00+02:00', 'timeZone' => 'Europe/Berlin']
             ],
@@ -206,7 +207,13 @@ assertSameValue(2, count($events), 'Cancelled events must be excluded.');
 assertSameValue(true, $events[0]['allDay'], 'Google date values must map to all-day events.');
 assertSameValue('2026-07-21', $events[0]['end'], 'The exclusive Google all-day end date must be retained.');
 assertSameValue(true, $events[1]['recurring'], 'Expanded recurring instances must remain marked as recurring.');
-assertSameValue('series-id', $events[1]['recurrenceId'], 'The recurring series ID must be retained.');
+assertSameValue('occurrence', $events[1]['recurrenceType'], 'Expanded Google events must be identified as occurrences.');
+assertSameValue('series-id', $events[1]['seriesId'], 'The Google series ID must be retained separately.');
+assertSameValue('instance-id', $events[1]['occurrenceId'], 'The concrete Google occurrence ID must be retained.');
+assertSameValue('2026-07-20T09:00:00+02:00', $events[1]['originalStart'], 'The original occurrence start must be retained.');
+assertSameValue('', $events[1]['recurrenceId'], 'Google series IDs must not be exposed as RFC recurrence IDs.');
+assertSameValue(true, $events[1]['canUpdateOccurrence'], 'Google occurrences must advertise update support.');
+assertSameValue(true, $events[1]['canDeleteOccurrence'], 'Google occurrences must advertise delete support.');
 assertTrueValue(str_contains($eventClient->requests[0]['url'], 'owner%40example.com'), 'Calendar IDs must be URL encoded.');
 assertSameValue('Bearer access-token', $eventClient->requests[0]['headers']['Authorization'], 'API requests must use Bearer authorization.');
 
@@ -241,6 +248,80 @@ assertTrueValue(
     'Event deletion must return true after HTTP 204.'
 );
 assertSameValue('DELETE', $writeClient->requests[2]['method'], 'Events must be deleted via DELETE.');
+
+$occurrenceWriteClient = new FakeHttpClient([
+    response(200, ['id' => 'instance-id', 'iCalUID' => 'series@example.com', 'etag' => '"occurrence-updated"']),
+    response(204)
+]);
+$occurrenceProvider = new GoogleCalendarProvider($occurrenceWriteClient, 'access-token');
+$googleOccurrence = [
+    'recurrenceType'      => 'occurrence',
+    'seriesId'            => 'series-id',
+    'occurrenceId'        => 'instance-id',
+    'originalStart'       => '2026-07-20T09:00:00+02:00',
+    'recurring'           => true,
+    'canUpdateOccurrence' => true,
+    'canDeleteOccurrence' => true
+];
+$occurrenceProvider->updateEvent(
+    'owner@example.com',
+    'https://www.googleapis.com/calendar/v3/calendars/owner%40example.com/events/instance-id',
+    '',
+    'series@example.com',
+    ['summary' => 'Changed occurrence'],
+    $googleOccurrence
+);
+assertTrueValue(
+    str_ends_with($occurrenceWriteClient->requests[0]['url'], '/events/instance-id'),
+    'Google occurrence updates must target the concrete occurrence ID.'
+);
+assertTrueValue(
+    $occurrenceProvider->deleteEvent(
+        'owner@example.com',
+        'https://www.googleapis.com/calendar/v3/calendars/owner%40example.com/events/instance-id',
+        '',
+        '',
+        $googleOccurrence
+    ),
+    'Google occurrences must be deletable by their concrete occurrence ID.'
+);
+
+$seriesWriteClient = new FakeHttpClient([]);
+try {
+    (new GoogleCalendarProvider($seriesWriteClient, 'access-token'))->updateEvent(
+        'owner@example.com',
+        'series-id',
+        '',
+        'series@example.com',
+        ['summary'        => 'Changed series'],
+        ['recurrenceType' => 'master', 'seriesId' => 'series-id', 'recurring' => true]
+    );
+    throw new RuntimeException('A complete Google recurring series was modified unexpectedly.');
+} catch (RuntimeException $exception) {
+    assertTrueValue(
+        str_contains($exception->getMessage(), 'Recurring series cannot be modified yet.'),
+        'Complete recurring series must remain protected.'
+    );
+}
+assertSameValue(0, count($seriesWriteClient->requests), 'Blocked series updates must not issue an HTTP request.');
+
+$mismatchedOccurrenceClient = new FakeHttpClient([]);
+try {
+    (new GoogleCalendarProvider($mismatchedOccurrenceClient, 'access-token'))->deleteEvent(
+        'owner@example.com',
+        'series-id',
+        '',
+        '',
+        $googleOccurrence
+    );
+    throw new RuntimeException('A mismatched Google occurrence identity was accepted.');
+} catch (RuntimeException $exception) {
+    assertTrueValue(
+        str_contains($exception->getMessage(), 'identity does not match'),
+        'Google occurrence writes must verify the concrete event ID.'
+    );
+}
+assertSameValue(0, count($mismatchedOccurrenceClient->requests), 'Mismatched occurrence identities must not issue a request.');
 
 $googleOAuthHttpClient = new FakeHttpClient([
     response(200, [
@@ -426,7 +507,11 @@ assertSameValue(2, count($msEvents), 'Cancelled Microsoft events must be exclude
 assertSameValue(true, $msEvents[0]['allDay'], 'Microsoft all-day events must retain their exclusive end date.');
 assertSameValue('2026-07-21', $msEvents[0]['end'], 'Microsoft all-day end dates must remain exclusive.');
 assertSameValue(true, $msEvents[1]['recurring'], 'Microsoft occurrences must remain marked as recurring.');
-assertSameValue('series-master', $msEvents[1]['recurrenceId'], 'Microsoft series master IDs must be retained.');
+assertSameValue('occurrence', $msEvents[1]['recurrenceType'], 'Microsoft occurrences must use the shared recurrence type.');
+assertSameValue('series-master', $msEvents[1]['seriesId'], 'Microsoft series master IDs must be retained separately.');
+assertSameValue('instance/id+1', $msEvents[1]['occurrenceId'], 'Microsoft occurrence IDs must be retained separately.');
+assertSameValue('', $msEvents[1]['recurrenceId'], 'Microsoft series IDs must not be exposed as RFC recurrence IDs.');
+assertSameValue(false, $msEvents[1]['canUpdateOccurrence'], 'Microsoft occurrence updates remain disabled for now.');
 assertSameValue(true, $msEvents[1]['onlineMeeting'], 'Microsoft online-meeting state must be exposed to the calendar view.');
 assertTrueValue(
     str_contains($msEventClient->requests[0]['url'], 'AQMk-primary/calendarView?'),
@@ -1138,6 +1223,9 @@ assertSameValue('2026-03-31T14:00:00+02:00', $recurringEvents[1]['start'], 'Move
 assertSameValue('2026-04-08T10:00:00+02:00', $recurringEvents[2]['start'], 'RDATE must add an occurrence.');
 assertSameValue('2026-04-13T10:00:00+02:00', $recurringEvents[3]['start'], 'Weekly recurrences must preserve wall time after DST.');
 assertSameValue(true, $recurringEvents[3]['recurring'], 'Generated recurrence instances must be marked as recurring.');
+assertSameValue('occurrence', $recurringEvents[3]['recurrenceType'], 'Generated RFC occurrences must use the shared recurrence type.');
+assertSameValue('weekly-series@example.com', $recurringEvents[3]['seriesId'], 'RFC occurrences must retain their series UID.');
+assertSameValue('20260413T100000', $recurringEvents[3]['recurrenceId'], 'RFC recurrence IDs must remain provider-native.');
 
 $monthlyFeed = "BEGIN:VCALENDAR\r\n"
     . "VERSION:2.0\r\n"

@@ -145,7 +145,8 @@ final class ICalendarFeedProvider implements CalendarProviderInterface
         string $eventReference,
         string $etag,
         string $uid,
-        array $event
+        array $event,
+        array $recurrence = []
     ): array {
         throw new ICalendarFeedProviderException('iCalendar subscriptions are read-only.');
     }
@@ -155,7 +156,8 @@ final class ICalendarFeedProvider implements CalendarProviderInterface
         string $calendarReference,
         string $eventReference,
         string $etag,
-        string $recurrenceId = ''
+        string $recurrenceId = '',
+        array $recurrence = []
     ): bool {
         throw new ICalendarFeedProviderException('iCalendar subscriptions are read-only.');
     }

@@ -260,7 +260,9 @@
             "The requested calendar does not belong to this local iCalendar file.": "Der angeforderte Kalender gehört nicht zu dieser lokalen ICS-Datei.",
             "Local iCalendar files are read-only.": "Lokale ICS-Dateien sind schreibgeschützt.",
             "Local iCalendar file is valid.": "Die lokale ICS-Datei ist gültig.",
-            "Upload read-only ICS files from the computer running the Symcon console. A calendar name is required and keeps the calendar assignment stable when the file is replaced. The file content is copied into the OpenCalendar configuration; later changes to the original file are not imported automatically.": "Hier können schreibgeschützte ICS-Dateien vom Rechner hochgeladen werden, auf dem die Symcon-Konsole geöffnet ist. Ein Kalendername ist erforderlich und hält die Kalenderzuordnung beim Ersetzen der Datei stabil. Der Dateiinhalt wird in die OpenCalendar-Konfiguration übernommen; spätere Änderungen an der Originaldatei werden nicht automatisch importiert."
+            "Upload read-only ICS files from the computer running the Symcon console. A calendar name is required and keeps the calendar assignment stable when the file is replaced. The file content is copied into the OpenCalendar configuration; later changes to the original file are not imported automatically.": "Hier können schreibgeschützte ICS-Dateien vom Rechner hochgeladen werden, auf dem die Symcon-Konsole geöffnet ist. Ein Kalendername ist erforderlich und hält die Kalenderzuordnung beim Ersetzen der Datei stabil. Der Dateiinhalt wird in die OpenCalendar-Konfiguration übernommen; spätere Änderungen an der Originaldatei werden nicht automatisch importiert.",
+            "Recurring series cannot be modified yet.": "Vollständige Terminserien können derzeit noch nicht geändert oder gelöscht werden.",
+            "The recurring occurrence identity does not match the event.": "Die Identität des Serienvorkommnisses stimmt nicht mit dem Termin überein."
         }
     }
 }

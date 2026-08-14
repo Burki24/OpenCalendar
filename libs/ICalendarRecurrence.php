@@ -9,6 +9,8 @@ use DateTimeImmutable;
 use DateTimeZone;
 use Throwable;
 
+require_once __DIR__ . '/CalendarEventRecurrence.php';
+
 final class ICalendarRecurrence
 {
     private const MAX_GENERATED_DAYS = 200_000;
@@ -124,7 +126,17 @@ final class ICalendarRecurrence
                     $override = $overrides[$originalTimestamp];
                     if (!self::isCancelled($override)
                         && self::overlapsRange($override, $rangeStart, $rangeEnd)) {
-                        $override['recurring'] = true;
+                        $override = array_merge(
+                            $override,
+                            CalendarEventRecurrence::occurrence(
+                                (string) ($override['uid'] ?? ''),
+                                (string) ($override['uid'] ?? '') . '|' . (string) ($override['recurrenceId'] ?? ''),
+                                (string) ($override['originalStart'] ?? ''),
+                                (string) ($override['recurrenceId'] ?? ''),
+                                false,
+                                true
+                            )
+                        );
                         $result[] = $override;
                     }
                     continue;
@@ -144,7 +156,17 @@ final class ICalendarRecurrence
             if (!isset($usedOverrides[$recurrenceTimestamp])
                 && !self::isCancelled($override)
                 && self::overlapsRange($override, $rangeStart, $rangeEnd)) {
-                $override['recurring'] = true;
+                $override = array_merge(
+                    $override,
+                    CalendarEventRecurrence::occurrence(
+                        (string) ($override['uid'] ?? ''),
+                        (string) ($override['uid'] ?? '') . '|' . (string) ($override['recurrenceId'] ?? ''),
+                        (string) ($override['originalStart'] ?? ''),
+                        (string) ($override['recurrenceId'] ?? ''),
+                        false,
+                        true
+                    )
+                );
                 $result[] = $override;
             }
         }
@@ -414,9 +436,16 @@ final class ICalendarRecurrence
 
         $occurrence['startTimestamp'] = $occurrenceStart->getTimestamp();
         $occurrence['endTimestamp'] = $occurrenceEnd->getTimestamp();
-        $occurrence['recurrenceId'] = $recurrenceId;
         $occurrence['recurrenceIdTimestamp'] = $occurrenceStart->getTimestamp();
-        $occurrence['recurring'] = true;
+        $occurrence = array_merge(
+            $occurrence,
+            CalendarEventRecurrence::occurrence(
+                (string) ($master['uid'] ?? ''),
+                (string) ($master['uid'] ?? '') . '|' . $recurrenceId,
+                $allDay ? $occurrenceStart->format('Y-m-d') : $occurrenceStart->format(DATE_ATOM),
+                $recurrenceId
+            )
+        );
         $occurrence['id'] = hash(
             'sha256',
             (string) ($master['resourceUrl'] ?? '') . '|'

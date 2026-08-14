@@ -148,7 +148,10 @@ trait KalenderKontoChildGatewayTrait
             trim((string) ($request['ResourceURL'] ?? '')),
             trim((string) ($request['ETag'] ?? '')),
             trim((string) ($request['UID'] ?? '')),
-            $event
+            $event,
+            CalendarEventRecurrence::fromEvent(
+                is_array($request['Recurrence'] ?? null) ? $request['Recurrence'] : []
+            )
         );
     }
 
@@ -163,7 +166,10 @@ trait KalenderKontoChildGatewayTrait
             $this->calendarReference($calendar),
             trim((string) ($request['ResourceURL'] ?? '')),
             trim((string) ($request['ETag'] ?? '')),
-            trim((string) ($request['RecurrenceID'] ?? ''))
+            trim((string) ($request['RecurrenceID'] ?? '')),
+            CalendarEventRecurrence::fromEvent(
+                is_array($request['Recurrence'] ?? null) ? $request['Recurrence'] : []
+            )
         );
     }
 

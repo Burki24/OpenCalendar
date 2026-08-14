@@ -114,7 +114,7 @@ Die zuletzt am jeweiligen Browser/Monitor gewählte Ansicht und das zugehörige 
 
 Alle eingebetteten Dialoge verwenden ein gemeinsames responsives OpenCalendar-Modaldesign. Kopf- und Aktionsbereich bleiben bei kleinen Darstellungsflächen sichtbar, während nur der Inhaltsbereich scrollt. Einheitliche Größenklassen, Abstände, Schließen-Schaltflächen, Fokusdarstellung, Popup-Farben, Rahmen und Schatten gelten gleichermaßen für Kachelvisualisierung und IPSView.
 
-Ein Klick auf einen Termin öffnet zunächst eine reine Termindetail-Ansicht mit Kalender, Beginn, Ende, Ort und Beschreibung. Schreibbare Einzeltermine können von dort gezielt bearbeitet oder gelöscht werden; schreibgeschützte und wiederkehrende Termine bleiben in der Detailansicht lesbar.
+Ein Klick auf einen Termin öffnet zunächst eine reine Termindetail-Ansicht mit Kalender, Beginn, Ende, Ort und Beschreibung. Schreibbare Einzeltermine und einzelne Google-Serienvorkommnisse können von dort gezielt bearbeitet oder gelöscht werden. Vollständige Serien, Microsoft- und CalDAV-Vorkommnisse sowie schreibgeschützte Kalender bleiben in der Detailansicht lesbar.
 Beim Löschen erscheint eine eigene OpenCalendar-Bestätigung mit Terminname und Zeitraum. Die native Browser-Abfrage wird nicht verwendet; Abbrechen kehrt zum zuvor geöffneten Detail- oder Bearbeitungsdialog zurück.
 
 Die **Listenansicht** verzichtet bewusst auf Karten und zusätzliche

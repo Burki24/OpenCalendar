@@ -12,6 +12,7 @@ use RuntimeException;
 use Throwable;
 
 require_once __DIR__ . '/ICalendarRecurrence.php';
+require_once __DIR__ . '/CalendarEventRecurrence.php';
 
 final class ICalendarCodec
 {
@@ -42,7 +43,21 @@ final class ICalendarCodec
                 ? self::parseDateProperty($recurrenceIdProperty)
                 : null;
 
-            $events[] = [
+            $recurrenceRule = self::propertyValue($properties, 'RRULE');
+            $recurrenceIdentity = $recurrenceId !== ''
+                ? CalendarEventRecurrence::occurrence(
+                    $uid,
+                    $uid . '|' . $recurrenceId,
+                    (string) ($parsedRecurrenceId['value'] ?? ''),
+                    $recurrenceId,
+                    false,
+                    true
+                )
+                : ($recurrenceRule !== ''
+                    ? CalendarEventRecurrence::master($uid)
+                    : CalendarEventRecurrence::single());
+
+            $events[] = array_merge([
                 'id'                    => hash('sha256', $resourceUrl . '|' . $uid . '|' . $recurrenceId . '|' . $start['value']),
                 'uid'                   => $uid,
                 'resourceUrl'           => $resourceUrl,
@@ -57,17 +72,15 @@ final class ICalendarCodec
                 'allDay'                => $start['allDay'],
                 'timezone'              => $start['timezone'],
                 'status'                => strtoupper(self::propertyValue($properties, 'STATUS')),
-                'recurrenceRule'        => self::propertyValue($properties, 'RRULE'),
-                'recurrenceId'          => $recurrenceId,
+                'recurrenceRule'        => $recurrenceRule,
                 'recurrenceIdTimestamp' => $parsedRecurrenceId['timestamp'] ?? null,
                 'exceptionDates'        => self::parseDatePropertyList($properties['EXDATE'] ?? []),
                 'recurrenceDates'       => self::parseDatePropertyList($properties['RDATE'] ?? []),
-                'recurring'             => self::propertyValue($properties, 'RRULE') !== '' || $recurrenceId !== '',
                 'sequence'              => (int) self::propertyValue($properties, 'SEQUENCE'),
                 'created'               => self::parseOptionalDate(self::firstProperty($properties, 'CREATED')),
                 'lastModified'          => self::parseOptionalDate(self::firstProperty($properties, 'LAST-MODIFIED')),
                 'url'                   => self::propertyValue($properties, 'URL')
-            ];
+            ], $recurrenceIdentity);
         }
 
         return $events;

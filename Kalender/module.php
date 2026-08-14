@@ -8,6 +8,7 @@ use Burki24\SymconModuleHelper\DataFlowHelper;
 use Burki24\SymconModuleHelper\PersistentJsonCacheHelper;
 use Burki24\SymconModuleHelper\VariableHelper;
 use IPSKalender\CalendarEventCounter;
+use IPSKalender\CalendarEventRecurrence;
 use IPSKalender\SynchronizationSchedule;
 
 require_once __DIR__ . '/../libs/helper/ChunkedJsonTransferHelper.php';
@@ -16,6 +17,7 @@ require_once __DIR__ . '/../libs/helper/DataFlowHelper.php';
 require_once __DIR__ . '/../libs/helper/PersistentJsonCacheHelper.php';
 require_once __DIR__ . '/../libs/helper/VariableHelper.php';
 require_once __DIR__ . '/../libs/CalendarEventCounter.php';
+require_once __DIR__ . '/../libs/CalendarEventRecurrence.php';
 require_once __DIR__ . '/../libs/SynchronizationSchedule.php';
 
 class Kalender extends IPSModuleStrict
@@ -418,7 +420,21 @@ class Kalender extends IPSModuleStrict
             if (!is_array($changes)) {
                 throw new InvalidArgumentException('The event changes are invalid.');
             }
-            foreach (['uid', 'resourceUrl', 'etag', 'recurrenceId', 'changes'] as $metadataKey) {
+            $recurrence = $this->resolveWriteRecurrence($event);
+            foreach ([
+                'uid',
+                'resourceUrl',
+                'etag',
+                'recurrenceType',
+                'seriesId',
+                'occurrenceId',
+                'originalStart',
+                'recurrenceId',
+                'recurring',
+                'canUpdateOccurrence',
+                'canDeleteOccurrence',
+                'changes'
+            ] as $metadataKey) {
                 unset($changes[$metadataKey]);
             }
             if ($changes === []) {
@@ -431,7 +447,8 @@ class Kalender extends IPSModuleStrict
                     'UID'         => trim((string) ($event['uid'] ?? '')),
                     'ResourceURL' => trim((string) ($event['resourceUrl'] ?? '')),
                     'ETag'        => trim((string) ($event['etag'] ?? '')),
-                    'Event'       => $changes
+                    'Event'       => $changes,
+                    'Recurrence'  => $recurrence
                 ]
             );
             $this->refreshAfterWrite();
@@ -452,12 +469,14 @@ class Kalender extends IPSModuleStrict
     {
         try {
             $event = $this->decodeObject($EventJSON, 'event');
+            $recurrence = $this->resolveWriteRecurrence($event);
             $result = $this->sendRequest(
                 'DeleteEvent',
                 [
                     'ResourceURL'  => trim((string) ($event['resourceUrl'] ?? '')),
                     'ETag'         => trim((string) ($event['etag'] ?? '')),
-                    'RecurrenceID' => trim((string) ($event['recurrenceId'] ?? ''))
+                    'RecurrenceID' => trim((string) ($recurrence['recurrenceId'] ?? '')),
+                    'Recurrence'   => $recurrence
                 ]
             );
             if (!(bool) ($result['success'] ?? false)) {
@@ -788,6 +807,28 @@ class Kalender extends IPSModuleStrict
         } catch (UnexpectedValueException) {
             return [];
         }
+    }
+
+    /**
+     * Resolves recurrence capabilities from the synchronized event cache whenever possible.
+     *
+     * @param array<string, mixed> $event
+     * @return array<string, mixed>
+     */
+    private function resolveWriteRecurrence(array $event): array
+    {
+        $resourceUrl = trim((string) ($event['resourceUrl'] ?? ''));
+        $occurrenceId = trim((string) ($event['occurrenceId'] ?? ''));
+        foreach ($this->readEvents() as $cachedEvent) {
+            $cachedResourceUrl = trim((string) ($cachedEvent['resourceUrl'] ?? ''));
+            $cachedOccurrenceId = trim((string) ($cachedEvent['occurrenceId'] ?? ''));
+            if (($resourceUrl !== '' && hash_equals($cachedResourceUrl, $resourceUrl))
+                || ($occurrenceId !== '' && hash_equals($cachedOccurrenceId, $occurrenceId))) {
+                return CalendarEventRecurrence::fromEvent($cachedEvent);
+            }
+        }
+
+        return CalendarEventRecurrence::fromEvent($event);
     }
 
     private function removeLegacyEventsVariable(): void

@@ -132,7 +132,8 @@ final class ICalendarFileProvider implements CalendarProviderInterface
         string $eventReference,
         string $etag,
         string $uid,
-        array $event
+        array $event,
+        array $recurrence = []
     ): array {
         throw new ICalendarFileProviderException('Local iCalendar files are read-only.');
     }
@@ -142,7 +143,8 @@ final class ICalendarFileProvider implements CalendarProviderInterface
         string $calendarReference,
         string $eventReference,
         string $etag,
-        string $recurrenceId = ''
+        string $recurrenceId = '',
+        array $recurrence = []
     ): bool {
         throw new ICalendarFileProviderException('Local iCalendar files are read-only.');
     }

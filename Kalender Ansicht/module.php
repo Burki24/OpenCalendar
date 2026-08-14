@@ -1152,6 +1152,7 @@ class KalenderAnsicht extends IPSModuleStrict
             'Tomorrow',
             'Yesterday',
             'Recurring occurrences are currently read-only.',
+            'Only this occurrence of the recurring event will be changed.',
             'This calendar is read-only.',
             'Editing events is unavailable because no action bridge is configured.',
             'Action failed.',

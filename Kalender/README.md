@@ -33,13 +33,15 @@ beliebig verschoben oder vom Benutzer umbenannt werden.
 - Auflösen wiederkehrender Termine für die lokale Anzeige
 - lokaler JSON-Cache und zyklische Synchronisation
 - Erstellen neuer Termine
-- Ändern einzelner, nicht wiederkehrender Termine
-- Löschen einzelner, nicht wiederkehrender Termine
+- Ändern und Löschen einzelner Termine sowie einzelner Google-Serienvorkommnisse
 - ETag-basierter Schutz vor dem Überschreiben zwischenzeitlicher Änderungen
 - Statusvariablen für die gesamte geladene Terminanzahl, die Termine des
   aktuellen Tages und den Zeitpunkt der letzten Synchronisation
 
-Das Ändern oder einzelne Löschen von Vorkommen einer Terminserie ist noch nicht freigegeben. Dadurch verhindert das Modul, dass eine komplette Serie versehentlich überschrieben oder gelöscht wird.
+Das Ändern oder Löschen der vollständigen Serie, „dieses und folgende“ sowie
+einzelner Microsoft- und CalDAV-Vorkommnisse ist noch nicht freigegeben. Einzelne
+Google-Vorkommnisse können anhand ihrer konkreten Instanz-ID sicher bearbeitet
+oder gelöscht werden.
 
 ## Voraussetzungen
 
@@ -159,5 +161,5 @@ Konfiguration unvollständig | Instanz im Kalender Konfigurator löschen und aus
 Synchronisation fehlgeschlagen | Zuerst im verbundenen Kalender Konto **Verbindung testen**, anschließend Konto und Kalender erneut synchronisieren
 Keine Termine sichtbar | Zeitraum für vergangene und zukünftige Termine prüfen und kontrollieren, ob der Online-Kalender im gewählten Zeitraum Termine enthält
 Kalender ist schreibgeschützt | Schreibrechte beim Anbieter prüfen; ICS/Webcal-Abonnements sind immer schreibgeschützt
-Ändern oder Löschen wird bei einem Serientermin verweigert | Einzelne Vorkommen wiederkehrender Termine sind bewusst noch nicht zum Schreiben freigegeben
+Ändern oder Löschen wird bei einem Serientermin verweigert | Derzeit werden nur einzelne Google-Vorkommnisse zum Schreiben freigegeben; vollständige Serien sowie Microsoft- und CalDAV-Vorkommnisse bleiben geschützt
 Schreibkonflikt | Kalender erneut synchronisieren; der ETag-Schutz verhindert das Überschreiben einer zwischenzeitlich geänderten Serverversion

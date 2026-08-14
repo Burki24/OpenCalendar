@@ -852,7 +852,8 @@ function openNewEvent(preferredDay = null) {
 
 function openEventDetails(event) {
     selectedEvent = event;
-    const editable = eventIsEditable(event);
+    const editable = eventCanUpdate(event);
+    const deletable = eventCanDelete(event);
     document.getElementById('details-dialog-title').textContent = t('Event details');
     document.getElementById('details-summary').textContent = event.summary || t('Untitled event');
     document.getElementById('details-calendar').textContent = event.calendarName || '';
@@ -872,7 +873,7 @@ function openEventDetails(event) {
     setOptionalDetail('location', event.location);
     setOptionalDetail('description', event.description);
     document.getElementById('details-edit-button').classList.toggle('hidden', !editable);
-    document.getElementById('details-delete-button').classList.toggle('hidden', !editable);
+    document.getElementById('details-delete-button').classList.toggle('hidden', !deletable);
 
     const note = document.getElementById('details-note');
     const reason = eventReadOnlyReason(event);
@@ -882,7 +883,7 @@ function openEventDetails(event) {
 }
 
 function requestDelete(sourceDialog) {
-    if (!selectedEvent || !eventIsEditable(selectedEvent)) return;
+    if (!selectedEvent || !eventCanDelete(selectedEvent)) return;
     deleteSourceDialog = sourceDialog;
     document.getElementById('delete-confirm-summary').textContent = selectedEvent.summary || t('Untitled event');
     document.getElementById('delete-confirm-period').textContent = formatDeleteEventPeriod(selectedEvent);
@@ -903,7 +904,7 @@ function formatDeleteEventPeriod(event) {
 }
 
 async function confirmDeleteEvent() {
-    if (!selectedEvent || !eventIsEditable(selectedEvent)) {
+    if (!selectedEvent || !eventCanDelete(selectedEvent)) {
         deleteConfirmDialog.close();
         return;
     }
@@ -917,7 +918,7 @@ async function confirmDeleteEvent() {
             event: {
                 resourceUrl: event.resourceUrl,
                 etag: event.etag,
-                recurrenceId: event.recurrenceId || ''
+                ...recurrencePayload(event)
             }
         });
         if (success) {
@@ -929,12 +930,33 @@ async function confirmDeleteEvent() {
     }
 }
 
-function eventIsEditable(event) {
-    return hasActionBridge() && Boolean(event.canWrite) && !event.recurring && !event.recurrenceId;
+function eventCanUpdate(event) {
+    return hasActionBridge()
+        && Boolean(event.canWrite)
+        && (!event.recurring || Boolean(event.canUpdateOccurrence));
+}
+
+function eventCanDelete(event) {
+    return hasActionBridge()
+        && Boolean(event.canWrite)
+        && (!event.recurring || Boolean(event.canDeleteOccurrence));
+}
+
+function recurrencePayload(event) {
+    return {
+        recurrenceType: event.recurrenceType || (event.recurring ? 'unknown' : 'single'),
+        seriesId: event.seriesId || '',
+        occurrenceId: event.occurrenceId || '',
+        originalStart: event.originalStart || '',
+        recurrenceId: event.recurrenceId || '',
+        recurring: Boolean(event.recurring),
+        canUpdateOccurrence: Boolean(event.canUpdateOccurrence),
+        canDeleteOccurrence: Boolean(event.canDeleteOccurrence)
+    };
 }
 
 function eventReadOnlyReason(event) {
-    if (eventIsEditable(event)) return '';
+    if (eventCanUpdate(event) || eventCanDelete(event)) return '';
     if (!hasActionBridge()) return 'Editing events is unavailable because no action bridge is configured.';
     if (event.recurring || event.recurrenceId) return 'Recurring occurrences are currently read-only.';
     return 'This calendar is read-only.';
@@ -958,12 +980,15 @@ function formatDetailDateTime(date) {
 
 function openExistingEvent(event) {
     selectedEvent = event;
-    const editable = eventIsEditable(event);
-    const availableCalendars = editable
+    const editable = eventCanUpdate(event);
+    const recurringOccurrence = Boolean(event.recurring) && Boolean(event.canUpdateOccurrence);
+    const availableCalendars = recurringOccurrence
+        ? calendarState.calendars.filter(calendar => calendar.instanceId === event.calendarInstanceId)
+        : (editable
         ? calendarState.calendars.filter(calendar => calendar.canWrite || calendar.instanceId === event.calendarInstanceId)
-        : calendarState.calendars;
+        : calendarState.calendars);
     populateCalendarSelect(availableCalendars, event.calendarInstanceId);
-    setCalendarSelectDisabled(!editable);
+    setCalendarSelectDisabled(!editable || recurringOccurrence);
     document.getElementById('dialog-title').textContent = t('Edit event');
     document.getElementById('event-summary').value = event.summary || '';
     document.getElementById('event-location').value = event.location || '';
@@ -972,10 +997,13 @@ function openExistingEvent(event) {
     setDateInputs(eventStart(event), eventEnd(event), Boolean(event.allDay), Boolean(event.allDay));
     const descriptionEditable = editable && !Boolean(event.onlineMeeting);
     setDialogEditable(editable, descriptionEditable);
-    document.getElementById('delete-button').classList.toggle('hidden', !editable);
+    document.getElementById('delete-button').classList.toggle('hidden', !eventCanDelete(event));
     const note = document.getElementById('dialog-note');
     if (!editable) {
         note.textContent = t(eventReadOnlyReason(event));
+        note.classList.remove('hidden');
+    } else if (recurringOccurrence) {
+        note.textContent = t('Only this occurrence of the recurring event will be changed.');
         note.classList.remove('hidden');
     } else if (!descriptionEditable) {
         note.textContent = t('The description of Microsoft online meetings is protected and cannot be edited here.');
@@ -1186,7 +1214,7 @@ eventForm.addEventListener('submit', async event => {
                     uid: selectedEvent.uid,
                     resourceUrl: selectedEvent.resourceUrl,
                     etag: selectedEvent.etag,
-                    recurrenceId: selectedEvent.recurrenceId || '',
+                    ...recurrencePayload(selectedEvent),
                     changes: eventData
                 }
             }
@@ -1241,7 +1269,7 @@ eventDialog.addEventListener('close', closeCalendarPicker);
 document.getElementById('details-close').addEventListener('click', () => eventDetailsDialog.close());
 document.getElementById('details-close-button').addEventListener('click', () => eventDetailsDialog.close());
 document.getElementById('details-edit-button').addEventListener('click', () => {
-    if (!selectedEvent || !eventIsEditable(selectedEvent)) return;
+    if (!selectedEvent || !eventCanUpdate(selectedEvent)) return;
     const event = selectedEvent;
     eventDetailsDialog.close();
     openExistingEvent(event);

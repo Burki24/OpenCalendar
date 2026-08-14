@@ -13,6 +13,7 @@ use Throwable;
 
 require_once __DIR__ . '/CalendarProviderInterface.php';
 require_once __DIR__ . '/CalendarHttpClient.php';
+require_once __DIR__ . '/CalendarEventRecurrence.php';
 
 final class MicrosoftCalendarProviderException extends RuntimeException
 {
@@ -198,8 +199,10 @@ final class MicrosoftCalendarProvider implements CalendarProviderInterface
         string $eventReference,
         string $etag,
         string $uid,
-        array $event
+        array $event,
+        array $recurrence = []
     ): array {
+        $this->assertSingleEvent($recurrence);
         $calendarId = $this->calendarId($calendarReference);
         $eventId = $this->eventId($eventReference);
         if (array_key_exists('description', $event)) {
@@ -222,8 +225,10 @@ final class MicrosoftCalendarProvider implements CalendarProviderInterface
         string $calendarReference,
         string $eventReference,
         string $etag,
-        string $recurrenceId = ''
+        string $recurrenceId = '',
+        array $recurrence = []
     ): bool {
+        $this->assertSingleEvent($recurrence);
         $calendarId = $this->calendarId($calendarReference);
         $eventId = $this->eventId($eventReference);
         $headers = $etag !== '' ? ['If-Match' => $etag] : [];
@@ -276,9 +281,21 @@ final class MicrosoftCalendarProvider implements CalendarProviderInterface
         $location = is_array($item['location'] ?? null) ? $item['location'] : [];
         $seriesMasterId = trim((string) ($item['seriesMasterId'] ?? ''));
         $type = strtolower(trim((string) ($item['type'] ?? 'singleInstance')));
+        $recurrenceIdentity = match ($type) {
+            'seriesmaster'            => CalendarEventRecurrence::master($eventId),
+            'occurrence', 'exception' => CalendarEventRecurrence::occurrence(
+                $seriesMasterId,
+                $eventId,
+                trim((string) ($item['originalStart'] ?? '')),
+                '',
+                false,
+                $type === 'exception'
+            ),
+            default => CalendarEventRecurrence::single()
+        };
         $resourceUrl = $this->eventUrl($calendarId, $eventId);
 
-        return [
+        return array_merge([
             'id'             => hash('sha256', 'microsoft|' . $calendarId . '|' . $eventId),
             'uid'            => trim((string) ($item['iCalUId'] ?? $eventId)),
             'eventReference' => $eventId,
@@ -295,15 +312,23 @@ final class MicrosoftCalendarProvider implements CalendarProviderInterface
             'timezone'       => $timezone !== '' ? $timezone : 'UTC',
             'status'         => (bool) ($item['isCancelled'] ?? false) ? 'CANCELLED' : 'CONFIRMED',
             'recurrenceRule' => '',
-            'recurrenceId'   => $seriesMasterId,
-            'recurring'      => in_array($type, ['occurrence', 'exception', 'seriesmaster'], true)
-                || $seriesMasterId !== '',
             'sequence'       => 0,
             'created'        => trim((string) ($item['createdDateTime'] ?? '')),
             'lastModified'   => trim((string) ($item['lastModifiedDateTime'] ?? '')),
             'url'            => trim((string) ($item['webLink'] ?? '')),
             'onlineMeeting'  => (bool) ($item['isOnlineMeeting'] ?? false)
-        ];
+        ], $recurrenceIdentity);
+    }
+
+    /** @param array<string, mixed> $recurrence */
+    private function assertSingleEvent(array $recurrence): void
+    {
+        if ($recurrence === []) {
+            return;
+        }
+        if (($recurrence['recurrenceType'] ?? CalendarEventRecurrence::SINGLE) !== CalendarEventRecurrence::SINGLE) {
+            throw new MicrosoftCalendarProviderException('Recurring series cannot be modified yet.');
+        }
     }
 
     private function assertDescriptionEditable(string $calendarId, string $eventId): void

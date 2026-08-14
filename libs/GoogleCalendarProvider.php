@@ -13,6 +13,7 @@ use Throwable;
 
 require_once __DIR__ . '/CalendarProviderInterface.php';
 require_once __DIR__ . '/CalendarHttpClient.php';
+require_once __DIR__ . '/CalendarEventRecurrence.php';
 
 final class GoogleCalendarProviderException extends RuntimeException
 {
@@ -209,10 +210,12 @@ final class GoogleCalendarProvider implements CalendarProviderInterface
         string $eventReference,
         string $etag,
         string $uid,
-        array $event
+        array $event,
+        array $recurrence = []
     ): array {
         $calendarId = $this->calendarId($calendarReference);
         $eventId = $this->eventId($eventReference);
+        $this->assertWritableRecurrence($recurrence, true, $eventId);
         $headers = $etag !== '' ? ['If-Match' => $etag] : [];
         $updated = $this->requestJson(
             'PATCH',
@@ -230,10 +233,12 @@ final class GoogleCalendarProvider implements CalendarProviderInterface
         string $calendarReference,
         string $eventReference,
         string $etag,
-        string $recurrenceId = ''
+        string $recurrenceId = '',
+        array $recurrence = []
     ): bool {
         $calendarId = $this->calendarId($calendarReference);
         $eventId = $this->eventId($eventReference);
+        $this->assertWritableRecurrence($recurrence, false, $eventId);
         $headers = $etag !== '' ? ['If-Match' => $etag] : [];
         $this->requestJson(
             'DELETE',
@@ -301,9 +306,29 @@ final class GoogleCalendarProvider implements CalendarProviderInterface
             }
         }
         $recurringEventId = trim((string) ($item['recurringEventId'] ?? ''));
+        $originalStartData = is_array($item['originalStartTime'] ?? null) ? $item['originalStartTime'] : [];
+        $originalStart = '';
+        if ($originalStartData !== []) {
+            $originalAllDay = isset($originalStartData['date']);
+            $parsedOriginalStart = $this->parseEventDate($originalStartData, $calendarTimezone, $originalAllDay);
+            $originalStart = $originalAllDay
+                ? $parsedOriginalStart->format('Y-m-d')
+                : $parsedOriginalStart->format(DATE_ATOM);
+        }
+        $recurrenceIdentity = $recurringEventId !== ''
+            ? CalendarEventRecurrence::occurrence(
+                $recurringEventId,
+                $eventId,
+                $originalStart,
+                '',
+                true
+            )
+            : ($recurrence !== []
+                ? CalendarEventRecurrence::master($eventId)
+                : CalendarEventRecurrence::single());
         $resourceUrl = $this->eventUrl($calendarId, $eventId);
 
-        return [
+        return array_merge([
             'id'             => hash('sha256', 'google|' . $calendarId . '|' . $eventId),
             'uid'            => trim((string) ($item['iCalUID'] ?? $eventId)),
             'eventReference' => $eventId,
@@ -320,13 +345,34 @@ final class GoogleCalendarProvider implements CalendarProviderInterface
             'timezone'       => $timezone,
             'status'         => strtoupper(trim((string) ($item['status'] ?? ''))),
             'recurrenceRule' => $recurrenceRule,
-            'recurrenceId'   => $recurringEventId,
-            'recurring'      => $recurrence !== [] || $recurringEventId !== '',
             'sequence'       => (int) ($item['sequence'] ?? 0),
             'created'        => trim((string) ($item['created'] ?? '')),
             'lastModified'   => trim((string) ($item['updated'] ?? '')),
             'url'            => trim((string) ($item['htmlLink'] ?? ''))
-        ];
+        ], $recurrenceIdentity);
+    }
+
+    /** @param array<string, mixed> $recurrence */
+    private function assertWritableRecurrence(array $recurrence, bool $updating, string $eventId): void
+    {
+        if ($recurrence === []) {
+            return;
+        }
+
+        $identity = CalendarEventRecurrence::fromEvent($recurrence);
+        if (($identity['recurrenceType'] ?? '') === CalendarEventRecurrence::SINGLE) {
+            return;
+        }
+        $capability = $updating ? 'canUpdateOccurrence' : 'canDeleteOccurrence';
+        if (CalendarEventRecurrence::isOccurrence($identity) && (bool) ($identity[$capability] ?? false)) {
+            if ($eventId !== '' && hash_equals((string) ($identity['occurrenceId'] ?? ''), $eventId)) {
+                return;
+            }
+
+            throw new GoogleCalendarProviderException('The recurring occurrence identity does not match the event.');
+        }
+
+        throw new GoogleCalendarProviderException('Recurring series cannot be modified yet.');
     }
 
     /**
