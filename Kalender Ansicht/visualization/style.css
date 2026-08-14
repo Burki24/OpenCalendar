@@ -40,6 +40,8 @@
     --agenda-color-bar-width: 5px;
     --compact-color-bar-width: 3px;
     --cal-dialog-font-size: clamp(0.98rem, 0.94rem + 0.12vw, 1.04rem);
+    --cal-dialog-label-font-size: .78em;
+    --cal-dialog-meta-font-size: .82em;
 }
 
 * { box-sizing: border-box; }
@@ -92,6 +94,9 @@ html.ipsview-mode {
     --cal-popup-shadow: var(--ipsview-role-popup-shadow);
     --cal-disabled-opacity: var(--ipsview-role-disabled-opacity);
     --cal-font-family: var(--ipsview-role-font-family);
+    --cal-dialog-small-width: 420px;
+    --cal-dialog-medium-width: 540px;
+    --cal-dialog-large-width: 680px;
     --cal-dialog-font-size: clamp(1rem, 0.96rem + 0.14vw, 1.06rem);
 }
 html.ipsview-mode button:disabled,
@@ -548,6 +553,7 @@ html.ipsview-mode .danger-button { min-height: 48px; padding-inline: 18px; }
     display: flex;
     flex-direction: column;
     width: 100%;
+    min-width: 0;
     min-height: 0;
     max-height: inherit;
 }
@@ -593,6 +599,7 @@ html.ipsview-mode .danger-button { min-height: 48px; padding-inline: 18px; }
     display: grid;
     flex: 1 1 auto;
     gap: 12px;
+    min-width: 0;
     min-height: 0;
     max-height: none;
     padding: 15px;
@@ -600,11 +607,13 @@ html.ipsview-mode .danger-button { min-height: 48px; padding-inline: 18px; }
     overscroll-behavior: contain;
     scrollbar-gutter: stable;
 }
-.form-row { display: grid; gap: 5px; }
+.form-row { display: grid; min-width: 0; gap: 5px; }
 .form-row.two { grid-template-columns: 1fr 1fr; gap: 10px; }
-.form-row label { color: var(--cal-label-text); font-size: .7em; font-weight: 600; }
+.form-row label { color: var(--cal-label-text); font-weight: 600; }
 .form-row input, .form-row textarea {
     width: 100%;
+    min-width: 0;
+    max-width: 100%;
     padding: 8px 9px;
     border: var(--cal-border-width, 1px) solid var(--cal-border);
     border-radius: var(--cal-radius);
@@ -673,12 +682,12 @@ html.ipsview-mode .danger-button { min-height: 48px; padding-inline: 18px; }
 .event-details-list { display: grid; gap: 0; margin: 0; }
 .event-details-row { display: grid; grid-template-columns: minmax(82px, .34fr) minmax(0, 1fr); gap: 12px; padding: 8px 0; border-top: var(--cal-line-width, 1px) solid var(--cal-line, var(--cal-border)); }
 .event-details-row:first-child { border-top: 0; }
-.event-details-row dt { color: var(--cal-label-text); font-size: .7em; font-weight: 600; }
+.event-details-row dt { color: var(--cal-label-text); font-weight: 600; }
 .event-details-row dd { margin: 0; line-height: 1.45; overflow-wrap: anywhere; white-space: pre-wrap; }
 
 .delete-confirm-body { gap: 8px; }
 .delete-confirm-summary { font-size: 1.02em; font-weight: 700; line-height: 1.35; overflow-wrap: anywhere; }
-.delete-confirm-period { color: var(--cal-muted); font-size: .76em; line-height: 1.4; overflow-wrap: anywhere; }
+.delete-confirm-period { color: var(--cal-muted); line-height: 1.4; overflow-wrap: anywhere; }
 .delete-confirm-question { margin: 4px 0 0; line-height: 1.45; }
 
 .view-selector-body { padding: 12px; }
@@ -729,17 +738,24 @@ html.ipsview-mode .view-selector-option { min-height: 48px; padding: 10px 13px; 
 .calendar-filter-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .day-events-body { gap: 8px; }
-.day-events-count { color: var(--cal-muted); font-size: .76em; font-weight: 600; }
+.day-events-count { color: var(--cal-muted); font-weight: 600; }
 .day-events-create-button::before { content: '＋'; margin-right: 5px; }
 .day-events-list { display: grid; gap: 6px; }
 .day-event-item { display: grid; grid-template-columns: minmax(70px, auto) minmax(0, 1fr); gap: 8px 12px; align-items: center; width: 100%; padding: 8px 10px; border: var(--cal-border-width, 1px) solid var(--cal-border); border-left: var(--compact-color-bar-width) solid var(--event-color); border-radius: var(--cal-radius); background: color-mix(in srgb, var(--event-color) 12%, var(--cal-surface)); color: var(--cal-text); text-align: left; }
 .day-event-item:hover, .day-event-item:focus-visible { background: color-mix(in srgb, var(--event-color) 20%, var(--cal-surface-hover)); }
-.day-event-time { color: var(--cal-muted); font-size: .72em; white-space: nowrap; }
+.day-event-time { color: var(--cal-muted); white-space: nowrap; }
 .day-event-summary { min-width: 0; font-weight: 650; overflow-wrap: anywhere; }
-.day-event-calendar { grid-column: 2; color: var(--cal-muted); font-size: .72em; }
+.day-event-calendar { grid-column: 2; color: var(--cal-muted); }
 .checkbox-row { display: flex; align-items: center; gap: 8px; }
 .checkbox-row input { width: auto; }
-.dialog-note { padding: 9px 10px; border-radius: var(--cal-radius); background: var(--cal-information-soft); color: var(--cal-muted); font-size: .72em; line-height: 1.45; }
+.form-row label,
+.event-details-row dt { font-size: var(--cal-dialog-label-font-size); }
+.delete-confirm-period,
+.day-events-count,
+.day-event-time,
+.day-event-calendar,
+.dialog-note { font-size: var(--cal-dialog-meta-font-size); }
+.dialog-note { padding: 9px 10px; border-radius: var(--cal-radius); background: var(--cal-information-soft); color: var(--cal-muted); line-height: 1.45; }
 .dialog-actions {
     display: flex;
     flex: 0 0 auto;
