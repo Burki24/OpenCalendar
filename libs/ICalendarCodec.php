@@ -45,6 +45,7 @@ final class ICalendarCodec
                 : null;
 
             $recurrenceRule = self::propertyValue($properties, 'RRULE');
+            $recurrenceDates = self::parseDatePropertyList($properties['RDATE'] ?? []);
             $recurrenceIdentity = $recurrenceId !== ''
                 ? CalendarEventRecurrence::occurrence(
                     $uid,
@@ -54,7 +55,7 @@ final class ICalendarCodec
                     false,
                     true
                 )
-                : ($recurrenceRule !== ''
+                : ($recurrenceRule !== '' || $recurrenceDates !== []
                     ? CalendarEventRecurrence::master($uid)
                     : CalendarEventRecurrence::single());
 
@@ -76,7 +77,7 @@ final class ICalendarCodec
                 'recurrenceRule'        => $recurrenceRule,
                 'recurrenceIdTimestamp' => $parsedRecurrenceId['timestamp'] ?? null,
                 'exceptionDates'        => self::parseDatePropertyList($properties['EXDATE'] ?? []),
-                'recurrenceDates'       => self::parseDatePropertyList($properties['RDATE'] ?? []),
+                'recurrenceDates'       => $recurrenceDates,
                 'sequence'              => (int) self::propertyValue($properties, 'SEQUENCE'),
                 'created'               => self::parseOptionalDate(self::firstProperty($properties, 'CREATED')),
                 'lastModified'          => self::parseOptionalDate(self::firstProperty($properties, 'LAST-MODIFIED')),
@@ -232,6 +233,80 @@ final class ICalendarCodec
         $block = $target['lines'];
         self::applyEventChangesToBlock($block, $data);
         array_splice($lines, $target['start'], $target['end'] - $target['start'] + 1, $block);
+
+        return self::foldLines($lines);
+    }
+
+    /**
+     * Updates the master VEVENT of a recurring iCalendar resource.
+     *
+     * Detached RECURRENCE-ID overrides and other calendar components are retained.
+     * A replacement RRULE is accepted only when the existing recurrence can be
+     * represented losslessly by the common OpenCalendar recurrence editor.
+     *
+     * @param array<string, mixed> $data
+     */
+    public static function updateRecurringSeries(string $ical, string $uid, array $data): string
+    {
+        $uid = trim($uid);
+        if ($uid === '') {
+            throw new InvalidArgumentException('The recurring event UID is missing.');
+        }
+
+        $lines = self::unfoldLines($ical);
+        $blocks = self::extractEventBlocksWithOffsets($lines);
+        $master = self::recurringMaster($blocks, $uid);
+        $block = $master['lines'];
+        $properties = $master['properties'];
+        $recurrenceProvided = array_key_exists('recurrence', $data);
+        $recurrence = $data['recurrence'] ?? null;
+
+        if ($recurrenceProvided) {
+            if (!is_array($recurrence) || $recurrence === [] || array_is_list($recurrence)) {
+                throw new InvalidArgumentException('The recurrence settings are invalid.');
+            }
+            $startProperty = self::firstProperty($properties, 'DTSTART');
+            $currentRule = self::propertyValue($properties, 'RRULE');
+            if ($startProperty === null
+                || count($properties['RRULE'] ?? []) !== 1
+                || self::propertyValue($properties, 'RDATE') !== ''
+                || self::propertyValue($properties, 'EXRULE') !== '') {
+                throw new RuntimeException('The recurrence pattern cannot be edited safely.');
+            }
+            $currentStart = self::parseDateProperty($startProperty);
+            if (CalendarRecurrenceRule::fromGoogleRule(
+                $currentRule,
+                $currentStart['allDay'],
+                $currentStart['timezone']
+            ) === null) {
+                throw new RuntimeException('The recurrence pattern cannot be edited safely.');
+            }
+        }
+
+        self::applyEventChangesToBlock($block, $data);
+
+        if ($recurrenceProvided && is_array($recurrence)) {
+            $updatedProperties = self::readTopLevelProperties($block);
+            $updatedStartProperty = self::firstProperty($updatedProperties, 'DTSTART');
+            if ($updatedStartProperty === null) {
+                throw new RuntimeException('The recurring event master has no start.');
+            }
+            $updatedStart = self::parseDateProperty($updatedStartProperty);
+            $timezone = self::timezone($updatedStart['timezone']);
+            $start = (new DateTimeImmutable('@' . $updatedStart['timestamp']))->setTimezone($timezone);
+            self::replaceProperty(
+                $block,
+                'RRULE',
+                CalendarRecurrenceRule::toICalendarRule(
+                    $recurrence,
+                    $start,
+                    $updatedStart['allDay'],
+                    $updatedStart['timezone']
+                )
+            );
+        }
+
+        array_splice($lines, $master['start'], $master['end'] - $master['start'] + 1, $block);
 
         return self::foldLines($lines);
     }

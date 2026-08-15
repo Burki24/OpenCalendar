@@ -41,7 +41,7 @@ beliebig verschoben oder vom Benutzer umbenannt werden.
 - Statusvariablen für die gesamte geladene Terminanzahl, die Termine des
   aktuellen Tages und den Zeitpunkt der letzten Synchronisation
 
-Google- und Microsoft-Serien können als einzelnes Vorkommnis, als vollständige Serie oder **ab dem ausgewählten Vorkommnis für alle folgenden Termine** bearbeitet und gelöscht werden. Beim Bearbeiten teilt OpenCalendar die bestehende Serie am gewählten Termin in einen unveränderten vorderen und einen neu angelegten hinteren Serienteil. Beim Löschen wird der bestehende Parent direkt vor dem ausgewählten Vorkommnis beendet; beginnt die Auswahl beim ersten Vorkommnis, wird die komplette Serie gelöscht. Bei nummerierten Serien übernimmt der neue Serienteil nur die verbleibende Anzahl. Bestehende Ausnahmen ab dem Trennpunkt werden beim Teilen nicht in die neue Serie übernommen. Apple-iCloud- und CalDAV-Kalender unterstützen zusätzlich die Neuanlage von Serien sowie das **Bearbeiten und Löschen einzelner Vorkommnisse**. Eine Änderung wird als `RECURRENCE-ID`-Ausnahme gespeichert, eine Löschung über `EXDATE` im bestehenden Serienobjekt abgebildet.
+Google- und Microsoft-Serien können als einzelnes Vorkommnis, als vollständige Serie oder **ab dem ausgewählten Vorkommnis für alle folgenden Termine** bearbeitet und gelöscht werden. Beim Bearbeiten teilt OpenCalendar die bestehende Serie am gewählten Termin in einen unveränderten vorderen und einen neu angelegten hinteren Serienteil. Beim Löschen wird der bestehende Parent direkt vor dem ausgewählten Vorkommnis beendet; beginnt die Auswahl beim ersten Vorkommnis, wird die komplette Serie gelöscht. Bei nummerierten Serien übernimmt der neue Serienteil nur die verbleibende Anzahl. Bestehende Ausnahmen ab dem Trennpunkt werden beim Teilen nicht in die neue Serie übernommen. Apple-iCloud- und CalDAV-Kalender unterstützen zusätzlich die Neuanlage von Serien sowie das **Bearbeiten und Löschen einzelner Vorkommnisse und vollständiger Serien**. Einzeländerungen werden als `RECURRENCE-ID`-Ausnahmen gespeichert, Einzellöschungen über `EXDATE` abgebildet. Beim Bearbeiten der vollständigen Serie wird nur der Serien-Master geändert; vorhandene Ausnahmen bleiben erhalten.
 
 ## Voraussetzungen
 
@@ -162,9 +162,9 @@ Endarten `never`, `count` und `until`. Bei Microsoft entspricht eine monatliche
 Serie dem Kalendertag des Starttermins und eine jährliche Serie zusätzlich dessen
 Monat. Bei Google und Microsoft können einzelne Vorkommnisse, die vollständige
 Serie sowie **dieses und alle folgenden Vorkommnisse** bearbeitet und gelöscht
-werden. Bei Apple iCloud und CalDAV können einzelne Serienvorkommnisse ebenfalls
-bearbeitet und gelöscht werden; vollständige Serie und „dieses und folgende“
-bleiben dort noch geschützt. Vor dem Bearbeiten einer vollständigen Serie lädt
+werden. Bei Apple iCloud und CalDAV können einzelne Serienvorkommnisse und die
+vollständige Serie ebenfalls bearbeitet und gelöscht werden; „dieses und folgende“
+bleibt dort noch geschützt. Vor dem Bearbeiten einer vollständigen Serie lädt
 `IPSKAL_GetRecurringSeries()` den
 verifizierten Parent-Termin. Für „dieses und folgende“ liefert
 `IPSKAL_GetRecurringFollowing()` zusätzlich das verifizierte Zielvorkommnis und
@@ -213,5 +213,5 @@ Konfiguration unvollständig | Instanz im Kalender Konfigurator löschen und aus
 Synchronisation fehlgeschlagen | Zuerst im verbundenen Kalender Konto **Verbindung testen**, anschließend Konto und Kalender erneut synchronisieren
 Keine Termine sichtbar | Zeitraum für vergangene und zukünftige Termine prüfen und kontrollieren, ob der Online-Kalender im gewählten Zeitraum Termine enthält
 Kalender ist schreibgeschützt | Schreibrechte beim Anbieter prüfen; ICS/Webcal-Abonnements sind immer schreibgeschützt
-Ändern oder Löschen wird bei einem Serientermin verweigert | Google und Microsoft unterstützen Vorkommnis, dieses und folgende sowie vollständige Serie; Apple/CalDAV unterstützt derzeit Neuanlage sowie Bearbeiten/Löschen einzelner Vorkommnisse; vollständige CalDAV-Serie und dieses und folgende bleiben noch geschützt
+Ändern oder Löschen wird bei einem Serientermin verweigert | Google und Microsoft unterstützen Vorkommnis, dieses und folgende sowie vollständige Serie; Apple/CalDAV unterstützt Neuanlage sowie Bearbeiten/Löschen einzelner Vorkommnisse und vollständiger Serien; dieses und folgende bleibt dort noch geschützt
 Schreibkonflikt | Kalender erneut synchronisieren; der ETag-Schutz verhindert das Überschreiben einer zwischenzeitlich geänderten Serverversion

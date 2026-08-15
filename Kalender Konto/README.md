@@ -53,7 +53,9 @@ oder Enddatum anlegen. Die Serie wird als RFC-5545-`RRULE` über CalDAV gespeich
 Zeitgebundene Serien enthalten einen passenden `VTIMEZONE`-Block. Einzelne
 Vorkommnisse bestehender Serien können außerdem bearbeitet oder gelöscht werden.
 Änderungen werden als `RECURRENCE-ID`-Ausnahme gespeichert; Löschungen ergänzen
-ein `EXDATE`, ohne das übrige Serienobjekt zu entfernen.
+ein `EXDATE`, ohne das übrige Serienobjekt zu entfernen. Die vollständige Serie
+kann ebenfalls bearbeitet oder gelöscht werden. Einfache RRULEs lassen sich dabei
+im gemeinsamen Serieneditor ändern; komplexere Regeln werden unverändert erhalten.
 
 ### Generisches CalDAV
 
@@ -72,8 +74,9 @@ verwendet werden.
 
 Beschreibbare CalDAV-Kalender unterstützen dieselbe Neuanlage von Terminserien wie
 iCloud. Zusätzlich können einzelne Vorkommnisse bestehender Serien bearbeitet und
-gelöscht werden. Vollständige Serien sowie **dieses und alle folgenden
-Vorkommnisse** bleiben noch geschützt und folgen in den nächsten Ausbauschritten.
+gelöscht werden. Auch vollständige Serien können bearbeitet oder gelöscht werden.
+**Dieses und alle folgenden Vorkommnisse** bleibt noch geschützt und folgt im
+nächsten Ausbauschritt.
 
 ### Google Calendar
 

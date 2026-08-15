@@ -205,6 +205,40 @@ function recurringSeriesIcal(): string
         . "END:VCALENDAR\r\n";
 }
 
+function recurringSeriesWithOverrideIcal(): string
+{
+    return "BEGIN:VCALENDAR\r\n"
+        . "VERSION:2.0\r\n"
+        . "BEGIN:VEVENT\r\n"
+        . "UID:series-1@example.com\r\n"
+        . "DTSTAMP:20260801T000000Z\r\n"
+        . "SEQUENCE:1\r\n"
+        . "DTSTART:20260817T100000Z\r\n"
+        . "DTEND:20260817T110000Z\r\n"
+        . "RRULE:FREQ=WEEKLY;COUNT=4\r\n"
+        . "SUMMARY:Recurring before\r\n"
+        . "END:VEVENT\r\n"
+        . "BEGIN:VEVENT\r\n"
+        . "UID:series-1@example.com\r\n"
+        . "RECURRENCE-ID:20260824T100000Z\r\n"
+        . "DTSTART:20260824T120000Z\r\n"
+        . "DTEND:20260824T130000Z\r\n"
+        . "SUMMARY:Detached override\r\n"
+        . "END:VEVENT\r\n"
+        . "END:VCALENDAR\r\n";
+}
+
+function recurringSeriesLookupResponseXml(string $href): string
+{
+    return '<?xml version="1.0" encoding="utf-8" ?>'
+        . '<d:multistatus xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav">'
+        . '<d:response><d:href>' . htmlspecialchars($href, ENT_XML1) . '</d:href><d:propstat><d:prop>'
+        . '<d:getetag>"series-etag"</d:getetag>'
+        . '<c:calendar-data><![CDATA[' . recurringSeriesIcal() . ']]></c:calendar-data>'
+        . '</d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response>'
+        . '</d:multistatus>';
+}
+
 function recurringEventQueryResponseXml(string $href, bool $includeSecondOccurrence = true): string
 {
     $ical = "BEGIN:VCALENDAR\r\n"
@@ -278,6 +312,8 @@ assertCalDAVSame(true, $calendars[0]['capabilities']['create'], 'Write privilege
 assertCalDAVSame(true, $calendars[0]['capabilities']['createRecurrence'], 'Writable CalDAV calendars must advertise recurring event creation.');
 assertCalDAVSame(true, $calendars[0]['capabilities']['updateOccurrence'], 'Writable CalDAV calendars must advertise recurring occurrence updates.');
 assertCalDAVSame(true, $calendars[0]['capabilities']['deleteOccurrence'], 'Writable CalDAV calendars must advertise recurring occurrence deletion.');
+assertCalDAVSame(true, $calendars[0]['capabilities']['updateSeries'], 'Writable CalDAV calendars must advertise recurring series updates.');
+assertCalDAVSame(true, $calendars[0]['capabilities']['deleteSeries'], 'Writable CalDAV calendars must advertise recurring series deletion.');
 assertCalDAVSame(true, $calendars[0]['writeAccessKnown'], 'Returned privileges must mark write access as known.');
 
 $calendarXmlWithoutPrivileges = preg_replace(
@@ -297,6 +333,8 @@ assertCalDAVSame(true, $unknownPrivilegeCalendars[0]['capabilities']['create'], 
 assertCalDAVSame(true, $unknownPrivilegeCalendars[0]['capabilities']['createRecurrence'], 'Unknown DAV privileges must not hide recurring creation optimistically.');
 assertCalDAVSame(true, $unknownPrivilegeCalendars[0]['capabilities']['updateOccurrence'], 'Unknown DAV privileges must not hide recurring occurrence updates optimistically.');
 assertCalDAVSame(true, $unknownPrivilegeCalendars[0]['capabilities']['deleteOccurrence'], 'Unknown DAV privileges must not hide recurring occurrence deletion optimistically.');
+assertCalDAVSame(true, $unknownPrivilegeCalendars[0]['capabilities']['updateSeries'], 'Unknown DAV privileges must not hide recurring series updates optimistically.');
+assertCalDAVSame(true, $unknownPrivilegeCalendars[0]['capabilities']['deleteSeries'], 'Unknown DAV privileges must not hide recurring series deletion optimistically.');
 
 assertCalDAVSame('https://calendar.example/.well-known/caldav', $discoveryClient->requests[0]['url'], 'Root server URLs must start discovery at .well-known/caldav.');
 assertCalDAVSame('https://calendar.example/principals/user/', $discoveryClient->requests[1]['url'], 'The discovered principal must be queried.');
@@ -411,6 +449,32 @@ assertCalDAVSame('series-1@example.com', $recurringEvents[0]['seriesId'], 'CalDA
 assertCalDAVSame(true, $recurringEvents[0]['canUpdateOccurrence'], 'Expanded CalDAV occurrences must advertise individual updates.');
 assertCalDAVSame(true, $recurringEvents[0]['canDeleteOccurrence'], 'Expanded CalDAV occurrences must advertise individual deletion.');
 assertCalDAVSame('2026-08-24T10:00:00+00:00', $recurringEvents[1]['originalStart'], 'RECURRENCE-ID must remain the immutable original occurrence start.');
+
+$seriesLookupClient = new FakeCalDAVHttpClient([
+    caldavResponse(
+        207,
+        recurringSeriesLookupResponseXml('/calendars/user/work/series-1.ics'),
+        'https://calendar.example/calendars/user/work/'
+    )
+]);
+$provider = new CalDAVProvider($seriesLookupClient, 'https://calendar.example/dav/');
+$recurringSeries = $provider->getRecurringSeries(
+    'https://calendar.example/calendars/user/work/',
+    'series-1@example.com'
+);
+assertCalDAVSame('master', $recurringSeries['recurrenceType'], 'CalDAV recurring series lookup must return the master event.');
+assertCalDAVSame(true, $recurringSeries['canUpdateSeries'], 'CalDAV recurring series lookup must enable full-series updates.');
+assertCalDAVSame(true, $recurringSeries['canDeleteSeries'], 'CalDAV recurring series lookup must enable full-series deletion.');
+assertCalDAVSame(true, $recurringSeries['recurrenceEditable'], 'Simple CalDAV RRULEs must be editable in the common recurrence editor.');
+assertCalDAVSame('WEEKLY', $recurringSeries['recurrenceSettings']['frequency'] ?? '', 'CalDAV recurring series lookup must expose the normalized frequency.');
+assertCalDAVSame(4, $recurringSeries['recurrenceSettings']['count'] ?? 0, 'CalDAV recurring series lookup must expose the normalized occurrence count.');
+assertCalDAVSame($recurringResourceUrl, $recurringSeries['resourceUrl'], 'CalDAV recurring series lookup must retain the object resource URL.');
+assertCalDAVSame('REPORT', $seriesLookupClient->requests[0]['method'], 'CalDAV recurring series lookup must use a calendar REPORT.');
+assertCalDAVTrue(
+    str_contains($seriesLookupClient->requests[0]['body'], '<c:prop-filter name="UID">')
+        && str_contains($seriesLookupClient->requests[0]['body'], 'series-1@example.com'),
+    'CalDAV recurring series lookup must filter the calendar query by the exact UID.'
+);
 
 // Updates must read the current resource, retain unrelated iCalendar data and use an ETag for optimistic locking.
 $resourceUrl = 'https://calendar.example/calendars/user/work/event-1.ics';
@@ -566,6 +630,72 @@ assertCalDAVTrue(
     str_contains($firstOccurrenceDeleteClient->requests[1]['body'], 'EXDATE:20260817T100000Z'),
     'Deleting an apparently single first recurrence instance must exclude the master DTSTART with EXDATE.'
 );
+
+$seriesUpdateClient = new FakeCalDAVHttpClient([
+    caldavResponseWithHeaders(
+        200,
+        ['etag' => '"series-etag"'],
+        recurringSeriesWithOverrideIcal(),
+        $recurringResourceUrl
+    ),
+    caldavResponseWithHeaders(204, ['etag' => '"series-after-full-update"'], '', $recurringResourceUrl)
+]);
+$provider = new CalDAVProvider($seriesUpdateClient, 'https://calendar.example/dav/');
+$seriesUpdateIdentity = $recurringSeries;
+$seriesUpdateIdentity['writeScope'] = 'series';
+$updatedSeries = $provider->updateEvent(
+    'https://calendar.example/calendars/user/work/',
+    $recurringResourceUrl,
+    '"series-etag"',
+    'series-1@example.com',
+    [
+        'summary'    => 'Recurring after',
+        'allDay'     => false,
+        'start'      => '2026-08-17T11:00:00Z',
+        'end'        => '2026-08-17T12:00:00Z',
+        'recurrence' => [
+            'frequency' => 'weekly',
+            'interval'  => 2,
+            'byDay'     => ['MO'],
+            'endMode'   => 'count',
+            'count'     => 3
+        ]
+    ],
+    $seriesUpdateIdentity
+);
+assertCalDAVSame('GET', $seriesUpdateClient->requests[0]['method'], 'Full CalDAV series updates must retrieve the current resource first.');
+assertCalDAVSame('PUT', $seriesUpdateClient->requests[1]['method'], 'Full CalDAV series updates must rewrite the resource via PUT.');
+assertCalDAVTrue(
+    str_contains($seriesUpdateClient->requests[1]['body'], 'SUMMARY:Recurring after')
+        && str_contains($seriesUpdateClient->requests[1]['body'], 'DTSTART:20260817T110000Z')
+        && str_contains($seriesUpdateClient->requests[1]['body'], 'RRULE:FREQ=WEEKLY;INTERVAL=2;BYDAY=MO;COUNT=3')
+        && str_contains($seriesUpdateClient->requests[1]['body'], 'RECURRENCE-ID:20260824T100000Z')
+        && str_contains($seriesUpdateClient->requests[1]['body'], 'SUMMARY:Detached override'),
+    'Updating a complete CalDAV series must change only the master while preserving detached overrides.'
+);
+assertCalDAVSame('"series-after-full-update"', $updatedSeries['etag'], 'Full CalDAV series updates must return the new ETag.');
+
+$seriesDeleteClient = new FakeCalDAVHttpClient([
+    caldavResponseWithHeaders(200, ['etag' => '"series-etag"'], recurringSeriesIcal(), $recurringResourceUrl),
+    caldavResponse(204, '', $recurringResourceUrl)
+]);
+$provider = new CalDAVProvider($seriesDeleteClient, 'https://calendar.example/dav/');
+$seriesDeleteIdentity = $recurringSeries;
+$seriesDeleteIdentity['writeScope'] = 'series';
+assertCalDAVSame(
+    true,
+    $provider->deleteEvent(
+        'https://calendar.example/calendars/user/work/',
+        $recurringResourceUrl,
+        '"series-etag"',
+        '',
+        $seriesDeleteIdentity
+    ),
+    'Deleting a complete CalDAV series must succeed.'
+);
+assertCalDAVSame('GET', $seriesDeleteClient->requests[0]['method'], 'Full CalDAV series deletion must verify the current resource first.');
+assertCalDAVSame('DELETE', $seriesDeleteClient->requests[1]['method'], 'Full CalDAV series deletion must delete the calendar object resource.');
+assertCalDAVSame('"series-etag"', $seriesDeleteClient->requests[1]['headers']['If-Match'] ?? '', 'Full CalDAV series deletion must keep optimistic ETag protection.');
 
 // A server must not be able to redirect the resulting resource outside the selected calendar path.
 $createOutsideClient = new FakeCalDAVHttpClient([

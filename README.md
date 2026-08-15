@@ -142,9 +142,12 @@ CalDAV-Pfad wie andere Server.
 Zusätzlich können einzelne Vorkommnisse bestehender Apple-iCloud- und
 CalDAV-Serien bearbeitet und gelöscht werden. Beim Bearbeiten schreibt
 OpenCalendar eine `RECURRENCE-ID`-Ausnahme in das bestehende Kalenderobjekt; beim
-Löschen wird das ausgewählte Vorkommnis über `EXDATE` ausgeschlossen. Die
-vollständige Serie sowie **Diesen und alle folgenden Termine** folgen in den
-nächsten Ausbauschritten.
+Löschen wird das ausgewählte Vorkommnis über `EXDATE` ausgeschlossen. Auch die
+**vollständige Serie** kann bearbeitet oder gelöscht werden. OpenCalendar lädt dazu
+den Serien-Master anhand seiner UID direkt aus dem CalDAV-Kalenderobjekt; einfache
+RRULEs können im gemeinsamen Serieneditor geändert werden. Komplexere Regeln bleiben
+erhalten und werden nicht verlustbehaftet vereinfacht. **Diesen und alle folgenden
+Termine** folgt im nächsten Ausbauschritt.
 
 ## Bekannte Einschränkungen
 
@@ -152,8 +155,8 @@ nächsten Ausbauschritten.
   Serien mit Anhängen nicht automatisch geteilt, weil diese Daten beim Erzeugen des
   neuen Serienteils nicht verlustfrei übernommen werden können.
 - Apple-iCloud- und generische CalDAV-Kalender unterstützen die Neuanlage von Serien
-  sowie das Bearbeiten und Löschen einzelner Serienvorkommnisse. Die vollständige
-  Serie und **Diesen und alle folgenden Termine** sind dort noch nicht freigegeben.
+  sowie das Bearbeiten und Löschen einzelner Serienvorkommnisse und vollständiger
+  Serien. **Diesen und alle folgenden Termine** ist dort noch nicht freigegeben.
 - ICS-/Webcal-Abonnements und lokal importierte ICS-Dateien sind grundsätzlich schreibgeschützt.
 - Die IPSView-Ausgabe benötigt im HTML-Box-Steuerelement den Renderer
   **Browser des Clients** oder **Automatisch**, da die Bedienung JavaScript

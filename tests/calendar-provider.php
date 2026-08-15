@@ -1848,6 +1848,31 @@ assertTrueValue(
     str_contains($calDavOccurrenceUpdatedAgain, 'SUMMARY:Changed occurrence again'),
     'An existing detached CalDAV occurrence must remain editable.'
 );
+$calDavSeriesUpdated = ICalendarCodec::updateRecurringSeries(
+    $calDavOccurrenceUpdatedAgain,
+    'caldav-series@example.com',
+    [
+        'summary'    => 'Changed complete series',
+        'allDay'     => false,
+        'start'      => '2026-08-17T11:00:00+02:00',
+        'end'        => '2026-08-17T12:00:00+02:00',
+        'recurrence' => [
+            'frequency' => 'weekly',
+            'interval'  => 2,
+            'byDay'     => ['MO'],
+            'endMode'   => 'count',
+            'count'     => 3
+        ]
+    ]
+);
+assertTrueValue(
+    str_contains($calDavSeriesUpdated, 'SUMMARY:Changed complete series')
+        && str_contains($calDavSeriesUpdated, 'DTSTART;TZID=Europe/Berlin:20260817T110000')
+        && str_contains($calDavSeriesUpdated, 'RRULE:FREQ=WEEKLY;INTERVAL=2;BYDAY=MO;COUNT=3')
+        && str_contains($calDavSeriesUpdated, 'RECURRENCE-ID;TZID=Europe/Berlin:20260824T100000')
+        && str_contains($calDavSeriesUpdated, 'SUMMARY:Changed occurrence again'),
+    'Updating the complete CalDAV series must change the master while retaining detached occurrence overrides.'
+);
 $calDavOccurrenceDeleted = ICalendarCodec::deleteRecurringOccurrence(
     $calDavOccurrenceUpdatedAgain,
     'caldav-series@example.com',
@@ -2538,6 +2563,7 @@ foreach ([
 $calendarModuleSource = file_get_contents(__DIR__ . '/../Kalender/module.php');
 $accountModuleSource = file_get_contents(__DIR__ . '/../Kalender Konto/module.php');
 $accountGoogleOAuthSource = file_get_contents(__DIR__ . '/../Kalender Konto/traits/GoogleOAuthTrait.php');
+$calDavProviderSource = file_get_contents(__DIR__ . '/../libs/CalDAVProvider.php');
 $viewModuleSource = file_get_contents(__DIR__ . '/../Kalender Ansicht/module.php');
 $viewTemplateSource = file_get_contents(__DIR__ . '/../Kalender Ansicht/visualization/index.html');
 $viewStyleSource = file_get_contents(__DIR__ . '/../Kalender Ansicht/visualization/style.css');
@@ -2593,6 +2619,21 @@ assertTrueValue(
         && str_contains($calendarModuleSource, "RegisterAttributeBoolean('RuntimeReady', false)")
         && str_contains($calendarModuleSource, 'IPS_GetKernelRunlevel() !== KR_READY'),
     'The calendar module must defer parent communication until the kernel is ready.'
+);
+assertTrueValue(
+    is_string($calDavProviderSource)
+        && str_contains(
+            $calDavProviderSource,
+            'final class CalDAVProvider implements CalendarProviderInterface, RecurringCalendarProviderInterface'
+        )
+        && str_contains($calDavProviderSource, 'public function getRecurringSeries(')
+        && str_contains($calDavProviderSource, '<c:prop-filter name="UID">')
+        && str_contains($calDavProviderSource, '<c:text-match collation="i;octet">')
+        && str_contains($calDavProviderSource, "'updateSeries'     => \$canWrite")
+        && str_contains($calDavProviderSource, "'deleteSeries'     => \$canWrite")
+        && str_contains($calDavProviderSource, 'ICalendarCodec::updateRecurringSeries(')
+        && str_contains($calDavProviderSource, 'CalendarEventRecurrence::WRITE_SCOPE_SERIES'),
+    'CalDAV must expose verified full-series lookup, editing and deletion while keeping following writes separate.'
 );
 assertTrueValue(
     is_string($calendarModuleSource)
