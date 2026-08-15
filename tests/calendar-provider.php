@@ -819,12 +819,14 @@ assertSameValue(true, $msCalendars[0]['capabilities']['create'], 'Editable Micro
 assertSameValue(true, $msCalendars[0]['capabilities']['createRecurrence'], 'Editable Microsoft calendars must advertise recurrence creation support.');
 assertSameValue(true, $msCalendars[0]['capabilities']['updateOccurrence'], 'Editable Microsoft calendars must advertise recurring occurrence update support.');
 assertSameValue(true, $msCalendars[0]['capabilities']['deleteOccurrence'], 'Editable Microsoft calendars must advertise recurring occurrence delete support.');
+assertSameValue(true, $msCalendars[0]['capabilities']['updateFollowing'], 'Editable Microsoft calendars must advertise this-and-following update support.');
 assertSameValue(true, $msCalendars[0]['capabilities']['updateSeries'], 'Editable Microsoft calendars must advertise recurring series update support.');
 assertSameValue(true, $msCalendars[0]['capabilities']['deleteSeries'], 'Editable Microsoft calendars must advertise recurring series delete support.');
 assertSameValue(false, $msCalendars[2]['capabilities']['create'], 'Read-only Microsoft calendars must remain read-only.');
 assertSameValue(false, $msCalendars[2]['capabilities']['createRecurrence'], 'Read-only Microsoft calendars must not advertise recurrence creation support.');
 assertSameValue(false, $msCalendars[2]['capabilities']['updateOccurrence'], 'Read-only Microsoft calendars must not advertise recurring occurrence update support.');
 assertSameValue(false, $msCalendars[2]['capabilities']['deleteOccurrence'], 'Read-only Microsoft calendars must not advertise recurring occurrence delete support.');
+assertSameValue(false, $msCalendars[2]['capabilities']['updateFollowing'], 'Read-only Microsoft calendars must not advertise this-and-following update support.');
 assertSameValue(false, $msCalendars[2]['capabilities']['updateSeries'], 'Read-only Microsoft calendars must not advertise recurring series update support.');
 assertSameValue(false, $msCalendars[2]['capabilities']['deleteSeries'], 'Read-only Microsoft calendars must not advertise recurring series delete support.');
 assertSameValue(
@@ -934,14 +936,20 @@ assertSameValue('occurrence', $msEvents[1]['recurrenceType'], 'Microsoft occurre
 assertSameValue('series-master', $msEvents[1]['seriesId'], 'Microsoft series master IDs must be retained separately.');
 assertSameValue('instance/id+1', $msEvents[1]['occurrenceId'], 'Microsoft occurrence IDs must be retained separately.');
 assertSameValue('', $msEvents[1]['recurrenceId'], 'Microsoft series IDs must not be exposed as RFC recurrence IDs.');
-assertSameValue('', $msEvents[1]['originalStart'], 'Microsoft calendarView occurrences may omit the original start without becoming read-only.');
+assertSameValue(
+    '2026-07-20T10:00:00+00:00',
+    $msEvents[1]['originalStart'],
+    'Microsoft calendarView occurrences must derive their unchanged original start when Graph omits it.'
+);
 assertSameValue(true, $msEvents[1]['canUpdateOccurrence'], 'Microsoft occurrences must advertise individual update support.');
 assertSameValue(true, $msEvents[1]['canDeleteOccurrence'], 'Microsoft occurrences must advertise individual delete support.');
+assertSameValue(true, $msEvents[1]['canUpdateFollowing'], 'Microsoft occurrences with a verified series start must advertise following-update support.');
 assertSameValue(true, $msEvents[1]['onlineMeeting'], 'Microsoft online-meeting state must be exposed to the calendar view.');
 assertSameValue('exception', $msEvents[2]['recurrenceType'], 'Modified Microsoft occurrences must be normalized as exceptions.');
 assertSameValue('2026-07-20T13:00:00Z', $msEvents[2]['originalStart'], 'Microsoft exception original starts must be retained when Graph supplies them.');
 assertSameValue(true, $msEvents[2]['canUpdateOccurrence'], 'Microsoft exceptions must remain individually editable.');
 assertSameValue(true, $msEvents[2]['canDeleteOccurrence'], 'Microsoft exceptions must remain individually deletable.');
+assertSameValue(true, $msEvents[2]['canUpdateFollowing'], 'Microsoft exceptions with an original start must support following updates.');
 assertTrueValue(
     str_contains($msEventClient->requests[0]['url'], 'AQMk-primary/calendarView?'),
     'Microsoft events must be read through calendarView for expanded occurrences.'
@@ -1152,6 +1160,43 @@ assertSameValue(
         new DateTimeImmutable('2026-10-19T00:00:00Z')
     ),
     'Microsoft weekly rules with a different week boundary must not be exposed lossily.'
+);
+
+$msSplitRecurrence = [
+    'pattern' => [
+        'type'           => 'weekly',
+        'interval'       => 1,
+        'daysOfWeek'     => ['monday', 'thursday'],
+        'firstDayOfWeek' => 'monday'
+    ],
+    'range'   => [
+        'type'                => 'numbered',
+        'startDate'           => '2026-10-19',
+        'numberOfOccurrences' => 8
+    ]
+];
+assertSameValue(
+    4,
+    CalendarRecurrenceRule::microsoftOccurrencePosition($msSplitRecurrence, '2026-10-29'),
+    'Microsoft recurrence splitting must locate the selected occurrence in the original pattern.'
+);
+assertSameValue(
+    5,
+    CalendarRecurrenceRule::remainingMicrosoftOccurrenceCount($msSplitRecurrence, '2026-10-29'),
+    'Numbered Microsoft series must retain only the remaining occurrences after a split.'
+);
+$msTrimmedRecurrence = CalendarRecurrenceRule::trimMicrosoftRecurrenceBefore(
+    $msSplitRecurrence,
+    '2026-10-29'
+);
+assertSameValue(
+    [
+        'type'      => 'endDate',
+        'startDate' => '2026-10-19',
+        'endDate'   => '2026-10-28'
+    ],
+    $msTrimmedRecurrence['range'],
+    'The original Microsoft series must end on the day before the selected occurrence.'
 );
 
 $msProvider->updateEvent(
@@ -1368,6 +1413,190 @@ assertTrueValue(
 assertTrueValue(
     !array_key_exists('If-Match', $msSeriesWriteClient->requests[2]['headers']),
     'Microsoft full-series deletion must not reuse an occurrence ETag for the parent event.'
+);
+
+$msFollowingParent = [
+    'id'                    => 'series-master',
+    'iCalUId'               => 'series@example.com',
+    '@odata.etag'           => 'W/"series-following"',
+    'subject'               => 'Microsoft series',
+    'body'                  => ['contentType' => 'text', 'content' => 'Series description'],
+    'location'              => ['displayName' => 'Berlin'],
+    'attendees'             => [[
+        'emailAddress' => ['address' => 'guest@example.com', 'name' => 'Guest'],
+        'type'         => 'required',
+        'status'       => ['response' => 'accepted']
+    ]],
+    'start'                 => ['dateTime' => '2026-10-19T08:00:00', 'timeZone' => 'UTC'],
+    'end'                   => ['dateTime' => '2026-10-19T09:00:00', 'timeZone' => 'UTC'],
+    'originalStartTimeZone' => 'Europe/Berlin',
+    'type'                  => 'seriesMaster',
+    'recurrence'            => $msSplitRecurrence
+];
+$msFollowingTarget = [
+    'id'                    => 'instance-following',
+    'iCalUId'               => 'series@example.com',
+    '@odata.etag'           => 'W/"following-target"',
+    'subject'               => 'Microsoft series',
+    'start'                 => ['dateTime' => '2026-10-29T08:00:00', 'timeZone' => 'UTC'],
+    'end'                   => ['dateTime' => '2026-10-29T09:00:00', 'timeZone' => 'UTC'],
+    'originalStartTimeZone' => 'Europe/Berlin',
+    'type'                  => 'occurrence',
+    'seriesMasterId'        => 'series-master'
+];
+$msFollowingPrepareClient = new FakeHttpClient([
+    response(200, $msFollowingParent),
+    response(200, $msFollowingTarget)
+]);
+$msFollowingProvider = new MicrosoftCalendarProvider($msFollowingPrepareClient, 'ms-access-token');
+$msFollowing = $msFollowingProvider->getRecurringFollowing(
+    'AQMk-primary',
+    'series-master',
+    'instance-following',
+    '2026-10-29T08:00:00+00:00'
+);
+assertSameValue('following', $msFollowing['writeScope'], 'Microsoft following preparation must return the following write scope.');
+assertSameValue(true, $msFollowing['canUpdateFollowing'], 'Microsoft following preparation must advertise following-update support.');
+assertSameValue(5, $msFollowing['recurrenceSettings']['count'], 'Microsoft following preparation must reduce numbered ranges to the remaining occurrence count.');
+assertSameValue(
+    '2026-10-29T08:00:00+00:00',
+    $msFollowing['originalStart'],
+    'Microsoft following preparation must retain a stable original occurrence start.'
+);
+
+$msFollowingUpdateClient = new FakeHttpClient([
+    response(200, $msFollowingParent),
+    response(200, $msFollowingTarget),
+    response(200, [
+        'id'          => 'series-master',
+        '@odata.etag' => 'W/"series-trimmed"'
+    ]),
+    response(201, [
+        'id'          => 'new-series-master',
+        'iCalUId'     => 'new-series@example.com',
+        '@odata.etag' => 'W/"new-series"'
+    ])
+]);
+$msFollowingUpdateProvider = new MicrosoftCalendarProvider($msFollowingUpdateClient, 'ms-access-token');
+$msFollowingIdentity = $msFollowing;
+$msFollowingIdentity['writeScope'] = 'following';
+$msFollowingResult = $msFollowingUpdateProvider->updateEvent(
+    'AQMk-primary',
+    'instance-following',
+    'W/"following-target"',
+    'series@example.com',
+    [
+        'summary'     => 'Updated from this occurrence',
+        'description' => 'Series description',
+        'location'    => 'Berlin',
+        'allDay'      => false,
+        'start'       => '2026-10-29T08:00:00Z',
+        'end'         => '2026-10-29T09:00:00Z',
+        'timezone'    => 'Europe/Berlin',
+        'recurrence'  => [
+            'frequency' => 'weekly',
+            'interval'  => 1,
+            'byDay'     => ['MO', 'TH'],
+            'endMode'   => 'count',
+            'count'     => 5
+        ]
+    ],
+    $msFollowingIdentity
+);
+assertSameValue('new-series-master', $msFollowingResult['eventReference'], 'Microsoft following updates must return the newly created series ID.');
+assertSameValue('PATCH', $msFollowingUpdateClient->requests[2]['method'], 'Microsoft following updates must first shorten the original series.');
+$msFollowingTrimBody = json_decode(
+    $msFollowingUpdateClient->requests[2]['body'],
+    true,
+    512,
+    JSON_THROW_ON_ERROR
+);
+assertSameValue(
+    '2026-10-28',
+    $msFollowingTrimBody['recurrence']['range']['endDate'],
+    'Microsoft following updates must end the original series before the selected occurrence.'
+);
+assertSameValue('POST', $msFollowingUpdateClient->requests[3]['method'], 'Microsoft following updates must create a new future series.');
+$msFollowingCreateBody = json_decode(
+    $msFollowingUpdateClient->requests[3]['body'],
+    true,
+    512,
+    JSON_THROW_ON_ERROR
+);
+assertSameValue('Updated from this occurrence', $msFollowingCreateBody['subject'], 'The new Microsoft future series must contain the edited subject.');
+assertSameValue('2026-10-29', $msFollowingCreateBody['recurrence']['range']['startDate'], 'The new Microsoft future series must begin at the selected occurrence.');
+assertSameValue(5, $msFollowingCreateBody['recurrence']['range']['numberOfOccurrences'], 'The new Microsoft future series must retain the remaining count.');
+assertSameValue(
+    [
+        'emailAddress' => ['address' => 'guest@example.com', 'name' => 'Guest'],
+        'type'         => 'required'
+    ],
+    $msFollowingCreateBody['attendees'][0],
+    'Microsoft series splitting must preserve writable attendee identity without copying response state.'
+);
+
+$msFollowingDeleteClient = new FakeHttpClient([
+    response(200, $msFollowingParent),
+    response(200, $msFollowingTarget),
+    response(200, [
+        'id'          => 'series-master',
+        '@odata.etag' => 'W/"series-trimmed-delete"'
+    ])
+]);
+$msFollowingDeleteProvider = new MicrosoftCalendarProvider($msFollowingDeleteClient, 'ms-access-token');
+assertTrueValue(
+    $msFollowingDeleteProvider->deleteEvent(
+        'AQMk-primary',
+        'instance-following',
+        'W/"following-target"',
+        '',
+        $msFollowingIdentity
+    ),
+    'Microsoft following deletion must return true after shortening the original series.'
+);
+assertSameValue('PATCH', $msFollowingDeleteClient->requests[2]['method'], 'Microsoft following deletion must shorten the parent series rather than delete one occurrence.');
+$msFollowingDeleteBody = json_decode(
+    $msFollowingDeleteClient->requests[2]['body'],
+    true,
+    512,
+    JSON_THROW_ON_ERROR
+);
+assertSameValue('2026-10-28', $msFollowingDeleteBody['recurrence']['range']['endDate'], 'Microsoft following deletion must end before the selected occurrence.');
+
+$msFirstFollowingTarget = $msFollowingTarget;
+$msFirstFollowingTarget['id'] = 'instance-first';
+$msFirstFollowingTarget['start']['dateTime'] = '2026-10-19T08:00:00';
+$msFirstFollowingTarget['end']['dateTime'] = '2026-10-19T09:00:00';
+$msFirstFollowingDeleteClient = new FakeHttpClient([
+    response(200, $msFollowingParent),
+    response(200, $msFirstFollowingTarget),
+    response(204)
+]);
+$msFirstFollowingDeleteProvider = new MicrosoftCalendarProvider($msFirstFollowingDeleteClient, 'ms-access-token');
+$msFirstFollowingIdentity = [
+    'recurrenceType'     => 'occurrence',
+    'seriesId'           => 'series-master',
+    'occurrenceId'       => 'instance-first',
+    'originalStart'      => '2026-10-19T08:00:00+00:00',
+    'recurring'          => true,
+    'canUpdateFollowing' => true,
+    'canDeleteSeries'    => true,
+    'writeScope'         => 'following'
+];
+assertTrueValue(
+    $msFirstFollowingDeleteProvider->deleteEvent(
+        'AQMk-primary',
+        'instance-first',
+        'W/"first"',
+        '',
+        $msFirstFollowingIdentity
+    ),
+    'Deleting from the first Microsoft occurrence must delete the complete series.'
+);
+assertSameValue('DELETE', $msFirstFollowingDeleteClient->requests[2]['method'], 'A first-occurrence following delete must delete the Microsoft series master.');
+assertTrueValue(
+    str_ends_with($msFirstFollowingDeleteClient->requests[2]['url'], '/events/series-master'),
+    'A first-occurrence following delete must target the series master ID.'
 );
 
 $msOnlineMeetingClient = new FakeHttpClient([
@@ -2246,6 +2475,8 @@ assertTrueValue(
         && str_contains($calendarModuleSource, "'timezone'            => \$metadataAvailable")
         && str_contains($calendarModuleSource, "(!\$updating && !\$this->ReadAttributeBoolean('DetectedCanDeleteSeries'))")
         && str_contains($calendarModuleSource, "\$identity['canDeleteSeries'] = true;")
+        && str_contains($calendarModuleSource, "trim((string) (\$cachedEvent['originalStart'] ?? '')) === ''")
+        && str_contains($calendarModuleSource, "\$cachedEvent['originalStart'] = trim((string) \$event['originalStart']);")
         && str_contains($calendarModuleSource, "\$cachedEvent['canUpdateOccurrence'] = true;")
         && str_contains($calendarModuleSource, "\$cachedEvent['canDeleteOccurrence'] = true;")
         && str_contains($calendarModuleSource, 'Recurring event creation is not supported by this calendar.')

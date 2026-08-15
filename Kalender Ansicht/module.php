@@ -1239,6 +1239,10 @@ class KalenderAnsicht extends IPSModuleStrict
                 $event['calendarName'] = $calendar['name'];
                 $event['calendarColor'] = $calendar['color'];
                 $event['canWrite'] = $calendar['canWrite'];
+                if (($event['recurrenceType'] ?? '') === 'occurrence'
+                    && trim((string) ($event['originalStart'] ?? '')) === '') {
+                    $event['originalStart'] = trim((string) ($event['start'] ?? ''));
+                }
                 $recurringOccurrence = (bool) ($event['recurring'] ?? false)
                     && trim((string) ($event['occurrenceId'] ?? '')) !== ''
                     && trim((string) ($event['seriesId'] ?? '')) !== '';
@@ -1304,6 +1308,10 @@ class KalenderAnsicht extends IPSModuleStrict
                 $event['calendarName'] = $calendar['name'];
                 $event['calendarColor'] = $calendar['color'];
                 $event['canWrite'] = $calendar['canWrite'];
+                if (($event['recurrenceType'] ?? '') === 'occurrence'
+                    && trim((string) ($event['originalStart'] ?? '')) === '') {
+                    $event['originalStart'] = trim((string) ($event['start'] ?? ''));
+                }
                 $recurringOccurrence = (bool) ($event['recurring'] ?? false)
                     && trim((string) ($event['occurrenceId'] ?? '')) !== ''
                     && trim((string) ($event['seriesId'] ?? '')) !== '';

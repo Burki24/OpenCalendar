@@ -118,14 +118,19 @@ bearbeitet oder gelöscht werden, ohne die übrigen Vorkommnisse der Serie zu ä
 Auch die **gesamte Microsoft-Serie** kann bearbeitet oder gelöscht werden. Beim
 Bearbeiten wird der Serien-Master geladen; Wiederholungsmuster, die dem gemeinsamen
 OpenCalendar-Serieneditor entsprechen, können dabei ebenfalls geändert werden.
-Komplexere Microsoft-Muster bleiben erhalten, werden aber nicht verlustbehaftet im
-Serieneditor vereinfacht.
+**Diesen und alle folgenden Termine** wird wie bei Google durch ein sicheres Teilen
+der Serie umgesetzt: Der bisherige Serienteil endet unmittelbar vor dem gewählten
+Vorkommnis und beim Bearbeiten wird ab dort eine neue Serie angelegt. Bei nummerierten
+Serien wird die verbleibende Anzahl übernommen. Beim Löschen wird nur der vordere
+Serienteil behalten. Bereits vorhandene Ausnahmen ab dem Trennpunkt werden beim
+Bearbeiten nicht in den neuen Serienteil übernommen. Komplexere Microsoft-Muster
+bleiben erhalten, werden aber nicht verlustbehaftet im Serieneditor vereinfacht.
 
 ## Bekannte Einschränkungen
 
-- Microsoft-Serien können als einzelnes Vorkommnis oder als vollständige Serie
-  bearbeitet und gelöscht werden. **Diesen und alle folgenden Termine** folgt in
-  einem späteren Ausbauschritt.
+- **Diesen und alle folgenden Termine** wird bei Microsoft-Onlinebesprechungen und
+  Serien mit Anhängen nicht automatisch geteilt, weil diese Daten beim Erzeugen des
+  neuen Serienteils nicht verlustfrei übernommen werden können.
 - Schreiboperationen auf Vorkommnisse oder vollständige Serien von CalDAV-
   Serienterminen sind derzeit nicht freigegeben. Diese Serientermine werden
   weiterhin lesend dargestellt.

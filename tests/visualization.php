@@ -231,11 +231,17 @@ $moduleSource = (string) file_get_contents(__DIR__ . '/../Kalender Ansicht/modul
 assertVisualization(
     substr_count(
         $moduleSource,
-        "\$recurringOccurrence = (bool) (\$event['recurring'] ?? false)\n"
-            . "                    && trim((string) (\$event['occurrenceId'] ?? '')) !== ''\n"
-            . "                    && trim((string) (\$event['seriesId'] ?? '')) !== '';"
-    ) === 2,
-    'Microsoft recurring occurrences must stay editable when calendarView omits originalStart.'
+        "if ((\$event['recurrenceType'] ?? '') === 'occurrence'\n"
+            . "                    && trim((string) (\$event['originalStart'] ?? '')) === '') {\n"
+            . "                    \$event['originalStart'] = trim((string) (\$event['start'] ?? ''));"
+    ) === 2
+        && substr_count(
+            $moduleSource,
+            "\$recurringOccurrence = (bool) (\$event['recurring'] ?? false)\n"
+                . "                    && trim((string) (\$event['occurrenceId'] ?? '')) !== ''\n"
+                . "                    && trim((string) (\$event['seriesId'] ?? '')) !== '';"
+        ) === 2,
+    'Cached Microsoft occurrences must recover their original start and recurrence capabilities without manual cache deletion.'
 );
 
 assertVisualization(
@@ -262,7 +268,7 @@ assertVisualization(
         && str_contains($moduleSource, '$seriesEdit[\'writeScope\'] = $writeScope;')
         && str_contains($moduleSource, "'Changes will apply to this and all following occurrences.'")
         && str_contains($moduleSource, "'Changes will apply to the entire recurring series.'"),
-    'Recurring Google events must offer occurrence, this-and-following, or complete-series editing with verified provider data.'
+    'Recurring Google and Microsoft events must offer supported write scopes with verified provider data.'
 );
 assertVisualization(
     str_contains($indexSource, 'id="delete-scope-following-option"')
@@ -272,7 +278,7 @@ assertVisualization(
         && str_contains($script, 'Boolean(event.canDeleteSeries)')
         && str_contains($script, 'const followingAllowed = eventCanDeleteFollowing(event);')
         && str_contains($script, "return ['following', 'series'].includes(selected?.value) ? selected.value : 'occurrence';"),
-    'Recurring Google events must offer deleting the selected occurrence and all following occurrences when splitting is supported.'
+    'Recurring Google and Microsoft events must offer deleting the selected occurrence and all following occurrences when splitting is supported.'
 );
 assertVisualization(
     str_contains($moduleSource, 'private function getFullUpdateMessage(?array $state = null, ?array $toast = null): string')

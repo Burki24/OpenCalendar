@@ -316,6 +316,115 @@ final class CalendarRecurrenceRule
     }
 
     /**
+     * Returns the one-based position of a Microsoft occurrence in a supported recurrence pattern.
+     *
+     * @param array<string, mixed> $recurrence Microsoft Graph patternedRecurrence data.
+     */
+    public static function microsoftOccurrencePosition(array $recurrence, string $targetDate): int
+    {
+        [$pattern, $range, $startDate, $target] = self::microsoftRecurrenceDates($recurrence, $targetDate);
+        $type = strtolower(trim((string) ($pattern['type'] ?? '')));
+        $interval = filter_var(
+            $pattern['interval'] ?? 1,
+            FILTER_VALIDATE_INT,
+            ['options' => ['min_range' => 1, 'max_range' => 999]]
+        );
+        if ($interval === false) {
+            throw new InvalidArgumentException('The Microsoft recurrence interval is invalid.');
+        }
+
+        $position = match ($type) {
+            'daily'           => self::microsoftDailyPosition($startDate, $target, $interval),
+            'weekly'          => self::microsoftWeeklyPosition($pattern, $startDate, $target, $interval),
+            'absolutemonthly' => self::microsoftMonthlyPosition($pattern, $startDate, $target, $interval),
+            'absoluteyearly'  => self::microsoftYearlyPosition($pattern, $startDate, $target, $interval),
+            default           => 0
+        };
+        if ($position < 1) {
+            throw new InvalidArgumentException('The Microsoft recurring target occurrence is not part of the pattern.');
+        }
+
+        $rangeType = strtolower(trim((string) ($range['type'] ?? '')));
+        if ($rangeType === 'numbered') {
+            $count = filter_var(
+                $range['numberOfOccurrences'] ?? null,
+                FILTER_VALIDATE_INT,
+                ['options' => ['min_range' => 1, 'max_range' => 9999]]
+            );
+            if ($count === false || $position > $count) {
+                throw new InvalidArgumentException('The Microsoft recurring target occurrence is outside the series range.');
+            }
+        } elseif ($rangeType === 'enddate') {
+            $endDate = self::strictDate(trim((string) ($range['endDate'] ?? '')));
+            if ($endDate === null || $target > $endDate) {
+                throw new InvalidArgumentException('The Microsoft recurring target occurrence is outside the series range.');
+            }
+        } elseif ($rangeType !== 'noend') {
+            throw new InvalidArgumentException('The Microsoft recurrence range is invalid.');
+        }
+
+        return $position;
+    }
+
+    /**
+     * Returns the number of occurrences remaining from a target in a numbered Microsoft series.
+     *
+     * @param array<string, mixed> $recurrence Microsoft Graph patternedRecurrence data.
+     */
+    public static function remainingMicrosoftOccurrenceCount(array $recurrence, string $targetDate): int
+    {
+        $range = is_array($recurrence['range'] ?? null) ? $recurrence['range'] : [];
+        if (strtolower(trim((string) ($range['type'] ?? ''))) !== 'numbered') {
+            throw new InvalidArgumentException('The Microsoft recurrence range is not numbered.');
+        }
+        $count = filter_var(
+            $range['numberOfOccurrences'] ?? null,
+            FILTER_VALIDATE_INT,
+            ['options' => ['min_range' => 1, 'max_range' => 9999]]
+        );
+        if ($count === false) {
+            throw new InvalidArgumentException('The Microsoft recurrence count is invalid.');
+        }
+
+        return $count - self::microsoftOccurrencePosition($recurrence, $targetDate) + 1;
+    }
+
+    /**
+     * Shortens a Microsoft recurrence so it ends before the selected occurrence.
+     *
+     * @param array<string, mixed> $recurrence Microsoft Graph patternedRecurrence data.
+     * @return array<string, mixed> Microsoft Graph recurrence ending before the target.
+     */
+    public static function trimMicrosoftRecurrenceBefore(array $recurrence, string $targetDate): array
+    {
+        if (self::microsoftOccurrencePosition($recurrence, $targetDate) <= 1) {
+            throw new InvalidArgumentException('The Microsoft recurrence cannot be shortened before its first occurrence.');
+        }
+        $pattern = is_array($recurrence['pattern'] ?? null) ? $recurrence['pattern'] : [];
+        $range = is_array($recurrence['range'] ?? null) ? $recurrence['range'] : [];
+        $startDate = trim((string) ($range['startDate'] ?? ''));
+        $target = self::strictDate($targetDate);
+        if ($pattern === [] || array_is_list($pattern) || $target === null) {
+            throw new InvalidArgumentException('The Microsoft recurrence settings are invalid.');
+        }
+
+        $trimmedRange = [
+            'type'      => 'endDate',
+            'startDate' => $startDate,
+            'endDate'   => $target->modify('-1 day')->format('Y-m-d')
+        ];
+        $recurrenceTimezone = trim((string) ($range['recurrenceTimeZone'] ?? ''));
+        if ($recurrenceTimezone !== '') {
+            $trimmedRange['recurrenceTimeZone'] = $recurrenceTimezone;
+        }
+
+        return [
+            'pattern' => $pattern,
+            'range'   => $trimmedRange
+        ];
+    }
+
+    /**
      * Parses the supported subset of a Google Calendar RRULE for the recurrence editor.
      *
      * Unsupported or more complex rules return null so callers can preserve the original
@@ -444,6 +553,197 @@ final class CalendarRecurrenceRule
         $parts[] = 'UNTIL=' . self::cutoffValue($targetOriginalStart, $allDay, $timezone);
 
         return 'RRULE:' . implode(';', $parts);
+    }
+
+    /**
+     * @param array<string, mixed> $recurrence
+     * @return array{0: array<string, mixed>, 1: array<string, mixed>, 2: DateTimeImmutable, 3: DateTimeImmutable}
+     */
+    private static function microsoftRecurrenceDates(array $recurrence, string $targetDate): array
+    {
+        if ($recurrence === [] || array_is_list($recurrence)) {
+            throw new InvalidArgumentException('The Microsoft recurrence settings are invalid.');
+        }
+        $pattern = is_array($recurrence['pattern'] ?? null) ? $recurrence['pattern'] : [];
+        $range = is_array($recurrence['range'] ?? null) ? $recurrence['range'] : [];
+        if ($pattern === [] || array_is_list($pattern) || $range === [] || array_is_list($range)) {
+            throw new InvalidArgumentException('The Microsoft recurrence settings are invalid.');
+        }
+
+        $startDate = self::strictDate(trim((string) ($range['startDate'] ?? '')));
+        $target = self::strictDate($targetDate);
+        if ($startDate === null || $target === null || $target < $startDate) {
+            throw new InvalidArgumentException('The Microsoft recurring target date is invalid.');
+        }
+
+        return [$pattern, $range, $startDate, $target];
+    }
+
+    private static function microsoftDailyPosition(
+        DateTimeImmutable $startDate,
+        DateTimeImmutable $target,
+        int $interval
+    ): int {
+        $days = (int) $startDate->diff($target)->format('%a');
+        return $days % $interval === 0 ? intdiv($days, $interval) + 1 : 0;
+    }
+
+    /** @param array<string, mixed> $pattern */
+    private static function microsoftWeeklyPosition(
+        array $pattern,
+        DateTimeImmutable $startDate,
+        DateTimeImmutable $target,
+        int $interval
+    ): int {
+        if (strtolower(trim((string) ($pattern['firstDayOfWeek'] ?? 'monday'))) !== 'monday') {
+            return 0;
+        }
+        $daysOfWeek = $pattern['daysOfWeek'] ?? null;
+        if (!is_array($daysOfWeek) || !array_is_list($daysOfWeek)) {
+            return 0;
+        }
+        $weekdays = [];
+        foreach ($daysOfWeek as $dayOfWeek) {
+            $code = self::MICROSOFT_WEEKDAY_CODES[strtolower(trim((string) $dayOfWeek))] ?? '';
+            $index = array_search($code, self::WEEKDAYS, true);
+            if ($index === false) {
+                return 0;
+            }
+            $weekdays[] = $index + 1;
+        }
+        $weekdays = array_values(array_unique($weekdays));
+        sort($weekdays, SORT_NUMERIC);
+        if ($weekdays === []) {
+            return 0;
+        }
+
+        $startMonday = $startDate->modify('-' . ((int) $startDate->format('N') - 1) . ' days');
+        $targetMonday = $target->modify('-' . ((int) $target->format('N') - 1) . ' days');
+        $weekIndex = intdiv((int) $startMonday->diff($targetMonday)->format('%a'), 7);
+        if ($weekIndex % $interval !== 0 || !in_array((int) $target->format('N'), $weekdays, true)) {
+            return 0;
+        }
+
+        $activeWeeks = intdiv($weekIndex, $interval);
+        $position = 0;
+        for ($activeWeek = 0; $activeWeek <= $activeWeeks; ++$activeWeek) {
+            $weekStart = $startMonday->modify('+' . ($activeWeek * $interval) . ' weeks');
+            foreach ($weekdays as $weekday) {
+                $candidate = $weekStart->modify('+' . ($weekday - 1) . ' days');
+                if ($candidate < $startDate) {
+                    continue;
+                }
+                if ($candidate > $target) {
+                    return $position;
+                }
+                ++$position;
+                if ($candidate == $target) {
+                    return $position;
+                }
+                if ($position > 9999) {
+                    return 0;
+                }
+            }
+        }
+
+        return 0;
+    }
+
+    /** @param array<string, mixed> $pattern */
+    private static function microsoftMonthlyPosition(
+        array $pattern,
+        DateTimeImmutable $startDate,
+        DateTimeImmutable $target,
+        int $interval
+    ): int {
+        $dayOfMonth = (int) ($pattern['dayOfMonth'] ?? 0);
+        if ($dayOfMonth < 1 || $dayOfMonth > 31) {
+            return 0;
+        }
+
+        $position = 0;
+        for ($offset = 0; $position <= 9999; $offset += $interval) {
+            $month = $startDate->modify('first day of this month')->modify('+' . $offset . ' months');
+            $candidate = self::dateWithDay($month, $dayOfMonth);
+            if ($candidate === null || $candidate < $startDate) {
+                if ($month > $target) {
+                    return 0;
+                }
+                continue;
+            }
+            if ($candidate > $target) {
+                return 0;
+            }
+            ++$position;
+            if ($candidate == $target) {
+                return $position;
+            }
+        }
+
+        return 0;
+    }
+
+    /** @param array<string, mixed> $pattern */
+    private static function microsoftYearlyPosition(
+        array $pattern,
+        DateTimeImmutable $startDate,
+        DateTimeImmutable $target,
+        int $interval
+    ): int {
+        $dayOfMonth = (int) ($pattern['dayOfMonth'] ?? 0);
+        $monthNumber = (int) ($pattern['month'] ?? 0);
+        if ($dayOfMonth < 1 || $dayOfMonth > 31 || $monthNumber < 1 || $monthNumber > 12) {
+            return 0;
+        }
+
+        $position = 0;
+        for ($offset = 0; $position <= 9999; $offset += $interval) {
+            $year = (int) $startDate->format('Y') + $offset;
+            $month = DateTimeImmutable::createFromFormat(
+                '!Y-n-j',
+                $year . '-' . $monthNumber . '-1',
+                new DateTimeZone('UTC')
+            );
+            if ($month === false) {
+                return 0;
+            }
+            $candidate = self::dateWithDay($month, $dayOfMonth);
+            if ($candidate === null || $candidate < $startDate) {
+                if ($month > $target) {
+                    return 0;
+                }
+                continue;
+            }
+            if ($candidate > $target) {
+                return 0;
+            }
+            ++$position;
+            if ($candidate == $target) {
+                return $position;
+            }
+        }
+
+        return 0;
+    }
+
+    private static function dateWithDay(DateTimeImmutable $month, int $dayOfMonth): ?DateTimeImmutable
+    {
+        $value = sprintf('%s-%02d', $month->format('Y-m'), $dayOfMonth);
+        return self::strictDate($value);
+    }
+
+    private static function strictDate(string $value): ?DateTimeImmutable
+    {
+        if (preg_match('/^\d{4}-\d{2}-\d{2}$/D', $value) !== 1) {
+            return null;
+        }
+        $date = DateTimeImmutable::createFromFormat('!Y-m-d', $value, new DateTimeZone('UTC'));
+        $errors = DateTimeImmutable::getLastErrors();
+        if ($date === false || ($errors !== false && ($errors['warning_count'] > 0 || $errors['error_count'] > 0))) {
+            return null;
+        }
+
+        return $date->format('Y-m-d') === $value ? $date : null;
     }
 
     /**

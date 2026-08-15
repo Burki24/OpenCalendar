@@ -104,10 +104,12 @@ Teams und andere Microsoft-Graph-Bereiche werden nicht angefordert. Microsofts
 `canEdit`-Angabe bestimmt, ob ein Kalender beschreibbar oder schreibgeschützt
 angelegt wird. In beschreibbaren Microsoft-Kalendern können außerdem neue tägliche,
 wöchentliche, monatliche und jährliche Terminserien mit Intervall sowie den
-Endarten Nie, Anzahl oder Enddatum angelegt werden. Einzelne Vorkommnisse
-bestehender Microsoft-Serien sowie die vollständige Serie können außerdem
-bearbeitet und gelöscht werden. **Dieses und alle folgenden Vorkommnisse** bleibt
-in diesem Ausbauschritt noch geschützt.
+Endarten Nie, Anzahl oder Enddatum angelegt werden. Einzelne Vorkommnisse,
+**dieses und alle folgenden Vorkommnisse** sowie die vollständige Serie können
+außerdem bearbeitet und gelöscht werden. Für „dieses und folgende“ wird die
+bestehende Serie vor dem ausgewählten Vorkommnis beendet und beim Bearbeiten ab
+dort als neuer Serienteil fortgeführt. Nummerierte Serien übernehmen dabei die
+verbleibende Anzahl.
 
 Bei bestehenden Microsoft-Onlinebesprechungen wird die Beschreibung in der
 Kalenderansicht nicht zur Bearbeitung angeboten. Microsoft speichert darin

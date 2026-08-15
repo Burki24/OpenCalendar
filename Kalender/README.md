@@ -35,13 +35,13 @@ beliebig verschoben oder vom Benutzer umbenannt werden.
 - Erstellen neuer Termine sowie neuer Google- und Microsoft-Serientermine
 - Ändern und Löschen einzelner Termine sowie einzelner Google- und Microsoft-Serienvorkommnisse
 - Bearbeiten einer vollständigen Google- oder Microsoft-Terminserie
-- Bearbeiten oder Löschen eines Google-Serienvorkommnisses **und aller folgenden Termine** durch sicheres Teilen bzw. Kürzen der Serie
+- Bearbeiten oder Löschen eines Google- oder Microsoft-Serienvorkommnisses **und aller folgenden Termine** durch sicheres Teilen bzw. Kürzen der Serie
 - Löschen einer vollständigen Google- oder Microsoft-Terminserie über ein synchronisiertes Serienvorkommnis
 - ETag-basierter Schutz vor dem Überschreiben zwischenzeitlicher Änderungen
 - Statusvariablen für die gesamte geladene Terminanzahl, die Termine des
   aktuellen Tages und den Zeitpunkt der letzten Synchronisation
 
-Google-Serien können als einzelnes Vorkommnis, als vollständige Serie oder **ab dem ausgewählten Vorkommnis für alle folgenden Termine** bearbeitet und gelöscht werden. Beim Bearbeiten teilt OpenCalendar die Google-Serie am gewählten Termin in einen unveränderten vorderen und einen neu angelegten hinteren Serienteil. Beim Löschen wird der bestehende Parent direkt vor dem ausgewählten Vorkommnis beendet; beginnt die Auswahl beim ersten Vorkommnis, wird die komplette Serie gelöscht. Microsoft-Serien können als einzelnes Vorkommnis oder als vollständige Serie bearbeitet und gelöscht werden; **dieses und alle folgenden Vorkommnisse** bleibt bei Microsoft in diesem Ausbauschritt noch geschützt. CalDAV-Serienvorkommnisse sind weiterhin nicht für Serien-Schreiboperationen freigegeben.
+Google- und Microsoft-Serien können als einzelnes Vorkommnis, als vollständige Serie oder **ab dem ausgewählten Vorkommnis für alle folgenden Termine** bearbeitet und gelöscht werden. Beim Bearbeiten teilt OpenCalendar die bestehende Serie am gewählten Termin in einen unveränderten vorderen und einen neu angelegten hinteren Serienteil. Beim Löschen wird der bestehende Parent direkt vor dem ausgewählten Vorkommnis beendet; beginnt die Auswahl beim ersten Vorkommnis, wird die komplette Serie gelöscht. Bei nummerierten Serien übernimmt der neue Serienteil nur die verbleibende Anzahl. Bestehende Ausnahmen ab dem Trennpunkt werden beim Teilen nicht in die neue Serie übernommen. CalDAV-Serienvorkommnisse sind weiterhin nicht für Serien-Schreiboperationen freigegeben.
 
 ## Voraussetzungen
 
@@ -159,9 +159,10 @@ Unterstützt werden für Google und Microsoft `DAILY`, `WEEKLY`, `MONTHLY` und
 `YEARLY`, ein Intervall, bei wöchentlichen Serien optionale Wochentage sowie die
 Endarten `never`, `count` und `until`. Bei Microsoft entspricht eine monatliche
 Serie dem Kalendertag des Starttermins und eine jährliche Serie zusätzlich dessen
-Monat. Bei Google können einzelne Vorkommnisse, die vollständige Serie sowie
-**dieses und alle folgenden Vorkommnisse** bearbeitet werden. Vor dem
-Bearbeiten einer vollständigen Serie lädt `IPSKAL_GetRecurringSeries()` den
+Monat. Bei Google und Microsoft können einzelne Vorkommnisse, die vollständige
+Serie sowie **dieses und alle folgenden Vorkommnisse** bearbeitet und gelöscht
+werden. Vor dem Bearbeiten einer vollständigen Serie lädt
+`IPSKAL_GetRecurringSeries()` den
 verifizierten Parent-Termin. Für „dieses und folgende“ liefert
 `IPSKAL_GetRecurringFollowing()` zusätzlich das verifizierte Zielvorkommnis und
 passt bei `COUNT`-Serien die verbleibende Anzahl an. Beim Speichern wird die
@@ -209,5 +210,5 @@ Konfiguration unvollständig | Instanz im Kalender Konfigurator löschen und aus
 Synchronisation fehlgeschlagen | Zuerst im verbundenen Kalender Konto **Verbindung testen**, anschließend Konto und Kalender erneut synchronisieren
 Keine Termine sichtbar | Zeitraum für vergangene und zukünftige Termine prüfen und kontrollieren, ob der Online-Kalender im gewählten Zeitraum Termine enthält
 Kalender ist schreibgeschützt | Schreibrechte beim Anbieter prüfen; ICS/Webcal-Abonnements sind immer schreibgeschützt
-Ändern oder Löschen wird bei einem Serientermin verweigert | Google unterstützt Vorkommnis, dieses und folgende sowie vollständige Serie; Microsoft unterstützt Vorkommnis und vollständige Serie, dieses und folgende bleibt noch geschützt; CalDAV-Serien bleiben schreibgeschützt
+Ändern oder Löschen wird bei einem Serientermin verweigert | Google und Microsoft unterstützen Vorkommnis, dieses und folgende sowie vollständige Serie; Microsoft-Onlinebesprechungen und Serien mit Anhängen werden nicht automatisch geteilt; CalDAV-Serien bleiben schreibgeschützt
 Schreibkonflikt | Kalender erneut synchronisieren; der ETag-Schutz verhindert das Überschreiben einer zwischenzeitlich geänderten Serverversion
