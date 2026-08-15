@@ -105,7 +105,9 @@ final class MicrosoftCalendarProvider implements CalendarProviderInterface
                         'create'           => $canWrite,
                         'update'           => $canWrite,
                         'delete'           => $canWrite,
-                        'createRecurrence' => $canWrite
+                        'createRecurrence' => $canWrite,
+                        'updateOccurrence' => $canWrite,
+                        'deleteOccurrence' => $canWrite
                     ]
                 ];
                 if (count($calendars) > self::MAX_CALENDARS) {

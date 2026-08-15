@@ -65,6 +65,8 @@ class Kalender extends IPSModuleStrict
         $this->RegisterAttributeString('DetectedCalendarColor', '');
         $this->RegisterAttributeBoolean('DetectedCanWrite', false);
         $this->RegisterAttributeBoolean('DetectedCanCreateRecurrence', false);
+        $this->RegisterAttributeBoolean('DetectedCanUpdateOccurrence', false);
+        $this->RegisterAttributeBoolean('DetectedCanDeleteOccurrence', false);
         $this->RegisterAttributeBoolean('DetectedCanUpdateFollowing', false);
         $this->RegisterAttributeBoolean('DetectedCanUpdateSeries', false);
         $this->RegisterAttributeBoolean('DetectedCanDeleteSeries', false);
@@ -645,6 +647,10 @@ class Kalender extends IPSModuleStrict
                     : '',
                 'canCreateRecurrence' => $metadataAvailable
                     && $this->ReadAttributeBoolean('DetectedCanCreateRecurrence'),
+                'canUpdateOccurrence' => $metadataAvailable
+                    && $this->ReadAttributeBoolean('DetectedCanUpdateOccurrence'),
+                'canDeleteOccurrence' => $metadataAvailable
+                    && $this->ReadAttributeBoolean('DetectedCanDeleteOccurrence'),
                 'canUpdateFollowing'  => $metadataAvailable
                     && $this->ReadAttributeBoolean('DetectedCanUpdateFollowing'),
                 'canUpdateSeries'     => $metadataAvailable
@@ -726,6 +732,8 @@ class Kalender extends IPSModuleStrict
         if ($availableCalendars !== []) {
             $this->WriteAttributeString('ResolvedCalendarID', '');
             $this->WriteAttributeBoolean('DetectedCanCreateRecurrence', false);
+            $this->WriteAttributeBoolean('DetectedCanUpdateOccurrence', false);
+            $this->WriteAttributeBoolean('DetectedCanDeleteOccurrence', false);
             $this->WriteAttributeBoolean('DetectedCanUpdateFollowing', false);
             $this->WriteAttributeBoolean('DetectedCanUpdateSeries', false);
             $this->WriteAttributeBoolean('DetectedCanDeleteSeries', false);
@@ -745,6 +753,8 @@ class Kalender extends IPSModuleStrict
             || (bool) ($capabilities['update'] ?? false)
             || (bool) ($capabilities['delete'] ?? false);
         $canCreateRecurrence = (bool) ($capabilities['createRecurrence'] ?? false);
+        $canUpdateOccurrence = (bool) ($capabilities['updateOccurrence'] ?? false);
+        $canDeleteOccurrence = (bool) ($capabilities['deleteOccurrence'] ?? false);
         $canUpdateFollowing = (bool) ($capabilities['updateFollowing'] ?? false);
         $canUpdateSeries = (bool) ($capabilities['updateSeries'] ?? false);
         $canDeleteSeries = (bool) ($capabilities['deleteSeries'] ?? false);
@@ -759,6 +769,8 @@ class Kalender extends IPSModuleStrict
         $this->WriteAttributeString('DetectedCalendarColor', trim((string) ($calendar['color'] ?? '')));
         $this->WriteAttributeBoolean('DetectedCanWrite', $canWrite);
         $this->WriteAttributeBoolean('DetectedCanCreateRecurrence', $canCreateRecurrence);
+        $this->WriteAttributeBoolean('DetectedCanUpdateOccurrence', $canUpdateOccurrence);
+        $this->WriteAttributeBoolean('DetectedCanDeleteOccurrence', $canDeleteOccurrence);
         $this->WriteAttributeBoolean('DetectedCanUpdateFollowing', $canUpdateFollowing);
         $this->WriteAttributeBoolean('DetectedCanUpdateSeries', $canUpdateSeries);
         $this->WriteAttributeBoolean('DetectedCanDeleteSeries', $canDeleteSeries);
@@ -962,6 +974,17 @@ class Kalender extends IPSModuleStrict
             if (($resourceUrl !== '' && hash_equals($cachedResourceUrl, $resourceUrl))
                 || ($occurrenceId !== '' && hash_equals($cachedOccurrenceId, $occurrenceId))) {
                 $cachedEvent['writeScope'] = (string) ($event['writeScope'] ?? '');
+                if ((bool) ($cachedEvent['recurring'] ?? false)
+                    && trim((string) ($cachedEvent['occurrenceId'] ?? '')) !== ''
+                    && trim((string) ($cachedEvent['seriesId'] ?? '')) !== ''
+                    && trim((string) ($cachedEvent['originalStart'] ?? '')) !== '') {
+                    if ($this->ReadAttributeBoolean('DetectedCanUpdateOccurrence')) {
+                        $cachedEvent['canUpdateOccurrence'] = true;
+                    }
+                    if ($this->ReadAttributeBoolean('DetectedCanDeleteOccurrence')) {
+                        $cachedEvent['canDeleteOccurrence'] = true;
+                    }
+                }
                 if ($this->ReadAttributeBoolean('DetectedCanUpdateFollowing')
                     && (bool) ($cachedEvent['recurring'] ?? false)
                     && trim((string) ($cachedEvent['occurrenceId'] ?? '')) !== ''
@@ -985,6 +1008,16 @@ class Kalender extends IPSModuleStrict
 
         $identity = CalendarEventRecurrence::fromEvent($event);
         $writeScope = (string) ($identity['writeScope'] ?? '');
+        if ($writeScope === CalendarEventRecurrence::WRITE_SCOPE_OCCURRENCE
+            && CalendarEventRecurrence::isOccurrence($identity)) {
+            if ($this->ReadAttributeBoolean('DetectedCanUpdateOccurrence')) {
+                $identity['canUpdateOccurrence'] = true;
+            }
+            if ($this->ReadAttributeBoolean('DetectedCanDeleteOccurrence')) {
+                $identity['canDeleteOccurrence'] = true;
+            }
+            return CalendarEventRecurrence::fromEvent($identity);
+        }
         if ($writeScope === CalendarEventRecurrence::WRITE_SCOPE_FOLLOWING) {
             if (!$this->ReadAttributeBoolean('DetectedCanUpdateFollowing')
                 || (!$updating && !$this->ReadAttributeBoolean('DetectedCanDeleteSeries'))

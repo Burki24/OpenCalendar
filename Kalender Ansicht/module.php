@@ -1239,6 +1239,14 @@ class KalenderAnsicht extends IPSModuleStrict
                 $event['calendarName'] = $calendar['name'];
                 $event['calendarColor'] = $calendar['color'];
                 $event['canWrite'] = $calendar['canWrite'];
+                $recurringOccurrence = (bool) ($event['recurring'] ?? false)
+                    && trim((string) ($event['occurrenceId'] ?? '')) !== ''
+                    && trim((string) ($event['seriesId'] ?? '')) !== ''
+                    && trim((string) ($event['originalStart'] ?? '')) !== '';
+                $event['canUpdateOccurrence'] = (bool) ($event['canUpdateOccurrence'] ?? false)
+                    || ($recurringOccurrence && $calendar['canUpdateOccurrence']);
+                $event['canDeleteOccurrence'] = (bool) ($event['canDeleteOccurrence'] ?? false)
+                    || ($recurringOccurrence && $calendar['canDeleteOccurrence']);
                 $event['canUpdateFollowing'] = (bool) ($event['canUpdateFollowing'] ?? false)
                     || ((bool) ($event['recurring'] ?? false)
                         && trim((string) ($event['occurrenceId'] ?? '')) !== ''
@@ -1297,6 +1305,14 @@ class KalenderAnsicht extends IPSModuleStrict
                 $event['calendarName'] = $calendar['name'];
                 $event['calendarColor'] = $calendar['color'];
                 $event['canWrite'] = $calendar['canWrite'];
+                $recurringOccurrence = (bool) ($event['recurring'] ?? false)
+                    && trim((string) ($event['occurrenceId'] ?? '')) !== ''
+                    && trim((string) ($event['seriesId'] ?? '')) !== ''
+                    && trim((string) ($event['originalStart'] ?? '')) !== '';
+                $event['canUpdateOccurrence'] = (bool) ($event['canUpdateOccurrence'] ?? false)
+                    || ($recurringOccurrence && $calendar['canUpdateOccurrence']);
+                $event['canDeleteOccurrence'] = (bool) ($event['canDeleteOccurrence'] ?? false)
+                    || ($recurringOccurrence && $calendar['canDeleteOccurrence']);
                 $event['canUpdateFollowing'] = (bool) ($event['canUpdateFollowing'] ?? false)
                     || ((bool) ($event['recurring'] ?? false)
                         && trim((string) ($event['occurrenceId'] ?? '')) !== ''
@@ -1710,7 +1726,7 @@ class KalenderAnsicht extends IPSModuleStrict
     }
 
     /**
-     * @return list<array{instanceId: int, name: string, color: string, canWrite: bool, timezone: string, canCreateRecurrence: bool, canUpdateFollowing: bool, canUpdateSeries: bool, canDeleteSeries: bool}>
+     * @return list<array{instanceId: int, name: string, color: string, canWrite: bool, timezone: string, canCreateRecurrence: bool, canUpdateOccurrence: bool, canDeleteOccurrence: bool, canUpdateFollowing: bool, canUpdateSeries: bool, canDeleteSeries: bool}>
      */
     private function loadSelectedCalendars(): array
     {
@@ -1756,6 +1772,8 @@ class KalenderAnsicht extends IPSModuleStrict
                     ?? IPS_GetProperty($instanceId, 'CanWrite')),
                 'timezone'            => trim((string) ($calendarStatus['timezone'] ?? '')),
                 'canCreateRecurrence' => (bool) ($calendarStatus['canCreateRecurrence'] ?? false),
+                'canUpdateOccurrence' => (bool) ($calendarStatus['canUpdateOccurrence'] ?? false),
+                'canDeleteOccurrence' => (bool) ($calendarStatus['canDeleteOccurrence'] ?? false),
                 'canUpdateFollowing'  => (bool) ($calendarStatus['canUpdateFollowing'] ?? false),
                 'canUpdateSeries'     => (bool) ($calendarStatus['canUpdateSeries'] ?? false),
                 'canDeleteSeries'     => (bool) ($calendarStatus['canDeleteSeries'] ?? false)

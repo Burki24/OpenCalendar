@@ -692,6 +692,14 @@ class KalenderKonto extends IPSModuleStrict
             if (!array_key_exists('createRecurrence', $capabilities)) {
                 $capabilities['createRecurrence'] = $canWrite;
             }
+            if ($provider === self::PROVIDER_MICROSOFT) {
+                if (!array_key_exists('updateOccurrence', $capabilities)) {
+                    $capabilities['updateOccurrence'] = $canWrite;
+                }
+                if (!array_key_exists('deleteOccurrence', $capabilities)) {
+                    $capabilities['deleteOccurrence'] = $canWrite;
+                }
+            }
             if ($provider === self::PROVIDER_GOOGLE) {
                 if (!array_key_exists('updateFollowing', $capabilities)) {
                     $capabilities['updateFollowing'] = $canWrite;

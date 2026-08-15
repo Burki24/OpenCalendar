@@ -817,8 +817,12 @@ assertSameValue('max@example.com', $msCalendars[0]['owner'], 'Microsoft calendar
 assertSameValue(true, $msCalendars[0]['writeAccessKnown'], 'Microsoft canEdit must provide authoritative write metadata.');
 assertSameValue(true, $msCalendars[0]['capabilities']['create'], 'Editable Microsoft calendars must expose write capabilities.');
 assertSameValue(true, $msCalendars[0]['capabilities']['createRecurrence'], 'Editable Microsoft calendars must advertise recurrence creation support.');
+assertSameValue(true, $msCalendars[0]['capabilities']['updateOccurrence'], 'Editable Microsoft calendars must advertise recurring occurrence update support.');
+assertSameValue(true, $msCalendars[0]['capabilities']['deleteOccurrence'], 'Editable Microsoft calendars must advertise recurring occurrence delete support.');
 assertSameValue(false, $msCalendars[2]['capabilities']['create'], 'Read-only Microsoft calendars must remain read-only.');
 assertSameValue(false, $msCalendars[2]['capabilities']['createRecurrence'], 'Read-only Microsoft calendars must not advertise recurrence creation support.');
+assertSameValue(false, $msCalendars[2]['capabilities']['updateOccurrence'], 'Read-only Microsoft calendars must not advertise recurring occurrence update support.');
+assertSameValue(false, $msCalendars[2]['capabilities']['deleteOccurrence'], 'Read-only Microsoft calendars must not advertise recurring occurrence delete support.');
 assertSameValue(
     'Bearer ms-access-token',
     $msCalendarClient->requests[0]['headers']['Authorization'],
@@ -2071,15 +2075,21 @@ assertTrueValue(
 assertTrueValue(
     is_string($calendarModuleSource)
         && str_contains($calendarModuleSource, "RegisterAttributeBoolean('DetectedCanCreateRecurrence', false)")
+        && str_contains($calendarModuleSource, "RegisterAttributeBoolean('DetectedCanUpdateOccurrence', false)")
+        && str_contains($calendarModuleSource, "RegisterAttributeBoolean('DetectedCanDeleteOccurrence', false)")
         && str_contains($calendarModuleSource, "RegisterAttributeBoolean('DetectedCanUpdateFollowing', false)")
         && str_contains($calendarModuleSource, "RegisterAttributeBoolean('DetectedCanUpdateSeries', false)")
         && str_contains($calendarModuleSource, "RegisterAttributeBoolean('DetectedCanDeleteSeries', false)")
         && str_contains($calendarModuleSource, "RegisterAttributeString('DetectedCalendarTimezone', '')")
         && str_contains($calendarModuleSource, "\$capabilities['createRecurrence'] ?? false")
+        && str_contains($calendarModuleSource, "\$capabilities['updateOccurrence'] ?? false")
+        && str_contains($calendarModuleSource, "\$capabilities['deleteOccurrence'] ?? false")
         && str_contains($calendarModuleSource, "\$capabilities['updateFollowing'] ?? false")
         && str_contains($calendarModuleSource, "\$capabilities['updateSeries'] ?? false")
         && str_contains($calendarModuleSource, "\$capabilities['deleteSeries'] ?? false")
         && str_contains($calendarModuleSource, "'canCreateRecurrence' => \$metadataAvailable")
+        && str_contains($calendarModuleSource, "'canUpdateOccurrence' => \$metadataAvailable")
+        && str_contains($calendarModuleSource, "'canDeleteOccurrence' => \$metadataAvailable")
         && str_contains($calendarModuleSource, "'canUpdateFollowing'")
         && str_contains($calendarModuleSource, "ReadAttributeBoolean('DetectedCanUpdateFollowing')")
         && str_contains($calendarModuleSource, "'canUpdateSeries'     => \$metadataAvailable")
@@ -2087,6 +2097,8 @@ assertTrueValue(
         && str_contains($calendarModuleSource, "'timezone'            => \$metadataAvailable")
         && str_contains($calendarModuleSource, "(!\$updating && !\$this->ReadAttributeBoolean('DetectedCanDeleteSeries'))")
         && str_contains($calendarModuleSource, "\$identity['canDeleteSeries'] = true;")
+        && str_contains($calendarModuleSource, "\$cachedEvent['canUpdateOccurrence'] = true;")
+        && str_contains($calendarModuleSource, "\$cachedEvent['canDeleteOccurrence'] = true;")
         && str_contains($calendarModuleSource, 'Recurring event creation is not supported by this calendar.')
         && str_contains($calendarModuleSource, 'This and following updates are not supported by this calendar.'),
     'Calendar instances must expose recurring create/following/series capabilities and calendar timezone while blocking unsupported recurring writes.'
@@ -2094,10 +2106,14 @@ assertTrueValue(
 assertTrueValue(
     is_string($viewModuleSource)
         && str_contains($viewModuleSource, "'canCreateRecurrence' => (bool) (\$calendarStatus['canCreateRecurrence'] ?? false)")
+        && str_contains($viewModuleSource, "'canUpdateOccurrence' => (bool) (\$calendarStatus['canUpdateOccurrence'] ?? false)")
+        && str_contains($viewModuleSource, "'canDeleteOccurrence' => (bool) (\$calendarStatus['canDeleteOccurrence'] ?? false)")
         && str_contains($viewModuleSource, "'canUpdateFollowing'  => (bool) (\$calendarStatus['canUpdateFollowing'] ?? false)")
         && str_contains($viewModuleSource, "'canUpdateSeries'     => (bool) (\$calendarStatus['canUpdateSeries'] ?? false)")
         && str_contains($viewModuleSource, "'canDeleteSeries'     => (bool) (\$calendarStatus['canDeleteSeries'] ?? false)")
         && str_contains($viewModuleSource, "'timezone'            => trim((string) (\$calendarStatus['timezone'] ?? ''))")
+        && str_contains($viewModuleSource, "\$event['canUpdateOccurrence'] = (bool) (\$event['canUpdateOccurrence'] ?? false)")
+        && str_contains($viewModuleSource, "\$event['canDeleteOccurrence'] = (bool) (\$event['canDeleteOccurrence'] ?? false)")
         && str_contains($viewModuleSource, "\$event['canUpdateFollowing'] = (bool) (\$event['canUpdateFollowing'] ?? false)")
         && str_contains($viewModuleSource, "\$event['canDeleteSeries'] = (bool) (\$event['canDeleteSeries'] ?? false)"),
     'Calendar views must pass recurrence capability and timezone metadata to Tile and IPSView clients.'
