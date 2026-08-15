@@ -330,8 +330,8 @@ $googleOccurrence = [
     'recurring'           => true,
     'canUpdateOccurrence' => true,
     'canDeleteOccurrence' => true,
-    'canUpdateSeries'      => false,
-    'canDeleteSeries'      => true
+    'canUpdateSeries'     => false,
+    'canDeleteSeries'     => true
 ];
 $occurrenceProvider->updateEvent(
     'owner@example.com',
