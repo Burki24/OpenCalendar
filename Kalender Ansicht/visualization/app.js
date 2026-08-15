@@ -113,8 +113,9 @@ function handleMessage(data) {
     if (seriesEdit && pendingSeriesEdit
         && Number(seriesEdit.calendarInstanceId) === pendingSeriesEdit.calendarInstanceId
         && String(seriesEdit.seriesId || '') === pendingSeriesEdit.seriesId) {
+        const writeScope = pendingSeriesEdit.writeScope === 'following' ? 'following' : 'series';
         pendingSeriesEdit = null;
-        openExistingEvent(seriesEdit, 'series');
+        openExistingEvent(seriesEdit, writeScope);
     }
 }
 
@@ -914,8 +915,9 @@ function requestEdit(sourceDialog) {
     if (!selectedEvent || !eventCanUpdate(selectedEvent)) return;
     const event = selectedEvent;
     const occurrenceAllowed = eventCanUpdateOccurrence(event);
+    const followingAllowed = eventCanUpdateFollowing(event);
     const seriesAllowed = eventCanUpdateSeries(event);
-    if (!event.recurring || !seriesAllowed) {
+    if (!event.recurring || (!followingAllowed && !seriesAllowed)) {
         sourceDialog?.close();
         openExistingEvent(event, 'occurrence');
         return;
@@ -923,8 +925,9 @@ function requestEdit(sourceDialog) {
 
     editScopeSourceDialog = sourceDialog;
     document.getElementById('edit-scope-occurrence-option').classList.toggle('hidden', !occurrenceAllowed);
+    document.getElementById('edit-scope-following-option').classList.toggle('hidden', !followingAllowed);
     document.getElementById('edit-scope-series-option').classList.toggle('hidden', !seriesAllowed);
-    const defaultValue = occurrenceAllowed ? 'occurrence' : 'series';
+    const defaultValue = occurrenceAllowed ? 'occurrence' : (followingAllowed ? 'following' : 'series');
     editScopeDialog.querySelectorAll('input[name="edit-scope"]').forEach(input => {
         input.checked = input.value === defaultValue;
     });
@@ -940,7 +943,7 @@ async function confirmEditScope() {
     const event = selectedEvent;
     const sourceDialog = editScopeSourceDialog;
     const selected = editScopeDialog.querySelector('input[name="edit-scope"]:checked');
-    const scope = selected?.value === 'series' ? 'series' : 'occurrence';
+    const scope = ['following', 'series'].includes(selected?.value) ? selected.value : 'occurrence';
     editScopeConfirmButton.disabled = true;
     try {
         editScopeDialog.close();
@@ -952,9 +955,13 @@ async function confirmEditScope() {
 
         pendingSeriesEdit = {
             calendarInstanceId: Number(event.calendarInstanceId),
-            seriesId: String(event.seriesId || '')
+            seriesId: String(event.seriesId || ''),
+            occurrenceId: String(event.occurrenceId || ''),
+            originalStart: String(event.originalStart || ''),
+            writeScope: scope
         };
         if (!pendingSeriesEdit.calendarInstanceId || !pendingSeriesEdit.seriesId
+            || (scope === 'following' && (!pendingSeriesEdit.occurrenceId || !pendingSeriesEdit.originalStart))
             || !await sendAction('PrepareSeriesEdit', pendingSeriesEdit)) {
             pendingSeriesEdit = null;
         }
@@ -1040,6 +1047,16 @@ function eventCanUpdateOccurrence(event) {
         && (!event.recurring || Boolean(event.canUpdateOccurrence));
 }
 
+function eventCanUpdateFollowing(event) {
+    return hasActionBridge()
+        && Boolean(event.canWrite)
+        && Boolean(event.recurring)
+        && Boolean(event.canUpdateFollowing)
+        && Boolean(event.seriesId)
+        && Boolean(event.occurrenceId)
+        && Boolean(event.originalStart);
+}
+
 function eventCanUpdateSeries(event) {
     return hasActionBridge()
         && Boolean(event.canWrite)
@@ -1049,7 +1066,7 @@ function eventCanUpdateSeries(event) {
 }
 
 function eventCanUpdate(event) {
-    return eventCanUpdateOccurrence(event) || eventCanUpdateSeries(event);
+    return eventCanUpdateOccurrence(event) || eventCanUpdateFollowing(event) || eventCanUpdateSeries(event);
 }
 
 function eventCanDelete(event) {
@@ -1069,6 +1086,7 @@ function recurrencePayload(event, writeScope = '') {
         recurring: Boolean(event.recurring),
         canUpdateOccurrence: Boolean(event.canUpdateOccurrence),
         canDeleteOccurrence: Boolean(event.canDeleteOccurrence),
+        canUpdateFollowing: Boolean(event.canUpdateFollowing),
         canUpdateSeries: Boolean(event.canUpdateSeries),
         canDeleteSeries: Boolean(event.canDeleteSeries),
         writeScope: scope
@@ -1102,10 +1120,13 @@ function openExistingEvent(event, writeScope = '') {
     const scope = event.recurring ? (writeScope || event.writeScope || 'occurrence') : '';
     selectedEvent = { ...event, writeScope: scope };
     const editingSeries = Boolean(selectedEvent.recurring) && scope === 'series';
-    const recurringOccurrence = Boolean(selectedEvent.recurring) && !editingSeries;
+    const editingFollowing = Boolean(selectedEvent.recurring) && scope === 'following';
+    const recurringOccurrence = Boolean(selectedEvent.recurring) && !editingSeries && !editingFollowing;
     const editable = editingSeries
         ? eventCanUpdateSeries(selectedEvent)
-        : eventCanUpdateOccurrence(selectedEvent);
+        : editingFollowing
+            ? eventCanUpdateFollowing(selectedEvent)
+            : eventCanUpdateOccurrence(selectedEvent);
     const availableCalendars = selectedEvent.recurring
         ? calendarState.calendars.filter(calendar => calendar.instanceId === selectedEvent.calendarInstanceId)
         : (editable
@@ -1124,7 +1145,7 @@ function openExistingEvent(event, writeScope = '') {
         Boolean(selectedEvent.allDay),
         Boolean(selectedEvent.allDay)
     );
-    if (editingSeries) {
+    if (editingSeries || editingFollowing) {
         loadRecurrenceEditor(selectedEvent);
     } else {
         updateRecurrenceAvailability();
@@ -1140,6 +1161,9 @@ function openExistingEvent(event, writeScope = '') {
         note.textContent = selectedEvent.recurrenceEditable === false
             ? `${t('Changes will apply to the entire recurring series.')} ${t('The recurrence pattern of this series cannot be edited here.')}`
             : t('Changes will apply to the entire recurring series.');
+        note.classList.remove('hidden');
+    } else if (editingFollowing) {
+        note.textContent = `${t('Changes will apply to this and all following occurrences.')} ${t('Existing exceptions from this occurrence onward will be reset.')}`;
         note.classList.remove('hidden');
     } else if (recurringOccurrence) {
         note.textContent = t('Only this occurrence of the recurring event will be changed.');
@@ -1303,12 +1327,15 @@ function selectDefaultRecurrenceWeekday(start) {
 function updateRecurrenceAvailability() {
     const calendar = selectedCalendarEntry();
     const editingSeries = Boolean(selectedEvent?.recurring) && selectedEvent?.writeScope === 'series';
-    const available = editingSeries
-        ? Boolean(selectedEvent?.canUpdateSeries) && selectedEvent?.recurrenceEditable !== false
+    const editingFollowing = Boolean(selectedEvent?.recurring) && selectedEvent?.writeScope === 'following';
+    const editingRecurringRange = editingSeries || editingFollowing;
+    const available = editingRecurringRange
+        ? Boolean(editingSeries ? selectedEvent?.canUpdateSeries : selectedEvent?.canUpdateFollowing)
+            && selectedEvent?.recurrenceEditable !== false
         : selectedEvent === null
             && Boolean(calendar?.canWrite)
             && Boolean(calendar?.canCreateRecurrence);
-    setRecurrenceNoneOptionDisabled(editingSeries && available);
+    setRecurrenceNoneOptionDisabled(editingRecurringRange && available);
     eventRecurrenceRow.classList.toggle('hidden', !available);
     eventRecurrenceFrequency.disabled = !available;
     if (!available) eventRecurrenceFrequency.value = 'none';
@@ -1353,7 +1380,8 @@ function updateRecurrenceEndDateMinimum() {
 
 function recurrenceEditorValue() {
     const editingSeries = Boolean(selectedEvent?.recurring) && selectedEvent?.writeScope === 'series';
-    if ((selectedEvent !== null && !editingSeries) || eventRecurrenceFrequency.disabled) return null;
+    const editingFollowing = Boolean(selectedEvent?.recurring) && selectedEvent?.writeScope === 'following';
+    if ((selectedEvent !== null && !editingSeries && !editingFollowing) || eventRecurrenceFrequency.disabled) return null;
     const frequency = eventRecurrenceFrequency.value;
     if (frequency === 'none') return null;
 
@@ -1475,7 +1503,8 @@ eventForm.addEventListener('submit', async event => {
         eventData.recurrence = recurrence;
     }
     const editingSeries = Boolean(selectedEvent?.recurring) && selectedEvent?.writeScope === 'series';
-    if (recurrence || editingSeries) {
+    const editingFollowing = Boolean(selectedEvent?.recurring) && selectedEvent?.writeScope === 'following';
+    if (recurrence || editingSeries || editingFollowing) {
         const timezone = String(selectedEvent?.timezone || selectedCalendarEntry()?.timezone || '').trim();
         if (timezone) eventData.timezone = timezone;
     }

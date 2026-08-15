@@ -34,12 +34,14 @@ beliebig verschoben oder vom Benutzer umbenannt werden.
 - lokaler JSON-Cache und zyklische Synchronisation
 - Erstellen neuer Termine sowie neuer Google-Serientermine
 - Ändern und Löschen einzelner Termine sowie einzelner Google-Serienvorkommnisse
+- Bearbeiten einer vollständigen Google-Terminserie
+- Bearbeiten eines Google-Serienvorkommnisses **und aller folgenden Termine** durch sicheres Teilen der Serie
 - Löschen einer vollständigen Google-Terminserie über ein synchronisiertes Serienvorkommnis
 - ETag-basierter Schutz vor dem Überschreiben zwischenzeitlicher Änderungen
 - Statusvariablen für die gesamte geladene Terminanzahl, die Termine des
   aktuellen Tages und den Zeitpunkt der letzten Synchronisation
 
-Das Ändern der vollständigen Serie, „dieses und folgende“ sowie einzelne Microsoft- und CalDAV-Vorkommnisse sind noch nicht freigegeben. Einzelne Google-Vorkommnisse können anhand ihrer konkreten Instanz-ID sicher bearbeitet oder gelöscht werden; beim Löschen kann alternativ die zugehörige vollständige Google-Serie entfernt werden.
+Google-Serien können als einzelnes Vorkommnis, als vollständige Serie oder – beim Bearbeiten – **ab dem ausgewählten Vorkommnis für alle folgenden Termine** geändert werden. Für „diesen und alle folgenden“ teilt OpenCalendar die Google-Serie am gewählten Termin in einen unveränderten vorderen und einen neu angelegten hinteren Serienteil. Einzelne Microsoft- und CalDAV-Vorkommnisse sind weiterhin nicht für Serien-Schreiboperationen freigegeben.
 
 ## Voraussetzungen
 
@@ -86,6 +88,7 @@ Ein Termin enthält unter anderem `id`, `uid`, `resourceUrl`, `etag`, `summary`,
 bool IPSKAL_Synchronize(int $InstanzID);
 string IPSKAL_GetEvents(int $InstanzID);
 string IPSKAL_GetRecurringSeries(int $InstanzID, string $SeriesID);
+string IPSKAL_GetRecurringFollowing(int $InstanzID, string $SeriesID, string $OccurrenceID, string $OriginalStart);
 string IPSKAL_BeginEventsTransfer(int $InstanzID, int $StartTimestamp, int $EndTimestamp);
 string IPSKAL_ReadEventsTransferPage(int $InstanzID, string $Token, int $Page);
 bool IPSKAL_FinishEventsTransfer(int $InstanzID, string $Token);
@@ -103,8 +106,8 @@ Transfer anschließend auch im Fehlerfall beenden. `StartTimestamp` ist inklusiv
 `EndTimestamp` exklusiv.
 
 `IPSKAL_GetCalendarStatus()` liefert neben Synchronisations- und Zählerinformationen
-auch `calendarColor`, `canWrite`, `timezone`, `canCreateRecurrence`, `canUpdateSeries`
-und `canDeleteSeries`. Die Serienfähigkeiten und die Zeitzone werden aus den vom
+auch `calendarColor`, `canWrite`, `timezone`, `canCreateRecurrence`, `canUpdateFollowing`,
+`canUpdateSeries` und `canDeleteSeries`. Die Serienfähigkeiten und die Zeitzone werden aus den vom
 Provider erkannten Kalender-Metadaten übernommen.
 
 ### Termin erstellen
@@ -152,17 +155,23 @@ $result = IPSKAL_CreateEvent(12345, json_encode([
 
 Unterstützt werden `DAILY`, `WEEKLY`, `MONTHLY` und `YEARLY`, ein Intervall,
 bei wöchentlichen Serien optionale Wochentage sowie die Endarten `never`,
-`count` und `until`. Bei Google können einzelne Vorkommnisse sowie die vollständige
-Serie bearbeitet werden. Vor dem Bearbeiten einer vollständigen Serie lädt
-`IPSKAL_GetRecurringSeries()` den verifizierten Parent-Termin inklusive ETag,
-Start/Ende und – soweit verlustfrei darstellbar – der Wiederholungsregel. Das
-Löschen einzelner Vorkommnisse oder der vollständigen Google-Serie wird ebenfalls unterstützt.
+`count` und `until`. Bei Google können einzelne Vorkommnisse, die vollständige
+Serie sowie **dieses und alle folgenden Vorkommnisse** bearbeitet werden. Vor dem
+Bearbeiten einer vollständigen Serie lädt `IPSKAL_GetRecurringSeries()` den
+verifizierten Parent-Termin. Für „dieses und folgende“ liefert
+`IPSKAL_GetRecurringFollowing()` zusätzlich das verifizierte Zielvorkommnis und
+passt bei `COUNT`-Serien die verbleibende Anzahl an. Beim Speichern wird die
+ursprüngliche Serie unmittelbar vor dem Zieltermin beendet und ab dem Ziel eine
+neue Serie angelegt. Bestehende Ausnahmen ab dem Trennpunkt gehören dadurch nicht
+zum neuen Serienteil. Das Löschen einzelner Vorkommnisse oder der vollständigen
+Google-Serie wird ebenfalls unterstützt.
 
 ### Termin ändern
 
 `uid`, `resourceUrl` und `etag` stammen bei Einzelterminen und Vorkommnissen aus
 `IPSKAL_GetEvents`. Für die vollständige Google-Serie sollten diese Werte aus
-`IPSKAL_GetRecurringSeries()` verwendet werden. Unter `changes` werden nur die zu
+`IPSKAL_GetRecurringSeries()` verwendet werden; für „dieses und folgende“ aus
+`IPSKAL_GetRecurringFollowing()`. Unter `changes` werden nur die zu
 ändernden Felder übergeben:
 
 ```php

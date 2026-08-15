@@ -30,8 +30,9 @@ trait KalenderKontoChildGatewayTrait
                 'FinishEventsTransfer'   => [
                     'success' => $this->finishEventsTransferForChild($request)
                 ],
-                'GetRecurringSeries' => $this->getRecurringSeriesForChild($request),
-                'CreateEvent'        => $this->createEventForChild($request),
+                'GetRecurringSeries'    => $this->getRecurringSeriesForChild($request),
+                'GetRecurringFollowing' => $this->getRecurringFollowingForChild($request),
+                'CreateEvent'            => $this->createEventForChild($request),
                 'UpdateEvent'        => $this->updateEventForChild($request),
                 'DeleteEvent'        => ['success' => $this->deleteEventForChild($request)],
                 'Synchronize'        => ['success' => $this->Synchronize()],
@@ -135,6 +136,26 @@ trait KalenderKontoChildGatewayTrait
         return $provider->getRecurringSeries(
             $this->calendarReference($calendar),
             trim((string) ($request['SeriesID'] ?? ''))
+        );
+    }
+
+    /**
+     * @param array<string, mixed> $request
+     * @return array<string, mixed>
+     */
+    private function getRecurringFollowingForChild(array $request): array
+    {
+        $calendar = $this->resolveCalendar((string) ($request['CalendarID'] ?? ''));
+        $provider = $this->createProvider();
+        if (!$provider instanceof RecurringCalendarProviderInterface) {
+            throw new InvalidArgumentException('Recurring series are not supported by this calendar provider.');
+        }
+
+        return $provider->getRecurringFollowing(
+            $this->calendarReference($calendar),
+            trim((string) ($request['SeriesID'] ?? '')),
+            trim((string) ($request['OccurrenceID'] ?? '')),
+            trim((string) ($request['OriginalStart'] ?? ''))
         );
     }
 

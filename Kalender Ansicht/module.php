@@ -1186,10 +1186,13 @@ class KalenderAnsicht extends IPSModuleStrict
             'Recurring event creation is not supported by this calendar.',
             'Recurring occurrences are currently read-only.',
             'Only this occurrence of the recurring event will be changed.',
+            'Changes will apply to this and all following occurrences.',
+            'Existing exceptions from this occurrence onward will be reset.',
             'Changes will apply to the entire recurring series.',
             'The recurrence pattern of this series cannot be edited here.',
             'Edit recurring event',
             'Which events do you want to edit?',
+            'This and following events',
             'Continue',
             'This calendar is read-only.',
             'Editing events is unavailable because no action bridge is configured.',
@@ -1236,6 +1239,11 @@ class KalenderAnsicht extends IPSModuleStrict
                 $event['calendarName'] = $calendar['name'];
                 $event['calendarColor'] = $calendar['color'];
                 $event['canWrite'] = $calendar['canWrite'];
+                $event['canUpdateFollowing'] = (bool) ($event['canUpdateFollowing'] ?? false)
+                    || ((bool) ($event['recurring'] ?? false)
+                        && trim((string) ($event['occurrenceId'] ?? '')) !== ''
+                        && trim((string) ($event['seriesId'] ?? '')) !== ''
+                        && $calendar['canUpdateFollowing']);
                 $event['canUpdateSeries'] = (bool) ($event['canUpdateSeries'] ?? false)
                     || ((bool) ($event['recurring'] ?? false)
                         && trim((string) ($event['seriesId'] ?? '')) !== ''
@@ -1289,6 +1297,11 @@ class KalenderAnsicht extends IPSModuleStrict
                 $event['calendarName'] = $calendar['name'];
                 $event['calendarColor'] = $calendar['color'];
                 $event['canWrite'] = $calendar['canWrite'];
+                $event['canUpdateFollowing'] = (bool) ($event['canUpdateFollowing'] ?? false)
+                    || ((bool) ($event['recurring'] ?? false)
+                        && trim((string) ($event['occurrenceId'] ?? '')) !== ''
+                        && trim((string) ($event['seriesId'] ?? '')) !== ''
+                        && $calendar['canUpdateFollowing']);
                 $event['canUpdateSeries'] = (bool) ($event['canUpdateSeries'] ?? false)
                     || ((bool) ($event['recurring'] ?? false)
                         && trim((string) ($event['seriesId'] ?? '')) !== ''
@@ -1697,7 +1710,7 @@ class KalenderAnsicht extends IPSModuleStrict
     }
 
     /**
-     * @return list<array{instanceId: int, name: string, color: string, canWrite: bool, timezone: string, canCreateRecurrence: bool, canUpdateSeries: bool, canDeleteSeries: bool}>
+     * @return list<array{instanceId: int, name: string, color: string, canWrite: bool, timezone: string, canCreateRecurrence: bool, canUpdateFollowing: bool, canUpdateSeries: bool, canDeleteSeries: bool}>
      */
     private function loadSelectedCalendars(): array
     {
@@ -1743,6 +1756,7 @@ class KalenderAnsicht extends IPSModuleStrict
                     ?? IPS_GetProperty($instanceId, 'CanWrite')),
                 'timezone'            => trim((string) ($calendarStatus['timezone'] ?? '')),
                 'canCreateRecurrence' => (bool) ($calendarStatus['canCreateRecurrence'] ?? false),
+                'canUpdateFollowing'  => (bool) ($calendarStatus['canUpdateFollowing'] ?? false),
                 'canUpdateSeries'     => (bool) ($calendarStatus['canUpdateSeries'] ?? false),
                 'canDeleteSeries'     => (bool) ($calendarStatus['canDeleteSeries'] ?? false)
             ];
@@ -1865,21 +1879,47 @@ class KalenderAnsicht extends IPSModuleStrict
                 $request = $this->decodeActionValue($value);
                 $instanceId = $this->requireWritableCalendar($request);
                 $seriesId = trim((string) ($request['seriesId'] ?? ''));
+                $writeScope = strtolower(trim((string) ($request['writeScope'] ?? 'series')));
                 if ($seriesId === '') {
                     throw new InvalidArgumentException($this->Translate('The recurring series ID is missing.'));
                 }
-                $seriesEdit = json_decode(
-                    IPSKAL_GetRecurringSeries($instanceId, $seriesId),
-                    true,
-                    512,
-                    JSON_THROW_ON_ERROR
-                );
-                if (!is_array($seriesEdit) || !($seriesEdit['canUpdateSeries'] ?? false)) {
-                    throw new RuntimeException($this->Translate('Recurring series updates are not supported by this calendar.'));
+                if (!in_array($writeScope, ['following', 'series'], true)) {
+                    throw new InvalidArgumentException($this->Translate('The event data is invalid.'));
+                }
+
+                if ($writeScope === 'following') {
+                    $occurrenceId = trim((string) ($request['occurrenceId'] ?? ''));
+                    $originalStart = trim((string) ($request['originalStart'] ?? ''));
+                    if ($occurrenceId === '' || $originalStart === '') {
+                        throw new InvalidArgumentException($this->Translate('The event data is invalid.'));
+                    }
+                    $seriesEdit = json_decode(
+                        IPSKAL_GetRecurringFollowing($instanceId, $seriesId, $occurrenceId, $originalStart),
+                        true,
+                        512,
+                        JSON_THROW_ON_ERROR
+                    );
+                    if (!is_array($seriesEdit) || !($seriesEdit['canUpdateFollowing'] ?? false)) {
+                        throw new RuntimeException(
+                            $this->Translate('This and following updates are not supported by this calendar.')
+                        );
+                    }
+                } else {
+                    $seriesEdit = json_decode(
+                        IPSKAL_GetRecurringSeries($instanceId, $seriesId),
+                        true,
+                        512,
+                        JSON_THROW_ON_ERROR
+                    );
+                    if (!is_array($seriesEdit) || !($seriesEdit['canUpdateSeries'] ?? false)) {
+                        throw new RuntimeException(
+                            $this->Translate('Recurring series updates are not supported by this calendar.')
+                        );
+                    }
                 }
                 $seriesEdit['calendarInstanceId'] = $instanceId;
                 $seriesEdit['canWrite'] = true;
-                $seriesEdit['writeScope'] = 'series';
+                $seriesEdit['writeScope'] = $writeScope;
                 break;
 
             case 'UpdateEvent':

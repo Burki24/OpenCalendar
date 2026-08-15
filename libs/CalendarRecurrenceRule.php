@@ -187,6 +187,37 @@ final class CalendarRecurrenceRule
     }
 
     /**
+     * Trims one supported Google RRULE so it ends before the target occurrence.
+     *
+     * COUNT is replaced by an UNTIL value because the original series is being
+     * shortened at a concrete occurrence boundary.
+     */
+    public static function trimGoogleRuleBefore(
+        string $rule,
+        string $targetOriginalStart,
+        bool $allDay,
+        string $timezone
+    ): string {
+        if (self::fromGoogleRule($rule, $allDay, $timezone) === null) {
+            throw new InvalidArgumentException('The recurrence pattern cannot be split safely.');
+        }
+
+        $rule = strtoupper(trim($rule));
+        if (str_starts_with($rule, 'RRULE:')) {
+            $rule = substr($rule, 6);
+        }
+
+        $parts = array_values(array_filter(
+            explode(';', $rule),
+            static fn (string $part): bool => !str_starts_with($part, 'COUNT=')
+                && !str_starts_with($part, 'UNTIL=')
+        ));
+        $parts[] = 'UNTIL=' . self::cutoffValue($targetOriginalStart, $allDay, $timezone);
+
+        return 'RRULE:' . implode(';', $parts);
+    }
+
+    /**
      * @return list<string>
      */
     private static function weekdays(mixed $value): array
@@ -208,6 +239,30 @@ final class CalendarRecurrenceRule
             self::WEEKDAYS,
             static fn (string $weekday): bool => isset($selected[$weekday])
         ));
+    }
+
+    private static function cutoffValue(string $targetOriginalStart, bool $allDay, string $timezone): string
+    {
+        $targetOriginalStart = trim($targetOriginalStart);
+        if ($allDay) {
+            if (preg_match('/^\d{4}-\d{2}-\d{2}$/D', $targetOriginalStart) !== 1) {
+                throw new InvalidArgumentException('The recurring target start is invalid.');
+            }
+            $target = DateTimeImmutable::createFromFormat('!Y-m-d', $targetOriginalStart, new DateTimeZone('UTC'));
+            if ($target === false || $target->format('Y-m-d') !== $targetOriginalStart) {
+                throw new InvalidArgumentException('The recurring target start is invalid.');
+            }
+
+            return $target->modify('-1 day')->format('Ymd');
+        }
+
+        try {
+            $target = new DateTimeImmutable($targetOriginalStart, self::timezone($timezone));
+        } catch (Throwable) {
+            throw new InvalidArgumentException('The recurring target start is invalid.');
+        }
+
+        return $target->setTimezone(new DateTimeZone('UTC'))->modify('-1 second')->format('Ymd\THis\Z');
     }
 
     private static function untilValue(

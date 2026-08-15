@@ -150,6 +150,7 @@ assertSameValue('owner@example.com', $calendars[0]['providerId'], 'The primary c
 assertSameValue(true, $calendars[0]['writeAccessKnown'], 'Google access roles must provide authoritative write metadata.');
 assertSameValue(true, $calendars[0]['capabilities']['create'], 'Owners must have write access.');
 assertSameValue(true, $calendars[0]['capabilities']['createRecurrence'], 'Writable Google calendars must advertise recurrence creation support.');
+assertSameValue(true, $calendars[0]['capabilities']['updateFollowing'], 'Writable Google calendars must advertise this-and-following update support.');
 assertSameValue(true, $calendars[0]['capabilities']['updateSeries'], 'Writable Google calendars must advertise recurring-series update support.');
 assertSameValue(true, $calendars[0]['capabilities']['deleteSeries'], 'Writable Google calendars must advertise recurring-series deletion support.');
 assertSameValue('Europe/Berlin', $calendars[0]['timezone'], 'Google calendar timezones must be retained for recurring events.');
@@ -219,6 +220,7 @@ assertSameValue('2026-07-20T09:00:00+02:00', $events[1]['originalStart'], 'The o
 assertSameValue('', $events[1]['recurrenceId'], 'Google series IDs must not be exposed as RFC recurrence IDs.');
 assertSameValue(true, $events[1]['canUpdateOccurrence'], 'Google occurrences must advertise update support.');
 assertSameValue(true, $events[1]['canDeleteOccurrence'], 'Google occurrences must advertise delete support.');
+assertSameValue(true, $events[1]['canUpdateFollowing'], 'Google occurrences must advertise this-and-following update support.');
 assertSameValue(true, $events[1]['canUpdateSeries'], 'Google occurrences must advertise parent-series update support.');
 assertSameValue(true, $events[1]['canDeleteSeries'], 'Google occurrences must advertise parent-series delete support.');
 assertTrueValue(str_contains($eventClient->requests[0]['url'], 'owner%40example.com'), 'Calendar IDs must be URL encoded.');
@@ -331,6 +333,7 @@ $googleOccurrence = [
     'recurring'           => true,
     'canUpdateOccurrence' => true,
     'canDeleteOccurrence' => true,
+    'canUpdateFollowing'  => true,
     'canUpdateSeries'     => true,
     'canDeleteSeries'     => true
 ];
@@ -428,6 +431,135 @@ assertTrueValue(
     str_ends_with($seriesReadClient->requests[0]['url'], '/events/series-id'),
     'Loading a recurring series must address the Google parent event directly.'
 );
+
+$followingReadClient = new FakeHttpClient([
+    response(200, [
+        'id'         => 'series-id',
+        'iCalUID'    => 'series@example.com',
+        'etag'       => '"series-etag"',
+        'summary'    => 'Series meeting',
+        'status'     => 'confirmed',
+        'start'      => ['dateTime' => '2026-07-20T09:00:00+02:00', 'timeZone' => 'Europe/Berlin'],
+        'end'        => ['dateTime' => '2026-07-20T10:00:00+02:00', 'timeZone' => 'Europe/Berlin'],
+        'recurrence' => ['RRULE:FREQ=WEEKLY;INTERVAL=2;BYDAY=MO,TH;COUNT=6']
+    ]),
+    response(200, [
+        'id'                => 'target-id',
+        'iCalUID'           => 'series@example.com',
+        'etag'              => '"target-etag"',
+        'summary'           => 'Series meeting',
+        'status'            => 'confirmed',
+        'recurringEventId'  => 'series-id',
+        'originalStartTime' => ['dateTime' => '2026-08-03T09:00:00+02:00', 'timeZone' => 'Europe/Berlin'],
+        'start'             => ['dateTime' => '2026-08-03T09:00:00+02:00', 'timeZone' => 'Europe/Berlin'],
+        'end'               => ['dateTime' => '2026-08-03T10:00:00+02:00', 'timeZone' => 'Europe/Berlin']
+    ]),
+    response(200, [
+        'items' => array_map(
+            static fn (string $start, int $index): array => [
+                'id'                => 'instance-' . $index,
+                'recurringEventId'  => 'series-id',
+                'originalStartTime' => ['dateTime' => $start, 'timeZone' => 'Europe/Berlin']
+            ],
+            [
+                '2026-07-20T09:00:00+02:00',
+                '2026-07-23T09:00:00+02:00',
+                '2026-08-03T09:00:00+02:00',
+                '2026-08-06T09:00:00+02:00',
+                '2026-08-17T09:00:00+02:00',
+                '2026-08-20T09:00:00+02:00'
+            ],
+            [1, 2, 3, 4, 5, 6]
+        )
+    ])
+]);
+$followingEvent = (new GoogleCalendarProvider($followingReadClient, 'access-token'))->getRecurringFollowing(
+    'owner@example.com',
+    'series-id',
+    'target-id',
+    '2026-08-03T09:00:00+02:00'
+);
+assertSameValue('following', $followingEvent['writeScope'], 'Following edits must carry their dedicated recurrence write scope.');
+assertSameValue(true, $followingEvent['canUpdateFollowing'], 'A verified Google target must advertise following-update support.');
+assertSameValue('target-id', $followingEvent['eventReference'], 'Following edits must retain the concrete target occurrence ID.');
+assertSameValue('2026-08-03T09:00:00+02:00', $followingEvent['start'], 'Following edits must start at the selected occurrence.');
+assertSameValue(4, $followingEvent['recurrenceSettings']['count'], 'Count-based following edits must retain only the target and later instances.');
+assertTrueValue(
+    str_contains($followingReadClient->requests[2]['url'], '/events/series-id/instances?')
+        && str_contains($followingReadClient->requests[2]['url'], 'showDeleted=true'),
+    'Count-based following edits must verify all Google instances including cancelled exceptions.'
+);
+
+$followingWriteClient = new FakeHttpClient([
+    response(200, [
+        'id'                => 'target-id',
+        'iCalUID'           => 'series@example.com',
+        'etag'              => '"target-etag"',
+        'summary'           => 'Series meeting',
+        'status'            => 'confirmed',
+        'recurringEventId'  => 'series-id',
+        'originalStartTime' => ['dateTime' => '2026-08-03T09:00:00+02:00', 'timeZone' => 'Europe/Berlin'],
+        'start'             => ['dateTime' => '2026-08-03T09:00:00+02:00', 'timeZone' => 'Europe/Berlin'],
+        'end'               => ['dateTime' => '2026-08-03T10:00:00+02:00', 'timeZone' => 'Europe/Berlin']
+    ]),
+    response(200, [
+        'id'         => 'series-id',
+        'iCalUID'    => 'series@example.com',
+        'etag'       => '"series-etag"',
+        'summary'    => 'Series meeting',
+        'location'   => 'Old room',
+        'status'     => 'confirmed',
+        'attendees'  => [['email' => 'guest@example.com']],
+        'start'      => ['dateTime' => '2026-07-20T09:00:00+02:00', 'timeZone' => 'Europe/Berlin'],
+        'end'        => ['dateTime' => '2026-07-20T10:00:00+02:00', 'timeZone' => 'Europe/Berlin'],
+        'recurrence' => ['RRULE:FREQ=WEEKLY;INTERVAL=2;BYDAY=MO,TH;COUNT=6']
+    ]),
+    response(200, ['id' => 'series-id', 'etag' => '"trimmed-etag"']),
+    response(200, ['id' => 'new-series-id', 'iCalUID' => 'new-series@example.com', 'etag' => '"new-series-etag"'])
+]);
+$followingWriteProvider = new GoogleCalendarProvider($followingWriteClient, 'access-token');
+$followingIdentity = $googleOccurrence;
+$followingIdentity['occurrenceId'] = 'target-id';
+$followingIdentity['originalStart'] = '2026-08-03T09:00:00+02:00';
+$followingIdentity['writeScope'] = 'following';
+$followingWriteProvider->updateEvent(
+    'owner@example.com',
+    'https://www.googleapis.com/calendar/v3/calendars/owner%40example.com/events/target-id',
+    '"target-etag"',
+    'series@example.com',
+    [
+        'summary'    => 'Changed from here',
+        'location'   => 'New room',
+        'allDay'     => false,
+        'start'      => '2026-08-03T10:00:00+02:00',
+        'end'        => '2026-08-03T11:00:00+02:00',
+        'timezone'   => 'Europe/Berlin',
+        'recurrence' => [
+            'frequency' => 'weekly',
+            'interval'  => 2,
+            'byDay'     => ['MO', 'TH'],
+            'endMode'   => 'count',
+            'count'     => 4
+        ]
+    ],
+    $followingIdentity
+);
+assertSameValue('PATCH', $followingWriteClient->requests[2]['method'], 'Following updates must first trim the original Google parent series.');
+assertTrueValue(
+    str_ends_with($followingWriteClient->requests[2]['url'], '/events/series-id'),
+    'Following updates must trim the original parent event rather than the target occurrence.'
+);
+$trimmedFollowingBody = json_decode($followingWriteClient->requests[2]['body'], true, 512, JSON_THROW_ON_ERROR);
+assertSameValue(
+    ['RRULE:FREQ=WEEKLY;INTERVAL=2;BYDAY=MO,TH;UNTIL=20260803T065959Z'],
+    $trimmedFollowingBody['recurrence'],
+    'The original series must end immediately before the selected target occurrence.'
+);
+assertSameValue('POST', $followingWriteClient->requests[3]['method'], 'Following updates must create a new recurring Google event for the changed tail.');
+$newFollowingBody = json_decode($followingWriteClient->requests[3]['body'], true, 512, JSON_THROW_ON_ERROR);
+assertSameValue('Changed from here', $newFollowingBody['summary'], 'The new tail series must contain the requested changes.');
+assertSameValue([['email' => 'guest@example.com']], $newFollowingBody['attendees'], 'The split series must preserve supported parent event metadata.');
+assertSameValue(['RRULE:FREQ=WEEKLY;INTERVAL=2;BYDAY=MO,TH;COUNT=4'], $newFollowingBody['recurrence'], 'The new tail series must use the remaining count from the selected target onward.');
 
 $seriesWriteClient = new FakeHttpClient([
     response(200, ['id' => 'series-id', 'iCalUID' => 'series@example.com', 'etag' => '"series-updated"'])
@@ -1659,25 +1791,32 @@ assertTrueValue(
 assertTrueValue(
     is_string($calendarModuleSource)
         && str_contains($calendarModuleSource, "RegisterAttributeBoolean('DetectedCanCreateRecurrence', false)")
+        && str_contains($calendarModuleSource, "RegisterAttributeBoolean('DetectedCanUpdateFollowing', false)")
         && str_contains($calendarModuleSource, "RegisterAttributeBoolean('DetectedCanUpdateSeries', false)")
         && str_contains($calendarModuleSource, "RegisterAttributeBoolean('DetectedCanDeleteSeries', false)")
         && str_contains($calendarModuleSource, "RegisterAttributeString('DetectedCalendarTimezone', '')")
         && str_contains($calendarModuleSource, "\$capabilities['createRecurrence'] ?? false")
+        && str_contains($calendarModuleSource, "\$capabilities['updateFollowing'] ?? false")
         && str_contains($calendarModuleSource, "\$capabilities['updateSeries'] ?? false")
         && str_contains($calendarModuleSource, "\$capabilities['deleteSeries'] ?? false")
         && str_contains($calendarModuleSource, "'canCreateRecurrence' => \$metadataAvailable")
+        && str_contains($calendarModuleSource, "'canUpdateFollowing'")
+        && str_contains($calendarModuleSource, "ReadAttributeBoolean('DetectedCanUpdateFollowing')")
         && str_contains($calendarModuleSource, "'canUpdateSeries'     => \$metadataAvailable")
         && str_contains($calendarModuleSource, "'canDeleteSeries'     => \$metadataAvailable")
         && str_contains($calendarModuleSource, "'timezone'            => \$metadataAvailable")
-        && str_contains($calendarModuleSource, 'Recurring event creation is not supported by this calendar.'),
-    'Calendar instances must expose recurring create/update/delete capabilities and calendar timezone while blocking unsupported recurring writes.'
+        && str_contains($calendarModuleSource, 'Recurring event creation is not supported by this calendar.')
+        && str_contains($calendarModuleSource, 'This and following updates are not supported by this calendar.'),
+    'Calendar instances must expose recurring create/following/series capabilities and calendar timezone while blocking unsupported recurring writes.'
 );
 assertTrueValue(
     is_string($viewModuleSource)
         && str_contains($viewModuleSource, "'canCreateRecurrence' => (bool) (\$calendarStatus['canCreateRecurrence'] ?? false)")
+        && str_contains($viewModuleSource, "'canUpdateFollowing'  => (bool) (\$calendarStatus['canUpdateFollowing'] ?? false)")
         && str_contains($viewModuleSource, "'canUpdateSeries'     => (bool) (\$calendarStatus['canUpdateSeries'] ?? false)")
         && str_contains($viewModuleSource, "'canDeleteSeries'     => (bool) (\$calendarStatus['canDeleteSeries'] ?? false)")
         && str_contains($viewModuleSource, "'timezone'            => trim((string) (\$calendarStatus['timezone'] ?? ''))")
+        && str_contains($viewModuleSource, "\$event['canUpdateFollowing'] = (bool) (\$event['canUpdateFollowing'] ?? false)")
         && str_contains($viewModuleSource, "\$event['canDeleteSeries'] = (bool) (\$event['canDeleteSeries'] ?? false)"),
     'Calendar views must pass recurrence capability and timezone metadata to Tile and IPSView clients.'
 );

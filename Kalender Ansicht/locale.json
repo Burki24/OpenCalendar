@@ -155,7 +155,11 @@
             "Which events do you want to edit?": "Welche Termine möchten Sie bearbeiten?",
             "Continue": "Weiter",
             "Recurring series updates are not supported by this calendar.": "Dieser Kalender unterstützt das Bearbeiten kompletter Terminserien nicht.",
-            "The recurring series ID is missing.": "Die Kennung der Terminserie fehlt."
+            "The recurring series ID is missing.": "Die Kennung der Terminserie fehlt.",
+            "This and following events": "Diesen und alle folgenden Termine",
+            "Changes will apply to this and all following occurrences.": "Änderungen werden auf diesen und alle folgenden Termine angewendet.",
+            "This and following updates are not supported by this calendar.": "Dieser Kalender unterstützt das Bearbeiten dieses und aller folgenden Serientermine nicht.",
+            "Existing exceptions from this occurrence onward will be reset.": "Bestehende Ausnahmen ab diesem Termin werden dabei zurückgesetzt."
         }
     }
 }

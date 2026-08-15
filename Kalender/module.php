@@ -65,6 +65,7 @@ class Kalender extends IPSModuleStrict
         $this->RegisterAttributeString('DetectedCalendarColor', '');
         $this->RegisterAttributeBoolean('DetectedCanWrite', false);
         $this->RegisterAttributeBoolean('DetectedCanCreateRecurrence', false);
+        $this->RegisterAttributeBoolean('DetectedCanUpdateFollowing', false);
         $this->RegisterAttributeBoolean('DetectedCanUpdateSeries', false);
         $this->RegisterAttributeBoolean('DetectedCanDeleteSeries', false);
         $this->RegisterAttributeString('DetectedCalendarTimezone', '');
@@ -356,6 +357,54 @@ class Kalender extends IPSModuleStrict
     }
 
     /**
+     * Returns an editable recurring event starting at the selected occurrence.
+     *
+     * @param string $SeriesID Provider-specific recurring parent event identifier.
+     * @param string $OccurrenceID Provider-specific target occurrence identifier.
+     * @param string $OriginalStart Immutable original start of the target occurrence.
+     * @return string JSON-encoded normalized recurring target event.
+     */
+    public function GetRecurringFollowing(
+        string $SeriesID,
+        string $OccurrenceID,
+        string $OriginalStart
+    ): string {
+        try {
+            $seriesId = trim($SeriesID);
+            $occurrenceId = trim($OccurrenceID);
+            $originalStart = trim($OriginalStart);
+            if ($seriesId === '' || $occurrenceId === '' || $originalStart === '') {
+                throw new InvalidArgumentException('The recurring occurrence identity is incomplete.');
+            }
+            if (!$this->ReadAttributeBoolean('CalendarMetadataAvailable')
+                || !$this->ReadAttributeBoolean('DetectedCanUpdateFollowing')) {
+                $this->refreshCalendarMetadataSafely();
+            }
+            if (!$this->ReadAttributeBoolean('DetectedCanUpdateFollowing')) {
+                throw new InvalidArgumentException('This and following updates are not supported by this calendar.');
+            }
+
+            $following = $this->sendRequest(
+                'GetRecurringFollowing',
+                [
+                    'SeriesID'      => $seriesId,
+                    'OccurrenceID'  => $occurrenceId,
+                    'OriginalStart' => $originalStart
+                ]
+            );
+            return json_encode(
+                $following,
+                JSON_UNESCAPED_SLASHES
+                    | JSON_UNESCAPED_UNICODE
+                    | JSON_PRESERVE_ZERO_FRACTION
+                    | JSON_THROW_ON_ERROR
+            );
+        } catch (Throwable $exception) {
+            throw new RuntimeException($this->handleError($exception), 0, $exception);
+        }
+    }
+
+    /**
      * Creates a temporary paged transfer for cached events overlapping a time range.
      *
      * This is the preferred API for module consumers because each subsequent
@@ -491,6 +540,7 @@ class Kalender extends IPSModuleStrict
                 'recurring',
                 'canUpdateOccurrence',
                 'canDeleteOccurrence',
+                'canUpdateFollowing',
                 'canUpdateSeries',
                 'canDeleteSeries',
                 'writeScope',
@@ -595,6 +645,8 @@ class Kalender extends IPSModuleStrict
                     : '',
                 'canCreateRecurrence' => $metadataAvailable
                     && $this->ReadAttributeBoolean('DetectedCanCreateRecurrence'),
+                'canUpdateFollowing'  => $metadataAvailable
+                    && $this->ReadAttributeBoolean('DetectedCanUpdateFollowing'),
                 'canUpdateSeries'     => $metadataAvailable
                     && $this->ReadAttributeBoolean('DetectedCanUpdateSeries'),
                 'canDeleteSeries'     => $metadataAvailable
@@ -674,6 +726,7 @@ class Kalender extends IPSModuleStrict
         if ($availableCalendars !== []) {
             $this->WriteAttributeString('ResolvedCalendarID', '');
             $this->WriteAttributeBoolean('DetectedCanCreateRecurrence', false);
+            $this->WriteAttributeBoolean('DetectedCanUpdateFollowing', false);
             $this->WriteAttributeBoolean('DetectedCanUpdateSeries', false);
             $this->WriteAttributeBoolean('DetectedCanDeleteSeries', false);
             $this->WriteAttributeString('DetectedCalendarTimezone', '');
@@ -692,6 +745,7 @@ class Kalender extends IPSModuleStrict
             || (bool) ($capabilities['update'] ?? false)
             || (bool) ($capabilities['delete'] ?? false);
         $canCreateRecurrence = (bool) ($capabilities['createRecurrence'] ?? false);
+        $canUpdateFollowing = (bool) ($capabilities['updateFollowing'] ?? false);
         $canUpdateSeries = (bool) ($capabilities['updateSeries'] ?? false);
         $canDeleteSeries = (bool) ($capabilities['deleteSeries'] ?? false);
         $timezone = trim((string) ($calendar['timezone'] ?? ''));
@@ -705,6 +759,7 @@ class Kalender extends IPSModuleStrict
         $this->WriteAttributeString('DetectedCalendarColor', trim((string) ($calendar['color'] ?? '')));
         $this->WriteAttributeBoolean('DetectedCanWrite', $canWrite);
         $this->WriteAttributeBoolean('DetectedCanCreateRecurrence', $canCreateRecurrence);
+        $this->WriteAttributeBoolean('DetectedCanUpdateFollowing', $canUpdateFollowing);
         $this->WriteAttributeBoolean('DetectedCanUpdateSeries', $canUpdateSeries);
         $this->WriteAttributeBoolean('DetectedCanDeleteSeries', $canDeleteSeries);
         $this->WriteAttributeString('DetectedCalendarTimezone', $timezone);
@@ -907,6 +962,12 @@ class Kalender extends IPSModuleStrict
             if (($resourceUrl !== '' && hash_equals($cachedResourceUrl, $resourceUrl))
                 || ($occurrenceId !== '' && hash_equals($cachedOccurrenceId, $occurrenceId))) {
                 $cachedEvent['writeScope'] = (string) ($event['writeScope'] ?? '');
+                if ($this->ReadAttributeBoolean('DetectedCanUpdateFollowing')
+                    && (bool) ($cachedEvent['recurring'] ?? false)
+                    && trim((string) ($cachedEvent['occurrenceId'] ?? '')) !== ''
+                    && trim((string) ($cachedEvent['seriesId'] ?? '')) !== '') {
+                    $cachedEvent['canUpdateFollowing'] = true;
+                }
                 if ($this->ReadAttributeBoolean('DetectedCanUpdateSeries')
                     && (bool) ($cachedEvent['recurring'] ?? false)
                     && trim((string) ($cachedEvent['seriesId'] ?? '')) !== '') {
@@ -923,7 +984,20 @@ class Kalender extends IPSModuleStrict
         }
 
         $identity = CalendarEventRecurrence::fromEvent($event);
-        if (($identity['writeScope'] ?? '') !== CalendarEventRecurrence::WRITE_SCOPE_SERIES) {
+        $writeScope = (string) ($identity['writeScope'] ?? '');
+        if ($writeScope === CalendarEventRecurrence::WRITE_SCOPE_FOLLOWING) {
+            if (!$updating
+                || !$this->ReadAttributeBoolean('DetectedCanUpdateFollowing')
+                || !CalendarEventRecurrence::isOccurrence($identity)
+                || trim((string) ($identity['seriesId'] ?? '')) === ''
+                || trim((string) ($identity['occurrenceId'] ?? '')) === ''
+                || trim((string) ($identity['originalStart'] ?? '')) === '') {
+                throw new InvalidArgumentException('The recurring event cannot be split by this calendar.');
+            }
+            $identity['canUpdateFollowing'] = true;
+            return CalendarEventRecurrence::fromEvent($identity);
+        }
+        if ($writeScope !== CalendarEventRecurrence::WRITE_SCOPE_SERIES) {
             return $identity;
         }
 

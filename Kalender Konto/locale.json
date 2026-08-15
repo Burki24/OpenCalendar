@@ -262,7 +262,19 @@
             "Local iCalendar file is valid.": "Die lokale ICS-Datei ist gültig.",
             "Upload read-only ICS files from the computer running the Symcon console. A calendar name is required and keeps the calendar assignment stable when the file is replaced. The file content is copied into the OpenCalendar configuration; later changes to the original file are not imported automatically.": "Hier können schreibgeschützte ICS-Dateien vom Rechner hochgeladen werden, auf dem die Symcon-Konsole geöffnet ist. Ein Kalendername ist erforderlich und hält die Kalenderzuordnung beim Ersetzen der Datei stabil. Der Dateiinhalt wird in die OpenCalendar-Konfiguration übernommen; spätere Änderungen an der Originaldatei werden nicht automatisch importiert.",
             "Recurring series cannot be modified yet.": "Vollständige Terminserien können derzeit noch nicht geändert oder gelöscht werden.",
-            "The recurring occurrence identity does not match the event.": "Die Identität des Serienvorkommnisses stimmt nicht mit dem Termin überein."
+            "The recurring occurrence identity does not match the event.": "Die Identität des Serienvorkommnisses stimmt nicht mit dem Termin überein.",
+            "The recurring occurrence identity is incomplete.": "Die Identität des Serienvorkommnisses ist unvollständig.",
+            "The recurring event cannot be split by this calendar.": "Dieser Serientermin kann von diesem Kalender nicht an dieser Stelle geteilt werden.",
+            "The recurrence pattern cannot be split safely.": "Das Wiederholungsmuster kann nicht sicher an dieser Stelle geteilt werden.",
+            "The recurrence settings are required when splitting a recurring event.": "Zum Teilen eines Serientermins werden die Wiederholungseinstellungen benötigt.",
+            "The recurring target occurrence could not be verified.": "Das ausgewählte Serienvorkommnis konnte nicht verifiziert werden.",
+            "The recurring series count is invalid.": "Die Anzahl der Termine in der Serie ist ungültig.",
+            "The recurring series instances could not be verified completely.": "Die Vorkommnisse der Terminserie konnten nicht vollständig verifiziert werden.",
+            "The recurring target occurrence could not be located.": "Das ausgewählte Serienvorkommnis konnte in der Terminserie nicht gefunden werden.",
+            "The recurring target start is missing.": "Der ursprüngliche Beginn des ausgewählten Serienvorkommnisses fehlt.",
+            "This and following updates are not supported for recurring events with conference data.": "Das Bearbeiten dieses und aller folgenden Termine wird für Serientermine mit Konferenzdaten nicht unterstützt.",
+            "This and following updates are not supported for this Google event type.": "Das Bearbeiten dieses und aller folgenden Termine wird für diesen Google-Termintyp nicht unterstützt.",
+            "The new recurring series could not be created and the original series could not be restored automatically.": "Die neue Terminserie konnte nicht angelegt und die ursprüngliche Serie nicht automatisch wiederhergestellt werden."
         }
     }
 }

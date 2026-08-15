@@ -15,6 +15,7 @@ final class CalendarEventRecurrence
     public const EXCEPTION = 'exception';
     public const UNKNOWN = 'unknown';
     public const WRITE_SCOPE_OCCURRENCE = 'occurrence';
+    public const WRITE_SCOPE_FOLLOWING = 'following';
     public const WRITE_SCOPE_SERIES = 'series';
 
     /**
@@ -56,7 +57,8 @@ final class CalendarEventRecurrence
         bool $writeSupported = false,
         bool $exception = false,
         bool $canUpdateSeries = false,
-        bool $canDeleteSeries = false
+        bool $canDeleteSeries = false,
+        bool $canUpdateFollowing = false
     ): array {
         return self::metadata(
             $exception ? self::EXCEPTION : self::OCCURRENCE,
@@ -66,7 +68,9 @@ final class CalendarEventRecurrence
             $recurrenceId,
             $writeSupported,
             $canUpdateSeries,
-            $canDeleteSeries
+            $canDeleteSeries,
+            self::WRITE_SCOPE_OCCURRENCE,
+            $canUpdateFollowing
         );
     }
 
@@ -89,15 +93,22 @@ final class CalendarEventRecurrence
             $type = self::UNKNOWN;
         }
 
-        $writeSupported = in_array($type, [self::OCCURRENCE, self::EXCEPTION], true)
+        $occurrence = in_array($type, [self::OCCURRENCE, self::EXCEPTION], true);
+        $writeSupported = $occurrence
             && (bool) ($event['canUpdateOccurrence'] ?? false)
             && (bool) ($event['canDeleteOccurrence'] ?? false);
         $canUpdateSeries = $type !== self::SINGLE
             && (bool) ($event['canUpdateSeries'] ?? false);
         $canDeleteSeries = $type !== self::SINGLE
             && (bool) ($event['canDeleteSeries'] ?? false);
+        $canUpdateFollowing = $occurrence
+            && (bool) ($event['canUpdateFollowing'] ?? false);
         $writeScope = strtolower(trim((string) ($event['writeScope'] ?? '')));
-        if (!in_array($writeScope, [self::WRITE_SCOPE_OCCURRENCE, self::WRITE_SCOPE_SERIES], true)) {
+        if (!in_array(
+            $writeScope,
+            [self::WRITE_SCOPE_OCCURRENCE, self::WRITE_SCOPE_FOLLOWING, self::WRITE_SCOPE_SERIES],
+            true
+        )) {
             $writeScope = self::WRITE_SCOPE_OCCURRENCE;
         }
 
@@ -110,7 +121,8 @@ final class CalendarEventRecurrence
             $writeSupported,
             $canUpdateSeries,
             $canDeleteSeries,
-            $writeScope
+            $writeScope,
+            $canUpdateFollowing
         );
     }
 
@@ -136,7 +148,8 @@ final class CalendarEventRecurrence
         bool $writeSupported = false,
         bool $canUpdateSeries = false,
         bool $canDeleteSeries = false,
-        string $writeScope = self::WRITE_SCOPE_OCCURRENCE
+        string $writeScope = self::WRITE_SCOPE_OCCURRENCE,
+        bool $canUpdateFollowing = false
     ): array {
         $recurring = $type !== self::SINGLE;
         $occurrence = in_array($type, [self::OCCURRENCE, self::EXCEPTION], true);
@@ -150,6 +163,7 @@ final class CalendarEventRecurrence
             'recurring'           => $recurring,
             'canUpdateOccurrence' => $occurrence && $writeSupported,
             'canDeleteOccurrence' => $occurrence && $writeSupported,
+            'canUpdateFollowing'  => $occurrence && $canUpdateFollowing,
             'canUpdateSeries'     => $recurring && $canUpdateSeries,
             'canDeleteSeries'     => $recurring && $canDeleteSeries,
             'writeScope'          => $recurring ? $writeScope : ''

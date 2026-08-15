@@ -57,6 +57,23 @@ final class CalendarAccountGatewayRecurrenceProbe
                 ];
             }
 
+            /** @return array<string, mixed> */
+            public function getRecurringFollowing(
+                string $calendarReference,
+                string $seriesId,
+                string $occurrenceId,
+                string $originalStart
+            ): array {
+                return [
+                    'recurrenceType'     => 'occurrence',
+                    'seriesId'           => $seriesId,
+                    'occurrenceId'       => $occurrenceId,
+                    'originalStart'      => $originalStart,
+                    'resourceUrl'        => $calendarReference . '/events/' . $occurrenceId,
+                    'canUpdateFollowing' => true
+                ];
+            }
+
             /** @param array<string, mixed> $recurrence */
             public function deleteEvent(
                 string $calendarReference,
@@ -98,6 +115,24 @@ assertAccountStructure(
         && ($gatewaySeries['seriesId'] ?? '') === 'series-id'
         && ($gatewaySeries['canUpdateSeries'] ?? false) === true,
     'A recurring parent event must pass through the account child gateway for complete-series editing.'
+);
+$getRecurringFollowingForChild = new ReflectionMethod(
+    CalendarAccountGatewayRecurrenceProbe::class,
+    'getRecurringFollowingForChild'
+);
+$gatewayFollowing = $getRecurringFollowingForChild->invoke($gatewayProbe, [
+    'CalendarID'    => 'calendar-id',
+    'SeriesID'      => 'series-id',
+    'OccurrenceID'  => 'instance-id',
+    'OriginalStart' => '2026-08-12T09:00:00+02:00'
+]);
+assertAccountStructure(
+    is_array($gatewayFollowing)
+        && ($gatewayFollowing['recurrenceType'] ?? '') === 'occurrence'
+        && ($gatewayFollowing['seriesId'] ?? '') === 'series-id'
+        && ($gatewayFollowing['occurrenceId'] ?? '') === 'instance-id'
+        && ($gatewayFollowing['canUpdateFollowing'] ?? false) === true,
+    'A recurring target occurrence must pass through the account child gateway for this-and-following editing.'
 );
 $deleteEventForChild = new ReflectionMethod(CalendarAccountGatewayRecurrenceProbe::class, 'deleteEventForChild');
 $recurringEvent = [
@@ -216,9 +251,11 @@ $legacyGoogleCalendars = [[
 $normalizedGoogleCalendars = $normalizeCapabilities->invoke(null, $legacyGoogleCalendars, 2);
 assertAccountStructure(
     ($normalizedGoogleCalendars[0]['capabilities']['createRecurrence'] ?? false) === true
+        && ($normalizedGoogleCalendars[0]['capabilities']['updateFollowing'] ?? false) === true
         && ($normalizedGoogleCalendars[0]['capabilities']['updateSeries'] ?? false) === true
         && ($normalizedGoogleCalendars[0]['capabilities']['deleteSeries'] ?? false) === true
         && ($normalizedGoogleCalendars[1]['capabilities']['createRecurrence'] ?? true) === false
+        && ($normalizedGoogleCalendars[1]['capabilities']['updateFollowing'] ?? true) === false
         && ($normalizedGoogleCalendars[1]['capabilities']['updateSeries'] ?? true) === false
         && ($normalizedGoogleCalendars[1]['capabilities']['deleteSeries'] ?? true) === false,
     'Legacy Google calendar caches must derive recurring create/update/delete support from cached write access.'
@@ -227,11 +264,15 @@ assertAccountStructure(
 $gatewaySource = file_get_contents(__DIR__ . '/../Kalender Konto/traits/ChildGatewayTrait.php');
 assertAccountStructure(
     is_string($gatewaySource)
-        && str_contains($gatewaySource, 'use IPSKalender\\RecurringCalendarProviderInterface;')
-        && str_contains($gatewaySource, "'GetRecurringSeries' => \$this->getRecurringSeriesForChild(\$request)")
+        && str_contains($gatewaySource, 'use IPSKalender\RecurringCalendarProviderInterface;')
+        && str_contains($gatewaySource, "'GetRecurringSeries'")
+        && str_contains($gatewaySource, 'getRecurringSeriesForChild($request)')
+        && str_contains($gatewaySource, "'GetRecurringFollowing'")
+        && str_contains($gatewaySource, 'getRecurringFollowingForChild($request)')
         && str_contains($gatewaySource, 'instanceof RecurringCalendarProviderInterface')
-        && str_contains($gatewaySource, '->getRecurringSeries('),
-    'The account child gateway must route recurring parent reads only through recurrence-capable providers.'
+        && str_contains($gatewaySource, '->getRecurringSeries(')
+        && str_contains($gatewaySource, '->getRecurringFollowing('),
+    'The account child gateway must route recurring parent and following reads only through recurrence-capable providers.'
 );
 
 $accountSource = file_get_contents(__DIR__ . '/../Kalender Konto/module.php');

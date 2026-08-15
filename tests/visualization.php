@@ -158,6 +158,8 @@ assertVisualization(
         && str_contains($script, 'const displayEnd = end > start ? addDays(end, -1) : start;')
         && str_contains($script, 'function eventCanUpdate(event)')
         && str_contains($script, 'Boolean(event.canUpdateOccurrence)')
+        && str_contains($script, 'function eventCanUpdateFollowing(event)')
+        && str_contains($script, 'Boolean(event.canUpdateFollowing)')
         && str_contains($script, 'Boolean(event.canUpdateSeries)')
         && str_contains($script, 'function eventCanDelete(event)')
         && str_contains($script, 'Boolean(event.canDeleteOccurrence)')
@@ -226,20 +228,28 @@ $moduleSource = (string) file_get_contents(__DIR__ . '/../Kalender Ansicht/modul
 assertVisualization(
     str_contains($indexSource, 'id="edit-scope-dialog"')
         && str_contains($indexSource, 'name="edit-scope" value="occurrence"')
+        && str_contains($indexSource, 'name="edit-scope" value="following"')
         && str_contains($indexSource, 'name="edit-scope" value="series"')
         && str_contains($script, 'function requestEdit(sourceDialog)')
         && str_contains($script, 'function confirmEditScope()')
+        && str_contains($script, 'function eventCanUpdateFollowing(event)')
         && str_contains($script, "sendAction('PrepareSeriesEdit', pendingSeriesEdit)")
-        && str_contains($script, "openExistingEvent(seriesEdit, 'series')")
+        && str_contains($script, "const writeScope = pendingSeriesEdit.writeScope === 'following' ? 'following' : 'series';")
+        && str_contains($script, 'openExistingEvent(seriesEdit, writeScope)')
         && str_contains($script, 'function loadRecurrenceEditor(event)')
+        && str_contains($script, "selectedEvent?.writeScope === 'following'")
         && str_contains($script, "selectedEvent?.writeScope === 'series'")
+        && str_contains($script, 'Boolean(event.canUpdateFollowing)')
         && str_contains($script, 'Boolean(event.canUpdateSeries)')
         && str_contains($script, 'writeScope: scope')
         && str_contains($moduleSource, "case 'PrepareSeriesEdit':")
+        && str_contains($moduleSource, 'IPSKAL_GetRecurringFollowing($instanceId, $seriesId, $occurrenceId, $originalStart)')
         && str_contains($moduleSource, 'IPSKAL_GetRecurringSeries($instanceId, $seriesId)')
         && str_contains($moduleSource, '$seriesEdit[\'canWrite\'] = true;')
+        && str_contains($moduleSource, '$seriesEdit[\'writeScope\'] = $writeScope;')
+        && str_contains($moduleSource, "'Changes will apply to this and all following occurrences.'")
         && str_contains($moduleSource, "'Changes will apply to the entire recurring series.'"),
-    'Recurring Google events must offer occurrence or complete-series editing and load the verified parent before editing the series.'
+    'Recurring Google events must offer occurrence, this-and-following, or complete-series editing with verified provider data.'
 );
 assertVisualization(
     str_contains($moduleSource, 'private function getFullUpdateMessage(?array $state = null, ?array $toast = null): string')
