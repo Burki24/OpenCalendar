@@ -31,11 +31,16 @@ final class CalendarAccountGatewayRecurrenceProbe
         ], JSON_THROW_ON_ERROR);
     }
 
+    /** @return list<array<string, mixed>> */
+    public function deleteCalls(): array
+    {
+        return $this->deleteCalls;
+    }
+
     /** @return object{deleteEvent: callable} */
     private function createProvider(): object
     {
-        return new class($this->deleteCalls)
-        {
+        return new class($this->deleteCalls) {
             /** @param list<array<string, mixed>> $deleteCalls */
             public function __construct(private array &$deleteCalls)
             {
@@ -60,12 +65,6 @@ final class CalendarAccountGatewayRecurrenceProbe
                 return true;
             }
         };
-    }
-
-    /** @return list<array<string, mixed>> */
-    public function deleteCalls(): array
-    {
-        return $this->deleteCalls;
     }
 }
 
