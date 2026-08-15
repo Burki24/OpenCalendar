@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace IPSKalender;
 
 /**
- * Exposes provider operations that address the parent resource of a recurring series.
+ * Exposes provider operations for recurring series and verified scoped writes.
  */
 interface RecurringCalendarProviderInterface
 {
@@ -19,16 +19,16 @@ interface RecurringCalendarProviderInterface
     public function getRecurringSeries(string $calendarReference, string $seriesId): array;
 
     /**
-     * Returns an editable recurring event starting at one verified occurrence.
+     * Returns a verified recurring target event for operations on this and following occurrences.
      *
-     * The returned event represents the new series that would begin with the target
-     * occurrence when a provider implements "this and following" updates.
+     * The returned event contains the provider-neutral recurrence data required to
+     * safely split, shorten, update or delete the series from the selected occurrence.
      *
      * @param string $calendarReference Provider-specific calendar identifier or URL.
      * @param string $seriesId Provider-specific recurring parent event identifier.
      * @param string $occurrenceId Provider-specific target occurrence identifier.
      * @param string $originalStart Immutable original start of the target occurrence.
-     * @return array<string, mixed> Normalized recurring target event.
+     * @return array<string, mixed> Normalized recurring target event and recurrence settings.
      */
     public function getRecurringFollowing(
         string $calendarReference,
@@ -37,4 +37,3 @@ interface RecurringCalendarProviderInterface
         string $originalStart
     ): array;
 }
-

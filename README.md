@@ -85,13 +85,31 @@ Diese Wiederverwendung entspricht dem von Symcon vorgesehenen Austausch einer
 der aktuellen Konfiguratorliste erstellt. Weitere Hintergründe enthält die
 [Dokumentation des Kalender Konfigurators](Kalender%20Konfigurator).
 
+## Google-Serientermine
+
+In beschreibbaren Google-Kalendern unterstützt OpenCalendar Serientermine
+vollständig im gemeinsamen Dialog-Workflow der Kachelvisualisierung und IPSView.
+
+- Neue Serien können **täglich, wöchentlich, monatlich oder jährlich** angelegt
+  werden. Unterstützt werden ein frei wählbares Intervall, bei Wochenserien
+  mehrere Wochentage sowie die Endarten **Nie**, **Nach Anzahl** und
+  **Am Datum**.
+- Bei zeitgebundenen Serien wird die Zeitzone des Google-Kalenders verwendet,
+  damit die lokale Uhrzeit auch über Sommer-/Winterzeitwechsel erhalten bleibt.
+- Einzelne Serienvorkommnisse können bearbeitet und gelöscht werden.
+- **Diesen und alle folgenden Termine** können gemeinsam bearbeitet oder
+  gelöscht werden. Beim Bearbeiten wird die Serie am gewählten Vorkommnis
+  geteilt; der zurückliegende Teil bleibt unverändert. Beim Löschen endet die
+  Serie unmittelbar vor dem gewählten Vorkommnis.
+- Die **gesamte Serie** kann bearbeitet oder gelöscht werden.
+- Komplexe Wiederholungsregeln, die OpenCalendar nicht verlustfrei in seinem
+  Serieneditor abbilden kann, werden nicht automatisch geteilt oder vereinfacht.
+
 ## Bekannte Einschränkungen
 
-- Neue Google-Terminserien können erstellt werden; einzelne Vorkommen einer
-  Google-Terminserie können außerdem bearbeitet und gelöscht werden. Die
-  vollständige Serie, „dieses und folgende“ sowie Vorkommnisse von Microsoft-
-  und CalDAV-Serien bleiben derzeit schreibgeschützt. Dadurch kann nicht
-  versehentlich die vollständige Terminserie überschrieben oder gelöscht werden.
+- Schreiboperationen auf Vorkommnisse oder vollständige Serien von Microsoft-
+  und CalDAV-Serienterminen sind derzeit nicht freigegeben. Diese Serientermine
+  werden weiterhin lesend dargestellt.
 - ICS-/Webcal-Abonnements und lokal importierte ICS-Dateien sind grundsätzlich schreibgeschützt.
 - Die IPSView-Ausgabe benötigt im HTML-Box-Steuerelement den Renderer
   **Browser des Clients** oder **Automatisch**, da die Bedienung JavaScript

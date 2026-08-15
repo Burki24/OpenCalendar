@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace IPSKalender;
 
 /**
- * Normalizes provider-specific recurrence metadata into a common event identity.
+ * Normalizes provider-specific recurrence metadata and supported write scopes.
  */
 final class CalendarEventRecurrence
 {
@@ -19,7 +19,9 @@ final class CalendarEventRecurrence
     public const WRITE_SCOPE_SERIES = 'series';
 
     /**
-     * @return array<string, mixed>
+     * Returns recurrence metadata for a non-recurring event.
+     *
+     * @return array<string, mixed> Normalized single-event recurrence metadata.
      */
     public static function single(): array
     {
@@ -27,7 +29,12 @@ final class CalendarEventRecurrence
     }
 
     /**
-     * @return array<string, mixed>
+     * Returns recurrence metadata for a recurring parent event.
+     *
+     * @param string $seriesId Provider-specific recurring parent event identifier.
+     * @param bool $canUpdateSeries Whether the provider allows updating the complete series.
+     * @param bool $canDeleteSeries Whether the provider allows deleting the complete series.
+     * @return array<string, mixed> Normalized recurring parent metadata.
      */
     public static function master(
         string $seriesId,
@@ -47,7 +54,18 @@ final class CalendarEventRecurrence
     }
 
     /**
-     * @return array<string, mixed>
+     * Returns recurrence metadata for one occurrence or exception of a recurring series.
+     *
+     * @param string $seriesId Provider-specific recurring parent event identifier.
+     * @param string $occurrenceId Provider-specific occurrence identifier.
+     * @param string $originalStart Immutable original start of the occurrence.
+     * @param string $recurrenceId Optional provider-neutral recurrence identifier.
+     * @param bool $writeSupported Whether the individual occurrence can be updated and deleted.
+     * @param bool $exception Whether the occurrence is an explicitly modified series exception.
+     * @param bool $canUpdateSeries Whether the complete series can be updated.
+     * @param bool $canDeleteSeries Whether the complete series can be deleted.
+     * @param bool $canUpdateFollowing Whether operations may start here and affect all following occurrences.
+     * @return array<string, mixed> Normalized recurring occurrence metadata.
      */
     public static function occurrence(
         string $seriesId,
@@ -77,8 +95,11 @@ final class CalendarEventRecurrence
     /**
      * Returns recurrence metadata for current and legacy normalized events.
      *
-     * @param array<string, mixed> $event
-     * @return array<string, mixed>
+     * The write scope is restricted to occurrence, following or complete series and
+     * provider capabilities are normalized into one common event identity.
+     *
+     * @param array<string, mixed> $event Normalized event data from a provider or legacy cache.
+     * @return array<string, mixed> Normalized recurrence identity and write capabilities.
      */
     public static function fromEvent(array $event): array
     {
@@ -126,7 +147,12 @@ final class CalendarEventRecurrence
         );
     }
 
-    /** @param array<string, mixed> $event */
+    /**
+     * Checks whether normalized event data represents a recurring occurrence or exception.
+     *
+     * @param array<string, mixed> $event Normalized event data.
+     * @return bool True for recurring occurrences and explicit exceptions.
+     */
     public static function isOccurrence(array $event): bool
     {
         return in_array(
@@ -137,7 +163,9 @@ final class CalendarEventRecurrence
     }
 
     /**
-     * @return array<string, mixed>
+     * Builds the normalized recurrence metadata array.
+     *
+     * @return array<string, mixed> Normalized recurrence metadata.
      */
     private static function metadata(
         string $type,
