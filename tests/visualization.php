@@ -152,7 +152,7 @@ assertVisualization(
         && str_contains($script, 'function openEventDetails(event)')
         && str_contains($script, 'card.addEventListener(\'click\', () => openEventDetails(event));')
         && str_contains($script, 'document.getElementById(\'details-edit-button\').addEventListener(\'click\'')
-        && str_contains($script, "requestEdit(eventDetailsDialog)")
+        && str_contains($script, 'requestEdit(eventDetailsDialog)')
         && str_contains($script, "openExistingEvent(event, 'occurrence')")
         && str_contains($script, "t(editingSeries ? 'Edit recurring event' : 'Edit event')")
         && str_contains($script, 'const displayEnd = end > start ? addDays(end, -1) : start;')
@@ -234,7 +234,7 @@ assertVisualization(
         && str_contains($script, 'function loadRecurrenceEditor(event)')
         && str_contains($script, "selectedEvent?.writeScope === 'series'")
         && str_contains($script, 'Boolean(event.canUpdateSeries)')
-        && str_contains($script, "writeScope: scope")
+        && str_contains($script, 'writeScope: scope')
         && str_contains($moduleSource, "case 'PrepareSeriesEdit':")
         && str_contains($moduleSource, 'IPSKAL_GetRecurringSeries($instanceId, $seriesId)')
         && str_contains($moduleSource, "'Changes will apply to the entire recurring series.'"),
