@@ -481,9 +481,9 @@ assertVisualization(
 
 $style = (string) file_get_contents(__DIR__ . '/../Kalender Ansicht/visualization/style.css');
 assertVisualization(
-    str_contains($style, '.delete-confirm-dialog { font-size: clamp(14px, 1.45vw, 16px); }')
-        && str_contains($style, 'html.ipsview-mode .delete-confirm-dialog { font-size: clamp(15px, 1.5vw, 18px); }'),
-    'The compact delete confirmation dialog must remain readable without inheriting extreme Tile or IPSView font scaling.'
+    !str_contains($style, '.delete-confirm-dialog { font-size:')
+        && !str_contains($style, 'html.ipsview-mode .delete-confirm-dialog { font-size:'),
+    'The delete confirmation dialog must use the shared OpenCalendar dialog typography instead of a dialog-specific font size.'
 );
 
 assertVisualization(

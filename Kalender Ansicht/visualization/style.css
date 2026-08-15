@@ -733,8 +733,6 @@ html.ipsview-mode .danger-button { min-height: 48px; padding-inline: 18px; }
 .event-details-row dt { color: var(--cal-label-text); font-weight: 600; }
 .event-details-row dd { margin: 0; line-height: 1.45; overflow-wrap: anywhere; white-space: pre-wrap; }
 
-.delete-confirm-dialog { font-size: clamp(14px, 1.45vw, 16px); }
-html.ipsview-mode .delete-confirm-dialog { font-size: clamp(15px, 1.5vw, 18px); }
 .delete-confirm-body { gap: 8px; }
 .delete-confirm-summary { font-size: 1.02em; font-weight: 700; line-height: 1.35; overflow-wrap: anywhere; }
 .delete-confirm-period { color: var(--cal-muted); line-height: 1.4; overflow-wrap: anywhere; }
