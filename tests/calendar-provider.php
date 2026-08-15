@@ -319,7 +319,7 @@ assertSameValue('DELETE', $writeClient->requests[2]['method'], 'Events must be d
 
 $occurrenceWriteClient = new FakeHttpClient([
     response(200, ['id' => 'instance-id', 'iCalUID' => 'series@example.com', 'etag' => '"occurrence-updated"']),
-    response(204)
+    response(200, ['id' => 'instance-id', 'status' => 'cancelled'])
 ]);
 $occurrenceProvider = new GoogleCalendarProvider($occurrenceWriteClient, 'access-token');
 $googleOccurrence = [
@@ -354,6 +354,20 @@ assertTrueValue(
         $googleOccurrence
     ),
     'Google occurrences must be deletable by their concrete occurrence ID.'
+);
+assertSameValue(
+    'PATCH',
+    $occurrenceWriteClient->requests[1]['method'],
+    'Deleting one Google occurrence must cancel the concrete instance instead of deleting the parent series.'
+);
+assertSameValue(
+    ['status' => 'cancelled'],
+    json_decode($occurrenceWriteClient->requests[1]['body'], true, 512, JSON_THROW_ON_ERROR),
+    'Deleting one Google occurrence must create a cancelled recurring-event exception.'
+);
+assertTrueValue(
+    str_ends_with($occurrenceWriteClient->requests[1]['url'], '/events/instance-id'),
+    'Cancelling one Google occurrence must target the concrete occurrence ID.'
 );
 
 $seriesDeleteClient = new FakeHttpClient([response(204)]);

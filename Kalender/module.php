@@ -867,6 +867,12 @@ class Kalender extends IPSModuleStrict
             if (($resourceUrl !== '' && hash_equals($cachedResourceUrl, $resourceUrl))
                 || ($occurrenceId !== '' && hash_equals($cachedOccurrenceId, $occurrenceId))) {
                 $cachedEvent['writeScope'] = (string) ($event['writeScope'] ?? '');
+                if ($this->ReadAttributeBoolean('DetectedCanDeleteSeries')
+                    && (bool) ($cachedEvent['recurring'] ?? false)
+                    && trim((string) ($cachedEvent['seriesId'] ?? '')) !== '') {
+                    $cachedEvent['canDeleteOccurrence'] = true;
+                    $cachedEvent['canDeleteSeries'] = true;
+                }
                 return CalendarEventRecurrence::fromEvent($cachedEvent);
             }
         }

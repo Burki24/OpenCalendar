@@ -249,7 +249,20 @@ final class GoogleCalendarProvider implements CalendarProviderInterface
         if ($targetEventId === '') {
             throw new GoogleCalendarProviderException('The recurring series ID is missing.');
         }
+        $occurrenceDelete = !$seriesDelete && CalendarEventRecurrence::isOccurrence($identity);
         $headers = !$seriesDelete && $etag !== '' ? ['If-Match' => $etag] : [];
+        if ($occurrenceDelete) {
+            $this->requestJson(
+                'PATCH',
+                '/calendars/' . rawurlencode($calendarId) . '/events/' . rawurlencode($targetEventId),
+                ['status' => 'cancelled'],
+                $headers,
+                [200]
+            );
+
+            return true;
+        }
+
         $this->requestJson(
             'DELETE',
             '/calendars/' . rawurlencode($calendarId) . '/events/' . rawurlencode($targetEventId),

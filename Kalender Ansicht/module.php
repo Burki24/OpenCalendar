@@ -1927,7 +1927,11 @@ class KalenderAnsicht extends IPSModuleStrict
                     $instanceId,
                     json_encode($event, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR)
                 )) {
-                    throw new RuntimeException($this->Translate('Event deletion failed.'));
+                    $status = json_decode(IPSKAL_GetCalendarStatus($instanceId), true, 512, JSON_THROW_ON_ERROR);
+                    $lastError = is_array($status) ? trim((string) ($status['lastError'] ?? '')) : '';
+                    throw new RuntimeException(
+                        $lastError !== '' ? $lastError : $this->Translate('Event deletion failed.')
+                    );
                 }
                 $message = 'Event deleted.';
                 break;
