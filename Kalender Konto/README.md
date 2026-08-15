@@ -105,8 +105,8 @@ Teams und andere Microsoft-Graph-Bereiche werden nicht angefordert. Microsofts
 angelegt wird. In beschreibbaren Microsoft-Kalendern können außerdem neue tägliche,
 wöchentliche, monatliche und jährliche Terminserien mit Intervall sowie den
 Endarten Nie, Anzahl oder Enddatum angelegt werden. Einzelne Vorkommnisse
-bestehender Microsoft-Serien können außerdem bearbeitet und gelöscht werden;
-die vollständige Serie sowie **dieses und alle folgenden Vorkommnisse** bleiben
+bestehender Microsoft-Serien sowie die vollständige Serie können außerdem
+bearbeitet und gelöscht werden. **Dieses und alle folgenden Vorkommnisse** bleibt
 in diesem Ausbauschritt noch geschützt.
 
 Bei bestehenden Microsoft-Onlinebesprechungen wird die Beschreibung in der

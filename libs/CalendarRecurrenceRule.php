@@ -25,6 +25,15 @@ final class CalendarRecurrenceRule
         'SA' => 'saturday',
         'SU' => 'sunday'
     ];
+    private const MICROSOFT_WEEKDAY_CODES = [
+        'monday'    => 'MO',
+        'tuesday'   => 'TU',
+        'wednesday' => 'WE',
+        'thursday'  => 'TH',
+        'friday'    => 'FR',
+        'saturday'  => 'SA',
+        'sunday'    => 'SU'
+    ];
 
     /**
      * Builds the Google Calendar recurrence lines for a newly created event.
@@ -96,7 +105,7 @@ final class CalendarRecurrenceRule
     }
 
     /**
-     * Builds a Microsoft Graph patternedRecurrence object for a newly created event.
+     * Builds a Microsoft Graph patternedRecurrence object for a recurring event.
      *
      * @param array<string, mixed> $recurrence Provider-neutral recurrence settings.
      * @param DateTimeImmutable $start Event start in the recurrence timezone.
@@ -192,6 +201,118 @@ final class CalendarRecurrenceRule
             'pattern' => $pattern,
             'range'   => $range
         ];
+    }
+
+    /**
+     * Parses the supported subset of a Microsoft Graph patternedRecurrence object.
+     *
+     * Relative monthly/yearly rules and weekly rules with a non-Monday week boundary
+     * are kept provider-side and return null rather than being represented lossily.
+     *
+     * @param array<string, mixed> $recurrence Microsoft Graph patternedRecurrence data.
+     * @return array<string, mixed>|null Provider-neutral recurrence settings.
+     */
+    public static function fromMicrosoftRecurrence(array $recurrence, DateTimeImmutable $start): ?array
+    {
+        if ($recurrence === [] || array_is_list($recurrence)) {
+            return null;
+        }
+
+        $pattern = is_array($recurrence['pattern'] ?? null) ? $recurrence['pattern'] : [];
+        $range = is_array($recurrence['range'] ?? null) ? $recurrence['range'] : [];
+        if ($pattern === [] || array_is_list($pattern) || $range === [] || array_is_list($range)) {
+            return null;
+        }
+
+        $type = strtolower(trim((string) ($pattern['type'] ?? '')));
+        $frequency = match ($type) {
+            'daily'           => 'DAILY',
+            'weekly'          => 'WEEKLY',
+            'absolutemonthly' => 'MONTHLY',
+            'absoluteyearly'  => 'YEARLY',
+            default           => ''
+        };
+        if ($frequency === '') {
+            return null;
+        }
+
+        $interval = filter_var(
+            $pattern['interval'] ?? 1,
+            FILTER_VALIDATE_INT,
+            ['options' => ['min_range' => 1, 'max_range' => 999]]
+        );
+        if ($interval === false) {
+            return null;
+        }
+
+        $result = [
+            'frequency' => $frequency,
+            'interval'  => $interval,
+            'endMode'   => 'never'
+        ];
+
+        if ($frequency === 'WEEKLY') {
+            $firstDayOfWeek = strtolower(trim((string) ($pattern['firstDayOfWeek'] ?? 'monday')));
+            $daysOfWeek = $pattern['daysOfWeek'] ?? null;
+            if ($firstDayOfWeek !== 'monday' || !is_array($daysOfWeek) || !array_is_list($daysOfWeek)) {
+                return null;
+            }
+
+            $weekdays = [];
+            foreach ($daysOfWeek as $dayOfWeek) {
+                $weekday = self::MICROSOFT_WEEKDAY_CODES[strtolower(trim((string) $dayOfWeek))] ?? '';
+                if ($weekday === '') {
+                    return null;
+                }
+                $weekdays[] = $weekday;
+            }
+            if ($weekdays === []) {
+                return null;
+            }
+            $result['byDay'] = self::weekdays($weekdays);
+        } elseif ($frequency === 'MONTHLY') {
+            if ((int) ($pattern['dayOfMonth'] ?? 0) !== (int) $start->format('j')) {
+                return null;
+            }
+        } elseif ($frequency === 'YEARLY') {
+            if ((int) ($pattern['dayOfMonth'] ?? 0) !== (int) $start->format('j')
+                || (int) ($pattern['month'] ?? 0) !== (int) $start->format('n')) {
+                return null;
+            }
+        }
+
+        $rangeStart = trim((string) ($range['startDate'] ?? ''));
+        if ($rangeStart !== '' && $rangeStart !== $start->format('Y-m-d')) {
+            return null;
+        }
+
+        $rangeType = strtolower(trim((string) ($range['type'] ?? '')));
+        if ($rangeType === 'numbered') {
+            $count = filter_var(
+                $range['numberOfOccurrences'] ?? null,
+                FILTER_VALIDATE_INT,
+                ['options' => ['min_range' => 1, 'max_range' => 9999]]
+            );
+            if ($count === false) {
+                return null;
+            }
+            $result['endMode'] = 'count';
+            $result['count'] = $count;
+        } elseif ($rangeType === 'enddate') {
+            $until = trim((string) ($range['endDate'] ?? ''));
+            $untilDate = preg_match('/^\d{4}-\d{2}-\d{2}$/D', $until) === 1
+                ? DateTimeImmutable::createFromFormat('!Y-m-d', $until, new DateTimeZone('UTC'))
+                : false;
+            if ($untilDate === false || $untilDate->format('Y-m-d') !== $until) {
+                return null;
+            }
+            $result['endMode'] = 'until';
+            $result['until'] = $until;
+        } elseif ($rangeType !== 'noend') {
+            return null;
+        }
+
+        return $result;
     }
 
     /**

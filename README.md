@@ -115,12 +115,17 @@ Für zeitgebundene Serien wird die vom Client beziehungsweise über die PHP-API
 übergebene Zeitzone verwendet, damit Microsoft Graph die lokale Uhrzeit der Serie
 erhält. Einzelne Vorkommnisse bestehender Microsoft-Serien können gezielt
 bearbeitet oder gelöscht werden, ohne die übrigen Vorkommnisse der Serie zu ändern.
+Auch die **gesamte Microsoft-Serie** kann bearbeitet oder gelöscht werden. Beim
+Bearbeiten wird der Serien-Master geladen; Wiederholungsmuster, die dem gemeinsamen
+OpenCalendar-Serieneditor entsprechen, können dabei ebenfalls geändert werden.
+Komplexere Microsoft-Muster bleiben erhalten, werden aber nicht verlustbehaftet im
+Serieneditor vereinfacht.
 
 ## Bekannte Einschränkungen
 
-- Einzelne Vorkommnisse bestehender Microsoft-Serien können bearbeitet und
-  gelöscht werden. Das Bearbeiten oder Löschen der vollständigen Microsoft-Serie
-  sowie **Diesen und alle folgenden Termine** folgen in späteren Ausbauschritten.
+- Microsoft-Serien können als einzelnes Vorkommnis oder als vollständige Serie
+  bearbeitet und gelöscht werden. **Diesen und alle folgenden Termine** folgt in
+  einem späteren Ausbauschritt.
 - Schreiboperationen auf Vorkommnisse oder vollständige Serien von CalDAV-
   Serienterminen sind derzeit nicht freigegeben. Diese Serientermine werden
   weiterhin lesend dargestellt.

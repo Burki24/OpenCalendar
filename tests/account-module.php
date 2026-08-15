@@ -285,13 +285,15 @@ assertAccountStructure(
     ($normalizedMicrosoftCalendars[0]['capabilities']['createRecurrence'] ?? false) === true
         && ($normalizedMicrosoftCalendars[0]['capabilities']['updateOccurrence'] ?? false) === true
         && ($normalizedMicrosoftCalendars[0]['capabilities']['deleteOccurrence'] ?? false) === true
+        && ($normalizedMicrosoftCalendars[0]['capabilities']['updateSeries'] ?? false) === true
+        && ($normalizedMicrosoftCalendars[0]['capabilities']['deleteSeries'] ?? false) === true
         && ($normalizedMicrosoftCalendars[1]['capabilities']['createRecurrence'] ?? true) === false
         && ($normalizedMicrosoftCalendars[1]['capabilities']['updateOccurrence'] ?? true) === false
         && ($normalizedMicrosoftCalendars[1]['capabilities']['deleteOccurrence'] ?? true) === false
-        && !array_key_exists('updateFollowing', $normalizedMicrosoftCalendars[0]['capabilities'])
-        && !array_key_exists('updateSeries', $normalizedMicrosoftCalendars[0]['capabilities'])
-        && !array_key_exists('deleteSeries', $normalizedMicrosoftCalendars[0]['capabilities']),
-    'Legacy Microsoft calendar caches must derive recurrence creation and occurrence writes from cached write access.'
+        && ($normalizedMicrosoftCalendars[1]['capabilities']['updateSeries'] ?? true) === false
+        && ($normalizedMicrosoftCalendars[1]['capabilities']['deleteSeries'] ?? true) === false
+        && !array_key_exists('updateFollowing', $normalizedMicrosoftCalendars[0]['capabilities']),
+    'Legacy Microsoft calendar caches must derive supported recurrence writes from cached write access.'
 );
 
 $gatewaySource = file_get_contents(__DIR__ . '/../Kalender Konto/traits/ChildGatewayTrait.php');

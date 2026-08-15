@@ -819,10 +819,14 @@ assertSameValue(true, $msCalendars[0]['capabilities']['create'], 'Editable Micro
 assertSameValue(true, $msCalendars[0]['capabilities']['createRecurrence'], 'Editable Microsoft calendars must advertise recurrence creation support.');
 assertSameValue(true, $msCalendars[0]['capabilities']['updateOccurrence'], 'Editable Microsoft calendars must advertise recurring occurrence update support.');
 assertSameValue(true, $msCalendars[0]['capabilities']['deleteOccurrence'], 'Editable Microsoft calendars must advertise recurring occurrence delete support.');
+assertSameValue(true, $msCalendars[0]['capabilities']['updateSeries'], 'Editable Microsoft calendars must advertise recurring series update support.');
+assertSameValue(true, $msCalendars[0]['capabilities']['deleteSeries'], 'Editable Microsoft calendars must advertise recurring series delete support.');
 assertSameValue(false, $msCalendars[2]['capabilities']['create'], 'Read-only Microsoft calendars must remain read-only.');
 assertSameValue(false, $msCalendars[2]['capabilities']['createRecurrence'], 'Read-only Microsoft calendars must not advertise recurrence creation support.');
 assertSameValue(false, $msCalendars[2]['capabilities']['updateOccurrence'], 'Read-only Microsoft calendars must not advertise recurring occurrence update support.');
 assertSameValue(false, $msCalendars[2]['capabilities']['deleteOccurrence'], 'Read-only Microsoft calendars must not advertise recurring occurrence delete support.');
+assertSameValue(false, $msCalendars[2]['capabilities']['updateSeries'], 'Read-only Microsoft calendars must not advertise recurring series update support.');
+assertSameValue(false, $msCalendars[2]['capabilities']['deleteSeries'], 'Read-only Microsoft calendars must not advertise recurring series delete support.');
 assertSameValue(
     'Bearer ms-access-token',
     $msCalendarClient->requests[0]['headers']['Authorization'],
@@ -1106,6 +1110,50 @@ assertSameValue('absoluteYearly', $msYearlyRecurrence['pattern']['type'], 'Micro
 assertSameValue(12, $msYearlyRecurrence['pattern']['month'], 'Microsoft yearly recurrence patterns must retain the start month.');
 assertSameValue(24, $msYearlyRecurrence['pattern']['dayOfMonth'], 'Microsoft yearly recurrence patterns must retain the start day.');
 
+$msParsedWeeklyRecurrence = CalendarRecurrenceRule::fromMicrosoftRecurrence(
+    [
+        'pattern' => [
+            'type'           => 'weekly',
+            'interval'       => 2,
+            'daysOfWeek'     => ['monday', 'thursday'],
+            'firstDayOfWeek' => 'monday'
+        ],
+        'range'   => [
+            'type'                => 'numbered',
+            'startDate'           => '2026-10-19',
+            'numberOfOccurrences' => 6
+        ]
+    ],
+    new DateTimeImmutable('2026-10-19T00:00:00Z')
+);
+assertSameValue(
+    [
+        'frequency' => 'WEEKLY',
+        'interval'  => 2,
+        'endMode'   => 'count',
+        'byDay'     => ['MO', 'TH'],
+        'count'     => 6
+    ],
+    $msParsedWeeklyRecurrence,
+    'Supported Microsoft recurrence patterns must round-trip into the shared recurrence editor.'
+);
+assertSameValue(
+    null,
+    CalendarRecurrenceRule::fromMicrosoftRecurrence(
+        [
+            'pattern' => [
+                'type'           => 'weekly',
+                'interval'       => 1,
+                'daysOfWeek'     => ['monday'],
+                'firstDayOfWeek' => 'sunday'
+            ],
+            'range'   => ['type' => 'noEnd', 'startDate' => '2026-10-19']
+        ],
+        new DateTimeImmutable('2026-10-19T00:00:00Z')
+    ),
+    'Microsoft weekly rules with a different week boundary must not be exposed lossily.'
+);
+
 $msProvider->updateEvent(
     'AQMk-primary',
     $msCreated['resourceUrl'],
@@ -1195,31 +1243,132 @@ assertTrueValue(
     'Microsoft occurrence deletion must target only the concrete occurrence ID.'
 );
 
-$msSeriesWriteClient = new FakeHttpClient([]);
-try {
-    (new MicrosoftCalendarProvider($msSeriesWriteClient, 'ms-access-token'))->updateEvent(
-        'AQMk-primary',
-        'series-master',
-        'W/"series"',
-        'series@example.com',
-        ['summary' => 'Do not update complete series yet'],
-        [
-            'recurrenceType'  => 'master',
-            'seriesId'        => 'series-master',
-            'recurring'       => true,
-            'canUpdateSeries' => false,
-            'canDeleteSeries' => false,
-            'writeScope'      => 'series'
+$msSeriesWriteClient = new FakeHttpClient([
+    response(200, [
+        'id'                    => 'series-master',
+        'iCalUId'               => 'series@example.com',
+        '@odata.etag'           => 'W/"series-master"',
+        'subject'               => 'Microsoft series',
+        'body'                  => ['contentType' => 'text', 'content' => 'Series description'],
+        'location'              => ['displayName' => 'Berlin'],
+        'start'                 => ['dateTime' => '2026-10-19T08:00:00', 'timeZone' => 'UTC'],
+        'end'                   => ['dateTime' => '2026-10-19T09:00:00', 'timeZone' => 'UTC'],
+        'originalStartTimeZone' => 'Europe/Berlin',
+        'type'                  => 'seriesMaster',
+        'recurrence'            => [
+            'pattern' => [
+                'type'           => 'weekly',
+                'interval'       => 1,
+                'daysOfWeek'     => ['monday', 'thursday'],
+                'firstDayOfWeek' => 'monday'
+            ],
+            'range'   => [
+                'type'                => 'numbered',
+                'startDate'           => '2026-10-19',
+                'numberOfOccurrences' => 8
+            ]
         ]
-    );
-    throw new RuntimeException('A complete Microsoft recurring series was modified before series support was enabled.');
-} catch (MicrosoftCalendarProviderException $exception) {
-    assertTrueValue(
-        str_contains($exception->getMessage(), 'individual Microsoft recurring occurrences'),
-        'Microsoft complete-series writes must remain blocked while only occurrence writes are supported.'
-    );
-    assertSameValue(0, count($msSeriesWriteClient->requests), 'Blocked Microsoft series writes must not reach Graph.');
-}
+    ]),
+    response(200, [
+        'id'          => 'series-master',
+        'iCalUId'     => 'series@example.com',
+        '@odata.etag' => 'W/"series-updated"'
+    ]),
+    response(204)
+]);
+$msSeriesProvider = new MicrosoftCalendarProvider($msSeriesWriteClient, 'ms-access-token');
+$msSeries = $msSeriesProvider->getRecurringSeries('AQMk-primary', 'series-master');
+assertSameValue('master', $msSeries['recurrenceType'], 'Microsoft recurring parent events must be normalized as series masters.');
+assertSameValue(true, $msSeries['canUpdateSeries'], 'Microsoft recurring parent events must allow full-series updates.');
+assertSameValue(true, $msSeries['canDeleteSeries'], 'Microsoft recurring parent events must allow full-series deletion.');
+assertSameValue(true, $msSeries['recurrenceEditable'], 'Supported Microsoft recurrence patterns must be editable.');
+assertSameValue(
+    [
+        'frequency' => 'WEEKLY',
+        'interval'  => 1,
+        'endMode'   => 'count',
+        'byDay'     => ['MO', 'TH'],
+        'count'     => 8
+    ],
+    $msSeries['recurrenceSettings'],
+    'Microsoft series masters must expose provider-neutral recurrence settings.'
+);
+assertTrueValue(
+    str_ends_with($msSeriesWriteClient->requests[0]['url'], '/events/series-master'),
+    'Microsoft recurring parent reads must target the concrete series master ID.'
+);
+
+$msSeriesRecurrence = $msSeries;
+$msSeriesRecurrence['writeScope'] = 'series';
+$msSeriesProvider->updateEvent(
+    'AQMk-primary',
+    $msSeries['resourceUrl'],
+    $msSeries['etag'],
+    $msSeries['uid'],
+    [
+        'summary'    => 'Updated Microsoft series',
+        'allDay'     => false,
+        'start'      => '2026-10-19T08:30:00Z',
+        'end'        => '2026-10-19T09:30:00Z',
+        'timezone'   => 'Europe/Berlin',
+        'recurrence' => [
+            'frequency' => 'weekly',
+            'interval'  => 2,
+            'byDay'     => ['MO', 'TH'],
+            'endMode'   => 'count',
+            'count'     => 6
+        ]
+    ],
+    $msSeriesRecurrence
+);
+assertSameValue('PATCH', $msSeriesWriteClient->requests[1]['method'], 'Microsoft recurring series must be updated via PATCH.');
+assertTrueValue(
+    str_ends_with($msSeriesWriteClient->requests[1]['url'], '/events/series-master'),
+    'Microsoft full-series updates must target the series master ID.'
+);
+assertSameValue(
+    'W/"series-master"',
+    $msSeriesWriteClient->requests[1]['headers']['If-Match'],
+    'Microsoft full-series updates must retain the verified parent ETag.'
+);
+$msSeriesUpdateBody = json_decode(
+    $msSeriesWriteClient->requests[1]['body'],
+    true,
+    512,
+    JSON_THROW_ON_ERROR
+);
+assertSameValue('Updated Microsoft series', $msSeriesUpdateBody['subject'], 'Microsoft series updates must change the parent subject.');
+assertSameValue('weekly', $msSeriesUpdateBody['recurrence']['pattern']['type'], 'Microsoft series updates must send the edited recurrence pattern.');
+assertSameValue(2, $msSeriesUpdateBody['recurrence']['pattern']['interval'], 'Microsoft series updates must send the edited recurrence interval.');
+assertSameValue(6, $msSeriesUpdateBody['recurrence']['range']['numberOfOccurrences'], 'Microsoft series updates must send the edited recurrence range.');
+
+$msSeriesDeleteRecurrence = [
+    'recurrenceType'  => 'occurrence',
+    'seriesId'        => 'series-master',
+    'occurrenceId'    => 'instance/id+1',
+    'recurring'       => true,
+    'canDeleteSeries' => true,
+    'writeScope'      => 'series'
+];
+assertTrueValue(
+    $msSeriesProvider->deleteEvent(
+        'AQMk-primary',
+        'instance/id+1',
+        'W/"occurrence"',
+        '',
+        $msSeriesDeleteRecurrence
+    ),
+    'Microsoft full-series deletion must return true after HTTP 204.'
+);
+assertSameValue('DELETE', $msSeriesWriteClient->requests[2]['method'], 'Microsoft recurring series must be deleted via DELETE.');
+assertTrueValue(
+    str_ends_with($msSeriesWriteClient->requests[2]['url'], '/events/series-master'),
+    'Microsoft full-series deletion must target the series master ID rather than the selected occurrence.'
+);
+assertTrueValue(
+    !array_key_exists('If-Match', $msSeriesWriteClient->requests[2]['headers']),
+    'Microsoft full-series deletion must not reuse an occurrence ETag for the parent event.'
+);
 
 $msOnlineMeetingClient = new FakeHttpClient([
     response(200, ['isOnlineMeeting' => true])
