@@ -167,8 +167,21 @@ final class CalDAVProvider implements CalendarProviderInterface, RecurringCalend
         }
 
         $resource = $this->findRecurringResource($calendarUrl, $seriesId);
+        $getResponse = $this->httpClient->request(
+            'GET',
+            $resource['resourceUrl'],
+            ['Accept' => 'text/calendar']
+        );
+        $this->assertResponseStatus($getResponse, [200], 'recurring series retrieval');
+        $resourceUrl = $this->trustedEffectiveUrl($getResponse, $resource['resourceUrl']);
+        $this->assertResourceBelongsToCalendar($calendarUrl, $resourceUrl);
+        $resourceEtag = trim((string) ($getResponse->headers['etag'] ?? ''));
+        if ($resourceEtag === '') {
+            $resourceEtag = $resource['etag'];
+        }
+
         $masters = array_values(array_filter(
-            ICalendarCodec::parseEvents($resource['ical'], $resource['resourceUrl'], $resource['etag']),
+            ICalendarCodec::parseEvents($getResponse->body, $resourceUrl, $resourceEtag),
             static fn (array $event): bool => ($event['recurrenceType'] ?? '') === CalendarEventRecurrence::MASTER
                 && hash_equals($seriesId, trim((string) ($event['seriesId'] ?? '')))
         ));

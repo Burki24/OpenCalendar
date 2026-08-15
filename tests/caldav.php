@@ -455,6 +455,12 @@ $seriesLookupClient = new FakeCalDAVHttpClient([
         207,
         recurringSeriesLookupResponseXml('/calendars/user/work/series-1.ics'),
         'https://calendar.example/calendars/user/work/'
+    ),
+    caldavResponseWithHeaders(
+        200,
+        ['etag' => '"series-get-etag"'],
+        recurringSeriesIcal(),
+        $recurringResourceUrl
     )
 ]);
 $provider = new CalDAVProvider($seriesLookupClient, 'https://calendar.example/dav/');
@@ -469,7 +475,10 @@ assertCalDAVSame(true, $recurringSeries['recurrenceEditable'], 'Simple CalDAV RR
 assertCalDAVSame('WEEKLY', $recurringSeries['recurrenceSettings']['frequency'] ?? '', 'CalDAV recurring series lookup must expose the normalized frequency.');
 assertCalDAVSame(4, $recurringSeries['recurrenceSettings']['count'] ?? 0, 'CalDAV recurring series lookup must expose the normalized occurrence count.');
 assertCalDAVSame($recurringResourceUrl, $recurringSeries['resourceUrl'], 'CalDAV recurring series lookup must retain the object resource URL.');
+assertCalDAVSame('"series-get-etag"', $recurringSeries['etag'], 'CalDAV recurring series lookup must use the current resource ETag from GET.');
 assertCalDAVSame('REPORT', $seriesLookupClient->requests[0]['method'], 'CalDAV recurring series lookup must use a calendar REPORT.');
+assertCalDAVSame('GET', $seriesLookupClient->requests[1]['method'], 'CalDAV recurring series lookup must retrieve the matched resource directly before editing.');
+assertCalDAVSame($recurringResourceUrl, $seriesLookupClient->requests[1]['url'], 'CalDAV recurring series lookup must GET the exact matched object resource.');
 assertCalDAVTrue(
     str_contains($seriesLookupClient->requests[0]['body'], '<c:prop-filter name="UID">')
         && str_contains($seriesLookupClient->requests[0]['body'], 'series-1@example.com'),
