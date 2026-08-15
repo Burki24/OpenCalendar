@@ -105,6 +105,20 @@ final class CalendarRecurrenceRule
     }
 
     /**
+     * Builds one RFC 5545 RRULE line for an iCalendar VEVENT.
+     *
+     * @param array<string, mixed> $recurrence Provider-neutral recurrence settings.
+     */
+    public static function toICalendarRule(
+        array $recurrence,
+        DateTimeImmutable $start,
+        bool $allDay,
+        string $timezone
+    ): string {
+        return self::toGoogleLines($recurrence, $start, $allDay, $timezone)[0];
+    }
+
+    /**
      * Builds a Microsoft Graph patternedRecurrence object for a recurring event.
      *
      * @param array<string, mixed> $recurrence Provider-neutral recurrence settings.

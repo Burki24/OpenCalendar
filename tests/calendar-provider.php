@@ -1734,6 +1734,63 @@ $explicitCredentials = ICalendarAuthentication::credentials(
 assertSameValue('calendar-user', $explicitCredentials['username'], 'Explicit username/password mode must retain the username.');
 assertSameValue('calendar-password', $explicitCredentials['password'], 'Explicit username/password mode must retain the password.');
 
+$calDavRecurringCreated = ICalendarCodec::createEvent([
+    'summary'    => 'CalDAV weekly meeting',
+    'allDay'     => false,
+    'start'      => '2026-10-19T08:00:00Z',
+    'end'        => '2026-10-19T09:00:00Z',
+    'timezone'   => 'Europe/Berlin',
+    'recurrence' => [
+        'frequency' => 'weekly',
+        'interval'  => 2,
+        'byDay'     => ['TH', 'MO'],
+        'endMode'   => 'until',
+        'until'     => '2026-11-30'
+    ]
+]);
+assertTrueValue(
+    str_contains($calDavRecurringCreated['ical'], 'BEGIN:VTIMEZONE')
+        && str_contains($calDavRecurringCreated['ical'], 'TZID:Europe/Berlin')
+        && str_contains($calDavRecurringCreated['ical'], 'DTSTART;TZID=Europe/Berlin:20261019T100000')
+        && str_contains(
+            $calDavRecurringCreated['ical'],
+            'RRULE:FREQ=WEEKLY;INTERVAL=2;BYDAY=MO,TH;UNTIL=20261130T090000Z'
+        ),
+    'Recurring iCalendar creation must preserve local time and emit a self-contained RFC 5545 rule.'
+);
+$calDavRecurringParsed = ICalendarCodec::parseEvents(
+    $calDavRecurringCreated['ical'],
+    'https://calendar.example/work/series.ics',
+    '"series"'
+);
+assertSameValue(1, count($calDavRecurringParsed), 'A newly created recurring iCalendar resource must parse as one master event.');
+assertSameValue('master', $calDavRecurringParsed[0]['recurrenceType'], 'A created RRULE event must parse as a recurring master.');
+assertSameValue('Europe/Berlin', $calDavRecurringParsed[0]['timezone'], 'The recurring iCalendar TZID must survive parsing.');
+assertSameValue(
+    'FREQ=WEEKLY;INTERVAL=2;BYDAY=MO,TH;UNTIL=20261130T090000Z',
+    $calDavRecurringParsed[0]['recurrenceRule'],
+    'The created RFC 5545 recurrence rule must survive parsing.'
+);
+
+$calDavAllDayRecurringCreated = ICalendarCodec::createEvent([
+    'summary'    => 'CalDAV yearly day',
+    'allDay'     => true,
+    'start'      => '2026-08-15',
+    'end'        => '2026-08-16',
+    'recurrence' => [
+        'frequency' => 'yearly',
+        'interval'  => 1,
+        'endMode'   => 'count',
+        'count'     => 3
+    ]
+]);
+assertTrueValue(
+    str_contains($calDavAllDayRecurringCreated['ical'], 'DTSTART;VALUE=DATE:20260815')
+        && str_contains($calDavAllDayRecurringCreated['ical'], 'RRULE:FREQ=YEARLY;COUNT=3')
+        && !str_contains($calDavAllDayRecurringCreated['ical'], 'BEGIN:VTIMEZONE'),
+    'All-day recurring iCalendar events must use DATE values without a timezone component.'
+);
+
 $diveraIcs = <<<'ICS'
 BEGIN:VCALENDAR
 VERSION:2.0

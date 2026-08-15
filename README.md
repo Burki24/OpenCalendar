@@ -126,14 +126,32 @@ Serienteil behalten. Bereits vorhandene Ausnahmen ab dem Trennpunkt werden beim
 Bearbeiten nicht in den neuen Serienteil übernommen. Komplexere Microsoft-Muster
 bleiben erhalten, werden aber nicht verlustbehaftet im Serieneditor vereinfacht.
 
+## Apple/iCloud- und CalDAV-Serientermine
+
+Beschreibbare Apple-iCloud- und generische CalDAV-Kalender können neue Terminserien
+mit demselben gemeinsamen Serieneditor wie Google und Microsoft anlegen. Unterstützt
+werden tägliche, wöchentliche, monatliche und jährliche Wiederholungen, Intervalle,
+mehrere Wochentage sowie die Endarten **Nie**, **Nach Anzahl** und **Am Datum**.
+
+OpenCalendar speichert die Serie als RFC-5545-`RRULE` im CalDAV-Kalenderobjekt.
+Zeitgebundene Serien werden mit der lokalen Zeitzone und einem passenden
+`VTIMEZONE`-Block geschrieben, damit die lokale Uhrzeit auch über
+Sommer-/Winterzeitwechsel erhalten bleibt. Apple iCloud verwendet denselben
+CalDAV-Pfad wie andere Server.
+
+In diesem ersten CalDAV-Ausbauschritt betrifft die Schreibunterstützung die
+**Neuanlage** von Serien. Bestehende CalDAV-Serienvorkommnisse bleiben zunächst
+für Änderungen und Löschungen geschützt; diese Schreiboperationen folgen in den
+nächsten Ausbauschritten.
+
 ## Bekannte Einschränkungen
 
 - **Diesen und alle folgenden Termine** wird bei Microsoft-Onlinebesprechungen und
   Serien mit Anhängen nicht automatisch geteilt, weil diese Daten beim Erzeugen des
   neuen Serienteils nicht verlustfrei übernommen werden können.
-- Schreiboperationen auf Vorkommnisse oder vollständige Serien von CalDAV-
-  Serienterminen sind derzeit nicht freigegeben. Diese Serientermine werden
-  weiterhin lesend dargestellt.
+- Neue Serien können auch in Apple-iCloud- und generischen CalDAV-Kalendern angelegt werden.
+  Schreiboperationen auf bereits vorhandene CalDAV-Serienvorkommnisse oder vollständige
+  Serien sind in diesem Ausbauschritt noch nicht freigegeben.
 - ICS-/Webcal-Abonnements und lokal importierte ICS-Dateien sind grundsätzlich schreibgeschützt.
 - Die IPSView-Ausgabe benötigt im HTML-Box-Steuerelement den Renderer
   **Browser des Clients** oder **Automatisch**, da die Bedienung JavaScript

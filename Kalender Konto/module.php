@@ -561,7 +561,11 @@ class KalenderKonto extends IPSModuleStrict
     {
         $cachedCalendars = $this->ReadAttributeString('CachedCalendars');
         $provider = $this->ReadPropertyInteger('Provider');
-        if (!in_array($provider, [self::PROVIDER_GOOGLE, self::PROVIDER_MICROSOFT], true)) {
+        if (!in_array(
+            $provider,
+            [self::PROVIDER_APPLE, self::PROVIDER_CALDAV, self::PROVIDER_GOOGLE, self::PROVIDER_MICROSOFT],
+            true
+        )) {
             return $cachedCalendars;
         }
 
@@ -678,7 +682,11 @@ class KalenderKonto extends IPSModuleStrict
      */
     private static function normalizeCachedCalendarCapabilities(array $calendars, int $provider): array
     {
-        if (!in_array($provider, [self::PROVIDER_GOOGLE, self::PROVIDER_MICROSOFT], true)) {
+        if (!in_array(
+            $provider,
+            [self::PROVIDER_APPLE, self::PROVIDER_CALDAV, self::PROVIDER_GOOGLE, self::PROVIDER_MICROSOFT],
+            true
+        )) {
             return $calendars;
         }
 

@@ -229,6 +229,36 @@ assertAccountStructure(
 
 $normalizeCapabilities = $reflection->getMethod('normalizeCachedCalendarCapabilities');
 $normalizeCapabilities->setAccessible(true);
+$legacyCalDavCalendars = [[
+    'id'           => 'legacy-caldav-calendar',
+    'capabilities' => [
+        'read'   => true,
+        'create' => true,
+        'update' => true,
+        'delete' => true
+    ]
+], [
+    'id'           => 'legacy-caldav-read-only',
+    'capabilities' => [
+        'read'   => true,
+        'create' => false,
+        'update' => false,
+        'delete' => false
+    ]
+]];
+foreach ([0, 1] as $calDavProvider) {
+    $normalizedCalDavCalendars = $normalizeCapabilities->invoke(null, $legacyCalDavCalendars, $calDavProvider);
+    assertAccountStructure(
+        ($normalizedCalDavCalendars[0]['capabilities']['createRecurrence'] ?? false) === true
+            && ($normalizedCalDavCalendars[1]['capabilities']['createRecurrence'] ?? true) === false
+            && !array_key_exists('updateOccurrence', $normalizedCalDavCalendars[0]['capabilities'])
+            && !array_key_exists('updateFollowing', $normalizedCalDavCalendars[0]['capabilities'])
+            && !array_key_exists('updateSeries', $normalizedCalDavCalendars[0]['capabilities'])
+            && !array_key_exists('deleteSeries', $normalizedCalDavCalendars[0]['capabilities']),
+        'Legacy Apple and CalDAV caches must derive recurring creation only from cached write access.'
+    );
+}
+
 $legacyGoogleCalendars = [[
     'id'           => 'legacy-google-calendar',
     'accessRole'   => 'writer',

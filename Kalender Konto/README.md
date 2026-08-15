@@ -47,6 +47,11 @@ werden.
    normale Apple-Account-Passwort.
 5. **Verbindung testen**, die Konfiguration übernehmen und synchronisieren.
 
+Beschreibbare iCloud-Kalender können neue tägliche, wöchentliche, monatliche und
+jährliche Terminserien mit Intervall, Wochentagen sowie den Endarten Nie, Anzahl
+oder Enddatum anlegen. Die Serie wird als RFC-5545-`RRULE` über CalDAV gespeichert.
+Zeitgebundene Serien enthalten einen passenden `VTIMEZONE`-Block.
+
 ### Generisches CalDAV
 
 1. Als Anbieter **CalDAV** wählen.
@@ -61,6 +66,10 @@ werden.
 Falls die automatische Ermittlung mit einer allgemeinen Serveradresse nicht
 funktioniert, sollte die vom Anbieter ausdrücklich genannte CalDAV-Basisadresse
 verwendet werden.
+
+Beschreibbare CalDAV-Kalender unterstützen dieselbe Neuanlage von Terminserien wie
+iCloud. Bestehende CalDAV-Serien werden in diesem ersten Ausbauschritt weiterhin
+nur gelesen; das Bearbeiten und Löschen von Vorkommnissen und Serien folgt separat.
 
 ### Google Calendar
 

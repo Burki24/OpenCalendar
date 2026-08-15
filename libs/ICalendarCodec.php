@@ -13,6 +13,7 @@ use Throwable;
 
 require_once __DIR__ . '/ICalendarRecurrence.php';
 require_once __DIR__ . '/CalendarEventRecurrence.php';
+require_once __DIR__ . '/CalendarRecurrenceRule.php';
 
 final class ICalendarCodec
 {
@@ -108,6 +109,9 @@ final class ICalendarCodec
     /**
      * Creates a standalone VCALENDAR document containing one VEVENT.
      *
+     * Recurring timed events retain their local wall-clock time through an
+     * RFC 5545 TZID reference plus a matching VTIMEZONE component.
+     *
      * @param array<string, mixed> $data
      * @return array{uid: string, ical: string}
      */
@@ -130,23 +134,53 @@ final class ICalendarCodec
             throw new InvalidArgumentException('The event end must be later than the start.');
         }
 
+        $recurrence = $data['recurrence'] ?? null;
+        $recurring = $recurrence !== null && $recurrence !== [];
+        if ($recurring && (!is_array($recurrence) || array_is_list($recurrence))) {
+            throw new InvalidArgumentException('The recurrence settings are invalid.');
+        }
+
+        $timezoneName = trim((string) ($data['timezone'] ?? ''));
+        $timezoneLines = [];
+        $useTimezoneReference = false;
+        if ($recurring && !$allDay) {
+            if ($timezoneName === '') {
+                $timezoneName = date_default_timezone_get();
+            }
+            $timezone = self::strictTimezone($timezoneName);
+            $start = $start->setTimezone($timezone);
+            $end = $end->setTimezone($timezone);
+            $timezoneLines = self::timezoneComponent($timezone, $start, $recurrence);
+            $useTimezoneReference = $timezoneLines !== [];
+        }
+
         $uid = bin2hex(random_bytes(16)) . '@ips-kalender';
         $now = gmdate('Ymd\THis\Z');
         $lines = [
             'BEGIN:VCALENDAR',
             'VERSION:2.0',
             'PRODID:-//OpenCalendar//Calendar Module//EN',
-            'CALSCALE:GREGORIAN',
-            'BEGIN:VEVENT',
-            'UID:' . $uid,
-            'DTSTAMP:' . $now,
-            'CREATED:' . $now,
-            'LAST-MODIFIED:' . $now,
-            'SEQUENCE:0',
-            self::formatDateLine('DTSTART', $start, $allDay),
-            self::formatDateLine('DTEND', $end, $allDay),
-            'SUMMARY:' . self::escapeText($summary)
+            'CALSCALE:GREGORIAN'
         ];
+        array_push($lines, ...$timezoneLines);
+        $lines[] = 'BEGIN:VEVENT';
+        $lines[] = 'UID:' . $uid;
+        $lines[] = 'DTSTAMP:' . $now;
+        $lines[] = 'CREATED:' . $now;
+        $lines[] = 'LAST-MODIFIED:' . $now;
+        $lines[] = 'SEQUENCE:0';
+        $lines[] = self::formatEventDateLine('DTSTART', $start, $allDay, $useTimezoneReference ? $timezoneName : '');
+        $lines[] = self::formatEventDateLine('DTEND', $end, $allDay, $useTimezoneReference ? $timezoneName : '');
+        $lines[] = 'SUMMARY:' . self::escapeText($summary);
+
+        if ($recurring) {
+            $lines[] = CalendarRecurrenceRule::toICalendarRule(
+                $recurrence,
+                $start,
+                $allDay,
+                $timezoneName !== '' ? $timezoneName : 'UTC'
+            );
+        }
 
         foreach (['description' => 'DESCRIPTION', 'location' => 'LOCATION'] as $key => $property) {
             $value = trim((string) ($data[$key] ?? ''));
@@ -243,6 +277,154 @@ final class ICalendarCodec
 
         array_splice($lines, $target['start'], $target['end'] - $target['start'] + 1, $block);
         return self::foldLines($lines);
+    }
+
+    private static function formatEventDateLine(
+        string $property,
+        DateTimeImmutable $date,
+        bool $allDay,
+        string $timezoneName
+    ): string {
+        if ($allDay || $timezoneName === '') {
+            return self::formatDateLine($property, $date, $allDay);
+        }
+
+        return $property . ';TZID=' . $timezoneName . ':' . $date->format('Ymd\THis');
+    }
+
+    private static function strictTimezone(string $name): DateTimeZone
+    {
+        $name = trim($name);
+        if ($name === '' || preg_match('/^[A-Za-z0-9._+\/-]+$/D', $name) !== 1) {
+            throw new InvalidArgumentException('The recurring event timezone is invalid.');
+        }
+
+        try {
+            return new DateTimeZone($name);
+        } catch (Throwable $exception) {
+            throw new InvalidArgumentException('The recurring event timezone is invalid.', 0, $exception);
+        }
+    }
+
+    /**
+     * Builds a compact VTIMEZONE component from PHP timezone transitions.
+     *
+     * Transition dates are emitted explicitly so the calendar object remains
+     * self-contained as required for TZID references in CalDAV resources.
+     *
+     * @param array<string, mixed> $recurrence
+     * @return list<string>
+     */
+    private static function timezoneComponent(
+        DateTimeZone $timezone,
+        DateTimeImmutable $start,
+        array $recurrence
+    ): array {
+        $timezoneName = $timezone->getName();
+        if (in_array(strtoupper($timezoneName), ['UTC', 'GMT', 'ETC/UTC', 'ETC/GMT'], true)) {
+            return [];
+        }
+
+        $windowStart = $start->modify('-2 years')->getTimestamp();
+        $windowEnd = self::timezoneTransitionEnd($start, $recurrence)->getTimestamp();
+        $transitions = $timezone->getTransitions($windowStart, $windowEnd);
+        if ($transitions === false || count($transitions) < 2) {
+            return [];
+        }
+
+        $groups = [];
+        $previous = $transitions[0];
+        foreach (array_slice($transitions, 1) as $transition) {
+            $fromOffset = (int) ($previous['offset'] ?? 0);
+            $toOffset = (int) ($transition['offset'] ?? 0);
+            if ($fromOffset === $toOffset) {
+                $previous = $transition;
+                continue;
+            }
+
+            $type = (bool) ($transition['isdst'] ?? false) ? 'DAYLIGHT' : 'STANDARD';
+            $name = trim((string) ($transition['abbr'] ?? ''));
+            $key = implode('|', [$type, $fromOffset, $toOffset, $name]);
+            $localTransition = gmdate(
+                'Ymd\THis',
+                (int) ($transition['ts'] ?? 0) + $fromOffset
+            );
+            if (!isset($groups[$key])) {
+                $groups[$key] = [
+                    'type'       => $type,
+                    'fromOffset' => $fromOffset,
+                    'toOffset'   => $toOffset,
+                    'name'       => $name,
+                    'dates'      => []
+                ];
+            }
+            $groups[$key]['dates'][] = $localTransition;
+            $previous = $transition;
+        }
+
+        if ($groups === []) {
+            return [];
+        }
+
+        $lines = [
+            'BEGIN:VTIMEZONE',
+            'TZID:' . $timezoneName
+        ];
+        foreach ($groups as $group) {
+            $dates = $group['dates'];
+            if ($dates === []) {
+                continue;
+            }
+            $lines[] = 'BEGIN:' . $group['type'];
+            $lines[] = 'DTSTART:' . array_shift($dates);
+            $lines[] = 'TZOFFSETFROM:' . self::timezoneOffset((int) $group['fromOffset']);
+            $lines[] = 'TZOFFSETTO:' . self::timezoneOffset((int) $group['toOffset']);
+            if ($group['name'] !== '') {
+                $lines[] = 'TZNAME:' . self::escapeText((string) $group['name']);
+            }
+            if ($dates !== []) {
+                $lines[] = 'RDATE:' . implode(',', $dates);
+            }
+            $lines[] = 'END:' . $group['type'];
+        }
+        $lines[] = 'END:VTIMEZONE';
+
+        return $lines;
+    }
+
+    /** @param array<string, mixed> $recurrence */
+    private static function timezoneTransitionEnd(DateTimeImmutable $start, array $recurrence): DateTimeImmutable
+    {
+        $maximum = $start->modify('+100 years');
+        if (strtolower(trim((string) ($recurrence['endMode'] ?? 'never'))) !== 'until') {
+            return $maximum;
+        }
+
+        $until = trim((string) ($recurrence['until'] ?? ''));
+        if (preg_match('/^\d{4}-\d{2}-\d{2}$/D', $until) !== 1) {
+            return $maximum;
+        }
+        $untilDate = DateTimeImmutable::createFromFormat('!Y-m-d', $until, $start->getTimezone());
+        if ($untilDate === false || $untilDate->format('Y-m-d') !== $until) {
+            return $maximum;
+        }
+
+        $end = $untilDate->modify('+2 years');
+        return $end < $maximum ? $end : $maximum;
+    }
+
+    private static function timezoneOffset(int $seconds): string
+    {
+        $sign = $seconds < 0 ? '-' : '+';
+        $seconds = abs($seconds);
+        $hours = intdiv($seconds, 3600);
+        $minutes = intdiv($seconds % 3600, 60);
+        $remainingSeconds = $seconds % 60;
+
+        $value = sprintf('%s%02d%02d', $sign, $hours, $minutes);
+        return $remainingSeconds === 0
+            ? $value
+            : $value . sprintf('%02d', $remainingSeconds);
     }
 
     /**

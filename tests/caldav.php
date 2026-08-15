@@ -229,6 +229,7 @@ assertCalDAVSame(1, count($calendars), 'Calendar discovery must ignore collectio
 assertCalDAVSame('Work', $calendars[0]['name'], 'The CalDAV display name must be returned.');
 assertCalDAVSame('#123456', $calendars[0]['color'], 'Apple eight-digit calendar colors must be normalized.');
 assertCalDAVSame(true, $calendars[0]['capabilities']['create'], 'Write privileges must enable event creation.');
+assertCalDAVSame(true, $calendars[0]['capabilities']['createRecurrence'], 'Writable CalDAV calendars must advertise recurring event creation.');
 assertCalDAVSame(true, $calendars[0]['writeAccessKnown'], 'Returned privileges must mark write access as known.');
 
 $calendarXmlWithoutPrivileges = preg_replace(
@@ -245,6 +246,7 @@ $unknownPrivilegeClient = new FakeCalDAVHttpClient([
 $unknownPrivilegeCalendars = (new CalDAVProvider($unknownPrivilegeClient, 'https://calendar.example'))->getCalendars();
 assertCalDAVSame(false, $unknownPrivilegeCalendars[0]['writeAccessKnown'], 'Missing DAV privileges must remain distinguishable from explicit read-only access.');
 assertCalDAVSame(true, $unknownPrivilegeCalendars[0]['capabilities']['create'], 'Missing DAV privileges must not disable event creation optimistically.');
+assertCalDAVSame(true, $unknownPrivilegeCalendars[0]['capabilities']['createRecurrence'], 'Unknown DAV privileges must not hide recurring creation optimistically.');
 
 assertCalDAVSame('https://calendar.example/.well-known/caldav', $discoveryClient->requests[0]['url'], 'Root server URLs must start discovery at .well-known/caldav.');
 assertCalDAVSame('https://calendar.example/principals/user/', $discoveryClient->requests[1]['url'], 'The discovered principal must be queried.');
@@ -358,6 +360,48 @@ assertCalDAVSame('PUT', $updateClient->requests[1]['method'], 'CalDAV updates mu
 assertCalDAVSame('"etag-from-get"', $updateClient->requests[1]['headers']['If-Match'] ?? '', 'The current ETag must protect an update when no stored ETag is available.');
 assertCalDAVTrue(str_contains($updateClient->requests[1]['body'], 'SUMMARY:After update'), 'The updated iCalendar body must contain the changed title.');
 assertCalDAVSame('"etag-after-put"', $updated['etag'], 'The updated ETag must be returned to the caller.');
+
+// Recurring CalDAV events must be serialized as one RFC 5545 calendar object resource.
+$recurringCreateClient = new FakeCalDAVHttpClient([
+    caldavResponseWithHeaders(201, ['etag' => '"series-etag"'], '', '')
+]);
+$provider = new CalDAVProvider($recurringCreateClient, 'https://calendar.example/dav/');
+$createdSeries = $provider->createEvent(
+    'https://calendar.example/calendars/user/work/',
+    [
+        'summary'    => 'Weekly meeting',
+        'allDay'     => false,
+        'start'      => '2026-10-19T08:00:00Z',
+        'end'        => '2026-10-19T09:00:00Z',
+        'timezone'   => 'Europe/Berlin',
+        'recurrence' => [
+            'frequency' => 'weekly',
+            'interval'  => 2,
+            'byDay'     => ['TH', 'MO'],
+            'endMode'   => 'until',
+            'until'     => '2026-11-30'
+        ]
+    ]
+);
+assertCalDAVSame('PUT', $recurringCreateClient->requests[0]['method'], 'Recurring CalDAV events must be created via PUT.');
+assertCalDAVSame('*', $recurringCreateClient->requests[0]['headers']['If-None-Match'] ?? '', 'Recurring CalDAV creation must keep If-None-Match protection.');
+assertCalDAVTrue(
+    str_contains($recurringCreateClient->requests[0]['body'], 'DTSTART;TZID=Europe/Berlin:20261019T100000'),
+    'Recurring CalDAV events must preserve their local wall-clock start time.'
+);
+assertCalDAVTrue(
+    str_contains($recurringCreateClient->requests[0]['body'], 'BEGIN:VTIMEZONE')
+        && str_contains($recurringCreateClient->requests[0]['body'], 'TZID:Europe/Berlin'),
+    'TZID-based CalDAV events must carry a matching VTIMEZONE component.'
+);
+assertCalDAVTrue(
+    str_contains(
+        $recurringCreateClient->requests[0]['body'],
+        'RRULE:FREQ=WEEKLY;INTERVAL=2;BYDAY=MO,TH;UNTIL=20261130T090000Z'
+    ),
+    'Recurring CalDAV events must serialize the normalized recurrence rule as RFC 5545.'
+);
+assertCalDAVSame('"series-etag"', $createdSeries['etag'], 'Recurring CalDAV creation must return the server ETag.');
 
 // A server must not be able to redirect the resulting resource outside the selected calendar path.
 $createOutsideClient = new FakeCalDAVHttpClient([

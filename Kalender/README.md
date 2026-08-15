@@ -32,7 +32,7 @@ beliebig verschoben oder vom Benutzer umbenannt werden.
 - Abruf von CalDAV-Terminen über einen konfigurierbaren Zeitraum
 - Auflösen wiederkehrender Termine für die lokale Anzeige
 - lokaler JSON-Cache und zyklische Synchronisation
-- Erstellen neuer Termine sowie neuer Google- und Microsoft-Serientermine
+- Erstellen neuer Termine sowie neuer Google-, Microsoft-, Apple-iCloud- und CalDAV-Serientermine
 - Ändern und Löschen einzelner Termine sowie einzelner Google- und Microsoft-Serienvorkommnisse
 - Bearbeiten einer vollständigen Google- oder Microsoft-Terminserie
 - Bearbeiten oder Löschen eines Google- oder Microsoft-Serienvorkommnisses **und aller folgenden Termine** durch sicheres Teilen bzw. Kürzen der Serie
@@ -41,7 +41,7 @@ beliebig verschoben oder vom Benutzer umbenannt werden.
 - Statusvariablen für die gesamte geladene Terminanzahl, die Termine des
   aktuellen Tages und den Zeitpunkt der letzten Synchronisation
 
-Google- und Microsoft-Serien können als einzelnes Vorkommnis, als vollständige Serie oder **ab dem ausgewählten Vorkommnis für alle folgenden Termine** bearbeitet und gelöscht werden. Beim Bearbeiten teilt OpenCalendar die bestehende Serie am gewählten Termin in einen unveränderten vorderen und einen neu angelegten hinteren Serienteil. Beim Löschen wird der bestehende Parent direkt vor dem ausgewählten Vorkommnis beendet; beginnt die Auswahl beim ersten Vorkommnis, wird die komplette Serie gelöscht. Bei nummerierten Serien übernimmt der neue Serienteil nur die verbleibende Anzahl. Bestehende Ausnahmen ab dem Trennpunkt werden beim Teilen nicht in die neue Serie übernommen. CalDAV-Serienvorkommnisse sind weiterhin nicht für Serien-Schreiboperationen freigegeben.
+Google- und Microsoft-Serien können als einzelnes Vorkommnis, als vollständige Serie oder **ab dem ausgewählten Vorkommnis für alle folgenden Termine** bearbeitet und gelöscht werden. Beim Bearbeiten teilt OpenCalendar die bestehende Serie am gewählten Termin in einen unveränderten vorderen und einen neu angelegten hinteren Serienteil. Beim Löschen wird der bestehende Parent direkt vor dem ausgewählten Vorkommnis beendet; beginnt die Auswahl beim ersten Vorkommnis, wird die komplette Serie gelöscht. Bei nummerierten Serien übernimmt der neue Serienteil nur die verbleibende Anzahl. Bestehende Ausnahmen ab dem Trennpunkt werden beim Teilen nicht in die neue Serie übernommen. Apple-iCloud- und CalDAV-Kalender unterstützen jetzt die Neuanlage von Serien; Schreiboperationen auf bereits vorhandene CalDAV-Serien folgen in späteren Ausbauschritten.
 
 ## Voraussetzungen
 
@@ -133,12 +133,13 @@ $result = IPSKAL_CreateEvent(12345, json_encode([
 ]));
 ```
 
-Für beschreibbare Google- und Microsoft-Kalender können beim Erstellen zusätzlich
+Für beschreibbare Google-, Microsoft-, Apple-iCloud- und CalDAV-Kalender können beim Erstellen zusätzlich
 providerneutrale Serienangaben übergeben werden. Bei Google verwendet OpenCalendar
-die Kalenderzeitzone. Für Microsoft wird die übergebene Zeitzone verwendet; fehlt
-sie bei einem Aufruf über die Visualisierung, wird die Zeitzone des Clients
-verwendet. Dadurch bleibt die lokale Uhrzeit auch über Sommer-/Winterzeitwechsel
-erhalten:
+die Kalenderzeitzone. Für Microsoft und CalDAV wird die übergebene Zeitzone verwendet;
+fehlt sie bei einem Aufruf über die Visualisierung, wird die Zeitzone des Clients
+verwendet. CalDAV schreibt für zeitgebundene Serien zusätzlich einen passenden
+`VTIMEZONE`-Block. Dadurch bleibt die lokale Uhrzeit auch über
+Sommer-/Winterzeitwechsel erhalten:
 
 ```php
 $result = IPSKAL_CreateEvent(12345, json_encode([
@@ -155,7 +156,7 @@ $result = IPSKAL_CreateEvent(12345, json_encode([
 ]));
 ```
 
-Unterstützt werden für Google und Microsoft `DAILY`, `WEEKLY`, `MONTHLY` und
+Unterstützt werden für Google, Microsoft und CalDAV/Apple iCloud `DAILY`, `WEEKLY`, `MONTHLY` und
 `YEARLY`, ein Intervall, bei wöchentlichen Serien optionale Wochentage sowie die
 Endarten `never`, `count` und `until`. Bei Microsoft entspricht eine monatliche
 Serie dem Kalendertag des Starttermins und eine jährliche Serie zusätzlich dessen
@@ -210,5 +211,5 @@ Konfiguration unvollständig | Instanz im Kalender Konfigurator löschen und aus
 Synchronisation fehlgeschlagen | Zuerst im verbundenen Kalender Konto **Verbindung testen**, anschließend Konto und Kalender erneut synchronisieren
 Keine Termine sichtbar | Zeitraum für vergangene und zukünftige Termine prüfen und kontrollieren, ob der Online-Kalender im gewählten Zeitraum Termine enthält
 Kalender ist schreibgeschützt | Schreibrechte beim Anbieter prüfen; ICS/Webcal-Abonnements sind immer schreibgeschützt
-Ändern oder Löschen wird bei einem Serientermin verweigert | Google und Microsoft unterstützen Vorkommnis, dieses und folgende sowie vollständige Serie; Microsoft-Onlinebesprechungen und Serien mit Anhängen werden nicht automatisch geteilt; CalDAV-Serien bleiben schreibgeschützt
+Ändern oder Löschen wird bei einem Serientermin verweigert | Google und Microsoft unterstützen Vorkommnis, dieses und folgende sowie vollständige Serie; Microsoft-Onlinebesprechungen und Serien mit Anhängen werden nicht automatisch geteilt; Apple/CalDAV unterstützt derzeit die Neuanlage von Serien, bestehende Serien bleiben noch schreibgeschützt
 Schreibkonflikt | Kalender erneut synchronisieren; der ETag-Schutz verhindert das Überschreiben einer zwischenzeitlich geänderten Serverversion

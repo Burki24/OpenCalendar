@@ -379,10 +379,11 @@ final class CalDAVProvider implements CalendarProviderInterface
                 'components'       => array_values(array_unique($components)),
                 'writeAccessKnown' => $writeAccessKnown,
                 'capabilities'     => [
-                    'read'   => true,
-                    'create' => $canWrite,
-                    'update' => $canWrite,
-                    'delete' => $canWrite
+                    'read'             => true,
+                    'create'           => $canWrite,
+                    'update'           => $canWrite,
+                    'delete'           => $canWrite,
+                    'createRecurrence' => $canWrite
                 ]
             ];
         }
