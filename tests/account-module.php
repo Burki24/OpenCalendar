@@ -10,12 +10,109 @@ if (!class_exists('IPSModuleStrict')) {
 
 require_once __DIR__ . '/../Kalender Konto/module.php';
 
+final class CalendarAccountGatewayRecurrenceProbe
+{
+    use KalenderKontoChildGatewayTrait;
+
+    /** @var list<array<string, mixed>> */
+    private array $deleteCalls = [];
+
+    public function ReadAttributeString(string $name): string
+    {
+        if ($name !== 'CachedCalendars') {
+            return '';
+        }
+
+        return json_encode([
+            [
+                'id'        => 'calendar-id',
+                'reference' => 'owner@example.com'
+            ]
+        ], JSON_THROW_ON_ERROR);
+    }
+
+    /** @return object{deleteEvent: callable} */
+    private function createProvider(): object
+    {
+        return new class($this->deleteCalls)
+        {
+            /** @param list<array<string, mixed>> $deleteCalls */
+            public function __construct(private array &$deleteCalls)
+            {
+            }
+
+            /** @param array<string, mixed> $recurrence */
+            public function deleteEvent(
+                string $calendarReference,
+                string $eventReference,
+                string $etag,
+                string $recurrenceId = '',
+                array $recurrence = []
+            ): bool {
+                $this->deleteCalls[] = [
+                    'calendarReference' => $calendarReference,
+                    'eventReference'    => $eventReference,
+                    'etag'              => $etag,
+                    'recurrenceId'      => $recurrenceId,
+                    'recurrence'        => $recurrence
+                ];
+
+                return true;
+            }
+        };
+    }
+
+    /** @return list<array<string, mixed>> */
+    public function deleteCalls(): array
+    {
+        return $this->deleteCalls;
+    }
+}
+
 function assertAccountStructure(bool $condition, string $message): void
 {
     if (!$condition) {
         throw new RuntimeException($message);
     }
 }
+
+$gatewayProbe = new CalendarAccountGatewayRecurrenceProbe();
+$deleteEventForChild = new ReflectionMethod(CalendarAccountGatewayRecurrenceProbe::class, 'deleteEventForChild');
+$recurringEvent = [
+    'CalendarID'  => 'calendar-id',
+    'ResourceURL' => 'https://www.googleapis.com/calendar/v3/calendars/owner%40example.com/events/instance-id',
+    'ETag'        => '"occurrence-etag"',
+    'Recurrence'  => [
+        'recurrenceType'      => 'occurrence',
+        'seriesId'            => 'series-id',
+        'occurrenceId'        => 'instance-id',
+        'originalStart'       => '2026-08-12T09:00:00+02:00',
+        'recurring'           => true,
+        'canUpdateOccurrence' => true,
+        'canDeleteOccurrence' => true,
+        'canUpdateSeries'     => false,
+        'canDeleteSeries'     => true,
+        'writeScope'          => 'occurrence'
+    ]
+];
+assertAccountStructure(
+    $deleteEventForChild->invoke($gatewayProbe, $recurringEvent) === true,
+    'A recurring Google occurrence must pass through the account child gateway for deletion.'
+);
+$recurringEvent['Recurrence']['writeScope'] = 'series';
+assertAccountStructure(
+    $deleteEventForChild->invoke($gatewayProbe, $recurringEvent) === true,
+    'A complete Google recurring series must pass through the account child gateway for deletion.'
+);
+$deleteCalls = $gatewayProbe->deleteCalls();
+assertAccountStructure(
+    count($deleteCalls) === 2
+        && ($deleteCalls[0]['recurrence']['recurrenceType'] ?? '') === 'occurrence'
+        && ($deleteCalls[0]['recurrence']['seriesId'] ?? '') === 'series-id'
+        && ($deleteCalls[0]['recurrence']['writeScope'] ?? '') === 'occurrence'
+        && ($deleteCalls[1]['recurrence']['writeScope'] ?? '') === 'series',
+    'The account child gateway must normalize recurring occurrence and series deletion metadata.'
+);
 
 $reflection = new ReflectionClass(KalenderKonto::class);
 $traits = class_uses(KalenderKonto::class);
