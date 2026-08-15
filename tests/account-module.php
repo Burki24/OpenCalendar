@@ -73,7 +73,6 @@ assertAccountStructure(
     'OAuth callbacks must retain their pending provider across form changes and restarts.'
 );
 
-
 $normalizeCapabilities = $reflection->getMethod('normalizeCachedCalendarCapabilities');
 $normalizeCapabilities->setAccessible(true);
 $legacyGoogleCalendars = [[

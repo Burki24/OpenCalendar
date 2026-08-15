@@ -189,7 +189,7 @@ $eventClient = new FakeHttpClient([
                 'summary'          => 'Meeting',
                 'status'           => 'confirmed',
                 'recurringEventId' => 'series-id',
-                'originalStartTime'=> ['dateTime' => '2026-07-20T09:00:00+02:00', 'timeZone' => 'Europe/Berlin'],
+                'originalStartTime' => ['dateTime' => '2026-07-20T09:00:00+02:00', 'timeZone' => 'Europe/Berlin'],
                 'start'            => ['dateTime' => '2026-07-20T10:00:00+02:00', 'timeZone' => 'Europe/Berlin'],
                 'end'              => ['dateTime' => '2026-07-20T11:00:00+02:00', 'timeZone' => 'Europe/Berlin']
             ],
