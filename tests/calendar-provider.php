@@ -227,6 +227,29 @@ assertSameValue(true, $events[1]['canDeleteSeries'], 'Google occurrences must ad
 assertTrueValue(str_contains($eventClient->requests[0]['url'], 'owner%40example.com'), 'Calendar IDs must be URL encoded.');
 assertSameValue('Bearer access-token', $eventClient->requests[0]['headers']['Authorization'], 'API requests must use Bearer authorization.');
 
+$freshEditClient = new FakeHttpClient([
+    response(200, [
+        'id'       => 'event-id',
+        'iCalUID'  => 'event@example.com',
+        'etag'     => '"fresh-etag"',
+        'summary'  => 'Fresh event',
+        'status'   => 'confirmed',
+        'start'    => ['dateTime' => '2026-07-20T10:00:00+02:00', 'timeZone' => 'Europe/Berlin'],
+        'end'      => ['dateTime' => '2026-07-20T11:00:00+02:00', 'timeZone' => 'Europe/Berlin']
+    ])
+]);
+$freshEditEvent = (new GoogleCalendarProvider($freshEditClient, 'access-token'))->getEventForEdit(
+    'owner@example.com',
+    'event-id'
+);
+assertSameValue('"fresh-etag"', $freshEditEvent['etag'], 'Editing must use the current Google event ETag.');
+assertSameValue('event-id', $freshEditEvent['eventReference'], 'The directly loaded Google event identity must be retained.');
+assertSameValue('GET', $freshEditClient->requests[0]['method'], 'Preparing an edit must read the event directly from Google.');
+assertTrueValue(
+    str_ends_with($freshEditClient->requests[0]['url'], '/events/event-id'),
+    'Preparing an edit must address the selected Google event directly.'
+);
+
 $writeClient = new FakeHttpClient([
     response(200, ['id' => 'created-id', 'iCalUID' => 'created@example.com', 'etag' => '"new"']),
     response(200, ['id' => 'created-id', 'iCalUID' => 'created@example.com', 'etag' => '"updated"']),

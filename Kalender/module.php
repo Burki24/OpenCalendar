@@ -325,6 +325,48 @@ class Kalender extends IPSModuleStrict
     }
 
     /**
+     * Returns the current provider version of one event before it is edited.
+     *
+     * This read intentionally bypasses the local event cache so the editor receives
+     * the provider's current ETag and other write-relevant identity fields.
+     *
+     * @param string $EventJSON JSON-encoded event identity and current time range.
+     * @return string JSON-encoded normalized current event.
+     */
+    public function GetEventForEdit(string $EventJSON): string
+    {
+        try {
+            $event = $this->decodeObject($EventJSON, 'event');
+            $startTimestamp = (int) ($event['startTimestamp'] ?? 0);
+            $endTimestamp = (int) ($event['endTimestamp'] ?? 0);
+            if ($startTimestamp <= 0) {
+                throw new InvalidArgumentException('The selected event start is invalid.');
+            }
+
+            $currentEvent = $this->sendRequest('GetEventForEdit', [
+                'ResourceURL'    => trim((string) ($event['resourceUrl'] ?? '')),
+                'EventReference' => trim((string) ($event['eventReference'] ?? '')),
+                'UID'            => trim((string) ($event['uid'] ?? '')),
+                'OccurrenceID'   => trim((string) ($event['occurrenceId'] ?? '')),
+                'OriginalStart'  => trim((string) ($event['originalStart'] ?? '')),
+                'RecurrenceID'   => trim((string) ($event['recurrenceId'] ?? '')),
+                'Start'          => $startTimestamp,
+                'End'            => $endTimestamp
+            ]);
+
+            return json_encode(
+                $currentEvent,
+                JSON_UNESCAPED_SLASHES
+                    | JSON_UNESCAPED_UNICODE
+                    | JSON_PRESERVE_ZERO_FRACTION
+                    | JSON_THROW_ON_ERROR
+            );
+        } catch (Throwable $exception) {
+            throw new RuntimeException($this->handleError($exception), 0, $exception);
+        }
+    }
+
+    /**
      * Returns the verified parent event for a recurring series.
      *
      * @param string $SeriesID Provider-specific recurring parent event identifier.

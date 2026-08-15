@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use IPSKalender\CalendarEventLookupProviderInterface;
 use IPSKalender\CalendarEventRecurrence;
 use IPSKalender\RecurringCalendarProviderInterface;
 
@@ -30,6 +31,7 @@ trait KalenderKontoChildGatewayTrait
                 'FinishEventsTransfer'   => [
                     'success' => $this->finishEventsTransferForChild($request)
                 ],
+                'GetEventForEdit'        => $this->getEventForEditForChild($request),
                 'GetRecurringSeries'     => $this->getRecurringSeriesForChild($request),
                 'GetRecurringFollowing'  => $this->getRecurringFollowingForChild($request),
                 'CreateEvent'            => $this->createEventForChild($request),
@@ -119,6 +121,111 @@ trait KalenderKontoChildGatewayTrait
             self::EVENT_TRANSFER_SCOPE,
             (string) ($request['Token'] ?? '')
         );
+    }
+
+    /**
+     * Returns the current provider version of one event before it is edited.
+     *
+     * Providers with a direct lookup capability are queried by their stable event
+     * reference. Other providers are queried in a narrow time window and the
+     * normalized result is matched against the event identity supplied by the child.
+     *
+     * @param array<string, mixed> $request
+     * @return array<string, mixed>
+     */
+    private function getEventForEditForChild(array $request): array
+    {
+        $calendar = $this->resolveCalendar((string) ($request['CalendarID'] ?? ''));
+        $provider = $this->createProvider();
+        $eventReference = trim((string) ($request['EventReference'] ?? ''));
+        if ($eventReference !== '' && $provider instanceof CalendarEventLookupProviderInterface) {
+            return $provider->getEventForEdit(
+                $this->calendarReference($calendar),
+                $eventReference
+            );
+        }
+
+        $startTimestamp = (int) ($request['Start'] ?? 0);
+        $endTimestamp = (int) ($request['End'] ?? 0);
+        if ($startTimestamp <= 0) {
+            throw new InvalidArgumentException('The selected event start is invalid.');
+        }
+        if ($endTimestamp <= $startTimestamp) {
+            $endTimestamp = $startTimestamp + 1;
+        }
+
+        $rangeStart = max(1, $startTimestamp - 86400);
+        $rangeEnd = $endTimestamp + 86400;
+        if (($rangeEnd - $rangeStart) > 6 * 366 * 86400) {
+            throw new InvalidArgumentException('The selected event time range is too large.');
+        }
+
+        $matches = array_values(array_filter(
+            $provider->getEvents(
+                $this->calendarReference($calendar),
+                new DateTimeImmutable('@' . $rangeStart),
+                new DateTimeImmutable('@' . $rangeEnd)
+            ),
+            fn (mixed $event): bool => is_array($event)
+                && $this->eventMatchesEditRequest($event, $request)
+        ));
+
+        if (count($matches) === 1) {
+            return $matches[0];
+        }
+        if ($matches === []) {
+            throw new RuntimeException(
+                'The selected event is no longer available. Synchronize the calendar and try again.'
+            );
+        }
+
+        throw new RuntimeException('The selected event could not be identified uniquely.');
+    }
+
+    /**
+     * @param array<string, mixed> $event
+     * @param array<string, mixed> $request
+     */
+    private function eventMatchesEditRequest(array $event, array $request): bool
+    {
+        $primaryIdentity = [
+            'OccurrenceID'   => 'occurrenceId',
+            'EventReference' => 'eventReference',
+            'ResourceURL'    => 'resourceUrl',
+            'UID'            => 'uid'
+        ];
+        $matchedPrimary = false;
+        foreach ($primaryIdentity as $requestKey => $eventKey) {
+            $expected = trim((string) ($request[$requestKey] ?? ''));
+            if ($expected === '') {
+                continue;
+            }
+            $actual = trim((string) ($event[$eventKey] ?? ''));
+            if ($actual === '') {
+                continue;
+            }
+            if (!hash_equals($expected, $actual)) {
+                return false;
+            }
+            $matchedPrimary = true;
+            break;
+        }
+        if (!$matchedPrimary) {
+            return false;
+        }
+
+        foreach ([
+            'OriginalStart' => 'originalStart',
+            'RecurrenceID'  => 'recurrenceId'
+        ] as $requestKey => $eventKey) {
+            $expected = trim((string) ($request[$requestKey] ?? ''));
+            $actual = trim((string) ($event[$eventKey] ?? ''));
+            if ($expected !== '' && $actual !== '' && !hash_equals($expected, $actual)) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /**

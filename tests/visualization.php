@@ -154,7 +154,7 @@ assertVisualization(
         && str_contains($script, 'card.addEventListener(\'click\', () => openEventDetails(event));')
         && str_contains($script, 'document.getElementById(\'details-edit-button\').addEventListener(\'click\'')
         && str_contains($script, 'requestEdit(eventDetailsDialog)')
-        && str_contains($script, "openExistingEvent(event, 'occurrence')")
+        && str_contains($script, 'void prepareEventEdit(event);')
         && str_contains($script, "t(editingSeries ? 'Edit recurring event' : 'Edit event')")
         && str_contains($script, 'const displayEnd = end > start ? addDays(end, -1) : start;')
         && str_contains($script, 'function eventCanUpdate(event)')
@@ -227,6 +227,7 @@ assertVisualization(
 
 $formSource = (string) file_get_contents(__DIR__ . '/../Kalender Ansicht/form.json');
 $moduleSource = (string) file_get_contents(__DIR__ . '/../Kalender Ansicht/module.php');
+$calendarModuleSource = (string) file_get_contents(__DIR__ . '/../Kalender/module.php');
 
 assertVisualization(
     substr_count(
@@ -242,6 +243,20 @@ assertVisualization(
                 . "                    && trim((string) (\$event['seriesId'] ?? '')) !== '';"
         ) === 2,
     'Cached Microsoft occurrences must recover their original start and recurrence capabilities without manual cache deletion.'
+);
+
+assertVisualization(
+    str_contains($script, 'let pendingEventEdit = null;')
+        && str_contains($script, 'async function prepareEventEdit(event)')
+        && str_contains($script, "sendAction('PrepareEventEdit', request)")
+        && str_contains($script, "openExistingEvent(eventEdit, 'occurrence')")
+        && !str_contains($script, "openExistingEvent(event, 'occurrence')")
+        && str_contains($moduleSource, "case 'PrepareEventEdit':")
+        && str_contains($moduleSource, 'IPSKAL_GetEventForEdit(')
+        && str_contains($moduleSource, '$state[\'eventEdit\'] = $eventEdit;')
+        && str_contains($calendarModuleSource, 'public function GetEventForEdit(string $EventJSON): string')
+        && str_contains($calendarModuleSource, '$this->sendRequest(\'GetEventForEdit\', ['),
+    'Opening a normal or single-occurrence editor must refresh the event identity and ETag from the provider first.'
 );
 
 assertVisualization(

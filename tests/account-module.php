@@ -40,10 +40,30 @@ final class CalendarAccountGatewayRecurrenceProbe
     /** @return object{deleteEvent: callable} */
     private function createProvider(): object
     {
-        return new class($this->deleteCalls) implements \IPSKalender\RecurringCalendarProviderInterface {
+        return new class($this->deleteCalls) implements
+            \IPSKalender\CalendarEventLookupProviderInterface,
+            \IPSKalender\RecurringCalendarProviderInterface {
             /** @param list<array<string, mixed>> $deleteCalls */
             public function __construct(private array &$deleteCalls)
             {
+            }
+
+            /** @return array<string, mixed> */
+            public function getEventForEdit(string $calendarReference, string $eventReference): array
+            {
+                return [
+                    'uid'            => 'event@example.com',
+                    'eventReference' => $eventReference,
+                    'resourceUrl'    => $calendarReference . '/events/' . $eventReference,
+                    'etag'           => '"fresh-etag"',
+                    'summary'        => 'Fresh event',
+                    'start'          => '2026-08-12T09:00:00+02:00',
+                    'end'            => '2026-08-12T10:00:00+02:00',
+                    'startTimestamp' => 1786518000,
+                    'endTimestamp'   => 1786521600,
+                    'allDay'         => false,
+                    'recurring'      => false
+                ];
             }
 
             /** @return array<string, mixed> */
@@ -104,6 +124,19 @@ function assertAccountStructure(bool $condition, string $message): void
 }
 
 $gatewayProbe = new CalendarAccountGatewayRecurrenceProbe();
+$getEventForEditForChild = new ReflectionMethod(CalendarAccountGatewayRecurrenceProbe::class, 'getEventForEditForChild');
+$gatewayEventForEdit = $getEventForEditForChild->invoke($gatewayProbe, [
+    'CalendarID'     => 'calendar-id',
+    'EventReference' => 'event-id',
+    'Start'          => 1786518000,
+    'End'            => 1786521600
+]);
+assertAccountStructure(
+    is_array($gatewayEventForEdit)
+        && ($gatewayEventForEdit['eventReference'] ?? '') === 'event-id'
+        && ($gatewayEventForEdit['etag'] ?? '') === '"fresh-etag"',
+    'The account child gateway must read the current provider event before editing.'
+);
 $getRecurringSeriesForChild = new ReflectionMethod(CalendarAccountGatewayRecurrenceProbe::class, 'getRecurringSeriesForChild');
 $gatewaySeries = $getRecurringSeriesForChild->invoke($gatewayProbe, [
     'CalendarID' => 'calendar-id',
@@ -336,7 +369,12 @@ assertAccountStructure(
 $gatewaySource = file_get_contents(__DIR__ . '/../Kalender Konto/traits/ChildGatewayTrait.php');
 assertAccountStructure(
     is_string($gatewaySource)
+        && str_contains($gatewaySource, 'use IPSKalender\CalendarEventLookupProviderInterface;')
         && str_contains($gatewaySource, 'use IPSKalender\RecurringCalendarProviderInterface;')
+        && str_contains($gatewaySource, "'GetEventForEdit'")
+        && str_contains($gatewaySource, 'getEventForEditForChild($request)')
+        && str_contains($gatewaySource, 'instanceof CalendarEventLookupProviderInterface')
+        && str_contains($gatewaySource, '->getEventForEdit(')
         && str_contains($gatewaySource, "'GetRecurringSeries'")
         && str_contains($gatewaySource, 'getRecurringSeriesForChild($request)')
         && str_contains($gatewaySource, "'GetRecurringFollowing'")

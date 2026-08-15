@@ -1868,6 +1868,7 @@ class KalenderAnsicht extends IPSModuleStrict
     {
         $level = 'success';
         $message = '';
+        $eventEdit = null;
         $seriesEdit = null;
 
         switch ($ident) {
@@ -1897,6 +1898,69 @@ class KalenderAnsicht extends IPSModuleStrict
                     throw new RuntimeException((string) ($result['error'] ?? $this->Translate('Event creation failed.')));
                 }
                 $message = 'Event created.';
+                break;
+
+            case 'PrepareEventEdit':
+                $request = $this->decodeActionValue($value);
+                $instanceId = $this->requireWritableCalendar($request);
+                $event = $request['event'] ?? null;
+                if (!is_array($event) || array_is_list($event)) {
+                    throw new InvalidArgumentException($this->Translate('The event data is invalid.'));
+                }
+
+                $eventEdit = json_decode(
+                    IPSKAL_GetEventForEdit(
+                        $instanceId,
+                        json_encode(
+                            $event,
+                            JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR
+                        )
+                    ),
+                    true,
+                    512,
+                    JSON_THROW_ON_ERROR
+                );
+                if (!is_array($eventEdit) || array_is_list($eventEdit)) {
+                    throw new RuntimeException($this->Translate('The event data is invalid.'));
+                }
+
+                $calendar = null;
+                foreach ($this->loadSelectedCalendars() as $selectedCalendar) {
+                    if ($selectedCalendar['instanceId'] === $instanceId) {
+                        $calendar = $selectedCalendar;
+                        break;
+                    }
+                }
+                if ($calendar === null) {
+                    throw new RuntimeException($this->Translate('The selected calendar is not writable.'));
+                }
+
+                $eventEdit['calendarInstanceId'] = $instanceId;
+                $eventEdit['calendarName'] = $calendar['name'];
+                $eventEdit['calendarColor'] = $calendar['color'];
+                $eventEdit['canWrite'] = true;
+                if (($eventEdit['recurrenceType'] ?? '') === 'occurrence'
+                    && trim((string) ($eventEdit['originalStart'] ?? '')) === '') {
+                    $eventEdit['originalStart'] = trim((string) ($eventEdit['start'] ?? ''));
+                }
+                $recurringOccurrence = (bool) ($eventEdit['recurring'] ?? false)
+                    && trim((string) ($eventEdit['occurrenceId'] ?? '')) !== ''
+                    && trim((string) ($eventEdit['seriesId'] ?? '')) !== '';
+                $eventEdit['canUpdateOccurrence'] = (bool) ($eventEdit['canUpdateOccurrence'] ?? false)
+                    || ($recurringOccurrence && $calendar['canUpdateOccurrence']);
+                $eventEdit['canDeleteOccurrence'] = (bool) ($eventEdit['canDeleteOccurrence'] ?? false)
+                    || ($recurringOccurrence && $calendar['canDeleteOccurrence']);
+                $eventEdit['canUpdateFollowing'] = (bool) ($eventEdit['canUpdateFollowing'] ?? false)
+                    || ($recurringOccurrence && $calendar['canUpdateFollowing']);
+                $eventEdit['canUpdateSeries'] = (bool) ($eventEdit['canUpdateSeries'] ?? false)
+                    || ((bool) ($eventEdit['recurring'] ?? false)
+                        && trim((string) ($eventEdit['seriesId'] ?? '')) !== ''
+                        && $calendar['canUpdateSeries']);
+                $eventEdit['canDeleteSeries'] = (bool) ($eventEdit['canDeleteSeries'] ?? false)
+                    || ((bool) ($eventEdit['recurring'] ?? false)
+                        && trim((string) ($eventEdit['seriesId'] ?? '')) !== ''
+                        && $calendar['canDeleteSeries']);
+                $eventEdit['writeScope'] = 'occurrence';
                 break;
 
             case 'PrepareSeriesEdit':
@@ -2047,6 +2111,9 @@ class KalenderAnsicht extends IPSModuleStrict
         }
 
         $state = $this->buildState();
+        if ($eventEdit !== null) {
+            $state['eventEdit'] = $eventEdit;
+        }
         if ($seriesEdit !== null) {
             $state['seriesEdit'] = $seriesEdit;
         }

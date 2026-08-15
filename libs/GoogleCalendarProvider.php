@@ -12,6 +12,7 @@ use RuntimeException;
 use Throwable;
 
 require_once __DIR__ . '/CalendarProviderInterface.php';
+require_once __DIR__ . '/CalendarEventLookupProviderInterface.php';
 require_once __DIR__ . '/RecurringCalendarProviderInterface.php';
 require_once __DIR__ . '/CalendarHttpClient.php';
 require_once __DIR__ . '/CalendarEventRecurrence.php';
@@ -31,7 +32,7 @@ final class GoogleCalendarProviderException extends RuntimeException
     }
 }
 
-final class GoogleCalendarProvider implements CalendarProviderInterface, RecurringCalendarProviderInterface
+final class GoogleCalendarProvider implements CalendarEventLookupProviderInterface, CalendarProviderInterface, RecurringCalendarProviderInterface
 {
     private const API_URL = 'https://www.googleapis.com/calendar/v3';
     private const MAX_PAGES = 100;
@@ -192,6 +193,27 @@ final class GoogleCalendarProvider implements CalendarProviderInterface, Recurri
         );
 
         return $events;
+    }
+
+    /** @inheritDoc */
+    public function getEventForEdit(string $calendarReference, string $eventReference): array
+    {
+        $calendarId = $this->calendarId($calendarReference);
+        $eventId = $this->eventId($eventReference);
+        $item = $this->requestJson(
+            'GET',
+            '/calendars/' . rawurlencode($calendarId) . '/events/' . rawurlencode($eventId)
+        );
+        if (($item['status'] ?? '') === 'cancelled') {
+            throw new GoogleCalendarProviderException('The selected event is no longer available.');
+        }
+
+        $event = $this->mapEvent($calendarId, $item, '');
+        if ($event === null || !hash_equals($eventId, (string) ($event['eventReference'] ?? ''))) {
+            throw new GoogleCalendarProviderException('Google Calendar did not return the selected event.');
+        }
+
+        return $event;
     }
 
     /** @inheritDoc */

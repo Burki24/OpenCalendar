@@ -29,6 +29,7 @@ let cursorDate = startOfDay(new Date());
 let initialized = false;
 let selectedEvent = null;
 let editScopeSourceDialog = null;
+let pendingEventEdit = null;
 let pendingSeriesEdit = null;
 let deleteSourceDialog = null;
 let visibleCalendarIds = null;
@@ -85,19 +86,29 @@ function handleMessage(data) {
     }
     if (!message || typeof message !== 'object') return;
     if (message.toast && typeof message.toast === 'object') {
-        if (message.toast.level === 'error') pendingSeriesEdit = null;
+        if (message.toast.level === 'error') {
+            pendingEventEdit = null;
+            pendingSeriesEdit = null;
+        }
         showToast(t(message.toast.message || ''), message.toast.level || 'success');
     }
     if (message.type === 'toast') {
-        if (message.level === 'error') pendingSeriesEdit = null;
+        if (message.level === 'error') {
+            pendingEventEdit = null;
+            pendingSeriesEdit = null;
+        }
         showToast(t(message.message || ''), message.level || 'success');
         return;
     }
     if (message.type !== 'state' || !message.payload) return;
     calendarState = message.payload;
+    const eventEdit = calendarState.eventEdit && typeof calendarState.eventEdit === 'object'
+        ? calendarState.eventEdit
+        : null;
     const seriesEdit = calendarState.seriesEdit && typeof calendarState.seriesEdit === 'object'
         ? calendarState.seriesEdit
         : null;
+    delete calendarState.eventEdit;
     delete calendarState.seriesEdit;
     calendarState.events = Array.isArray(calendarState.events) ? calendarState.events : [];
     calendarState.calendars = Array.isArray(calendarState.calendars) ? calendarState.calendars : [];
@@ -110,6 +121,15 @@ function handleMessage(data) {
         initialized = true;
     }
     render();
+    if (eventEdit && pendingEventEdit
+        && Number(eventEdit.calendarInstanceId) === pendingEventEdit.calendarInstanceId
+        && (pendingEventEdit.eventReference === ''
+            || String(eventEdit.eventReference || '') === pendingEventEdit.eventReference)
+        && (pendingEventEdit.occurrenceId === ''
+            || String(eventEdit.occurrenceId || '') === pendingEventEdit.occurrenceId)) {
+        pendingEventEdit = null;
+        openExistingEvent(eventEdit, 'occurrence');
+    }
     if (seriesEdit && pendingSeriesEdit
         && Number(seriesEdit.calendarInstanceId) === pendingSeriesEdit.calendarInstanceId
         && String(seriesEdit.seriesId || '') === pendingSeriesEdit.seriesId) {
@@ -919,7 +939,7 @@ function requestEdit(sourceDialog) {
     const seriesAllowed = eventCanUpdateSeries(event);
     if (!event.recurring || (!followingAllowed && !seriesAllowed)) {
         sourceDialog?.close();
-        openExistingEvent(event, 'occurrence');
+        void prepareEventEdit(event);
         return;
     }
 
@@ -949,7 +969,7 @@ async function confirmEditScope() {
         editScopeDialog.close();
         sourceDialog?.close();
         if (scope === 'occurrence') {
-            openExistingEvent(event, 'occurrence');
+            await prepareEventEdit(event);
             return;
         }
 
@@ -967,6 +987,40 @@ async function confirmEditScope() {
         }
     } finally {
         editScopeConfirmButton.disabled = false;
+    }
+}
+
+async function prepareEventEdit(event) {
+    const calendarInstanceId = Number(event?.calendarInstanceId || 0);
+    const eventReference = String(event?.eventReference || '');
+    const occurrenceId = String(event?.occurrenceId || '');
+    const startTimestamp = Number(event?.startTimestamp)
+        || Math.floor(eventStart(event).getTime() / 1000);
+    const endTimestamp = Number(event?.endTimestamp)
+        || Math.floor(eventEnd(event).getTime() / 1000);
+
+    pendingEventEdit = {
+        calendarInstanceId,
+        eventReference,
+        occurrenceId
+    };
+    const request = {
+        calendarInstanceId,
+        event: {
+            uid: String(event?.uid || ''),
+            resourceUrl: String(event?.resourceUrl || ''),
+            eventReference,
+            occurrenceId,
+            originalStart: String(event?.originalStart || ''),
+            recurrenceId: String(event?.recurrenceId || ''),
+            startTimestamp,
+            endTimestamp
+        }
+    };
+
+    if (!calendarInstanceId || startTimestamp <= 0
+        || !(await sendAction('PrepareEventEdit', request))) {
+        pendingEventEdit = null;
     }
 }
 
