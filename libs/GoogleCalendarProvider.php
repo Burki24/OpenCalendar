@@ -12,6 +12,7 @@ use RuntimeException;
 use Throwable;
 
 require_once __DIR__ . '/CalendarProviderInterface.php';
+require_once __DIR__ . '/RecurringCalendarProviderInterface.php';
 require_once __DIR__ . '/CalendarHttpClient.php';
 require_once __DIR__ . '/CalendarEventRecurrence.php';
 require_once __DIR__ . '/CalendarRecurrenceRule.php';
@@ -30,7 +31,7 @@ final class GoogleCalendarProviderException extends RuntimeException
     }
 }
 
-final class GoogleCalendarProvider implements CalendarProviderInterface
+final class GoogleCalendarProvider implements CalendarProviderInterface, RecurringCalendarProviderInterface
 {
     private const API_URL = 'https://www.googleapis.com/calendar/v3';
     private const MAX_PAGES = 100;
@@ -118,6 +119,7 @@ final class GoogleCalendarProvider implements CalendarProviderInterface
                         'update'           => $canWrite,
                         'delete'           => $canWrite,
                         'createRecurrence' => $canWrite,
+                        'updateSeries'     => $canWrite,
                         'deleteSeries'     => $canWrite
                     ]
                 ];
@@ -192,6 +194,45 @@ final class GoogleCalendarProvider implements CalendarProviderInterface
     }
 
     /** @inheritDoc */
+    public function getRecurringSeries(string $calendarReference, string $seriesId): array
+    {
+        $calendarId = $this->calendarId($calendarReference);
+        $seriesId = trim($seriesId);
+        if ($seriesId === '') {
+            throw new GoogleCalendarProviderException('The recurring series ID is missing.');
+        }
+
+        $item = $this->requestJson(
+            'GET',
+            '/calendars/' . rawurlencode($calendarId) . '/events/' . rawurlencode($seriesId)
+        );
+        $mapped = $this->mapEvent($calendarId, $item, '');
+        if ($mapped === null
+            || ($mapped['recurrenceType'] ?? '') !== CalendarEventRecurrence::MASTER
+            || !hash_equals($seriesId, (string) ($mapped['seriesId'] ?? ''))) {
+            throw new GoogleCalendarProviderException('Google Calendar did not return the recurring parent event.');
+        }
+
+        $recurrenceLines = array_values(array_filter(
+            is_array($item['recurrence'] ?? null) ? $item['recurrence'] : [],
+            'is_string'
+        ));
+        $recurrenceSettings = null;
+        if (count($recurrenceLines) === 1) {
+            $recurrenceSettings = CalendarRecurrenceRule::fromGoogleRule(
+                $recurrenceLines[0],
+                (bool) ($mapped['allDay'] ?? false),
+                (string) ($mapped['timezone'] ?? '')
+            );
+        }
+
+        $mapped['recurrenceEditable'] = $recurrenceSettings !== null;
+        $mapped['recurrenceSettings'] = $recurrenceSettings ?? [];
+
+        return $mapped;
+    }
+
+    /** @inheritDoc */
     public function createEvent(string $calendarReference, array $event): array
     {
         $calendarId = $this->calendarId($calendarReference);
@@ -218,12 +259,19 @@ final class GoogleCalendarProvider implements CalendarProviderInterface
     ): array {
         $calendarId = $this->calendarId($calendarReference);
         $eventId = $this->eventId($eventReference);
-        $this->assertWritableRecurrence($recurrence, true, $eventId);
+        $identity = $this->assertWritableRecurrence($recurrence, true, $eventId);
+        $seriesUpdate = ($identity['writeScope'] ?? '') === CalendarEventRecurrence::WRITE_SCOPE_SERIES;
+        $targetEventId = $seriesUpdate
+            ? trim((string) ($identity['seriesId'] ?? ''))
+            : $eventId;
+        if ($targetEventId === '') {
+            throw new GoogleCalendarProviderException('The recurring series ID is missing.');
+        }
         $headers = $etag !== '' ? ['If-Match' => $etag] : [];
         $updated = $this->requestJson(
             'PATCH',
-            '/calendars/' . rawurlencode($calendarId) . '/events/' . rawurlencode($eventId),
-            $this->buildEventPayload($event, false),
+            '/calendars/' . rawurlencode($calendarId) . '/events/' . rawurlencode($targetEventId),
+            $this->buildEventPayload($event, false, $seriesUpdate),
             $headers,
             [200]
         );
@@ -346,11 +394,11 @@ final class GoogleCalendarProvider implements CalendarProviderInterface
                 '',
                 true,
                 false,
-                false,
+                true,
                 true
             )
             : ($recurrence !== []
-                ? CalendarEventRecurrence::master($eventId, false, true)
+                ? CalendarEventRecurrence::master($eventId, true, true)
                 : CalendarEventRecurrence::single());
         $resourceUrl = $this->eventUrl($calendarId, $eventId);
 
@@ -418,7 +466,7 @@ final class GoogleCalendarProvider implements CalendarProviderInterface
      * @param array<string, mixed> $data
      * @return array<string, mixed>
      */
-    private function buildEventPayload(array $data, bool $creating): array
+    private function buildEventPayload(array $data, bool $creating, bool $allowRecurrenceUpdate = false): array
     {
         $payload = [];
         if ($creating || array_key_exists('summary', $data)) {
@@ -447,8 +495,8 @@ final class GoogleCalendarProvider implements CalendarProviderInterface
                 throw new InvalidArgumentException('The recurrence settings are invalid.');
             }
             if ($data['recurrence'] !== []) {
-                if (!$creating) {
-                    throw new InvalidArgumentException('Recurring series can currently only be created as new events.');
+                if (!$creating && !$allowRecurrenceUpdate) {
+                    throw new InvalidArgumentException('The recurrence settings cannot be changed for this event.');
                 }
                 $recurrence = $data['recurrence'];
             }
@@ -471,7 +519,7 @@ final class GoogleCalendarProvider implements CalendarProviderInterface
             }
 
             $eventTimezone = trim((string) ($data['timezone'] ?? ''));
-            if ($recurrence !== null && !$allDay) {
+            if (($recurrence !== null || $allowRecurrenceUpdate) && !$allDay) {
                 $zone = $this->inputTimezone($eventTimezone);
                 $start = $start->setTimezone($zone);
                 $end = $end->setTimezone($zone);
@@ -483,7 +531,7 @@ final class GoogleCalendarProvider implements CalendarProviderInterface
             } else {
                 $payload['start'] = ['dateTime' => $start->format(DATE_RFC3339)];
                 $payload['end'] = ['dateTime' => $end->format(DATE_RFC3339)];
-                if ($recurrence !== null) {
+                if ($recurrence !== null || $allowRecurrenceUpdate) {
                     $payload['start']['timeZone'] = $eventTimezone;
                     $payload['end']['timeZone'] = $eventTimezone;
                 }
@@ -500,7 +548,7 @@ final class GoogleCalendarProvider implements CalendarProviderInterface
         } elseif (array_key_exists('allDay', $data)) {
             throw new InvalidArgumentException('Changing all-day mode requires a start and end.');
         } elseif ($recurrence !== null) {
-            throw new InvalidArgumentException('Creating a recurring event requires a start and end.');
+            throw new InvalidArgumentException('Changing recurrence requires a start and end.');
         }
 
         if ($payload === []) {

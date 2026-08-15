@@ -66,7 +66,7 @@ Sicherung wiederhergestellt, soweit diese verfügbar ist.
 - responsive Bedienung auf großen Kacheln und schmalen Mobilansichten
 - optionale IPSView-Ausgabe über eine WebContent-Variable
 
-Google-Serienvorkommnisse können einzeln bearbeitet oder gelöscht werden. Beim Löschen bietet OpenCalendar zusätzlich die sichere Auswahl **Nur diesen Termin** oder **Gesamte Serie**; standardmäßig bleibt das einzelne Vorkommnis ausgewählt. Das Bearbeiten der vollständigen Serie bleibt vorerst geschützt. Microsoft- und CalDAV-Serienvorkommnisse werden weiterhin nur lesend dargestellt.
+Google-Serienvorkommnisse können einzeln oder als vollständige Serie bearbeitet und gelöscht werden. Beim Bearbeiten und Löschen bietet OpenCalendar die Auswahl **Nur diesen Termin** oder **Gesamte Serie**; standardmäßig bleibt das einzelne Vorkommnis ausgewählt. Für die Serienbearbeitung wird vor dem Öffnen des Editors der Google-Parent-Termin geladen, damit Start/Ende, ETag und Wiederholungsregel nicht aus einem einzelnen Vorkommnis abgeleitet werden. Microsoft- und CalDAV-Serienvorkommnisse werden weiterhin nur lesend dargestellt.
 
 Normale Einzeltermine können im Bearbeitungsdialog in einen anderen, in dieser
 Kalender Ansicht ausgewählten und beschreibbaren Kalender verschoben werden.
@@ -114,7 +114,7 @@ Die zuletzt am jeweiligen Browser/Monitor gewählte Ansicht und das zugehörige 
 
 Alle eingebetteten Dialoge verwenden ein gemeinsames responsives OpenCalendar-Modaldesign. Kopf- und Aktionsbereich bleiben bei kleinen Darstellungsflächen sichtbar, während nur der Inhaltsbereich scrollt. Einheitliche Größenklassen, Abstände, Schließen-Schaltflächen, Fokusdarstellung, Popup-Farben, Rahmen und Schatten gelten gleichermaßen für Kachelvisualisierung und IPSView.
 
-Ein Klick auf einen Termin öffnet zunächst eine reine Termindetail-Ansicht mit Kalender, Beginn, Ende, Ort und Beschreibung. Schreibbare Einzeltermine und einzelne Google-Serienvorkommnisse können von dort gezielt bearbeitet oder gelöscht werden. Beim Löschen eines Google-Serienvorkommnisses kann wahlweise nur dieses Vorkommnis oder die gesamte Serie entfernt werden. Das Bearbeiten vollständiger Serien, Microsoft- und CalDAV-Vorkommnisse sowie schreibgeschützte Kalender bleiben geschützt.
+Ein Klick auf einen Termin öffnet zunächst eine reine Termindetail-Ansicht mit Kalender, Beginn, Ende, Ort und Beschreibung. Bei Google-Serienvorkommnissen kann beim Bearbeiten und Löschen zwischen **Nur diesen Termin** und **Gesamte Serie** gewählt werden. Beim Bearbeiten der gesamten Serie lädt OpenCalendar zuerst den Parent-Termin und öffnet anschließend den Editor mit dessen Start/Ende und Wiederholungsdaten. Wiederholungsregeln außerhalb des von OpenCalendar unterstützten einfachen RRULE-Umfangs bleiben unverändert, während Titel, Zeit, Ort und Beschreibung weiterhin geändert werden können. Microsoft- und CalDAV-Vorkommnisse sowie schreibgeschützte Kalender bleiben geschützt.
 
 Beim Erstellen eines Termins bietet ein beschreibbarer Google-Kalender zusätzlich den Bereich **Wiederholen**. Unterstützt werden tägliche, wöchentliche, monatliche und jährliche Serien, ein frei wählbares Intervall, bei wöchentlichen Serien mehrere Wochentage sowie die Endarten **Nie**, **Nach Anzahl** und **Am Datum**. Die Serienoption erscheint nur bei Kalendern, deren Provider das Anlegen von Serienterminen ausdrücklich unterstützt. Für zeitgebundene Google-Serien wird die Kalenderzeitzone verwendet.
 

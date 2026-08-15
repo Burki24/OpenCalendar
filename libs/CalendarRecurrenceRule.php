@@ -87,6 +87,106 @@ final class CalendarRecurrenceRule
     }
 
     /**
+     * Parses the supported subset of a Google Calendar RRULE for the recurrence editor.
+     *
+     * Unsupported or more complex rules return null so callers can preserve the original
+     * provider rule without exposing a lossy editor representation.
+     *
+     * @return array<string, mixed>|null Provider-neutral recurrence settings.
+     */
+    public static function fromGoogleRule(
+        string $rule,
+        bool $allDay,
+        string $timezone
+    ): ?array {
+        $rule = strtoupper(trim($rule));
+        if (str_starts_with($rule, 'RRULE:')) {
+            $rule = substr($rule, 6);
+        }
+        if ($rule === '') {
+            return null;
+        }
+
+        $values = [];
+        foreach (explode(';', $rule) as $part) {
+            $separator = strpos($part, '=');
+            if ($separator === false) {
+                return null;
+            }
+            $key = trim(substr($part, 0, $separator));
+            $value = trim(substr($part, $separator + 1));
+            if ($key === '' || $value === '' || isset($values[$key])) {
+                return null;
+            }
+            if (!in_array($key, ['FREQ', 'INTERVAL', 'BYDAY', 'COUNT', 'UNTIL'], true)) {
+                return null;
+            }
+            $values[$key] = $value;
+        }
+
+        $frequency = $values['FREQ'] ?? '';
+        if (!in_array($frequency, self::FREQUENCIES, true)) {
+            return null;
+        }
+
+        $interval = filter_var(
+            $values['INTERVAL'] ?? 1,
+            FILTER_VALIDATE_INT,
+            ['options' => ['min_range' => 1, 'max_range' => 999]]
+        );
+        if ($interval === false) {
+            return null;
+        }
+
+        $result = [
+            'frequency' => $frequency,
+            'interval'  => $interval,
+            'endMode'   => 'never'
+        ];
+
+        if (isset($values['BYDAY'])) {
+            if ($frequency !== 'WEEKLY') {
+                return null;
+            }
+            $byDay = explode(',', $values['BYDAY']);
+            if ($byDay === [] || array_filter(
+                $byDay,
+                static fn (string $weekday): bool => !in_array($weekday, self::WEEKDAYS, true)
+            ) !== []) {
+                return null;
+            }
+            $result['byDay'] = self::weekdays($byDay);
+        } elseif ($frequency === 'WEEKLY') {
+            $result['byDay'] = [];
+        }
+
+        if (isset($values['COUNT']) && isset($values['UNTIL'])) {
+            return null;
+        }
+        if (isset($values['COUNT'])) {
+            $count = filter_var(
+                $values['COUNT'],
+                FILTER_VALIDATE_INT,
+                ['options' => ['min_range' => 1, 'max_range' => 9999]]
+            );
+            if ($count === false) {
+                return null;
+            }
+            $result['endMode'] = 'count';
+            $result['count'] = $count;
+        } elseif (isset($values['UNTIL'])) {
+            $until = self::untilDate($values['UNTIL'], $allDay, $timezone);
+            if ($until === null) {
+                return null;
+            }
+            $result['endMode'] = 'until';
+            $result['until'] = $until;
+        }
+
+        return $result;
+    }
+
+    /**
      * @return list<string>
      */
     private static function weekdays(mixed $value): array
@@ -146,6 +246,31 @@ final class CalendarRecurrenceRule
         }
 
         return $until->setTimezone(new DateTimeZone('UTC'))->format('Ymd\THis\Z');
+    }
+
+    private static function untilDate(string $value, bool $allDay, string $timezone): ?string
+    {
+        if ($allDay) {
+            $date = DateTimeImmutable::createFromFormat('!Ymd', $value, new DateTimeZone('UTC'));
+            return $date !== false && $date->format('Ymd') === $value
+                ? $date->format('Y-m-d')
+                : null;
+        }
+
+        if (preg_match('/^\d{8}T\d{6}Z$/D', $value) !== 1) {
+            return null;
+        }
+
+        $date = DateTimeImmutable::createFromFormat('!Ymd\THis\Z', $value, new DateTimeZone('UTC'));
+        if ($date === false || $date->format('Ymd\THis\Z') !== $value) {
+            return null;
+        }
+
+        try {
+            return $date->setTimezone(self::timezone($timezone))->format('Y-m-d');
+        } catch (InvalidArgumentException) {
+            return null;
+        }
     }
 
     private static function timezone(string $name): DateTimeZone

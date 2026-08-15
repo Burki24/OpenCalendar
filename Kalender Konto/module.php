@@ -35,6 +35,7 @@ require_once __DIR__ . '/../libs/helper/DataFlowHelper.php';
 require_once __DIR__ . '/../libs/helper/HttpResponseHelper.php';
 require_once __DIR__ . '/../libs/helper/SymconOAuthHelper.php';
 require_once __DIR__ . '/../libs/CalendarProviderInterface.php';
+require_once __DIR__ . '/../libs/RecurringCalendarProviderInterface.php';
 require_once __DIR__ . '/../libs/CalendarHttpClient.php';
 require_once __DIR__ . '/../libs/CalendarHttpOriginPolicyInterface.php';
 require_once __DIR__ . '/../libs/CalendarEventTranslation.php';
@@ -690,6 +691,9 @@ class KalenderKonto extends IPSModuleStrict
                 || in_array($accessRole, ['writer', 'owner'], true);
             if (!array_key_exists('createRecurrence', $capabilities)) {
                 $capabilities['createRecurrence'] = $canWrite;
+            }
+            if (!array_key_exists('updateSeries', $capabilities)) {
+                $capabilities['updateSeries'] = $canWrite;
             }
             if (!array_key_exists('deleteSeries', $capabilities)) {
                 $capabilities['deleteSeries'] = $canWrite;

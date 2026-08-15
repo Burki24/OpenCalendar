@@ -228,6 +228,35 @@
     </div>
 </dialog>
 
+
+<dialog id="edit-scope-dialog" class="oc-dialog oc-dialog-small edit-scope-dialog">
+    <div class="dialog-header">
+        <span class="dialog-accent" style="--dialog-accent-color:var(--cal-accent)"></span>
+        <h2 id="edit-scope-dialog-title">Edit recurring event</h2>
+        <button type="button" class="icon-button dialog-close-button" id="edit-scope-close" aria-label="Close">×</button>
+    </div>
+    <div class="dialog-body edit-scope-body">
+        <p id="edit-scope-question">Which events do you want to edit?</p>
+        <fieldset class="edit-scope" id="edit-scope">
+            <legend data-i18n="Recurring event">Recurring event</legend>
+            <label class="edit-scope-option" id="edit-scope-occurrence-option">
+                <input type="radio" name="edit-scope" value="occurrence" checked>
+                <span data-i18n="Only this event">Only this event</span>
+            </label>
+            <label class="edit-scope-option" id="edit-scope-series-option">
+                <input type="radio" name="edit-scope" value="series">
+                <span data-i18n="Entire series">Entire series</span>
+            </label>
+        </fieldset>
+    </div>
+    <div class="dialog-actions">
+        <div class="dialog-actions-end">
+            <button type="button" class="secondary-button" id="edit-scope-cancel">Cancel</button>
+            <button type="button" class="primary-button" id="edit-scope-confirm">Continue</button>
+        </div>
+    </div>
+</dialog>
+
 <dialog id="delete-confirm-dialog" class="oc-dialog oc-dialog-small delete-confirm-dialog">
     <div class="dialog-header">
         <span class="dialog-accent" style="--dialog-accent-color:var(--cal-danger)"></span>

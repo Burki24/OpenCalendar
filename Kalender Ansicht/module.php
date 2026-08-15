@@ -450,13 +450,13 @@ class KalenderAnsicht extends IPSModuleStrict
 
                 default:
                     $result = $this->executeVisualizationAction($Ident, $Value);
-                    $this->UpdateVisualizationValue($this->getFullUpdateMessage(
-                        $result['state'],
-                        [
+                    $toast = $result['message'] !== ''
+                        ? [
                             'level'   => $result['level'],
                             'message' => $result['message']
                         ]
-                    ));
+                        : null;
+                    $this->UpdateVisualizationValue($this->getFullUpdateMessage($result['state'], $toast));
                     break;
             }
         } catch (Throwable $exception) {
@@ -837,7 +837,7 @@ class KalenderAnsicht extends IPSModuleStrict
     /**
      * Returns the calendar instances selected and enabled in this Calendar View.
      *
-     * The result contains instanceId, name, color, canWrite, timezone and canCreateRecurrence for each selected calendar.
+     * The result contains instanceId, name, color, canWrite, timezone and recurring-event capabilities for each selected calendar.
      * Client-side temporary calendar filters do not alter this configured selection.
      *
      * @return string JSON-encoded selected calendar list.
@@ -948,14 +948,17 @@ class KalenderAnsicht extends IPSModuleStrict
 
         try {
             $result = $this->executeVisualizationAction($action, $value);
-            $this->outputIPSViewResponse([
+            $response = [
                 'type'    => 'state',
-                'payload' => $result['state'],
-                'toast'   => [
+                'payload' => $result['state']
+            ];
+            if ($result['message'] !== '') {
+                $response['toast'] = [
                     'level'   => $result['level'],
                     'message' => $result['message']
-                ]
-            ]);
+                ];
+            }
+            $this->outputIPSViewResponse($response);
         } catch (InvalidArgumentException $exception) {
             $this->outputIPSViewResponse(['Error' => $exception->getMessage()], 400);
         } catch (RuntimeException $exception) {
@@ -1183,6 +1186,11 @@ class KalenderAnsicht extends IPSModuleStrict
             'Recurring event creation is not supported by this calendar.',
             'Recurring occurrences are currently read-only.',
             'Only this occurrence of the recurring event will be changed.',
+            'Changes will apply to the entire recurring series.',
+            'The recurrence pattern of this series cannot be edited here.',
+            'Edit recurring event',
+            'Which events do you want to edit?',
+            'Continue',
             'This calendar is read-only.',
             'Editing events is unavailable because no action bridge is configured.',
             'Action failed.',
@@ -1228,6 +1236,10 @@ class KalenderAnsicht extends IPSModuleStrict
                 $event['calendarName'] = $calendar['name'];
                 $event['calendarColor'] = $calendar['color'];
                 $event['canWrite'] = $calendar['canWrite'];
+                $event['canUpdateSeries'] = (bool) ($event['canUpdateSeries'] ?? false)
+                    || ((bool) ($event['recurring'] ?? false)
+                        && trim((string) ($event['seriesId'] ?? '')) !== ''
+                        && $calendar['canUpdateSeries']);
                 $event['canDeleteSeries'] = (bool) ($event['canDeleteSeries'] ?? false)
                     || ((bool) ($event['recurring'] ?? false)
                         && trim((string) ($event['seriesId'] ?? '')) !== ''
@@ -1277,6 +1289,10 @@ class KalenderAnsicht extends IPSModuleStrict
                 $event['calendarName'] = $calendar['name'];
                 $event['calendarColor'] = $calendar['color'];
                 $event['canWrite'] = $calendar['canWrite'];
+                $event['canUpdateSeries'] = (bool) ($event['canUpdateSeries'] ?? false)
+                    || ((bool) ($event['recurring'] ?? false)
+                        && trim((string) ($event['seriesId'] ?? '')) !== ''
+                        && $calendar['canUpdateSeries']);
                 $event['canDeleteSeries'] = (bool) ($event['canDeleteSeries'] ?? false)
                     || ((bool) ($event['recurring'] ?? false)
                         && trim((string) ($event['seriesId'] ?? '')) !== ''
@@ -1681,7 +1697,7 @@ class KalenderAnsicht extends IPSModuleStrict
     }
 
     /**
-     * @return list<array{instanceId: int, name: string, color: string, canWrite: bool, timezone: string, canCreateRecurrence: bool, canDeleteSeries: bool}>
+     * @return list<array{instanceId: int, name: string, color: string, canWrite: bool, timezone: string, canCreateRecurrence: bool, canUpdateSeries: bool, canDeleteSeries: bool}>
      */
     private function loadSelectedCalendars(): array
     {
@@ -1727,6 +1743,7 @@ class KalenderAnsicht extends IPSModuleStrict
                     ?? IPS_GetProperty($instanceId, 'CanWrite')),
                 'timezone'            => trim((string) ($calendarStatus['timezone'] ?? '')),
                 'canCreateRecurrence' => (bool) ($calendarStatus['canCreateRecurrence'] ?? false),
+                'canUpdateSeries'     => (bool) ($calendarStatus['canUpdateSeries'] ?? false),
                 'canDeleteSeries'     => (bool) ($calendarStatus['canDeleteSeries'] ?? false)
             ];
         }
@@ -1813,6 +1830,7 @@ class KalenderAnsicht extends IPSModuleStrict
     {
         $level = 'success';
         $message = '';
+        $seriesEdit = null;
 
         switch ($ident) {
             case 'Refresh':
@@ -1841,6 +1859,26 @@ class KalenderAnsicht extends IPSModuleStrict
                     throw new RuntimeException((string) ($result['error'] ?? $this->Translate('Event creation failed.')));
                 }
                 $message = 'Event created.';
+                break;
+
+            case 'PrepareSeriesEdit':
+                $request = $this->decodeActionValue($value);
+                $instanceId = $this->requireWritableCalendar($request);
+                $seriesId = trim((string) ($request['seriesId'] ?? ''));
+                if ($seriesId === '') {
+                    throw new InvalidArgumentException($this->Translate('The recurring series ID is missing.'));
+                }
+                $seriesEdit = json_decode(
+                    IPSKAL_GetRecurringSeries($instanceId, $seriesId),
+                    true,
+                    512,
+                    JSON_THROW_ON_ERROR
+                );
+                if (!is_array($seriesEdit) || !($seriesEdit['canUpdateSeries'] ?? false)) {
+                    throw new RuntimeException($this->Translate('Recurring series updates are not supported by this calendar.'));
+                }
+                $seriesEdit['calendarInstanceId'] = $instanceId;
+                $seriesEdit['writeScope'] = 'series';
                 break;
 
             case 'UpdateEvent':
@@ -1944,6 +1982,9 @@ class KalenderAnsicht extends IPSModuleStrict
         }
 
         $state = $this->buildState();
+        if ($seriesEdit !== null) {
+            $state['seriesEdit'] = $seriesEdit;
+        }
         $this->broadcastState($state);
 
         return [

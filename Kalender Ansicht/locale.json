@@ -148,7 +148,14 @@
             "Recurring event creation is not supported by this calendar.": "Dieser Kalender unterstützt das Anlegen von Serienterminen nicht.",
             "Recurring event": "Serientermin",
             "Only this event": "Nur diesen Termin",
-            "Entire series": "Gesamte Serie"
+            "Entire series": "Gesamte Serie",
+            "Changes will apply to the entire recurring series.": "Änderungen werden auf die gesamte Terminserie angewendet.",
+            "The recurrence pattern of this series cannot be edited here.": "Das Wiederholungsmuster dieser Serie kann hier nicht bearbeitet werden.",
+            "Edit recurring event": "Serientermin bearbeiten",
+            "Which events do you want to edit?": "Welche Termine möchten Sie bearbeiten?",
+            "Continue": "Weiter",
+            "Recurring series updates are not supported by this calendar.": "Dieser Kalender unterstützt das Bearbeiten kompletter Terminserien nicht.",
+            "The recurring series ID is missing.": "Die Kennung der Terminserie fehlt."
         }
     }
 }

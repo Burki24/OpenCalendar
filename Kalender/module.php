@@ -65,6 +65,7 @@ class Kalender extends IPSModuleStrict
         $this->RegisterAttributeString('DetectedCalendarColor', '');
         $this->RegisterAttributeBoolean('DetectedCanWrite', false);
         $this->RegisterAttributeBoolean('DetectedCanCreateRecurrence', false);
+        $this->RegisterAttributeBoolean('DetectedCanUpdateSeries', false);
         $this->RegisterAttributeBoolean('DetectedCanDeleteSeries', false);
         $this->RegisterAttributeString('DetectedCalendarTimezone', '');
         $this->RegisterAttributeBoolean('DetectedWriteAccessKnown', false);
@@ -321,6 +322,40 @@ class Kalender extends IPSModuleStrict
     }
 
     /**
+     * Returns the verified parent event for a recurring series.
+     *
+     * @param string $SeriesID Provider-specific recurring parent event identifier.
+     * @return string JSON-encoded normalized recurring parent event.
+     */
+    public function GetRecurringSeries(string $SeriesID): string
+    {
+        try {
+            $seriesId = trim($SeriesID);
+            if ($seriesId === '') {
+                throw new InvalidArgumentException('The recurring series ID is missing.');
+            }
+            if (!$this->ReadAttributeBoolean('CalendarMetadataAvailable')
+                || !$this->ReadAttributeBoolean('DetectedCanUpdateSeries')) {
+                $this->refreshCalendarMetadataSafely();
+            }
+            if (!$this->ReadAttributeBoolean('DetectedCanUpdateSeries')) {
+                throw new InvalidArgumentException('Recurring series updates are not supported by this calendar.');
+            }
+
+            $series = $this->sendRequest('GetRecurringSeries', ['SeriesID' => $seriesId]);
+            return json_encode(
+                $series,
+                JSON_UNESCAPED_SLASHES
+                    | JSON_UNESCAPED_UNICODE
+                    | JSON_PRESERVE_ZERO_FRACTION
+                    | JSON_THROW_ON_ERROR
+            );
+        } catch (Throwable $exception) {
+            throw new RuntimeException($this->handleError($exception), 0, $exception);
+        }
+    }
+
+    /**
      * Creates a temporary paged transfer for cached events overlapping a time range.
      *
      * This is the preferred API for module consumers because each subsequent
@@ -443,7 +478,7 @@ class Kalender extends IPSModuleStrict
             if (!is_array($changes)) {
                 throw new InvalidArgumentException('The event changes are invalid.');
             }
-            $recurrence = $this->resolveWriteRecurrence($event);
+            $recurrence = $this->resolveWriteRecurrence($event, true);
             foreach ([
                 'uid',
                 'resourceUrl',
@@ -495,7 +530,7 @@ class Kalender extends IPSModuleStrict
     {
         try {
             $event = $this->decodeObject($EventJSON, 'event');
-            $recurrence = $this->resolveWriteRecurrence($event);
+            $recurrence = $this->resolveWriteRecurrence($event, false);
             $result = $this->sendRequest(
                 'DeleteEvent',
                 [
@@ -560,6 +595,8 @@ class Kalender extends IPSModuleStrict
                     : '',
                 'canCreateRecurrence' => $metadataAvailable
                     && $this->ReadAttributeBoolean('DetectedCanCreateRecurrence'),
+                'canUpdateSeries'     => $metadataAvailable
+                    && $this->ReadAttributeBoolean('DetectedCanUpdateSeries'),
                 'canDeleteSeries'     => $metadataAvailable
                     && $this->ReadAttributeBoolean('DetectedCanDeleteSeries'),
                 'eventCount'          => count($events),
@@ -637,6 +674,7 @@ class Kalender extends IPSModuleStrict
         if ($availableCalendars !== []) {
             $this->WriteAttributeString('ResolvedCalendarID', '');
             $this->WriteAttributeBoolean('DetectedCanCreateRecurrence', false);
+            $this->WriteAttributeBoolean('DetectedCanUpdateSeries', false);
             $this->WriteAttributeBoolean('DetectedCanDeleteSeries', false);
             $this->WriteAttributeString('DetectedCalendarTimezone', '');
             $this->WriteAttributeBoolean('DetectedWriteAccessKnown', false);
@@ -654,6 +692,7 @@ class Kalender extends IPSModuleStrict
             || (bool) ($capabilities['update'] ?? false)
             || (bool) ($capabilities['delete'] ?? false);
         $canCreateRecurrence = (bool) ($capabilities['createRecurrence'] ?? false);
+        $canUpdateSeries = (bool) ($capabilities['updateSeries'] ?? false);
         $canDeleteSeries = (bool) ($capabilities['deleteSeries'] ?? false);
         $timezone = trim((string) ($calendar['timezone'] ?? ''));
         // Cached calendar metadata created before writeAccessKnown existed cannot
@@ -666,6 +705,7 @@ class Kalender extends IPSModuleStrict
         $this->WriteAttributeString('DetectedCalendarColor', trim((string) ($calendar['color'] ?? '')));
         $this->WriteAttributeBoolean('DetectedCanWrite', $canWrite);
         $this->WriteAttributeBoolean('DetectedCanCreateRecurrence', $canCreateRecurrence);
+        $this->WriteAttributeBoolean('DetectedCanUpdateSeries', $canUpdateSeries);
         $this->WriteAttributeBoolean('DetectedCanDeleteSeries', $canDeleteSeries);
         $this->WriteAttributeString('DetectedCalendarTimezone', $timezone);
         $this->WriteAttributeBoolean('DetectedWriteAccessKnown', $writeAccessKnown);
@@ -857,7 +897,7 @@ class Kalender extends IPSModuleStrict
      * @param array<string, mixed> $event
      * @return array<string, mixed>
      */
-    private function resolveWriteRecurrence(array $event): array
+    private function resolveWriteRecurrence(array $event, bool $updating): array
     {
         $resourceUrl = trim((string) ($event['resourceUrl'] ?? ''));
         $occurrenceId = trim((string) ($event['occurrenceId'] ?? ''));
@@ -867,6 +907,11 @@ class Kalender extends IPSModuleStrict
             if (($resourceUrl !== '' && hash_equals($cachedResourceUrl, $resourceUrl))
                 || ($occurrenceId !== '' && hash_equals($cachedOccurrenceId, $occurrenceId))) {
                 $cachedEvent['writeScope'] = (string) ($event['writeScope'] ?? '');
+                if ($this->ReadAttributeBoolean('DetectedCanUpdateSeries')
+                    && (bool) ($cachedEvent['recurring'] ?? false)
+                    && trim((string) ($cachedEvent['seriesId'] ?? '')) !== '') {
+                    $cachedEvent['canUpdateSeries'] = true;
+                }
                 if ($this->ReadAttributeBoolean('DetectedCanDeleteSeries')
                     && (bool) ($cachedEvent['recurring'] ?? false)
                     && trim((string) ($cachedEvent['seriesId'] ?? '')) !== '') {
@@ -878,11 +923,29 @@ class Kalender extends IPSModuleStrict
         }
 
         $identity = CalendarEventRecurrence::fromEvent($event);
-        if (($identity['writeScope'] ?? '') === CalendarEventRecurrence::WRITE_SCOPE_SERIES) {
-            throw new InvalidArgumentException('The recurring series could not be verified from the synchronized event cache.');
+        if (($identity['writeScope'] ?? '') !== CalendarEventRecurrence::WRITE_SCOPE_SERIES) {
+            return $identity;
         }
 
-        return $identity;
+        $seriesId = trim((string) ($identity['seriesId'] ?? ''));
+        $capabilityAvailable = $updating
+            ? $this->ReadAttributeBoolean('DetectedCanUpdateSeries')
+            : $this->ReadAttributeBoolean('DetectedCanDeleteSeries');
+        if ($seriesId === '' || !$capabilityAvailable) {
+            throw new InvalidArgumentException('The recurring series cannot be modified by this calendar.');
+        }
+
+        $verifiedSeries = $this->sendRequest('GetRecurringSeries', ['SeriesID' => $seriesId]);
+        $verifiedIdentity = CalendarEventRecurrence::fromEvent($verifiedSeries);
+        $capability = $updating ? 'canUpdateSeries' : 'canDeleteSeries';
+        if (($verifiedIdentity['recurrenceType'] ?? '') !== CalendarEventRecurrence::MASTER
+            || !hash_equals($seriesId, (string) ($verifiedIdentity['seriesId'] ?? ''))
+            || !(bool) ($verifiedIdentity[$capability] ?? false)) {
+            throw new InvalidArgumentException('The recurring series could not be verified for this calendar.');
+        }
+
+        $verifiedIdentity['writeScope'] = CalendarEventRecurrence::WRITE_SCOPE_SERIES;
+        return $verifiedIdentity;
     }
 
     private function removeLegacyEventsVariable(): void

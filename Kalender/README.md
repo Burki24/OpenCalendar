@@ -85,6 +85,7 @@ Ein Termin enthält unter anderem `id`, `uid`, `resourceUrl`, `etag`, `summary`,
 ```php
 bool IPSKAL_Synchronize(int $InstanzID);
 string IPSKAL_GetEvents(int $InstanzID);
+string IPSKAL_GetRecurringSeries(int $InstanzID, string $SeriesID);
 string IPSKAL_BeginEventsTransfer(int $InstanzID, int $StartTimestamp, int $EndTimestamp);
 string IPSKAL_ReadEventsTransferPage(int $InstanzID, string $Token, int $Page);
 bool IPSKAL_FinishEventsTransfer(int $InstanzID, string $Token);
@@ -102,8 +103,9 @@ Transfer anschließend auch im Fehlerfall beenden. `StartTimestamp` ist inklusiv
 `EndTimestamp` exklusiv.
 
 `IPSKAL_GetCalendarStatus()` liefert neben Synchronisations- und Zählerinformationen
-auch `calendarColor`, `canWrite`, `timezone` und `canCreateRecurrence`. Die beiden
-letzten Felder werden aus den vom Provider erkannten Kalender-Metadaten übernommen.
+auch `calendarColor`, `canWrite`, `timezone`, `canCreateRecurrence`, `canUpdateSeries`
+und `canDeleteSeries`. Die Serienfähigkeiten und die Zeitzone werden aus den vom
+Provider erkannten Kalender-Metadaten übernommen.
 
 ### Termin erstellen
 
@@ -150,11 +152,18 @@ $result = IPSKAL_CreateEvent(12345, json_encode([
 
 Unterstützt werden `DAILY`, `WEEKLY`, `MONTHLY` und `YEARLY`, ein Intervall,
 bei wöchentlichen Serien optionale Wochentage sowie die Endarten `never`,
-`count` und `until`. Das Ändern einer vollständigen Serie ist weiterhin bewusst nicht freigegeben; das Löschen der vollständigen Google-Serie ist dagegen über ein synchronisiertes Serienvorkommnis möglich.
+`count` und `until`. Bei Google können einzelne Vorkommnisse sowie die vollständige
+Serie bearbeitet werden. Vor dem Bearbeiten einer vollständigen Serie lädt
+`IPSKAL_GetRecurringSeries()` den verifizierten Parent-Termin inklusive ETag,
+Start/Ende und – soweit verlustfrei darstellbar – der Wiederholungsregel. Das
+Löschen einzelner Vorkommnisse oder der vollständigen Google-Serie wird ebenfalls unterstützt.
 
 ### Termin ändern
 
-`uid`, `resourceUrl` und `etag` stammen aus `IPSKAL_GetEvents`. Unter `changes` werden nur die zu ändernden Felder übergeben:
+`uid`, `resourceUrl` und `etag` stammen bei Einzelterminen und Vorkommnissen aus
+`IPSKAL_GetEvents`. Für die vollständige Google-Serie sollten diese Werte aus
+`IPSKAL_GetRecurringSeries()` verwendet werden. Unter `changes` werden nur die zu
+ändernden Felder übergeben:
 
 ```php
 $result = IPSKAL_UpdateEvent(12345, json_encode([
@@ -187,5 +196,5 @@ Konfiguration unvollständig | Instanz im Kalender Konfigurator löschen und aus
 Synchronisation fehlgeschlagen | Zuerst im verbundenen Kalender Konto **Verbindung testen**, anschließend Konto und Kalender erneut synchronisieren
 Keine Termine sichtbar | Zeitraum für vergangene und zukünftige Termine prüfen und kontrollieren, ob der Online-Kalender im gewählten Zeitraum Termine enthält
 Kalender ist schreibgeschützt | Schreibrechte beim Anbieter prüfen; ICS/Webcal-Abonnements sind immer schreibgeschützt
-Ändern oder Löschen wird bei einem Serientermin verweigert | Derzeit werden nur einzelne Google-Vorkommnisse zum Schreiben freigegeben; vollständige Serien sowie Microsoft- und CalDAV-Vorkommnisse bleiben geschützt
+Ändern oder Löschen wird bei einem Serientermin verweigert | Google-Vorkommnisse und vollständige Google-Serien sind beschreibbar; Microsoft- und CalDAV-Serienvorkommnisse bleiben geschützt
 Schreibkonflikt | Kalender erneut synchronisieren; der ETag-Schutz verhindert das Überschreiben einer zwischenzeitlich geänderten Serverversion

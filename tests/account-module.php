@@ -40,10 +40,21 @@ final class CalendarAccountGatewayRecurrenceProbe
     /** @return object{deleteEvent: callable} */
     private function createProvider(): object
     {
-        return new class($this->deleteCalls) {
+        return new class($this->deleteCalls) implements \IPSKalender\RecurringCalendarProviderInterface {
             /** @param list<array<string, mixed>> $deleteCalls */
             public function __construct(private array &$deleteCalls)
             {
+            }
+
+            /** @return array<string, mixed> */
+            public function getRecurringSeries(string $calendarReference, string $seriesId): array
+            {
+                return [
+                    'recurrenceType'  => 'master',
+                    'seriesId'        => $seriesId,
+                    'resourceUrl'     => $calendarReference . '/events/' . $seriesId,
+                    'canUpdateSeries' => true
+                ];
             }
 
             /** @param array<string, mixed> $recurrence */
@@ -76,6 +87,18 @@ function assertAccountStructure(bool $condition, string $message): void
 }
 
 $gatewayProbe = new CalendarAccountGatewayRecurrenceProbe();
+$getRecurringSeriesForChild = new ReflectionMethod(CalendarAccountGatewayRecurrenceProbe::class, 'getRecurringSeriesForChild');
+$gatewaySeries = $getRecurringSeriesForChild->invoke($gatewayProbe, [
+    'CalendarID' => 'calendar-id',
+    'SeriesID'   => 'series-id'
+]);
+assertAccountStructure(
+    is_array($gatewaySeries)
+        && ($gatewaySeries['recurrenceType'] ?? '') === 'master'
+        && ($gatewaySeries['seriesId'] ?? '') === 'series-id'
+        && ($gatewaySeries['canUpdateSeries'] ?? false) === true,
+    'A recurring parent event must pass through the account child gateway for complete-series editing.'
+);
 $deleteEventForChild = new ReflectionMethod(CalendarAccountGatewayRecurrenceProbe::class, 'deleteEventForChild');
 $recurringEvent = [
     'CalendarID'  => 'calendar-id',
@@ -193,10 +216,22 @@ $legacyGoogleCalendars = [[
 $normalizedGoogleCalendars = $normalizeCapabilities->invoke(null, $legacyGoogleCalendars, 2);
 assertAccountStructure(
     ($normalizedGoogleCalendars[0]['capabilities']['createRecurrence'] ?? false) === true
+        && ($normalizedGoogleCalendars[0]['capabilities']['updateSeries'] ?? false) === true
         && ($normalizedGoogleCalendars[0]['capabilities']['deleteSeries'] ?? false) === true
         && ($normalizedGoogleCalendars[1]['capabilities']['createRecurrence'] ?? true) === false
+        && ($normalizedGoogleCalendars[1]['capabilities']['updateSeries'] ?? true) === false
         && ($normalizedGoogleCalendars[1]['capabilities']['deleteSeries'] ?? true) === false,
-    'Legacy Google calendar caches must derive recurrence creation and series deletion support from cached write access.'
+    'Legacy Google calendar caches must derive recurring create/update/delete support from cached write access.'
+);
+
+$gatewaySource = file_get_contents(__DIR__ . '/../Kalender Konto/traits/ChildGatewayTrait.php');
+assertAccountStructure(
+    is_string($gatewaySource)
+        && str_contains($gatewaySource, 'use IPSKalender\\RecurringCalendarProviderInterface;')
+        && str_contains($gatewaySource, "'GetRecurringSeries' => \$this->getRecurringSeriesForChild(\$request)")
+        && str_contains($gatewaySource, 'instanceof RecurringCalendarProviderInterface')
+        && str_contains($gatewaySource, '->getRecurringSeries('),
+    'The account child gateway must route recurring parent reads only through recurrence-capable providers.'
 );
 
 $accountSource = file_get_contents(__DIR__ . '/../Kalender Konto/module.php');

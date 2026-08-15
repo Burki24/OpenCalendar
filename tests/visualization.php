@@ -97,7 +97,8 @@ assertVisualization(
     'All-day events must use their date-only boundaries so exclusive end dates cannot spill into the next local day.'
 );
 assertVisualization(
-    str_contains($script, 'setDateInputs(eventStart(event), eventEnd(event), Boolean(event.allDay), Boolean(event.allDay));')
+    str_contains($script, 'eventStart(selectedEvent),')
+        && str_contains($script, 'Boolean(selectedEvent.allDay)')
         && str_contains($script, 'const displayEnd = allDay && allDayEndExclusive && end > start ? addDays(end, -1) : end;')
         && str_contains($script, "end: inputDateValue(document.getElementById('event-end').value, allDay, allDay)")
         && str_contains($script, 'return localDate(exclusiveEnd ? addDays(date, 1) : date);'),
@@ -125,11 +126,12 @@ assertVisualization(
         && str_contains($script, 'eventData.timezone = timezone;'),
     'The event dialog must expose recurrence creation only for recurrence-capable calendars and submit normalized recurrence data with the calendar timezone.'
 );
+
 assertVisualization(
     str_contains($script, "const action = moving ? 'MoveEvent' : (selectedEvent ? 'UpdateEvent' : 'CreateEvent');")
         && str_contains($script, 'targetCalendarInstanceId: calendarInstanceId')
         && str_contains($script, "document.getElementById('save-button').textContent = t(moving ? 'Move' : 'Save');")
-        && str_contains($script, 'calendarState.calendars.filter(calendar => calendar.canWrite || calendar.instanceId === event.calendarInstanceId)'),
+        && str_contains($script, 'calendarState.calendars.filter(calendar => calendar.canWrite || calendar.instanceId === selectedEvent.calendarInstanceId)'),
     'Editable events must allow selecting another writable calendar and submit a dedicated move action.'
 );
 
@@ -150,12 +152,13 @@ assertVisualization(
         && str_contains($script, 'function openEventDetails(event)')
         && str_contains($script, 'card.addEventListener(\'click\', () => openEventDetails(event));')
         && str_contains($script, 'document.getElementById(\'details-edit-button\').addEventListener(\'click\'')
-        && str_contains($script, 'eventDetailsDialog.close();')
-        && str_contains($script, 'openExistingEvent(event);')
-        && str_contains($script, 'document.getElementById(\'dialog-title\').textContent = t(\'Edit event\');')
+        && str_contains($script, "requestEdit(eventDetailsDialog)")
+        && str_contains($script, "openExistingEvent(event, 'occurrence')")
+        && str_contains($script, "t(editingSeries ? 'Edit recurring event' : 'Edit event')")
         && str_contains($script, 'const displayEnd = end > start ? addDays(end, -1) : start;')
         && str_contains($script, 'function eventCanUpdate(event)')
         && str_contains($script, 'Boolean(event.canUpdateOccurrence)')
+        && str_contains($script, 'Boolean(event.canUpdateSeries)')
         && str_contains($script, 'function eventCanDelete(event)')
         && str_contains($script, 'Boolean(event.canDeleteOccurrence)')
         && str_contains($script, '...recurrencePayload(selectedEvent)')
@@ -219,6 +222,24 @@ assertVisualization(
 
 $formSource = (string) file_get_contents(__DIR__ . '/../Kalender Ansicht/form.json');
 $moduleSource = (string) file_get_contents(__DIR__ . '/../Kalender Ansicht/module.php');
+
+assertVisualization(
+    str_contains($indexSource, 'id="edit-scope-dialog"')
+        && str_contains($indexSource, 'name="edit-scope" value="occurrence"')
+        && str_contains($indexSource, 'name="edit-scope" value="series"')
+        && str_contains($script, 'function requestEdit(sourceDialog)')
+        && str_contains($script, 'function confirmEditScope()')
+        && str_contains($script, "sendAction('PrepareSeriesEdit', pendingSeriesEdit)")
+        && str_contains($script, "openExistingEvent(seriesEdit, 'series')")
+        && str_contains($script, 'function loadRecurrenceEditor(event)')
+        && str_contains($script, "selectedEvent?.writeScope === 'series'")
+        && str_contains($script, 'Boolean(event.canUpdateSeries)')
+        && str_contains($script, "writeScope: scope")
+        && str_contains($moduleSource, "case 'PrepareSeriesEdit':")
+        && str_contains($moduleSource, 'IPSKAL_GetRecurringSeries($instanceId, $seriesId)')
+        && str_contains($moduleSource, "'Changes will apply to the entire recurring series.'"),
+    'Recurring Google events must offer occurrence or complete-series editing and load the verified parent before editing the series.'
+);
 assertVisualization(
     str_contains($moduleSource, 'private function getFullUpdateMessage(?array $state = null, ?array $toast = null): string')
         && str_contains($moduleSource, '$message[\'toast\'] = $toast;')
@@ -398,12 +419,13 @@ assertVisualization(
     str_contains($indexSource, 'id="event-dialog" class="oc-dialog oc-dialog-large"')
         && str_contains($indexSource, 'id="event-form" class="dialog-layout"')
         && str_contains($indexSource, 'id="event-details-dialog" class="oc-dialog oc-dialog-medium event-details-dialog"')
+        && str_contains($indexSource, 'id="edit-scope-dialog" class="oc-dialog oc-dialog-small edit-scope-dialog"')
         && str_contains($indexSource, 'id="delete-confirm-dialog" class="oc-dialog oc-dialog-small delete-confirm-dialog"')
         && str_contains($indexSource, 'id="day-events-dialog" class="oc-dialog oc-dialog-large day-events-dialog"')
         && str_contains($indexSource, 'id="view-selector-dialog" class="oc-dialog oc-dialog-small view-selector-dialog"')
         && str_contains($indexSource, 'id="calendar-filter-dialog" class="oc-dialog oc-dialog-medium calendar-filter-dialog"')
-        && substr_count($indexSource, 'class="icon-button dialog-close-button"') === 6
-        && substr_count($indexSource, 'class="dialog-actions-end"') === 6,
+        && substr_count($indexSource, 'class="icon-button dialog-close-button"') === 7
+        && substr_count($indexSource, 'class="dialog-actions-end"') === 7,
     'All calendar dialogs must use the shared OpenCalendar modal structure and action layout.'
 );
 
@@ -518,8 +540,10 @@ assertVisualization(
         && str_contains($style, 'scrollbar-gutter: stable;')
         && str_contains($style, '.dialog-actions-start, .dialog-actions-end {')
         && str_contains($style, '.dialog-close-button {')
-        && str_contains($style, '.delete-scope { display: grid;')
-        && str_contains($style, '.delete-scope-option:hover { background: var(--cal-surface-hover); }')
+        && str_contains($style, '.delete-scope,')
+        && str_contains($style, '.edit-scope { display: grid;')
+        && str_contains($style, '.delete-scope-option:hover,')
+        && str_contains($style, '.edit-scope-option:hover { background: var(--cal-surface-hover); }')
         && str_contains($style, '@media (max-width: 420px) {'),
     'All OpenCalendar modals must share responsive size classes, fixed header/footer layout and a scrollable content area.'
 );

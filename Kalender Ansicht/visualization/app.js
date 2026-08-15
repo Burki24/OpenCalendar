@@ -28,6 +28,8 @@ let activeView = 'agenda';
 let cursorDate = startOfDay(new Date());
 let initialized = false;
 let selectedEvent = null;
+let editScopeSourceDialog = null;
+let pendingSeriesEdit = null;
 let deleteSourceDialog = null;
 let visibleCalendarIds = null;
 let pendingCalendarFilterIds = new Set();
@@ -40,6 +42,8 @@ const content = document.getElementById('calendar-content');
 const periodTitle = document.getElementById('period-title');
 const eventDialog = document.getElementById('event-dialog');
 const eventDetailsDialog = document.getElementById('event-details-dialog');
+const editScopeDialog = document.getElementById('edit-scope-dialog');
+const editScopeConfirmButton = document.getElementById('edit-scope-confirm');
 const deleteConfirmDialog = document.getElementById('delete-confirm-dialog');
 const deleteConfirmButton = document.getElementById('delete-confirm-button');
 const eventForm = document.getElementById('event-form');
@@ -81,14 +85,20 @@ function handleMessage(data) {
     }
     if (!message || typeof message !== 'object') return;
     if (message.toast && typeof message.toast === 'object') {
+        if (message.toast.level === 'error') pendingSeriesEdit = null;
         showToast(t(message.toast.message || ''), message.toast.level || 'success');
     }
     if (message.type === 'toast') {
+        if (message.level === 'error') pendingSeriesEdit = null;
         showToast(t(message.message || ''), message.level || 'success');
         return;
     }
     if (message.type !== 'state' || !message.payload) return;
     calendarState = message.payload;
+    const seriesEdit = calendarState.seriesEdit && typeof calendarState.seriesEdit === 'object'
+        ? calendarState.seriesEdit
+        : null;
+    delete calendarState.seriesEdit;
     calendarState.events = Array.isArray(calendarState.events) ? calendarState.events : [];
     calendarState.calendars = Array.isArray(calendarState.calendars) ? calendarState.calendars : [];
     calendarState.settings = calendarState.settings || {};
@@ -100,6 +110,12 @@ function handleMessage(data) {
         initialized = true;
     }
     render();
+    if (seriesEdit && pendingSeriesEdit
+        && Number(seriesEdit.calendarInstanceId) === pendingSeriesEdit.calendarInstanceId
+        && String(seriesEdit.seriesId || '') === pendingSeriesEdit.seriesId) {
+        pendingSeriesEdit = null;
+        openExistingEvent(seriesEdit, 'series');
+    }
 }
 
 
@@ -894,6 +910,59 @@ function openEventDetails(event) {
     eventDetailsDialog.showModal();
 }
 
+function requestEdit(sourceDialog) {
+    if (!selectedEvent || !eventCanUpdate(selectedEvent)) return;
+    const event = selectedEvent;
+    const occurrenceAllowed = eventCanUpdateOccurrence(event);
+    const seriesAllowed = eventCanUpdateSeries(event);
+    if (!event.recurring || !seriesAllowed) {
+        sourceDialog?.close();
+        openExistingEvent(event, 'occurrence');
+        return;
+    }
+
+    editScopeSourceDialog = sourceDialog;
+    document.getElementById('edit-scope-occurrence-option').classList.toggle('hidden', !occurrenceAllowed);
+    document.getElementById('edit-scope-series-option').classList.toggle('hidden', !seriesAllowed);
+    const defaultValue = occurrenceAllowed ? 'occurrence' : 'series';
+    editScopeDialog.querySelectorAll('input[name="edit-scope"]').forEach(input => {
+        input.checked = input.value === defaultValue;
+    });
+    editScopeDialog.showModal();
+}
+
+async function confirmEditScope() {
+    if (!selectedEvent || !eventCanUpdate(selectedEvent)) {
+        editScopeDialog.close();
+        return;
+    }
+
+    const event = selectedEvent;
+    const sourceDialog = editScopeSourceDialog;
+    const selected = editScopeDialog.querySelector('input[name="edit-scope"]:checked');
+    const scope = selected?.value === 'series' ? 'series' : 'occurrence';
+    editScopeConfirmButton.disabled = true;
+    try {
+        editScopeDialog.close();
+        sourceDialog?.close();
+        if (scope === 'occurrence') {
+            openExistingEvent(event, 'occurrence');
+            return;
+        }
+
+        pendingSeriesEdit = {
+            calendarInstanceId: Number(event.calendarInstanceId),
+            seriesId: String(event.seriesId || '')
+        };
+        if (!pendingSeriesEdit.calendarInstanceId || !pendingSeriesEdit.seriesId
+            || !await sendAction('PrepareSeriesEdit', pendingSeriesEdit)) {
+            pendingSeriesEdit = null;
+        }
+    } finally {
+        editScopeConfirmButton.disabled = false;
+    }
+}
+
 function requestDelete(sourceDialog) {
     if (!selectedEvent || !eventCanDelete(selectedEvent)) return;
     deleteSourceDialog = sourceDialog;
@@ -965,10 +1034,22 @@ async function confirmDeleteEvent() {
     }
 }
 
-function eventCanUpdate(event) {
+function eventCanUpdateOccurrence(event) {
     return hasActionBridge()
         && Boolean(event.canWrite)
         && (!event.recurring || Boolean(event.canUpdateOccurrence));
+}
+
+function eventCanUpdateSeries(event) {
+    return hasActionBridge()
+        && Boolean(event.canWrite)
+        && Boolean(event.recurring)
+        && Boolean(event.canUpdateSeries)
+        && Boolean(event.seriesId);
+}
+
+function eventCanUpdate(event) {
+    return eventCanUpdateOccurrence(event) || eventCanUpdateSeries(event);
 }
 
 function eventCanDelete(event) {
@@ -978,6 +1059,7 @@ function eventCanDelete(event) {
 }
 
 function recurrencePayload(event, writeScope = '') {
+    const scope = writeScope || event.writeScope || '';
     return {
         recurrenceType: event.recurrenceType || (event.recurring ? 'unknown' : 'single'),
         seriesId: event.seriesId || '',
@@ -989,7 +1071,7 @@ function recurrencePayload(event, writeScope = '') {
         canDeleteOccurrence: Boolean(event.canDeleteOccurrence),
         canUpdateSeries: Boolean(event.canUpdateSeries),
         canDeleteSeries: Boolean(event.canDeleteSeries),
-        writeScope
+        writeScope: scope
     };
 }
 
@@ -1016,30 +1098,48 @@ function formatDetailDateTime(date) {
     return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(date);
 }
 
-function openExistingEvent(event) {
-    selectedEvent = event;
-    const editable = eventCanUpdate(event);
-    const recurringOccurrence = Boolean(event.recurring) && Boolean(event.canUpdateOccurrence);
-    const availableCalendars = recurringOccurrence
-        ? calendarState.calendars.filter(calendar => calendar.instanceId === event.calendarInstanceId)
+function openExistingEvent(event, writeScope = '') {
+    const scope = event.recurring ? (writeScope || event.writeScope || 'occurrence') : '';
+    selectedEvent = { ...event, writeScope: scope };
+    const editingSeries = Boolean(selectedEvent.recurring) && scope === 'series';
+    const recurringOccurrence = Boolean(selectedEvent.recurring) && !editingSeries;
+    const editable = editingSeries
+        ? eventCanUpdateSeries(selectedEvent)
+        : eventCanUpdateOccurrence(selectedEvent);
+    const availableCalendars = selectedEvent.recurring
+        ? calendarState.calendars.filter(calendar => calendar.instanceId === selectedEvent.calendarInstanceId)
         : (editable
-        ? calendarState.calendars.filter(calendar => calendar.canWrite || calendar.instanceId === event.calendarInstanceId)
+        ? calendarState.calendars.filter(calendar => calendar.canWrite || calendar.instanceId === selectedEvent.calendarInstanceId)
         : calendarState.calendars);
-    populateCalendarSelect(availableCalendars, event.calendarInstanceId);
-    setCalendarSelectDisabled(!editable || recurringOccurrence);
-    document.getElementById('dialog-title').textContent = t('Edit event');
-    document.getElementById('event-summary').value = event.summary || '';
-    document.getElementById('event-location').value = event.location || '';
-    document.getElementById('event-description').value = event.description || '';
-    document.getElementById('event-all-day').checked = Boolean(event.allDay);
-    setDateInputs(eventStart(event), eventEnd(event), Boolean(event.allDay), Boolean(event.allDay));
-    updateRecurrenceAvailability();
-    const descriptionEditable = editable && !Boolean(event.onlineMeeting);
+    populateCalendarSelect(availableCalendars, selectedEvent.calendarInstanceId);
+    setCalendarSelectDisabled(!editable || selectedEvent.recurring);
+    document.getElementById('dialog-title').textContent = t(editingSeries ? 'Edit recurring event' : 'Edit event');
+    document.getElementById('event-summary').value = selectedEvent.summary || '';
+    document.getElementById('event-location').value = selectedEvent.location || '';
+    document.getElementById('event-description').value = selectedEvent.description || '';
+    document.getElementById('event-all-day').checked = Boolean(selectedEvent.allDay);
+    setDateInputs(
+        eventStart(selectedEvent),
+        eventEnd(selectedEvent),
+        Boolean(selectedEvent.allDay),
+        Boolean(selectedEvent.allDay)
+    );
+    if (editingSeries) {
+        loadRecurrenceEditor(selectedEvent);
+    } else {
+        updateRecurrenceAvailability();
+    }
+    const descriptionEditable = editable && !Boolean(selectedEvent.onlineMeeting);
     setDialogEditable(editable, descriptionEditable);
-    document.getElementById('delete-button').classList.toggle('hidden', !eventCanDelete(event));
+    document.getElementById('delete-button').classList.toggle('hidden', !eventCanDelete(selectedEvent));
     const note = document.getElementById('dialog-note');
     if (!editable) {
-        note.textContent = t(eventReadOnlyReason(event));
+        note.textContent = t(eventReadOnlyReason(selectedEvent));
+        note.classList.remove('hidden');
+    } else if (editingSeries) {
+        note.textContent = selectedEvent.recurrenceEditable === false
+            ? `${t('Changes will apply to the entire recurring series.')} ${t('The recurrence pattern of this series cannot be edited here.')}`
+            : t('Changes will apply to the entire recurring series.');
         note.classList.remove('hidden');
     } else if (recurringOccurrence) {
         note.textContent = t('Only this occurrence of the recurring event will be changed.');
@@ -1152,6 +1252,7 @@ function selectedCalendarEntry() {
 }
 
 function resetRecurrenceEditor(start) {
+    setRecurrenceNoneOptionDisabled(false);
     eventRecurrenceFrequency.value = 'none';
     eventRecurrenceInterval.value = '1';
     eventRecurrenceEndMode.value = 'never';
@@ -1164,6 +1265,34 @@ function resetRecurrenceEditor(start) {
     updateRecurrenceAvailability();
 }
 
+function setRecurrenceNoneOptionDisabled(disabled) {
+    const option = eventRecurrenceFrequency.querySelector('option[value="none"]');
+    if (option) option.disabled = disabled;
+}
+
+function loadRecurrenceEditor(event) {
+    const recurrence = event.recurrenceSettings && typeof event.recurrenceSettings === 'object'
+        ? event.recurrenceSettings
+        : {};
+    const editable = event.recurrenceEditable !== false && Boolean(recurrence.frequency);
+    setRecurrenceNoneOptionDisabled(editable);
+    eventRecurrenceFrequency.value = editable ? String(recurrence.frequency).toLowerCase() : 'none';
+    eventRecurrenceInterval.value = String(Math.max(1, Number(recurrence.interval) || 1));
+    eventRecurrenceEndMode.value = ['count', 'until'].includes(recurrence.endMode)
+        ? recurrence.endMode
+        : 'never';
+    eventRecurrenceCount.value = String(Math.max(1, Number(recurrence.count) || 10));
+    eventRecurrenceUntil.value = String(recurrence.until || '');
+    const selectedWeekdays = new Set(Array.isArray(recurrence.byDay) ? recurrence.byDay : []);
+    eventRecurrenceWeekdays.querySelectorAll('input[type="checkbox"]').forEach(input => {
+        input.checked = selectedWeekdays.has(input.value);
+    });
+    if (editable && eventRecurrenceFrequency.value === 'weekly' && selectedWeekdays.size === 0) {
+        selectDefaultRecurrenceWeekday(eventStart(event));
+    }
+    updateRecurrenceAvailability();
+}
+
 function selectDefaultRecurrenceWeekday(start) {
     if (!(start instanceof Date) || Number.isNaN(start.getTime())) return;
     const weekday = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'][start.getDay()];
@@ -1173,9 +1302,13 @@ function selectDefaultRecurrenceWeekday(start) {
 
 function updateRecurrenceAvailability() {
     const calendar = selectedCalendarEntry();
-    const available = selectedEvent === null
-        && Boolean(calendar?.canWrite)
-        && Boolean(calendar?.canCreateRecurrence);
+    const editingSeries = Boolean(selectedEvent?.recurring) && selectedEvent?.writeScope === 'series';
+    const available = editingSeries
+        ? Boolean(selectedEvent?.canUpdateSeries) && selectedEvent?.recurrenceEditable !== false
+        : selectedEvent === null
+            && Boolean(calendar?.canWrite)
+            && Boolean(calendar?.canCreateRecurrence);
+    setRecurrenceNoneOptionDisabled(editingSeries && available);
     eventRecurrenceRow.classList.toggle('hidden', !available);
     eventRecurrenceFrequency.disabled = !available;
     if (!available) eventRecurrenceFrequency.value = 'none';
@@ -1219,7 +1352,8 @@ function updateRecurrenceEndDateMinimum() {
 }
 
 function recurrenceEditorValue() {
-    if (selectedEvent !== null || eventRecurrenceFrequency.disabled) return null;
+    const editingSeries = Boolean(selectedEvent?.recurring) && selectedEvent?.writeScope === 'series';
+    if ((selectedEvent !== null && !editingSeries) || eventRecurrenceFrequency.disabled) return null;
     const frequency = eventRecurrenceFrequency.value;
     if (frequency === 'none') return null;
 
@@ -1339,7 +1473,10 @@ eventForm.addEventListener('submit', async event => {
     const recurrence = recurrenceEditorValue();
     if (recurrence) {
         eventData.recurrence = recurrence;
-        const timezone = String(selectedCalendarEntry()?.timezone || '').trim();
+    }
+    const editingSeries = Boolean(selectedEvent?.recurring) && selectedEvent?.writeScope === 'series';
+    if (recurrence || editingSeries) {
+        const timezone = String(selectedEvent?.timezone || selectedCalendarEntry()?.timezone || '').trim();
         if (timezone) eventData.timezone = timezone;
     }
     if (!calendarInstanceId || !eventData.summary || !eventData.start || !eventData.end) return;
@@ -1429,11 +1566,12 @@ eventDialog.addEventListener('cancel', event => {
 eventDialog.addEventListener('close', closeCalendarPicker);
 document.getElementById('details-close').addEventListener('click', () => eventDetailsDialog.close());
 document.getElementById('details-close-button').addEventListener('click', () => eventDetailsDialog.close());
-document.getElementById('details-edit-button').addEventListener('click', () => {
-    if (!selectedEvent || !eventCanUpdate(selectedEvent)) return;
-    const event = selectedEvent;
-    eventDetailsDialog.close();
-    openExistingEvent(event);
+document.getElementById('details-edit-button').addEventListener('click', () => requestEdit(eventDetailsDialog));
+document.getElementById('edit-scope-close').addEventListener('click', () => editScopeDialog.close());
+document.getElementById('edit-scope-cancel').addEventListener('click', () => editScopeDialog.close());
+editScopeConfirmButton.addEventListener('click', confirmEditScope);
+editScopeDialog.addEventListener('close', () => {
+    editScopeSourceDialog = null;
 });
 document.getElementById('details-delete-button').addEventListener('click', () => requestDelete(eventDetailsDialog));
 document.getElementById('delete-confirm-close').addEventListener('click', () => deleteConfirmDialog.close());
@@ -1488,7 +1626,7 @@ function containWheelInsideTile(event) {
     const calendarOptionList = event.target instanceof Element
         ? event.target.closest('.calendar-picker-options')
         : null;
-    const openDialog = [eventDialog, eventDetailsDialog, dayEventsDialog, viewSelectorDialog, calendarFilterDialog]
+    const openDialog = [eventDialog, eventDetailsDialog, editScopeDialog, deleteConfirmDialog, dayEventsDialog, viewSelectorDialog, calendarFilterDialog]
         .find(dialog => dialog.open);
     const scrollTarget = calendarOptionList || openDialog?.querySelector('.dialog-body') || content;
     const factor = event.deltaMode === WheelEvent.DOM_DELTA_LINE
@@ -1746,6 +1884,8 @@ function applyStaticTranslations() {
         ['details-delete-button', 'Delete'],
         ['details-close-button', 'Close'],
         ['details-edit-button', 'Edit'],
+        ['edit-scope-cancel', 'Cancel'],
+        ['edit-scope-confirm', 'Continue'],
         ['delete-confirm-cancel', 'Cancel'],
         ['delete-confirm-button', 'Delete'],
         ['day-events-create-button', 'Create event on this day'],
@@ -1759,6 +1899,8 @@ function applyStaticTranslations() {
     document.getElementById('all-day-label').textContent = t('All day');
     document.getElementById('dialog-title').textContent = t('Event');
     document.getElementById('details-dialog-title').textContent = t('Event details');
+    document.getElementById('edit-scope-dialog-title').textContent = t('Edit recurring event');
+    document.getElementById('edit-scope-question').textContent = t('Which events do you want to edit?');
     document.getElementById('delete-confirm-dialog-title').textContent = t('Delete event');
     document.getElementById('delete-confirm-question').textContent = t('Do you really want to delete this event?');
     document.getElementById('day-events-dialog-title').textContent = t('Day events');
@@ -1774,6 +1916,7 @@ function applyStaticTranslations() {
     [
         ['dialog-close', 'Close'],
         ['details-close', 'Close'],
+        ['edit-scope-close', 'Close'],
         ['delete-confirm-close', 'Close'],
         ['day-events-close', 'Close'],
         ['view-selector-close', 'Close'],

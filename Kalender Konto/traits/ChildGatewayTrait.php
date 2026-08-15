@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use IPSKalender\CalendarEventRecurrence;
+use IPSKalender\RecurringCalendarProviderInterface;
 
 trait KalenderKontoChildGatewayTrait
 {
@@ -29,7 +30,8 @@ trait KalenderKontoChildGatewayTrait
                 'FinishEventsTransfer'   => [
                     'success' => $this->finishEventsTransferForChild($request)
                 ],
-                'CreateEvent'       => $this->createEventForChild($request),
+                'GetRecurringSeries' => $this->getRecurringSeriesForChild($request),
+                'CreateEvent'         => $this->createEventForChild($request),
                 'UpdateEvent'       => $this->updateEventForChild($request),
                 'DeleteEvent'       => ['success' => $this->deleteEventForChild($request)],
                 'Synchronize'       => ['success' => $this->Synchronize()],
@@ -115,6 +117,24 @@ trait KalenderKontoChildGatewayTrait
         return $this->ClearChunkedJsonTransfer(
             self::EVENT_TRANSFER_SCOPE,
             (string) ($request['Token'] ?? '')
+        );
+    }
+
+    /**
+     * @param array<string, mixed> $request
+     * @return array<string, mixed>
+     */
+    private function getRecurringSeriesForChild(array $request): array
+    {
+        $calendar = $this->resolveCalendar((string) ($request['CalendarID'] ?? ''));
+        $provider = $this->createProvider();
+        if (!$provider instanceof RecurringCalendarProviderInterface) {
+            throw new InvalidArgumentException('Recurring series are not supported by this calendar provider.');
+        }
+
+        return $provider->getRecurringSeries(
+            $this->calendarReference($calendar),
+            trim((string) ($request['SeriesID'] ?? ''))
         );
     }
 
