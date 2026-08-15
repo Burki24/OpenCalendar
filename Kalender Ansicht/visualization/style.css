@@ -37,6 +37,7 @@
     --cal-dialog-small-width: 360px;
     --cal-dialog-medium-width: 440px;
     --cal-dialog-large-width: 560px;
+    --cal-dialog-extra-large-width: 640px;
     --agenda-color-bar-width: 5px;
     --compact-color-bar-width: 3px;
     --cal-dialog-font-size: clamp(0.98rem, 0.94rem + 0.12vw, 1.04rem);
@@ -97,6 +98,7 @@ html.ipsview-mode {
     --cal-dialog-small-width: 420px;
     --cal-dialog-medium-width: 540px;
     --cal-dialog-large-width: 680px;
+    --cal-dialog-extra-large-width: 760px;
     --cal-dialog-font-size: clamp(1rem, 0.96rem + 0.14vw, 1.06rem);
 }
 html.ipsview-mode button:disabled,
@@ -549,6 +551,7 @@ html.ipsview-mode .danger-button { min-height: 48px; padding-inline: 18px; }
 .oc-dialog-small { --dialog-width: var(--cal-dialog-small-width); }
 .oc-dialog-medium { --dialog-width: var(--cal-dialog-medium-width); }
 .oc-dialog-large { --dialog-width: var(--cal-dialog-large-width); }
+.oc-dialog-extra-large { --dialog-width: var(--cal-dialog-extra-large-width); }
 .oc-dialog[open] { display: flex; flex-direction: column; }
 .oc-dialog > .dialog-layout {
     display: flex;
@@ -732,6 +735,9 @@ html.ipsview-mode .danger-button { min-height: 48px; padding-inline: 18px; }
 .event-details-row:first-child { border-top: 0; }
 .event-details-row dt { color: var(--cal-label-text); font-weight: 600; }
 .event-details-row dd { margin: 0; line-height: 1.45; overflow-wrap: anywhere; white-space: pre-wrap; }
+.event-details-dialog .dialog-actions-start,
+.event-details-dialog .dialog-actions-end { flex-wrap: nowrap; }
+.event-details-dialog .dialog-actions button { flex: 0 0 auto; white-space: nowrap; }
 
 .delete-confirm-body { gap: 8px; }
 .delete-confirm-summary { font-size: 1.02em; font-weight: 700; line-height: 1.35; overflow-wrap: anywhere; }

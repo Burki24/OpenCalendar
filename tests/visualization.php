@@ -148,7 +148,7 @@ assertVisualization(
 );
 
 assertVisualization(
-    str_contains($indexSource, 'id="event-details-dialog" class="oc-dialog oc-dialog-medium event-details-dialog"')
+    str_contains($indexSource, 'id="event-details-dialog" class="oc-dialog oc-dialog-extra-large event-details-dialog"')
         && str_contains($script, 'function openEventDetails(event)')
         && str_contains($script, 'card.addEventListener(\'click\', () => openEventDetails(event));')
         && str_contains($script, 'document.getElementById(\'details-edit-button\').addEventListener(\'click\'')
@@ -419,7 +419,7 @@ assertVisualization(
 assertVisualization(
     str_contains($indexSource, 'id="event-dialog" class="oc-dialog oc-dialog-large"')
         && str_contains($indexSource, 'id="event-form" class="dialog-layout"')
-        && str_contains($indexSource, 'id="event-details-dialog" class="oc-dialog oc-dialog-medium event-details-dialog"')
+        && str_contains($indexSource, 'id="event-details-dialog" class="oc-dialog oc-dialog-extra-large event-details-dialog"')
         && str_contains($indexSource, 'id="edit-scope-dialog" class="oc-dialog oc-dialog-small edit-scope-dialog"')
         && str_contains($indexSource, 'id="delete-confirm-dialog" class="oc-dialog oc-dialog-small delete-confirm-dialog"')
         && str_contains($indexSource, 'id="day-events-dialog" class="oc-dialog oc-dialog-large day-events-dialog"')
@@ -532,14 +532,20 @@ assertVisualization(
     str_contains($style, '--cal-dialog-small-width: 360px;')
         && str_contains($style, '--cal-dialog-medium-width: 440px;')
         && str_contains($style, '--cal-dialog-large-width: 560px;')
+        && str_contains($style, '--cal-dialog-extra-large-width: 640px;')
         && str_contains($style, '--cal-dialog-small-width: 420px;')
         && str_contains($style, '--cal-dialog-medium-width: 540px;')
         && str_contains($style, '--cal-dialog-large-width: 680px;')
+        && str_contains($style, '--cal-dialog-extra-large-width: 760px;')
+        && str_contains($style, '.oc-dialog-extra-large { --dialog-width: var(--cal-dialog-extra-large-width); }')
         && str_contains($style, '.oc-dialog[open] { display: flex; flex-direction: column; }')
         && str_contains($style, '.oc-dialog > .dialog-layout {')
         && str_contains($style, 'flex: 1 1 auto;')
         && str_contains($style, 'scrollbar-gutter: stable;')
         && str_contains($style, '.dialog-actions-start, .dialog-actions-end {')
+        && str_contains($style, '.event-details-dialog .dialog-actions-start,')
+        && str_contains($style, '.event-details-dialog .dialog-actions-end { flex-wrap: nowrap; }')
+        && str_contains($style, '.event-details-dialog .dialog-actions button { flex: 0 0 auto; white-space: nowrap; }')
         && str_contains($style, '.dialog-close-button {')
         && str_contains($style, '.delete-scope,')
         && str_contains($style, '.edit-scope { display: grid;')
