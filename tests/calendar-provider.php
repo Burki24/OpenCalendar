@@ -893,7 +893,6 @@ $msEventClient = new FakeHttpClient([
                 'end'             => ['dateTime' => '2026-07-20T11:00:00.1234567', 'timeZone' => 'UTC'],
                 'type'            => 'occurrence',
                 'seriesMasterId'  => 'series-master',
-                'originalStart'   => '2026-07-20T10:00:00Z',
                 'isOnlineMeeting' => true,
                 'webLink'         => 'https://outlook.office.com/calendar/item/1'
             ],
@@ -931,11 +930,12 @@ assertSameValue('occurrence', $msEvents[1]['recurrenceType'], 'Microsoft occurre
 assertSameValue('series-master', $msEvents[1]['seriesId'], 'Microsoft series master IDs must be retained separately.');
 assertSameValue('instance/id+1', $msEvents[1]['occurrenceId'], 'Microsoft occurrence IDs must be retained separately.');
 assertSameValue('', $msEvents[1]['recurrenceId'], 'Microsoft series IDs must not be exposed as RFC recurrence IDs.');
-assertSameValue('2026-07-20T10:00:00Z', $msEvents[1]['originalStart'], 'Microsoft occurrence original starts must be retained.');
+assertSameValue('', $msEvents[1]['originalStart'], 'Microsoft calendarView occurrences may omit the original start without becoming read-only.');
 assertSameValue(true, $msEvents[1]['canUpdateOccurrence'], 'Microsoft occurrences must advertise individual update support.');
 assertSameValue(true, $msEvents[1]['canDeleteOccurrence'], 'Microsoft occurrences must advertise individual delete support.');
 assertSameValue(true, $msEvents[1]['onlineMeeting'], 'Microsoft online-meeting state must be exposed to the calendar view.');
 assertSameValue('exception', $msEvents[2]['recurrenceType'], 'Modified Microsoft occurrences must be normalized as exceptions.');
+assertSameValue('2026-07-20T13:00:00Z', $msEvents[2]['originalStart'], 'Microsoft exception original starts must be retained when Graph supplies them.');
 assertSameValue(true, $msEvents[2]['canUpdateOccurrence'], 'Microsoft exceptions must remain individually editable.');
 assertSameValue(true, $msEvents[2]['canDeleteOccurrence'], 'Microsoft exceptions must remain individually deletable.');
 assertTrueValue(
@@ -1148,7 +1148,7 @@ $msOccurrenceRecurrence = [
     'recurrenceType'      => 'occurrence',
     'seriesId'            => 'series-master',
     'occurrenceId'        => 'instance/id+1',
-    'originalStart'       => '2026-07-20T10:00:00Z',
+    'originalStart'       => '',
     'recurring'           => true,
     'canUpdateOccurrence' => true,
     'canDeleteOccurrence' => true,

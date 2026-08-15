@@ -976,8 +976,7 @@ class Kalender extends IPSModuleStrict
                 $cachedEvent['writeScope'] = (string) ($event['writeScope'] ?? '');
                 if ((bool) ($cachedEvent['recurring'] ?? false)
                     && trim((string) ($cachedEvent['occurrenceId'] ?? '')) !== ''
-                    && trim((string) ($cachedEvent['seriesId'] ?? '')) !== ''
-                    && trim((string) ($cachedEvent['originalStart'] ?? '')) !== '') {
+                    && trim((string) ($cachedEvent['seriesId'] ?? '')) !== '') {
                     if ($this->ReadAttributeBoolean('DetectedCanUpdateOccurrence')) {
                         $cachedEvent['canUpdateOccurrence'] = true;
                     }

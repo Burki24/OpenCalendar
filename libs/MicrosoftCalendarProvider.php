@@ -293,7 +293,7 @@ final class MicrosoftCalendarProvider implements CalendarProviderInterface
                 $eventId,
                 $originalStart,
                 '',
-                $seriesMasterId !== '' && $originalStart !== '',
+                $seriesMasterId !== '',
                 $type === 'exception'
             ),
             default => CalendarEventRecurrence::single()
@@ -343,7 +343,6 @@ final class MicrosoftCalendarProvider implements CalendarProviderInterface
         if (!in_array($type, [CalendarEventRecurrence::OCCURRENCE, CalendarEventRecurrence::EXCEPTION], true)
             || ($identity['writeScope'] ?? '') !== CalendarEventRecurrence::WRITE_SCOPE_OCCURRENCE
             || trim((string) ($identity['seriesId'] ?? '')) === ''
-            || trim((string) ($identity['originalStart'] ?? '')) === ''
             || $occurrenceId === ''
             || !hash_equals($eventId, $occurrenceId)
             || !(bool) ($identity[$capability] ?? false)) {

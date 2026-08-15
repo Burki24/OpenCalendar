@@ -229,6 +229,16 @@ $formSource = (string) file_get_contents(__DIR__ . '/../Kalender Ansicht/form.js
 $moduleSource = (string) file_get_contents(__DIR__ . '/../Kalender Ansicht/module.php');
 
 assertVisualization(
+    substr_count(
+        $moduleSource,
+        "\$recurringOccurrence = (bool) (\$event['recurring'] ?? false)\n"
+            . "                    && trim((string) (\$event['occurrenceId'] ?? '')) !== ''\n"
+            . "                    && trim((string) (\$event['seriesId'] ?? '')) !== '';"
+    ) === 2,
+    'Microsoft recurring occurrences must stay editable when calendarView omits originalStart.'
+);
+
+assertVisualization(
     str_contains($indexSource, 'id="edit-scope-dialog"')
         && str_contains($indexSource, 'name="edit-scope" value="occurrence"')
         && str_contains($indexSource, 'name="edit-scope" value="following"')
