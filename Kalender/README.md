@@ -32,7 +32,7 @@ beliebig verschoben oder vom Benutzer umbenannt werden.
 - Abruf von CalDAV-Terminen über einen konfigurierbaren Zeitraum
 - Auflösen wiederkehrender Termine für die lokale Anzeige
 - lokaler JSON-Cache und zyklische Synchronisation
-- Erstellen neuer Termine sowie neuer Google-Serientermine
+- Erstellen neuer Termine sowie neuer Google- und Microsoft-Serientermine
 - Ändern und Löschen einzelner Termine sowie einzelner Google-Serienvorkommnisse
 - Bearbeiten einer vollständigen Google-Terminserie
 - Bearbeiten oder Löschen eines Google-Serienvorkommnisses **und aller folgenden Termine** durch sicheres Teilen bzw. Kürzen der Serie
@@ -133,10 +133,12 @@ $result = IPSKAL_CreateEvent(12345, json_encode([
 ]));
 ```
 
-Für beschreibbare Google-Kalender können beim Erstellen zusätzlich providerneutrale
-Serienangaben übergeben werden. Bei zeitgebundenen Serien verwendet OpenCalendar
-die Zeitzone des ausgewählten Kalenders, damit die lokale Uhrzeit auch über
-Sommer-/Winterzeitwechsel erhalten bleibt:
+Für beschreibbare Google- und Microsoft-Kalender können beim Erstellen zusätzlich
+providerneutrale Serienangaben übergeben werden. Bei Google verwendet OpenCalendar
+die Kalenderzeitzone. Für Microsoft wird die übergebene Zeitzone verwendet; fehlt
+sie bei einem Aufruf über die Visualisierung, wird die Zeitzone des Clients
+verwendet. Dadurch bleibt die lokale Uhrzeit auch über Sommer-/Winterzeitwechsel
+erhalten:
 
 ```php
 $result = IPSKAL_CreateEvent(12345, json_encode([
@@ -153,10 +155,12 @@ $result = IPSKAL_CreateEvent(12345, json_encode([
 ]));
 ```
 
-Unterstützt werden `DAILY`, `WEEKLY`, `MONTHLY` und `YEARLY`, ein Intervall,
-bei wöchentlichen Serien optionale Wochentage sowie die Endarten `never`,
-`count` und `until`. Bei Google können einzelne Vorkommnisse, die vollständige
-Serie sowie **dieses und alle folgenden Vorkommnisse** bearbeitet werden. Vor dem
+Unterstützt werden für Google und Microsoft `DAILY`, `WEEKLY`, `MONTHLY` und
+`YEARLY`, ein Intervall, bei wöchentlichen Serien optionale Wochentage sowie die
+Endarten `never`, `count` und `until`. Bei Microsoft entspricht eine monatliche
+Serie dem Kalendertag des Starttermins und eine jährliche Serie zusätzlich dessen
+Monat. Bei Google können einzelne Vorkommnisse, die vollständige Serie sowie
+**dieses und alle folgenden Vorkommnisse** bearbeitet werden. Vor dem
 Bearbeiten einer vollständigen Serie lädt `IPSKAL_GetRecurringSeries()` den
 verifizierten Parent-Termin. Für „dieses und folgende“ liefert
 `IPSKAL_GetRecurringFollowing()` zusätzlich das verifizierte Zielvorkommnis und
@@ -205,5 +209,5 @@ Konfiguration unvollständig | Instanz im Kalender Konfigurator löschen und aus
 Synchronisation fehlgeschlagen | Zuerst im verbundenen Kalender Konto **Verbindung testen**, anschließend Konto und Kalender erneut synchronisieren
 Keine Termine sichtbar | Zeitraum für vergangene und zukünftige Termine prüfen und kontrollieren, ob der Online-Kalender im gewählten Zeitraum Termine enthält
 Kalender ist schreibgeschützt | Schreibrechte beim Anbieter prüfen; ICS/Webcal-Abonnements sind immer schreibgeschützt
-Ändern oder Löschen wird bei einem Serientermin verweigert | Google-Vorkommnisse und vollständige Google-Serien sind beschreibbar; Microsoft- und CalDAV-Serienvorkommnisse bleiben geschützt
+Ändern oder Löschen wird bei einem Serientermin verweigert | Google-Vorkommnisse und vollständige Google-Serien sind beschreibbar; Microsoft unterstützt derzeit nur das Anlegen neuer Serien, bestehende Microsoft- und CalDAV-Serienvorkommnisse bleiben geschützt
 Schreibkonflikt | Kalender erneut synchronisieren; der ETag-Schutz verhindert das Überschreiben einer zwischenzeitlich geänderten Serverversion

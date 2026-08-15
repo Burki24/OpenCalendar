@@ -560,7 +560,8 @@ class KalenderKonto extends IPSModuleStrict
     public function GetCalendars(): string
     {
         $cachedCalendars = $this->ReadAttributeString('CachedCalendars');
-        if ($this->ReadPropertyInteger('Provider') !== self::PROVIDER_GOOGLE) {
+        $provider = $this->ReadPropertyInteger('Provider');
+        if (!in_array($provider, [self::PROVIDER_GOOGLE, self::PROVIDER_MICROSOFT], true)) {
             return $cachedCalendars;
         }
 
@@ -571,7 +572,7 @@ class KalenderKonto extends IPSModuleStrict
             }
 
             return json_encode(
-                self::normalizeCachedCalendarCapabilities($calendars, self::PROVIDER_GOOGLE),
+                self::normalizeCachedCalendarCapabilities($calendars, $provider),
                 JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR
             );
         } catch (JsonException) {
@@ -668,17 +669,16 @@ class KalenderKonto extends IPSModuleStrict
     /**
      * Adds capabilities introduced after calendar discovery to compatible cached entries.
      *
-     * Existing account caches survive module updates. Google calendars discovered before
-     * recurring-event support was added therefore do not yet contain the newer recurrence
-     * capabilities. Derive them from the already cached write permission so child calendar
-     * instances can use the features without requiring a manual account resynchronization.
+     * Existing account caches survive module updates. Recurrence capabilities introduced
+     * later are therefore derived from the provider and the already cached write permission
+     * so child calendar instances can use them without a manual account resynchronization.
      *
      * @param list<array<string, mixed>> $calendars Cached account calendars.
      * @return list<array<string, mixed>> Normalized calendars.
      */
     private static function normalizeCachedCalendarCapabilities(array $calendars, int $provider): array
     {
-        if ($provider !== self::PROVIDER_GOOGLE) {
+        if (!in_array($provider, [self::PROVIDER_GOOGLE, self::PROVIDER_MICROSOFT], true)) {
             return $calendars;
         }
 
@@ -692,14 +692,16 @@ class KalenderKonto extends IPSModuleStrict
             if (!array_key_exists('createRecurrence', $capabilities)) {
                 $capabilities['createRecurrence'] = $canWrite;
             }
-            if (!array_key_exists('updateFollowing', $capabilities)) {
-                $capabilities['updateFollowing'] = $canWrite;
-            }
-            if (!array_key_exists('updateSeries', $capabilities)) {
-                $capabilities['updateSeries'] = $canWrite;
-            }
-            if (!array_key_exists('deleteSeries', $capabilities)) {
-                $capabilities['deleteSeries'] = $canWrite;
+            if ($provider === self::PROVIDER_GOOGLE) {
+                if (!array_key_exists('updateFollowing', $capabilities)) {
+                    $capabilities['updateFollowing'] = $canWrite;
+                }
+                if (!array_key_exists('updateSeries', $capabilities)) {
+                    $capabilities['updateSeries'] = $canWrite;
+                }
+                if (!array_key_exists('deleteSeries', $capabilities)) {
+                    $capabilities['deleteSeries'] = $canWrite;
+                }
             }
             $calendar['capabilities'] = $capabilities;
         }

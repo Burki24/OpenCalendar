@@ -7,6 +7,7 @@ use IPSKalender\CalendarEventTranslation;
 use IPSKalender\CalendarHttpClientInterface;
 use IPSKalender\CalendarHttpResponse;
 use IPSKalender\CalendarProviderInterface;
+use IPSKalender\CalendarRecurrenceRule;
 use IPSKalender\GoogleCalendarOriginPolicy;
 use IPSKalender\GoogleCalendarProvider;
 use IPSKalender\GoogleOAuthOriginPolicy;
@@ -815,7 +816,9 @@ assertSameValue('AQMk-primary', $msCalendars[0]['providerId'], 'The default Micr
 assertSameValue('max@example.com', $msCalendars[0]['owner'], 'Microsoft calendar ownership must be retained for account display.');
 assertSameValue(true, $msCalendars[0]['writeAccessKnown'], 'Microsoft canEdit must provide authoritative write metadata.');
 assertSameValue(true, $msCalendars[0]['capabilities']['create'], 'Editable Microsoft calendars must expose write capabilities.');
+assertSameValue(true, $msCalendars[0]['capabilities']['createRecurrence'], 'Editable Microsoft calendars must advertise recurrence creation support.');
 assertSameValue(false, $msCalendars[2]['capabilities']['create'], 'Read-only Microsoft calendars must remain read-only.');
+assertSameValue(false, $msCalendars[2]['capabilities']['createRecurrence'], 'Read-only Microsoft calendars must not advertise recurrence creation support.');
 assertSameValue(
     'Bearer ms-access-token',
     $msCalendarClient->requests[0]['headers']['Authorization'],
@@ -1002,6 +1005,85 @@ $msCreateBody = json_decode($msWriteClient->requests[0]['body'], true, 512, JSON
 assertSameValue('Test', $msCreateBody['subject'], 'Microsoft event subjects must be sent.');
 assertSameValue('text', $msCreateBody['body']['contentType'], 'Microsoft event descriptions must be sent as text.');
 assertSameValue('UTC', $msCreateBody['start']['timeZone'], 'Microsoft event writes must use unambiguous UTC times.');
+
+$msRecurringCreateClient = new FakeHttpClient([
+    response(201, [
+        'id'          => 'microsoft-series-id',
+        'iCalUId'     => 'microsoft-series@example.com',
+        '@odata.etag' => 'W/"microsoft-series"'
+    ])
+]);
+(new MicrosoftCalendarProvider($msRecurringCreateClient, 'ms-access-token'))->createEvent('AQMk-primary', [
+    'summary'    => 'Microsoft weekly meeting',
+    'allDay'     => false,
+    'start'      => '2026-10-19T08:00:00Z',
+    'end'        => '2026-10-19T09:00:00Z',
+    'timezone'   => 'Europe/Berlin',
+    'recurrence' => [
+        'frequency' => 'weekly',
+        'interval'  => 2,
+        'byDay'     => ['TH', 'MO'],
+        'endMode'   => 'until',
+        'until'     => '2026-11-30'
+    ]
+]);
+$msRecurringCreateBody = json_decode(
+    $msRecurringCreateClient->requests[0]['body'],
+    true,
+    512,
+    JSON_THROW_ON_ERROR
+);
+assertSameValue(
+    ['dateTime' => '2026-10-19T10:00:00', 'timeZone' => 'Europe/Berlin'],
+    $msRecurringCreateBody['start'],
+    'Recurring Microsoft events must preserve the local wall-clock start time and timezone.'
+);
+assertSameValue(
+    [
+        'type'           => 'weekly',
+        'interval'       => 2,
+        'daysOfWeek'     => ['monday', 'thursday'],
+        'firstDayOfWeek' => 'monday'
+    ],
+    $msRecurringCreateBody['recurrence']['pattern'],
+    'Recurring Microsoft events must serialize weekly patterns in Microsoft Graph format.'
+);
+assertSameValue(
+    [
+        'type'      => 'endDate',
+        'startDate' => '2026-10-19',
+        'endDate'   => '2026-11-30'
+    ],
+    $msRecurringCreateBody['recurrence']['range'],
+    'Recurring Microsoft events must serialize end-date ranges in Microsoft Graph format.'
+);
+
+$msDailyRecurrence = CalendarRecurrenceRule::toMicrosoftRecurrence(
+    [
+        'frequency' => 'daily',
+        'interval'  => 3,
+        'endMode'   => 'count',
+        'count'     => 5
+    ],
+    new DateTimeImmutable('2026-08-17T09:00:00+02:00')
+);
+assertSameValue('daily', $msDailyRecurrence['pattern']['type'], 'Microsoft daily recurrence patterns must be supported.');
+assertSameValue(5, $msDailyRecurrence['range']['numberOfOccurrences'], 'Microsoft numbered recurrence ranges must retain the occurrence count.');
+
+$msMonthlyRecurrence = CalendarRecurrenceRule::toMicrosoftRecurrence(
+    ['frequency' => 'monthly', 'interval' => 2, 'endMode' => 'never'],
+    new DateTimeImmutable('2026-08-31T09:00:00+02:00')
+);
+assertSameValue('absoluteMonthly', $msMonthlyRecurrence['pattern']['type'], 'Microsoft monthly recurrence patterns must be absolute monthly patterns.');
+assertSameValue(31, $msMonthlyRecurrence['pattern']['dayOfMonth'], 'Microsoft monthly recurrence patterns must use the start day of month.');
+
+$msYearlyRecurrence = CalendarRecurrenceRule::toMicrosoftRecurrence(
+    ['frequency' => 'yearly', 'interval' => 1, 'endMode' => 'never'],
+    new DateTimeImmutable('2026-12-24T09:00:00+01:00')
+);
+assertSameValue('absoluteYearly', $msYearlyRecurrence['pattern']['type'], 'Microsoft yearly recurrence patterns must be absolute yearly patterns.');
+assertSameValue(12, $msYearlyRecurrence['pattern']['month'], 'Microsoft yearly recurrence patterns must retain the start month.');
+assertSameValue(24, $msYearlyRecurrence['pattern']['dayOfMonth'], 'Microsoft yearly recurrence patterns must retain the start day.');
 
 $msProvider->updateEvent(
     'AQMk-primary',

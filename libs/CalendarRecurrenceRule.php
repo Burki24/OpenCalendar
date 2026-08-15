@@ -10,12 +10,21 @@ use InvalidArgumentException;
 use Throwable;
 
 /**
- * Validates provider-neutral recurrence settings and serializes RFC 5545 rules.
+ * Validates provider-neutral recurrence settings and serializes provider recurrence formats.
  */
 final class CalendarRecurrenceRule
 {
     private const FREQUENCIES = ['DAILY', 'WEEKLY', 'MONTHLY', 'YEARLY'];
     private const WEEKDAYS = ['MO', 'TU', 'WE', 'TH', 'FR', 'SA', 'SU'];
+    private const MICROSOFT_WEEKDAYS = [
+        'MO' => 'monday',
+        'TU' => 'tuesday',
+        'WE' => 'wednesday',
+        'TH' => 'thursday',
+        'FR' => 'friday',
+        'SA' => 'saturday',
+        'SU' => 'sunday'
+    ];
 
     /**
      * Builds the Google Calendar recurrence lines for a newly created event.
@@ -84,6 +93,105 @@ final class CalendarRecurrenceRule
         }
 
         return ['RRULE:' . implode(';', $parts)];
+    }
+
+    /**
+     * Builds a Microsoft Graph patternedRecurrence object for a newly created event.
+     *
+     * @param array<string, mixed> $recurrence Provider-neutral recurrence settings.
+     * @param DateTimeImmutable $start Event start in the recurrence timezone.
+     * @return array<string, mixed> Microsoft Graph patternedRecurrence data.
+     */
+    public static function toMicrosoftRecurrence(array $recurrence, DateTimeImmutable $start): array
+    {
+        if ($recurrence === [] || array_is_list($recurrence)) {
+            throw new InvalidArgumentException('The recurrence settings are invalid.');
+        }
+
+        $frequency = strtoupper(trim((string) ($recurrence['frequency'] ?? '')));
+        if (!in_array($frequency, self::FREQUENCIES, true)) {
+            throw new InvalidArgumentException('The recurrence frequency is invalid.');
+        }
+
+        $interval = filter_var(
+            $recurrence['interval'] ?? 1,
+            FILTER_VALIDATE_INT,
+            ['options' => ['min_range' => 1, 'max_range' => 999]]
+        );
+        if ($interval === false) {
+            throw new InvalidArgumentException('The recurrence interval is invalid.');
+        }
+
+        $pattern = [
+            'type'     => match ($frequency) {
+                'DAILY'   => 'daily',
+                'WEEKLY'  => 'weekly',
+                'MONTHLY' => 'absoluteMonthly',
+                'YEARLY'  => 'absoluteYearly'
+            },
+            'interval' => $interval
+        ];
+        if ($frequency === 'WEEKLY') {
+            $weekdays = self::weekdays($recurrence['byDay'] ?? []);
+            if ($weekdays === []) {
+                $weekdays = [self::WEEKDAYS[(int) $start->format('N') - 1]];
+            }
+            $pattern['daysOfWeek'] = array_map(
+                static fn (string $weekday): string => self::MICROSOFT_WEEKDAYS[$weekday],
+                $weekdays
+            );
+            $pattern['firstDayOfWeek'] = 'monday';
+        } elseif ($frequency === 'MONTHLY') {
+            $pattern['dayOfMonth'] = (int) $start->format('j');
+        } elseif ($frequency === 'YEARLY') {
+            $pattern['dayOfMonth'] = (int) $start->format('j');
+            $pattern['month'] = (int) $start->format('n');
+        }
+
+        $endMode = strtolower(trim((string) ($recurrence['endMode'] ?? 'never')));
+        if (!in_array($endMode, ['never', 'count', 'until'], true)) {
+            throw new InvalidArgumentException('The recurrence end mode is invalid.');
+        }
+
+        $range = [
+            'type'      => 'noEnd',
+            'startDate' => $start->format('Y-m-d')
+        ];
+        if ($endMode === 'count') {
+            $count = filter_var(
+                $recurrence['count'] ?? null,
+                FILTER_VALIDATE_INT,
+                ['options' => ['min_range' => 1, 'max_range' => 9999]]
+            );
+            if ($count === false) {
+                throw new InvalidArgumentException('The recurrence count is invalid.');
+            }
+            $range['type'] = 'numbered';
+            $range['numberOfOccurrences'] = $count;
+        } elseif ($endMode === 'until') {
+            $until = trim((string) ($recurrence['until'] ?? ''));
+            $untilDate = preg_match('/^\d{4}-\d{2}-\d{2}$/D', $until) === 1
+                ? DateTimeImmutable::createFromFormat('!Y-m-d', $until, new DateTimeZone('UTC'))
+                : false;
+            $startDate = DateTimeImmutable::createFromFormat(
+                '!Y-m-d',
+                $start->format('Y-m-d'),
+                new DateTimeZone('UTC')
+            );
+            if ($untilDate === false
+                || $untilDate->format('Y-m-d') !== $until
+                || $startDate === false
+                || $untilDate < $startDate) {
+                throw new InvalidArgumentException('The recurrence end date must not be before the event start.');
+            }
+            $range['type'] = 'endDate';
+            $range['endDate'] = $until;
+        }
+
+        return [
+            'pattern' => $pattern,
+            'range'   => $range
+        ];
     }
 
     /**

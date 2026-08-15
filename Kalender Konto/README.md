@@ -102,7 +102,10 @@ Konten wie Outlook.com.
 OpenCalendar verwendet delegierten Kalenderzugriff. Mail, Kontakte, OneDrive,
 Teams und andere Microsoft-Graph-Bereiche werden nicht angefordert. Microsofts
 `canEdit`-Angabe bestimmt, ob ein Kalender beschreibbar oder schreibgeschützt
-angelegt wird.
+angelegt wird. In beschreibbaren Microsoft-Kalendern können außerdem neue tägliche,
+wöchentliche, monatliche und jährliche Terminserien mit Intervall sowie den
+Endarten Nie, Anzahl oder Enddatum angelegt werden. Bestehende Microsoft-Serien
+bleiben in diesem Ausbauschritt noch schreibgeschützt.
 
 Bei bestehenden Microsoft-Onlinebesprechungen wird die Beschreibung in der
 Kalenderansicht nicht zur Bearbeitung angeboten. Microsoft speichert darin

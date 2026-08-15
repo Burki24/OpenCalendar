@@ -14,6 +14,7 @@ use Throwable;
 require_once __DIR__ . '/CalendarProviderInterface.php';
 require_once __DIR__ . '/CalendarHttpClient.php';
 require_once __DIR__ . '/CalendarEventRecurrence.php';
+require_once __DIR__ . '/CalendarRecurrenceRule.php';
 
 final class MicrosoftCalendarProviderException extends RuntimeException
 {
@@ -100,10 +101,11 @@ final class MicrosoftCalendarProvider implements CalendarProviderInterface
                     'components'       => ['VEVENT'],
                     'writeAccessKnown' => true,
                     'capabilities'     => [
-                        'read'   => true,
-                        'create' => $canWrite,
-                        'update' => $canWrite,
-                        'delete' => $canWrite
+                        'read'             => true,
+                        'create'           => $canWrite,
+                        'update'           => $canWrite,
+                        'delete'           => $canWrite,
+                        'createRecurrence' => $canWrite
                     ]
                 ];
                 if (count($calendars) > self::MAX_CALENDARS) {
@@ -369,6 +371,12 @@ final class MicrosoftCalendarProvider implements CalendarProviderInterface
             $payload['location'] = ['displayName' => (string) $data['location']];
         }
 
+        $recurrence = $data['recurrence'] ?? null;
+        $recurring = $recurrence !== null && $recurrence !== [];
+        if ($recurring && (!$creating || !is_array($recurrence) || array_is_list($recurrence))) {
+            throw new InvalidArgumentException('The recurrence settings are invalid.');
+        }
+
         $hasStart = array_key_exists('start', $data);
         $hasEnd = array_key_exists('end', $data);
         if ($creating && !$hasStart) {
@@ -386,7 +394,12 @@ final class MicrosoftCalendarProvider implements CalendarProviderInterface
             }
 
             $payload['isAllDay'] = $allDay;
+            $recurrenceTimezone = trim((string) ($data['timezone'] ?? ''));
+            if ($recurring && $recurrenceTimezone === '') {
+                $recurrenceTimezone = date_default_timezone_get();
+            }
             if ($allDay) {
+                $recurrenceStart = $start;
                 $payload['start'] = [
                     'dateTime' => $start->format('Y-m-d') . 'T00:00:00',
                     'timeZone' => 'UTC'
@@ -395,7 +408,20 @@ final class MicrosoftCalendarProvider implements CalendarProviderInterface
                     'dateTime' => $end->format('Y-m-d') . 'T00:00:00',
                     'timeZone' => 'UTC'
                 ];
+            } elseif ($recurring) {
+                $recurrenceZone = $this->recurrenceTimezone($recurrenceTimezone);
+                $recurrenceStart = $start->setTimezone($recurrenceZone);
+                $recurrenceEnd = $end->setTimezone($recurrenceZone);
+                $payload['start'] = [
+                    'dateTime' => $recurrenceStart->format('Y-m-d\TH:i:s'),
+                    'timeZone' => $recurrenceTimezone
+                ];
+                $payload['end'] = [
+                    'dateTime' => $recurrenceEnd->format('Y-m-d\TH:i:s'),
+                    'timeZone' => $recurrenceTimezone
+                ];
             } else {
+                $recurrenceStart = $start;
                 $payload['start'] = [
                     'dateTime' => $start->setTimezone(new DateTimeZone('UTC'))->format('Y-m-d\TH:i:s'),
                     'timeZone' => 'UTC'
@@ -405,8 +431,17 @@ final class MicrosoftCalendarProvider implements CalendarProviderInterface
                     'timeZone' => 'UTC'
                 ];
             }
+
+            if ($recurring) {
+                $payload['recurrence'] = CalendarRecurrenceRule::toMicrosoftRecurrence(
+                    $recurrence,
+                    $recurrenceStart
+                );
+            }
         } elseif (array_key_exists('allDay', $data)) {
             throw new InvalidArgumentException('Changing all-day mode requires a start and end.');
+        } elseif ($recurring) {
+            throw new InvalidArgumentException('Recurring event creation requires a start and end.');
         }
 
         if ($payload === []) {
@@ -541,6 +576,24 @@ final class MicrosoftCalendarProvider implements CalendarProviderInterface
             return new DateTimeImmutable($rawValue);
         } catch (Throwable) {
             throw new InvalidArgumentException('The event contains an invalid date.');
+        }
+    }
+
+    private function recurrenceTimezone(string $name): DateTimeZone
+    {
+        $name = trim($name);
+        if ($name === '') {
+            throw new InvalidArgumentException('The recurring event timezone is missing.');
+        }
+
+        try {
+            return new DateTimeZone($name);
+        } catch (Throwable) {
+            $ianaName = $this->windowsTimezoneToIana($name);
+            if ($ianaName !== '') {
+                return new DateTimeZone($ianaName);
+            }
+            throw new InvalidArgumentException('The recurring event timezone is invalid.');
         }
     }
 

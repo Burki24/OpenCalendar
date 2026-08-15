@@ -1525,7 +1525,10 @@ eventForm.addEventListener('submit', async event => {
     const editingSeries = Boolean(selectedEvent?.recurring) && selectedEvent?.writeScope === 'series';
     const editingFollowing = Boolean(selectedEvent?.recurring) && selectedEvent?.writeScope === 'following';
     if (recurrence || editingSeries || editingFollowing) {
-        const timezone = String(selectedEvent?.timezone || selectedCalendarEntry()?.timezone || '').trim();
+        const browserTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone || '';
+        const timezone = String(
+            selectedEvent?.timezone || selectedCalendarEntry()?.timezone || browserTimezone
+        ).trim();
         if (timezone) eventData.timezone = timezone;
     }
     if (!calendarInstanceId || !eventData.summary || !eventData.start || !eventData.end) return;

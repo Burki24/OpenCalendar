@@ -261,6 +261,35 @@ assertAccountStructure(
     'Legacy Google calendar caches must derive recurring create/update/delete support from cached write access.'
 );
 
+$legacyMicrosoftCalendars = [[
+    'id'           => 'legacy-microsoft-calendar',
+    'accessRole'   => 'writer',
+    'capabilities' => [
+        'read'   => true,
+        'create' => true,
+        'update' => true,
+        'delete' => true
+    ]
+], [
+    'id'           => 'legacy-microsoft-read-only',
+    'accessRole'   => 'reader',
+    'capabilities' => [
+        'read'   => true,
+        'create' => false,
+        'update' => false,
+        'delete' => false
+    ]
+]];
+$normalizedMicrosoftCalendars = $normalizeCapabilities->invoke(null, $legacyMicrosoftCalendars, 3);
+assertAccountStructure(
+    ($normalizedMicrosoftCalendars[0]['capabilities']['createRecurrence'] ?? false) === true
+        && ($normalizedMicrosoftCalendars[1]['capabilities']['createRecurrence'] ?? true) === false
+        && !array_key_exists('updateFollowing', $normalizedMicrosoftCalendars[0]['capabilities'])
+        && !array_key_exists('updateSeries', $normalizedMicrosoftCalendars[0]['capabilities'])
+        && !array_key_exists('deleteSeries', $normalizedMicrosoftCalendars[0]['capabilities']),
+    'Legacy Microsoft calendar caches must derive recurrence creation only from cached write access.'
+);
+
 $gatewaySource = file_get_contents(__DIR__ . '/../Kalender Konto/traits/ChildGatewayTrait.php');
 assertAccountStructure(
     is_string($gatewaySource)

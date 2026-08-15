@@ -105,11 +105,23 @@ vollständig im gemeinsamen Dialog-Workflow der Kachelvisualisierung und IPSView
 - Komplexe Wiederholungsregeln, die OpenCalendar nicht verlustfrei in seinem
   Serieneditor abbilden kann, werden nicht automatisch geteilt oder vereinfacht.
 
+## Microsoft-Serientermine
+
+In beschreibbaren Microsoft-365-/Outlook.com-Kalendern können neue Terminserien
+mit demselben gemeinsamen Serieneditor wie bei Google angelegt werden. Unterstützt
+werden tägliche, wöchentliche, monatliche und jährliche Wiederholungen, Intervalle,
+mehrere Wochentage sowie die Endarten **Nie**, **Nach Anzahl** und **Am Datum**.
+Für zeitgebundene Serien wird die vom Client beziehungsweise über die PHP-API
+übergebene Zeitzone verwendet, damit Microsoft Graph die lokale Uhrzeit der Serie
+erhält.
+
 ## Bekannte Einschränkungen
 
-- Schreiboperationen auf Vorkommnisse oder vollständige Serien von Microsoft-
-  und CalDAV-Serienterminen sind derzeit nicht freigegeben. Diese Serientermine
-  werden weiterhin lesend dargestellt.
+- Bestehende Microsoft-Serien und deren Vorkommnisse werden weiterhin nur lesend
+  behandelt; Bearbeiten und Löschen folgen in einem späteren Ausbauschritt.
+- Schreiboperationen auf Vorkommnisse oder vollständige Serien von CalDAV-
+  Serienterminen sind derzeit nicht freigegeben. Diese Serientermine werden
+  weiterhin lesend dargestellt.
 - ICS-/Webcal-Abonnements und lokal importierte ICS-Dateien sind grundsätzlich schreibgeschützt.
 - Die IPSView-Ausgabe benötigt im HTML-Box-Steuerelement den Renderer
   **Browser des Clients** oder **Automatisch**, da die Bedienung JavaScript
