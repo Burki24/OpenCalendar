@@ -204,9 +204,9 @@ final class MicrosoftCalendarProvider implements CalendarProviderInterface
         array $event,
         array $recurrence = []
     ): array {
-        $this->assertSingleEvent($recurrence);
         $calendarId = $this->calendarId($calendarReference);
         $eventId = $this->eventId($eventReference);
+        $this->assertWritableEventTarget($recurrence, $eventId, true);
         if (array_key_exists('description', $event)) {
             $this->assertDescriptionEditable($calendarId, $eventId);
         }
@@ -230,9 +230,9 @@ final class MicrosoftCalendarProvider implements CalendarProviderInterface
         string $recurrenceId = '',
         array $recurrence = []
     ): bool {
-        $this->assertSingleEvent($recurrence);
         $calendarId = $this->calendarId($calendarReference);
         $eventId = $this->eventId($eventReference);
+        $this->assertWritableEventTarget($recurrence, $eventId, false);
         $headers = $etag !== '' ? ['If-Match' => $etag] : [];
         $this->requestJson(
             'DELETE',
@@ -282,15 +282,16 @@ final class MicrosoftCalendarProvider implements CalendarProviderInterface
         $body = is_array($item['body'] ?? null) ? $item['body'] : [];
         $location = is_array($item['location'] ?? null) ? $item['location'] : [];
         $seriesMasterId = trim((string) ($item['seriesMasterId'] ?? ''));
+        $originalStart = trim((string) ($item['originalStart'] ?? ''));
         $type = strtolower(trim((string) ($item['type'] ?? 'singleInstance')));
         $recurrenceIdentity = match ($type) {
             'seriesmaster'            => CalendarEventRecurrence::master($eventId),
             'occurrence', 'exception' => CalendarEventRecurrence::occurrence(
                 $seriesMasterId,
                 $eventId,
-                trim((string) ($item['originalStart'] ?? '')),
+                $originalStart,
                 '',
-                false,
+                $seriesMasterId !== '' && $originalStart !== '',
                 $type === 'exception'
             ),
             default => CalendarEventRecurrence::single()
@@ -323,13 +324,30 @@ final class MicrosoftCalendarProvider implements CalendarProviderInterface
     }
 
     /** @param array<string, mixed> $recurrence */
-    private function assertSingleEvent(array $recurrence): void
+    private function assertWritableEventTarget(array $recurrence, string $eventId, bool $updating): void
     {
         if ($recurrence === []) {
             return;
         }
-        if (($recurrence['recurrenceType'] ?? CalendarEventRecurrence::SINGLE) !== CalendarEventRecurrence::SINGLE) {
-            throw new MicrosoftCalendarProviderException('Recurring series cannot be modified yet.');
+
+        $identity = CalendarEventRecurrence::fromEvent($recurrence);
+        $type = (string) ($identity['recurrenceType'] ?? CalendarEventRecurrence::SINGLE);
+        if ($type === CalendarEventRecurrence::SINGLE) {
+            return;
+        }
+
+        $capability = $updating ? 'canUpdateOccurrence' : 'canDeleteOccurrence';
+        $occurrenceId = trim((string) ($identity['occurrenceId'] ?? ''));
+        if (!in_array($type, [CalendarEventRecurrence::OCCURRENCE, CalendarEventRecurrence::EXCEPTION], true)
+            || ($identity['writeScope'] ?? '') !== CalendarEventRecurrence::WRITE_SCOPE_OCCURRENCE
+            || trim((string) ($identity['seriesId'] ?? '')) === ''
+            || trim((string) ($identity['originalStart'] ?? '')) === ''
+            || $occurrenceId === ''
+            || !hash_equals($eventId, $occurrenceId)
+            || !(bool) ($identity[$capability] ?? false)) {
+            throw new MicrosoftCalendarProviderException(
+                'Only individual Microsoft recurring occurrences can be modified at this time.'
+            );
         }
     }
 

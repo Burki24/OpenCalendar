@@ -889,8 +889,20 @@ $msEventClient = new FakeHttpClient([
                 'end'             => ['dateTime' => '2026-07-20T11:00:00.1234567', 'timeZone' => 'UTC'],
                 'type'            => 'occurrence',
                 'seriesMasterId'  => 'series-master',
+                'originalStart'   => '2026-07-20T10:00:00Z',
                 'isOnlineMeeting' => true,
                 'webLink'         => 'https://outlook.office.com/calendar/item/1'
+            ],
+            [
+                'id'             => 'exception-id',
+                'iCalUId'        => 'series-exception@example.com',
+                '@odata.etag'    => 'W/"etag-3"',
+                'subject'        => 'Moved series occurrence',
+                'start'          => ['dateTime' => '2026-07-20T14:00:00', 'timeZone' => 'UTC'],
+                'end'            => ['dateTime' => '2026-07-20T15:00:00', 'timeZone' => 'UTC'],
+                'type'           => 'exception',
+                'seriesMasterId' => 'series-master',
+                'originalStart'  => '2026-07-20T13:00:00Z'
             ],
             [
                 'id'          => 'cancelled-id',
@@ -907,7 +919,7 @@ $msEvents = $msProvider->getEvents(
     new DateTimeImmutable('2026-07-19T00:00:00Z'),
     new DateTimeImmutable('2026-07-22T00:00:00Z')
 );
-assertSameValue(2, count($msEvents), 'Cancelled Microsoft events must be excluded.');
+assertSameValue(3, count($msEvents), 'Cancelled Microsoft events must be excluded.');
 assertSameValue(true, $msEvents[0]['allDay'], 'Microsoft all-day events must retain their exclusive end date.');
 assertSameValue('2026-07-21', $msEvents[0]['end'], 'Microsoft all-day end dates must remain exclusive.');
 assertSameValue(true, $msEvents[1]['recurring'], 'Microsoft occurrences must remain marked as recurring.');
@@ -915,8 +927,13 @@ assertSameValue('occurrence', $msEvents[1]['recurrenceType'], 'Microsoft occurre
 assertSameValue('series-master', $msEvents[1]['seriesId'], 'Microsoft series master IDs must be retained separately.');
 assertSameValue('instance/id+1', $msEvents[1]['occurrenceId'], 'Microsoft occurrence IDs must be retained separately.');
 assertSameValue('', $msEvents[1]['recurrenceId'], 'Microsoft series IDs must not be exposed as RFC recurrence IDs.');
-assertSameValue(false, $msEvents[1]['canUpdateOccurrence'], 'Microsoft occurrence updates remain disabled for now.');
+assertSameValue('2026-07-20T10:00:00Z', $msEvents[1]['originalStart'], 'Microsoft occurrence original starts must be retained.');
+assertSameValue(true, $msEvents[1]['canUpdateOccurrence'], 'Microsoft occurrences must advertise individual update support.');
+assertSameValue(true, $msEvents[1]['canDeleteOccurrence'], 'Microsoft occurrences must advertise individual delete support.');
 assertSameValue(true, $msEvents[1]['onlineMeeting'], 'Microsoft online-meeting state must be exposed to the calendar view.');
+assertSameValue('exception', $msEvents[2]['recurrenceType'], 'Modified Microsoft occurrences must be normalized as exceptions.');
+assertSameValue(true, $msEvents[2]['canUpdateOccurrence'], 'Microsoft exceptions must remain individually editable.');
+assertSameValue(true, $msEvents[2]['canDeleteOccurrence'], 'Microsoft exceptions must remain individually deletable.');
 assertTrueValue(
     str_contains($msEventClient->requests[0]['url'], 'AQMk-primary/calendarView?'),
     'Microsoft events must be read through calendarView for expanded occurrences.'
@@ -1113,6 +1130,92 @@ assertTrueValue(
     'Microsoft event deletion must return true after HTTP 204.'
 );
 assertSameValue('DELETE', $msWriteClient->requests[4]['method'], 'Microsoft events must be deleted via DELETE.');
+
+$msOccurrenceWriteClient = new FakeHttpClient([
+    response(200, [
+        'id'          => 'instance/id+1',
+        'iCalUId'     => 'series-occurrence@example.com',
+        '@odata.etag' => 'W/"occurrence-updated"'
+    ]),
+    response(204)
+]);
+$msOccurrenceProvider = new MicrosoftCalendarProvider($msOccurrenceWriteClient, 'ms-access-token');
+$msOccurrenceRecurrence = [
+    'recurrenceType'      => 'occurrence',
+    'seriesId'            => 'series-master',
+    'occurrenceId'        => 'instance/id+1',
+    'originalStart'       => '2026-07-20T10:00:00Z',
+    'recurring'           => true,
+    'canUpdateOccurrence' => true,
+    'canDeleteOccurrence' => true,
+    'canUpdateFollowing'  => false,
+    'canUpdateSeries'     => false,
+    'canDeleteSeries'     => false,
+    'writeScope'          => 'occurrence'
+];
+$msOccurrenceProvider->updateEvent(
+    'AQMk-primary',
+    'instance/id+1',
+    'W/"occurrence"',
+    'series-occurrence@example.com',
+    ['summary' => 'Updated occurrence'],
+    $msOccurrenceRecurrence
+);
+assertSameValue('PATCH', $msOccurrenceWriteClient->requests[0]['method'], 'Microsoft occurrences must be updated via PATCH.');
+assertTrueValue(
+    str_ends_with($msOccurrenceWriteClient->requests[0]['url'], '/events/instance%2Fid%2B1'),
+    'Microsoft occurrence updates must target the concrete immutable occurrence ID.'
+);
+$msOccurrenceUpdateBody = json_decode(
+    $msOccurrenceWriteClient->requests[0]['body'],
+    true,
+    512,
+    JSON_THROW_ON_ERROR
+);
+assertSameValue('Updated occurrence', $msOccurrenceUpdateBody['subject'], 'Microsoft occurrence changes must be sent without changing the series pattern.');
+$msExceptionRecurrence = $msOccurrenceRecurrence;
+$msExceptionRecurrence['recurrenceType'] = 'exception';
+assertTrueValue(
+    $msOccurrenceProvider->deleteEvent(
+        'AQMk-primary',
+        'instance/id+1',
+        'W/"occurrence-updated"',
+        '',
+        $msExceptionRecurrence
+    ),
+    'Microsoft occurrence deletion must return true after HTTP 204.'
+);
+assertSameValue('DELETE', $msOccurrenceWriteClient->requests[1]['method'], 'Microsoft occurrences must be deleted via DELETE.');
+assertTrueValue(
+    str_ends_with($msOccurrenceWriteClient->requests[1]['url'], '/events/instance%2Fid%2B1'),
+    'Microsoft occurrence deletion must target only the concrete occurrence ID.'
+);
+
+$msSeriesWriteClient = new FakeHttpClient([]);
+try {
+    (new MicrosoftCalendarProvider($msSeriesWriteClient, 'ms-access-token'))->updateEvent(
+        'AQMk-primary',
+        'series-master',
+        'W/"series"',
+        'series@example.com',
+        ['summary' => 'Do not update complete series yet'],
+        [
+            'recurrenceType'  => 'master',
+            'seriesId'        => 'series-master',
+            'recurring'       => true,
+            'canUpdateSeries' => false,
+            'canDeleteSeries' => false,
+            'writeScope'      => 'series'
+        ]
+    );
+    throw new RuntimeException('A complete Microsoft recurring series was modified before series support was enabled.');
+} catch (MicrosoftCalendarProviderException $exception) {
+    assertTrueValue(
+        str_contains($exception->getMessage(), 'individual Microsoft recurring occurrences'),
+        'Microsoft complete-series writes must remain blocked while only occurrence writes are supported.'
+    );
+    assertSameValue(0, count($msSeriesWriteClient->requests), 'Blocked Microsoft series writes must not reach Graph.');
+}
 
 $msOnlineMeetingClient = new FakeHttpClient([
     response(200, ['isOnlineMeeting' => true])

@@ -113,12 +113,14 @@ werden tägliche, wöchentliche, monatliche und jährliche Wiederholungen, Inter
 mehrere Wochentage sowie die Endarten **Nie**, **Nach Anzahl** und **Am Datum**.
 Für zeitgebundene Serien wird die vom Client beziehungsweise über die PHP-API
 übergebene Zeitzone verwendet, damit Microsoft Graph die lokale Uhrzeit der Serie
-erhält.
+erhält. Einzelne Vorkommnisse bestehender Microsoft-Serien können gezielt
+bearbeitet oder gelöscht werden, ohne die übrigen Vorkommnisse der Serie zu ändern.
 
 ## Bekannte Einschränkungen
 
-- Bestehende Microsoft-Serien und deren Vorkommnisse werden weiterhin nur lesend
-  behandelt; Bearbeiten und Löschen folgen in einem späteren Ausbauschritt.
+- Einzelne Vorkommnisse bestehender Microsoft-Serien können bearbeitet und
+  gelöscht werden. Das Bearbeiten oder Löschen der vollständigen Microsoft-Serie
+  sowie **Diesen und alle folgenden Termine** folgen in späteren Ausbauschritten.
 - Schreiboperationen auf Vorkommnisse oder vollständige Serien von CalDAV-
   Serienterminen sind derzeit nicht freigegeben. Diese Serientermine werden
   weiterhin lesend dargestellt.
