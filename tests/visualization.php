@@ -237,6 +237,7 @@ assertVisualization(
         && str_contains($script, 'writeScope: scope')
         && str_contains($moduleSource, "case 'PrepareSeriesEdit':")
         && str_contains($moduleSource, 'IPSKAL_GetRecurringSeries($instanceId, $seriesId)')
+        && str_contains($moduleSource, '$seriesEdit[\'canWrite\'] = true;')
         && str_contains($moduleSource, "'Changes will apply to the entire recurring series.'"),
     'Recurring Google events must offer occurrence or complete-series editing and load the verified parent before editing the series.'
 );

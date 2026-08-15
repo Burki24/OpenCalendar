@@ -1878,6 +1878,7 @@ class KalenderAnsicht extends IPSModuleStrict
                     throw new RuntimeException($this->Translate('Recurring series updates are not supported by this calendar.'));
                 }
                 $seriesEdit['calendarInstanceId'] = $instanceId;
+                $seriesEdit['canWrite'] = true;
                 $seriesEdit['writeScope'] = 'series';
                 break;
 
