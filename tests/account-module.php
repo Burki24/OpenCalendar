@@ -98,8 +98,10 @@ $legacyGoogleCalendars = [[
 $normalizedGoogleCalendars = $normalizeCapabilities->invoke(null, $legacyGoogleCalendars, 2);
 assertAccountStructure(
     ($normalizedGoogleCalendars[0]['capabilities']['createRecurrence'] ?? false) === true
-        && ($normalizedGoogleCalendars[1]['capabilities']['createRecurrence'] ?? true) === false,
-    'Legacy Google calendar caches must derive recurring-event creation support from cached write access.'
+        && ($normalizedGoogleCalendars[0]['capabilities']['deleteSeries'] ?? false) === true
+        && ($normalizedGoogleCalendars[1]['capabilities']['createRecurrence'] ?? true) === false
+        && ($normalizedGoogleCalendars[1]['capabilities']['deleteSeries'] ?? true) === false,
+    'Legacy Google calendar caches must derive recurrence creation and series deletion support from cached write access.'
 );
 
 $accountSource = file_get_contents(__DIR__ . '/../Kalender Konto/module.php');

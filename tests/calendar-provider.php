@@ -150,6 +150,7 @@ assertSameValue('owner@example.com', $calendars[0]['providerId'], 'The primary c
 assertSameValue(true, $calendars[0]['writeAccessKnown'], 'Google access roles must provide authoritative write metadata.');
 assertSameValue(true, $calendars[0]['capabilities']['create'], 'Owners must have write access.');
 assertSameValue(true, $calendars[0]['capabilities']['createRecurrence'], 'Writable Google calendars must advertise recurrence creation support.');
+assertSameValue(true, $calendars[0]['capabilities']['deleteSeries'], 'Writable Google calendars must advertise recurring-series deletion support.');
 assertSameValue('Europe/Berlin', $calendars[0]['timezone'], 'Google calendar timezones must be retained for recurring events.');
 assertSameValue(false, $calendars[1]['capabilities']['create'], 'Readers must not have write access.');
 assertTrueValue(str_contains($calendarClient->requests[1]['url'], 'pageToken=page-2'), 'The second calendar page must be requested.');
@@ -1577,9 +1578,12 @@ assertTrueValue(
 assertTrueValue(
     is_string($calendarModuleSource)
         && str_contains($calendarModuleSource, "RegisterAttributeBoolean('DetectedCanCreateRecurrence', false)")
+        && str_contains($calendarModuleSource, "RegisterAttributeBoolean('DetectedCanDeleteSeries', false)")
         && str_contains($calendarModuleSource, "RegisterAttributeString('DetectedCalendarTimezone', '')")
         && str_contains($calendarModuleSource, "\$capabilities['createRecurrence'] ?? false")
+        && str_contains($calendarModuleSource, "\$capabilities['deleteSeries'] ?? false")
         && str_contains($calendarModuleSource, "'canCreateRecurrence' => \$metadataAvailable")
+        && str_contains($calendarModuleSource, "'canDeleteSeries'     => \$metadataAvailable")
         && str_contains($calendarModuleSource, "'timezone'            => \$metadataAvailable")
         && str_contains($calendarModuleSource, 'Recurring event creation is not supported by this calendar.'),
     'Calendar instances must expose recurrence creation capability and calendar timezone while blocking unsupported recurring writes.'
@@ -1587,7 +1591,9 @@ assertTrueValue(
 assertTrueValue(
     is_string($viewModuleSource)
         && str_contains($viewModuleSource, "'canCreateRecurrence' => (bool) (\$calendarStatus['canCreateRecurrence'] ?? false)")
-        && str_contains($viewModuleSource, "'timezone'            => trim((string) (\$calendarStatus['timezone'] ?? ''))"),
+        && str_contains($viewModuleSource, "'canDeleteSeries'     => (bool) (\$calendarStatus['canDeleteSeries'] ?? false)")
+        && str_contains($viewModuleSource, "'timezone'            => trim((string) (\$calendarStatus['timezone'] ?? ''))")
+        && str_contains($viewModuleSource, "\$event['canDeleteSeries'] = (bool) (\$event['canDeleteSeries'] ?? false)"),
     'Calendar views must pass recurrence capability and timezone metadata to Tile and IPSView clients.'
 );
 assertTrueValue(

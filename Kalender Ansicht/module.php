@@ -1228,6 +1228,10 @@ class KalenderAnsicht extends IPSModuleStrict
                 $event['calendarName'] = $calendar['name'];
                 $event['calendarColor'] = $calendar['color'];
                 $event['canWrite'] = $calendar['canWrite'];
+                $event['canDeleteSeries'] = (bool) ($event['canDeleteSeries'] ?? false)
+                    || ((bool) ($event['recurring'] ?? false)
+                        && trim((string) ($event['seriesId'] ?? '')) !== ''
+                        && $calendar['canDeleteSeries']);
                 $events[] = $event;
             }
         }
@@ -1273,6 +1277,10 @@ class KalenderAnsicht extends IPSModuleStrict
                 $event['calendarName'] = $calendar['name'];
                 $event['calendarColor'] = $calendar['color'];
                 $event['canWrite'] = $calendar['canWrite'];
+                $event['canDeleteSeries'] = (bool) ($event['canDeleteSeries'] ?? false)
+                    || ((bool) ($event['recurring'] ?? false)
+                        && trim((string) ($event['seriesId'] ?? '')) !== ''
+                        && $calendar['canDeleteSeries']);
                 $events[] = $event;
             }
         }
@@ -1673,7 +1681,7 @@ class KalenderAnsicht extends IPSModuleStrict
     }
 
     /**
-     * @return list<array{instanceId: int, name: string, color: string, canWrite: bool, timezone: string, canCreateRecurrence: bool}>
+     * @return list<array{instanceId: int, name: string, color: string, canWrite: bool, timezone: string, canCreateRecurrence: bool, canDeleteSeries: bool}>
      */
     private function loadSelectedCalendars(): array
     {
@@ -1718,7 +1726,8 @@ class KalenderAnsicht extends IPSModuleStrict
                 'canWrite'            => (bool) ($calendarStatus['canWrite']
                     ?? IPS_GetProperty($instanceId, 'CanWrite')),
                 'timezone'            => trim((string) ($calendarStatus['timezone'] ?? '')),
-                'canCreateRecurrence' => (bool) ($calendarStatus['canCreateRecurrence'] ?? false)
+                'canCreateRecurrence' => (bool) ($calendarStatus['canCreateRecurrence'] ?? false),
+                'canDeleteSeries'     => (bool) ($calendarStatus['canDeleteSeries'] ?? false)
             ];
         }
 

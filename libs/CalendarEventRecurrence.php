@@ -142,11 +142,11 @@ final class CalendarEventRecurrence
         $occurrence = in_array($type, [self::OCCURRENCE, self::EXCEPTION], true);
 
         return [
-            'recurrenceType'     => $type,
-            'seriesId'           => $seriesId,
-            'occurrenceId'       => $occurrenceId,
-            'originalStart'      => $originalStart,
-            'recurrenceId'       => $recurrenceId,
+            'recurrenceType'      => $type,
+            'seriesId'            => $seriesId,
+            'occurrenceId'        => $occurrenceId,
+            'originalStart'       => $originalStart,
+            'recurrenceId'        => $recurrenceId,
             'recurring'           => $recurring,
             'canUpdateOccurrence' => $occurrence && $writeSupported,
             'canDeleteOccurrence' => $occurrence && $writeSupported,

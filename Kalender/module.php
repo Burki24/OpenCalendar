@@ -65,6 +65,7 @@ class Kalender extends IPSModuleStrict
         $this->RegisterAttributeString('DetectedCalendarColor', '');
         $this->RegisterAttributeBoolean('DetectedCanWrite', false);
         $this->RegisterAttributeBoolean('DetectedCanCreateRecurrence', false);
+        $this->RegisterAttributeBoolean('DetectedCanDeleteSeries', false);
         $this->RegisterAttributeString('DetectedCalendarTimezone', '');
         $this->RegisterAttributeBoolean('DetectedWriteAccessKnown', false);
         $this->RegisterAttributeBoolean('RuntimeReady', false);
@@ -559,6 +560,8 @@ class Kalender extends IPSModuleStrict
                     : '',
                 'canCreateRecurrence' => $metadataAvailable
                     && $this->ReadAttributeBoolean('DetectedCanCreateRecurrence'),
+                'canDeleteSeries'     => $metadataAvailable
+                    && $this->ReadAttributeBoolean('DetectedCanDeleteSeries'),
                 'eventCount'          => count($events),
                 'todayEventCount'     => CalendarEventCounter::countForDay(
                     $events,
@@ -634,6 +637,7 @@ class Kalender extends IPSModuleStrict
         if ($availableCalendars !== []) {
             $this->WriteAttributeString('ResolvedCalendarID', '');
             $this->WriteAttributeBoolean('DetectedCanCreateRecurrence', false);
+            $this->WriteAttributeBoolean('DetectedCanDeleteSeries', false);
             $this->WriteAttributeString('DetectedCalendarTimezone', '');
             $this->WriteAttributeBoolean('DetectedWriteAccessKnown', false);
             $this->WriteAttributeBoolean('CalendarMetadataAvailable', false);
@@ -650,6 +654,7 @@ class Kalender extends IPSModuleStrict
             || (bool) ($capabilities['update'] ?? false)
             || (bool) ($capabilities['delete'] ?? false);
         $canCreateRecurrence = (bool) ($capabilities['createRecurrence'] ?? false);
+        $canDeleteSeries = (bool) ($capabilities['deleteSeries'] ?? false);
         $timezone = trim((string) ($calendar['timezone'] ?? ''));
         // Cached calendar metadata created before writeAccessKnown existed cannot
         // distinguish an explicit read-only result from incomplete DAV privilege
@@ -661,6 +666,7 @@ class Kalender extends IPSModuleStrict
         $this->WriteAttributeString('DetectedCalendarColor', trim((string) ($calendar['color'] ?? '')));
         $this->WriteAttributeBoolean('DetectedCanWrite', $canWrite);
         $this->WriteAttributeBoolean('DetectedCanCreateRecurrence', $canCreateRecurrence);
+        $this->WriteAttributeBoolean('DetectedCanDeleteSeries', $canDeleteSeries);
         $this->WriteAttributeString('DetectedCalendarTimezone', $timezone);
         $this->WriteAttributeBoolean('DetectedWriteAccessKnown', $writeAccessKnown);
         $this->WriteAttributeBoolean('CalendarMetadataAvailable', true);

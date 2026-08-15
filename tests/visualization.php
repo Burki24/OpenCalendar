@@ -446,6 +446,7 @@ assertVisualization(
         && str_contains($script, 'function updateDeleteScope(event)')
         && str_contains($script, 'function selectedDeleteScope(event)')
         && str_contains($script, 'Boolean(event.canDeleteSeries)')
+        && str_contains($indexSource, 'id="delete-scope-series-option"')
         && str_contains($script, 'recurrencePayload(event, selectedDeleteScope(event))')
         && !str_contains($script, 'confirm(')
         && str_contains($moduleSource, '\'Delete event\'')
@@ -479,6 +480,12 @@ assertVisualization(
 );
 
 $style = (string) file_get_contents(__DIR__ . '/../Kalender Ansicht/visualization/style.css');
+assertVisualization(
+    str_contains($style, '.delete-confirm-dialog { font-size: clamp(14px, 1.45vw, 16px); }')
+        && str_contains($style, 'html.ipsview-mode .delete-confirm-dialog { font-size: clamp(15px, 1.5vw, 18px); }'),
+    'The compact delete confirmation dialog must remain readable without inheriting extreme Tile or IPSView font scaling.'
+);
+
 assertVisualization(
     str_contains($style, '.form-row select option,')
         && str_contains($style, 'background: var(--cal-dialog);')

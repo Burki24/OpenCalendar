@@ -579,43 +579,6 @@ class KalenderKonto extends IPSModuleStrict
     }
 
     /**
-     * Adds capabilities introduced after calendar discovery to compatible cached entries.
-     *
-     * Existing account caches survive module updates. Google calendars discovered before
-     * recurring-event creation support was added therefore do not yet contain the
-     * createRecurrence capability. Derive it from the already cached write permission so
-     * child calendar instances can use the new feature without requiring a manual account
-     * resynchronization.
-     *
-     * @param list<array<string, mixed>> $calendars Cached account calendars.
-     * @return list<array<string, mixed>> Normalized calendars.
-     */
-    private static function normalizeCachedCalendarCapabilities(array $calendars, int $provider): array
-    {
-        if ($provider !== self::PROVIDER_GOOGLE) {
-            return $calendars;
-        }
-
-        foreach ($calendars as &$calendar) {
-            $capabilities = is_array($calendar['capabilities'] ?? null)
-                ? $calendar['capabilities']
-                : [];
-            if (array_key_exists('createRecurrence', $capabilities)) {
-                continue;
-            }
-
-            $accessRole = strtolower(trim((string) ($calendar['accessRole'] ?? '')));
-            $canWrite = (bool) ($capabilities['create'] ?? false)
-                || in_array($accessRole, ['writer', 'owner'], true);
-            $capabilities['createRecurrence'] = $canWrite;
-            $calendar['capabilities'] = $capabilities;
-        }
-        unset($calendar);
-
-        return $calendars;
-    }
-
-    /**
      * Returns provider, synchronization, and cache status for this account.
      *
      * @return string JSON-encoded account status.
@@ -701,6 +664,43 @@ class KalenderKonto extends IPSModuleStrict
     /**
      * Defers OAuth registration until the current module reload sequence has settled.
      */
+    /**
+     * Adds capabilities introduced after calendar discovery to compatible cached entries.
+     *
+     * Existing account caches survive module updates. Google calendars discovered before
+     * recurring-event support was added therefore do not yet contain the newer recurrence
+     * capabilities. Derive them from the already cached write permission so child calendar
+     * instances can use the features without requiring a manual account resynchronization.
+     *
+     * @param list<array<string, mixed>> $calendars Cached account calendars.
+     * @return list<array<string, mixed>> Normalized calendars.
+     */
+    private static function normalizeCachedCalendarCapabilities(array $calendars, int $provider): array
+    {
+        if ($provider !== self::PROVIDER_GOOGLE) {
+            return $calendars;
+        }
+
+        foreach ($calendars as &$calendar) {
+            $capabilities = is_array($calendar['capabilities'] ?? null)
+                ? $calendar['capabilities']
+                : [];
+            $accessRole = strtolower(trim((string) ($calendar['accessRole'] ?? '')));
+            $canWrite = (bool) ($capabilities['create'] ?? false)
+                || in_array($accessRole, ['writer', 'owner'], true);
+            if (!array_key_exists('createRecurrence', $capabilities)) {
+                $capabilities['createRecurrence'] = $canWrite;
+            }
+            if (!array_key_exists('deleteSeries', $capabilities)) {
+                $capabilities['deleteSeries'] = $canWrite;
+            }
+            $calendar['capabilities'] = $capabilities;
+        }
+        unset($calendar);
+
+        return $calendars;
+    }
+
     private function scheduleOAuthRegistration(): void
     {
         $this->SetTimerInterval('OAuthRegistrationTimer', 0);

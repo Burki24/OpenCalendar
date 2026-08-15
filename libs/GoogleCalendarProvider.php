@@ -117,7 +117,8 @@ final class GoogleCalendarProvider implements CalendarProviderInterface
                         'create'           => $canWrite,
                         'update'           => $canWrite,
                         'delete'           => $canWrite,
-                        'createRecurrence' => $canWrite
+                        'createRecurrence' => $canWrite,
+                        'deleteSeries'     => $canWrite
                     ]
                 ];
                 if (count($calendars) > self::MAX_CALENDARS) {
