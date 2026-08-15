@@ -561,6 +561,101 @@ assertSameValue('Changed from here', $newFollowingBody['summary'], 'The new tail
 assertSameValue([['email' => 'guest@example.com']], $newFollowingBody['attendees'], 'The split series must preserve supported parent event metadata.');
 assertSameValue(['RRULE:FREQ=WEEKLY;INTERVAL=2;BYDAY=MO,TH;COUNT=4'], $newFollowingBody['recurrence'], 'The new tail series must use the remaining count from the selected target onward.');
 
+$followingDeleteClient = new FakeHttpClient([
+    response(200, [
+        'id'                => 'target-id',
+        'iCalUID'           => 'series@example.com',
+        'etag'              => '"target-etag"',
+        'summary'           => 'Series meeting',
+        'recurringEventId'  => 'series-id',
+        'originalStartTime' => ['dateTime' => '2026-08-03T09:00:00+02:00', 'timeZone' => 'Europe/Berlin'],
+        'start'             => ['dateTime' => '2026-08-03T09:00:00+02:00', 'timeZone' => 'Europe/Berlin'],
+        'end'               => ['dateTime' => '2026-08-03T10:00:00+02:00', 'timeZone' => 'Europe/Berlin']
+    ]),
+    response(200, [
+        'id'         => 'series-id',
+        'iCalUID'    => 'series@example.com',
+        'etag'       => '"series-etag"',
+        'summary'    => 'Series meeting',
+        'start'      => ['dateTime' => '2026-07-20T09:00:00+02:00', 'timeZone' => 'Europe/Berlin'],
+        'end'        => ['dateTime' => '2026-07-20T10:00:00+02:00', 'timeZone' => 'Europe/Berlin'],
+        'recurrence' => ['RRULE:FREQ=WEEKLY;INTERVAL=2;BYDAY=MO,TH;COUNT=6']
+    ]),
+    response(200, ['id' => 'series-id', 'etag' => '"trimmed-etag"'])
+]);
+$followingDeleteProvider = new GoogleCalendarProvider($followingDeleteClient, 'access-token');
+$followingDeleteIdentity = $followingIdentity;
+assertTrueValue(
+    $followingDeleteProvider->deleteEvent(
+        'owner@example.com',
+        'https://www.googleapis.com/calendar/v3/calendars/owner%40example.com/events/target-id',
+        '"target-etag"',
+        '',
+        $followingDeleteIdentity
+    ),
+    'Google recurring events must support deleting the selected occurrence and all following occurrences.'
+);
+assertSameValue(
+    'PATCH',
+    $followingDeleteClient->requests[2]['method'],
+    'Deleting this and following Google occurrences must trim the original recurring parent.'
+);
+assertTrueValue(
+    str_ends_with($followingDeleteClient->requests[2]['url'], '/events/series-id'),
+    'This-and-following deletion must modify the recurring parent instead of cancelling only the target occurrence.'
+);
+assertSameValue(
+    ['RRULE:FREQ=WEEKLY;INTERVAL=2;BYDAY=MO,TH;UNTIL=20260803T065959Z'],
+    json_decode($followingDeleteClient->requests[2]['body'], true, 512, JSON_THROW_ON_ERROR)['recurrence'],
+    'This-and-following deletion must end the parent immediately before the selected occurrence.'
+);
+
+$followingDeleteFirstClient = new FakeHttpClient([
+    response(200, [
+        'id'                => 'first-id',
+        'iCalUID'           => 'series@example.com',
+        'etag'              => '"first-etag"',
+        'summary'           => 'Series meeting',
+        'recurringEventId'  => 'series-id',
+        'originalStartTime' => ['dateTime' => '2026-07-20T09:00:00+02:00', 'timeZone' => 'Europe/Berlin'],
+        'start'             => ['dateTime' => '2026-07-20T09:00:00+02:00', 'timeZone' => 'Europe/Berlin'],
+        'end'               => ['dateTime' => '2026-07-20T10:00:00+02:00', 'timeZone' => 'Europe/Berlin']
+    ]),
+    response(200, [
+        'id'         => 'series-id',
+        'iCalUID'    => 'series@example.com',
+        'etag'       => '"series-etag"',
+        'summary'    => 'Series meeting',
+        'start'      => ['dateTime' => '2026-07-20T09:00:00+02:00', 'timeZone' => 'Europe/Berlin'],
+        'end'        => ['dateTime' => '2026-07-20T10:00:00+02:00', 'timeZone' => 'Europe/Berlin'],
+        'recurrence' => ['RRULE:FREQ=WEEKLY;COUNT=6']
+    ]),
+    response(204)
+]);
+$followingDeleteFirstProvider = new GoogleCalendarProvider($followingDeleteFirstClient, 'access-token');
+$followingDeleteFirstIdentity = $googleOccurrence;
+$followingDeleteFirstIdentity['occurrenceId'] = 'first-id';
+$followingDeleteFirstIdentity['writeScope'] = 'following';
+assertTrueValue(
+    $followingDeleteFirstProvider->deleteEvent(
+        'owner@example.com',
+        'https://www.googleapis.com/calendar/v3/calendars/owner%40example.com/events/first-id',
+        '"first-etag"',
+        '',
+        $followingDeleteFirstIdentity
+    ),
+    'Deleting this and following from the first occurrence must delete the complete Google series.'
+);
+assertSameValue(
+    'DELETE',
+    $followingDeleteFirstClient->requests[2]['method'],
+    'Deleting from the first occurrence onward must remove the recurring parent.'
+);
+assertTrueValue(
+    str_ends_with($followingDeleteFirstClient->requests[2]['url'], '/events/series-id'),
+    'Deleting from the first occurrence onward must target the recurring parent ID.'
+);
+
 $seriesWriteClient = new FakeHttpClient([
     response(200, ['id' => 'series-id', 'iCalUID' => 'series@example.com', 'etag' => '"series-updated"'])
 ]);
@@ -1805,6 +1900,8 @@ assertTrueValue(
         && str_contains($calendarModuleSource, "'canUpdateSeries'     => \$metadataAvailable")
         && str_contains($calendarModuleSource, "'canDeleteSeries'     => \$metadataAvailable")
         && str_contains($calendarModuleSource, "'timezone'            => \$metadataAvailable")
+        && str_contains($calendarModuleSource, "(!\$updating && !\$this->ReadAttributeBoolean('DetectedCanDeleteSeries'))")
+        && str_contains($calendarModuleSource, "\$identity['canDeleteSeries'] = true;")
         && str_contains($calendarModuleSource, 'Recurring event creation is not supported by this calendar.')
         && str_contains($calendarModuleSource, 'This and following updates are not supported by this calendar.'),
     'Calendar instances must expose recurring create/following/series capabilities and calendar timezone while blocking unsupported recurring writes.'

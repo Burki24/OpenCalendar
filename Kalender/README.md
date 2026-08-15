@@ -35,13 +35,13 @@ beliebig verschoben oder vom Benutzer umbenannt werden.
 - Erstellen neuer Termine sowie neuer Google-Serientermine
 - Ändern und Löschen einzelner Termine sowie einzelner Google-Serienvorkommnisse
 - Bearbeiten einer vollständigen Google-Terminserie
-- Bearbeiten eines Google-Serienvorkommnisses **und aller folgenden Termine** durch sicheres Teilen der Serie
+- Bearbeiten oder Löschen eines Google-Serienvorkommnisses **und aller folgenden Termine** durch sicheres Teilen bzw. Kürzen der Serie
 - Löschen einer vollständigen Google-Terminserie über ein synchronisiertes Serienvorkommnis
 - ETag-basierter Schutz vor dem Überschreiben zwischenzeitlicher Änderungen
 - Statusvariablen für die gesamte geladene Terminanzahl, die Termine des
   aktuellen Tages und den Zeitpunkt der letzten Synchronisation
 
-Google-Serien können als einzelnes Vorkommnis, als vollständige Serie oder – beim Bearbeiten – **ab dem ausgewählten Vorkommnis für alle folgenden Termine** geändert werden. Für „diesen und alle folgenden“ teilt OpenCalendar die Google-Serie am gewählten Termin in einen unveränderten vorderen und einen neu angelegten hinteren Serienteil. Einzelne Microsoft- und CalDAV-Vorkommnisse sind weiterhin nicht für Serien-Schreiboperationen freigegeben.
+Google-Serien können als einzelnes Vorkommnis, als vollständige Serie oder **ab dem ausgewählten Vorkommnis für alle folgenden Termine** bearbeitet und gelöscht werden. Beim Bearbeiten teilt OpenCalendar die Google-Serie am gewählten Termin in einen unveränderten vorderen und einen neu angelegten hinteren Serienteil. Beim Löschen wird der bestehende Parent direkt vor dem ausgewählten Vorkommnis beendet; beginnt die Auswahl beim ersten Vorkommnis, wird die komplette Serie gelöscht. Einzelne Microsoft- und CalDAV-Vorkommnisse sind weiterhin nicht für Serien-Schreiboperationen freigegeben.
 
 ## Voraussetzungen
 

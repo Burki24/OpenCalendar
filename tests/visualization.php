@@ -161,8 +161,10 @@ assertVisualization(
         && str_contains($script, 'function eventCanUpdateFollowing(event)')
         && str_contains($script, 'Boolean(event.canUpdateFollowing)')
         && str_contains($script, 'Boolean(event.canUpdateSeries)')
+        && str_contains($script, 'function eventCanDeleteFollowing(event)')
         && str_contains($script, 'function eventCanDelete(event)')
         && str_contains($script, 'Boolean(event.canDeleteOccurrence)')
+        && str_contains($script, 'eventCanDeleteFollowing(event)')
         && str_contains($script, '...recurrencePayload(selectedEvent)')
         && str_contains($script, "t('Only this occurrence of the recurring event will be changed.')"),
     'Event clicks must open a read-first details modal and route editable events to the existing editor only on request.'
@@ -250,6 +252,16 @@ assertVisualization(
         && str_contains($moduleSource, "'Changes will apply to this and all following occurrences.'")
         && str_contains($moduleSource, "'Changes will apply to the entire recurring series.'"),
     'Recurring Google events must offer occurrence, this-and-following, or complete-series editing with verified provider data.'
+);
+assertVisualization(
+    str_contains($indexSource, 'id="delete-scope-following-option"')
+        && str_contains($indexSource, 'name="delete-scope" value="following"')
+        && str_contains($script, 'function eventCanDeleteFollowing(event)')
+        && str_contains($script, 'Boolean(event.canUpdateFollowing)')
+        && str_contains($script, 'Boolean(event.canDeleteSeries)')
+        && str_contains($script, 'const followingAllowed = eventCanDeleteFollowing(event);')
+        && str_contains($script, "return ['following', 'series'].includes(selected?.value) ? selected.value : 'occurrence';"),
+    'Recurring Google events must offer deleting the selected occurrence and all following occurrences when splitting is supported.'
 );
 assertVisualization(
     str_contains($moduleSource, 'private function getFullUpdateMessage(?array $state = null, ?array $toast = null): string')

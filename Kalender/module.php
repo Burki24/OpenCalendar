@@ -986,8 +986,8 @@ class Kalender extends IPSModuleStrict
         $identity = CalendarEventRecurrence::fromEvent($event);
         $writeScope = (string) ($identity['writeScope'] ?? '');
         if ($writeScope === CalendarEventRecurrence::WRITE_SCOPE_FOLLOWING) {
-            if (!$updating
-                || !$this->ReadAttributeBoolean('DetectedCanUpdateFollowing')
+            if (!$this->ReadAttributeBoolean('DetectedCanUpdateFollowing')
+                || (!$updating && !$this->ReadAttributeBoolean('DetectedCanDeleteSeries'))
                 || !CalendarEventRecurrence::isOccurrence($identity)
                 || trim((string) ($identity['seriesId'] ?? '')) === ''
                 || trim((string) ($identity['occurrenceId'] ?? '')) === ''
@@ -995,6 +995,9 @@ class Kalender extends IPSModuleStrict
                 throw new InvalidArgumentException('The recurring event cannot be split by this calendar.');
             }
             $identity['canUpdateFollowing'] = true;
+            if (!$updating) {
+                $identity['canDeleteSeries'] = true;
+            }
             return CalendarEventRecurrence::fromEvent($identity);
         }
         if ($writeScope !== CalendarEventRecurrence::WRITE_SCOPE_SERIES) {

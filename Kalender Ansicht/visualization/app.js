@@ -982,14 +982,20 @@ function requestDelete(sourceDialog) {
 function updateDeleteScope(event) {
     const scope = document.getElementById('delete-scope');
     const occurrenceOption = document.getElementById('delete-scope-occurrence-option');
+    const followingOption = document.getElementById('delete-scope-following-option');
     const seriesOption = document.getElementById('delete-scope-series-option');
     const occurrenceAllowed = Boolean(event.recurring) && Boolean(event.canDeleteOccurrence);
+    const followingAllowed = eventCanDeleteFollowing(event);
     const seriesAllowed = Boolean(event.recurring) && Boolean(event.canDeleteSeries);
     occurrenceOption.classList.toggle('hidden', !occurrenceAllowed);
+    followingOption.classList.toggle('hidden', !followingAllowed);
     seriesOption.classList.toggle('hidden', !seriesAllowed);
-    scope.classList.toggle('hidden', !event.recurring || (!occurrenceAllowed && !seriesAllowed));
+    scope.classList.toggle(
+        'hidden',
+        !event.recurring || (!occurrenceAllowed && !followingAllowed && !seriesAllowed)
+    );
 
-    const defaultValue = occurrenceAllowed ? 'occurrence' : 'series';
+    const defaultValue = occurrenceAllowed ? 'occurrence' : (followingAllowed ? 'following' : 'series');
     scope.querySelectorAll('input[name="delete-scope"]').forEach(input => {
         input.checked = input.value === defaultValue;
     });
@@ -998,7 +1004,7 @@ function updateDeleteScope(event) {
 function selectedDeleteScope(event) {
     if (!event?.recurring) return '';
     const selected = document.querySelector('input[name="delete-scope"]:checked');
-    return selected?.value === 'series' ? 'series' : 'occurrence';
+    return ['following', 'series'].includes(selected?.value) ? selected.value : 'occurrence';
 }
 
 function formatDeleteEventPeriod(event) {
@@ -1069,10 +1075,24 @@ function eventCanUpdate(event) {
     return eventCanUpdateOccurrence(event) || eventCanUpdateFollowing(event) || eventCanUpdateSeries(event);
 }
 
+function eventCanDeleteFollowing(event) {
+    return hasActionBridge()
+        && Boolean(event.canWrite)
+        && Boolean(event.recurring)
+        && Boolean(event.canUpdateFollowing)
+        && Boolean(event.canDeleteSeries)
+        && Boolean(event.seriesId)
+        && Boolean(event.occurrenceId)
+        && Boolean(event.originalStart);
+}
+
 function eventCanDelete(event) {
     return hasActionBridge()
         && Boolean(event.canWrite)
-        && (!event.recurring || Boolean(event.canDeleteOccurrence) || Boolean(event.canDeleteSeries));
+        && (!event.recurring
+            || Boolean(event.canDeleteOccurrence)
+            || eventCanDeleteFollowing(event)
+            || Boolean(event.canDeleteSeries));
 }
 
 function recurrencePayload(event, writeScope = '') {
