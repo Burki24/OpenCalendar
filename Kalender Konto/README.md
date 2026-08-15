@@ -50,7 +50,10 @@ werden.
 Beschreibbare iCloud-Kalender können neue tägliche, wöchentliche, monatliche und
 jährliche Terminserien mit Intervall, Wochentagen sowie den Endarten Nie, Anzahl
 oder Enddatum anlegen. Die Serie wird als RFC-5545-`RRULE` über CalDAV gespeichert.
-Zeitgebundene Serien enthalten einen passenden `VTIMEZONE`-Block.
+Zeitgebundene Serien enthalten einen passenden `VTIMEZONE`-Block. Einzelne
+Vorkommnisse bestehender Serien können außerdem bearbeitet oder gelöscht werden.
+Änderungen werden als `RECURRENCE-ID`-Ausnahme gespeichert; Löschungen ergänzen
+ein `EXDATE`, ohne das übrige Serienobjekt zu entfernen.
 
 ### Generisches CalDAV
 
@@ -68,8 +71,9 @@ funktioniert, sollte die vom Anbieter ausdrücklich genannte CalDAV-Basisadresse
 verwendet werden.
 
 Beschreibbare CalDAV-Kalender unterstützen dieselbe Neuanlage von Terminserien wie
-iCloud. Bestehende CalDAV-Serien werden in diesem ersten Ausbauschritt weiterhin
-nur gelesen; das Bearbeiten und Löschen von Vorkommnissen und Serien folgt separat.
+iCloud. Zusätzlich können einzelne Vorkommnisse bestehender Serien bearbeitet und
+gelöscht werden. Vollständige Serien sowie **dieses und alle folgenden
+Vorkommnisse** bleiben noch geschützt und folgen in den nächsten Ausbauschritten.
 
 ### Google Calendar
 

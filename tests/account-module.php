@@ -250,12 +250,15 @@ foreach ([0, 1] as $calDavProvider) {
     $normalizedCalDavCalendars = $normalizeCapabilities->invoke(null, $legacyCalDavCalendars, $calDavProvider);
     assertAccountStructure(
         ($normalizedCalDavCalendars[0]['capabilities']['createRecurrence'] ?? false) === true
+            && ($normalizedCalDavCalendars[0]['capabilities']['updateOccurrence'] ?? false) === true
+            && ($normalizedCalDavCalendars[0]['capabilities']['deleteOccurrence'] ?? false) === true
             && ($normalizedCalDavCalendars[1]['capabilities']['createRecurrence'] ?? true) === false
-            && !array_key_exists('updateOccurrence', $normalizedCalDavCalendars[0]['capabilities'])
+            && ($normalizedCalDavCalendars[1]['capabilities']['updateOccurrence'] ?? true) === false
+            && ($normalizedCalDavCalendars[1]['capabilities']['deleteOccurrence'] ?? true) === false
             && !array_key_exists('updateFollowing', $normalizedCalDavCalendars[0]['capabilities'])
             && !array_key_exists('updateSeries', $normalizedCalDavCalendars[0]['capabilities'])
             && !array_key_exists('deleteSeries', $normalizedCalDavCalendars[0]['capabilities']),
-        'Legacy Apple and CalDAV caches must derive recurring creation only from cached write access.'
+        'Legacy Apple and CalDAV caches must derive supported recurring occurrence writes from cached write access.'
     );
 }
 

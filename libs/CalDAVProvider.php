@@ -138,7 +138,12 @@ final class CalDAVProvider implements CalendarProviderInterface
             $resourceUrl = $this->resolveUrl($effectiveCalendarUrl, $href);
             $this->assertResourceBelongsToCalendar($calendarUrl, $resourceUrl);
             $etag = $this->firstNodeValue($xpath, './/d:getetag', $eventResponse);
-            array_push($events, ...ICalendarCodec::parseEvents($calendarData, $resourceUrl, $etag));
+            array_push(
+                $events,
+                ...$this->enableExpandedOccurrenceWrites(
+                    ICalendarCodec::parseEvents($calendarData, $resourceUrl, $etag)
+                )
+            );
         }
 
         usort(
@@ -185,13 +190,10 @@ final class CalDAVProvider implements CalendarProviderInterface
         array $event,
         array $recurrence = []
     ): array {
-        if ($recurrence !== []
-            && ($recurrence['recurrenceType'] ?? CalendarEventRecurrence::SINGLE) !== CalendarEventRecurrence::SINGLE) {
-            throw new CalDAVProviderException('Individual occurrences of recurring events cannot be updated yet.');
-        }
         $calendarUrl = $this->normalizeAbsoluteUrl($calendarUrl);
         $resourceUrl = $this->normalizeAbsoluteUrl($resourceUrl);
         $this->assertResourceBelongsToCalendar($calendarUrl, $resourceUrl);
+        $uid = trim($uid);
         if ($uid === '') {
             throw new CalDAVProviderException('The event UID is missing.');
         }
@@ -200,7 +202,26 @@ final class CalDAVProvider implements CalendarProviderInterface
         $this->assertResponseStatus($getResponse, [200], 'event retrieval');
         $effectiveResourceUrl = $this->trustedEffectiveUrl($getResponse, $resourceUrl);
         $this->assertResourceBelongsToCalendar($calendarUrl, $effectiveResourceUrl);
-        $updatedIcal = ICalendarCodec::updateEvent($getResponse->body, $uid, $event);
+
+        $identity = CalendarEventRecurrence::fromEvent($recurrence);
+        $recurrenceType = (string) ($identity['recurrenceType'] ?? CalendarEventRecurrence::SINGLE);
+        if ($recurrenceType !== CalendarEventRecurrence::SINGLE) {
+            $this->assertWritableOccurrence($identity, $uid, true);
+            $updatedIcal = ICalendarCodec::updateRecurringOccurrence(
+                $getResponse->body,
+                $uid,
+                trim((string) ($identity['originalStart'] ?? '')),
+                $event
+            );
+        } elseif (ICalendarCodec::hasRecurringEvent($getResponse->body, $uid)) {
+            // CALDAV:expand may omit RECURRENCE-ID on the first instance. If the
+            // backing resource is recurring, an apparently single first instance
+            // must still be written as an exception instead of changing the master.
+            $updatedIcal = ICalendarCodec::updateRecurringOccurrence($getResponse->body, $uid, '', $event);
+        } else {
+            $updatedIcal = ICalendarCodec::updateEvent($getResponse->body, $uid, $event);
+        }
+
         $currentEtag = $etag !== '' ? $etag : (string) ($getResponse->headers['etag'] ?? '');
         $headers = ['Content-Type' => 'text/calendar; charset=utf-8'];
         if ($currentEtag !== '') {
@@ -227,23 +248,168 @@ final class CalDAVProvider implements CalendarProviderInterface
         string $recurrenceId = '',
         array $recurrence = []
     ): bool {
-        if ($recurrenceId !== ''
-            || ($recurrence !== []
-                && ($recurrence['recurrenceType'] ?? CalendarEventRecurrence::SINGLE) !== CalendarEventRecurrence::SINGLE)) {
-            throw new CalDAVProviderException('Individual occurrences of recurring events cannot be deleted yet.');
-        }
-
         $calendarUrl = $this->normalizeAbsoluteUrl($calendarUrl);
         $resourceUrl = $this->normalizeAbsoluteUrl($resourceUrl);
         $this->assertResourceBelongsToCalendar($calendarUrl, $resourceUrl);
+
+        $getResponse = $this->httpClient->request('GET', $resourceUrl, ['Accept' => 'text/calendar']);
+        $this->assertResponseStatus($getResponse, [200], 'event retrieval');
+        $effectiveResourceUrl = $this->trustedEffectiveUrl($getResponse, $resourceUrl);
+        $this->assertResourceBelongsToCalendar($calendarUrl, $effectiveResourceUrl);
+        $currentEtag = $etag !== '' ? $etag : (string) ($getResponse->headers['etag'] ?? '');
+
+        $identity = CalendarEventRecurrence::fromEvent($recurrence);
+        $recurrenceType = (string) ($identity['recurrenceType'] ?? CalendarEventRecurrence::SINGLE);
+        $seriesId = trim((string) ($identity['seriesId'] ?? ''));
+        $originalStart = trim((string) ($identity['originalStart'] ?? ''));
+        if ($recurrenceType !== CalendarEventRecurrence::SINGLE) {
+            $this->assertWritableOccurrence($identity, $seriesId, false);
+            $updatedIcal = ICalendarCodec::deleteRecurringOccurrence(
+                $getResponse->body,
+                $seriesId,
+                $originalStart
+            );
+
+            return $this->putRecurringResource(
+                $calendarUrl,
+                $effectiveResourceUrl,
+                $currentEtag,
+                $updatedIcal,
+                'recurring occurrence deletion'
+            );
+        }
+
+        if ($recurrenceId !== '') {
+            $updatedIcal = ICalendarCodec::deleteRecurringOccurrence(
+                $getResponse->body,
+                '',
+                trim($recurrenceId)
+            );
+
+            return $this->putRecurringResource(
+                $calendarUrl,
+                $effectiveResourceUrl,
+                $currentEtag,
+                $updatedIcal,
+                'recurring occurrence deletion'
+            );
+        }
+
+        if (ICalendarCodec::hasRecurringEvent($getResponse->body)) {
+            // The first expanded instance is allowed to arrive without
+            // RECURRENCE-ID. Exclude only that first instance, never the resource.
+            $updatedIcal = ICalendarCodec::deleteRecurringOccurrence($getResponse->body, '', '');
+
+            return $this->putRecurringResource(
+                $calendarUrl,
+                $effectiveResourceUrl,
+                $currentEtag,
+                $updatedIcal,
+                'recurring occurrence deletion'
+            );
+        }
+
         $headers = [];
+        if ($currentEtag !== '') {
+            $headers['If-Match'] = $currentEtag;
+        }
+        $response = $this->httpClient->request('DELETE', $effectiveResourceUrl, $headers);
+        $this->assertResponseStatus($response, [200, 204], 'event deletion');
+        $deletedResourceUrl = $this->trustedEffectiveUrl($response, $effectiveResourceUrl);
+        $this->assertResourceBelongsToCalendar($calendarUrl, $deletedResourceUrl);
+
+        return true;
+    }
+
+    /**
+     * Marks server-expanded recurrence instances as individually writable.
+     *
+     * CALDAV:expand strips RRULE/RDATE/EXDATE from returned components. All
+     * non-initial instances carry RECURRENCE-ID, while the initial instance may
+     * omit it. Multiple components with the same UID therefore identify the
+     * initial component as part of the same recurring resource as well.
+     *
+     * @param list<array<string, mixed>> $events
+     * @return list<array<string, mixed>>
+     */
+    private function enableExpandedOccurrenceWrites(array $events): array
+    {
+        $groups = [];
+        foreach ($events as $index => $event) {
+            $uid = trim((string) ($event['uid'] ?? ''));
+            if ($uid !== '') {
+                $groups[$uid][] = $index;
+            }
+        }
+
+        foreach ($groups as $uid => $indexes) {
+            $expandedRecurring = count($indexes) > 1;
+            foreach ($indexes as $index) {
+                if (trim((string) ($events[$index]['recurrenceId'] ?? '')) !== '') {
+                    $expandedRecurring = true;
+                    break;
+                }
+            }
+            if (!$expandedRecurring) {
+                continue;
+            }
+
+            foreach ($indexes as $index) {
+                $originalStart = trim((string) ($events[$index]['originalStart'] ?? ''));
+                if ($originalStart === '') {
+                    $originalStart = trim((string) ($events[$index]['start'] ?? ''));
+                }
+                if ($originalStart === '') {
+                    continue;
+                }
+                $recurrenceId = trim((string) ($events[$index]['recurrenceId'] ?? ''));
+                $events[$index] = array_merge(
+                    $events[$index],
+                    CalendarEventRecurrence::occurrence(
+                        $uid,
+                        $uid . '|' . ($recurrenceId !== '' ? $recurrenceId : $originalStart),
+                        $originalStart,
+                        $recurrenceId,
+                        true
+                    )
+                );
+            }
+        }
+
+        return $events;
+    }
+
+    /** @param array<string, mixed> $identity */
+    private function assertWritableOccurrence(array $identity, string $expectedSeriesId, bool $updating): void
+    {
+        $capability = $updating ? 'canUpdateOccurrence' : 'canDeleteOccurrence';
+        $seriesId = trim((string) ($identity['seriesId'] ?? ''));
+        if (!CalendarEventRecurrence::isOccurrence($identity)
+            || ($identity['writeScope'] ?? '') !== CalendarEventRecurrence::WRITE_SCOPE_OCCURRENCE
+            || $seriesId === ''
+            || ($expectedSeriesId !== '' && !hash_equals($expectedSeriesId, $seriesId))
+            || trim((string) ($identity['occurrenceId'] ?? '')) === ''
+            || trim((string) ($identity['originalStart'] ?? '')) === ''
+            || !(bool) ($identity[$capability] ?? false)) {
+            throw new CalDAVProviderException('The CalDAV recurring occurrence cannot be modified.');
+        }
+    }
+
+    private function putRecurringResource(
+        string $calendarUrl,
+        string $resourceUrl,
+        string $etag,
+        string $ical,
+        string $operation
+    ): bool {
+        $headers = ['Content-Type' => 'text/calendar; charset=utf-8'];
         if ($etag !== '') {
             $headers['If-Match'] = $etag;
         }
-        $response = $this->httpClient->request('DELETE', $resourceUrl, $headers);
-        $this->assertResponseStatus($response, [200, 204], 'event deletion');
-        $effectiveResourceUrl = $this->trustedEffectiveUrl($response, $resourceUrl);
-        $this->assertResourceBelongsToCalendar($calendarUrl, $effectiveResourceUrl);
+        $response = $this->httpClient->request('PUT', $resourceUrl, $headers, $ical);
+        $this->assertResponseStatus($response, [200, 201, 204], $operation);
+        $updatedResourceUrl = $this->trustedEffectiveUrl($response, $resourceUrl);
+        $this->assertResourceBelongsToCalendar($calendarUrl, $updatedResourceUrl);
 
         return true;
     }
@@ -383,7 +549,9 @@ final class CalDAVProvider implements CalendarProviderInterface
                     'create'           => $canWrite,
                     'update'           => $canWrite,
                     'delete'           => $canWrite,
-                    'createRecurrence' => $canWrite
+                    'createRecurrence' => $canWrite,
+                    'updateOccurrence' => $canWrite,
+                    'deleteOccurrence' => $canWrite
                 ]
             ];
         }

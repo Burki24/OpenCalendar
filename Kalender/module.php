@@ -971,8 +971,13 @@ class Kalender extends IPSModuleStrict
         foreach ($this->readEvents() as $cachedEvent) {
             $cachedResourceUrl = trim((string) ($cachedEvent['resourceUrl'] ?? ''));
             $cachedOccurrenceId = trim((string) ($cachedEvent['occurrenceId'] ?? ''));
-            if (($resourceUrl !== '' && hash_equals($cachedResourceUrl, $resourceUrl))
-                || ($occurrenceId !== '' && hash_equals($cachedOccurrenceId, $occurrenceId))) {
+            $matchesOccurrence = $occurrenceId !== ''
+                && $cachedOccurrenceId !== ''
+                && hash_equals($cachedOccurrenceId, $occurrenceId);
+            $matchesResource = $occurrenceId === ''
+                && $resourceUrl !== ''
+                && hash_equals($cachedResourceUrl, $resourceUrl);
+            if ($matchesOccurrence || $matchesResource) {
                 $cachedEvent['writeScope'] = (string) ($event['writeScope'] ?? '');
                 if (trim((string) ($cachedEvent['originalStart'] ?? '')) === ''
                     && trim((string) ($event['originalStart'] ?? '')) !== ''

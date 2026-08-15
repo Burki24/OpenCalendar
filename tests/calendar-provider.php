@@ -1791,6 +1791,109 @@ assertTrueValue(
     'All-day recurring iCalendar events must use DATE values without a timezone component.'
 );
 
+$calDavOccurrenceFixture = <<<'ICS'
+BEGIN:VCALENDAR
+VERSION:2.0
+BEGIN:VEVENT
+UID:caldav-series@example.com
+DTSTAMP:20260801T000000Z
+SEQUENCE:1
+DTSTART;TZID=Europe/Berlin:20260817T100000
+DTEND;TZID=Europe/Berlin:20260817T110000
+RRULE:FREQ=WEEKLY;COUNT=4
+SUMMARY:Weekly master
+LOCATION:Room A
+END:VEVENT
+END:VCALENDAR
+ICS;
+$calDavOccurrenceFixture = str_replace("\n", "\r\n", $calDavOccurrenceFixture) . "\r\n";
+assertSameValue(
+    true,
+    ICalendarCodec::hasRecurringEvent($calDavOccurrenceFixture, 'caldav-series@example.com'),
+    'Recurring iCalendar resources must be detectable before occurrence writes.'
+);
+$calDavOccurrenceUpdated = ICalendarCodec::updateRecurringOccurrence(
+    $calDavOccurrenceFixture,
+    'caldav-series@example.com',
+    '2026-08-24T10:00:00+02:00',
+    [
+        'summary' => 'Changed occurrence',
+        'allDay'  => false,
+        'start'   => '2026-08-24T12:00:00+02:00',
+        'end'     => '2026-08-24T13:00:00+02:00'
+    ]
+);
+assertTrueValue(
+    str_contains($calDavOccurrenceUpdated, 'RRULE:FREQ=WEEKLY;COUNT=4')
+        && str_contains(
+            $calDavOccurrenceUpdated,
+            'RECURRENCE-ID;TZID=Europe/Berlin:20260824T100000'
+        )
+        && str_contains($calDavOccurrenceUpdated, 'DTSTART;TZID=Europe/Berlin:20260824T120000')
+        && str_contains($calDavOccurrenceUpdated, 'SUMMARY:Changed occurrence'),
+    'Updating one CalDAV occurrence must add a detached override while preserving the recurring master.'
+);
+$calDavOccurrenceUpdatedAgain = ICalendarCodec::updateRecurringOccurrence(
+    $calDavOccurrenceUpdated,
+    'caldav-series@example.com',
+    '2026-08-24T10:00:00+02:00',
+    ['summary' => 'Changed occurrence again']
+);
+assertSameValue(
+    1,
+    substr_count($calDavOccurrenceUpdatedAgain, 'RECURRENCE-ID;TZID=Europe/Berlin:20260824T100000'),
+    'Updating an existing CalDAV override must not create duplicate detached instances.'
+);
+assertTrueValue(
+    str_contains($calDavOccurrenceUpdatedAgain, 'SUMMARY:Changed occurrence again'),
+    'An existing detached CalDAV occurrence must remain editable.'
+);
+$calDavOccurrenceDeleted = ICalendarCodec::deleteRecurringOccurrence(
+    $calDavOccurrenceUpdatedAgain,
+    'caldav-series@example.com',
+    '2026-08-24T10:00:00+02:00'
+);
+assertTrueValue(
+    str_contains($calDavOccurrenceDeleted, 'EXDATE;TZID=Europe/Berlin:20260824T100000')
+        && !str_contains($calDavOccurrenceDeleted, 'RECURRENCE-ID;TZID=Europe/Berlin:20260824T100000')
+        && str_contains($calDavOccurrenceDeleted, 'RRULE:FREQ=WEEKLY;COUNT=4'),
+    'Deleting one CalDAV occurrence must exclude it from the master and remove a matching detached override.'
+);
+$calDavFirstOccurrenceDeleted = ICalendarCodec::deleteRecurringOccurrence(
+    $calDavOccurrenceFixture,
+    'caldav-series@example.com',
+    ''
+);
+assertTrueValue(
+    str_contains($calDavFirstOccurrenceDeleted, 'EXDATE;TZID=Europe/Berlin:20260817T100000')
+        && str_contains($calDavFirstOccurrenceDeleted, 'DTSTART;TZID=Europe/Berlin:20260817T100000'),
+    'Deleting the first recurrence instance must retain the master DTSTART and exclude it with EXDATE.'
+);
+$calDavAllDayOccurrenceFixture = <<<'ICS'
+BEGIN:VCALENDAR
+VERSION:2.0
+BEGIN:VEVENT
+UID:caldav-allday@example.com
+DTSTART;VALUE=DATE:20260815
+DTEND;VALUE=DATE:20260816
+RRULE:FREQ=DAILY;COUNT=3
+SUMMARY:All-day series
+END:VEVENT
+END:VCALENDAR
+ICS;
+$calDavAllDayOccurrenceFixture = str_replace("\n", "\r\n", $calDavAllDayOccurrenceFixture) . "\r\n";
+$calDavAllDayOccurrenceUpdated = ICalendarCodec::updateRecurringOccurrence(
+    $calDavAllDayOccurrenceFixture,
+    'caldav-allday@example.com',
+    '2026-08-16',
+    ['summary' => 'All-day exception']
+);
+assertTrueValue(
+    str_contains($calDavAllDayOccurrenceUpdated, 'RECURRENCE-ID;VALUE=DATE:20260816')
+        && str_contains($calDavAllDayOccurrenceUpdated, 'DTSTART;VALUE=DATE:20260816'),
+    'All-day CalDAV occurrence overrides must keep DATE-valued recurrence identities.'
+);
+
 $diveraIcs = <<<'ICS'
 BEGIN:VCALENDAR
 VERSION:2.0
@@ -2534,6 +2637,9 @@ assertTrueValue(
         && str_contains($calendarModuleSource, "\$identity['canDeleteSeries'] = true;")
         && str_contains($calendarModuleSource, "trim((string) (\$cachedEvent['originalStart'] ?? '')) === ''")
         && str_contains($calendarModuleSource, "\$cachedEvent['originalStart'] = trim((string) \$event['originalStart']);")
+        && str_contains($calendarModuleSource, "\$matchesOccurrence = \$occurrenceId !== ''")
+        && str_contains($calendarModuleSource, "\$matchesResource = \$occurrenceId === ''")
+        && str_contains($calendarModuleSource, 'if ($matchesOccurrence || $matchesResource)')
         && str_contains($calendarModuleSource, "\$cachedEvent['canUpdateOccurrence'] = true;")
         && str_contains($calendarModuleSource, "\$cachedEvent['canDeleteOccurrence'] = true;")
         && str_contains($calendarModuleSource, 'Recurring event creation is not supported by this calendar.')
