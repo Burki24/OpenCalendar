@@ -30,14 +30,14 @@ trait KalenderKontoChildGatewayTrait
                 'FinishEventsTransfer'   => [
                     'success' => $this->finishEventsTransferForChild($request)
                 ],
-                'GetRecurringSeries'    => $this->getRecurringSeriesForChild($request),
-                'GetRecurringFollowing' => $this->getRecurringFollowingForChild($request),
+                'GetRecurringSeries'     => $this->getRecurringSeriesForChild($request),
+                'GetRecurringFollowing'  => $this->getRecurringFollowingForChild($request),
                 'CreateEvent'            => $this->createEventForChild($request),
-                'UpdateEvent'        => $this->updateEventForChild($request),
-                'DeleteEvent'        => ['success' => $this->deleteEventForChild($request)],
-                'Synchronize'        => ['success' => $this->Synchronize()],
-                'TestConnection'     => json_decode($this->TestConnection(), true, 512, JSON_THROW_ON_ERROR),
-                default              => throw new InvalidArgumentException('Unsupported operation: ' . $operation)
+                'UpdateEvent'            => $this->updateEventForChild($request),
+                'DeleteEvent'            => ['success' => $this->deleteEventForChild($request)],
+                'Synchronize'            => ['success' => $this->Synchronize()],
+                'TestConnection'         => json_decode($this->TestConnection(), true, 512, JSON_THROW_ON_ERROR),
+                default                  => throw new InvalidArgumentException('Unsupported operation: ' . $operation)
             };
 
             return $this->encodeResponse(true, $operation, $requestID, $payload);
