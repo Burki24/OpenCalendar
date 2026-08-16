@@ -495,7 +495,7 @@ $followingPrepared = $provider->getRecurringFollowing(
     (string) ($recurringEvents[1]['originalStart'] ?? ''),
     $recurringResourceUrl
 );
-assertCalDAVSame('occurrence', $followingPrepared['recurrenceType'], 'This-and-following preparation must return the selected recurring occurrence.');
+assertCalDAVSame('exception', $followingPrepared['recurrenceType'], 'This-and-following preparation must preserve the selected recurring exception.');
 assertCalDAVSame('following', $followingPrepared['writeScope'], 'This-and-following preparation must select the following write scope.');
 assertCalDAVSame(true, $followingPrepared['canUpdateFollowing'], 'A supported CalDAV occurrence must allow this-and-following updates.');
 assertCalDAVSame(true, $followingPrepared['canDeleteSeries'], 'A supported CalDAV occurrence must retain the series deletion capability needed for following deletion.');

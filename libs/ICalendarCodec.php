@@ -464,89 +464,6 @@ final class ICalendarCodec
     }
 
     /**
-     * Validates and resolves one supported recurring split boundary.
-     *
-     * @return array{
-     *     uid: string,
-     *     lines: list<string>,
-     *     blocks: list<array{start: int, end: int, lines: list<string>}>,
-     *     master: array{start: int, end: int, lines: list<string>, properties: array<string, list<array{value: string, params: array<string, string>}>>},
-     *     masterStart: DateTimeImmutable,
-     *     targetStart: DateTimeImmutable,
-     *     rule: string,
-     *     settings: array<string, mixed>,
-     *     allDay: bool,
-     *     timezone: string,
-     *     position: int
-     * }
-     */
-    private static function recurringSplitContext(string $ical, string $uid, string $originalStart): array
-    {
-        $uid = trim($uid);
-        if ($uid === '') {
-            throw new InvalidArgumentException('The recurring event UID is missing.');
-        }
-
-        $lines = self::unfoldLines($ical);
-        $blocks = self::extractEventBlocksWithOffsets($lines);
-        $master = self::recurringMaster($blocks, $uid);
-        $startProperty = self::firstProperty($master['properties'], 'DTSTART');
-        $rule = self::propertyValue($master['properties'], 'RRULE');
-        if ($startProperty === null
-            || count($master['properties']['RRULE'] ?? []) !== 1
-            || $rule === ''
-            || self::propertyValue($master['properties'], 'RDATE') !== ''
-            || self::propertyValue($master['properties'], 'EXRULE') !== '') {
-            throw new RuntimeException('The recurrence pattern cannot be split safely.');
-        }
-
-        $parsedStart = self::parseDateProperty($startProperty);
-        $settings = CalendarRecurrenceRule::fromGoogleRule(
-            $rule,
-            $parsedStart['allDay'],
-            $parsedStart['timezone']
-        );
-        if ($settings === null) {
-            throw new RuntimeException('The recurrence pattern cannot be split safely.');
-        }
-
-        $timezone = self::timezone($parsedStart['timezone']);
-        $masterStart = (new DateTimeImmutable('@' . $parsedStart['timestamp']))->setTimezone($timezone);
-        $targetStart = self::occurrenceOriginalStart($originalStart, $startProperty)->setTimezone($timezone);
-        if ($targetStart < $masterStart
-            || (!$parsedStart['allDay'] && $targetStart->format('H:i:s') !== $masterStart->format('H:i:s'))) {
-            throw new RuntimeException('The recurring target occurrence is not part of the series pattern.');
-        }
-
-        try {
-            $microsoftRecurrence = CalendarRecurrenceRule::toMicrosoftRecurrence($settings, $masterStart);
-            $position = CalendarRecurrenceRule::microsoftOccurrencePosition(
-                $microsoftRecurrence,
-                $targetStart->format('Y-m-d')
-            );
-        } catch (Throwable $exception) {
-            throw new RuntimeException('The recurring target occurrence is not part of the series pattern.', 0, $exception);
-        }
-        if ($position < 1) {
-            throw new RuntimeException('The recurring target occurrence is not part of the series pattern.');
-        }
-
-        return [
-            'uid'         => $uid,
-            'lines'       => $lines,
-            'blocks'      => $blocks,
-            'master'      => $master,
-            'masterStart' => $masterStart,
-            'targetStart' => $targetStart,
-            'rule'        => $rule,
-            'settings'    => $settings,
-            'allDay'      => $parsedStart['allDay'],
-            'timezone'    => $parsedStart['timezone'],
-            'position'    => $position
-        ];
-    }
-
-    /**
      * Checks whether an iCalendar resource contains a recurring VEVENT master.
      */
     public static function hasRecurringEvent(string $ical, string $uid = ''): bool
@@ -673,6 +590,89 @@ final class ICalendarCodec
         }
 
         return self::foldLines($lines);
+    }
+
+    /**
+     * Validates and resolves one supported recurring split boundary.
+     *
+     * @return array{
+     *     uid: string,
+     *     lines: list<string>,
+     *     blocks: list<array{start: int, end: int, lines: list<string>}>,
+     *     master: array{start: int, end: int, lines: list<string>, properties: array<string, list<array{value: string, params: array<string, string>}>>},
+     *     masterStart: DateTimeImmutable,
+     *     targetStart: DateTimeImmutable,
+     *     rule: string,
+     *     settings: array<string, mixed>,
+     *     allDay: bool,
+     *     timezone: string,
+     *     position: int
+     * }
+     */
+    private static function recurringSplitContext(string $ical, string $uid, string $originalStart): array
+    {
+        $uid = trim($uid);
+        if ($uid === '') {
+            throw new InvalidArgumentException('The recurring event UID is missing.');
+        }
+
+        $lines = self::unfoldLines($ical);
+        $blocks = self::extractEventBlocksWithOffsets($lines);
+        $master = self::recurringMaster($blocks, $uid);
+        $startProperty = self::firstProperty($master['properties'], 'DTSTART');
+        $rule = self::propertyValue($master['properties'], 'RRULE');
+        if ($startProperty === null
+            || count($master['properties']['RRULE'] ?? []) !== 1
+            || $rule === ''
+            || self::propertyValue($master['properties'], 'RDATE') !== ''
+            || self::propertyValue($master['properties'], 'EXRULE') !== '') {
+            throw new RuntimeException('The recurrence pattern cannot be split safely.');
+        }
+
+        $parsedStart = self::parseDateProperty($startProperty);
+        $settings = CalendarRecurrenceRule::fromGoogleRule(
+            $rule,
+            $parsedStart['allDay'],
+            $parsedStart['timezone']
+        );
+        if ($settings === null) {
+            throw new RuntimeException('The recurrence pattern cannot be split safely.');
+        }
+
+        $timezone = self::timezone($parsedStart['timezone']);
+        $masterStart = (new DateTimeImmutable('@' . $parsedStart['timestamp']))->setTimezone($timezone);
+        $targetStart = self::occurrenceOriginalStart($originalStart, $startProperty)->setTimezone($timezone);
+        if ($targetStart < $masterStart
+            || (!$parsedStart['allDay'] && $targetStart->format('H:i:s') !== $masterStart->format('H:i:s'))) {
+            throw new RuntimeException('The recurring target occurrence is not part of the series pattern.');
+        }
+
+        try {
+            $microsoftRecurrence = CalendarRecurrenceRule::toMicrosoftRecurrence($settings, $masterStart);
+            $position = CalendarRecurrenceRule::microsoftOccurrencePosition(
+                $microsoftRecurrence,
+                $targetStart->format('Y-m-d')
+            );
+        } catch (Throwable $exception) {
+            throw new RuntimeException('The recurring target occurrence is not part of the series pattern.', 0, $exception);
+        }
+        if ($position < 1) {
+            throw new RuntimeException('The recurring target occurrence is not part of the series pattern.');
+        }
+
+        return [
+            'uid'         => $uid,
+            'lines'       => $lines,
+            'blocks'      => $blocks,
+            'master'      => $master,
+            'masterStart' => $masterStart,
+            'targetStart' => $targetStart,
+            'rule'        => $rule,
+            'settings'    => $settings,
+            'allDay'      => $parsedStart['allDay'],
+            'timezone'    => $parsedStart['timezone'],
+            'position'    => $position
+        ];
     }
 
     /**
