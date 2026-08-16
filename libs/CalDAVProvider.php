@@ -262,53 +262,77 @@ final class CalDAVProvider implements CalendarProviderInterface, RecurringCalend
             throw new CalDAVProviderException('The event UID is missing.');
         }
 
-        $getResponse = $this->httpClient->request('GET', $resourceUrl, ['Accept' => 'text/calendar']);
-        $this->assertResponseStatus($getResponse, [200], 'event retrieval');
-        $effectiveResourceUrl = $this->trustedEffectiveUrl($getResponse, $resourceUrl);
-        $this->assertResourceBelongsToCalendar($calendarUrl, $effectiveResourceUrl);
-
         $identity = CalendarEventRecurrence::fromEvent($recurrence);
         $recurrenceType = (string) ($identity['recurrenceType'] ?? CalendarEventRecurrence::SINGLE);
         if (($identity['writeScope'] ?? '') === CalendarEventRecurrence::WRITE_SCOPE_SERIES) {
             $this->assertWritableSeries($identity, $uid, true);
-            $updatedIcal = ICalendarCodec::updateRecurringSeries(
-                $getResponse->body,
-                trim((string) ($identity['seriesId'] ?? '')),
-                $event
-            );
         } elseif ($recurrenceType !== CalendarEventRecurrence::SINGLE) {
             $this->assertWritableOccurrence($identity, $uid, true);
-            $updatedIcal = ICalendarCodec::updateRecurringOccurrence(
-                $getResponse->body,
-                $uid,
-                trim((string) ($identity['originalStart'] ?? '')),
-                $event
-            );
-        } elseif (ICalendarCodec::hasRecurringEvent($getResponse->body, $uid)) {
-            // CALDAV:expand may omit RECURRENCE-ID on the first instance. If the
-            // backing resource is recurring, an apparently single first instance
-            // must still be written as an exception instead of changing the master.
-            $updatedIcal = ICalendarCodec::updateRecurringOccurrence($getResponse->body, $uid, '', $event);
-        } else {
-            $updatedIcal = ICalendarCodec::updateEvent($getResponse->body, $uid, $event);
         }
 
-        $currentEtag = $etag !== '' ? $etag : (string) ($getResponse->headers['etag'] ?? '');
-        $headers = ['Content-Type' => 'text/calendar; charset=utf-8'];
-        if ($currentEtag !== '') {
-            $headers['If-Match'] = $currentEtag;
+        // CalDAV updates always replace the complete calendar object resource. Read the
+        // resource immediately before every PUT and use the ETag returned by that GET.
+        // The ETag supplied by the editor is only a snapshot from when editing started
+        // and must not override the fresher resource validator obtained here.
+        for ($attempt = 0; $attempt < 2; ++$attempt) {
+            $getResponse = $this->httpClient->request('GET', $resourceUrl, ['Accept' => 'text/calendar']);
+            $this->assertResponseStatus($getResponse, [200], 'event retrieval');
+            $effectiveResourceUrl = $this->trustedEffectiveUrl($getResponse, $resourceUrl);
+            $this->assertResourceBelongsToCalendar($calendarUrl, $effectiveResourceUrl);
+
+            if (($identity['writeScope'] ?? '') === CalendarEventRecurrence::WRITE_SCOPE_SERIES) {
+                $updatedIcal = ICalendarCodec::updateRecurringSeries(
+                    $getResponse->body,
+                    trim((string) ($identity['seriesId'] ?? '')),
+                    $event
+                );
+            } elseif ($recurrenceType !== CalendarEventRecurrence::SINGLE) {
+                $updatedIcal = ICalendarCodec::updateRecurringOccurrence(
+                    $getResponse->body,
+                    $uid,
+                    trim((string) ($identity['originalStart'] ?? '')),
+                    $event
+                );
+            } elseif (ICalendarCodec::hasRecurringEvent($getResponse->body, $uid)) {
+                // CALDAV:expand may omit RECURRENCE-ID on the first instance. If the
+                // backing resource is recurring, an apparently single first instance
+                // must still be written as an exception instead of changing the master.
+                $updatedIcal = ICalendarCodec::updateRecurringOccurrence($getResponse->body, $uid, '', $event);
+            } else {
+                $updatedIcal = ICalendarCodec::updateEvent($getResponse->body, $uid, $event);
+            }
+
+            $currentEtag = trim((string) ($getResponse->headers['etag'] ?? ''));
+            if ($currentEtag === '') {
+                // RFC 4791 requires a strong ETag on a calendar object GET. Keep the
+                // editor value only as a compatibility fallback for non-conforming servers.
+                $currentEtag = trim($etag);
+            }
+            $headers = ['Content-Type' => 'text/calendar; charset=utf-8'];
+            if ($currentEtag !== '') {
+                $headers['If-Match'] = $currentEtag;
+            }
+
+            $putResponse = $this->httpClient->request('PUT', $effectiveResourceUrl, $headers, $updatedIcal);
+            if ($putResponse->statusCode === 412 && $attempt === 0) {
+                // A resource can legitimately change between the GET and PUT. Re-read it
+                // once, re-apply the requested changes and retry with the new ETag.
+                $resourceUrl = $effectiveResourceUrl;
+                continue;
+            }
+
+            $this->assertResponseStatus($putResponse, [200, 201, 204], 'event update');
+            $updatedResourceUrl = $this->trustedEffectiveUrl($putResponse, $effectiveResourceUrl);
+            $this->assertResourceBelongsToCalendar($calendarUrl, $updatedResourceUrl);
+
+            return [
+                'uid'         => $uid,
+                'resourceUrl' => $updatedResourceUrl,
+                'etag'        => (string) ($putResponse->headers['etag'] ?? '')
+            ];
         }
 
-        $putResponse = $this->httpClient->request('PUT', $effectiveResourceUrl, $headers, $updatedIcal);
-        $this->assertResponseStatus($putResponse, [200, 201, 204], 'event update');
-        $updatedResourceUrl = $this->trustedEffectiveUrl($putResponse, $effectiveResourceUrl);
-        $this->assertResourceBelongsToCalendar($calendarUrl, $updatedResourceUrl);
-
-        return [
-            'uid'         => $uid,
-            'resourceUrl' => $updatedResourceUrl,
-            'etag'        => (string) ($putResponse->headers['etag'] ?? '')
-        ];
+        throw new CalDAVProviderException('The calendar object could not be updated.', 412);
     }
 
     /** @inheritDoc */
@@ -786,7 +810,7 @@ final class CalDAVProvider implements CalendarProviderInterface, RecurringCalend
         }
         if ($response->statusCode === 412) {
             throw new CalDAVProviderException(
-                'The event was changed by another client. Synchronize the calendar and try again.',
+                'The calendar object changed while OpenCalendar was saving it. Please try again.',
                 412
             );
         }

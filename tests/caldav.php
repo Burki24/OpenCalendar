@@ -643,7 +643,7 @@ assertCalDAVTrue(
 $seriesUpdateClient = new FakeCalDAVHttpClient([
     caldavResponseWithHeaders(
         200,
-        ['etag' => '"series-etag"'],
+        ['etag' => '"series-current-etag"'],
         recurringSeriesWithOverrideIcal(),
         $recurringResourceUrl
     ),
@@ -655,7 +655,7 @@ $seriesUpdateIdentity['writeScope'] = 'series';
 $updatedSeries = $provider->updateEvent(
     'https://calendar.example/calendars/user/work/',
     $recurringResourceUrl,
-    '"series-etag"',
+    '"series-editor-etag"',
     'series-1@example.com',
     [
         'summary'    => 'Recurring after',
@@ -674,6 +674,11 @@ $updatedSeries = $provider->updateEvent(
 );
 assertCalDAVSame('GET', $seriesUpdateClient->requests[0]['method'], 'Full CalDAV series updates must retrieve the current resource first.');
 assertCalDAVSame('PUT', $seriesUpdateClient->requests[1]['method'], 'Full CalDAV series updates must rewrite the resource via PUT.');
+assertCalDAVSame(
+    '"series-current-etag"',
+    $seriesUpdateClient->requests[1]['headers']['If-Match'] ?? '',
+    'Full CalDAV series updates must use the fresh GET ETag instead of the older editor ETag.'
+);
 assertCalDAVTrue(
     str_contains($seriesUpdateClient->requests[1]['body'], 'SUMMARY:Recurring after')
         && str_contains($seriesUpdateClient->requests[1]['body'], 'DTSTART:20260817T110000Z')
@@ -683,6 +688,86 @@ assertCalDAVTrue(
     'Updating a complete CalDAV series must change only the master while preserving detached overrides.'
 );
 assertCalDAVSame('"series-after-full-update"', $updatedSeries['etag'], 'Full CalDAV series updates must return the new ETag.');
+
+// A transient 412 between GET and PUT must trigger one fresh read and retry.
+$seriesRetryClient = new FakeCalDAVHttpClient([
+    caldavResponseWithHeaders(
+        200,
+        ['etag' => '"series-retry-etag-1"'],
+        recurringSeriesWithOverrideIcal(),
+        $recurringResourceUrl
+    ),
+    caldavResponse(412, '', $recurringResourceUrl),
+    caldavResponseWithHeaders(
+        200,
+        ['etag' => '"series-retry-etag-2"'],
+        recurringSeriesWithOverrideIcal(),
+        $recurringResourceUrl
+    ),
+    caldavResponseWithHeaders(204, ['etag' => '"series-after-retry"'], '', $recurringResourceUrl)
+]);
+$provider = new CalDAVProvider($seriesRetryClient, 'https://calendar.example/dav/');
+$retriedSeries = $provider->updateEvent(
+    'https://calendar.example/calendars/user/work/',
+    $recurringResourceUrl,
+    '"series-editor-etag"',
+    'series-1@example.com',
+    ['summary' => 'Recurring after retry'],
+    $seriesUpdateIdentity
+);
+assertCalDAVSame('GET', $seriesRetryClient->requests[0]['method'], 'A CalDAV retry must start with a fresh GET.');
+assertCalDAVSame('PUT', $seriesRetryClient->requests[1]['method'], 'The first CalDAV write attempt must use PUT.');
+assertCalDAVSame('GET', $seriesRetryClient->requests[2]['method'], 'HTTP 412 must trigger exactly one additional GET before retrying.');
+assertCalDAVSame('PUT', $seriesRetryClient->requests[3]['method'], 'The CalDAV retry must issue one second PUT.');
+assertCalDAVSame(
+    '"series-retry-etag-1"',
+    $seriesRetryClient->requests[1]['headers']['If-Match'] ?? '',
+    'The first write attempt must use the ETag from the immediately preceding GET.'
+);
+assertCalDAVSame(
+    '"series-retry-etag-2"',
+    $seriesRetryClient->requests[3]['headers']['If-Match'] ?? '',
+    'The retry must use the refreshed ETag from the second GET.'
+);
+assertCalDAVTrue(
+    str_contains($seriesRetryClient->requests[3]['body'], 'SUMMARY:Recurring after retry'),
+    'The retry must re-apply the requested series changes to the freshly retrieved resource.'
+);
+assertCalDAVSame('"series-after-retry"', $retriedSeries['etag'], 'A successful retry must return the final server ETag.');
+
+// Repeated 412 responses remain a conflict, but the message must not blame another client.
+$seriesRetryConflictClient = new FakeCalDAVHttpClient([
+    caldavResponseWithHeaders(
+        200,
+        ['etag' => '"series-conflict-etag-1"'],
+        recurringSeriesIcal(),
+        $recurringResourceUrl
+    ),
+    caldavResponse(412, '', $recurringResourceUrl),
+    caldavResponseWithHeaders(
+        200,
+        ['etag' => '"series-conflict-etag-2"'],
+        recurringSeriesIcal(),
+        $recurringResourceUrl
+    ),
+    caldavResponse(412, '', $recurringResourceUrl)
+]);
+$provider = new CalDAVProvider($seriesRetryConflictClient, 'https://calendar.example/dav/');
+$seriesRetryConflict = assertCalDAVThrows(
+    static fn () => $provider->updateEvent(
+        'https://calendar.example/calendars/user/work/',
+        $recurringResourceUrl,
+        '"series-editor-etag"',
+        'series-1@example.com',
+        ['summary' => 'Will still conflict'],
+        $seriesUpdateIdentity
+    ),
+    CalDAVProviderException::class,
+    'changed while OpenCalendar was saving it',
+    'Repeated HTTP 412 responses must remain distinguishable without blaming another client.'
+);
+assertCalDAVSame(412, $seriesRetryConflict->httpStatus, 'Repeated CalDAV update conflicts must retain HTTP status 412.');
+assertCalDAVSame(4, count($seriesRetryConflictClient->requests), 'A CalDAV update conflict must retry only once.');
 
 $seriesDeleteClient = new FakeCalDAVHttpClient([
     caldavResponseWithHeaders(200, ['etag' => '"series-etag"'], recurringSeriesIcal(), $recurringResourceUrl),
@@ -744,8 +829,8 @@ $conflict = assertCalDAVThrows(
         '"old-etag"'
     ),
     CalDAVProviderException::class,
-    'changed by another client',
-    'HTTP 412 must be reported as an optimistic-locking conflict.'
+    'changed while OpenCalendar was saving it',
+    'HTTP 412 must be reported as a neutral optimistic-locking conflict.'
 );
 assertCalDAVSame(412, $conflict->httpStatus, 'The CalDAV conflict exception must retain HTTP status 412.');
 assertCalDAVSame('GET', $conflictClient->requests[0]['method'], 'Deletes must inspect the current resource before deciding between resource and occurrence deletion.');
