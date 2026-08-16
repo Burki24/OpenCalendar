@@ -126,6 +126,15 @@ assertVisualization(
         && str_contains($script, 'const canClearSeriesRecurrence = editingSeries')
         && str_contains($script, 'Boolean(calendar?.canUpdateRecurrence);')
         && str_contains($script, 'resetRecurrenceEditor(eventStart(selectedEvent));')
+        && str_contains($script, 'function recurrencePatternControls()')
+        && str_contains($script, "mode.id = 'event-recurrence-pattern-mode';")
+        && str_contains($script, "index.id = 'event-recurrence-relative-index';")
+        && str_contains($script, "Boolean(selectedCalendarEntry()?.canUpdateRecurrence);")
+        && str_contains($script, "recurrencePatternContext.patternMode")
+        && str_contains($script, "recurrence.patternMode = 'relative';")
+        && str_contains($script, 'recurrence.relativeIndex = patternControls.index.value;')
+        && str_contains($script, 'recurrence.weekStart = recurrencePatternContext.weekStart;')
+        && str_contains($script, 'recurrence.recurrenceTimeZone = recurrencePatternContext.recurrenceTimeZone;')
         && str_contains($script, 'function recurrenceEditorValue()')
         && str_contains($script, 'eventData.recurrence = recurrence;')
         && str_contains($script, "eventRecurrenceFrequency.value === 'none'")
@@ -133,7 +142,7 @@ assertVisualization(
         && str_contains($script, 'Intl.DateTimeFormat().resolvedOptions().timeZone')
         && str_contains($script, 'if (timezone && (!allDay || recurrence || editingSeries || editingFollowing)) {')
         && str_contains($script, 'eventData.timezone = timezone;'),
-    'The event dialog must support Microsoft single-to-series and series-to-single conversion while submitting a calendar or browser timezone for timed events and recurrence edits.'
+    'The event dialog must support Microsoft recurrence conversion and preserve Outlook-specific weekly and relative recurrence metadata while submitting the correct timezone.'
 );
 
 assertVisualization(

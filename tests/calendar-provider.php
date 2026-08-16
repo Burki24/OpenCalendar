@@ -1320,7 +1320,13 @@ assertSameValue(
     'Supported Microsoft recurrence patterns must round-trip into the shared recurrence editor.'
 );
 assertSameValue(
-    null,
+    [
+        'frequency' => 'WEEKLY',
+        'interval'  => 1,
+        'endMode'   => 'never',
+        'byDay'     => ['MO'],
+        'weekStart' => 'SU'
+    ],
     CalendarRecurrenceRule::fromMicrosoftRecurrence(
         [
             'pattern' => [
@@ -1333,7 +1339,87 @@ assertSameValue(
         ],
         new DateTimeImmutable('2026-10-19T00:00:00Z')
     ),
-    'Microsoft weekly rules with a different week boundary must not be exposed lossily.'
+    'Microsoft weekly rules must retain Outlook week boundaries in the shared recurrence editor.'
+);
+
+$msRelativeMonthlyRecurrence = [
+    'pattern' => [
+        'type'       => 'relativeMonthly',
+        'interval'   => 1,
+        'daysOfWeek' => ['wednesday'],
+        'index'      => 'second'
+    ],
+    'range'   => [
+        'type'                => 'numbered',
+        'startDate'           => '2026-08-12',
+        'recurrenceTimeZone'  => 'W. Europe Standard Time',
+        'numberOfOccurrences' => 6
+    ]
+];
+$msParsedRelativeMonthly = CalendarRecurrenceRule::fromMicrosoftRecurrence(
+    $msRelativeMonthlyRecurrence,
+    new DateTimeImmutable('2026-08-12T00:00:00Z')
+);
+assertSameValue(
+    [
+        'frequency'          => 'MONTHLY',
+        'interval'           => 1,
+        'endMode'            => 'count',
+        'patternMode'        => 'relative',
+        'byDay'              => ['WE'],
+        'relativeIndex'      => 'second',
+        'recurrenceTimeZone' => 'W. Europe Standard Time',
+        'count'              => 6
+    ],
+    $msParsedRelativeMonthly,
+    'Relative monthly Outlook patterns must be editable without losing their weekday position.'
+);
+assertSameValue(
+    $msRelativeMonthlyRecurrence,
+    CalendarRecurrenceRule::toMicrosoftRecurrence(
+        $msParsedRelativeMonthly,
+        new DateTimeImmutable('2026-08-12T09:00:00+02:00')
+    ),
+    'Relative monthly Outlook patterns must round-trip without changing their Graph semantics.'
+);
+assertSameValue(
+    2,
+    CalendarRecurrenceRule::microsoftOccurrencePosition($msRelativeMonthlyRecurrence, '2026-09-09'),
+    'Relative monthly Microsoft series must support this-and-following occurrence positioning.'
+);
+
+$msRelativeYearlyRecurrence = [
+    'pattern' => [
+        'type'       => 'relativeYearly',
+        'interval'   => 1,
+        'daysOfWeek' => ['wednesday'],
+        'index'      => 'last',
+        'month'      => 11
+    ],
+    'range'   => [
+        'type'      => 'noEnd',
+        'startDate' => '2026-11-25'
+    ]
+];
+$msParsedRelativeYearly = CalendarRecurrenceRule::fromMicrosoftRecurrence(
+    $msRelativeYearlyRecurrence,
+    new DateTimeImmutable('2026-11-25T00:00:00Z')
+);
+assertSameValue('YEARLY', $msParsedRelativeYearly['frequency'], 'Relative yearly Outlook patterns must be supported.');
+assertSameValue('relative', $msParsedRelativeYearly['patternMode'], 'Relative yearly patterns must retain their pattern mode.');
+assertSameValue('last', $msParsedRelativeYearly['relativeIndex'], 'Relative yearly patterns must retain their position.');
+assertSameValue(
+    $msRelativeYearlyRecurrence,
+    CalendarRecurrenceRule::toMicrosoftRecurrence(
+        $msParsedRelativeYearly,
+        new DateTimeImmutable('2026-11-25T09:00:00+01:00')
+    ),
+    'Relative yearly Outlook patterns must round-trip without changing their Graph semantics.'
+);
+assertSameValue(
+    2,
+    CalendarRecurrenceRule::microsoftOccurrencePosition($msRelativeYearlyRecurrence, '2027-11-24'),
+    'Relative yearly Microsoft series must support this-and-following occurrence positioning.'
 );
 
 $msSplitRecurrence = [
@@ -1358,6 +1444,13 @@ assertSameValue(
     5,
     CalendarRecurrenceRule::remainingMicrosoftOccurrenceCount($msSplitRecurrence, '2026-10-29'),
     'Numbered Microsoft series must retain only the remaining occurrences after a split.'
+);
+$msSundaySplitRecurrence = $msSplitRecurrence;
+$msSundaySplitRecurrence['pattern']['firstDayOfWeek'] = 'sunday';
+assertSameValue(
+    4,
+    CalendarRecurrenceRule::microsoftOccurrencePosition($msSundaySplitRecurrence, '2026-10-29'),
+    'Microsoft recurrence splitting must support Outlook weekly patterns whose week starts on Sunday.'
 );
 $msTrimmedRecurrence = CalendarRecurrenceRule::trimMicrosoftRecurrenceBefore(
     $msSplitRecurrence,

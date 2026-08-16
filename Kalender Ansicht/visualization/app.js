@@ -31,6 +31,7 @@ let selectedEvent = null;
 let editScopeSourceDialog = null;
 let pendingEventEdit = null;
 let pendingSeriesEdit = null;
+let recurrencePatternContext = null;
 let deleteSourceDialog = null;
 let visibleCalendarIds = null;
 let pendingCalendarFilterIds = new Set();
@@ -1353,6 +1354,7 @@ function selectedCalendarEntry() {
 }
 
 function resetRecurrenceEditor(start) {
+    recurrencePatternContext = null;
     setRecurrenceNoneOptionDisabled(false);
     eventRecurrenceFrequency.value = 'none';
     eventRecurrenceInterval.value = '1';
@@ -1362,6 +1364,9 @@ function resetRecurrenceEditor(start) {
     eventRecurrenceWeekdays.querySelectorAll('input[type="checkbox"]').forEach(input => {
         input.checked = false;
     });
+    const patternControls = recurrencePatternControls();
+    patternControls.mode.value = 'absolute';
+    patternControls.index.value = 'first';
     selectDefaultRecurrenceWeekday(start);
     updateRecurrenceAvailability();
 }
@@ -1375,6 +1380,18 @@ function loadRecurrenceEditor(event) {
     const recurrence = event.recurrenceSettings && typeof event.recurrenceSettings === 'object'
         ? event.recurrenceSettings
         : {};
+    recurrencePatternContext = {
+        frequency: String(recurrence.frequency || '').toUpperCase(),
+        patternMode: recurrence.patternMode === 'relative' ? 'relative' : 'absolute',
+        relativeIndex: ['first', 'second', 'third', 'fourth', 'last'].includes(recurrence.relativeIndex)
+            ? recurrence.relativeIndex
+            : 'first',
+        weekStart: String(recurrence.weekStart || ''),
+        dayOfMonth: Number(recurrence.dayOfMonth) || 0,
+        month: Number(recurrence.month) || 0,
+        recurrenceTimeZone: String(recurrence.recurrenceTimeZone || ''),
+        startDate: localDate(eventStart(event))
+    };
     const editable = event.recurrenceEditable !== false && Boolean(recurrence.frequency);
     setRecurrenceNoneOptionDisabled(editable);
     eventRecurrenceFrequency.value = editable ? String(recurrence.frequency).toLowerCase() : 'none';
@@ -1388,10 +1405,83 @@ function loadRecurrenceEditor(event) {
     eventRecurrenceWeekdays.querySelectorAll('input[type="checkbox"]').forEach(input => {
         input.checked = selectedWeekdays.has(input.value);
     });
-    if (editable && eventRecurrenceFrequency.value === 'weekly' && selectedWeekdays.size === 0) {
+    const patternControls = recurrencePatternControls();
+    patternControls.mode.value = recurrencePatternContext.patternMode;
+    patternControls.index.value = recurrencePatternContext.relativeIndex;
+    if (editable
+        && (eventRecurrenceFrequency.value === 'weekly' || recurrencePatternContext.patternMode === 'relative')
+        && selectedWeekdays.size === 0) {
         selectDefaultRecurrenceWeekday(eventStart(event));
     }
     updateRecurrenceAvailability();
+}
+
+function recurrencePatternControls() {
+    let row = document.getElementById('event-recurrence-pattern-row');
+    if (row) {
+        return {
+            row,
+            mode: document.getElementById('event-recurrence-pattern-mode'),
+            index: document.getElementById('event-recurrence-relative-index')
+        };
+    }
+
+    const german = document.documentElement.lang.toLowerCase().startsWith('de');
+    row = document.createElement('div');
+    row.id = 'event-recurrence-pattern-row';
+    row.className = 'form-row two hidden';
+
+    const modeRow = document.createElement('div');
+    modeRow.className = 'form-row';
+    const modeLabel = document.createElement('label');
+    modeLabel.htmlFor = 'event-recurrence-pattern-mode';
+    modeLabel.textContent = german ? 'Muster' : 'Pattern';
+    const mode = document.createElement('select');
+    mode.id = 'event-recurrence-pattern-mode';
+    const absolute = document.createElement('option');
+    absolute.value = 'absolute';
+    const relative = document.createElement('option');
+    relative.value = 'relative';
+    relative.textContent = german ? 'Wochentagsposition' : 'Weekday position';
+    mode.append(absolute, relative);
+    modeRow.append(modeLabel, mode);
+
+    const indexRow = document.createElement('div');
+    indexRow.className = 'form-row';
+    indexRow.id = 'event-recurrence-relative-index-row';
+    const indexLabel = document.createElement('label');
+    indexLabel.htmlFor = 'event-recurrence-relative-index';
+    indexLabel.textContent = german ? 'Position' : 'Position';
+    const index = document.createElement('select');
+    index.id = 'event-recurrence-relative-index';
+    const labels = german
+        ? { first: 'Erste', second: 'Zweite', third: 'Dritte', fourth: 'Vierte', last: 'Letzte' }
+        : { first: 'First', second: 'Second', third: 'Third', fourth: 'Fourth', last: 'Last' };
+    Object.entries(labels).forEach(([value, label]) => {
+        const option = document.createElement('option');
+        option.value = value;
+        option.textContent = label;
+        index.appendChild(option);
+    });
+    indexRow.append(indexLabel, index);
+    row.append(modeRow, indexRow);
+    eventRecurrenceWeekdays.before(row);
+    mode.addEventListener('change', updateRecurrenceControls);
+    index.addEventListener('change', updateRecurrenceControls);
+
+    return { row, mode, index };
+}
+
+function updateRecurrencePatternLabels(frequency, mode) {
+    const controls = recurrencePatternControls();
+    const absolute = controls.mode.querySelector('option[value="absolute"]');
+    const german = document.documentElement.lang.toLowerCase().startsWith('de');
+    if (absolute) {
+        absolute.textContent = frequency === 'yearly'
+            ? (german ? 'Festes Datum' : 'Fixed date')
+            : (german ? 'Fester Monatstag' : 'Fixed day of month');
+    }
+    controls.index.parentElement.classList.toggle('hidden', mode !== 'relative');
 }
 
 function selectDefaultRecurrenceWeekday(start) {
@@ -1433,7 +1523,19 @@ function updateRecurrenceControls() {
     const frequency = eventRecurrenceFrequency.value;
     const enabled = !eventRecurrenceFrequency.disabled && frequency !== 'none';
     eventRecurrenceOptions.classList.toggle('hidden', !enabled);
-    eventRecurrenceWeekdays.classList.toggle('hidden', !enabled || frequency !== 'weekly');
+
+    const patternControls = recurrencePatternControls();
+    const patternSupported = enabled
+        && ['monthly', 'yearly'].includes(frequency)
+        && Boolean(selectedCalendarEntry()?.canUpdateRecurrence);
+    patternControls.row.classList.toggle('hidden', !patternSupported);
+    if (!patternSupported) {
+        patternControls.mode.value = 'absolute';
+    }
+    const patternMode = patternSupported ? patternControls.mode.value : 'absolute';
+    updateRecurrencePatternLabels(frequency, patternMode);
+    const relativePattern = patternSupported && patternMode === 'relative';
+    eventRecurrenceWeekdays.classList.toggle('hidden', !enabled || (frequency !== 'weekly' && !relativePattern));
 
     const endMode = eventRecurrenceEndMode.value;
     const countVisible = enabled && endMode === 'count';
@@ -1479,7 +1581,14 @@ function recurrenceEditorValue() {
         interval: Math.max(1, Math.min(999, Number(eventRecurrenceInterval.value) || 1)),
         endMode: eventRecurrenceEndMode.value
     };
-    if (frequency === 'weekly') {
+    const patternControls = recurrencePatternControls();
+    const relativePattern = ['monthly', 'yearly'].includes(frequency)
+        && patternControls.mode.value === 'relative';
+    if (relativePattern) {
+        recurrence.patternMode = 'relative';
+        recurrence.relativeIndex = patternControls.index.value;
+    }
+    if (frequency === 'weekly' || relativePattern) {
         let byDay = Array.from(eventRecurrenceWeekdays.querySelectorAll('input[type="checkbox"]:checked'))
             .map(input => input.value);
         if (!byDay.length) {
@@ -1488,6 +1597,37 @@ function recurrenceEditorValue() {
         }
         recurrence.byDay = byDay;
     }
+
+    const currentStartDate = String(document.getElementById('event-start').value || '').slice(0, 10);
+    if (frequency === 'weekly'
+        && recurrencePatternContext?.frequency === 'WEEKLY'
+        && recurrencePatternContext.weekStart) {
+        recurrence.weekStart = recurrencePatternContext.weekStart;
+    }
+    if (!relativePattern
+        && recurrencePatternContext?.frequency === recurrence.frequency
+        && recurrencePatternContext.startDate === currentStartDate) {
+        if (frequency === 'monthly' && recurrencePatternContext.dayOfMonth > 0) {
+            recurrence.dayOfMonth = recurrencePatternContext.dayOfMonth;
+        } else if (frequency === 'yearly') {
+            if (recurrencePatternContext.dayOfMonth > 0) {
+                recurrence.dayOfMonth = recurrencePatternContext.dayOfMonth;
+            }
+            if (recurrencePatternContext.month > 0) {
+                recurrence.month = recurrencePatternContext.month;
+            }
+        }
+    } else if (relativePattern
+        && frequency === 'yearly'
+        && recurrencePatternContext?.frequency === 'YEARLY'
+        && recurrencePatternContext.startDate === currentStartDate
+        && recurrencePatternContext.month > 0) {
+        recurrence.month = recurrencePatternContext.month;
+    }
+    if (recurrencePatternContext?.recurrenceTimeZone) {
+        recurrence.recurrenceTimeZone = recurrencePatternContext.recurrenceTimeZone;
+    }
+
     if (recurrence.endMode === 'count') {
         recurrence.count = Math.max(1, Math.min(9999, Number(eventRecurrenceCount.value) || 1));
     } else if (recurrence.endMode === 'until') {
@@ -1664,7 +1804,18 @@ eventCalendarInput.addEventListener('change', () => {
     updateSaveButtonLabel();
     updateRecurrenceAvailability();
 });
-eventRecurrenceFrequency.addEventListener('change', updateRecurrenceControls);
+eventRecurrenceFrequency.addEventListener('change', () => {
+    const controls = recurrencePatternControls();
+    const frequency = eventRecurrenceFrequency.value.toUpperCase();
+    if (!recurrencePatternContext || recurrencePatternContext.frequency !== frequency) {
+        controls.mode.value = 'absolute';
+        controls.index.value = 'first';
+    } else {
+        controls.mode.value = recurrencePatternContext.patternMode;
+        controls.index.value = recurrencePatternContext.relativeIndex;
+    }
+    updateRecurrenceControls();
+});
 eventRecurrenceInterval.addEventListener('input', updateRecurrenceControls);
 eventRecurrenceEndMode.addEventListener('change', updateRecurrenceControls);
 eventCalendarTrigger.addEventListener('click', event => {
