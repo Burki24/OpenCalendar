@@ -1579,12 +1579,12 @@ eventForm.addEventListener('submit', async event => {
     }
     const editingSeries = Boolean(selectedEvent?.recurring) && selectedEvent?.writeScope === 'series';
     const editingFollowing = Boolean(selectedEvent?.recurring) && selectedEvent?.writeScope === 'following';
-    if (recurrence || editingSeries || editingFollowing) {
-        const browserTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone || '';
-        const timezone = String(
-            selectedEvent?.timezone || selectedCalendarEntry()?.timezone || browserTimezone
-        ).trim();
-        if (timezone) eventData.timezone = timezone;
+    const browserTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone || '';
+    const timezone = String(
+        selectedEvent?.timezone || selectedCalendarEntry()?.timezone || browserTimezone
+    ).trim();
+    if (timezone && (!allDay || recurrence || editingSeries || editingFollowing)) {
+        eventData.timezone = timezone;
     }
     if (!calendarInstanceId || !eventData.summary || !eventData.start || !eventData.end) return;
     const sourceCalendarInstanceId = Number(selectedEvent?.calendarInstanceId || 0);

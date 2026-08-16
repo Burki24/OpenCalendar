@@ -124,8 +124,9 @@ assertVisualization(
         && str_contains($script, 'function recurrenceEditorValue()')
         && str_contains($script, 'eventData.recurrence = recurrence;')
         && str_contains($script, 'Intl.DateTimeFormat().resolvedOptions().timeZone')
+        && str_contains($script, 'if (timezone && (!allDay || recurrence || editingSeries || editingFollowing)) {')
         && str_contains($script, 'eventData.timezone = timezone;'),
-    'The event dialog must expose recurrence creation only for recurrence-capable calendars and submit normalized recurrence data with a calendar or browser timezone.'
+    'The event dialog must submit a calendar or browser timezone for timed events and recurrence edits.'
 );
 
 assertVisualization(

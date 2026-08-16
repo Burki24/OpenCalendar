@@ -1060,7 +1060,38 @@ assertSameValue('POST', $msWriteClient->requests[0]['method'], 'Microsoft events
 $msCreateBody = json_decode($msWriteClient->requests[0]['body'], true, 512, JSON_THROW_ON_ERROR);
 assertSameValue('Test', $msCreateBody['subject'], 'Microsoft event subjects must be sent.');
 assertSameValue('text', $msCreateBody['body']['contentType'], 'Microsoft event descriptions must be sent as text.');
-assertSameValue('UTC', $msCreateBody['start']['timeZone'], 'Microsoft event writes must use unambiguous UTC times.');
+assertSameValue('UTC', $msCreateBody['start']['timeZone'], 'Microsoft event writes without a timezone must use unambiguous UTC times.');
+
+$msLocalTimeClient = new FakeHttpClient([
+    response(201, [
+        'id'          => 'local-time-id',
+        'iCalUId'     => 'local-time@example.com',
+        '@odata.etag' => 'W/"local-time"'
+    ])
+]);
+(new MicrosoftCalendarProvider($msLocalTimeClient, 'ms-access-token'))->createEvent('AQMk-primary', [
+    'summary'  => 'Local time test',
+    'allDay'   => false,
+    'start'    => '2026-07-20T08:00:00Z',
+    'end'      => '2026-07-20T09:00:00Z',
+    'timezone' => 'Europe/Berlin'
+]);
+$msLocalTimeBody = json_decode($msLocalTimeClient->requests[0]['body'], true, 512, JSON_THROW_ON_ERROR);
+assertSameValue(
+    '2026-07-20T10:00:00',
+    $msLocalTimeBody['start']['dateTime'],
+    'Microsoft timed events must preserve the local wall-clock time supplied by the calendar view.'
+);
+assertSameValue(
+    'Europe/Berlin',
+    $msLocalTimeBody['start']['timeZone'],
+    'Microsoft timed events must retain the submitted local timezone instead of being stored as UTC.'
+);
+assertSameValue(
+    '2026-07-20T11:00:00',
+    $msLocalTimeBody['end']['dateTime'],
+    'Microsoft timed event end values must use the same local timezone conversion.'
+);
 
 $msRecurringCreateClient = new FakeHttpClient([
     response(201, [

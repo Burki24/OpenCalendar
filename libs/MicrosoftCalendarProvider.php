@@ -903,9 +903,9 @@ final class MicrosoftCalendarProvider implements CalendarProviderInterface, Recu
             }
 
             $payload['isAllDay'] = $allDay;
-            $recurrenceTimezone = trim((string) ($data['timezone'] ?? ''));
-            if ($recurring && $recurrenceTimezone === '') {
-                $recurrenceTimezone = date_default_timezone_get();
+            $eventTimezone = trim((string) ($data['timezone'] ?? ''));
+            if ($recurring && $eventTimezone === '') {
+                $eventTimezone = date_default_timezone_get();
             }
             if ($allDay) {
                 $recurrenceStart = $start;
@@ -917,17 +917,17 @@ final class MicrosoftCalendarProvider implements CalendarProviderInterface, Recu
                     'dateTime' => $end->format('Y-m-d') . 'T00:00:00',
                     'timeZone' => 'UTC'
                 ];
-            } elseif ($recurring) {
-                $recurrenceZone = $this->recurrenceTimezone($recurrenceTimezone);
-                $recurrenceStart = $start->setTimezone($recurrenceZone);
-                $recurrenceEnd = $end->setTimezone($recurrenceZone);
+            } elseif ($eventTimezone !== '') {
+                $eventZone = $this->recurrenceTimezone($eventTimezone);
+                $recurrenceStart = $start->setTimezone($eventZone);
+                $eventEnd = $end->setTimezone($eventZone);
                 $payload['start'] = [
                     'dateTime' => $recurrenceStart->format('Y-m-d\TH:i:s'),
-                    'timeZone' => $recurrenceTimezone
+                    'timeZone' => $eventTimezone
                 ];
                 $payload['end'] = [
-                    'dateTime' => $recurrenceEnd->format('Y-m-d\TH:i:s'),
-                    'timeZone' => $recurrenceTimezone
+                    'dateTime' => $eventEnd->format('Y-m-d\TH:i:s'),
+                    'timeZone' => $eventTimezone
                 ];
             } else {
                 $recurrenceStart = $start;
