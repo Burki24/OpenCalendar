@@ -130,7 +130,7 @@ assertVisualization(
         && str_contains($script, "mode.id = 'event-recurrence-pattern-mode';")
         && str_contains($script, "index.id = 'event-recurrence-relative-index';")
         && str_contains($script, "Boolean(selectedCalendarEntry()?.canUpdateRecurrence);")
-        && str_contains($script, "recurrencePatternContext.patternMode")
+        && str_contains($script, 'recurrencePatternContext.patternMode')
         && str_contains($script, "recurrence.patternMode = 'relative';")
         && str_contains($script, 'recurrence.relativeIndex = patternControls.index.value;')
         && str_contains($script, 'recurrence.weekStart = recurrencePatternContext.weekStart;')

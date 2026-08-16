@@ -155,12 +155,12 @@ final class CalendarRecurrenceRule
 
         $pattern = [
             'type'     => match (true) {
-                $frequency === 'DAILY' => 'daily',
-                $frequency === 'WEEKLY' => 'weekly',
+                $frequency === 'DAILY'                                  => 'daily',
+                $frequency === 'WEEKLY'                                 => 'weekly',
                 $frequency === 'MONTHLY' && $patternMode === 'relative' => 'relativeMonthly',
-                $frequency === 'MONTHLY' => 'absoluteMonthly',
-                $frequency === 'YEARLY' && $patternMode === 'relative' => 'relativeYearly',
-                default => 'absoluteYearly'
+                $frequency === 'MONTHLY'                                => 'absoluteMonthly',
+                $frequency === 'YEARLY' && $patternMode === 'relative'  => 'relativeYearly',
+                default                                                 => 'absoluteYearly'
             },
             'interval' => $interval
         ];
@@ -304,11 +304,11 @@ final class CalendarRecurrenceRule
 
         $type = strtolower(trim((string) ($pattern['type'] ?? '')));
         $frequency = match ($type) {
-            'daily'           => 'DAILY',
-            'weekly'          => 'WEEKLY',
+            'daily'                              => 'DAILY',
+            'weekly'                             => 'WEEKLY',
             'absolutemonthly', 'relativemonthly' => 'MONTHLY',
             'absoluteyearly', 'relativeyearly'   => 'YEARLY',
-            default           => ''
+            default                              => ''
         };
         if ($frequency === '') {
             return null;
