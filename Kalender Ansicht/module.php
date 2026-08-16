@@ -1967,6 +1967,7 @@ class KalenderAnsicht extends IPSModuleStrict
                 $request = $this->decodeActionValue($value);
                 $instanceId = $this->requireWritableCalendar($request);
                 $seriesId = trim((string) ($request['seriesId'] ?? ''));
+                $resourceUrl = trim((string) ($request['resourceUrl'] ?? ''));
                 $writeScope = strtolower(trim((string) ($request['writeScope'] ?? 'series')));
                 if ($seriesId === '') {
                     throw new InvalidArgumentException($this->Translate('The recurring series ID is missing.'));
@@ -1994,7 +1995,7 @@ class KalenderAnsicht extends IPSModuleStrict
                     }
                 } else {
                     $seriesEdit = json_decode(
-                        IPSKAL_GetRecurringSeries($instanceId, $seriesId),
+                        IPSKAL_GetRecurringSeries($instanceId, $seriesId, $resourceUrl),
                         true,
                         512,
                         JSON_THROW_ON_ERROR

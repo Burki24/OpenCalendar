@@ -242,7 +242,8 @@ trait KalenderKontoChildGatewayTrait
 
         return $provider->getRecurringSeries(
             $this->calendarReference($calendar),
-            trim((string) ($request['SeriesID'] ?? ''))
+            trim((string) ($request['SeriesID'] ?? '')),
+            trim((string) ($request['ResourceURL'] ?? ''))
         );
     }
 

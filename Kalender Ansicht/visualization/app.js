@@ -976,6 +976,7 @@ async function confirmEditScope() {
         pendingSeriesEdit = {
             calendarInstanceId: Number(event.calendarInstanceId),
             seriesId: String(event.seriesId || ''),
+            resourceUrl: String(event.resourceUrl || ''),
             occurrenceId: String(event.occurrenceId || ''),
             originalStart: String(event.originalStart || ''),
             writeScope: scope

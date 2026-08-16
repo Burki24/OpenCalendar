@@ -158,26 +158,43 @@ final class CalDAVProvider implements CalendarProviderInterface, RecurringCalend
     }
 
     /** @inheritDoc */
-    public function getRecurringSeries(string $calendarUrl, string $seriesId): array
-    {
+    public function getRecurringSeries(
+        string $calendarUrl,
+        string $seriesId,
+        string $resourceReference = ''
+    ): array {
         $calendarUrl = $this->normalizeAbsoluteUrl($calendarUrl);
         $seriesId = trim($seriesId);
         if ($seriesId === '') {
             throw new CalDAVProviderException('The recurring series ID is missing.');
         }
 
-        $resource = $this->findRecurringResource($calendarUrl, $seriesId);
+        $resourceReference = trim($resourceReference);
+        $fallbackEtag = '';
+        if ($resourceReference !== '') {
+            $resourceReference = $this->normalizeAbsoluteUrl($resourceReference);
+            $this->assertResourceBelongsToCalendar($calendarUrl, $resourceReference);
+        } else {
+            // Keep UID lookup only as a compatibility fallback for callers that do not
+            // already know the calendar object URL. iCloud rejects UID prop-filter
+            // calendar-query REPORT requests with HTTP 412, so the visualization path
+            // must pass the resource URL obtained during event synchronization.
+            $resource = $this->findRecurringResource($calendarUrl, $seriesId);
+            $resourceReference = $resource['resourceUrl'];
+            $fallbackEtag = $resource['etag'];
+        }
+
         $getResponse = $this->httpClient->request(
             'GET',
-            $resource['resourceUrl'],
+            $resourceReference,
             ['Accept' => 'text/calendar']
         );
         $this->assertResponseStatus($getResponse, [200], 'recurring series retrieval');
-        $resourceUrl = $this->trustedEffectiveUrl($getResponse, $resource['resourceUrl']);
+        $resourceUrl = $this->trustedEffectiveUrl($getResponse, $resourceReference);
         $this->assertResourceBelongsToCalendar($calendarUrl, $resourceUrl);
         $resourceEtag = trim((string) ($getResponse->headers['etag'] ?? ''));
         if ($resourceEtag === '') {
-            $resourceEtag = $resource['etag'];
+            $resourceEtag = $fallbackEtag;
         }
 
         $masters = array_values(array_filter(
@@ -808,9 +825,13 @@ final class CalDAVProvider implements CalendarProviderInterface, RecurringCalend
         if (in_array($response->statusCode, [401, 403], true)) {
             throw new CalDAVProviderException('Authentication failed or calendar access was denied.', $response->statusCode);
         }
-        if ($response->statusCode === 412) {
+        if ($response->statusCode === 412 && in_array(
+            $operation,
+            ['event update', 'event deletion', 'recurring occurrence deletion', 'recurring series deletion'],
+            true
+        )) {
             throw new CalDAVProviderException(
-                'The calendar object changed while OpenCalendar was saving it. Please try again.',
+                'The calendar object changed before OpenCalendar could complete the write. Please try again.',
                 412
             );
         }

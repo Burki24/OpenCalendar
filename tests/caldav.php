@@ -450,6 +450,29 @@ assertCalDAVSame(true, $recurringEvents[0]['canUpdateOccurrence'], 'Expanded Cal
 assertCalDAVSame(true, $recurringEvents[0]['canDeleteOccurrence'], 'Expanded CalDAV occurrences must advertise individual deletion.');
 assertCalDAVSame('2026-08-24T10:00:00+00:00', $recurringEvents[1]['originalStart'], 'RECURRENCE-ID must remain the immutable original occurrence start.');
 
+// iCloud rejects calendar-query UID prop-filter lookups with HTTP 412. When the
+// synchronized occurrence already carries its calendar object URL, complete-series
+// editing must open that exact resource directly and must not issue a UID REPORT.
+$directSeriesClient = new FakeCalDAVHttpClient([
+    caldavResponseWithHeaders(
+        200,
+        ['etag' => '"series-direct-etag"'],
+        recurringSeriesIcal(),
+        $recurringResourceUrl
+    )
+]);
+$provider = new CalDAVProvider($directSeriesClient, 'https://calendar.example/dav/');
+$directRecurringSeries = $provider->getRecurringSeries(
+    'https://calendar.example/calendars/user/work/',
+    'series-1@example.com',
+    $recurringResourceUrl
+);
+assertCalDAVSame('master', $directRecurringSeries['recurrenceType'], 'A known CalDAV resource URL must resolve the recurring master directly.');
+assertCalDAVSame('"series-direct-etag"', $directRecurringSeries['etag'], 'Direct recurring series retrieval must retain the current GET ETag.');
+assertCalDAVSame(1, count($directSeriesClient->requests), 'A known recurring resource URL must avoid an additional UID calendar-query.');
+assertCalDAVSame('GET', $directSeriesClient->requests[0]['method'], 'A known recurring resource URL must be retrieved directly with GET.');
+assertCalDAVSame($recurringResourceUrl, $directSeriesClient->requests[0]['url'], 'Complete-series editing must GET the exact synchronized CalDAV object URL.');
+
 $seriesLookupClient = new FakeCalDAVHttpClient([
     caldavResponse(
         207,
@@ -763,7 +786,7 @@ $seriesRetryConflict = assertCalDAVThrows(
         $seriesUpdateIdentity
     ),
     CalDAVProviderException::class,
-    'changed while OpenCalendar was saving it',
+    'changed before OpenCalendar could complete the write',
     'Repeated HTTP 412 responses must remain distinguishable without blaming another client.'
 );
 assertCalDAVSame(412, $seriesRetryConflict->httpStatus, 'Repeated CalDAV update conflicts must retain HTTP status 412.');
@@ -816,6 +839,24 @@ assertCalDAVThrows(
     'A created resource outside the selected calendar path must be rejected.'
 );
 
+// HTTP 412 during a read-only UID lookup is not a write conflict. This is
+// especially important for iCloud, which rejects UID prop-filter REPORT queries.
+$lookupPreconditionClient = new FakeCalDAVHttpClient([
+    caldavResponse(412, '', 'https://calendar.example/calendars/user/work/')
+]);
+$provider = new CalDAVProvider($lookupPreconditionClient, 'https://calendar.example/dav/');
+$lookupPrecondition = assertCalDAVThrows(
+    static fn () => $provider->getRecurringSeries(
+        'https://calendar.example/calendars/user/work/',
+        'series-1@example.com'
+    ),
+    CalDAVProviderException::class,
+    'Unexpected CalDAV response during recurring series lookup: HTTP 412.',
+    'HTTP 412 during recurring-series discovery must not be reported as a save conflict.'
+);
+assertCalDAVSame(412, $lookupPrecondition->httpStatus, 'A CalDAV lookup precondition failure must retain HTTP status 412.');
+assertCalDAVSame('REPORT', $lookupPreconditionClient->requests[0]['method'], 'The compatibility fallback still uses UID REPORT when no resource URL is known.');
+
 // HTTP 412 is the CalDAV conflict signal and must remain distinguishable.
 $conflictClient = new FakeCalDAVHttpClient([
     caldavResponseWithHeaders(200, ['etag' => '"current-etag"'], singleEventIcal(), $resourceUrl),
@@ -829,7 +870,7 @@ $conflict = assertCalDAVThrows(
         '"old-etag"'
     ),
     CalDAVProviderException::class,
-    'changed while OpenCalendar was saving it',
+    'changed before OpenCalendar could complete the write',
     'HTTP 412 must be reported as a neutral optimistic-locking conflict.'
 );
 assertCalDAVSame(412, $conflict->httpStatus, 'The CalDAV conflict exception must retain HTTP status 412.');

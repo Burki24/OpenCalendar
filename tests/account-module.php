@@ -67,12 +67,17 @@ final class CalendarAccountGatewayRecurrenceProbe
             }
 
             /** @return array<string, mixed> */
-            public function getRecurringSeries(string $calendarReference, string $seriesId): array
-            {
+            public function getRecurringSeries(
+                string $calendarReference,
+                string $seriesId,
+                string $resourceReference = ''
+            ): array {
                 return [
                     'recurrenceType'  => 'master',
                     'seriesId'        => $seriesId,
-                    'resourceUrl'     => $calendarReference . '/events/' . $seriesId,
+                    'resourceUrl'     => $resourceReference !== ''
+                        ? $resourceReference
+                        : $calendarReference . '/events/' . $seriesId,
                     'canUpdateSeries' => true
                 ];
             }
@@ -138,16 +143,19 @@ assertAccountStructure(
     'The account child gateway must read the current provider event before editing.'
 );
 $getRecurringSeriesForChild = new ReflectionMethod(CalendarAccountGatewayRecurrenceProbe::class, 'getRecurringSeriesForChild');
+$gatewaySeriesResourceUrl = 'https://calendar.example/calendars/user/work/series-id.ics';
 $gatewaySeries = $getRecurringSeriesForChild->invoke($gatewayProbe, [
-    'CalendarID' => 'calendar-id',
-    'SeriesID'   => 'series-id'
+    'CalendarID'  => 'calendar-id',
+    'SeriesID'    => 'series-id',
+    'ResourceURL' => $gatewaySeriesResourceUrl
 ]);
 assertAccountStructure(
     is_array($gatewaySeries)
         && ($gatewaySeries['recurrenceType'] ?? '') === 'master'
         && ($gatewaySeries['seriesId'] ?? '') === 'series-id'
+        && ($gatewaySeries['resourceUrl'] ?? '') === $gatewaySeriesResourceUrl
         && ($gatewaySeries['canUpdateSeries'] ?? false) === true,
-    'A recurring parent event must pass through the account child gateway for complete-series editing.'
+    'A recurring parent event and its known resource URL must pass through the account child gateway for complete-series editing.'
 );
 $getRecurringFollowingForChild = new ReflectionMethod(
     CalendarAccountGatewayRecurrenceProbe::class,

@@ -370,9 +370,10 @@ class Kalender extends IPSModuleStrict
      * Returns the verified parent event for a recurring series.
      *
      * @param string $SeriesID Provider-specific recurring parent event identifier.
+     * @param string $ResourceURL Optional provider-specific resource URL already known for the series.
      * @return string JSON-encoded normalized recurring parent event.
      */
-    public function GetRecurringSeries(string $SeriesID): string
+    public function GetRecurringSeries(string $SeriesID, string $ResourceURL = ''): string
     {
         try {
             $seriesId = trim($SeriesID);
@@ -387,7 +388,13 @@ class Kalender extends IPSModuleStrict
                 throw new InvalidArgumentException('Recurring series updates are not supported by this calendar.');
             }
 
-            $series = $this->sendRequest('GetRecurringSeries', ['SeriesID' => $seriesId]);
+            $series = $this->sendRequest(
+                'GetRecurringSeries',
+                [
+                    'SeriesID'    => $seriesId,
+                    'ResourceURL' => trim($ResourceURL)
+                ]
+            );
             return json_encode(
                 $series,
                 JSON_UNESCAPED_SLASHES

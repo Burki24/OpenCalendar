@@ -187,8 +187,11 @@ final class MicrosoftCalendarProvider implements CalendarProviderInterface, Recu
     }
 
     /** @inheritDoc */
-    public function getRecurringSeries(string $calendarReference, string $seriesId): array
-    {
+    public function getRecurringSeries(
+        string $calendarReference,
+        string $seriesId,
+        string $resourceReference = ''
+    ): array {
         $seriesData = $this->recurringSeriesData($calendarReference, $seriesId);
         $mapped = array_merge(
             $seriesData['event'],

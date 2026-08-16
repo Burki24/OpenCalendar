@@ -217,8 +217,11 @@ final class GoogleCalendarProvider implements CalendarEventLookupProviderInterfa
     }
 
     /** @inheritDoc */
-    public function getRecurringSeries(string $calendarReference, string $seriesId): array
-    {
+    public function getRecurringSeries(
+        string $calendarReference,
+        string $seriesId,
+        string $resourceReference = ''
+    ): array {
         $calendarId = $this->calendarId($calendarReference);
         $seriesId = trim($seriesId);
         if ($seriesId === '') {

@@ -14,9 +14,14 @@ interface RecurringCalendarProviderInterface
      *
      * @param string $calendarReference Provider-specific calendar identifier or URL.
      * @param string $seriesId Provider-specific recurring parent event identifier.
+     * @param string $resourceReference Optional provider-specific resource reference already known for the series.
      * @return array<string, mixed> Normalized recurring parent event.
      */
-    public function getRecurringSeries(string $calendarReference, string $seriesId): array;
+    public function getRecurringSeries(
+        string $calendarReference,
+        string $seriesId,
+        string $resourceReference = ''
+    ): array;
 
     /**
      * Returns a verified recurring target event for operations on this and following occurrences.
