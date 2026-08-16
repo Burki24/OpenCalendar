@@ -107,6 +107,7 @@ final class MicrosoftCalendarProvider implements CalendarProviderInterface, Recu
                         'update'           => $canWrite,
                         'delete'           => $canWrite,
                         'createRecurrence' => $canWrite,
+                        'updateRecurrence' => $canWrite,
                         'updateOccurrence' => $canWrite,
                         'deleteOccurrence' => $canWrite,
                         'updateFollowing'  => $canWrite,
@@ -287,11 +288,15 @@ final class MicrosoftCalendarProvider implements CalendarProviderInterface, Recu
         $calendarId = $this->calendarId($calendarReference);
         $eventId = $this->eventId($eventReference);
         $identity = $this->assertWritableEventTarget($recurrence, $eventId, true);
+        $recurrenceType = (string) ($identity['recurrenceType'] ?? CalendarEventRecurrence::SINGLE);
         if (($identity['writeScope'] ?? '') === CalendarEventRecurrence::WRITE_SCOPE_FOLLOWING) {
             return $this->updateFollowingInstances($calendarId, $eventId, $event, $identity);
         }
 
         $seriesUpdate = ($identity['writeScope'] ?? '') === CalendarEventRecurrence::WRITE_SCOPE_SERIES;
+        $singleRecurrenceUpdate = $recurrenceType === CalendarEventRecurrence::SINGLE
+            && is_array($event['recurrence'] ?? null)
+            && $event['recurrence'] !== [];
         $targetEventId = $seriesUpdate
             ? trim((string) ($identity['seriesId'] ?? ''))
             : $eventId;
@@ -305,7 +310,7 @@ final class MicrosoftCalendarProvider implements CalendarProviderInterface, Recu
         $updated = $this->requestJson(
             'PATCH',
             '/me/calendars/' . rawurlencode($calendarId) . '/events/' . rawurlencode($targetEventId),
-            $this->buildEventPayload($event, false, $seriesUpdate),
+            $this->buildEventPayload($event, false, $seriesUpdate || $singleRecurrenceUpdate),
             $headers,
             [200]
         );

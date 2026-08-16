@@ -1222,6 +1222,8 @@ function openExistingEvent(event, writeScope = '') {
     );
     if (editingSeries || editingFollowing) {
         loadRecurrenceEditor(selectedEvent);
+    } else if (!selectedEvent.recurring) {
+        resetRecurrenceEditor(eventStart(selectedEvent));
     } else {
         updateRecurrenceAvailability();
     }
@@ -1404,12 +1406,18 @@ function updateRecurrenceAvailability() {
     const editingSeries = Boolean(selectedEvent?.recurring) && selectedEvent?.writeScope === 'series';
     const editingFollowing = Boolean(selectedEvent?.recurring) && selectedEvent?.writeScope === 'following';
     const editingRecurringRange = editingSeries || editingFollowing;
+    const editingSingle = selectedEvent !== null && !Boolean(selectedEvent?.recurring);
+    const movingSingle = editingSingle
+        && Number(calendar?.instanceId || 0) !== Number(selectedEvent?.calendarInstanceId || 0);
     const available = editingRecurringRange
         ? Boolean(editingSeries ? selectedEvent?.canUpdateSeries : selectedEvent?.canUpdateFollowing)
             && selectedEvent?.recurrenceEditable !== false
         : selectedEvent === null
-            && Boolean(calendar?.canWrite)
-            && Boolean(calendar?.canCreateRecurrence);
+            ? Boolean(calendar?.canWrite) && Boolean(calendar?.canCreateRecurrence)
+            : editingSingle
+                && eventCanUpdateOccurrence(selectedEvent)
+                && Boolean(calendar?.canWrite)
+                && Boolean(movingSingle ? calendar?.canCreateRecurrence : calendar?.canUpdateRecurrence);
     setRecurrenceNoneOptionDisabled(editingRecurringRange && available);
     eventRecurrenceRow.classList.toggle('hidden', !available);
     eventRecurrenceFrequency.disabled = !available;
@@ -1456,7 +1464,9 @@ function updateRecurrenceEndDateMinimum() {
 function recurrenceEditorValue() {
     const editingSeries = Boolean(selectedEvent?.recurring) && selectedEvent?.writeScope === 'series';
     const editingFollowing = Boolean(selectedEvent?.recurring) && selectedEvent?.writeScope === 'following';
-    if ((selectedEvent !== null && !editingSeries && !editingFollowing) || eventRecurrenceFrequency.disabled) return null;
+    const editingSingle = selectedEvent !== null && !Boolean(selectedEvent?.recurring);
+    if ((selectedEvent !== null && !editingSeries && !editingFollowing && !editingSingle)
+        || eventRecurrenceFrequency.disabled) return null;
     const frequency = eventRecurrenceFrequency.value;
     if (frequency === 'none') return null;
 

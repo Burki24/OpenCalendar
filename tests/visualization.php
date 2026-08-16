@@ -121,12 +121,15 @@ assertVisualization(
         && str_contains($indexSource, 'id="event-recurrence-weekdays"')
         && str_contains($indexSource, 'id="event-recurrence-end-mode"')
         && str_contains($script, 'Boolean(calendar?.canCreateRecurrence)')
+        && str_contains($script, 'Boolean(movingSingle ? calendar?.canCreateRecurrence : calendar?.canUpdateRecurrence)')
+        && str_contains($script, 'const editingSingle = selectedEvent !== null && !Boolean(selectedEvent?.recurring);')
+        && str_contains($script, 'resetRecurrenceEditor(eventStart(selectedEvent));')
         && str_contains($script, 'function recurrenceEditorValue()')
         && str_contains($script, 'eventData.recurrence = recurrence;')
         && str_contains($script, 'Intl.DateTimeFormat().resolvedOptions().timeZone')
         && str_contains($script, 'if (timezone && (!allDay || recurrence || editingSeries || editingFollowing)) {')
         && str_contains($script, 'eventData.timezone = timezone;'),
-    'The event dialog must submit a calendar or browser timezone for timed events and recurrence edits.'
+    'The event dialog must support recurrence creation and Microsoft single-to-series conversion while submitting a calendar or browser timezone for timed events and recurrence edits.'
 );
 
 assertVisualization(

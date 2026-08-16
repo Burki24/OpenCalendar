@@ -1732,7 +1732,7 @@ class KalenderAnsicht extends IPSModuleStrict
     }
 
     /**
-     * @return list<array{instanceId: int, name: string, color: string, canWrite: bool, timezone: string, canCreateRecurrence: bool, canUpdateOccurrence: bool, canDeleteOccurrence: bool, canUpdateFollowing: bool, canUpdateSeries: bool, canDeleteSeries: bool}>
+     * @return list<array{instanceId: int, name: string, color: string, canWrite: bool, timezone: string, canCreateRecurrence: bool, canUpdateRecurrence: bool, canUpdateOccurrence: bool, canDeleteOccurrence: bool, canUpdateFollowing: bool, canUpdateSeries: bool, canDeleteSeries: bool}>
      */
     private function loadSelectedCalendars(): array
     {
@@ -1778,6 +1778,7 @@ class KalenderAnsicht extends IPSModuleStrict
                     ?? IPS_GetProperty($instanceId, 'CanWrite')),
                 'timezone'            => trim((string) ($calendarStatus['timezone'] ?? '')),
                 'canCreateRecurrence' => (bool) ($calendarStatus['canCreateRecurrence'] ?? false),
+                'canUpdateRecurrence' => (bool) ($calendarStatus['canUpdateRecurrence'] ?? false),
                 'canUpdateOccurrence' => (bool) ($calendarStatus['canUpdateOccurrence'] ?? false),
                 'canDeleteOccurrence' => (bool) ($calendarStatus['canDeleteOccurrence'] ?? false),
                 'canUpdateFollowing'  => (bool) ($calendarStatus['canUpdateFollowing'] ?? false),

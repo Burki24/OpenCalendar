@@ -65,6 +65,7 @@ class Kalender extends IPSModuleStrict
         $this->RegisterAttributeString('DetectedCalendarColor', '');
         $this->RegisterAttributeBoolean('DetectedCanWrite', false);
         $this->RegisterAttributeBoolean('DetectedCanCreateRecurrence', false);
+        $this->RegisterAttributeBoolean('DetectedCanUpdateRecurrence', false);
         $this->RegisterAttributeBoolean('DetectedCanUpdateOccurrence', false);
         $this->RegisterAttributeBoolean('DetectedCanDeleteOccurrence', false);
         $this->RegisterAttributeBoolean('DetectedCanUpdateFollowing', false);
@@ -582,6 +583,29 @@ class Kalender extends IPSModuleStrict
                 throw new InvalidArgumentException('The event changes are invalid.');
             }
             $recurrence = $this->resolveWriteRecurrence($event, true);
+            $requestedRecurrence = $changes['recurrence'] ?? null;
+            $recurrenceType = (string) ($recurrence['recurrenceType'] ?? CalendarEventRecurrence::SINGLE);
+            $convertingSingleToSeries = $recurrenceType === CalendarEventRecurrence::SINGLE
+                && is_array($requestedRecurrence)
+                && $requestedRecurrence !== [];
+            if ($convertingSingleToSeries) {
+                if (!$this->ReadAttributeBoolean('CalendarMetadataAvailable')
+                    || !$this->ReadAttributeBoolean('DetectedCanUpdateRecurrence')) {
+                    $this->refreshCalendarMetadataSafely();
+                }
+                if (!$this->ReadAttributeBoolean('DetectedCanUpdateRecurrence')) {
+                    throw new InvalidArgumentException(
+                        'Converting this event into a recurring series is not supported by this calendar.'
+                    );
+                }
+                if (trim((string) ($changes['timezone'] ?? '')) === '') {
+                    $timezone = trim($this->ReadAttributeString('DetectedCalendarTimezone'));
+                    if ($timezone === '') {
+                        $timezone = date_default_timezone_get();
+                    }
+                    $changes['timezone'] = $timezone;
+                }
+            }
             foreach ([
                 'uid',
                 'resourceUrl',
@@ -699,6 +723,8 @@ class Kalender extends IPSModuleStrict
                     : '',
                 'canCreateRecurrence' => $metadataAvailable
                     && $this->ReadAttributeBoolean('DetectedCanCreateRecurrence'),
+                'canUpdateRecurrence' => $metadataAvailable
+                    && $this->ReadAttributeBoolean('DetectedCanUpdateRecurrence'),
                 'canUpdateOccurrence' => $metadataAvailable
                     && $this->ReadAttributeBoolean('DetectedCanUpdateOccurrence'),
                 'canDeleteOccurrence' => $metadataAvailable
@@ -784,6 +810,7 @@ class Kalender extends IPSModuleStrict
         if ($availableCalendars !== []) {
             $this->WriteAttributeString('ResolvedCalendarID', '');
             $this->WriteAttributeBoolean('DetectedCanCreateRecurrence', false);
+            $this->WriteAttributeBoolean('DetectedCanUpdateRecurrence', false);
             $this->WriteAttributeBoolean('DetectedCanUpdateOccurrence', false);
             $this->WriteAttributeBoolean('DetectedCanDeleteOccurrence', false);
             $this->WriteAttributeBoolean('DetectedCanUpdateFollowing', false);
@@ -805,6 +832,7 @@ class Kalender extends IPSModuleStrict
             || (bool) ($capabilities['update'] ?? false)
             || (bool) ($capabilities['delete'] ?? false);
         $canCreateRecurrence = (bool) ($capabilities['createRecurrence'] ?? false);
+        $canUpdateRecurrence = (bool) ($capabilities['updateRecurrence'] ?? false);
         $canUpdateOccurrence = (bool) ($capabilities['updateOccurrence'] ?? false);
         $canDeleteOccurrence = (bool) ($capabilities['deleteOccurrence'] ?? false);
         $canUpdateFollowing = (bool) ($capabilities['updateFollowing'] ?? false);
@@ -821,6 +849,7 @@ class Kalender extends IPSModuleStrict
         $this->WriteAttributeString('DetectedCalendarColor', trim((string) ($calendar['color'] ?? '')));
         $this->WriteAttributeBoolean('DetectedCanWrite', $canWrite);
         $this->WriteAttributeBoolean('DetectedCanCreateRecurrence', $canCreateRecurrence);
+        $this->WriteAttributeBoolean('DetectedCanUpdateRecurrence', $canUpdateRecurrence);
         $this->WriteAttributeBoolean('DetectedCanUpdateOccurrence', $canUpdateOccurrence);
         $this->WriteAttributeBoolean('DetectedCanDeleteOccurrence', $canDeleteOccurrence);
         $this->WriteAttributeBoolean('DetectedCanUpdateFollowing', $canUpdateFollowing);

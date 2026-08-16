@@ -840,6 +840,7 @@ assertSameValue('max@example.com', $msCalendars[0]['owner'], 'Microsoft calendar
 assertSameValue(true, $msCalendars[0]['writeAccessKnown'], 'Microsoft canEdit must provide authoritative write metadata.');
 assertSameValue(true, $msCalendars[0]['capabilities']['create'], 'Editable Microsoft calendars must expose write capabilities.');
 assertSameValue(true, $msCalendars[0]['capabilities']['createRecurrence'], 'Editable Microsoft calendars must advertise recurrence creation support.');
+assertSameValue(true, $msCalendars[0]['capabilities']['updateRecurrence'], 'Editable Microsoft calendars must advertise recurrence conversion support.');
 assertSameValue(true, $msCalendars[0]['capabilities']['updateOccurrence'], 'Editable Microsoft calendars must advertise recurring occurrence update support.');
 assertSameValue(true, $msCalendars[0]['capabilities']['deleteOccurrence'], 'Editable Microsoft calendars must advertise recurring occurrence delete support.');
 assertSameValue(true, $msCalendars[0]['capabilities']['updateFollowing'], 'Editable Microsoft calendars must advertise this-and-following update support.');
@@ -847,6 +848,7 @@ assertSameValue(true, $msCalendars[0]['capabilities']['updateSeries'], 'Editable
 assertSameValue(true, $msCalendars[0]['capabilities']['deleteSeries'], 'Editable Microsoft calendars must advertise recurring series delete support.');
 assertSameValue(false, $msCalendars[2]['capabilities']['create'], 'Read-only Microsoft calendars must remain read-only.');
 assertSameValue(false, $msCalendars[2]['capabilities']['createRecurrence'], 'Read-only Microsoft calendars must not advertise recurrence creation support.');
+assertSameValue(false, $msCalendars[2]['capabilities']['updateRecurrence'], 'Read-only Microsoft calendars must not advertise recurrence conversion support.');
 assertSameValue(false, $msCalendars[2]['capabilities']['updateOccurrence'], 'Read-only Microsoft calendars must not advertise recurring occurrence update support.');
 assertSameValue(false, $msCalendars[2]['capabilities']['deleteOccurrence'], 'Read-only Microsoft calendars must not advertise recurring occurrence delete support.');
 assertSameValue(false, $msCalendars[2]['capabilities']['updateFollowing'], 'Read-only Microsoft calendars must not advertise this-and-following update support.');
@@ -1091,6 +1093,65 @@ assertSameValue(
     '2026-07-20T11:00:00',
     $msLocalTimeBody['end']['dateTime'],
     'Microsoft timed event end values must use the same local timezone conversion.'
+);
+
+$msSingleToSeriesClient = new FakeHttpClient([
+    response(200, [
+        'id'          => 'single-to-series-id',
+        'iCalUId'     => 'single-to-series@example.com',
+        '@odata.etag' => 'W/"single-to-series"'
+    ])
+]);
+(new MicrosoftCalendarProvider($msSingleToSeriesClient, 'ms-access-token'))->updateEvent(
+    'AQMk-primary',
+    'single-to-series-id',
+    'W/"single-before"',
+    'single-to-series@example.com',
+    [
+        'summary'    => 'Converted recurring event',
+        'allDay'     => false,
+        'start'      => '2026-08-17T08:00:00Z',
+        'end'        => '2026-08-17T09:00:00Z',
+        'timezone'   => 'Europe/Berlin',
+        'recurrence' => [
+            'frequency' => 'weekly',
+            'interval'  => 1,
+            'byDay'     => ['MO'],
+            'endMode'   => 'count',
+            'count'     => 4
+        ]
+    ]
+);
+assertSameValue(
+    'PATCH',
+    $msSingleToSeriesClient->requests[0]['method'],
+    'Microsoft single events must be convertible to recurring series via PATCH.'
+);
+assertSameValue(
+    'W/"single-before"',
+    $msSingleToSeriesClient->requests[0]['headers']['If-Match'] ?? '',
+    'Microsoft recurrence conversion must retain optimistic locking.'
+);
+$msSingleToSeriesBody = json_decode(
+    $msSingleToSeriesClient->requests[0]['body'],
+    true,
+    512,
+    JSON_THROW_ON_ERROR
+);
+assertSameValue(
+    ['dateTime' => '2026-08-17T10:00:00', 'timeZone' => 'Europe/Berlin'],
+    $msSingleToSeriesBody['start'],
+    'Converting a Microsoft single event to a series must preserve its local wall-clock time.'
+);
+assertSameValue(
+    'weekly',
+    $msSingleToSeriesBody['recurrence']['pattern']['type'] ?? '',
+    'Converting a Microsoft single event must submit a Graph recurrence pattern.'
+);
+assertSameValue(
+    4,
+    $msSingleToSeriesBody['recurrence']['range']['numberOfOccurrences'] ?? 0,
+    'Converting a Microsoft single event must submit the requested recurrence range.'
 );
 
 $msRecurringCreateClient = new FakeHttpClient([
@@ -2708,6 +2769,7 @@ assertTrueValue(
 assertTrueValue(
     is_string($calendarModuleSource)
         && str_contains($calendarModuleSource, "RegisterAttributeBoolean('DetectedCanCreateRecurrence', false)")
+        && str_contains($calendarModuleSource, "RegisterAttributeBoolean('DetectedCanUpdateRecurrence', false)")
         && str_contains($calendarModuleSource, "RegisterAttributeBoolean('DetectedCanUpdateOccurrence', false)")
         && str_contains($calendarModuleSource, "RegisterAttributeBoolean('DetectedCanDeleteOccurrence', false)")
         && str_contains($calendarModuleSource, "RegisterAttributeBoolean('DetectedCanUpdateFollowing', false)")
@@ -2715,12 +2777,14 @@ assertTrueValue(
         && str_contains($calendarModuleSource, "RegisterAttributeBoolean('DetectedCanDeleteSeries', false)")
         && str_contains($calendarModuleSource, "RegisterAttributeString('DetectedCalendarTimezone', '')")
         && str_contains($calendarModuleSource, "\$capabilities['createRecurrence'] ?? false")
+        && str_contains($calendarModuleSource, "\$capabilities['updateRecurrence'] ?? false")
         && str_contains($calendarModuleSource, "\$capabilities['updateOccurrence'] ?? false")
         && str_contains($calendarModuleSource, "\$capabilities['deleteOccurrence'] ?? false")
         && str_contains($calendarModuleSource, "\$capabilities['updateFollowing'] ?? false")
         && str_contains($calendarModuleSource, "\$capabilities['updateSeries'] ?? false")
         && str_contains($calendarModuleSource, "\$capabilities['deleteSeries'] ?? false")
         && str_contains($calendarModuleSource, "'canCreateRecurrence' => \$metadataAvailable")
+        && str_contains($calendarModuleSource, "'canUpdateRecurrence' => \$metadataAvailable")
         && str_contains($calendarModuleSource, "'canUpdateOccurrence' => \$metadataAvailable")
         && str_contains($calendarModuleSource, "'canDeleteOccurrence' => \$metadataAvailable")
         && str_contains($calendarModuleSource, "'canUpdateFollowing'")
@@ -2738,12 +2802,15 @@ assertTrueValue(
         && str_contains($calendarModuleSource, "\$cachedEvent['canUpdateOccurrence'] = true;")
         && str_contains($calendarModuleSource, "\$cachedEvent['canDeleteOccurrence'] = true;")
         && str_contains($calendarModuleSource, 'Recurring event creation is not supported by this calendar.')
+        && str_contains($calendarModuleSource, 'Converting this event into a recurring series is not supported by this calendar.')
+        && str_contains($calendarModuleSource, "ReadAttributeBoolean('DetectedCanUpdateRecurrence')")
         && str_contains($calendarModuleSource, 'This and following updates are not supported by this calendar.'),
     'Calendar instances must expose recurring create/following/series capabilities and calendar timezone while blocking unsupported recurring writes.'
 );
 assertTrueValue(
     is_string($viewModuleSource)
         && str_contains($viewModuleSource, "'canCreateRecurrence' => (bool) (\$calendarStatus['canCreateRecurrence'] ?? false)")
+        && str_contains($viewModuleSource, "'canUpdateRecurrence' => (bool) (\$calendarStatus['canUpdateRecurrence'] ?? false)")
         && str_contains($viewModuleSource, "'canUpdateOccurrence' => (bool) (\$calendarStatus['canUpdateOccurrence'] ?? false)")
         && str_contains($viewModuleSource, "'canDeleteOccurrence' => (bool) (\$calendarStatus['canDeleteOccurrence'] ?? false)")
         && str_contains($viewModuleSource, "'canUpdateFollowing'  => (bool) (\$calendarStatus['canUpdateFollowing'] ?? false)")

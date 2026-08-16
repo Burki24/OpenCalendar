@@ -366,12 +366,14 @@ $legacyMicrosoftCalendars = [[
 $normalizedMicrosoftCalendars = $normalizeCapabilities->invoke(null, $legacyMicrosoftCalendars, 3);
 assertAccountStructure(
     ($normalizedMicrosoftCalendars[0]['capabilities']['createRecurrence'] ?? false) === true
+        && ($normalizedMicrosoftCalendars[0]['capabilities']['updateRecurrence'] ?? false) === true
         && ($normalizedMicrosoftCalendars[0]['capabilities']['updateOccurrence'] ?? false) === true
         && ($normalizedMicrosoftCalendars[0]['capabilities']['deleteOccurrence'] ?? false) === true
         && ($normalizedMicrosoftCalendars[0]['capabilities']['updateFollowing'] ?? false) === true
         && ($normalizedMicrosoftCalendars[0]['capabilities']['updateSeries'] ?? false) === true
         && ($normalizedMicrosoftCalendars[0]['capabilities']['deleteSeries'] ?? false) === true
         && ($normalizedMicrosoftCalendars[1]['capabilities']['createRecurrence'] ?? true) === false
+        && ($normalizedMicrosoftCalendars[1]['capabilities']['updateRecurrence'] ?? true) === false
         && ($normalizedMicrosoftCalendars[1]['capabilities']['updateOccurrence'] ?? true) === false
         && ($normalizedMicrosoftCalendars[1]['capabilities']['deleteOccurrence'] ?? true) === false
         && ($normalizedMicrosoftCalendars[1]['capabilities']['updateFollowing'] ?? true) === false
