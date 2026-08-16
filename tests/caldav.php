@@ -1089,6 +1089,6 @@ $conflict = assertCalDAVThrows(
 assertCalDAVSame(412, $conflict->httpStatus, 'The CalDAV conflict exception must retain HTTP status 412.');
 assertCalDAVSame('GET', $conflictClient->requests[0]['method'], 'Deletes must inspect the current resource before deciding between resource and occurrence deletion.');
 assertCalDAVSame('DELETE', $conflictClient->requests[1]['method'], 'A confirmed non-recurring event must still be deleted as a resource.');
-assertCalDAVSame('"old-etag"', $conflictClient->requests[1]['headers']['If-Match'] ?? '', 'Deletes must keep the stored ETag through If-Match.');
+assertCalDAVSame('"current-etag"', $conflictClient->requests[1]['headers']['If-Match'] ?? '', 'Deletes must use the current GET ETag through If-Match.');
 
 echo "All CalDAV provider tests passed.\n";
