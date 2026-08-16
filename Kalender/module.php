@@ -1016,6 +1016,42 @@ class Kalender extends IPSModuleStrict
     private function resolveWriteRecurrence(array $event, bool $updating): array
     {
         $resourceUrl = trim((string) ($event['resourceUrl'] ?? ''));
+        $identity = CalendarEventRecurrence::fromEvent($event);
+        $writeScope = (string) ($identity['writeScope'] ?? '');
+
+        // A synchronized CalDAV cache contains expanded occurrences, not the recurring
+        // master. All occurrences of one series share the same resource URL. Therefore
+        // a resource-URL cache match must never be used to validate a whole-series
+        // write: it would turn the verified master back into an occurrence. Verify the
+        // master directly with the provider before considering cached occurrence data.
+        if ($writeScope === CalendarEventRecurrence::WRITE_SCOPE_SERIES) {
+            $seriesId = trim((string) ($identity['seriesId'] ?? ''));
+            $capabilityAvailable = $updating
+                ? $this->ReadAttributeBoolean('DetectedCanUpdateSeries')
+                : $this->ReadAttributeBoolean('DetectedCanDeleteSeries');
+            if ($seriesId === '' || !$capabilityAvailable) {
+                throw new InvalidArgumentException('The recurring series cannot be modified by this calendar.');
+            }
+
+            $verifiedSeries = $this->sendRequest(
+                'GetRecurringSeries',
+                [
+                    'SeriesID'    => $seriesId,
+                    'ResourceURL' => $resourceUrl
+                ]
+            );
+            $verifiedIdentity = CalendarEventRecurrence::fromEvent($verifiedSeries);
+            $capability = $updating ? 'canUpdateSeries' : 'canDeleteSeries';
+            if (($verifiedIdentity['recurrenceType'] ?? '') !== CalendarEventRecurrence::MASTER
+                || !hash_equals($seriesId, (string) ($verifiedIdentity['seriesId'] ?? ''))
+                || !(bool) ($verifiedIdentity[$capability] ?? false)) {
+                throw new InvalidArgumentException('The recurring series could not be verified for this calendar.');
+            }
+
+            $verifiedIdentity['writeScope'] = CalendarEventRecurrence::WRITE_SCOPE_SERIES;
+            return CalendarEventRecurrence::fromEvent($verifiedIdentity);
+        }
+
         $occurrenceId = trim((string) ($event['occurrenceId'] ?? ''));
         foreach ($this->readEvents() as $cachedEvent) {
             $cachedResourceUrl = trim((string) ($cachedEvent['resourceUrl'] ?? ''));
@@ -1064,8 +1100,6 @@ class Kalender extends IPSModuleStrict
             }
         }
 
-        $identity = CalendarEventRecurrence::fromEvent($event);
-        $writeScope = (string) ($identity['writeScope'] ?? '');
         if ($writeScope === CalendarEventRecurrence::WRITE_SCOPE_OCCURRENCE
             && CalendarEventRecurrence::isOccurrence($identity)) {
             if ($this->ReadAttributeBoolean('DetectedCanUpdateOccurrence')) {
@@ -1091,29 +1125,7 @@ class Kalender extends IPSModuleStrict
             }
             return CalendarEventRecurrence::fromEvent($identity);
         }
-        if ($writeScope !== CalendarEventRecurrence::WRITE_SCOPE_SERIES) {
-            return $identity;
-        }
-
-        $seriesId = trim((string) ($identity['seriesId'] ?? ''));
-        $capabilityAvailable = $updating
-            ? $this->ReadAttributeBoolean('DetectedCanUpdateSeries')
-            : $this->ReadAttributeBoolean('DetectedCanDeleteSeries');
-        if ($seriesId === '' || !$capabilityAvailable) {
-            throw new InvalidArgumentException('The recurring series cannot be modified by this calendar.');
-        }
-
-        $verifiedSeries = $this->sendRequest('GetRecurringSeries', ['SeriesID' => $seriesId]);
-        $verifiedIdentity = CalendarEventRecurrence::fromEvent($verifiedSeries);
-        $capability = $updating ? 'canUpdateSeries' : 'canDeleteSeries';
-        if (($verifiedIdentity['recurrenceType'] ?? '') !== CalendarEventRecurrence::MASTER
-            || !hash_equals($seriesId, (string) ($verifiedIdentity['seriesId'] ?? ''))
-            || !(bool) ($verifiedIdentity[$capability] ?? false)) {
-            throw new InvalidArgumentException('The recurring series could not be verified for this calendar.');
-        }
-
-        $verifiedIdentity['writeScope'] = CalendarEventRecurrence::WRITE_SCOPE_SERIES;
-        return $verifiedIdentity;
+        return $identity;
     }
 
     private function removeLegacyEventsVariable(): void

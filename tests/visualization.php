@@ -288,6 +288,30 @@ assertVisualization(
         && str_contains($moduleSource, "'Changes will apply to the entire recurring series.'"),
     'Recurring Google and Microsoft events must offer supported write scopes with verified provider data.'
 );
+$seriesWriteScopePosition = strpos(
+    $calendarModuleSource,
+    'if ($writeScope === CalendarEventRecurrence::WRITE_SCOPE_SERIES) {'
+);
+$cachedWriteLookupPosition = strpos(
+    $calendarModuleSource,
+    'foreach ($this->readEvents() as $cachedEvent) {'
+);
+assertVisualization(
+    $seriesWriteScopePosition !== false
+        && $cachedWriteLookupPosition !== false
+        && $seriesWriteScopePosition < $cachedWriteLookupPosition
+        && str_contains($calendarModuleSource, "'ResourceURL' => \$resourceUrl")
+        && str_contains(
+            $calendarModuleSource,
+            'return CalendarEventRecurrence::fromEvent($verifiedIdentity);'
+        )
+        && !str_contains(
+            $calendarModuleSource,
+            "\$verifiedSeries = \$this->sendRequest('GetRecurringSeries', ['SeriesID' => \$seriesId]);"
+        ),
+    'Whole-series writes must verify the recurring master before cached occurrences and reuse the known provider resource.'
+);
+
 assertVisualization(
     str_contains($indexSource, 'id="delete-scope-following-option"')
         && str_contains($indexSource, 'name="delete-scope" value="following"')
