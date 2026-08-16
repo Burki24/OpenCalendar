@@ -884,8 +884,13 @@ final class MicrosoftCalendarProvider implements CalendarProviderInterface, Recu
             $payload['location'] = ['displayName' => (string) $data['location']];
         }
 
+        $recurrenceProvided = array_key_exists('recurrence', $data);
         $recurrence = $data['recurrence'] ?? null;
         $recurring = $recurrence !== null && $recurrence !== [];
+        $clearRecurrence = $recurrenceProvided && $recurrence === null;
+        if ($clearRecurrence && ($creating || !$allowRecurrenceUpdate)) {
+            throw new InvalidArgumentException('The recurrence settings are invalid.');
+        }
         if ($recurring
             && ((!$creating && !$allowRecurrenceUpdate) || !is_array($recurrence) || array_is_list($recurrence))) {
             throw new InvalidArgumentException('The recurrence settings are invalid.');
@@ -956,6 +961,10 @@ final class MicrosoftCalendarProvider implements CalendarProviderInterface, Recu
             throw new InvalidArgumentException('Changing all-day mode requires a start and end.');
         } elseif ($recurring) {
             throw new InvalidArgumentException('Recurring event changes require a start and end.');
+        }
+
+        if ($clearRecurrence) {
+            $payload['recurrence'] = null;
         }
 
         if ($payload === []) {

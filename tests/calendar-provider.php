@@ -1154,6 +1154,65 @@ assertSameValue(
     'Converting a Microsoft single event must submit the requested recurrence range.'
 );
 
+$msSeriesToSingleClient = new FakeHttpClient([
+    response(200, [
+        'id'          => 'series-to-single-id',
+        'iCalUId'     => 'series-to-single@example.com',
+        '@odata.etag' => 'W/"series-to-single"'
+    ])
+]);
+(new MicrosoftCalendarProvider($msSeriesToSingleClient, 'ms-access-token'))->updateEvent(
+    'AQMk-primary',
+    'series-to-single-id',
+    'W/"series-before-single"',
+    'series-to-single@example.com',
+    [
+        'summary'    => 'Converted single event',
+        'allDay'     => false,
+        'start'      => '2026-08-17T08:00:00Z',
+        'end'        => '2026-08-17T09:00:00Z',
+        'timezone'   => 'Europe/Berlin',
+        'recurrence' => null
+    ],
+    [
+        'recurrenceType'  => 'master',
+        'seriesId'        => 'series-to-single-id',
+        'recurring'       => true,
+        'canUpdateSeries' => true,
+        'writeScope'      => 'series'
+    ]
+);
+assertSameValue(
+    'PATCH',
+    $msSeriesToSingleClient->requests[0]['method'],
+    'Microsoft recurring series must be convertible to a single event via PATCH.'
+);
+assertSameValue(
+    'W/"series-before-single"',
+    $msSeriesToSingleClient->requests[0]['headers']['If-Match'] ?? '',
+    'Microsoft series-to-single conversion must retain optimistic locking.'
+);
+$msSeriesToSingleBody = json_decode(
+    $msSeriesToSingleClient->requests[0]['body'],
+    true,
+    512,
+    JSON_THROW_ON_ERROR
+);
+assertTrueValue(
+    array_key_exists('recurrence', $msSeriesToSingleBody),
+    'Microsoft series-to-single conversion must explicitly submit the recurrence property.'
+);
+assertSameValue(
+    null,
+    $msSeriesToSingleBody['recurrence'],
+    'Microsoft series-to-single conversion must clear the Graph recurrence pattern with null.'
+);
+assertSameValue(
+    ['dateTime' => '2026-08-17T10:00:00', 'timeZone' => 'Europe/Berlin'],
+    $msSeriesToSingleBody['start'],
+    'Converting a Microsoft series to a single event must preserve its local wall-clock time.'
+);
+
 $msRecurringCreateClient = new FakeHttpClient([
     response(201, [
         'id'          => 'microsoft-series-id',

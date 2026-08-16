@@ -1418,7 +1418,11 @@ function updateRecurrenceAvailability() {
                 && eventCanUpdateOccurrence(selectedEvent)
                 && Boolean(calendar?.canWrite)
                 && Boolean(movingSingle ? calendar?.canCreateRecurrence : calendar?.canUpdateRecurrence);
-    setRecurrenceNoneOptionDisabled(editingRecurringRange && available);
+    const canClearSeriesRecurrence = editingSeries
+        && Boolean(calendar?.canUpdateRecurrence);
+    setRecurrenceNoneOptionDisabled(
+        editingRecurringRange && available && (!editingSeries || !canClearSeriesRecurrence)
+    );
     eventRecurrenceRow.classList.toggle('hidden', !available);
     eventRecurrenceFrequency.disabled = !available;
     if (!available) eventRecurrenceFrequency.value = 'none';
@@ -1583,12 +1587,17 @@ eventForm.addEventListener('submit', async event => {
         start: inputDateValue(document.getElementById('event-start').value, allDay),
         end: inputDateValue(document.getElementById('event-end').value, allDay, allDay)
     };
+    const editingSeries = Boolean(selectedEvent?.recurring) && selectedEvent?.writeScope === 'series';
+    const editingFollowing = Boolean(selectedEvent?.recurring) && selectedEvent?.writeScope === 'following';
     const recurrence = recurrenceEditorValue();
     if (recurrence) {
         eventData.recurrence = recurrence;
+    } else if (editingSeries
+        && !eventRecurrenceFrequency.disabled
+        && eventRecurrenceFrequency.value === 'none'
+        && Boolean(selectedCalendarEntry()?.canUpdateRecurrence)) {
+        eventData.recurrence = null;
     }
-    const editingSeries = Boolean(selectedEvent?.recurring) && selectedEvent?.writeScope === 'series';
-    const editingFollowing = Boolean(selectedEvent?.recurring) && selectedEvent?.writeScope === 'following';
     const browserTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone || '';
     const timezone = String(
         selectedEvent?.timezone || selectedCalendarEntry()?.timezone || browserTimezone
