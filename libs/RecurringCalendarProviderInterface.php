@@ -33,12 +33,14 @@ interface RecurringCalendarProviderInterface
      * @param string $seriesId Provider-specific recurring parent event identifier.
      * @param string $occurrenceId Provider-specific target occurrence identifier.
      * @param string $originalStart Immutable original start of the target occurrence.
+     * @param string $resourceReference Optional provider-specific resource reference already known for the series.
      * @return array<string, mixed> Normalized recurring target event and recurrence settings.
      */
     public function getRecurringFollowing(
         string $calendarReference,
         string $seriesId,
         string $occurrenceId,
-        string $originalStart
+        string $originalStart,
+        string $resourceReference = ''
     ): array;
 }

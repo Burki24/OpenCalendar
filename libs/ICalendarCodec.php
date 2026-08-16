@@ -312,6 +312,241 @@ final class ICalendarCodec
     }
 
     /**
+     * Shortens one supported recurring series so it ends before the selected occurrence.
+     *
+     * Detached overrides at or after the split boundary are removed because they belong
+     * to the future part of the series. Overrides before the boundary are retained.
+     */
+    public static function trimRecurringSeriesBefore(
+        string $ical,
+        string $uid,
+        string $originalStart
+    ): string {
+        $context = self::recurringSplitContext($ical, $uid, $originalStart);
+        $targetStart = $context['targetStart'];
+        $masterStart = $context['masterStart'];
+        if ($targetStart->getTimestamp() === $masterStart->getTimestamp()) {
+            throw new RuntimeException('The recurring series cannot be shortened before its first occurrence.');
+        }
+
+        $lines = $context['lines'];
+        $master = $context['master'];
+        $masterBlock = $master['lines'];
+        self::replaceProperty(
+            $masterBlock,
+            'RRULE',
+            CalendarRecurrenceRule::trimGoogleRuleBefore(
+                'RRULE:' . $context['rule'],
+                $context['allDay'] ? $targetStart->format('Y-m-d') : $targetStart->format(DATE_ATOM),
+                $context['allDay'],
+                $context['timezone']
+            )
+        );
+        self::touchEventBlock($masterBlock);
+
+        $operations = [[
+            'start'       => $master['start'],
+            'length'      => $master['end'] - $master['start'] + 1,
+            'replacement' => $masterBlock
+        ]];
+        foreach ($context['blocks'] as $block) {
+            $properties = self::readTopLevelProperties($block['lines']);
+            if (!hash_equals($context['uid'], self::propertyValue($properties, 'UID'))) {
+                continue;
+            }
+            $recurrenceId = self::firstProperty($properties, 'RECURRENCE-ID');
+            if ($recurrenceId === null) {
+                continue;
+            }
+            try {
+                $timestamp = self::parseDateProperty($recurrenceId)['timestamp'];
+            } catch (Throwable) {
+                continue;
+            }
+            if ($timestamp < $targetStart->getTimestamp()) {
+                continue;
+            }
+            $operations[] = [
+                'start'       => $block['start'],
+                'length'      => $block['end'] - $block['start'] + 1,
+                'replacement' => []
+            ];
+        }
+
+        usort(
+            $operations,
+            static fn (array $left, array $right): int => $right['start'] <=> $left['start']
+        );
+        foreach ($operations as $operation) {
+            array_splice(
+                $lines,
+                $operation['start'],
+                $operation['length'],
+                $operation['replacement']
+            );
+        }
+
+        return self::foldLines($lines);
+    }
+
+    /**
+     * Splits one supported recurring series at the selected occurrence.
+     *
+     * The original resource is shortened before the selected occurrence and all
+     * following detached exceptions are removed. The future portion is returned as
+     * a new self-contained VCALENDAR resource with a new UID so a CalDAV provider can
+     * create it atomically before shortening the original resource.
+     *
+     * @param array<string, mixed> $data Changes and recurrence settings for the new future series.
+     * @return array{originalIcal: string, newIcal: string, newUid: string}
+     */
+    public static function splitRecurringSeries(
+        string $ical,
+        string $uid,
+        string $originalStart,
+        array $data
+    ): array {
+        $recurrence = $data['recurrence'] ?? null;
+        if (!is_array($recurrence) || $recurrence === [] || array_is_list($recurrence)) {
+            throw new InvalidArgumentException('The recurrence settings are required when splitting a recurring event.');
+        }
+
+        $context = self::recurringSplitContext($ical, $uid, $originalStart);
+        $targetStart = $context['targetStart'];
+        if ($targetStart->getTimestamp() === $context['masterStart']->getTimestamp()) {
+            throw new RuntimeException('The first occurrence must update the existing recurring series.');
+        }
+
+        $originalIcal = self::trimRecurringSeriesBefore($ical, $uid, $originalStart);
+
+        $newBlock = self::createOccurrenceOverrideBlock($context['master']['lines'], $targetStart);
+        self::replaceProperty($newBlock, 'RECURRENCE-ID', null);
+        $newUid = bin2hex(random_bytes(16)) . '@ips-kalender';
+        self::replaceProperty($newBlock, 'UID', 'UID:' . $newUid);
+        self::applyEventChangesToBlock($newBlock, $data);
+
+        $updatedProperties = self::readTopLevelProperties($newBlock);
+        $updatedStartProperty = self::firstProperty($updatedProperties, 'DTSTART');
+        if ($updatedStartProperty === null) {
+            throw new RuntimeException('The split recurring event has no start.');
+        }
+        $updatedStart = self::parseDateProperty($updatedStartProperty);
+        $updatedTimezone = self::timezone($updatedStart['timezone']);
+        $updatedStartDate = (new DateTimeImmutable('@' . $updatedStart['timestamp']))->setTimezone($updatedTimezone);
+        self::replaceProperty(
+            $newBlock,
+            'RRULE',
+            CalendarRecurrenceRule::toICalendarRule(
+                $recurrence,
+                $updatedStartDate,
+                $updatedStart['allDay'],
+                $updatedStart['timezone']
+            )
+        );
+
+        $now = gmdate('Ymd\\THis\\Z');
+        self::replaceProperty($newBlock, 'SEQUENCE', 'SEQUENCE:0');
+        self::replaceProperty($newBlock, 'CREATED', 'CREATED:' . $now);
+        self::replaceProperty($newBlock, 'DTSTAMP', 'DTSTAMP:' . $now);
+        self::replaceProperty($newBlock, 'LAST-MODIFIED', 'LAST-MODIFIED:' . $now);
+
+        $newLines = $context['lines'];
+        foreach (array_reverse($context['blocks']) as $block) {
+            array_splice($newLines, $block['start'], $block['end'] - $block['start'] + 1);
+        }
+        self::insertEventBlock($newLines, $newBlock);
+
+        return [
+            'originalIcal' => $originalIcal,
+            'newIcal'      => self::foldLines($newLines),
+            'newUid'       => $newUid
+        ];
+    }
+
+    /**
+     * Validates and resolves one supported recurring split boundary.
+     *
+     * @return array{
+     *     uid: string,
+     *     lines: list<string>,
+     *     blocks: list<array{start: int, end: int, lines: list<string>}>,
+     *     master: array{start: int, end: int, lines: list<string>, properties: array<string, list<array{value: string, params: array<string, string>}>>},
+     *     masterStart: DateTimeImmutable,
+     *     targetStart: DateTimeImmutable,
+     *     rule: string,
+     *     settings: array<string, mixed>,
+     *     allDay: bool,
+     *     timezone: string,
+     *     position: int
+     * }
+     */
+    private static function recurringSplitContext(string $ical, string $uid, string $originalStart): array
+    {
+        $uid = trim($uid);
+        if ($uid === '') {
+            throw new InvalidArgumentException('The recurring event UID is missing.');
+        }
+
+        $lines = self::unfoldLines($ical);
+        $blocks = self::extractEventBlocksWithOffsets($lines);
+        $master = self::recurringMaster($blocks, $uid);
+        $startProperty = self::firstProperty($master['properties'], 'DTSTART');
+        $rule = self::propertyValue($master['properties'], 'RRULE');
+        if ($startProperty === null
+            || count($master['properties']['RRULE'] ?? []) !== 1
+            || $rule === ''
+            || self::propertyValue($master['properties'], 'RDATE') !== ''
+            || self::propertyValue($master['properties'], 'EXRULE') !== '') {
+            throw new RuntimeException('The recurrence pattern cannot be split safely.');
+        }
+
+        $parsedStart = self::parseDateProperty($startProperty);
+        $settings = CalendarRecurrenceRule::fromGoogleRule(
+            $rule,
+            $parsedStart['allDay'],
+            $parsedStart['timezone']
+        );
+        if ($settings === null) {
+            throw new RuntimeException('The recurrence pattern cannot be split safely.');
+        }
+
+        $timezone = self::timezone($parsedStart['timezone']);
+        $masterStart = (new DateTimeImmutable('@' . $parsedStart['timestamp']))->setTimezone($timezone);
+        $targetStart = self::occurrenceOriginalStart($originalStart, $startProperty)->setTimezone($timezone);
+        if ($targetStart < $masterStart
+            || (!$parsedStart['allDay'] && $targetStart->format('H:i:s') !== $masterStart->format('H:i:s'))) {
+            throw new RuntimeException('The recurring target occurrence is not part of the series pattern.');
+        }
+
+        try {
+            $microsoftRecurrence = CalendarRecurrenceRule::toMicrosoftRecurrence($settings, $masterStart);
+            $position = CalendarRecurrenceRule::microsoftOccurrencePosition(
+                $microsoftRecurrence,
+                $targetStart->format('Y-m-d')
+            );
+        } catch (Throwable $exception) {
+            throw new RuntimeException('The recurring target occurrence is not part of the series pattern.', 0, $exception);
+        }
+        if ($position < 1) {
+            throw new RuntimeException('The recurring target occurrence is not part of the series pattern.');
+        }
+
+        return [
+            'uid'         => $uid,
+            'lines'       => $lines,
+            'blocks'      => $blocks,
+            'master'      => $master,
+            'masterStart' => $masterStart,
+            'targetStart' => $targetStart,
+            'rule'        => $rule,
+            'settings'    => $settings,
+            'allDay'      => $parsedStart['allDay'],
+            'timezone'    => $parsedStart['timezone'],
+            'position'    => $position
+        ];
+    }
+
+    /**
      * Checks whether an iCalendar resource contains a recurring VEVENT master.
      */
     public static function hasRecurringEvent(string $ical, string $uid = ''): bool

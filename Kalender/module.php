@@ -413,12 +413,14 @@ class Kalender extends IPSModuleStrict
      * @param string $SeriesID Provider-specific recurring parent event identifier.
      * @param string $OccurrenceID Provider-specific target occurrence identifier.
      * @param string $OriginalStart Immutable original start of the target occurrence.
+     * @param string $ResourceURL Optional provider-specific resource URL already known for the series.
      * @return string JSON-encoded normalized recurring target event.
      */
     public function GetRecurringFollowing(
         string $SeriesID,
         string $OccurrenceID,
-        string $OriginalStart
+        string $OriginalStart,
+        string $ResourceURL = ''
     ): string {
         try {
             $seriesId = trim($SeriesID);
@@ -440,7 +442,8 @@ class Kalender extends IPSModuleStrict
                 [
                     'SeriesID'      => $seriesId,
                     'OccurrenceID'  => $occurrenceId,
-                    'OriginalStart' => $originalStart
+                    'OriginalStart' => $originalStart,
+                    'ResourceURL'   => trim($ResourceURL)
                 ]
             );
             return json_encode(

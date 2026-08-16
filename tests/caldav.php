@@ -311,6 +311,7 @@ assertCalDAVSame('#123456', $calendars[0]['color'], 'Apple eight-digit calendar 
 assertCalDAVSame(true, $calendars[0]['capabilities']['create'], 'Write privileges must enable event creation.');
 assertCalDAVSame(true, $calendars[0]['capabilities']['createRecurrence'], 'Writable CalDAV calendars must advertise recurring event creation.');
 assertCalDAVSame(true, $calendars[0]['capabilities']['updateOccurrence'], 'Writable CalDAV calendars must advertise recurring occurrence updates.');
+assertCalDAVSame(true, $calendars[0]['capabilities']['updateFollowing'], 'Writable CalDAV calendars must advertise this-and-following updates.');
 assertCalDAVSame(true, $calendars[0]['capabilities']['deleteOccurrence'], 'Writable CalDAV calendars must advertise recurring occurrence deletion.');
 assertCalDAVSame(true, $calendars[0]['capabilities']['updateSeries'], 'Writable CalDAV calendars must advertise recurring series updates.');
 assertCalDAVSame(true, $calendars[0]['capabilities']['deleteSeries'], 'Writable CalDAV calendars must advertise recurring series deletion.');
@@ -332,6 +333,7 @@ assertCalDAVSame(false, $unknownPrivilegeCalendars[0]['writeAccessKnown'], 'Miss
 assertCalDAVSame(true, $unknownPrivilegeCalendars[0]['capabilities']['create'], 'Missing DAV privileges must not disable event creation optimistically.');
 assertCalDAVSame(true, $unknownPrivilegeCalendars[0]['capabilities']['createRecurrence'], 'Unknown DAV privileges must not hide recurring creation optimistically.');
 assertCalDAVSame(true, $unknownPrivilegeCalendars[0]['capabilities']['updateOccurrence'], 'Unknown DAV privileges must not hide recurring occurrence updates optimistically.');
+assertCalDAVSame(true, $unknownPrivilegeCalendars[0]['capabilities']['updateFollowing'], 'Unknown DAV privileges must not hide this-and-following updates optimistically.');
 assertCalDAVSame(true, $unknownPrivilegeCalendars[0]['capabilities']['deleteOccurrence'], 'Unknown DAV privileges must not hide recurring occurrence deletion optimistically.');
 assertCalDAVSame(true, $unknownPrivilegeCalendars[0]['capabilities']['updateSeries'], 'Unknown DAV privileges must not hide recurring series updates optimistically.');
 assertCalDAVSame(true, $unknownPrivilegeCalendars[0]['capabilities']['deleteSeries'], 'Unknown DAV privileges must not hide recurring series deletion optimistically.');
@@ -448,6 +450,9 @@ assertCalDAVSame('occurrence', $recurringEvents[0]['recurrenceType'], 'The first
 assertCalDAVSame('series-1@example.com', $recurringEvents[0]['seriesId'], 'CalDAV occurrence metadata must retain the recurring UID as series identity.');
 assertCalDAVSame(true, $recurringEvents[0]['canUpdateOccurrence'], 'Expanded CalDAV occurrences must advertise individual updates.');
 assertCalDAVSame(true, $recurringEvents[0]['canDeleteOccurrence'], 'Expanded CalDAV occurrences must advertise individual deletion.');
+assertCalDAVSame(true, $recurringEvents[0]['canUpdateFollowing'], 'Expanded CalDAV occurrences must advertise this-and-following updates.');
+assertCalDAVSame(true, $recurringEvents[0]['canUpdateSeries'], 'Expanded CalDAV occurrences must advertise complete-series updates.');
+assertCalDAVSame(true, $recurringEvents[0]['canDeleteSeries'], 'Expanded CalDAV occurrences must advertise complete-series deletion.');
 assertCalDAVSame('2026-08-24T10:00:00+00:00', $recurringEvents[1]['originalStart'], 'RECURRENCE-ID must remain the immutable original occurrence start.');
 
 // iCloud rejects calendar-query UID prop-filter lookups with HTTP 412. When the
@@ -472,6 +477,33 @@ assertCalDAVSame('"series-direct-etag"', $directRecurringSeries['etag'], 'Direct
 assertCalDAVSame(1, count($directSeriesClient->requests), 'A known recurring resource URL must avoid an additional UID calendar-query.');
 assertCalDAVSame('GET', $directSeriesClient->requests[0]['method'], 'A known recurring resource URL must be retrieved directly with GET.');
 assertCalDAVSame($recurringResourceUrl, $directSeriesClient->requests[0]['url'], 'Complete-series editing must GET the exact synchronized CalDAV object URL.');
+
+// This-and-following preparation must use the exact known object resource as well.
+$followingPrepareClient = new FakeCalDAVHttpClient([
+    caldavResponseWithHeaders(
+        200,
+        ['etag' => '"following-prepare-etag"'],
+        recurringSeriesWithOverrideIcal(),
+        $recurringResourceUrl
+    )
+]);
+$provider = new CalDAVProvider($followingPrepareClient, 'https://calendar.example/dav/');
+$followingPrepared = $provider->getRecurringFollowing(
+    'https://calendar.example/calendars/user/work/',
+    'series-1@example.com',
+    (string) ($recurringEvents[1]['occurrenceId'] ?? ''),
+    (string) ($recurringEvents[1]['originalStart'] ?? ''),
+    $recurringResourceUrl
+);
+assertCalDAVSame('occurrence', $followingPrepared['recurrenceType'], 'This-and-following preparation must return the selected recurring occurrence.');
+assertCalDAVSame('following', $followingPrepared['writeScope'], 'This-and-following preparation must select the following write scope.');
+assertCalDAVSame(true, $followingPrepared['canUpdateFollowing'], 'A supported CalDAV occurrence must allow this-and-following updates.');
+assertCalDAVSame(true, $followingPrepared['canDeleteSeries'], 'A supported CalDAV occurrence must retain the series deletion capability needed for following deletion.');
+assertCalDAVSame(3, $followingPrepared['recurrenceSettings']['count'] ?? 0, 'A numbered series must expose the remaining occurrence count from the selected split point.');
+assertCalDAVSame('2026-08-24T12:00:00+00:00', $followingPrepared['start'], 'A detached selected occurrence must retain its current edited start when preparing the future series.');
+assertCalDAVSame('"following-prepare-etag"', $followingPrepared['etag'], 'This-and-following preparation must use the current direct GET ETag.');
+assertCalDAVSame(1, count($followingPrepareClient->requests), 'A known CalDAV resource must prepare this-and-following editing without a UID REPORT.');
+assertCalDAVSame('GET', $followingPrepareClient->requests[0]['method'], 'This-and-following preparation must read the exact calendar object directly.');
 
 $seriesLookupClient = new FakeCalDAVHttpClient([
     caldavResponse(
@@ -711,6 +743,187 @@ assertCalDAVTrue(
     'Updating a complete CalDAV series must change only the master while preserving detached overrides.'
 );
 assertCalDAVSame('"series-after-full-update"', $updatedSeries['etag'], 'Full CalDAV series updates must return the new ETag.');
+
+// This-and-following updates split the calendar object into an old shortened series and a new future series.
+$followingUpdateClient = new FakeCalDAVHttpClient([
+    caldavResponseWithHeaders(
+        200,
+        ['etag' => '"following-current-etag"'],
+        recurringSeriesWithOverrideIcal(),
+        $recurringResourceUrl
+    ),
+    caldavResponseWithHeaders(201, ['etag' => '"future-series-etag"'], '', ''),
+    caldavResponseWithHeaders(204, ['etag' => '"shortened-series-etag"'], '', $recurringResourceUrl)
+]);
+$provider = new CalDAVProvider($followingUpdateClient, 'https://calendar.example/dav/');
+$followingIdentity = $followingPrepared;
+$followingIdentity['writeScope'] = 'following';
+$followingUpdated = $provider->updateEvent(
+    'https://calendar.example/calendars/user/work/',
+    $recurringResourceUrl,
+    '"following-editor-etag"',
+    'series-1@example.com',
+    [
+        'summary'    => 'Future series after split',
+        'allDay'     => false,
+        'start'      => '2026-08-24T13:00:00Z',
+        'end'        => '2026-08-24T14:00:00Z',
+        'recurrence' => [
+            'frequency' => 'weekly',
+            'interval'  => 1,
+            'byDay'     => ['MO'],
+            'endMode'   => 'count',
+            'count'     => 3
+        ]
+    ],
+    $followingIdentity
+);
+assertCalDAVSame(3, count($followingUpdateClient->requests), 'Splitting a CalDAV series must use one GET and two protected PUT writes.');
+assertCalDAVSame('GET', $followingUpdateClient->requests[0]['method'], 'This-and-following updates must start from the current resource.');
+assertCalDAVSame('PUT', $followingUpdateClient->requests[1]['method'], 'This-and-following updates must create the future series first.');
+assertCalDAVSame('*', $followingUpdateClient->requests[1]['headers']['If-None-Match'] ?? '', 'The new future CalDAV resource must be protected against accidental overwrite.');
+assertCalDAVSame('PUT', $followingUpdateClient->requests[2]['method'], 'This-and-following updates must shorten the original resource after creating the future resource.');
+assertCalDAVSame('"following-current-etag"', $followingUpdateClient->requests[2]['headers']['If-Match'] ?? '', 'The original series must be shortened with the ETag from the immediately preceding GET.');
+assertCalDAVTrue(
+    str_contains($followingUpdateClient->requests[1]['body'], 'SUMMARY:Future series after split')
+        && str_contains($followingUpdateClient->requests[1]['body'], 'DTSTART:20260824T130000Z')
+        && str_contains($followingUpdateClient->requests[1]['body'], 'RRULE:FREQ=WEEKLY;BYDAY=MO;COUNT=3')
+        && !str_contains($followingUpdateClient->requests[1]['body'], 'RECURRENCE-ID:20260824T100000Z')
+        && !str_contains($followingUpdateClient->requests[1]['body'], 'UID:series-1@example.com'),
+    'The future CalDAV resource must be a new recurring master at the selected occurrence and reset old detached exceptions.'
+);
+assertCalDAVTrue(
+    str_contains($followingUpdateClient->requests[2]['body'], 'UID:series-1@example.com')
+        && str_contains($followingUpdateClient->requests[2]['body'], 'RRULE:FREQ=WEEKLY;UNTIL=20260824T095959Z')
+        && str_contains($followingUpdateClient->requests[2]['body'], 'SUMMARY:Recurring before')
+        && !str_contains($followingUpdateClient->requests[2]['body'], 'RECURRENCE-ID:20260824T100000Z'),
+    'The original CalDAV resource must end before the split target and discard detached overrides at or after the split.'
+);
+assertCalDAVTrue(
+    ($followingUpdated['uid'] ?? '') !== ''
+        && ($followingUpdated['uid'] ?? '') !== 'series-1@example.com'
+        && str_ends_with((string) ($followingUpdated['resourceUrl'] ?? ''), rawurlencode((string) $followingUpdated['uid']) . '.ics')
+        && ($followingUpdated['etag'] ?? '') === '"future-series-etag"',
+    'A successful CalDAV split must return the new future-series identity and ETag.'
+);
+
+// If shortening races with another write, remove the temporary future series and retry from a fresh resource.
+$followingRetryClient = new FakeCalDAVHttpClient([
+    caldavResponseWithHeaders(200, ['etag' => '"following-retry-old-1"'], recurringSeriesWithOverrideIcal(), $recurringResourceUrl),
+    caldavResponseWithHeaders(201, ['etag' => '"following-retry-new-1"'], '', ''),
+    caldavResponse(412, '', $recurringResourceUrl),
+    caldavResponse(204, '', ''),
+    caldavResponseWithHeaders(200, ['etag' => '"following-retry-old-2"'], recurringSeriesWithOverrideIcal(), $recurringResourceUrl),
+    caldavResponseWithHeaders(201, ['etag' => '"following-retry-new-2"'], '', ''),
+    caldavResponseWithHeaders(204, ['etag' => '"following-retry-after"'], '', $recurringResourceUrl)
+]);
+$provider = new CalDAVProvider($followingRetryClient, 'https://calendar.example/dav/');
+$retriedFollowing = $provider->updateEvent(
+    'https://calendar.example/calendars/user/work/',
+    $recurringResourceUrl,
+    '',
+    'series-1@example.com',
+    [
+        'summary'    => 'Future series after retry',
+        'allDay'     => false,
+        'start'      => '2026-08-24T13:00:00Z',
+        'end'        => '2026-08-24T14:00:00Z',
+        'recurrence' => [
+            'frequency' => 'weekly',
+            'interval'  => 1,
+            'byDay'     => ['MO'],
+            'endMode'   => 'count',
+            'count'     => 3
+        ]
+    ],
+    $followingIdentity
+);
+assertCalDAVSame(7, count($followingRetryClient->requests), 'A CalDAV following split conflict must roll back once and retry exactly once.');
+assertCalDAVSame('DELETE', $followingRetryClient->requests[3]['method'], 'A failed original-series trim must remove the temporary future series before retrying.');
+assertCalDAVSame('"following-retry-old-1"', $followingRetryClient->requests[2]['headers']['If-Match'] ?? '', 'The first trim attempt must use the first fresh ETag.');
+assertCalDAVSame('"following-retry-old-2"', $followingRetryClient->requests[6]['headers']['If-Match'] ?? '', 'The retried trim must use the refreshed ETag.');
+assertCalDAVTrue($followingRetryClient->requests[1]['url'] !== $followingRetryClient->requests[5]['url'], 'A retried split must use a fresh future resource identity after rollback.');
+assertCalDAVSame('"following-retry-new-2"', $retriedFollowing['etag'], 'A successful split retry must return the final future-series ETag.');
+
+// Selecting the first occurrence for this-and-following is equivalent to updating the existing whole series in place.
+$firstFollowingUpdateClient = new FakeCalDAVHttpClient([
+    caldavResponseWithHeaders(200, ['etag' => '"first-following-etag"'], recurringSeriesIcal(), $recurringResourceUrl),
+    caldavResponseWithHeaders(204, ['etag' => '"first-following-after"'], '', $recurringResourceUrl)
+]);
+$provider = new CalDAVProvider($firstFollowingUpdateClient, 'https://calendar.example/dav/');
+$firstFollowingIdentity = $recurringEvents[0];
+$firstFollowingIdentity['writeScope'] = 'following';
+$provider->updateEvent(
+    'https://calendar.example/calendars/user/work/',
+    $recurringResourceUrl,
+    '"old-first-following-etag"',
+    'series-1@example.com',
+    [
+        'summary'    => 'All occurrences from first',
+        'recurrence' => [
+            'frequency' => 'weekly',
+            'interval'  => 1,
+            'byDay'     => ['MO'],
+            'endMode'   => 'count',
+            'count'     => 4
+        ]
+    ],
+    $firstFollowingIdentity
+);
+assertCalDAVSame(2, count($firstFollowingUpdateClient->requests), 'This-and-following from the first occurrence must not create a second resource.');
+assertCalDAVSame('PUT', $firstFollowingUpdateClient->requests[1]['method'], 'This-and-following from the first occurrence must update the existing series.');
+assertCalDAVSame('"first-following-etag"', $firstFollowingUpdateClient->requests[1]['headers']['If-Match'] ?? '', 'The first-occurrence update must use the current GET ETag.');
+assertCalDAVTrue(
+    str_contains($firstFollowingUpdateClient->requests[1]['body'], 'SUMMARY:All occurrences from first')
+        && str_contains($firstFollowingUpdateClient->requests[1]['body'], 'UID:series-1@example.com'),
+    'This-and-following from the first occurrence must retain the existing series identity.'
+);
+
+$followingDeleteClient = new FakeCalDAVHttpClient([
+    caldavResponseWithHeaders(200, ['etag' => '"following-delete-etag"'], recurringSeriesWithOverrideIcal(), $recurringResourceUrl),
+    caldavResponseWithHeaders(204, ['etag' => '"following-delete-after"'], '', $recurringResourceUrl)
+]);
+$provider = new CalDAVProvider($followingDeleteClient, 'https://calendar.example/dav/');
+assertCalDAVSame(
+    true,
+    $provider->deleteEvent(
+        'https://calendar.example/calendars/user/work/',
+        $recurringResourceUrl,
+        '"stale-following-delete-etag"',
+        '',
+        $followingIdentity
+    ),
+    'Deleting a CalDAV occurrence and all following occurrences must succeed.'
+);
+assertCalDAVSame('GET', $followingDeleteClient->requests[0]['method'], 'Following deletion must verify the current recurring resource first.');
+assertCalDAVSame('PUT', $followingDeleteClient->requests[1]['method'], 'Following deletion after the first occurrence must shorten the existing resource.');
+assertCalDAVSame('"following-delete-etag"', $followingDeleteClient->requests[1]['headers']['If-Match'] ?? '', 'Following deletion must use the fresh GET ETag.');
+assertCalDAVTrue(
+    str_contains($followingDeleteClient->requests[1]['body'], 'RRULE:FREQ=WEEKLY;UNTIL=20260824T095959Z')
+        && !str_contains($followingDeleteClient->requests[1]['body'], 'RECURRENCE-ID:20260824T100000Z'),
+    'Following deletion must remove the selected and future occurrences, including future detached overrides.'
+);
+
+$firstFollowingDeleteClient = new FakeCalDAVHttpClient([
+    caldavResponseWithHeaders(200, ['etag' => '"first-following-delete-etag"'], recurringSeriesIcal(), $recurringResourceUrl),
+    caldavResponse(204, '', $recurringResourceUrl)
+]);
+$provider = new CalDAVProvider($firstFollowingDeleteClient, 'https://calendar.example/dav/');
+$firstFollowingDeleteIdentity = $recurringEvents[0];
+$firstFollowingDeleteIdentity['writeScope'] = 'following';
+assertCalDAVSame(
+    true,
+    $provider->deleteEvent(
+        'https://calendar.example/calendars/user/work/',
+        $recurringResourceUrl,
+        '"old-first-following-delete-etag"',
+        '',
+        $firstFollowingDeleteIdentity
+    ),
+    'Deleting this and following from the first CalDAV occurrence must delete the complete series resource.'
+);
+assertCalDAVSame('DELETE', $firstFollowingDeleteClient->requests[1]['method'], 'Following deletion from the first occurrence must delete the whole calendar object.');
+assertCalDAVSame('"first-following-delete-etag"', $firstFollowingDeleteClient->requests[1]['headers']['If-Match'] ?? '', 'First-occurrence following deletion must use the current resource ETag.');
 
 // A transient 412 between GET and PUT must trigger one fresh read and retry.
 $seriesRetryClient = new FakeCalDAVHttpClient([

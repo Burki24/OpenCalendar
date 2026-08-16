@@ -1983,7 +1983,7 @@ class KalenderAnsicht extends IPSModuleStrict
                         throw new InvalidArgumentException($this->Translate('The event data is invalid.'));
                     }
                     $seriesEdit = json_decode(
-                        IPSKAL_GetRecurringFollowing($instanceId, $seriesId, $occurrenceId, $originalStart),
+                        IPSKAL_GetRecurringFollowing($instanceId, $seriesId, $occurrenceId, $originalStart, $resourceUrl),
                         true,
                         512,
                         JSON_THROW_ON_ERROR

@@ -208,7 +208,8 @@ final class MicrosoftCalendarProvider implements CalendarProviderInterface, Recu
         string $calendarReference,
         string $seriesId,
         string $occurrenceId,
-        string $originalStart
+        string $originalStart,
+        string $resourceReference = ''
     ): array {
         $seriesId = trim($seriesId);
         $seriesData = $this->recurringSeriesData($calendarReference, $seriesId);

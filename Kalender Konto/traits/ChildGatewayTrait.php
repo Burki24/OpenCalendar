@@ -263,7 +263,8 @@ trait KalenderKontoChildGatewayTrait
             $this->calendarReference($calendar),
             trim((string) ($request['SeriesID'] ?? '')),
             trim((string) ($request['OccurrenceID'] ?? '')),
-            trim((string) ($request['OriginalStart'] ?? ''))
+            trim((string) ($request['OriginalStart'] ?? '')),
+            trim((string) ($request['ResourceURL'] ?? ''))
         );
     }
 

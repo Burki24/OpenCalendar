@@ -707,6 +707,9 @@ class KalenderKonto extends IPSModuleStrict
                 if (!array_key_exists('deleteOccurrence', $capabilities)) {
                     $capabilities['deleteOccurrence'] = $canWrite;
                 }
+                if (!array_key_exists('updateFollowing', $capabilities)) {
+                    $capabilities['updateFollowing'] = $canWrite;
+                }
                 if (!array_key_exists('updateSeries', $capabilities)) {
                     $capabilities['updateSeries'] = $canWrite;
                 }

@@ -263,7 +263,8 @@ final class GoogleCalendarProvider implements CalendarEventLookupProviderInterfa
         string $calendarReference,
         string $seriesId,
         string $occurrenceId,
-        string $originalStart
+        string $originalStart,
+        string $resourceReference = ''
     ): array {
         $calendarId = $this->calendarId($calendarReference);
         $series = $this->getRecurringSeries($calendarReference, $seriesId);

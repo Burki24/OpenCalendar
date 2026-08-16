@@ -87,14 +87,17 @@ final class CalendarAccountGatewayRecurrenceProbe
                 string $calendarReference,
                 string $seriesId,
                 string $occurrenceId,
-                string $originalStart
+                string $originalStart,
+                string $resourceReference = ''
             ): array {
                 return [
                     'recurrenceType'     => 'occurrence',
                     'seriesId'           => $seriesId,
                     'occurrenceId'       => $occurrenceId,
                     'originalStart'      => $originalStart,
-                    'resourceUrl'        => $calendarReference . '/events/' . $occurrenceId,
+                    'resourceUrl'        => $resourceReference !== ''
+                        ? $resourceReference
+                        : $calendarReference . '/events/' . $occurrenceId,
                     'canUpdateFollowing' => true
                 ];
             }
@@ -161,19 +164,22 @@ $getRecurringFollowingForChild = new ReflectionMethod(
     CalendarAccountGatewayRecurrenceProbe::class,
     'getRecurringFollowingForChild'
 );
+$gatewayFollowingResourceUrl = 'https://calendar.example/calendars/user/work/series-id.ics';
 $gatewayFollowing = $getRecurringFollowingForChild->invoke($gatewayProbe, [
     'CalendarID'    => 'calendar-id',
     'SeriesID'      => 'series-id',
     'OccurrenceID'  => 'instance-id',
-    'OriginalStart' => '2026-08-12T09:00:00+02:00'
+    'OriginalStart' => '2026-08-12T09:00:00+02:00',
+    'ResourceURL'   => $gatewayFollowingResourceUrl
 ]);
 assertAccountStructure(
     is_array($gatewayFollowing)
         && ($gatewayFollowing['recurrenceType'] ?? '') === 'occurrence'
         && ($gatewayFollowing['seriesId'] ?? '') === 'series-id'
         && ($gatewayFollowing['occurrenceId'] ?? '') === 'instance-id'
+        && ($gatewayFollowing['resourceUrl'] ?? '') === $gatewayFollowingResourceUrl
         && ($gatewayFollowing['canUpdateFollowing'] ?? false) === true,
-    'A recurring target occurrence must pass through the account child gateway for this-and-following editing.'
+    'A recurring target occurrence and its known resource URL must pass through the account child gateway for this-and-following editing.'
 );
 $deleteEventForChild = new ReflectionMethod(CalendarAccountGatewayRecurrenceProbe::class, 'deleteEventForChild');
 $recurringEvent = [
@@ -293,16 +299,16 @@ foreach ([0, 1] as $calDavProvider) {
         ($normalizedCalDavCalendars[0]['capabilities']['createRecurrence'] ?? false) === true
             && ($normalizedCalDavCalendars[0]['capabilities']['updateOccurrence'] ?? false) === true
             && ($normalizedCalDavCalendars[0]['capabilities']['deleteOccurrence'] ?? false) === true
+            && ($normalizedCalDavCalendars[0]['capabilities']['updateFollowing'] ?? false) === true
             && ($normalizedCalDavCalendars[0]['capabilities']['updateSeries'] ?? false) === true
             && ($normalizedCalDavCalendars[0]['capabilities']['deleteSeries'] ?? false) === true
             && ($normalizedCalDavCalendars[1]['capabilities']['createRecurrence'] ?? true) === false
             && ($normalizedCalDavCalendars[1]['capabilities']['updateOccurrence'] ?? true) === false
             && ($normalizedCalDavCalendars[1]['capabilities']['deleteOccurrence'] ?? true) === false
+            && ($normalizedCalDavCalendars[1]['capabilities']['updateFollowing'] ?? true) === false
             && ($normalizedCalDavCalendars[1]['capabilities']['updateSeries'] ?? true) === false
-            && ($normalizedCalDavCalendars[1]['capabilities']['deleteSeries'] ?? true) === false
-            && !array_key_exists('updateFollowing', $normalizedCalDavCalendars[0]['capabilities'])
-            && !array_key_exists('updateFollowing', $normalizedCalDavCalendars[1]['capabilities']),
-        'Legacy Apple and CalDAV caches must derive supported recurring occurrence and series writes from cached write access.'
+            && ($normalizedCalDavCalendars[1]['capabilities']['deleteSeries'] ?? true) === false,
+        'Legacy Apple and CalDAV caches must derive supported recurring occurrence, following and series writes from cached write access.'
     );
 }
 

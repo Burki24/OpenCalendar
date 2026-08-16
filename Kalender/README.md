@@ -34,14 +34,14 @@ beliebig verschoben oder vom Benutzer umbenannt werden.
 - lokaler JSON-Cache und zyklische Synchronisation
 - Erstellen neuer Termine sowie neuer Google-, Microsoft-, Apple-iCloud- und CalDAV-Serientermine
 - Ändern und Löschen einzelner Termine sowie einzelner Google-, Microsoft-, Apple-iCloud- und CalDAV-Serienvorkommnisse
-- Bearbeiten einer vollständigen Google- oder Microsoft-Terminserie
-- Bearbeiten oder Löschen eines Google- oder Microsoft-Serienvorkommnisses **und aller folgenden Termine** durch sicheres Teilen bzw. Kürzen der Serie
-- Löschen einer vollständigen Google- oder Microsoft-Terminserie über ein synchronisiertes Serienvorkommnis
+- Bearbeiten einer vollständigen Google-, Microsoft-, Apple-iCloud- oder CalDAV-Terminserie
+- Bearbeiten oder Löschen eines Google-, Microsoft-, Apple-iCloud- oder CalDAV-Serienvorkommnisses **und aller folgenden Termine** durch sicheres Teilen bzw. Kürzen der Serie
+- Löschen einer vollständigen Google-, Microsoft-, Apple-iCloud- oder CalDAV-Terminserie über ein synchronisiertes Serienvorkommnis
 - ETag-basierter Schutz vor dem Überschreiben zwischenzeitlicher Änderungen
 - Statusvariablen für die gesamte geladene Terminanzahl, die Termine des
   aktuellen Tages und den Zeitpunkt der letzten Synchronisation
 
-Google- und Microsoft-Serien können als einzelnes Vorkommnis, als vollständige Serie oder **ab dem ausgewählten Vorkommnis für alle folgenden Termine** bearbeitet und gelöscht werden. Beim Bearbeiten teilt OpenCalendar die bestehende Serie am gewählten Termin in einen unveränderten vorderen und einen neu angelegten hinteren Serienteil. Beim Löschen wird der bestehende Parent direkt vor dem ausgewählten Vorkommnis beendet; beginnt die Auswahl beim ersten Vorkommnis, wird die komplette Serie gelöscht. Bei nummerierten Serien übernimmt der neue Serienteil nur die verbleibende Anzahl. Bestehende Ausnahmen ab dem Trennpunkt werden beim Teilen nicht in die neue Serie übernommen. Apple-iCloud- und CalDAV-Kalender unterstützen zusätzlich die Neuanlage von Serien sowie das **Bearbeiten und Löschen einzelner Vorkommnisse und vollständiger Serien**. Einzeländerungen werden als `RECURRENCE-ID`-Ausnahmen gespeichert, Einzellöschungen über `EXDATE` abgebildet. Beim Bearbeiten der vollständigen Serie wird nur der Serien-Master geändert; vorhandene Ausnahmen bleiben erhalten.
+Google-, Microsoft-, Apple-iCloud- und CalDAV-Serien können als einzelnes Vorkommnis, als vollständige Serie oder **ab dem ausgewählten Vorkommnis für alle folgenden Termine** bearbeitet und gelöscht werden. Beim Bearbeiten teilt OpenCalendar eine unterstützte Serie am gewählten Termin in einen unveränderten vorderen und einen neu angelegten hinteren Serienteil. Beim Löschen wird der bestehende Parent direkt vor dem ausgewählten Vorkommnis beendet; beginnt die Auswahl beim ersten Vorkommnis, wird die komplette Serie gelöscht. Bei nummerierten Serien übernimmt der neue Serienteil nur die verbleibende Anzahl. Bestehende Ausnahmen ab dem Trennpunkt werden beim Teilen nicht in die neue Serie übernommen. Bei CalDAV werden Einzeländerungen weiterhin als `RECURRENCE-ID`-Ausnahmen gespeichert und Einzellöschungen über `EXDATE` abgebildet. Beim Bearbeiten der vollständigen CalDAV-Serie wird nur der Serien-Master geändert; vorhandene Ausnahmen bleiben erhalten.
 
 ## Voraussetzungen
 
@@ -87,8 +87,8 @@ Ein Termin enthält unter anderem `id`, `uid`, `resourceUrl`, `etag`, `summary`,
 ```php
 bool IPSKAL_Synchronize(int $InstanzID);
 string IPSKAL_GetEvents(int $InstanzID);
-string IPSKAL_GetRecurringSeries(int $InstanzID, string $SeriesID);
-string IPSKAL_GetRecurringFollowing(int $InstanzID, string $SeriesID, string $OccurrenceID, string $OriginalStart);
+string IPSKAL_GetRecurringSeries(int $InstanzID, string $SeriesID, string $ResourceURL = '');
+string IPSKAL_GetRecurringFollowing(int $InstanzID, string $SeriesID, string $OccurrenceID, string $OriginalStart, string $ResourceURL = '');
 string IPSKAL_BeginEventsTransfer(int $InstanzID, int $StartTimestamp, int $EndTimestamp);
 string IPSKAL_ReadEventsTransferPage(int $InstanzID, string $Token, int $Page);
 bool IPSKAL_FinishEventsTransfer(int $InstanzID, string $Token);
@@ -160,19 +160,18 @@ Unterstützt werden für Google, Microsoft und CalDAV/Apple iCloud `DAILY`, `WEE
 `YEARLY`, ein Intervall, bei wöchentlichen Serien optionale Wochentage sowie die
 Endarten `never`, `count` und `until`. Bei Microsoft entspricht eine monatliche
 Serie dem Kalendertag des Starttermins und eine jährliche Serie zusätzlich dessen
-Monat. Bei Google und Microsoft können einzelne Vorkommnisse, die vollständige
-Serie sowie **dieses und alle folgenden Vorkommnisse** bearbeitet und gelöscht
-werden. Bei Apple iCloud und CalDAV können einzelne Serienvorkommnisse und die
-vollständige Serie ebenfalls bearbeitet und gelöscht werden; „dieses und folgende“
-bleibt dort noch geschützt. Vor dem Bearbeiten einer vollständigen Serie lädt
-`IPSKAL_GetRecurringSeries()` den
-verifizierten Parent-Termin. Für „dieses und folgende“ liefert
-`IPSKAL_GetRecurringFollowing()` zusätzlich das verifizierte Zielvorkommnis und
-passt bei `COUNT`-Serien die verbleibende Anzahl an. Beim Speichern wird die
-ursprüngliche Serie unmittelbar vor dem Zieltermin beendet und ab dem Ziel eine
-neue Serie angelegt. Bestehende Ausnahmen ab dem Trennpunkt gehören dadurch nicht
-zum neuen Serienteil. Das Löschen einzelner Vorkommnisse oder der vollständigen
-Google-Serie wird ebenfalls unterstützt.
+Monat. Bei Google, Microsoft, Apple iCloud und CalDAV können einzelne Vorkommnisse,
+die vollständige Serie sowie **dieses und alle folgenden Vorkommnisse** bearbeitet
+und gelöscht werden, sofern OpenCalendar die Wiederholungsregel verlustfrei teilen
+kann. Vor dem Bearbeiten einer vollständigen Serie lädt
+`IPSKAL_GetRecurringSeries()` den verifizierten Parent-Termin. Für „dieses und
+folgende“ liefert `IPSKAL_GetRecurringFollowing()` zusätzlich das verifizierte
+Zielvorkommnis und passt bei `COUNT`-Serien die verbleibende Anzahl an. Für CalDAV
+kann die bereits bekannte `ResourceURL` an beide Funktionen übergeben werden; damit
+wird das Kalenderobjekt direkt geladen. Beim Speichern wird die ursprüngliche Serie
+unmittelbar vor dem Zieltermin beendet und ab dem Ziel eine neue Serie angelegt.
+Bestehende Ausnahmen ab dem Trennpunkt gehören dadurch nicht zum neuen Serienteil.
+Beim Löschen bleibt nur der vordere Serienteil bestehen.
 
 ### Termin ändern
 
@@ -213,5 +212,5 @@ Konfiguration unvollständig | Instanz im Kalender Konfigurator löschen und aus
 Synchronisation fehlgeschlagen | Zuerst im verbundenen Kalender Konto **Verbindung testen**, anschließend Konto und Kalender erneut synchronisieren
 Keine Termine sichtbar | Zeitraum für vergangene und zukünftige Termine prüfen und kontrollieren, ob der Online-Kalender im gewählten Zeitraum Termine enthält
 Kalender ist schreibgeschützt | Schreibrechte beim Anbieter prüfen; ICS/Webcal-Abonnements sind immer schreibgeschützt
-Ändern oder Löschen wird bei einem Serientermin verweigert | Google und Microsoft unterstützen Vorkommnis, dieses und folgende sowie vollständige Serie; Apple/CalDAV unterstützt Neuanlage sowie Bearbeiten/Löschen einzelner Vorkommnisse und vollständiger Serien; dieses und folgende bleibt dort noch geschützt
+Ändern oder Löschen wird bei einem Serientermin verweigert | Google, Microsoft und unterstützte Apple/CalDAV-RRULEs erlauben Vorkommnis, dieses und folgende sowie vollständige Serie; komplexe Wiederholungsregeln werden nicht verlustbehaftet geteilt
 Schreibkonflikt | Kalender erneut synchronisieren; der ETag-Schutz verhindert das Überschreiben einer zwischenzeitlich geänderten Serverversion

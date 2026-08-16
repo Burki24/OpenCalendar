@@ -278,15 +278,18 @@ assertVisualization(
         && str_contains($script, 'Boolean(event.canUpdateSeries)')
         && str_contains($script, 'writeScope: scope')
         && str_contains($moduleSource, "case 'PrepareSeriesEdit':")
-        && str_contains($moduleSource, 'IPSKAL_GetRecurringFollowing($instanceId, $seriesId, $occurrenceId, $originalStart)')
+        && str_contains($moduleSource, 'IPSKAL_GetRecurringFollowing($instanceId, $seriesId, $occurrenceId, $originalStart, $resourceUrl)')
         && str_contains($moduleSource, 'IPSKAL_GetRecurringSeries($instanceId, $seriesId, $resourceUrl)')
         && str_contains($calendarModuleSource, "public function GetRecurringSeries(string \$SeriesID, string \$ResourceURL = ''): string")
+        && str_contains($calendarModuleSource, 'public function GetRecurringFollowing(')
+        && str_contains($calendarModuleSource, "string \$ResourceURL = ''")
         && str_contains($calendarModuleSource, "'ResourceURL' => trim(\$ResourceURL)")
+        && str_contains($calendarModuleSource, "'ResourceURL'   => trim(\$ResourceURL)")
         && str_contains($moduleSource, '$seriesEdit[\'canWrite\'] = true;')
         && str_contains($moduleSource, '$seriesEdit[\'writeScope\'] = $writeScope;')
         && str_contains($moduleSource, "'Changes will apply to this and all following occurrences.'")
         && str_contains($moduleSource, "'Changes will apply to the entire recurring series.'"),
-    'Recurring Google and Microsoft events must offer supported write scopes with verified provider data.'
+    'Recurring Google, Microsoft and CalDAV events must offer supported write scopes with verified provider data.'
 );
 $seriesWriteScopePosition = strpos(
     $calendarModuleSource,
@@ -320,7 +323,7 @@ assertVisualization(
         && str_contains($script, 'Boolean(event.canDeleteSeries)')
         && str_contains($script, 'const followingAllowed = eventCanDeleteFollowing(event);')
         && str_contains($script, "return ['following', 'series'].includes(selected?.value) ? selected.value : 'occurrence';"),
-    'Recurring Google and Microsoft events must offer deleting the selected occurrence and all following occurrences when splitting is supported.'
+    'Recurring Google, Microsoft and CalDAV events must offer deleting the selected occurrence and all following occurrences when splitting is supported.'
 );
 assertVisualization(
     str_contains($moduleSource, 'private function getFullUpdateMessage(?array $state = null, ?array $toast = null): string')

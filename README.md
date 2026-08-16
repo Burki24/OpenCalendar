@@ -143,20 +143,25 @@ Zusätzlich können einzelne Vorkommnisse bestehender Apple-iCloud- und
 CalDAV-Serien bearbeitet und gelöscht werden. Beim Bearbeiten schreibt
 OpenCalendar eine `RECURRENCE-ID`-Ausnahme in das bestehende Kalenderobjekt; beim
 Löschen wird das ausgewählte Vorkommnis über `EXDATE` ausgeschlossen. Auch die
-**vollständige Serie** kann bearbeitet oder gelöscht werden. OpenCalendar lädt dazu
-den Serien-Master anhand seiner UID direkt aus dem CalDAV-Kalenderobjekt; einfache
-RRULEs können im gemeinsamen Serieneditor geändert werden. Komplexere Regeln bleiben
-erhalten und werden nicht verlustbehaftet vereinfacht. **Diesen und alle folgenden
-Termine** folgt im nächsten Ausbauschritt.
+**vollständige Serie** kann bearbeitet oder gelöscht werden. OpenCalendar lädt den
+Serien-Master dabei direkt über die bereits bekannte CalDAV-Ressource. Einfache
+RRULEs können im gemeinsamen Serieneditor geändert werden; komplexere Regeln bleiben
+erhalten und werden nicht verlustbehaftet vereinfacht.
+
+Auch **Diesen und alle folgenden Termine** wird für unterstützte RRULEs verarbeitet.
+Beim Bearbeiten legt OpenCalendar ab dem gewählten Vorkommnis zuerst eine neue
+CalDAV-Serie an und kürzt anschließend die ursprüngliche Serie unmittelbar davor.
+Bei nummerierten Serien übernimmt der neue Teil nur die verbleibende Anzahl;
+vorhandene Ausnahmen ab dem Trennpunkt werden bewusst zurückgesetzt. Beim Löschen
+wird nur die ursprüngliche Serie vor dem gewählten Vorkommnis beendet. Beginnt die
+Auswahl mit dem ersten Vorkommnis, wird die bestehende Serie direkt geändert bzw.
+gelöscht, ohne einen zweiten Serienteil anzulegen.
 
 ## Bekannte Einschränkungen
 
 - **Diesen und alle folgenden Termine** wird bei Microsoft-Onlinebesprechungen und
   Serien mit Anhängen nicht automatisch geteilt, weil diese Daten beim Erzeugen des
   neuen Serienteils nicht verlustfrei übernommen werden können.
-- Apple-iCloud- und generische CalDAV-Kalender unterstützen die Neuanlage von Serien
-  sowie das Bearbeiten und Löschen einzelner Serienvorkommnisse und vollständiger
-  Serien. **Diesen und alle folgenden Termine** ist dort noch nicht freigegeben.
 - ICS-/Webcal-Abonnements und lokal importierte ICS-Dateien sind grundsätzlich schreibgeschützt.
 - Die IPSView-Ausgabe benötigt im HTML-Box-Steuerelement den Renderer
   **Browser des Clients** oder **Automatisch**, da die Bedienung JavaScript
