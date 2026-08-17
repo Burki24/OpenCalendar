@@ -732,15 +732,15 @@ class Kalender extends IPSModuleStrict
             $updated = $changes === []
                 ? []
                 : $this->sendRequest(
-                'UpdateEvent',
-                [
-                    'UID'         => trim((string) ($event['uid'] ?? '')),
-                    'ResourceURL' => trim((string) ($event['resourceUrl'] ?? '')),
-                    'ETag'        => trim((string) ($event['etag'] ?? '')),
-                    'Event'       => $changes,
-                    'Recurrence'  => $recurrence
-                ]
-            );
+                    'UpdateEvent',
+                    [
+                        'UID'         => trim((string) ($event['uid'] ?? '')),
+                        'ResourceURL' => trim((string) ($event['resourceUrl'] ?? '')),
+                        'ETag'        => trim((string) ($event['etag'] ?? '')),
+                        'Event'       => $changes,
+                        'Recurrence'  => $recurrence
+                    ]
+                );
 
             if ($birthdayDisabled) {
                 $this->removeBirthdayMetadata($event);

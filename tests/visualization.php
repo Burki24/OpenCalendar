@@ -151,10 +151,10 @@ assertVisualization(
         && str_contains($script, 'function birthdayEditorEditable()')
         && str_contains($script, 'function birthdayRecurrence()')
         && str_contains($script, 'function birthdayEditorChange()')
-        && str_contains($script, "eventData.birthDate = birthdayChange.birthDate;")
-        && str_contains($script, "eventData.recurrence = birthdayRecurrence();")
+        && str_contains($script, 'eventData.birthDate = birthdayChange.birthDate;')
+        && str_contains($script, 'eventData.recurrence = birthdayRecurrence();')
         && str_contains($script, 'function eventDisplaySummary(event)')
-        && str_contains($script, "eventDisplaySummary(event) || t('Untitled event')"),
+        && str_contains($script, 'eventDisplaySummary(event) || t(\'Untitled event\')'),
     'The shared event dialog must support provider-neutral birthdays with a birth date and dynamic age display.'
 );
 

@@ -54,9 +54,9 @@ try {
     $presentation = new ReflectionMethod(Kalender::class, 'applyBirthdayPresentation');
     $presentation->setAccessible(true);
     $presented = $presentation->invoke($calendar, [
-        'uid' => 'birthday-1',
-        'summary' => 'Max Mustermann',
-        'start' => '2026-07-20',
+        'uid'           => 'birthday-1',
+        'summary'       => 'Max Mustermann',
+        'start'         => '2026-07-20',
         'originalStart' => '2026-07-20'
     ], ['keys' => ['uid:birthday-1'], 'birthDate' => '1993-07-20', 'summary' => 'Max Mustermann']);
     assertBirthday(($presented['age'] ?? null) === 33, 'Birthday occurrence age must use the occurrence year.');
