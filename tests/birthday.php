@@ -82,6 +82,54 @@ try {
         'Annual-event list must expose the stored date, next date, year count, and days until.'
     );
 
+    $setCalendar = new Kalender(9003);
+    $registerAttribute->invoke($setCalendar, 'AnniversaryMetadata', '[]');
+    $registerAttribute->invoke($setCalendar, 'BirthdayMetadata', '[]');
+    assertAnniversary(
+        $setCalendar->SetAnniversary(
+            json_encode([
+                'seriesId'       => 'set-series-1',
+                'recurrenceType' => 'master',
+                'recurring'      => true,
+                'summary'        => 'Hochzeitstag'
+            ], JSON_THROW_ON_ERROR),
+            'wedding',
+            '2010-06-19'
+        ),
+        'SetAnniversary must accept every supported annual-event type for an existing series.'
+    );
+    $setList = json_decode($setCalendar->GetAnniversaryList(0, 'wedding'), true, 512, JSON_THROW_ON_ERROR);
+    assertAnniversary(
+        count($setList) === 1
+            && ($setList[0]['anniversaryDate'] ?? '') === '2010-06-19'
+            && ($setList[0]['name'] ?? '') === 'Hochzeitstag',
+        'SetAnniversary must persist type, original date, and summary.'
+    );
+    $setCalendar->SetAnniversary(
+        json_encode([
+            'seriesId'       => 'set-series-1',
+            'recurrenceType' => 'master',
+            'recurring'      => true,
+            'summary'        => 'Geburtstag'
+        ], JSON_THROW_ON_ERROR),
+        'birthday',
+        '1988-06-19'
+    );
+    $setBirthdays = json_decode($setCalendar->GetBirthdayList(), true, 512, JSON_THROW_ON_ERROR);
+    assertAnniversary(
+        count($setBirthdays) === 1 && ($setBirthdays[0]['birthDate'] ?? '') === '1988-06-19',
+        'SetAnniversary must allow changing the annual-event type while keeping birthday compatibility output.'
+    );
+    try {
+        $setCalendar->SetAnniversary(
+            json_encode(['uid' => 'single-event'], JSON_THROW_ON_ERROR),
+            'birthday',
+            '1988-06-19'
+        );
+        throw new RuntimeException('SetAnniversary must reject non-recurring events.');
+    } catch (InvalidArgumentException) {
+    }
+
     $birthdays = json_decode($calendar->GetBirthdayList(), true, 512, JSON_THROW_ON_ERROR);
     assertAnniversary(count($birthdays) === 1, 'Birthday compatibility API must keep filtering to birthdays.');
     assertAnniversary(

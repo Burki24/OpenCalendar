@@ -426,6 +426,48 @@ class Kalender extends IPSModuleStrict
     }
 
     /**
+     * Marks an existing recurring series as an annual event managed locally by OpenCalendar.
+     *
+     * The provider event itself is not modified. The event identity should come from
+     * GetEvents() or, preferably for a complete series, GetRecurringSeries().
+     * Supported types are birthday, anniversary, wedding, and death.
+     *
+     * @param string $EventJSON JSON-encoded recurring event identity.
+     * @param string $Type Annual-event type: birthday, anniversary, wedding, or death.
+     * @param string $Date Original annual-event date in YYYY-MM-DD format.
+     * @return bool True when the local annual-event metadata was stored.
+     */
+    public function SetAnniversary(string $EventJSON, string $Type, string $Date): bool
+    {
+        $event = $this->decodeObject($EventJSON, 'event');
+        $type = $this->normalizeAnniversaryType($Type, true);
+        $date = $this->normalizeAnniversaryDate($Date);
+        if ($type === '') {
+            throw new InvalidArgumentException('The annual-event type is missing.');
+        }
+        if ($date === '' || $date > date('Y-m-d')) {
+            throw new InvalidArgumentException('The annual-event date is invalid.');
+        }
+        $recurrence = CalendarEventRecurrence::fromEvent($event);
+        if (!(bool) ($recurrence['recurring'] ?? false)
+            && trim((string) ($event['seriesId'] ?? '')) === '') {
+            throw new InvalidArgumentException('Annual-event metadata requires a recurring series.');
+        }
+
+        $this->upsertAnniversaryMetadata(
+            $event,
+            $type,
+            $date,
+            trim((string) ($event['summary'] ?? ''))
+        );
+        $events = $this->enrichAnniversaryEvents($this->readEvents());
+        $this->WritePersistentJsonCache('CachedEvents', $events);
+        $this->updateEventCounters($events);
+
+        return true;
+    }
+
+    /**
      * Returns the current provider version of one event before it is edited.
      *
      * This read intentionally bypasses the local event cache so the editor receives
@@ -1613,6 +1655,7 @@ class Kalender extends IPSModuleStrict
         $event['anniversaryDate'] = $date;
         $event['years'] = $years;
         $event['displaySummary'] = $summary !== '' ? sprintf('%s (%dJ)', $summary, $years) : sprintf('(%dJ)', $years);
+        unset($event['birthday'], $event['birthDate'], $event['age']);
         if ($metadata['type'] === self::ANNIVERSARY_TYPE_BIRTHDAY) {
             $event['birthday'] = true;
             $event['birthDate'] = $date;

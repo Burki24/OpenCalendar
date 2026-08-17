@@ -89,6 +89,7 @@ bool IPSKAL_Synchronize(int $InstanzID);
 string IPSKAL_GetEvents(int $InstanzID);
 string IPSKAL_GetAnniversaryList(int $InstanzID, int $Days = 0, string $Type = '');
 string IPSKAL_GetBirthdayList(int $InstanzID, int $Days = 0);
+bool IPSKAL_SetAnniversary(int $InstanzID, string $EventJSON, string $Type, string $Date);
 string IPSKAL_GetRecurringSeries(int $InstanzID, string $SeriesID, string $ResourceURL = '');
 string IPSKAL_GetRecurringFollowing(int $InstanzID, string $SeriesID, string $OccurrenceID, string $OriginalStart, string $ResourceURL = '');
 string IPSKAL_BeginEventsTransfer(int $InstanzID, int $StartTimestamp, int $EndTimestamp);
@@ -108,6 +109,13 @@ Transfer anschließend auch im Fehlerfall beenden. `StartTimestamp` ist inklusiv
 `EndTimestamp` exklusiv.
 
 `IPSKAL_GetAnniversaryList()` liefert die in dieser Kalenderinstanz von OpenCalendar verwalteten Jahresereignisse nach dem nächsten Vorkommnis sortiert. `Days = 0` liefert alle Einträge; jeder positive Wert begrenzt die Ausgabe auf die frei wählbare Anzahl der nächsten Kalendertage. Der optionale Filter `Type` akzeptiert `birthday`, `anniversary`, `wedding` oder `death`; ein leerer Wert liefert alle Typen. Die Datensätze enthalten `name`, `anniversaryType`, `anniversaryDate`, `nextDate`, `years`, `displayName` und `daysUntil`. Für Geburtstage werden zusätzlich `birthDate`, `nextBirthday` und `age` geliefert. `IPSKAL_GetBirthdayList()` bleibt als kompatibler Spezialfall erhalten und entspricht dem Filter `birthday`.
+
+`IPSKAL_SetAnniversary()` markiert eine bereits vorhandene wiederkehrende Serie lokal als Jahresereignis. `Type` akzeptiert ebenfalls `birthday`, `anniversary`, `wedding` oder `death`; `Date` enthält das ursprüngliche Datum im Format `YYYY-MM-DD`. Als `EventJSON` kann ein Termin aus `IPSKAL_GetEvents()` verwendet werden. Für eine vollständige Serie ist der von `IPSKAL_GetRecurringSeries()` gelieferte Parent-Termin vorzuziehen. Die Funktion verändert weder Titel noch Wiederholungsregel beim Kalenderanbieter, sondern speichert ausschließlich die OpenCalendar-Metadaten.
+
+```php
+$series = IPSKAL_GetRecurringSeries(12345, 'provider-series-id');
+IPSKAL_SetAnniversary(12345, $series, 'birthday', '1993-07-20');
+```
 
 `IPSKAL_GetCalendarStatus()` liefert neben Synchronisations- und Zählerinformationen
 auch `calendarColor`, `canWrite`, `timezone`, `canCreateRecurrence`, `canUpdateFollowing`,
