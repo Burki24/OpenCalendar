@@ -1,9 +1,7 @@
 {
     "translations": {
-        "en": {
-            "Kalender": "Calendar"
-        },
         "de": {
+            "Calendar": "Kalender",
             "Active": "Aktiv",
             "Synchronization schedule": "Aktualisierungsplan",
             "Custom interval": "Benutzerdefiniertes Intervall",

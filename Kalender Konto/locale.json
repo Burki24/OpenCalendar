@@ -1,9 +1,7 @@
 {
     "translations": {
-        "en": {
-            "Kalender Konto": "Calendar Account"
-        },
         "de": {
+            "Calendar Account": "Kalender Konto",
             "Active": "Aktiv",
             "Provider": "Anbieter",
             "Google Calendar": "Google Kalender",

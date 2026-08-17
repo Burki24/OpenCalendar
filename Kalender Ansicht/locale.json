@@ -1,9 +1,7 @@
 {
     "translations": {
-        "en": {
-            "Kalender Ansicht": "Calendar View"
-        },
         "de": {
+            "Calendar View": "Kalender Ansicht",
             "Calendars": "Kalender",
             "Calendar instance": "Kalenderinstanz",
             "Enabled": "Aktiviert",
@@ -185,7 +183,9 @@
             "This calendar supports up to %d reminders.": "Dieser Kalender unterstützt bis zu %d Erinnerungen.",
             "Reminder times must be unique.": "Erinnerungszeitpunkte müssen eindeutig sein.",
             "The selected calendar does not support these reminder settings.": "Der ausgewählte Kalender unterstützt diese Erinnerungseinstellungen nicht.",
-            "Events with complex reminder settings cannot be moved safely.": "Termine mit komplexen Erinnerungseinstellungen können nicht sicher verschoben werden."
+            "Events with complex reminder settings cannot be moved safely.": "Termine mit komplexen Erinnerungseinstellungen können nicht sicher verschoben werden.",
+            "Configure optional IPSView HTML output.": "Optionale IPSView-HTML-Ausgabe konfigurieren.",
+            "Configure the shared IPSView style used by the standalone HTML page.": "Gemeinsamen IPSView-Stil für die eigenständige HTML-Seite konfigurieren."
         }
     }
 }
