@@ -81,20 +81,23 @@ try {
 $moduleSource = (string) file_get_contents(__DIR__ . '/../Kalender Ansicht/module.php');
 $calendarModuleSource = (string) file_get_contents(__DIR__ . '/../Kalender/module.php');
 assertCalendarViewApi(
-    str_contains($calendarModuleSource, "RegisterAttributeString('BirthdayMetadata', '[]')")
+    str_contains($calendarModuleSource, "RegisterAttributeString('AnniversaryMetadata', '[]')")
+        && str_contains($calendarModuleSource, 'public function GetAnniversaryList(int $Days = 0, string $Type = \'\'): string')
         && str_contains($calendarModuleSource, 'public function GetBirthdayList(int $Days = 0): string')
-        && str_contains($calendarModuleSource, "'displaySummary'")
+        && str_contains($calendarModuleSource, "'anniversaryType'")
+        && str_contains($calendarModuleSource, "'anniversaryDate'")
         && str_contains($calendarModuleSource, "sprintf('%s (%dJ)'")
         && str_contains($calendarModuleSource, "'frequency' => 'YEARLY'"),
-    'Calendar instances must persist provider-neutral birthday metadata and expose dynamically calculated birthday data.'
+    'Calendar instances must persist provider-neutral annual-event metadata, filter it by type, and preserve the birthday compatibility API.'
 );
 assertCalendarViewApi(
-    str_contains($moduleSource, 'public function GetBirthdayList(int $CalendarInstanceID = 0, int $Days = 0): string')
-        && str_contains($moduleSource, "IPSKAL_GetBirthdayList(\$calendar['instanceId'], \$Days)")
-        && str_contains($moduleSource, "\$birthday['calendarInstanceId'] = \$calendar['instanceId'];")
-        && str_contains($moduleSource, "\$birthday['calendarName'] = \$calendar['name'];")
-        && str_contains($moduleSource, "if (\$CalendarInstanceID !== 0 && \$calendar['instanceId'] !== \$CalendarInstanceID)"),
-    'Calendar View must aggregate birthday lists with zero meaning all selected calendars and an arbitrary non-negative day window.'
+    str_contains($moduleSource, 'public function GetAnniversaryList(int $CalendarInstanceID = 0, int $Days = 0, string $Type = \'\'): string')
+        && str_contains($moduleSource, "IPSKAL_GetAnniversaryList(\$calendar['instanceId'], \$Days, \$type)")
+        && str_contains($moduleSource, "\$entry['calendarInstanceId'] = \$calendar['instanceId'];")
+        && str_contains($moduleSource, "\$entry['calendarName'] = \$calendar['name'];")
+        && str_contains($moduleSource, "if (\$CalendarInstanceID !== 0 && \$calendar['instanceId'] !== \$CalendarInstanceID)")
+        && str_contains($moduleSource, "return \$this->GetAnniversaryList(\$CalendarInstanceID, \$Days, 'birthday');"),
+    'Calendar View must aggregate annual-event lists with calendar, day-window, and type filters while retaining GetBirthdayList().'
 );
 
 assertCalendarViewApi(

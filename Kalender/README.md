@@ -80,13 +80,14 @@ Kalenderansicht übertragen große Terminmengen automatisch in begrenzten Seiten
 Dadurch wird weder bei der Synchronisation noch beim Aufbau der Ansicht eine
 einzelne JSON-Antwort mit sämtlichen Terminen benötigt.
 
-Ein Termin enthält unter anderem `id`, `uid`, `resourceUrl`, `etag`, `summary`, `description`, `location`, `start`, `end`, `startTimestamp`, `endTimestamp`, `allDay`, `status`, `recurrenceRule` und `recurrenceId`. Wurde der Titel durch ein ausgewähltes iCalendar-Übersetzungsprofil angepasst, enthält `originalSummary` zusätzlich den unveränderten Originaltitel. Als Geburtstag markierte Termine erhalten zusätzlich `birthday`, `birthDate`, `age` und `displaySummary`. Das Geburtsdatum wird lokal in OpenCalendar gespeichert; der eigentliche Titel beim Kalenderanbieter bleibt unverändert.
+Ein Termin enthält unter anderem `id`, `uid`, `resourceUrl`, `etag`, `summary`, `description`, `location`, `start`, `end`, `startTimestamp`, `endTimestamp`, `allDay`, `status`, `recurrenceRule` und `recurrenceId`. Wurde der Titel durch ein ausgewähltes iCalendar-Übersetzungsprofil angepasst, enthält `originalSummary` zusätzlich den unveränderten Originaltitel. Als Jahresereignis markierte Termine erhalten zusätzlich `anniversaryType`, `anniversaryDate`, `years` und `displaySummary`. Unterstützt werden `birthday`, `anniversary`, `wedding` und `death`. Für Geburtstage bleiben zusätzlich die kompatiblen Felder `birthday`, `birthDate` und `age` erhalten. Das Ausgangsdatum wird lokal in OpenCalendar gespeichert; der eigentliche Titel beim Kalenderanbieter bleibt unverändert.
 
 ## PHP-Befehlsreferenz
 
 ```php
 bool IPSKAL_Synchronize(int $InstanzID);
 string IPSKAL_GetEvents(int $InstanzID);
+string IPSKAL_GetAnniversaryList(int $InstanzID, int $Days = 0, string $Type = '');
 string IPSKAL_GetBirthdayList(int $InstanzID, int $Days = 0);
 string IPSKAL_GetRecurringSeries(int $InstanzID, string $SeriesID, string $ResourceURL = '');
 string IPSKAL_GetRecurringFollowing(int $InstanzID, string $SeriesID, string $OccurrenceID, string $OriginalStart, string $ResourceURL = '');
@@ -106,7 +107,7 @@ Transfer beginnen, die Seiten von `0` bis `PageCount - 1` abrufen und den
 Transfer anschließend auch im Fehlerfall beenden. `StartTimestamp` ist inklusiv,
 `EndTimestamp` exklusiv.
 
-`IPSKAL_GetBirthdayList()` liefert die in dieser Kalenderinstanz von OpenCalendar verwalteten Geburtstage nach dem nächsten Geburtstag sortiert. `Days = 0` liefert alle Einträge; jeder positive Wert begrenzt die Ausgabe auf die frei wählbare Anzahl der nächsten Kalendertage. Die Datensätze enthalten `name`, `birthDate`, `nextBirthday`, `age`, `displayName` und `daysUntil`.
+`IPSKAL_GetAnniversaryList()` liefert die in dieser Kalenderinstanz von OpenCalendar verwalteten Jahresereignisse nach dem nächsten Vorkommnis sortiert. `Days = 0` liefert alle Einträge; jeder positive Wert begrenzt die Ausgabe auf die frei wählbare Anzahl der nächsten Kalendertage. Der optionale Filter `Type` akzeptiert `birthday`, `anniversary`, `wedding` oder `death`; ein leerer Wert liefert alle Typen. Die Datensätze enthalten `name`, `anniversaryType`, `anniversaryDate`, `nextDate`, `years`, `displayName` und `daysUntil`. Für Geburtstage werden zusätzlich `birthDate`, `nextBirthday` und `age` geliefert. `IPSKAL_GetBirthdayList()` bleibt als kompatibler Spezialfall erhalten und entspricht dem Filter `birthday`.
 
 `IPSKAL_GetCalendarStatus()` liefert neben Synchronisations- und Zählerinformationen
 auch `calendarColor`, `canWrite`, `timezone`, `canCreateRecurrence`, `canUpdateFollowing`,

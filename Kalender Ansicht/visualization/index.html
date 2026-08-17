@@ -104,11 +104,20 @@
                 <input id="event-summary" maxlength="250" required>
             </div>
             <label class="checkbox-row" id="event-all-day-row"><input type="checkbox" id="event-all-day"> <span id="all-day-label">All day</span></label>
-            <div class="form-row two" id="event-birthday-row">
-                <label class="checkbox-row"><input type="checkbox" id="event-birthday"> <span data-i18n="Birthday">Birthday</span></label>
-                <div class="form-row hidden" id="event-birth-date-row">
-                    <label for="event-birth-date" data-i18n="Birth date">Birth date</label>
-                    <input id="event-birth-date" type="date">
+            <div class="form-row two" id="event-anniversary-row">
+                <div class="form-row">
+                    <label for="event-anniversary-type" data-i18n="Annual event">Annual event</label>
+                    <select id="event-anniversary-type">
+                        <option value="" data-i18n="No annual event">No annual event</option>
+                        <option value="birthday" data-i18n="Birthday">Birthday</option>
+                        <option value="anniversary" data-i18n="Anniversary">Anniversary</option>
+                        <option value="wedding" data-i18n="Wedding anniversary">Wedding anniversary</option>
+                        <option value="death" data-i18n="Death anniversary">Death anniversary</option>
+                    </select>
+                </div>
+                <div class="form-row hidden" id="event-anniversary-date-row">
+                    <label for="event-anniversary-date" id="event-anniversary-date-label" data-i18n="Anniversary date">Anniversary date</label>
+                    <input id="event-anniversary-date" type="date">
                 </div>
             </div>
             <div class="form-row two" id="event-date-row">

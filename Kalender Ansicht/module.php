@@ -543,54 +543,60 @@ class KalenderAnsicht extends IPSModuleStrict
     }
 
     /**
-     * Returns birthdays from the calendars selected in this Calendar View.
+     * Returns annual events from the calendars selected in this Calendar View.
      *
      * Calendar instance ID zero includes every selected calendar. A positive day
-     * window only returns birthdays whose next occurrence is within that many days;
-     * zero returns every birthday stored by OpenCalendar.
+     * window only returns entries whose next occurrence is within that many days;
+     * zero returns every annual event stored by OpenCalendar. The optional type
+     * filter accepts birthday, anniversary, wedding, or death.
      *
      * @param int $CalendarInstanceID Optional selected calendar instance ID. Zero includes all selected calendars.
-     * @param int $Days Optional look-ahead window in days. Zero returns all birthdays.
-     * @return string JSON-encoded birthday list sorted by the next birthday.
+     * @param int $Days Optional look-ahead window in days. Zero returns all annual events.
+     * @param string $Type Optional annual-event type. Empty returns every supported type.
+     * @return string JSON-encoded annual-event list sorted by the next occurrence.
      */
-    public function GetBirthdayList(int $CalendarInstanceID = 0, int $Days = 0): string
+    public function GetAnniversaryList(int $CalendarInstanceID = 0, int $Days = 0, string $Type = ''): string
     {
         if ($Days < 0) {
-            throw new InvalidArgumentException('Birthday look-ahead days must not be negative.');
+            throw new InvalidArgumentException('Annual-event look-ahead days must not be negative.');
+        }
+        $type = strtolower(trim($Type));
+        if ($type !== '' && !in_array($type, ['birthday', 'anniversary', 'wedding', 'death'], true)) {
+            throw new InvalidArgumentException('The annual-event type is invalid.');
         }
 
-        $birthdays = [];
+        $entries = [];
         foreach ($this->loadSelectedCalendars() as $calendar) {
             if ($CalendarInstanceID !== 0 && $calendar['instanceId'] !== $CalendarInstanceID) {
                 continue;
             }
             try {
-                $calendarBirthdays = json_decode(
-                    IPSKAL_GetBirthdayList($calendar['instanceId'], $Days),
+                $calendarEntries = json_decode(
+                    IPSKAL_GetAnniversaryList($calendar['instanceId'], $Days, $type),
                     true,
                     512,
                     JSON_THROW_ON_ERROR
                 );
             } catch (Throwable $exception) {
-                $this->SendDebug('BirthdayList', $exception->getMessage(), 0);
+                $this->SendDebug('AnniversaryList', $exception->getMessage(), 0);
                 continue;
             }
-            if (!is_array($calendarBirthdays) || !array_is_list($calendarBirthdays)) {
+            if (!is_array($calendarEntries) || !array_is_list($calendarEntries)) {
                 continue;
             }
-            foreach ($calendarBirthdays as $birthday) {
-                if (!is_array($birthday)) {
+            foreach ($calendarEntries as $entry) {
+                if (!is_array($entry)) {
                     continue;
                 }
-                $birthday['calendarInstanceId'] = $calendar['instanceId'];
-                $birthday['calendarName'] = $calendar['name'];
-                $birthday['calendarColor'] = $calendar['color'];
-                $birthdays[] = $birthday;
+                $entry['calendarInstanceId'] = $calendar['instanceId'];
+                $entry['calendarName'] = $calendar['name'];
+                $entry['calendarColor'] = $calendar['color'];
+                $entries[] = $entry;
             }
         }
 
         usort(
-            $birthdays,
+            $entries,
             static fn (array $left, array $right): int => ((int) ($left['daysUntil'] ?? PHP_INT_MAX)
                 <=> (int) ($right['daysUntil'] ?? PHP_INT_MAX))
                 ?: strcasecmp((string) ($left['name'] ?? ''), (string) ($right['name'] ?? ''))
@@ -598,12 +604,26 @@ class KalenderAnsicht extends IPSModuleStrict
         );
 
         return json_encode(
-            $birthdays,
+            $entries,
             JSON_UNESCAPED_SLASHES
                 | JSON_UNESCAPED_UNICODE
                 | JSON_PRESERVE_ZERO_FRACTION
                 | JSON_THROW_ON_ERROR
         );
+    }
+
+    /**
+     * Returns birthdays from the calendars selected in this Calendar View.
+     *
+     * This compatibility function delegates to GetAnniversaryList() with the birthday filter.
+     *
+     * @param int $CalendarInstanceID Optional selected calendar instance ID. Zero includes all selected calendars.
+     * @param int $Days Optional look-ahead window in days. Zero returns all birthdays.
+     * @return string JSON-encoded birthday list sorted by the next birthday.
+     */
+    public function GetBirthdayList(int $CalendarInstanceID = 0, int $Days = 0): string
+    {
+        return $this->GetAnniversaryList($CalendarInstanceID, $Days, 'birthday');
     }
 
     /**

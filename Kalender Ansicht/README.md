@@ -118,7 +118,7 @@ Ein Klick auf einen Termin öffnet zunächst eine reine Termindetail-Ansicht mit
 
 Beim Erstellen eines Termins bieten beschreibbare Google-, Microsoft-, Apple-iCloud- und CalDAV-Kalender zusätzlich den Bereich **Wiederholen**. Unterstützt werden tägliche, wöchentliche, monatliche und jährliche Serien, ein frei wählbares Intervall, bei wöchentlichen Serien mehrere Wochentage sowie die Endarten **Nie**, **Nach Anzahl** und **Am Datum**. Die Serienoption erscheint nur bei Kalendern, deren Provider das Anlegen von Serienterminen ausdrücklich unterstützt. Für zeitgebundene Google-Serien wird die Kalenderzeitzone verwendet; bei Microsoft und CalDAV dient die Zeitzone des Clients als Rückfallwert, wenn der Kalender selbst keine Zeitzone bereitstellt. CalDAV-Serien werden mit `TZID` und passendem `VTIMEZONE` gespeichert.
 
-Geburtstage können im selben Termin-Dialog über **Geburtstag** markiert werden. Sobald die Option aktiviert ist, wird ein **Geburtsdatum** hinterlegt und OpenCalendar legt den Termin als ganztägige jährliche Serie an. Das Geburtsdatum wird ausschließlich als lokale OpenCalendar-Metainformation gespeichert; der sichtbare Terminname beim Provider bleibt unverändert. In den OpenCalendar-Ansichten wird das Alter dynamisch ergänzt, beispielsweise `Max Mustermann (33J)`. Beim Bearbeiten eines einzelnen Serienvorkommnisses bleibt die Geburtstagsinformation geschützt; geändert werden kann sie beim vollständigen Serientermin.
+Jährlich wiederkehrende persönliche Ereignisse können im selben Termin-Dialog über **Jahresereignis** als **Geburtstag**, **Jahrestag**, **Hochzeitstag** oder **Todestag** markiert werden. Sobald ein Typ gewählt ist, wird das zugehörige Ausgangsdatum hinterlegt und OpenCalendar legt den Termin als ganztägige jährliche Serie an. Tag und Monat des im Kalender gewählten Termins werden dabei als Datums-Vorschlag übernommen. Typ und Ausgangsdatum werden ausschließlich als lokale OpenCalendar-Metainformation gespeichert; der sichtbare Terminname beim Provider bleibt unverändert. In den OpenCalendar-Ansichten wird die Zahl der vergangenen Jahre dynamisch ergänzt, beispielsweise `Max Mustermann (33J)`. Beim Bearbeiten eines einzelnen Serienvorkommnisses bleibt die Jahresereignis-Information geschützt; geändert werden kann sie beim vollständigen Serientermin.
 
 Erinnerungen werden ebenfalls providerübergreifend bearbeitet. Google sowie Apple-iCloud/CalDAV können in OpenCalendar bis zu fünf einfache Erinnerungen relativ zum Terminbeginn verwalten; über **Erinnerung hinzufügen** lassen sich weitere Zeitpunkte ergänzen und einzeln wieder entfernen. Microsoft bleibt bei einer Erinnerung pro Termin. Beim Verschieben in einen Kalender mit kleinerem Limit wird keine Erinnerung stillschweigend verworfen: Der Vorgang wird abgelehnt, bis die Anzahl passend reduziert wurde. Nicht verlustfrei abbildbare Provider-Konfigurationen bleiben weiterhin als komplex geschützt und werden nicht automatisch vereinfacht.
 
@@ -268,17 +268,17 @@ $count = IPSKALVIEW_GetUpcomingAppointmentCount(12345, 24);
 // Die nächsten drei noch nicht begonnenen Termine abrufen.
 $appointments = IPSKALVIEW_GetNextAppointments(12345, 3);
 
-// Alle in OpenCalendar hinterlegten Geburtstage aus allen ausgewählten Kalendern.
-$birthdays = IPSKALVIEW_GetBirthdayList(12345);
+// Alle Jahresereignisse aus allen ausgewählten Kalendern.
+$annualEvents = IPSKALVIEW_GetAnniversaryList(12345);
 
-// Nur Geburtstage aus Kalenderinstanz 23456.
-$birthdays = IPSKALVIEW_GetBirthdayList(12345, 23456);
+// Nur Hochzeitstage der nächsten frei gewählten 90 Tage.
+$weddings = IPSKALVIEW_GetAnniversaryList(12345, 0, 90, 'wedding');
 
-// Geburtstage der nächsten frei gewählten 45 Tage aus allen ausgewählten Kalendern.
+// Nur Todestage aus Kalenderinstanz 23456, ohne Zeitbegrenzung.
+$deathAnniversaries = IPSKALVIEW_GetAnniversaryList(12345, 23456, 0, 'death');
+
+// Die kompatible Geburtstagsfunktion bleibt erhalten.
 $birthdays = IPSKALVIEW_GetBirthdayList(12345, 0, 45);
-
-// Kalenderfilter und frei gewählten Zeitraum kombinieren.
-$birthdays = IPSKALVIEW_GetBirthdayList(12345, 23456, 90);
 
 // Alle exakt bestimmbaren Reminder eines lokalen Kalendertags abrufen.
 $reminders = IPSKALVIEW_GetDayReminders(12345, '2026-08-11');
@@ -376,7 +376,7 @@ können über `GetCurrentAppointments()` abgefragt werden. Das Zeitfenster darf 
 `GetUpcomingAppointmentCount()` liefert für dieselbe Auswahl direkt die Anzahl.
 Beide Funktionen unterstützen den optionalen Kalenderfilter.
 
-`GetBirthdayList()` liefert die von OpenCalendar verwalteten Geburtstage unabhängig vom normalen Synchronisationszeitraum der Terminansicht. Das erste optionale Argument ist die Kalenderinstanz: `0` berücksichtigt alle in dieser Kalender Ansicht ausgewählten Kalender, eine konkrete Instanz-ID nur diesen Kalender. Das zweite optionale Argument ist die frei wählbare Anzahl der nächsten Tage. `0` liefert alle hinterlegten Geburtstage, jeder positive Wert filtert auf Geburtstage, deren nächster Termin innerhalb dieses Zeitraums liegt. Pro Eintrag werden `name`, `birthDate`, `nextBirthday`, `age`, `displayName`, `daysUntil`, `calendarInstanceId`, `calendarName` und `calendarColor` geliefert. Die Liste ist nach dem nächsten Geburtstag sortiert.
+`GetAnniversaryList()` liefert die von OpenCalendar verwalteten Jahresereignisse unabhängig vom normalen Synchronisationszeitraum der Terminansicht. Das erste optionale Argument ist die Kalenderinstanz: `0` berücksichtigt alle in dieser Kalender Ansicht ausgewählten Kalender, eine konkrete Instanz-ID nur diesen Kalender. Das zweite optionale Argument ist die frei wählbare Anzahl der nächsten Tage. `0` liefert alle hinterlegten Jahresereignisse, jeder positive Wert filtert auf Einträge, deren nächstes Vorkommnis innerhalb dieses Zeitraums liegt. Das dritte optionale Argument filtert auf `birthday`, `anniversary`, `wedding` oder `death`; ein leerer Wert liefert alle Typen. Pro Eintrag werden `name`, `anniversaryType`, `anniversaryDate`, `nextDate`, `years`, `displayName`, `daysUntil`, `calendarInstanceId`, `calendarName` und `calendarColor` geliefert. Geburtstage enthalten zusätzlich `birthDate`, `nextBirthday` und `age`. `GetBirthdayList()` bleibt als kompatibler Spezialfall für Geburtstage erhalten.
 
 Für Reminder stehen fünf providerübergreifende Lesefunktionen bereit.
 `GetDayReminders()` und `GetReminders()` liefern alle Erinnerungen, deren **effektiver

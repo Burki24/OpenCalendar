@@ -147,19 +147,22 @@ assertVisualization(
 );
 
 assertVisualization(
-    str_contains($indexSource, 'id="event-birthday"')
-        && str_contains($indexSource, 'id="event-birth-date"')
-        && str_contains($script, 'function birthdayEditorEditable()')
-        && str_contains($script, 'function birthdayRecurrence()')
-        && str_contains($script, 'function suggestedBirthDate()')
-        && str_contains($script, 'if (!eventBirthDate.value) eventBirthDate.value = suggestedBirthDate();')
-        && str_contains($script, 'function birthdayEditorChange()')
-        && str_contains($script, 'eventData.birthDate = birthdayChange.birthDate;')
-        && str_contains($script, 'eventData.recurrence = birthdayRecurrence();')
+    str_contains($indexSource, 'id="event-anniversary-type"')
+        && str_contains($indexSource, '<option value="birthday"')
+        && str_contains($indexSource, '<option value="anniversary"')
+        && str_contains($indexSource, '<option value="wedding"')
+        && str_contains($indexSource, '<option value="death"')
+        && str_contains($indexSource, 'id="event-anniversary-date"')
+        && str_contains($script, 'function anniversaryEditorEditable()')
+        && str_contains($script, 'function anniversaryRecurrence()')
+        && str_contains($script, 'function suggestedAnniversaryDate()')
+        && str_contains($script, 'function anniversaryEditorChange()')
+        && str_contains($script, 'eventData.anniversaryType = anniversaryChange.enabled ? anniversaryChange.type : \'\';')
+        && str_contains($script, 'eventData.anniversaryDate = anniversaryChange.enabled ? anniversaryChange.date : \'\';')
+        && str_contains($script, 'eventData.recurrence = anniversaryRecurrence();')
         && str_contains($script, 'function eventDisplaySummary(event)')
-        && str_contains($script, 'eventDisplaySummary(event) || t(\'Untitled event\')')
-        && str_contains($style, '#event-birthday-row > .checkbox-row { font-size: inherit; }'),
-    'The shared event dialog must support provider-neutral birthdays, suggest the selected calendar date, and keep the birthday label at normal checkbox size.'
+        && str_contains($script, 'eventDisplaySummary(event) || t(\'Untitled event\')'),
+    'The shared event dialog must support provider-neutral birthdays, anniversaries, wedding anniversaries, and death anniversaries with a suggested source date.'
 );
 
 assertVisualization(

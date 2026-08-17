@@ -56,9 +56,10 @@ const eventCalendarPicker = document.getElementById('event-calendar-picker');
 const eventCalendarTrigger = document.getElementById('event-calendar-trigger');
 const eventCalendarValue = document.getElementById('event-calendar-value');
 const eventCalendarOptions = document.getElementById('event-calendar-options');
-const eventBirthday = document.getElementById('event-birthday');
-const eventBirthDateRow = document.getElementById('event-birth-date-row');
-const eventBirthDate = document.getElementById('event-birth-date');
+const eventAnniversaryType = document.getElementById('event-anniversary-type');
+const eventAnniversaryDateRow = document.getElementById('event-anniversary-date-row');
+const eventAnniversaryDate = document.getElementById('event-anniversary-date');
+const eventAnniversaryDateLabel = document.getElementById('event-anniversary-date-label');
 const eventRecurrenceRow = document.getElementById('event-recurrence-row');
 const eventRecurrenceFrequency = document.getElementById('event-recurrence-frequency');
 const eventRecurrenceOptions = document.getElementById('event-recurrence-options');
@@ -876,22 +877,36 @@ function eventDisplaySummary(event) {
     return displaySummary || String(event?.summary || '').trim();
 }
 
-function resetBirthdayEditor() {
-    eventBirthday.checked = false;
-    eventBirthDate.max = localDate(new Date());
-    eventBirthDate.value = '';
-    eventBirthDateRow.classList.add('hidden');
-    eventBirthDate.required = false;
+function resetAnniversaryEditor() {
+    eventAnniversaryType.value = '';
+    eventAnniversaryDate.max = localDate(new Date());
+    eventAnniversaryDate.value = '';
+    eventAnniversaryDateRow.classList.add('hidden');
+    eventAnniversaryDate.required = false;
+    updateAnniversaryDateLabel();
 }
 
-function loadBirthdayEditor(event) {
-    eventBirthday.checked = Boolean(event?.birthday);
-    eventBirthDate.max = localDate(new Date());
-    eventBirthDate.value = event?.birthday ? String(event.birthDate || '') : '';
-    eventBirthDateRow.classList.toggle('hidden', !eventBirthday.checked);
+function annualEventType(event) {
+    const type = String(event?.anniversaryType || '').trim().toLowerCase();
+    if (['birthday', 'anniversary', 'wedding', 'death'].includes(type)) return type;
+    return event?.birthday ? 'birthday' : '';
 }
 
-function birthdayEditorEditable() {
+function annualEventDate(event) {
+    const date = String(event?.anniversaryDate || '').trim();
+    if (date) return date;
+    return event?.birthday ? String(event.birthDate || '') : '';
+}
+
+function loadAnniversaryEditor(event) {
+    eventAnniversaryType.value = annualEventType(event);
+    eventAnniversaryDate.max = localDate(new Date());
+    eventAnniversaryDate.value = eventAnniversaryType.value ? annualEventDate(event) : '';
+    eventAnniversaryDateRow.classList.toggle('hidden', !eventAnniversaryType.value);
+    updateAnniversaryDateLabel();
+}
+
+function anniversaryEditorEditable() {
     const calendar = selectedCalendarEntry();
     if (!eventDialogEditable || !calendar?.canWrite) return false;
     if (selectedEvent === null) return Boolean(calendar.canCreateRecurrence);
@@ -904,25 +919,36 @@ function birthdayEditorEditable() {
         && Boolean(calendar.canUpdateRecurrence);
 }
 
-function birthdayRecurrence() {
+function anniversaryRecurrence() {
     return { frequency: 'YEARLY', interval: 1, endMode: 'never' };
 }
 
-function updateBirthdayControls() {
-    let checked = eventBirthday.checked;
-    const editable = birthdayEditorEditable();
-    if (checked && eventDialogEditable && !editable && !selectedEvent?.birthday) {
-        eventBirthday.checked = false;
-        eventBirthDate.value = '';
-        checked = false;
+function updateAnniversaryDateLabel() {
+    const labels = {
+        birthday: 'Birth date',
+        anniversary: 'Anniversary date',
+        wedding: 'Wedding date',
+        death: 'Date of death'
+    };
+    eventAnniversaryDateLabel.textContent = t(labels[eventAnniversaryType.value] || 'Anniversary date');
+}
+
+function updateAnniversaryControls() {
+    let type = String(eventAnniversaryType.value || '');
+    const editable = anniversaryEditorEditable();
+    if (type && eventDialogEditable && !editable && !annualEventType(selectedEvent)) {
+        eventAnniversaryType.value = '';
+        eventAnniversaryDate.value = '';
+        type = '';
     }
-    eventBirthday.disabled = !editable;
-    eventBirthDateRow.classList.toggle('hidden', !checked);
-    eventBirthDate.disabled = !editable || !checked;
-    eventBirthDate.required = editable && checked;
+    eventAnniversaryType.disabled = !editable;
+    eventAnniversaryDateRow.classList.toggle('hidden', !type);
+    eventAnniversaryDate.disabled = !editable || !type;
+    eventAnniversaryDate.required = editable && Boolean(type);
+    updateAnniversaryDateLabel();
 
     const allDayInput = document.getElementById('event-all-day');
-    if (checked && editable) {
+    if (type && editable) {
         allDayInput.checked = true;
         allDayInput.disabled = true;
         eventRecurrenceRow.classList.remove('hidden');
@@ -936,7 +962,7 @@ function updateBirthdayControls() {
     }
 }
 
-function suggestedBirthDate() {
+function suggestedAnniversaryDate() {
     const eventStart = readInputDate(document.getElementById('event-start').value);
     if (!eventStart) return '';
 
@@ -959,30 +985,30 @@ function suggestedBirthDate() {
     return '';
 }
 
-function syncBirthdaySchedule() {
-    if (!eventBirthday.checked || !birthdayEditorEditable()) return;
-    const birthDate = readInputDate(eventBirthDate.value);
-    if (!birthDate) return;
-    const end = addDays(birthDate, 1);
+function syncAnniversarySchedule() {
+    if (!eventAnniversaryType.value || !anniversaryEditorEditable()) return;
+    const anniversaryDate = readInputDate(eventAnniversaryDate.value);
+    if (!anniversaryDate) return;
+    const end = addDays(anniversaryDate, 1);
     document.getElementById('event-all-day').checked = true;
-    setDateInputs(birthDate, end, true, true);
+    setDateInputs(anniversaryDate, end, true, true);
     eventRecurrenceFrequency.value = 'yearly';
     eventRecurrenceInterval.value = '1';
     eventRecurrenceEndMode.value = 'never';
 }
 
-function birthdayEditorChange() {
-    if (!birthdayEditorEditable()) return null;
-    const birthday = eventBirthday.checked;
-    const birthDate = birthday ? String(eventBirthDate.value || '') : '';
-    if (birthday && !birthDate) return null;
+function anniversaryEditorChange() {
+    if (!anniversaryEditorEditable()) return null;
+    const type = String(eventAnniversaryType.value || '');
+    const date = type ? String(eventAnniversaryDate.value || '') : '';
+    if (type && !date) return null;
     if (selectedEvent === null) {
-        return birthday ? { birthday: true, birthDate } : null;
+        return type ? { enabled: true, type, date } : null;
     }
-    const wasBirthday = Boolean(selectedEvent.birthday);
-    const oldBirthDate = wasBirthday ? String(selectedEvent.birthDate || '') : '';
-    if (birthday === wasBirthday && (!birthday || birthDate === oldBirthDate)) return null;
-    return { birthday, birthDate };
+    const oldType = annualEventType(selectedEvent);
+    const oldDate = oldType ? annualEventDate(selectedEvent) : '';
+    if (type === oldType && (!type || date === oldDate)) return null;
+    return { enabled: Boolean(type), type, date };
 }
 
 function openNewEvent(preferredDay = null) {
@@ -995,7 +1021,7 @@ function openNewEvent(preferredDay = null) {
     document.getElementById('event-location').value = '';
     document.getElementById('event-description').value = '';
     document.getElementById('event-all-day').checked = false;
-    resetBirthdayEditor();
+    resetAnniversaryEditor();
     let start;
     if (preferredDay instanceof Date && !Number.isNaN(preferredDay.getTime())) {
         start = startOfDay(preferredDay);
@@ -1374,7 +1400,7 @@ function openExistingEvent(event, writeScope = '') {
     document.getElementById('event-location').value = selectedEvent.location || '';
     document.getElementById('event-description').value = selectedEvent.description || '';
     document.getElementById('event-all-day').checked = Boolean(selectedEvent.allDay);
-    loadBirthdayEditor(selectedEvent);
+    loadAnniversaryEditor(selectedEvent);
     setDateInputs(
         eventStart(selectedEvent),
         eventEnd(selectedEvent),
@@ -2209,7 +2235,7 @@ function setDialogEditable(editable, descriptionEditable = editable) {
     document.getElementById('event-description').disabled = !descriptionEditable;
     document.getElementById('save-button').classList.toggle('hidden', !editable);
     updateReminderControls();
-    updateBirthdayControls();
+    updateAnniversaryControls();
 }
 
 function setDateInputs(start, end, allDay, allDayEndExclusive = false) {
@@ -2285,16 +2311,16 @@ eventForm.addEventListener('submit', async event => {
         start: inputDateValue(document.getElementById('event-start').value, allDay),
         end: inputDateValue(document.getElementById('event-end').value, allDay, allDay)
     };
-    const birthdayChange = birthdayEditorChange();
-    if (birthdayChange) {
-        eventData.birthday = birthdayChange.birthday;
-        if (birthdayChange.birthday) {
-            eventData.birthDate = birthdayChange.birthDate;
+    const anniversaryChange = anniversaryEditorChange();
+    if (anniversaryChange) {
+        eventData.anniversaryType = anniversaryChange.enabled ? anniversaryChange.type : '';
+        eventData.anniversaryDate = anniversaryChange.enabled ? anniversaryChange.date : '';
+        if (anniversaryChange.enabled) {
             eventData.allDay = true;
-            eventData.start = birthdayChange.birthDate;
-            const birthdayStart = readInputDate(birthdayChange.birthDate);
-            eventData.end = birthdayStart ? localDate(addDays(birthdayStart, 1)) : '';
-            eventData.recurrence = birthdayRecurrence();
+            eventData.start = anniversaryChange.date;
+            const anniversaryStart = readInputDate(anniversaryChange.date);
+            eventData.end = anniversaryStart ? localDate(addDays(anniversaryStart, 1)) : '';
+            eventData.recurrence = anniversaryRecurrence();
         }
     }
     const reminder = reminderEditorValue();
@@ -2304,9 +2330,9 @@ eventForm.addEventListener('submit', async event => {
     const editingSeries = Boolean(selectedEvent?.recurring) && selectedEvent?.writeScope === 'series';
     const editingFollowing = Boolean(selectedEvent?.recurring) && selectedEvent?.writeScope === 'following';
     const recurrence = recurrenceEditorValue();
-    if (recurrence && !(birthdayChange?.birthday)) {
+    if (recurrence && !(anniversaryChange?.enabled)) {
         eventData.recurrence = recurrence;
-    } else if (!birthdayChange?.birthday && editingSeries
+    } else if (!anniversaryChange?.enabled && editingSeries
         && !eventRecurrenceFrequency.disabled
         && eventRecurrenceFrequency.value === 'none'
         && Boolean(selectedCalendarEntry()?.canUpdateRecurrence)) {
@@ -2322,11 +2348,12 @@ eventForm.addEventListener('submit', async event => {
     if (!calendarInstanceId || !eventData.summary || !eventData.start || !eventData.end) return;
     const sourceCalendarInstanceId = Number(selectedEvent?.calendarInstanceId || 0);
     const moving = Boolean(selectedEvent) && calendarInstanceId !== sourceCalendarInstanceId;
-    if (moving && selectedEvent?.birthday && ['series', 'following'].includes(selectedEvent?.writeScope)) {
-        eventData.birthday = true;
-        eventData.birthDate = String(selectedEvent.birthDate || '');
+    const selectedAnniversaryType = annualEventType(selectedEvent);
+    if (moving && selectedAnniversaryType && ['series', 'following'].includes(selectedEvent?.writeScope)) {
+        eventData.anniversaryType = selectedAnniversaryType;
+        eventData.anniversaryDate = annualEventDate(selectedEvent);
         eventData.allDay = true;
-        eventData.recurrence = birthdayRecurrence();
+        eventData.recurrence = anniversaryRecurrence();
     }
     if (selectedEvent?.onlineMeeting && !moving) delete eventData.description;
 
@@ -2340,8 +2367,8 @@ eventForm.addEventListener('submit', async event => {
                 resourceUrl: selectedEvent.resourceUrl,
                 etag: selectedEvent.etag,
                 reminder: selectedEvent.reminder || null,
-                birthday: Boolean(selectedEvent.birthday),
-                birthDate: selectedEvent.birthDate || '',
+                anniversaryType: annualEventType(selectedEvent),
+                anniversaryDate: annualEventDate(selectedEvent),
                 ...recurrencePayload(selectedEvent)
             },
             event: eventData
@@ -2385,21 +2412,21 @@ eventCalendarInput.addEventListener('change', () => {
     updateDialogColor();
     updateSaveButtonLabel();
     updateRecurrenceAvailability();
-    updateBirthdayControls();
+    updateAnniversaryControls();
     resolveDefaultReminderForCalendarMove();
     updateReminderControls();
 });
-eventBirthday.addEventListener('change', () => {
+eventAnniversaryType.addEventListener('change', () => {
     updateRecurrenceAvailability();
-    if (eventBirthday.checked) {
-        if (!eventBirthDate.value) eventBirthDate.value = suggestedBirthDate();
-        syncBirthdaySchedule();
+    if (eventAnniversaryType.value) {
+        if (!eventAnniversaryDate.value) eventAnniversaryDate.value = suggestedAnniversaryDate();
+        syncAnniversarySchedule();
     }
-    updateBirthdayControls();
+    updateAnniversaryControls();
 });
-eventBirthDate.addEventListener('change', () => {
-    syncBirthdaySchedule();
-    updateBirthdayControls();
+eventAnniversaryDate.addEventListener('change', () => {
+    syncAnniversarySchedule();
+    updateAnniversaryControls();
 });
 eventReminderMode.addEventListener('change', () => {
     reminderDefaultResolvedForMove = false;
