@@ -157,6 +157,26 @@ wird nur die ursprüngliche Serie vor dem gewählten Vorkommnis beendet. Beginnt
 Auswahl mit dem ersten Vorkommnis, wird die bestehende Serie direkt geändert bzw.
 gelöscht, ohne einen zweiten Serienteil anzulegen.
 
+## Jahresereignisse
+
+OpenCalendar kann jährlich wiederkehrende persönliche Ereignisse als
+**Geburtstag**, **Jahrestag**, **Hochzeitstag** oder **Todestag** verwalten. Der
+Typ und das ursprüngliche Ausgangsdatum werden als lokale OpenCalendar-Metadaten
+gespeichert; der Terminname beim Kalenderanbieter bleibt unverändert. In der
+Kachelvisualisierung und in IPSView wird die Zahl der vergangenen Jahre
+dynamisch ergänzt, beispielsweise `Max Mustermann (33J)`.
+
+Für Skripte stehen providerneutrale PHP-Funktionen zur Verfügung. Auf Ebene einer
+einzelnen Kalenderinstanz können Jahresereignisse mit
+`IPSKAL_GetAnniversaryList()` gelesen und mit `IPSKAL_SetAnniversary()` markiert
+oder geändert werden. `IPSKAL_GetBirthdayList()` bleibt als kompatibler
+Geburtstags-Spezialfall erhalten. Über die **Kalender Ansicht** liefert
+`IPSKALVIEW_GetAnniversaryList()` wahlweise alle ausgewählten Kalender oder eine
+bestimmte Kalenderinstanz und unterstützt sowohl einen frei wählbaren Zeitraum in
+Tagen als auch einen Filter nach Ereignistyp. Die vollständige Befehlsreferenz
+befindet sich in der Dokumentation der Module **Kalender** und
+**Kalender Ansicht**.
+
 ## Bekannte Einschränkungen
 
 - **Diesen und alle folgenden Termine** wird bei Microsoft-Onlinebesprechungen und
@@ -203,5 +223,6 @@ Drittanbieter.
 
   Führt mehrere Kalender in einer responsiven Kachel- oder IPSView-Ansicht
   zusammen und stellt die ausgewählten Kalender zusätzlich providerübergreifend
-  über PHP-Funktionen für Tages- und Datumsbereichsabfragen bereit. Neben der
-  vollständigen Ausgabe stehen kompakte Varianten für einfache Skripte zur Verfügung.
+  über PHP-Funktionen für Tages- und Datumsbereichsabfragen sowie für
+  Jahresereignisse bereit. Neben der vollständigen Ausgabe stehen kompakte
+  Varianten für einfache Skripte zur Verfügung.
