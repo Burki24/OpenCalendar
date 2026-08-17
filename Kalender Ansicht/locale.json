@@ -160,6 +160,8 @@
             "Changes will apply to this and all following occurrences.": "Änderungen werden auf diesen und alle folgenden Termine angewendet.",
             "This and following updates are not supported by this calendar.": "Dieser Kalender unterstützt das Bearbeiten dieses und aller folgenden Serientermine nicht.",
             "Existing exceptions from this occurrence onward will be reset.": "Bestehende Ausnahmen ab diesem Termin werden dabei zurückgesetzt.",
+            "Birthday": "Geburtstag",
+            "Birth date": "Geburtsdatum",
             "Reminder": "Erinnerung",
             "Calendar default": "Kalenderstandard",
             "No reminder": "Keine Erinnerung",

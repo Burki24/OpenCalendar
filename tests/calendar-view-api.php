@@ -79,6 +79,24 @@ try {
 }
 
 $moduleSource = (string) file_get_contents(__DIR__ . '/../Kalender Ansicht/module.php');
+$calendarModuleSource = (string) file_get_contents(__DIR__ . '/../Kalender/module.php');
+assertCalendarViewApi(
+    str_contains($calendarModuleSource, "RegisterAttributeString('BirthdayMetadata', '[]')")
+        && str_contains($calendarModuleSource, 'public function GetBirthdayList(int $Days = 0): string')
+        && str_contains($calendarModuleSource, "'displaySummary'")
+        && str_contains($calendarModuleSource, "sprintf('%s (%dJ)'")
+        && str_contains($calendarModuleSource, "'frequency' => 'YEARLY'"),
+    'Calendar instances must persist provider-neutral birthday metadata and expose dynamically calculated birthday data.'
+);
+assertCalendarViewApi(
+    str_contains($moduleSource, 'public function GetBirthdayList(int $CalendarInstanceID = 0, int $Days = 0): string')
+        && str_contains($moduleSource, "IPSKAL_GetBirthdayList(\$calendar['instanceId'], \$Days)")
+        && str_contains($moduleSource, "\$birthday['calendarInstanceId'] = \$calendar['instanceId'];")
+        && str_contains($moduleSource, "\$birthday['calendarName'] = \$calendar['name'];")
+        && str_contains($moduleSource, "if (\$CalendarInstanceID !== 0 && \$calendar['instanceId'] !== \$CalendarInstanceID)"),
+    'Calendar View must aggregate birthday lists with zero meaning all selected calendars and an arbitrary non-negative day window.'
+);
+
 assertCalendarViewApi(
     str_contains($moduleSource, 'public function GetDayAppointments(string $Date, int $CalendarInstanceID = 0): string')
         && str_contains($moduleSource, 'return $this->GetAppointments($Date, $Date, $CalendarInstanceID);'),

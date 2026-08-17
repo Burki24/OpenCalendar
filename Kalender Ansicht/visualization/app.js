@@ -56,6 +56,9 @@ const eventCalendarPicker = document.getElementById('event-calendar-picker');
 const eventCalendarTrigger = document.getElementById('event-calendar-trigger');
 const eventCalendarValue = document.getElementById('event-calendar-value');
 const eventCalendarOptions = document.getElementById('event-calendar-options');
+const eventBirthday = document.getElementById('event-birthday');
+const eventBirthDateRow = document.getElementById('event-birth-date-row');
+const eventBirthDate = document.getElementById('event-birth-date');
 const eventRecurrenceRow = document.getElementById('event-recurrence-row');
 const eventRecurrenceFrequency = document.getElementById('event-recurrence-frequency');
 const eventRecurrenceOptions = document.getElementById('event-recurrence-options');
@@ -320,7 +323,7 @@ function createAgendaEvent(event) {
     time.style.whiteSpace = 'pre-line';
     const main = element('span', 'event-main');
     const title = element('span', 'event-title');
-    title.textContent = event.summary || t('Untitled event');
+    title.textContent = eventDisplaySummary(event) || t('Untitled event');
     main.appendChild(title);
     const metaParts = [];
     if (calendarState.settings.showCalendarName) metaParts.push(event.calendarName || '');
@@ -443,7 +446,7 @@ function listColumns() {
         columns.push({
             key: 'title',
             label: 'Title',
-            value: event => event.summary || t('Untitled event')
+            value: event => eventDisplaySummary(event) || t('Untitled event')
         });
     }
     if (calendarState.settings.showListCalendarName !== false) {
@@ -525,7 +528,7 @@ function renderDayColumns(days, className, showDayOfYear, showEventCount) {
             item.addEventListener('click', () => openEventDetails(event));
             item.addEventListener('keydown', key => { if (key.key === 'Enter') openEventDetails(event); });
             const title = document.createElement('strong');
-            title.textContent = event.summary || t('Untitled event');
+            title.textContent = eventDisplaySummary(event) || t('Untitled event');
             const time = document.createElement('span');
             time.textContent = event.allDay ? t('All day') : formatTime(eventStart(event));
             item.append(title, time);
@@ -677,7 +680,7 @@ function createMonthEventChip(event) {
     chip.type = 'button';
     chip.style.setProperty('--event-color', safeColor(event.calendarColor));
     chip.textContent = (event.allDay ? '' : formatTime(eventStart(event)) + ' ')
-        + (event.summary || t('Untitled event'));
+        + (eventDisplaySummary(event) || t('Untitled event'));
     chip.addEventListener('click', () => openEventDetails(event));
     return chip;
 }
@@ -711,7 +714,7 @@ function openDayEvents(day, events) {
         const time = element('span', 'day-event-time');
         time.textContent = event.allDay ? t('All day') : `${formatTime(eventStart(event))} – ${formatTime(eventEnd(event))}`;
         const summary = element('span', 'day-event-summary');
-        summary.textContent = event.summary || t('Untitled event');
+        summary.textContent = eventDisplaySummary(event) || t('Untitled event');
         item.append(time, summary);
         if (calendarState.settings.showCalendarName !== false && event.calendarName) {
             const calendar = element('span', 'day-event-calendar');
@@ -868,6 +871,97 @@ function applyCalendarFilter() {
     render();
 }
 
+function eventDisplaySummary(event) {
+    const displaySummary = String(event?.displaySummary || '').trim();
+    return displaySummary || String(event?.summary || '').trim();
+}
+
+function resetBirthdayEditor() {
+    eventBirthday.checked = false;
+    eventBirthDate.max = localDate(new Date());
+    eventBirthDate.value = '';
+    eventBirthDateRow.classList.add('hidden');
+    eventBirthDate.required = false;
+}
+
+function loadBirthdayEditor(event) {
+    eventBirthday.checked = Boolean(event?.birthday);
+    eventBirthDate.max = localDate(new Date());
+    eventBirthDate.value = event?.birthday ? String(event.birthDate || '') : '';
+    eventBirthDateRow.classList.toggle('hidden', !eventBirthday.checked);
+}
+
+function birthdayEditorEditable() {
+    const calendar = selectedCalendarEntry();
+    if (!eventDialogEditable || !calendar?.canWrite) return false;
+    if (selectedEvent === null) return Boolean(calendar.canCreateRecurrence);
+    if (!selectedEvent.recurring) {
+        const moving = Number(calendar.instanceId || 0) !== Number(selectedEvent.calendarInstanceId || 0);
+        return Boolean(moving ? calendar.canCreateRecurrence : calendar.canUpdateRecurrence);
+    }
+    return selectedEvent.writeScope === 'series'
+        && Boolean(selectedEvent.canUpdateSeries)
+        && Boolean(calendar.canUpdateRecurrence);
+}
+
+function birthdayRecurrence() {
+    return { frequency: 'YEARLY', interval: 1, endMode: 'never' };
+}
+
+function updateBirthdayControls() {
+    let checked = eventBirthday.checked;
+    const editable = birthdayEditorEditable();
+    if (checked && eventDialogEditable && !editable && !selectedEvent?.birthday) {
+        eventBirthday.checked = false;
+        eventBirthDate.value = '';
+        checked = false;
+    }
+    eventBirthday.disabled = !editable;
+    eventBirthDateRow.classList.toggle('hidden', !checked);
+    eventBirthDate.disabled = !editable || !checked;
+    eventBirthDate.required = editable && checked;
+
+    const allDayInput = document.getElementById('event-all-day');
+    if (checked && editable) {
+        allDayInput.checked = true;
+        allDayInput.disabled = true;
+        eventRecurrenceRow.classList.remove('hidden');
+        eventRecurrenceFrequency.value = 'yearly';
+        eventRecurrenceInterval.value = '1';
+        eventRecurrenceEndMode.value = 'never';
+        eventRecurrenceFrequency.disabled = true;
+        eventRecurrenceOptions.classList.add('hidden');
+    } else {
+        allDayInput.disabled = !eventDialogEditable;
+    }
+}
+
+function syncBirthdaySchedule() {
+    if (!eventBirthday.checked || !birthdayEditorEditable()) return;
+    const birthDate = readInputDate(eventBirthDate.value);
+    if (!birthDate) return;
+    const end = addDays(birthDate, 1);
+    document.getElementById('event-all-day').checked = true;
+    setDateInputs(birthDate, end, true, true);
+    eventRecurrenceFrequency.value = 'yearly';
+    eventRecurrenceInterval.value = '1';
+    eventRecurrenceEndMode.value = 'never';
+}
+
+function birthdayEditorChange() {
+    if (!birthdayEditorEditable()) return null;
+    const birthday = eventBirthday.checked;
+    const birthDate = birthday ? String(eventBirthDate.value || '') : '';
+    if (birthday && !birthDate) return null;
+    if (selectedEvent === null) {
+        return birthday ? { birthday: true, birthDate } : null;
+    }
+    const wasBirthday = Boolean(selectedEvent.birthday);
+    const oldBirthDate = wasBirthday ? String(selectedEvent.birthDate || '') : '';
+    if (birthday === wasBirthday && (!birthday || birthDate === oldBirthDate)) return null;
+    return { birthday, birthDate };
+}
+
 function openNewEvent(preferredDay = null) {
     const writable = calendarState.calendars.filter(calendar => calendar.canWrite);
     if (!writable.length) return;
@@ -878,6 +972,7 @@ function openNewEvent(preferredDay = null) {
     document.getElementById('event-location').value = '';
     document.getElementById('event-description').value = '';
     document.getElementById('event-all-day').checked = false;
+    resetBirthdayEditor();
     let start;
     if (preferredDay instanceof Date && !Number.isNaN(preferredDay.getTime())) {
         start = startOfDay(preferredDay);
@@ -915,7 +1010,7 @@ function openEventDetails(event) {
     const editable = eventCanUpdate(event);
     const deletable = eventCanDelete(event);
     document.getElementById('details-dialog-title').textContent = t('Event details');
-    document.getElementById('details-summary').textContent = event.summary || t('Untitled event');
+    document.getElementById('details-summary').textContent = eventDisplaySummary(event) || t('Untitled event');
     document.getElementById('details-calendar').textContent = event.calendarName || '';
     document.getElementById('details-color').style.setProperty('--dialog-accent-color', safeColor(event.calendarColor));
 
@@ -1040,7 +1135,7 @@ async function prepareEventEdit(event) {
 function requestDelete(sourceDialog) {
     if (!selectedEvent || !eventCanDelete(selectedEvent)) return;
     deleteSourceDialog = sourceDialog;
-    document.getElementById('delete-confirm-summary').textContent = selectedEvent.summary || t('Untitled event');
+    document.getElementById('delete-confirm-summary').textContent = eventDisplaySummary(selectedEvent) || t('Untitled event');
     document.getElementById('delete-confirm-period').textContent = formatDeleteEventPeriod(selectedEvent);
     updateDeleteScope(selectedEvent);
     deleteConfirmDialog.showModal();
@@ -1256,6 +1351,7 @@ function openExistingEvent(event, writeScope = '') {
     document.getElementById('event-location').value = selectedEvent.location || '';
     document.getElementById('event-description').value = selectedEvent.description || '';
     document.getElementById('event-all-day').checked = Boolean(selectedEvent.allDay);
+    loadBirthdayEditor(selectedEvent);
     setDateInputs(
         eventStart(selectedEvent),
         eventEnd(selectedEvent),
@@ -2090,6 +2186,7 @@ function setDialogEditable(editable, descriptionEditable = editable) {
     document.getElementById('event-description').disabled = !descriptionEditable;
     document.getElementById('save-button').classList.toggle('hidden', !editable);
     updateReminderControls();
+    updateBirthdayControls();
 }
 
 function setDateInputs(start, end, allDay, allDayEndExclusive = false) {
@@ -2165,6 +2262,18 @@ eventForm.addEventListener('submit', async event => {
         start: inputDateValue(document.getElementById('event-start').value, allDay),
         end: inputDateValue(document.getElementById('event-end').value, allDay, allDay)
     };
+    const birthdayChange = birthdayEditorChange();
+    if (birthdayChange) {
+        eventData.birthday = birthdayChange.birthday;
+        if (birthdayChange.birthday) {
+            eventData.birthDate = birthdayChange.birthDate;
+            eventData.allDay = true;
+            eventData.start = birthdayChange.birthDate;
+            const birthdayStart = readInputDate(birthdayChange.birthDate);
+            eventData.end = birthdayStart ? localDate(addDays(birthdayStart, 1)) : '';
+            eventData.recurrence = birthdayRecurrence();
+        }
+    }
     const reminder = reminderEditorValue();
     if (reminder) {
         eventData.reminder = reminder;
@@ -2172,9 +2281,9 @@ eventForm.addEventListener('submit', async event => {
     const editingSeries = Boolean(selectedEvent?.recurring) && selectedEvent?.writeScope === 'series';
     const editingFollowing = Boolean(selectedEvent?.recurring) && selectedEvent?.writeScope === 'following';
     const recurrence = recurrenceEditorValue();
-    if (recurrence) {
+    if (recurrence && !(birthdayChange?.birthday)) {
         eventData.recurrence = recurrence;
-    } else if (editingSeries
+    } else if (!birthdayChange?.birthday && editingSeries
         && !eventRecurrenceFrequency.disabled
         && eventRecurrenceFrequency.value === 'none'
         && Boolean(selectedCalendarEntry()?.canUpdateRecurrence)) {
@@ -2190,6 +2299,12 @@ eventForm.addEventListener('submit', async event => {
     if (!calendarInstanceId || !eventData.summary || !eventData.start || !eventData.end) return;
     const sourceCalendarInstanceId = Number(selectedEvent?.calendarInstanceId || 0);
     const moving = Boolean(selectedEvent) && calendarInstanceId !== sourceCalendarInstanceId;
+    if (moving && selectedEvent?.birthday && ['series', 'following'].includes(selectedEvent?.writeScope)) {
+        eventData.birthday = true;
+        eventData.birthDate = String(selectedEvent.birthDate || '');
+        eventData.allDay = true;
+        eventData.recurrence = birthdayRecurrence();
+    }
     if (selectedEvent?.onlineMeeting && !moving) delete eventData.description;
 
     const action = moving ? 'MoveEvent' : (selectedEvent ? 'UpdateEvent' : 'CreateEvent');
@@ -2202,6 +2317,8 @@ eventForm.addEventListener('submit', async event => {
                 resourceUrl: selectedEvent.resourceUrl,
                 etag: selectedEvent.etag,
                 reminder: selectedEvent.reminder || null,
+                birthday: Boolean(selectedEvent.birthday),
+                birthDate: selectedEvent.birthDate || '',
                 ...recurrencePayload(selectedEvent)
             },
             event: eventData
@@ -2245,8 +2362,20 @@ eventCalendarInput.addEventListener('change', () => {
     updateDialogColor();
     updateSaveButtonLabel();
     updateRecurrenceAvailability();
+    updateBirthdayControls();
     resolveDefaultReminderForCalendarMove();
     updateReminderControls();
+});
+eventBirthday.addEventListener('change', () => {
+    updateRecurrenceAvailability();
+    if (eventBirthday.checked) {
+        syncBirthdaySchedule();
+    }
+    updateBirthdayControls();
+});
+eventBirthDate.addEventListener('change', () => {
+    syncBirthdaySchedule();
+    updateBirthdayControls();
 });
 eventReminderMode.addEventListener('change', () => {
     reminderDefaultResolvedForMove = false;

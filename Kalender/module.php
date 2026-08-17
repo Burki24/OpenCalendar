@@ -58,6 +58,7 @@ class Kalender extends IPSModuleStrict
         $this->RegisterPropertyInteger('FutureDays', 365);
 
         $this->RegisterPersistentJsonCache('CachedEvents');
+        $this->RegisterAttributeString('BirthdayMetadata', '[]');
         $this->RegisterAttributeInteger('LastSynchronization', 0);
         $this->RegisterAttributeString('LastError', '');
         $this->RegisterAttributeBoolean('CalendarMetadataAvailable', false);
@@ -330,6 +331,62 @@ class Kalender extends IPSModuleStrict
     }
 
     /**
+     * Returns the birthdays managed locally by OpenCalendar.
+     *
+     * A zero day window returns every stored birthday. Positive values only return
+     * birthdays whose next occurrence is within the requested number of calendar days.
+     *
+     * @param int $Days Optional look-ahead window in days. Zero returns all birthdays.
+     * @return string JSON-encoded birthday list sorted by the next birthday.
+     */
+    public function GetBirthdayList(int $Days = 0): string
+    {
+        if ($Days < 0) {
+            throw new InvalidArgumentException('Birthday look-ahead days must not be negative.');
+        }
+
+        $today = new DateTimeImmutable('today');
+        $birthdays = [];
+        foreach ($this->readBirthdayMetadata() as $metadata) {
+            $birthDate = $this->normalizeBirthDate((string) ($metadata['birthDate'] ?? ''));
+            if ($birthDate === '') {
+                continue;
+            }
+            $nextBirthday = $this->nextBirthdayDate($birthDate, $today);
+            $daysUntil = (int) $today->diff($nextBirthday)->format('%a');
+            if ($Days > 0 && $daysUntil > $Days) {
+                continue;
+            }
+
+            $birthYear = (int) substr($birthDate, 0, 4);
+            $age = max(0, (int) $nextBirthday->format('Y') - $birthYear);
+            $name = trim((string) ($metadata['summary'] ?? ''));
+            $birthdays[] = [
+                'name'         => $name,
+                'birthDate'    => $birthDate,
+                'nextBirthday' => $nextBirthday->format('Y-m-d'),
+                'age'          => $age,
+                'displayName'  => $name !== '' ? sprintf('%s (%dJ)', $name, $age) : sprintf('(%dJ)', $age),
+                'daysUntil'    => $daysUntil
+            ];
+        }
+
+        usort(
+            $birthdays,
+            static fn (array $left, array $right): int => ((int) $left['daysUntil'] <=> (int) $right['daysUntil'])
+                ?: strcasecmp((string) $left['name'], (string) $right['name'])
+        );
+
+        return json_encode(
+            $birthdays,
+            JSON_UNESCAPED_SLASHES
+                | JSON_UNESCAPED_UNICODE
+                | JSON_PRESERVE_ZERO_FRACTION
+                | JSON_THROW_ON_ERROR
+        );
+    }
+
+    /**
      * Returns the current provider version of one event before it is edited.
      *
      * This read intentionally bypasses the local event cache so the editor receives
@@ -358,6 +415,7 @@ class Kalender extends IPSModuleStrict
                 'Start'          => $startTimestamp,
                 'End'            => $endTimestamp
             ]);
+            $currentEvent = $this->enrichBirthdayEvent($currentEvent);
 
             return json_encode(
                 $currentEvent,
@@ -400,6 +458,7 @@ class Kalender extends IPSModuleStrict
                     'ResourceURL' => trim($ResourceURL)
                 ]
             );
+            $series = $this->enrichBirthdayEvent($series);
             return json_encode(
                 $series,
                 JSON_UNESCAPED_SLASHES
@@ -451,6 +510,7 @@ class Kalender extends IPSModuleStrict
                     'ResourceURL'   => trim($ResourceURL)
                 ]
             );
+            $following = $this->enrichBirthdayEvent($following);
             return json_encode(
                 $following,
                 JSON_UNESCAPED_SLASHES
@@ -543,6 +603,15 @@ class Kalender extends IPSModuleStrict
     {
         try {
             $event = $this->decodeObject($EventJSON, 'event');
+            $birthday = $this->birthdayInput($event);
+            if ($birthday !== null && $birthday['enabled']) {
+                $recurrenceInput = $event['recurrence'] ?? null;
+                if (!is_array($recurrenceInput) || $recurrenceInput === []) {
+                    $this->applyBirthdayEventDefaults($event, $birthday['birthDate']);
+                } else {
+                    $this->assertBirthdayRecurrence($event);
+                }
+            }
             $recurrence = $event['recurrence'] ?? null;
             if ($recurrence !== null && $recurrence !== []) {
                 if (!is_array($recurrence) || array_is_list($recurrence)) {
@@ -563,7 +632,16 @@ class Kalender extends IPSModuleStrict
                     $event['timezone'] = $timezone;
                 }
             }
-            $created = $this->sendRequest('CreateEvent', ['Event' => $event]);
+            $providerEvent = $event;
+            unset($providerEvent['birthday'], $providerEvent['birthDate']);
+            $created = $this->sendRequest('CreateEvent', ['Event' => $providerEvent]);
+            if ($birthday !== null && $birthday['enabled']) {
+                $this->upsertBirthdayMetadata(
+                    array_merge($event, is_array($created) ? $created : []),
+                    $birthday['birthDate'],
+                    trim((string) ($event['summary'] ?? ''))
+                );
+            }
             $this->refreshAfterWrite();
 
             return $this->encodeResult(true, $created);
@@ -587,6 +665,19 @@ class Kalender extends IPSModuleStrict
                 throw new InvalidArgumentException('The event changes are invalid.');
             }
             $recurrence = $this->resolveWriteRecurrence($event, true);
+            $birthday = $this->birthdayInput($changes);
+            $existingBirthday = $this->birthdayMetadataForEvent($event);
+            $writeScope = (string) ($recurrence['writeScope'] ?? '');
+            if ($birthday !== null && $birthday['enabled']) {
+                if (in_array(
+                    $writeScope,
+                    [CalendarEventRecurrence::WRITE_SCOPE_OCCURRENCE, CalendarEventRecurrence::WRITE_SCOPE_FOLLOWING],
+                    true
+                )) {
+                    throw new InvalidArgumentException('Birthday settings can only be changed for a complete recurring series.');
+                }
+                $this->applyBirthdayEventDefaults($changes, $birthday['birthDate']);
+            }
             $requestedRecurrence = $changes['recurrence'] ?? null;
             $recurrenceType = (string) ($recurrence['recurrenceType'] ?? CalendarEventRecurrence::SINGLE);
             $convertingSingleToSeries = $recurrenceType === CalendarEventRecurrence::SINGLE
@@ -630,11 +721,17 @@ class Kalender extends IPSModuleStrict
             ] as $metadataKey) {
                 unset($changes[$metadataKey]);
             }
-            if ($changes === []) {
+            $birthdayEnabled = $birthday !== null && $birthday['enabled'];
+            $birthdayDisabled = $birthday !== null && !$birthday['enabled'];
+            $birthdayDate = $birthdayEnabled ? $birthday['birthDate'] : (string) ($existingBirthday['birthDate'] ?? '');
+            unset($changes['birthday'], $changes['birthDate']);
+            if ($changes === [] && !$birthdayDisabled) {
                 throw new InvalidArgumentException('No event changes were supplied.');
             }
 
-            $updated = $this->sendRequest(
+            $updated = $changes === []
+                ? []
+                : $this->sendRequest(
                 'UpdateEvent',
                 [
                     'UID'         => trim((string) ($event['uid'] ?? '')),
@@ -644,6 +741,18 @@ class Kalender extends IPSModuleStrict
                     'Recurrence'  => $recurrence
                 ]
             );
+
+            if ($birthdayDisabled) {
+                $this->removeBirthdayMetadata($event);
+            } elseif ($birthdayEnabled || $existingBirthday !== null) {
+                $summary = trim((string) ($changes['summary'] ?? $existingBirthday['summary'] ?? $event['summary'] ?? ''));
+                $this->upsertBirthdayMetadata(
+                    array_merge($event, is_array($updated) ? $updated : []),
+                    $birthdayDate,
+                    $summary,
+                    $event
+                );
+            }
             $this->refreshAfterWrite();
 
             return $this->encodeResult(true, $updated);
@@ -674,6 +783,15 @@ class Kalender extends IPSModuleStrict
             );
             if (!(bool) ($result['success'] ?? false)) {
                 throw new RuntimeException('The calendar account did not confirm the deletion.');
+            }
+            $writeScope = (string) ($recurrence['writeScope'] ?? '');
+            if (!CalendarEventRecurrence::isOccurrence($recurrence)
+                || in_array(
+                    $writeScope,
+                    [CalendarEventRecurrence::WRITE_SCOPE_FOLLOWING, CalendarEventRecurrence::WRITE_SCOPE_SERIES],
+                    true
+                )) {
+                $this->removeBirthdayMetadata($event);
             }
             $this->refreshAfterWrite();
             return true;
@@ -1036,6 +1154,7 @@ class Kalender extends IPSModuleStrict
     private function storeEvents(array $events): void
     {
         $timestamp = time();
+        $events = $this->enrichBirthdayEvents($events);
         $this->WritePersistentJsonCache('CachedEvents', $events);
         $this->WriteAttributeInteger('LastSynchronization', $timestamp);
         $this->updateEventCounters($events);
@@ -1077,6 +1196,321 @@ class Kalender extends IPSModuleStrict
         } catch (UnexpectedValueException) {
             return [];
         }
+    }
+
+    /**
+     * @return list<array{keys: list<string>, birthDate: string, summary: string}>
+     */
+    private function readBirthdayMetadata(): array
+    {
+        try {
+            $decoded = json_decode($this->ReadAttributeString('BirthdayMetadata'), true, 512, JSON_THROW_ON_ERROR);
+        } catch (Throwable) {
+            return [];
+        }
+        if (!is_array($decoded) || !array_is_list($decoded)) {
+            return [];
+        }
+
+        $result = [];
+        foreach ($decoded as $entry) {
+            if (!is_array($entry) || !array_is_list($entry['keys'] ?? [])) {
+                continue;
+            }
+            $birthDate = $this->normalizeBirthDate((string) ($entry['birthDate'] ?? ''));
+            $keys = array_values(array_unique(array_filter(
+                array_map(static fn (mixed $key): string => trim((string) $key), $entry['keys']),
+                static fn (string $key): bool => $key !== ''
+            )));
+            if ($birthDate === '' || $keys === []) {
+                continue;
+            }
+            $result[] = [
+                'keys'      => $keys,
+                'birthDate' => $birthDate,
+                'summary'   => trim((string) ($entry['summary'] ?? ''))
+            ];
+        }
+
+        return $result;
+    }
+
+    /** @param list<array{keys: list<string>, birthDate: string, summary: string}> $metadata */
+    private function writeBirthdayMetadata(array $metadata): void
+    {
+        $this->WriteAttributeString(
+            'BirthdayMetadata',
+            json_encode(
+                array_values($metadata),
+                JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR
+            )
+        );
+    }
+
+    /**
+     * @param array<string, mixed> $event
+     * @return list<string>
+     */
+    private function birthdayEventKeys(array $event): array
+    {
+        $keys = [];
+        $seriesId = trim((string) ($event['seriesId'] ?? ''));
+        $eventReference = trim((string) ($event['eventReference'] ?? ''));
+        if ($seriesId !== '') {
+            $keys[] = 'id:' . $seriesId;
+        } elseif ($eventReference !== '') {
+            $keys[] = 'id:' . $eventReference;
+        }
+
+        $uid = trim((string) ($event['uid'] ?? ''));
+        if ($uid !== '') {
+            $keys[] = 'uid:' . $uid;
+        }
+        $resourceUrl = trim((string) ($event['resourceUrl'] ?? ''));
+        if ($resourceUrl !== '') {
+            $keys[] = 'resource:' . $resourceUrl;
+        }
+
+        return array_values(array_unique($keys));
+    }
+
+    /**
+     * @param array<string, mixed> $event
+     * @param list<array{keys: list<string>, birthDate: string, summary: string}> $metadata
+     */
+    private function birthdayMetadataIndex(array $event, array $metadata): ?int
+    {
+        $keys = $this->birthdayEventKeys($event);
+        if ($keys === []) {
+            return null;
+        }
+        foreach ($metadata as $index => $entry) {
+            if (array_intersect($keys, $entry['keys']) !== []) {
+                return $index;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @param array<string, mixed> $event
+     * @return array{keys: list<string>, birthDate: string, summary: string}|null
+     */
+    private function birthdayMetadataForEvent(array $event): ?array
+    {
+        $metadata = $this->readBirthdayMetadata();
+        $index = $this->birthdayMetadataIndex($event, $metadata);
+        return $index === null ? null : $metadata[$index];
+    }
+
+    /**
+     * @param array<string, mixed> $event
+     * @param array<string, mixed> $sourceEvent
+     */
+    private function upsertBirthdayMetadata(
+        array $event,
+        string $birthDate,
+        string $summary,
+        array $sourceEvent = []
+    ): void {
+        $birthDate = $this->normalizeBirthDate($birthDate);
+        if ($birthDate === '') {
+            throw new InvalidArgumentException('The birth date is invalid.');
+        }
+        $metadata = $this->readBirthdayMetadata();
+        $index = $sourceEvent !== [] ? $this->birthdayMetadataIndex($sourceEvent, $metadata) : null;
+        if ($index === null) {
+            $index = $this->birthdayMetadataIndex($event, $metadata);
+        }
+        $keys = $this->birthdayEventKeys($event);
+        if ($sourceEvent !== []) {
+            $keys = array_merge($keys, $this->birthdayEventKeys($sourceEvent));
+        }
+        if ($index === null) {
+            if ($keys === []) {
+                throw new InvalidArgumentException('The birthday event identity is incomplete.');
+            }
+            $metadata[] = [
+                'keys'      => array_values(array_unique($keys)),
+                'birthDate' => $birthDate,
+                'summary'   => trim($summary)
+            ];
+        } else {
+            $metadata[$index]['keys'] = array_values(array_unique(array_merge($metadata[$index]['keys'], $keys)));
+            $metadata[$index]['birthDate'] = $birthDate;
+            if (trim($summary) !== '') {
+                $metadata[$index]['summary'] = trim($summary);
+            }
+        }
+        $this->writeBirthdayMetadata($metadata);
+    }
+
+    /** @param array<string, mixed> $event */
+    private function removeBirthdayMetadata(array $event): void
+    {
+        $metadata = $this->readBirthdayMetadata();
+        $index = $this->birthdayMetadataIndex($event, $metadata);
+        if ($index === null) {
+            return;
+        }
+        unset($metadata[$index]);
+        $this->writeBirthdayMetadata(array_values($metadata));
+    }
+
+    /**
+     * @param array<string, mixed> $event
+     * @return array{enabled: bool, birthDate: string}|null
+     */
+    private function birthdayInput(array $event): ?array
+    {
+        if (!array_key_exists('birthday', $event)) {
+            return null;
+        }
+        if (!is_bool($event['birthday'])) {
+            throw new InvalidArgumentException('The birthday flag must be boolean.');
+        }
+        if (!$event['birthday']) {
+            return ['enabled' => false, 'birthDate' => ''];
+        }
+        $birthDate = $this->normalizeBirthDate((string) ($event['birthDate'] ?? ''));
+        if ($birthDate === '' || $birthDate > date('Y-m-d')) {
+            throw new InvalidArgumentException('The birth date is invalid.');
+        }
+
+        return ['enabled' => true, 'birthDate' => $birthDate];
+    }
+
+    /** @param array<string, mixed> $event */
+    private function assertBirthdayRecurrence(array $event): void
+    {
+        $recurrence = $event['recurrence'] ?? null;
+        if (!is_array($recurrence)
+            || strtoupper(trim((string) ($recurrence['frequency'] ?? ''))) !== 'YEARLY'
+            || max(1, (int) ($recurrence['interval'] ?? 1)) !== 1
+            || !(bool) ($event['allDay'] ?? false)) {
+            throw new InvalidArgumentException('Birthdays must be all-day yearly recurring events.');
+        }
+    }
+
+    /** @param array<string, mixed> $event */
+    private function applyBirthdayEventDefaults(array &$event, string $birthDate): void
+    {
+        $birthDate = $this->normalizeBirthDate($birthDate);
+        if ($birthDate === '') {
+            throw new InvalidArgumentException('The birth date is invalid.');
+        }
+        $start = new DateTimeImmutable($birthDate . ' 00:00:00');
+        $event['allDay'] = true;
+        $event['start'] = $birthDate;
+        $event['end'] = $start->modify('+1 day')->format('Y-m-d');
+        $event['recurrence'] = [
+            'frequency' => 'YEARLY',
+            'interval'  => 1,
+            'endMode'   => 'never'
+        ];
+    }
+
+    private function normalizeBirthDate(string $birthDate): string
+    {
+        $birthDate = trim($birthDate);
+        if (preg_match('/^\d{4}-\d{2}-\d{2}$/D', $birthDate) !== 1) {
+            return '';
+        }
+        $date = DateTimeImmutable::createFromFormat('!Y-m-d', $birthDate);
+        if ($date === false || $date->format('Y-m-d') !== $birthDate) {
+            return '';
+        }
+
+        return $birthDate;
+    }
+
+    private function nextBirthdayDate(string $birthDate, DateTimeImmutable $today): DateTimeImmutable
+    {
+        $month = (int) substr($birthDate, 5, 2);
+        $day = (int) substr($birthDate, 8, 2);
+        $year = (int) $today->format('Y');
+        for ($offset = 0; $offset <= 8; ++$offset) {
+            $candidateText = sprintf('%04d-%02d-%02d', $year + $offset, $month, $day);
+            $candidate = DateTimeImmutable::createFromFormat('!Y-m-d', $candidateText, $today->getTimezone());
+            if ($candidate === false || $candidate->format('Y-m-d') !== $candidateText) {
+                continue;
+            }
+            if ($candidate >= $today) {
+                return $candidate;
+            }
+        }
+
+        throw new RuntimeException('The next birthday could not be calculated.');
+    }
+
+    /** @param array<string, mixed> $event */
+    private function enrichBirthdayEvent(array $event): array
+    {
+        $metadata = $this->birthdayMetadataForEvent($event);
+        if ($metadata === null) {
+            return $event;
+        }
+
+        return $this->applyBirthdayPresentation($event, $metadata);
+    }
+
+    /**
+     * @param list<array<string, mixed>> $events
+     * @return list<array<string, mixed>>
+     */
+    private function enrichBirthdayEvents(array $events): array
+    {
+        $metadata = $this->readBirthdayMetadata();
+        if ($metadata === []) {
+            return $events;
+        }
+        $changed = false;
+        foreach ($events as &$event) {
+            if (!is_array($event)) {
+                continue;
+            }
+            $index = $this->birthdayMetadataIndex($event, $metadata);
+            if ($index === null) {
+                continue;
+            }
+            $event = $this->applyBirthdayPresentation($event, $metadata[$index]);
+            $summary = trim((string) ($event['summary'] ?? ''));
+            if ($summary !== '' && $summary !== $metadata[$index]['summary']) {
+                $metadata[$index]['summary'] = $summary;
+                $changed = true;
+            }
+        }
+        unset($event);
+        if ($changed) {
+            $this->writeBirthdayMetadata($metadata);
+        }
+
+        return $events;
+    }
+
+    /**
+     * @param array<string, mixed> $event
+     * @param array{keys: list<string>, birthDate: string, summary: string} $metadata
+     * @return array<string, mixed>
+     */
+    private function applyBirthdayPresentation(array $event, array $metadata): array
+    {
+        $birthDate = $metadata['birthDate'];
+        $birthYear = (int) substr($birthDate, 0, 4);
+        $occurrenceDate = trim((string) ($event['originalStart'] ?? $event['start'] ?? ''));
+        $occurrenceYear = preg_match('/^\d{4}/', $occurrenceDate, $matches) === 1
+            ? (int) $matches[0]
+            : (int) date('Y');
+        $age = max(0, $occurrenceYear - $birthYear);
+        $summary = trim((string) ($event['summary'] ?? $metadata['summary']));
+
+        $event['birthday'] = true;
+        $event['birthDate'] = $birthDate;
+        $event['age'] = $age;
+        $event['displaySummary'] = $summary !== '' ? sprintf('%s (%dJ)', $summary, $age) : sprintf('(%dJ)', $age);
+
+        return $event;
     }
 
     /**

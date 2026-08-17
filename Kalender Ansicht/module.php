@@ -543,6 +543,70 @@ class KalenderAnsicht extends IPSModuleStrict
     }
 
     /**
+     * Returns birthdays from the calendars selected in this Calendar View.
+     *
+     * Calendar instance ID zero includes every selected calendar. A positive day
+     * window only returns birthdays whose next occurrence is within that many days;
+     * zero returns every birthday stored by OpenCalendar.
+     *
+     * @param int $CalendarInstanceID Optional selected calendar instance ID. Zero includes all selected calendars.
+     * @param int $Days Optional look-ahead window in days. Zero returns all birthdays.
+     * @return string JSON-encoded birthday list sorted by the next birthday.
+     */
+    public function GetBirthdayList(int $CalendarInstanceID = 0, int $Days = 0): string
+    {
+        if ($Days < 0) {
+            throw new InvalidArgumentException('Birthday look-ahead days must not be negative.');
+        }
+
+        $birthdays = [];
+        foreach ($this->loadSelectedCalendars() as $calendar) {
+            if ($CalendarInstanceID !== 0 && $calendar['instanceId'] !== $CalendarInstanceID) {
+                continue;
+            }
+            try {
+                $calendarBirthdays = json_decode(
+                    IPSKAL_GetBirthdayList($calendar['instanceId'], $Days),
+                    true,
+                    512,
+                    JSON_THROW_ON_ERROR
+                );
+            } catch (Throwable $exception) {
+                $this->SendDebug('BirthdayList', $exception->getMessage(), 0);
+                continue;
+            }
+            if (!is_array($calendarBirthdays) || !array_is_list($calendarBirthdays)) {
+                continue;
+            }
+            foreach ($calendarBirthdays as $birthday) {
+                if (!is_array($birthday)) {
+                    continue;
+                }
+                $birthday['calendarInstanceId'] = $calendar['instanceId'];
+                $birthday['calendarName'] = $calendar['name'];
+                $birthday['calendarColor'] = $calendar['color'];
+                $birthdays[] = $birthday;
+            }
+        }
+
+        usort(
+            $birthdays,
+            static fn (array $left, array $right): int => ((int) ($left['daysUntil'] ?? PHP_INT_MAX)
+                <=> (int) ($right['daysUntil'] ?? PHP_INT_MAX))
+                ?: strcasecmp((string) ($left['name'] ?? ''), (string) ($right['name'] ?? ''))
+                ?: strcasecmp((string) ($left['calendarName'] ?? ''), (string) ($right['calendarName'] ?? ''))
+        );
+
+        return json_encode(
+            $birthdays,
+            JSON_UNESCAPED_SLASHES
+                | JSON_UNESCAPED_UNICODE
+                | JSON_PRESERVE_ZERO_FRACTION
+                | JSON_THROW_ON_ERROR
+        );
+    }
+
+    /**
      * Returns appointments from all selected calendars that overlap an inclusive local date range.
      *
      * This API deliberately ignores the visualization properties PastDays, FutureDays and

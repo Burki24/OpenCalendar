@@ -103,8 +103,15 @@
                 <label for="event-summary">Title</label>
                 <input id="event-summary" maxlength="250" required>
             </div>
-            <label class="checkbox-row"><input type="checkbox" id="event-all-day"> <span id="all-day-label">All day</span></label>
-            <div class="form-row two">
+            <label class="checkbox-row" id="event-all-day-row"><input type="checkbox" id="event-all-day"> <span id="all-day-label">All day</span></label>
+            <div class="form-row two" id="event-birthday-row">
+                <label class="checkbox-row"><input type="checkbox" id="event-birthday"> <span data-i18n="Birthday">Birthday</span></label>
+                <div class="form-row hidden" id="event-birth-date-row">
+                    <label for="event-birth-date" data-i18n="Birth date">Birth date</label>
+                    <input id="event-birth-date" type="date">
+                </div>
+            </div>
+            <div class="form-row two" id="event-date-row">
                 <div class="form-row">
                     <label for="event-start">Start</label>
                     <input id="event-start" type="datetime-local" required>
