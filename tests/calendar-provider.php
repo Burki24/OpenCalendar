@@ -151,11 +151,13 @@ assertSameValue('owner@example.com', $calendars[0]['providerId'], 'The primary c
 assertSameValue(true, $calendars[0]['writeAccessKnown'], 'Google access roles must provide authoritative write metadata.');
 assertSameValue(true, $calendars[0]['capabilities']['create'], 'Owners must have write access.');
 assertSameValue(true, $calendars[0]['capabilities']['createRecurrence'], 'Writable Google calendars must advertise recurrence creation support.');
+assertSameValue(true, $calendars[0]['capabilities']['updateRecurrence'], 'Writable Google calendars must advertise recurrence conversion support.');
 assertSameValue(true, $calendars[0]['capabilities']['updateFollowing'], 'Writable Google calendars must advertise this-and-following update support.');
 assertSameValue(true, $calendars[0]['capabilities']['updateSeries'], 'Writable Google calendars must advertise recurring-series update support.');
 assertSameValue(true, $calendars[0]['capabilities']['deleteSeries'], 'Writable Google calendars must advertise recurring-series deletion support.');
 assertSameValue('Europe/Berlin', $calendars[0]['timezone'], 'Google calendar timezones must be retained for recurring events.');
 assertSameValue(false, $calendars[1]['capabilities']['create'], 'Readers must not have write access.');
+assertSameValue(false, $calendars[1]['capabilities']['updateRecurrence'], 'Read-only Google calendars must not advertise recurrence conversion support.');
 assertTrueValue(str_contains($calendarClient->requests[1]['url'], 'pageToken=page-2'), 'The second calendar page must be requested.');
 
 $googleRepeatedPageClient = new FakeHttpClient([
@@ -328,6 +330,124 @@ assertSameValue(
     ['RRULE:FREQ=YEARLY;COUNT=3'],
     $allDayRecurringBody['recurrence'],
     'All-day recurring Google events must support count-based series without a timezone.'
+);
+
+$googleSingleToSeriesClient = new FakeHttpClient([
+    response(200, [
+        'id'      => 'single-to-series-id',
+        'iCalUID' => 'single-to-series@example.com',
+        'etag'    => '"single-to-series"'
+    ])
+]);
+(new GoogleCalendarProvider($googleSingleToSeriesClient, 'access-token'))->updateEvent(
+    'owner@example.com',
+    'single-to-series-id',
+    '"single-before"',
+    'single-to-series@example.com',
+    [
+        'summary'    => 'Converted recurring event',
+        'allDay'     => false,
+        'start'      => '2026-08-17T08:00:00Z',
+        'end'        => '2026-08-17T09:00:00Z',
+        'timezone'   => 'Europe/Berlin',
+        'recurrence' => [
+            'frequency' => 'weekly',
+            'interval'  => 1,
+            'byDay'     => ['MO'],
+            'endMode'   => 'count',
+            'count'     => 4
+        ]
+    ]
+);
+assertSameValue(
+    'PATCH',
+    $googleSingleToSeriesClient->requests[0]['method'],
+    'Google single events must be convertible to recurring series via PATCH.'
+);
+assertSameValue(
+    '"single-before"',
+    $googleSingleToSeriesClient->requests[0]['headers']['If-Match'] ?? '',
+    'Google recurrence conversion must retain optimistic locking.'
+);
+$googleSingleToSeriesBody = json_decode(
+    $googleSingleToSeriesClient->requests[0]['body'],
+    true,
+    512,
+    JSON_THROW_ON_ERROR
+);
+assertSameValue(
+    '2026-08-17T10:00:00+02:00',
+    $googleSingleToSeriesBody['start']['dateTime'],
+    'Converting a Google single event to a series must preserve its local wall-clock time.'
+);
+assertSameValue(
+    'Europe/Berlin',
+    $googleSingleToSeriesBody['start']['timeZone'],
+    'Converting a Google single event to a series must retain its timezone.'
+);
+assertSameValue(
+    ['RRULE:FREQ=WEEKLY;BYDAY=MO;COUNT=4'],
+    $googleSingleToSeriesBody['recurrence'],
+    'Converting a Google single event must submit the requested recurrence rule.'
+);
+
+$googleSeriesToSingleClient = new FakeHttpClient([
+    response(200, [
+        'id'      => 'series-to-single-id',
+        'iCalUID' => 'series-to-single@example.com',
+        'etag'    => '"series-to-single"'
+    ])
+]);
+(new GoogleCalendarProvider($googleSeriesToSingleClient, 'access-token'))->updateEvent(
+    'owner@example.com',
+    'series-to-single-id',
+    '"series-before-single"',
+    'series-to-single@example.com',
+    [
+        'summary'    => 'Converted single event',
+        'allDay'     => false,
+        'start'      => '2026-08-17T08:00:00Z',
+        'end'        => '2026-08-17T09:00:00Z',
+        'timezone'   => 'Europe/Berlin',
+        'recurrence' => null
+    ],
+    [
+        'recurrenceType'  => 'master',
+        'seriesId'        => 'series-to-single-id',
+        'recurring'       => true,
+        'canUpdateSeries' => true,
+        'writeScope'      => 'series'
+    ]
+);
+assertSameValue(
+    'PATCH',
+    $googleSeriesToSingleClient->requests[0]['method'],
+    'Google recurring series must be convertible to a single event via PATCH.'
+);
+assertSameValue(
+    '"series-before-single"',
+    $googleSeriesToSingleClient->requests[0]['headers']['If-Match'] ?? '',
+    'Google series-to-single conversion must retain optimistic locking.'
+);
+$googleSeriesToSingleBody = json_decode(
+    $googleSeriesToSingleClient->requests[0]['body'],
+    true,
+    512,
+    JSON_THROW_ON_ERROR
+);
+assertTrueValue(
+    array_key_exists('recurrence', $googleSeriesToSingleBody),
+    'Google series-to-single conversion must explicitly submit the recurrence property.'
+);
+assertSameValue(
+    [],
+    $googleSeriesToSingleBody['recurrence'],
+    'Google series-to-single conversion must clear the recurrence array.'
+);
+assertSameValue(
+    '2026-08-17T10:00:00+02:00',
+    $googleSeriesToSingleBody['start']['dateTime'],
+    'Converting a Google series to a single event must preserve its local wall-clock time.'
 );
 $provider->updateEvent(
     'owner@example.com',

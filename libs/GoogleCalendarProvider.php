@@ -120,6 +120,7 @@ final class GoogleCalendarProvider implements CalendarEventLookupProviderInterfa
                         'update'           => $canWrite,
                         'delete'           => $canWrite,
                         'createRecurrence' => $canWrite,
+                        'updateRecurrence' => $canWrite,
                         'updateFollowing'  => $canWrite,
                         'updateSeries'     => $canWrite,
                         'deleteSeries'     => $canWrite
@@ -347,11 +348,15 @@ final class GoogleCalendarProvider implements CalendarEventLookupProviderInterfa
         $calendarId = $this->calendarId($calendarReference);
         $eventId = $this->eventId($eventReference);
         $identity = $this->assertWritableRecurrence($recurrence, true, $eventId);
+        $recurrenceType = (string) ($identity['recurrenceType'] ?? CalendarEventRecurrence::SINGLE);
         if (($identity['writeScope'] ?? '') === CalendarEventRecurrence::WRITE_SCOPE_FOLLOWING) {
             return $this->updateFollowingInstances($calendarId, $eventId, $event, $identity);
         }
 
         $seriesUpdate = ($identity['writeScope'] ?? '') === CalendarEventRecurrence::WRITE_SCOPE_SERIES;
+        $singleRecurrenceUpdate = $recurrenceType === CalendarEventRecurrence::SINGLE
+            && is_array($event['recurrence'] ?? null)
+            && $event['recurrence'] !== [];
         $targetEventId = $seriesUpdate
             ? trim((string) ($identity['seriesId'] ?? ''))
             : $eventId;
@@ -362,7 +367,7 @@ final class GoogleCalendarProvider implements CalendarEventLookupProviderInterfa
         $updated = $this->requestJson(
             'PATCH',
             '/calendars/' . rawurlencode($calendarId) . '/events/' . rawurlencode($targetEventId),
-            $this->buildEventPayload($event, false, $seriesUpdate),
+            $this->buildEventPayload($event, false, $seriesUpdate || $singleRecurrenceUpdate),
             $headers,
             [200]
         );
@@ -930,15 +935,23 @@ final class GoogleCalendarProvider implements CalendarEventLookupProviderInterfa
         }
 
         $recurrence = null;
+        $clearRecurrence = false;
         if (array_key_exists('recurrence', $data)) {
-            if (!is_array($data['recurrence']) || array_is_list($data['recurrence'])) {
-                throw new InvalidArgumentException('The recurrence settings are invalid.');
-            }
-            if ($data['recurrence'] !== []) {
-                if (!$creating && !$allowRecurrenceUpdate) {
+            if ($data['recurrence'] === null) {
+                if ($creating || !$allowRecurrenceUpdate) {
                     throw new InvalidArgumentException('The recurrence settings cannot be changed for this event.');
                 }
-                $recurrence = $data['recurrence'];
+                $clearRecurrence = true;
+            } else {
+                if (!is_array($data['recurrence']) || array_is_list($data['recurrence'])) {
+                    throw new InvalidArgumentException('The recurrence settings are invalid.');
+                }
+                if ($data['recurrence'] !== []) {
+                    if (!$creating && !$allowRecurrenceUpdate) {
+                        throw new InvalidArgumentException('The recurrence settings cannot be changed for this event.');
+                    }
+                    $recurrence = $data['recurrence'];
+                }
             }
         }
 
@@ -984,10 +997,12 @@ final class GoogleCalendarProvider implements CalendarEventLookupProviderInterfa
                     $allDay,
                     $eventTimezone
                 );
+            } elseif ($clearRecurrence) {
+                $payload['recurrence'] = [];
             }
         } elseif (array_key_exists('allDay', $data)) {
             throw new InvalidArgumentException('Changing all-day mode requires a start and end.');
-        } elseif ($recurrence !== null) {
+        } elseif ($recurrence !== null || $clearRecurrence) {
             throw new InvalidArgumentException('Changing recurrence requires a start and end.');
         }
 
