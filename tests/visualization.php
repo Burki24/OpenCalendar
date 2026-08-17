@@ -90,6 +90,7 @@ function assertVisualization(bool $condition, string $message): void
 
 $script = (string) file_get_contents(__DIR__ . '/../Kalender Ansicht/visualization/app.js');
 $indexSource = (string) file_get_contents(__DIR__ . '/../Kalender Ansicht/visualization/index.html');
+$style = (string) file_get_contents(__DIR__ . '/../Kalender Ansicht/visualization/style.css');
 assertVisualization(
     str_contains($script, 'return event.allDay ? allDayDate(event.start, event.startTimestamp)')
         && str_contains($script, 'allDayDate(event.end, event.endTimestamp || event.startTimestamp)')
@@ -150,12 +151,15 @@ assertVisualization(
         && str_contains($indexSource, 'id="event-birth-date"')
         && str_contains($script, 'function birthdayEditorEditable()')
         && str_contains($script, 'function birthdayRecurrence()')
+        && str_contains($script, 'function suggestedBirthDate()')
+        && str_contains($script, 'if (!eventBirthDate.value) eventBirthDate.value = suggestedBirthDate();')
         && str_contains($script, 'function birthdayEditorChange()')
         && str_contains($script, 'eventData.birthDate = birthdayChange.birthDate;')
         && str_contains($script, 'eventData.recurrence = birthdayRecurrence();')
         && str_contains($script, 'function eventDisplaySummary(event)')
-        && str_contains($script, 'eventDisplaySummary(event) || t(\'Untitled event\')'),
-    'The shared event dialog must support provider-neutral birthdays with a birth date and dynamic age display.'
+        && str_contains($script, 'eventDisplaySummary(event) || t(\'Untitled event\')')
+        && str_contains($style, '#event-birthday-row > .checkbox-row { font-size: inherit; }'),
+    'The shared event dialog must support provider-neutral birthdays, suggest the selected calendar date, and keep the birthday label at normal checkbox size.'
 );
 
 assertVisualization(

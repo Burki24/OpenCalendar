@@ -936,6 +936,29 @@ function updateBirthdayControls() {
     }
 }
 
+function suggestedBirthDate() {
+    const eventStart = readInputDate(document.getElementById('event-start').value);
+    if (!eventStart) return '';
+
+    const today = startOfDay(new Date());
+    const month = eventStart.getMonth();
+    const day = eventStart.getDate();
+    let year = Math.min(eventStart.getFullYear(), today.getFullYear());
+
+    while (year >= 1) {
+        const candidate = new Date(year, month, day);
+        if (candidate.getFullYear() === year
+            && candidate.getMonth() === month
+            && candidate.getDate() === day
+            && candidate <= today) {
+            return localDate(candidate);
+        }
+        --year;
+    }
+
+    return '';
+}
+
 function syncBirthdaySchedule() {
     if (!eventBirthday.checked || !birthdayEditorEditable()) return;
     const birthDate = readInputDate(eventBirthDate.value);
@@ -2369,6 +2392,7 @@ eventCalendarInput.addEventListener('change', () => {
 eventBirthday.addEventListener('change', () => {
     updateRecurrenceAvailability();
     if (eventBirthday.checked) {
+        if (!eventBirthDate.value) eventBirthDate.value = suggestedBirthDate();
         syncBirthdaySchedule();
     }
     updateBirthdayControls();
