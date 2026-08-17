@@ -70,10 +70,90 @@ final class CalendarRecurrenceRule
             $parts[] = 'INTERVAL=' . $interval;
         }
 
+        $patternMode = strtolower(trim((string) ($recurrence['patternMode'] ?? 'absolute')));
+        if (!in_array($patternMode, ['absolute', 'relative'], true)) {
+            throw new InvalidArgumentException('The recurrence pattern mode is invalid.');
+        }
+        if (!in_array($frequency, ['MONTHLY', 'YEARLY'], true)) {
+            $patternMode = 'absolute';
+        }
+
         if ($frequency === 'WEEKLY') {
             $weekdays = self::weekdays($recurrence['byDay'] ?? []);
             if ($weekdays !== []) {
                 $parts[] = 'BYDAY=' . implode(',', $weekdays);
+            }
+            if (array_key_exists('weekStart', $recurrence)) {
+                $weekStart = strtoupper(trim((string) $recurrence['weekStart']));
+                if (!in_array($weekStart, self::WEEKDAYS, true)) {
+                    throw new InvalidArgumentException('The recurrence week start is invalid.');
+                }
+                if ($weekStart !== 'MO') {
+                    $parts[] = 'WKST=' . $weekStart;
+                }
+            }
+        } elseif ($patternMode === 'relative') {
+            $weekdays = self::weekdays($recurrence['byDay'] ?? []);
+            if ($weekdays === []) {
+                $weekdays = [self::WEEKDAYS[(int) $start->format('N') - 1]];
+            }
+            $relativeIndex = strtolower(trim((string) ($recurrence['relativeIndex'] ?? 'first')));
+            $setPosition = match ($relativeIndex) {
+                'first'  => 1,
+                'second' => 2,
+                'third'  => 3,
+                'fourth' => 4,
+                'last'   => -1,
+                default  => 0
+            };
+            if ($setPosition === 0) {
+                throw new InvalidArgumentException('The recurrence relative position is invalid.');
+            }
+            if ($frequency === 'YEARLY') {
+                $month = filter_var(
+                    $recurrence['month'] ?? (int) $start->format('n'),
+                    FILTER_VALIDATE_INT,
+                    ['options' => ['min_range' => 1, 'max_range' => 12]]
+                );
+                if ($month === false) {
+                    throw new InvalidArgumentException('The recurrence month is invalid.');
+                }
+                $parts[] = 'BYMONTH=' . $month;
+            }
+            $parts[] = 'BYDAY=' . implode(',', $weekdays);
+            $parts[] = 'BYSETPOS=' . $setPosition;
+        } else {
+            if (array_key_exists('dayOfMonth', $recurrence)) {
+                $dayOfMonth = filter_var(
+                    $recurrence['dayOfMonth'],
+                    FILTER_VALIDATE_INT,
+                    ['options' => ['min_range' => 1, 'max_range' => 31]]
+                );
+                if ($dayOfMonth === false) {
+                    throw new InvalidArgumentException('The recurrence day of month is invalid.');
+                }
+                if ($frequency === 'YEARLY' && array_key_exists('month', $recurrence)) {
+                    $month = filter_var(
+                        $recurrence['month'],
+                        FILTER_VALIDATE_INT,
+                        ['options' => ['min_range' => 1, 'max_range' => 12]]
+                    );
+                    if ($month === false) {
+                        throw new InvalidArgumentException('The recurrence month is invalid.');
+                    }
+                    $parts[] = 'BYMONTH=' . $month;
+                }
+                $parts[] = 'BYMONTHDAY=' . $dayOfMonth;
+            } elseif ($frequency === 'YEARLY' && array_key_exists('month', $recurrence)) {
+                $month = filter_var(
+                    $recurrence['month'],
+                    FILTER_VALIDATE_INT,
+                    ['options' => ['min_range' => 1, 'max_range' => 12]]
+                );
+                if ($month === false) {
+                    throw new InvalidArgumentException('The recurrence month is invalid.');
+                }
+                $parts[] = 'BYMONTH=' . $month;
             }
         }
 
@@ -578,7 +658,11 @@ final class CalendarRecurrenceRule
             if ($key === '' || $value === '' || isset($values[$key])) {
                 return null;
             }
-            if (!in_array($key, ['FREQ', 'INTERVAL', 'BYDAY', 'COUNT', 'UNTIL'], true)) {
+            if (!in_array(
+                $key,
+                ['FREQ', 'INTERVAL', 'BYDAY', 'BYMONTHDAY', 'BYMONTH', 'BYSETPOS', 'WKST', 'COUNT', 'UNTIL'],
+                true
+            )) {
                 return null;
             }
             $values[$key] = $value;
@@ -604,20 +688,129 @@ final class CalendarRecurrenceRule
             'endMode'   => 'never'
         ];
 
+        $byDay = null;
         if (isset($values['BYDAY'])) {
-            if ($frequency !== 'WEEKLY') {
-                return null;
-            }
             $byDay = explode(',', $values['BYDAY']);
-            if ($byDay === [] || array_filter(
-                $byDay,
-                static fn (string $weekday): bool => !in_array($weekday, self::WEEKDAYS, true)
-            ) !== []) {
+            if ($byDay === []) {
                 return null;
             }
-            $result['byDay'] = self::weekdays($byDay);
-        } elseif ($frequency === 'WEEKLY') {
-            $result['byDay'] = [];
+        }
+
+        if ($frequency === 'WEEKLY') {
+            if (isset($values['BYMONTHDAY'])
+                || isset($values['BYMONTH'])
+                || isset($values['BYSETPOS'])) {
+                return null;
+            }
+            if ($byDay !== null) {
+                if (array_filter(
+                    $byDay,
+                    static fn (string $weekday): bool => !in_array($weekday, self::WEEKDAYS, true)
+                ) !== []) {
+                    return null;
+                }
+                $result['byDay'] = self::weekdays($byDay);
+            } else {
+                $result['byDay'] = [];
+            }
+            if (isset($values['WKST'])) {
+                $weekStart = trim($values['WKST']);
+                if (!in_array($weekStart, self::WEEKDAYS, true)) {
+                    return null;
+                }
+                if ($weekStart !== 'MO') {
+                    $result['weekStart'] = $weekStart;
+                }
+            }
+        } elseif (isset($values['WKST'])) {
+            return null;
+        }
+
+        if (in_array($frequency, ['MONTHLY', 'YEARLY'], true)) {
+            $relativeIndex = null;
+            $relativeDays = null;
+            if (isset($values['BYSETPOS'])) {
+                if ($byDay === null || isset($values['BYMONTHDAY'])) {
+                    return null;
+                }
+                $position = filter_var($values['BYSETPOS'], FILTER_VALIDATE_INT);
+                $relativeIndex = match ($position) {
+                    1       => 'first',
+                    2       => 'second',
+                    3       => 'third',
+                    4       => 'fourth',
+                    -1      => 'last',
+                    default => null
+                };
+                if ($relativeIndex === null || array_filter(
+                    $byDay,
+                    static fn (string $weekday): bool => !in_array($weekday, self::WEEKDAYS, true)
+                ) !== []) {
+                    return null;
+                }
+                $relativeDays = self::weekdays($byDay);
+            } elseif ($byDay !== null) {
+                if (count($byDay) !== 1
+                    || preg_match('/^(1|2|3|4|-1)(MO|TU|WE|TH|FR|SA|SU)$/D', $byDay[0], $matches) !== 1) {
+                    return null;
+                }
+                $relativeIndex = match ((int) $matches[1]) {
+                    1       => 'first',
+                    2       => 'second',
+                    3       => 'third',
+                    4       => 'fourth',
+                    -1      => 'last',
+                    default => null
+                };
+                if ($relativeIndex === null) {
+                    return null;
+                }
+                $relativeDays = [$matches[2]];
+            }
+
+            if ($relativeIndex !== null) {
+                if ($frequency === 'YEARLY' && !isset($values['BYMONTH'])) {
+                    return null;
+                }
+                $result['patternMode'] = 'relative';
+                $result['byDay'] = $relativeDays;
+                $result['relativeIndex'] = $relativeIndex;
+            }
+
+            if (isset($values['BYMONTHDAY'])) {
+                if ($relativeIndex !== null || str_contains($values['BYMONTHDAY'], ',')) {
+                    return null;
+                }
+                $dayOfMonth = filter_var(
+                    $values['BYMONTHDAY'],
+                    FILTER_VALIDATE_INT,
+                    ['options' => ['min_range' => 1, 'max_range' => 31]]
+                );
+                if ($dayOfMonth === false) {
+                    return null;
+                }
+                $result['dayOfMonth'] = $dayOfMonth;
+            }
+
+            if (isset($values['BYMONTH'])) {
+                if ($frequency !== 'YEARLY' || str_contains($values['BYMONTH'], ',')) {
+                    return null;
+                }
+                $month = filter_var(
+                    $values['BYMONTH'],
+                    FILTER_VALIDATE_INT,
+                    ['options' => ['min_range' => 1, 'max_range' => 12]]
+                );
+                if ($month === false) {
+                    return null;
+                }
+                $result['month'] = $month;
+            }
+        } elseif ($frequency !== 'WEEKLY' && ($byDay !== null
+            || isset($values['BYMONTHDAY'])
+            || isset($values['BYMONTH'])
+            || isset($values['BYSETPOS']))) {
+            return null;
         }
 
         if (isset($values['COUNT']) && isset($values['UNTIL'])) {

@@ -1542,6 +1542,124 @@ assertSameValue(
     'Relative yearly Microsoft series must support this-and-following occurrence positioning.'
 );
 
+assertSameValue(
+    ['RRULE:FREQ=WEEKLY;INTERVAL=2;BYDAY=TU,TH;WKST=SU'],
+    CalendarRecurrenceRule::toGoogleLines(
+        [
+            'frequency' => 'weekly',
+            'interval'  => 2,
+            'byDay'     => ['TH', 'TU'],
+            'weekStart' => 'SU',
+            'endMode'   => 'never'
+        ],
+        new DateTimeImmutable('2026-09-01T09:00:00+02:00'),
+        false,
+        'Europe/Berlin'
+    ),
+    'Provider-neutral weekly recurrence must preserve non-Monday week boundaries when serialized as RFC 5545.'
+);
+assertSameValue(
+    [
+        'frequency' => 'WEEKLY',
+        'interval'  => 2,
+        'endMode'   => 'never',
+        'byDay'     => ['TU', 'TH'],
+        'weekStart' => 'SU'
+    ],
+    CalendarRecurrenceRule::fromGoogleRule(
+        'RRULE:FREQ=WEEKLY;INTERVAL=2;BYDAY=TU,TH;WKST=SU',
+        false,
+        'Europe/Berlin'
+    ),
+    'RFC 5545 weekly recurrence must round-trip Outlook week boundaries for cross-provider moves.'
+);
+assertSameValue(
+    ['RRULE:FREQ=MONTHLY;BYDAY=WE,FR;BYSETPOS=2;COUNT=6'],
+    CalendarRecurrenceRule::toGoogleLines(
+        [
+            'frequency'     => 'monthly',
+            'interval'      => 1,
+            'patternMode'   => 'relative',
+            'byDay'         => ['FR', 'WE'],
+            'relativeIndex' => 'second',
+            'endMode'       => 'count',
+            'count'         => 6
+        ],
+        new DateTimeImmutable('2026-08-12T09:00:00+02:00'),
+        false,
+        'Europe/Berlin'
+    ),
+    'Relative monthly recurrence must serialize losslessly for Google and CalDAV targets.'
+);
+assertSameValue(
+    [
+        'frequency'     => 'MONTHLY',
+        'interval'      => 1,
+        'endMode'       => 'count',
+        'patternMode'   => 'relative',
+        'byDay'         => ['WE', 'FR'],
+        'relativeIndex' => 'second',
+        'count'         => 6
+    ],
+    CalendarRecurrenceRule::fromGoogleRule(
+        'RRULE:FREQ=MONTHLY;BYDAY=WE,FR;BYSETPOS=2;COUNT=6',
+        false,
+        'Europe/Berlin'
+    ),
+    'Relative monthly RFC 5545 recurrence must return to the shared recurrence model.'
+);
+assertSameValue(
+    ['RRULE:FREQ=YEARLY;BYMONTH=11;BYDAY=WE;BYSETPOS=-1'],
+    CalendarRecurrenceRule::toGoogleLines(
+        [
+            'frequency'     => 'yearly',
+            'interval'      => 1,
+            'patternMode'   => 'relative',
+            'byDay'         => ['WE'],
+            'relativeIndex' => 'last',
+            'month'         => 11,
+            'endMode'       => 'never'
+        ],
+        new DateTimeImmutable('2026-11-25T09:00:00+01:00'),
+        false,
+        'Europe/Berlin'
+    ),
+    'Relative yearly recurrence must retain its month when moved to an RFC 5545 provider.'
+);
+assertSameValue(
+    [
+        'frequency'     => 'YEARLY',
+        'interval'      => 1,
+        'endMode'       => 'never',
+        'patternMode'   => 'relative',
+        'byDay'         => ['WE'],
+        'relativeIndex' => 'last',
+        'month'         => 11
+    ],
+    CalendarRecurrenceRule::fromGoogleRule(
+        'RRULE:FREQ=YEARLY;BYMONTH=11;BYDAY=WE;BYSETPOS=-1',
+        false,
+        'Europe/Berlin'
+    ),
+    'Relative yearly RFC 5545 recurrence must remain editable after a cross-provider move.'
+);
+assertSameValue(
+    ['RRULE:FREQ=YEARLY;BYMONTH=3;BYMONTHDAY=15'],
+    CalendarRecurrenceRule::toGoogleLines(
+        [
+            'frequency'  => 'yearly',
+            'interval'   => 1,
+            'month'      => 3,
+            'dayOfMonth' => 15,
+            'endMode'    => 'never'
+        ],
+        new DateTimeImmutable('2026-02-01T09:00:00+01:00'),
+        false,
+        'Europe/Berlin'
+    ),
+    'Absolute yearly recurrence must preserve an Outlook month and day that differ from DTSTART.'
+);
+
 $msSplitRecurrence = [
     'pattern' => [
         'type'           => 'weekly',
@@ -3172,11 +3290,16 @@ assertTrueValue(
 assertTrueValue(
     is_string($viewModuleSource)
         && str_contains($viewModuleSource, "case 'MoveEvent':")
+        && str_contains($viewModuleSource, "\$sourceRecurring = (bool) (\$sourceEvent['recurring'] ?? false);")
+        && str_contains($viewModuleSource, "in_array(\$writeScope, ['occurrence', 'following', 'series'], true)")
+        && str_contains($viewModuleSource, '$this->requireRecurrenceCreationCalendar($targetInstanceId);')
         && str_contains($viewModuleSource, 'IPSKAL_CreateEvent(')
-        && str_contains($viewModuleSource, 'IPSKAL_DeleteEvent(')
+        && str_contains($viewModuleSource, "json_encode(\n                        \$sourceEvent,")
+        && str_contains($viewModuleSource, '$this->rollbackMovedTargetEvent($targetInstanceId, $creationResult, $targetRecurring)')
         && str_contains($viewModuleSource, "'Event moved.'")
+        && !str_contains($viewModuleSource, 'Recurring events cannot be moved yet.')
         && str_contains($viewModuleSource, 'The event was created in the target calendar, but could not be deleted from the source calendar.'),
-    'Moving an event must create the target copy before deleting the source and report partial failures without risking event loss.'
+    'Moving an event must support recurring write scopes, create the target copy before deleting the source, and roll the target back when source deletion fails.'
 );
 
 assertTrueValue(

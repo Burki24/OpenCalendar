@@ -2047,11 +2047,43 @@ class KalenderAnsicht extends IPSModuleStrict
                 }
                 $sourceEvent = $request['sourceEvent'] ?? null;
                 $event = $request['event'] ?? null;
-                if (!is_array($sourceEvent) || !is_array($event)) {
+                if (!is_array($sourceEvent) || array_is_list($sourceEvent)
+                    || !is_array($event) || array_is_list($event)) {
                     throw new InvalidArgumentException($this->Translate('The event data is invalid.'));
                 }
-                if (($sourceEvent['recurring'] ?? false) || trim((string) ($sourceEvent['recurrenceId'] ?? '')) !== '') {
-                    throw new RuntimeException($this->Translate('Recurring events cannot be moved yet.'));
+
+                $sourceRecurring = (bool) ($sourceEvent['recurring'] ?? false);
+                $writeScope = strtolower(trim((string) ($sourceEvent['writeScope'] ?? '')));
+                $targetRecurrenceProvided = array_key_exists('recurrence', $event);
+                $targetRecurrence = $event['recurrence'] ?? null;
+                $targetRecurring = is_array($targetRecurrence) && $targetRecurrence !== [];
+                if ($targetRecurrenceProvided
+                    && $targetRecurrence !== null
+                    && (!is_array($targetRecurrence) || $targetRecurrence === [] || array_is_list($targetRecurrence))) {
+                    throw new InvalidArgumentException($this->Translate('The recurrence settings are invalid.'));
+                }
+
+                if ($sourceRecurring) {
+                    if (!in_array($writeScope, ['occurrence', 'following', 'series'], true)) {
+                        throw new InvalidArgumentException($this->Translate('The event data is invalid.'));
+                    }
+                    if ($writeScope === 'following' && !$targetRecurring) {
+                        throw new RuntimeException($this->Translate('The recurrence pattern cannot be split safely.'));
+                    }
+                    if ($writeScope === 'series' && !$targetRecurrenceProvided) {
+                        throw new RuntimeException($this->Translate('The recurrence pattern cannot be edited safely.'));
+                    }
+                    if ($writeScope === 'occurrence' && $targetRecurring) {
+                        throw new RuntimeException($this->Translate('The recurrence settings are invalid.'));
+                    }
+                } elseif ($targetRecurring) {
+                    $writeScope = '';
+                }
+
+                if ($targetRecurring) {
+                    $this->requireRecurrenceCreationCalendar($targetInstanceId);
+                } elseif ($targetRecurrenceProvided && $targetRecurrence === null) {
+                    unset($event['recurrence']);
                 }
 
                 $creationResult = json_decode(
@@ -2070,14 +2102,13 @@ class KalenderAnsicht extends IPSModuleStrict
                 if (!IPSKAL_DeleteEvent(
                     $sourceInstanceId,
                     json_encode(
-                        [
-                            'resourceUrl'  => (string) ($sourceEvent['resourceUrl'] ?? ''),
-                            'etag'         => (string) ($sourceEvent['etag'] ?? ''),
-                            'recurrenceId' => (string) ($sourceEvent['recurrenceId'] ?? '')
-                        ],
+                        $sourceEvent,
                         JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR
                     )
                 )) {
+                    if ($this->rollbackMovedTargetEvent($targetInstanceId, $creationResult, $targetRecurring)) {
+                        throw new RuntimeException($this->Translate('Event move failed.'));
+                    }
                     throw new RuntimeException($this->Translate(
                         'The event was created in the target calendar, but could not be deleted from the source calendar. Please check both calendars.'
                     ));
@@ -2228,6 +2259,62 @@ class KalenderAnsicht extends IPSModuleStrict
             }
         }
         throw new RuntimeException($this->Translate('The selected calendar is not writable.'));
+    }
+
+    private function requireRecurrenceCreationCalendar(int $instanceId): void
+    {
+        foreach ($this->loadSelectedCalendars() as $calendar) {
+            if ($calendar['instanceId'] === $instanceId
+                && $calendar['canWrite']
+                && $calendar['canCreateRecurrence']) {
+                return;
+            }
+        }
+        throw new RuntimeException($this->Translate('Recurring event creation is not supported by this calendar.'));
+    }
+
+    /** @param array<string, mixed> $creationResult */
+    private function rollbackMovedTargetEvent(int $instanceId, array $creationResult, bool $recurring): bool
+    {
+        $createdEvent = $creationResult['event'] ?? null;
+        if (!is_array($createdEvent) || array_is_list($createdEvent)) {
+            return false;
+        }
+
+        $rollbackEvent = [
+            'uid'         => trim((string) ($createdEvent['uid'] ?? '')),
+            'resourceUrl' => trim((string) ($createdEvent['resourceUrl'] ?? '')),
+            'etag'        => trim((string) ($createdEvent['etag'] ?? ''))
+        ];
+        if ($recurring) {
+            $seriesId = trim((string) ($createdEvent['eventReference'] ?? ''));
+            if ($seriesId === '') {
+                $seriesId = $rollbackEvent['uid'];
+            }
+            if ($seriesId === '') {
+                return false;
+            }
+            $rollbackEvent = array_merge($rollbackEvent, [
+                'recurrenceType'  => 'master',
+                'seriesId'        => $seriesId,
+                'recurring'       => true,
+                'canDeleteSeries' => true,
+                'writeScope'      => 'series'
+            ]);
+        }
+
+        try {
+            return IPSKAL_DeleteEvent(
+                $instanceId,
+                json_encode(
+                    $rollbackEvent,
+                    JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR
+                )
+            );
+        } catch (Throwable $exception) {
+            $this->SendDebug('MoveRollback', $exception->getMessage(), 0);
+            return false;
+        }
     }
 
     private function sendToast(string $level, string $message): void

@@ -1131,6 +1131,27 @@ function eventCanUpdate(event) {
     return eventCanUpdateOccurrence(event) || eventCanUpdateFollowing(event) || eventCanUpdateSeries(event);
 }
 
+function eventCanMove(event, writeScope = '') {
+    if (!hasActionBridge() || !Boolean(event?.canWrite)) return false;
+    if (!Boolean(event?.recurring)) {
+        return eventCanUpdateOccurrence(event) && eventCanDelete(event);
+    }
+
+    const scope = writeScope || event.writeScope || 'occurrence';
+    if (scope === 'series') {
+        return eventCanUpdateSeries(event)
+            && Boolean(event.canDeleteSeries)
+            && event.recurrenceEditable !== false;
+    }
+    if (scope === 'following') {
+        return eventCanUpdateFollowing(event)
+            && eventCanDeleteFollowing(event)
+            && event.recurrenceEditable !== false;
+    }
+
+    return eventCanUpdateOccurrence(event) && Boolean(event.canDeleteOccurrence);
+}
+
 function eventCanDeleteFollowing(event) {
     return hasActionBridge()
         && Boolean(event.canWrite)
@@ -1203,13 +1224,16 @@ function openExistingEvent(event, writeScope = '') {
         : editingFollowing
             ? eventCanUpdateFollowing(selectedEvent)
             : eventCanUpdateOccurrence(selectedEvent);
-    const availableCalendars = selectedEvent.recurring
-        ? calendarState.calendars.filter(calendar => calendar.instanceId === selectedEvent.calendarInstanceId)
-        : (editable
-        ? calendarState.calendars.filter(calendar => calendar.canWrite || calendar.instanceId === selectedEvent.calendarInstanceId)
-        : calendarState.calendars);
+    const canMove = editable && eventCanMove(selectedEvent, scope);
+    const recurringTargetRequired = editingSeries || editingFollowing;
+    const availableCalendars = editable
+        ? calendarState.calendars.filter(calendar => calendar.instanceId === selectedEvent.calendarInstanceId
+            || (canMove
+                && calendar.canWrite
+                && (!recurringTargetRequired || calendar.canCreateRecurrence)))
+        : calendarState.calendars;
     populateCalendarSelect(availableCalendars, selectedEvent.calendarInstanceId);
-    setCalendarSelectDisabled(!editable || selectedEvent.recurring);
+    setCalendarSelectDisabled(!canMove);
     document.getElementById('dialog-title').textContent = t(editingSeries ? 'Edit recurring event' : 'Edit event');
     document.getElementById('event-summary').value = selectedEvent.summary || '';
     document.getElementById('event-location').value = selectedEvent.location || '';
@@ -1759,8 +1783,7 @@ eventForm.addEventListener('submit', async event => {
                 uid: selectedEvent.uid,
                 resourceUrl: selectedEvent.resourceUrl,
                 etag: selectedEvent.etag,
-                recurrenceId: selectedEvent.recurrenceId || '',
-                recurring: Boolean(selectedEvent.recurring)
+                ...recurrencePayload(selectedEvent)
             },
             event: eventData
         }

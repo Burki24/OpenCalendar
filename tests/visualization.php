@@ -149,8 +149,11 @@ assertVisualization(
     str_contains($script, "const action = moving ? 'MoveEvent' : (selectedEvent ? 'UpdateEvent' : 'CreateEvent');")
         && str_contains($script, 'targetCalendarInstanceId: calendarInstanceId')
         && str_contains($script, "document.getElementById('save-button').textContent = t(moving ? 'Move' : 'Save');")
-        && str_contains($script, 'calendarState.calendars.filter(calendar => calendar.canWrite || calendar.instanceId === selectedEvent.calendarInstanceId)'),
-    'Editable events must allow selecting another writable calendar and submit a dedicated move action.'
+        && str_contains($script, 'function eventCanMove(event, writeScope = \'\')')
+        && str_contains($script, 'const recurringTargetRequired = editingSeries || editingFollowing;')
+        && str_contains($script, '(!recurringTargetRequired || calendar.canCreateRecurrence)')
+        && str_contains($script, '...recurrencePayload(selectedEvent)'),
+    'Editable single events and supported recurring scopes must allow selecting a compatible writable target calendar and submit complete move identity data.'
 );
 
 assertVisualization(
