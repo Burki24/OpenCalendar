@@ -165,13 +165,14 @@ assertCalendarViewApi(
         && str_contains($moduleSource, 'array_slice($this->filterFutureAppointments($appointments, $now->getTimestamp()), 0, $Count)'),
     'Calendar View must expose a configurable list of the next future appointments.'
 );
+$normalizedModuleSource = preg_replace('/\s+/', ' ', $moduleSource) ?? $moduleSource;
 assertCalendarViewApi(
     str_contains($moduleSource, 'public function GetSelectedCalendars(): string')
         && str_contains($moduleSource, '$this->loadSelectedCalendars()')
         && str_contains($moduleSource, 'private function loadSelectedCalendars(): array')
-        && str_contains($moduleSource, "'timezone'            => trim((string) (\$calendarStatus['timezone'] ?? ''))")
-        && str_contains($moduleSource, "'canCreateRecurrence' => (bool) (\$calendarStatus['canCreateRecurrence'] ?? false)")
-        && str_contains($moduleSource, "'canDeleteSeries'     => (bool) (\$calendarStatus['canDeleteSeries'] ?? false)"),
+        && str_contains($normalizedModuleSource, "'timezone' => trim((string) (\$calendarStatus['timezone'] ?? ''))")
+        && str_contains($normalizedModuleSource, "'canCreateRecurrence' => (bool) (\$calendarStatus['canCreateRecurrence'] ?? false)")
+        && str_contains($normalizedModuleSource, "'canDeleteSeries' => (bool) (\$calendarStatus['canDeleteSeries'] ?? false)"),
     'Calendar View must expose selected calendar metadata including recurrence capabilities and timezone without colliding with its internal loader.'
 );
 
