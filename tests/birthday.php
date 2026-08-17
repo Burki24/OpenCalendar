@@ -85,6 +85,7 @@ try {
     $setCalendar = new Kalender(9003);
     $registerAttribute->invoke($setCalendar, 'AnniversaryMetadata', '[]');
     $registerAttribute->invoke($setCalendar, 'BirthdayMetadata', '[]');
+    $registerAttribute->invoke($setCalendar, 'CachedEvents', '[]');
     assertAnniversary(
         $setCalendar->SetAnniversary(
             json_encode([

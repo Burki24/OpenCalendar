@@ -462,7 +462,6 @@ class Kalender extends IPSModuleStrict
         );
         $events = $this->enrichAnniversaryEvents($this->readEvents());
         $this->WritePersistentJsonCache('CachedEvents', $events);
-        $this->updateEventCounters($events);
 
         return true;
     }
