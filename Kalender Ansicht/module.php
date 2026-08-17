@@ -837,6 +837,119 @@ class KalenderAnsicht extends IPSModuleStrict
     }
 
     /**
+     * Returns reminders whose effective trigger falls on one local calendar day.
+     *
+     * Only provider-neutral reminders with an exact trigger timestamp are returned.
+     * Provider defaults are resolved through the selected calendar metadata when possible.
+     *
+     * @param string $Date Local reminder date in YYYY-MM-DD format.
+     * @param int $CalendarInstanceID Optional selected calendar instance ID. Zero includes all selected calendars.
+     * @return string JSON-encoded reminder list.
+     */
+    public function GetDayReminders(string $Date, int $CalendarInstanceID = 0): string
+    {
+        return $this->GetReminders($Date, $Date, $CalendarInstanceID);
+    }
+
+    /**
+     * Returns reminders whose effective trigger falls inside an inclusive local date range.
+     *
+     * The queried range applies to the reminder trigger, not to the event start. Events may
+     * therefore start after the requested range when their reminder falls inside it.
+     * Disabled or complex reminder configurations without one exact provider-neutral trigger
+     * are intentionally omitted.
+     *
+     * @param string $From First local reminder date in YYYY-MM-DD format.
+     * @param string $To Last local reminder date in YYYY-MM-DD format, inclusive.
+     * @param int $CalendarInstanceID Optional selected calendar instance ID. Zero includes all selected calendars.
+     * @return string JSON-encoded reminder list.
+     */
+    public function GetReminders(string $From, string $To, int $CalendarInstanceID = 0): string
+    {
+        [$rangeStart, $rangeEnd] = CalendarAppointmentRange::fromInclusiveDates($From, $To);
+
+        return $this->encodeReminderList($this->collectRemindersForTimestampRange(
+            $rangeStart->getTimestamp(),
+            $rangeEnd->getTimestamp() - 1,
+            $CalendarInstanceID
+        ));
+    }
+
+    /**
+     * Returns reminders becoming due within the next requested number of minutes.
+     *
+     * The current timestamp is included and the end of the requested window is inclusive.
+     *
+     * @param int $Minutes Number of minutes to look ahead.
+     * @param int $CalendarInstanceID Optional selected calendar instance ID. Zero includes all selected calendars.
+     * @return string JSON-encoded reminder list.
+     */
+    public function GetUpcomingReminders(int $Minutes, int $CalendarInstanceID = 0): string
+    {
+        $this->validateReminderMinutesWindow($Minutes);
+
+        $now = new DateTimeImmutable('now');
+
+        return $this->encodeReminderList($this->collectRemindersForTimestampRange(
+            $now->getTimestamp(),
+            $now->getTimestamp() + ($Minutes * 60),
+            $CalendarInstanceID
+        ));
+    }
+
+    /**
+     * Returns the next reminder whose exact trigger has not passed yet.
+     *
+     * The search covers the maximum synchronized future range supported by Calendar instances.
+     * If no determinable future reminder is cached, JSON null is returned.
+     *
+     * @param int $CalendarInstanceID Optional selected calendar instance ID. Zero includes all selected calendars.
+     * @return string JSON-encoded reminder object or null.
+     */
+    public function GetNextReminder(int $CalendarInstanceID = 0): string
+    {
+        $now = new DateTimeImmutable('now');
+        $until = $now->modify('+' . self::APPOINTMENT_LOOKAHEAD_DAYS . ' days')->getTimestamp();
+        $reminders = $this->collectRemindersForTimestampRange(
+            $now->getTimestamp(),
+            $until,
+            $CalendarInstanceID
+        );
+
+        return json_encode(
+            $reminders[0] ?? null,
+            JSON_UNESCAPED_SLASHES
+                | JSON_UNESCAPED_UNICODE
+                | JSON_PRESERVE_ZERO_FRACTION
+                | JSON_THROW_ON_ERROR
+        );
+    }
+
+    /**
+     * Returns reminders that became due during the requested look-back tolerance.
+     *
+     * The function never returns future triggers. It is intended for cyclic scripts whose
+     * execution may drift slightly. Callers can persist reminderId to suppress duplicate
+     * processing when consecutive runs overlap.
+     *
+     * @param int $ToleranceMinutes Number of minutes to look back from now.
+     * @param int $CalendarInstanceID Optional selected calendar instance ID. Zero includes all selected calendars.
+     * @return string JSON-encoded reminder list.
+     */
+    public function GetDueReminders(int $ToleranceMinutes = 1, int $CalendarInstanceID = 0): string
+    {
+        $this->validateReminderMinutesWindow($ToleranceMinutes);
+
+        $now = new DateTimeImmutable('now');
+
+        return $this->encodeReminderList($this->collectRemindersForTimestampRange(
+            $now->getTimestamp() - ($ToleranceMinutes * 60),
+            $now->getTimestamp(),
+            $CalendarInstanceID
+        ));
+    }
+
+    /**
      * Returns the calendar instances selected and enabled in this Calendar View.
      *
      * The result contains instanceId, name, color, canWrite, timezone and recurring-event capabilities for each selected calendar.
@@ -1380,6 +1493,208 @@ class KalenderAnsicht extends IPSModuleStrict
             $appointments,
             static fn (array $appointment): bool => (int) ($appointment['calendarInstanceId'] ?? 0) === $CalendarInstanceID
         ));
+    }
+
+    /**
+     * Collects provider-neutral reminder triggers inside an inclusive timestamp range.
+     *
+     * Event loading is extended by the maximum supported reminder lead time so a reminder
+     * can be returned even when its event starts after the requested reminder range.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function collectRemindersForTimestampRange(
+        int $fromTimestamp,
+        int $toTimestamp,
+        int $CalendarInstanceID
+    ): array {
+        if ($fromTimestamp <= 0 || $toTimestamp < $fromTimestamp) {
+            throw new InvalidArgumentException('The reminder time range is invalid.');
+        }
+
+        $timezone = new DateTimeZone(date_default_timezone_get());
+        $eventRangeStartDate = (new DateTimeImmutable('@' . $fromTimestamp))
+            ->setTimezone($timezone)
+            ->format('Y-m-d');
+        $eventRangeEndDate = (new DateTimeImmutable(
+            '@' . ($toTimestamp + (CalendarEventReminder::MAX_MINUTES_BEFORE_START * 60))
+        ))
+            ->setTimezone($timezone)
+            ->format('Y-m-d');
+        [$eventRangeStart, $eventRangeEnd] = CalendarAppointmentRange::fromInclusiveDates(
+            $eventRangeStartDate,
+            $eventRangeEndDate
+        );
+
+        $appointments = $this->collectAppointmentsForRange($eventRangeStart, $eventRangeEnd);
+        $appointments = $this->filterAppointmentsByCalendarInstanceId($appointments, $CalendarInstanceID);
+
+        $calendars = [];
+        foreach ($this->loadSelectedCalendars() as $calendar) {
+            $calendars[(int) $calendar['instanceId']] = $calendar;
+        }
+
+        $reminders = [];
+        foreach ($appointments as $appointment) {
+            $calendarInstanceId = (int) ($appointment['calendarInstanceId'] ?? 0);
+            if (!isset($calendars[$calendarInstanceId])) {
+                continue;
+            }
+
+            $reminder = $this->buildReminderRecord($appointment, $calendars[$calendarInstanceId]);
+            if ($reminder === null) {
+                continue;
+            }
+
+            $reminderTimestamp = (int) ($reminder['reminderTimestamp'] ?? 0);
+            if ($reminderTimestamp < $fromTimestamp || $reminderTimestamp > $toTimestamp) {
+                continue;
+            }
+
+            $reminders[] = $reminder;
+        }
+
+        usort(
+            $reminders,
+            static fn (array $left, array $right): int => ((int) ($left['reminderTimestamp'] ?? 0)
+                <=> (int) ($right['reminderTimestamp'] ?? 0))
+                ?: ((int) ($left['startTimestamp'] ?? 0) <=> (int) ($right['startTimestamp'] ?? 0))
+                ?: strcasecmp((string) ($left['summary'] ?? ''), (string) ($right['summary'] ?? ''))
+                ?: strcasecmp((string) ($left['calendarName'] ?? ''), (string) ($right['calendarName'] ?? ''))
+        );
+
+        return $reminders;
+    }
+
+    /**
+     * Builds one script-friendly reminder record from a normalized appointment.
+     *
+     * @param array<string, mixed> $appointment Full normalized appointment.
+     * @param array<string, mixed> $calendar Selected calendar metadata.
+     * @return array<string, mixed>|null Exact reminder record or null when no exact trigger can be determined.
+     */
+    private function buildReminderRecord(array $appointment, array $calendar): ?array
+    {
+        $startTimestamp = (int) ($appointment['startTimestamp'] ?? 0);
+        $calendarInstanceId = (int) ($appointment['calendarInstanceId'] ?? $calendar['instanceId'] ?? 0);
+        $reminder = $appointment['reminder'] ?? null;
+        if ($startTimestamp <= 0 || $calendarInstanceId <= 0 || !is_array($reminder) || array_is_list($reminder)) {
+            return null;
+        }
+
+        try {
+            $normalizedReminder = CalendarEventReminder::normalizeInput($reminder, true);
+        } catch (InvalidArgumentException) {
+            return null;
+        }
+
+        $sourceMode = (string) ($normalizedReminder['mode'] ?? '');
+        $effectiveReminder = $normalizedReminder;
+        if ($sourceMode === CalendarEventReminder::MODE_DEFAULT) {
+            if (!(bool) ($calendar['canUseDefaultReminder'] ?? false)) {
+                return null;
+            }
+
+            try {
+                $effectiveReminder = CalendarEventReminder::normalizeInput($calendar['defaultReminder'] ?? null);
+            } catch (InvalidArgumentException) {
+                return null;
+            }
+        }
+
+        if (($effectiveReminder['mode'] ?? '') !== CalendarEventReminder::MODE_CUSTOM) {
+            return null;
+        }
+
+        $minutesBeforeStart = (int) ($effectiveReminder['minutesBeforeStart'] ?? -1);
+        if ($minutesBeforeStart < 0) {
+            return null;
+        }
+
+        $reminderTimestamp = $startTimestamp - ($minutesBeforeStart * 60);
+        $timezone = new DateTimeZone(date_default_timezone_get());
+        $eventIdentity = $this->reminderEventIdentity($appointment);
+        $reminderId = hash(
+            'sha256',
+            $calendarInstanceId . '|' . $eventIdentity . '|' . $startTimestamp . '|' . $reminderTimestamp
+        );
+
+        return [
+            'reminderId'         => $reminderId,
+            'summary'            => (string) ($appointment['summary'] ?? ''),
+            'calendarInstanceId' => $calendarInstanceId,
+            'calendarName'       => (string) ($appointment['calendarName'] ?? $calendar['name'] ?? ''),
+            'calendarColor'      => (string) ($appointment['calendarColor'] ?? $calendar['color'] ?? ''),
+            'start'              => (string) ($appointment['start'] ?? ''),
+            'startTimestamp'     => $startTimestamp,
+            'allDay'             => (bool) ($appointment['allDay'] ?? false),
+            'location'           => (string) ($appointment['location'] ?? ''),
+            'reminderMode'       => $sourceMode,
+            'minutesBeforeStart' => $minutesBeforeStart,
+            'reminderTimestamp'  => $reminderTimestamp,
+            'reminderDateTime'   => (new DateTimeImmutable('@' . $reminderTimestamp))
+                ->setTimezone($timezone)
+                ->format(DATE_ATOM)
+        ];
+    }
+
+    /**
+     * Returns a stable provider-independent identity input for reminder IDs.
+     *
+     * @param array<string, mixed> $appointment Full normalized appointment.
+     */
+    private function reminderEventIdentity(array $appointment): string
+    {
+        foreach (['occurrenceId', 'eventReference', 'uid', 'resourceUrl', 'id'] as $key) {
+            $value = trim((string) ($appointment[$key] ?? ''));
+            if ($value !== '') {
+                return $key . ':' . $value;
+            }
+        }
+
+        $seriesId = trim((string) ($appointment['seriesId'] ?? ''));
+        $originalStart = trim((string) ($appointment['originalStart'] ?? ''));
+        if ($seriesId !== '' || $originalStart !== '') {
+            return 'series:' . $seriesId . '|' . $originalStart;
+        }
+
+        return 'fallback:' . hash(
+            'sha256',
+            (string) ($appointment['summary'] ?? '')
+                . '|'
+                . (string) ($appointment['start'] ?? '')
+                . '|'
+                . (string) ($appointment['end'] ?? '')
+        );
+    }
+
+    /**
+     * Encodes provider-neutral reminder records for PHP callers.
+     *
+     * @param list<array<string, mixed>> $reminders Reminder records sorted by trigger timestamp.
+     */
+    private function encodeReminderList(array $reminders): string
+    {
+        return json_encode(
+            $reminders,
+            JSON_UNESCAPED_SLASHES
+                | JSON_UNESCAPED_UNICODE
+                | JSON_PRESERVE_ZERO_FRACTION
+                | JSON_THROW_ON_ERROR
+        );
+    }
+
+    /**
+     * Validates minute windows used by upcoming and due reminder queries.
+     */
+    private function validateReminderMinutesWindow(int $Minutes): void
+    {
+        $maximumMinutes = self::APPOINTMENT_LOOKAHEAD_DAYS * 24 * 60;
+        if ($Minutes < 1 || $Minutes > $maximumMinutes) {
+            throw new InvalidArgumentException(
+                'Minutes must be between 1 and ' . $maximumMinutes . '.'
+            );
+        }
     }
 
     /**

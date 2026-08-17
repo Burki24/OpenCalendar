@@ -165,6 +165,28 @@ assertCalendarViewApi(
         && str_contains($moduleSource, 'array_slice($this->filterFutureAppointments($appointments, $now->getTimestamp()), 0, $Count)'),
     'Calendar View must expose a configurable list of the next future appointments.'
 );
+assertCalendarViewApi(
+    str_contains($moduleSource, 'public function GetDayReminders(string $Date, int $CalendarInstanceID = 0): string')
+        && str_contains($moduleSource, 'return $this->GetReminders($Date, $Date, $CalendarInstanceID);')
+        && str_contains($moduleSource, 'public function GetReminders(string $From, string $To, int $CalendarInstanceID = 0): string'),
+    'Calendar View must expose provider-neutral day and date-range reminder functions.'
+);
+assertCalendarViewApi(
+    str_contains($moduleSource, 'public function GetUpcomingReminders(int $Minutes, int $CalendarInstanceID = 0): string')
+        && str_contains($moduleSource, 'public function GetNextReminder(int $CalendarInstanceID = 0): string')
+        && str_contains($moduleSource, 'public function GetDueReminders(int $ToleranceMinutes = 1, int $CalendarInstanceID = 0): string')
+        && str_contains($moduleSource, '$this->collectRemindersForTimestampRange(')
+        && str_contains($moduleSource, 'CalendarEventReminder::MAX_MINUTES_BEFORE_START'),
+    'Calendar View must expose upcoming, next and due reminder functions using the provider-neutral reminder model.'
+);
+assertCalendarViewApi(
+    str_contains($moduleSource, "'reminderId'")
+        && str_contains($moduleSource, "'reminderMode'")
+        && str_contains($moduleSource, "'minutesBeforeStart'")
+        && str_contains($moduleSource, "'reminderTimestamp'")
+        && str_contains($moduleSource, "'reminderDateTime'"),
+    'Reminder API results must expose stable IDs, effective lead time and exact trigger timestamps.'
+);
 $normalizedModuleSource = preg_replace('/\s+/', ' ', $moduleSource) ?? $moduleSource;
 assertCalendarViewApi(
     str_contains($moduleSource, 'public function GetSelectedCalendars(): string')
@@ -195,6 +217,10 @@ $upcomingMethod = new ReflectionMethod(KalenderAnsicht::class, 'filterUpcomingAp
 $upcomingMethod->setAccessible(true);
 $validateUpcomingHoursMethod = new ReflectionMethod(KalenderAnsicht::class, 'validateUpcomingHours');
 $validateUpcomingHoursMethod->setAccessible(true);
+$buildReminderRecordMethod = new ReflectionMethod(KalenderAnsicht::class, 'buildReminderRecord');
+$buildReminderRecordMethod->setAccessible(true);
+$validateReminderMinutesWindowMethod = new ReflectionMethod(KalenderAnsicht::class, 'validateReminderMinutesWindow');
+$validateReminderMinutesWindowMethod->setAccessible(true);
 $calendarView = new KalenderAnsicht(1);
 $previousTimezone = date_default_timezone_get();
 date_default_timezone_set('Europe/Berlin');
@@ -374,5 +400,131 @@ assertCalendarViewApiThrows(
     static fn (): mixed => $validateUpcomingHoursMethod->invoke($calendarView, (1095 * 24) + 1),
     'Upcoming appointment queries must reject windows beyond the maximum synchronized future range.'
 );
+
+$previousReminderTimezone = date_default_timezone_get();
+date_default_timezone_set('Europe/Berlin');
+
+$reminderCalendar = [
+    'instanceId'            => 111,
+    'name'                  => 'Calendar A',
+    'color'                 => '#123456',
+    'canUseDefaultReminder' => true,
+    'defaultReminder'       => [
+        'mode'               => 'custom',
+        'minutesBeforeStart' => 15,
+        'editable'           => true
+    ]
+];
+$reminderStart = (new DateTimeImmutable('2026-08-12T10:00:00+02:00'))->getTimestamp();
+$customReminderAppointment = [
+    'uid'                => 'custom-reminder@example.com',
+    'summary'            => 'Custom reminder',
+    'calendarInstanceId' => 111,
+    'calendarName'       => 'Calendar A',
+    'calendarColor'      => '#123456',
+    'start'              => '2026-08-12T10:00:00+02:00',
+    'startTimestamp'     => $reminderStart,
+    'allDay'             => false,
+    'location'           => 'Office',
+    'reminder'           => [
+        'mode'               => 'custom',
+        'minutesBeforeStart' => 30,
+        'editable'           => true
+    ]
+];
+$customReminderRecord = $buildReminderRecordMethod->invoke(
+    $calendarView,
+    $customReminderAppointment,
+    $reminderCalendar
+);
+assertCalendarViewApi(
+    is_array($customReminderRecord)
+        && ($customReminderRecord['summary'] ?? '') === 'Custom reminder'
+        && ($customReminderRecord['reminderMode'] ?? '') === 'custom'
+        && ($customReminderRecord['minutesBeforeStart'] ?? -1) === 30
+        && ($customReminderRecord['reminderTimestamp'] ?? 0) === $reminderStart - (30 * 60)
+        && ($customReminderRecord['reminderDateTime'] ?? '') === '2026-08-12T09:30:00+02:00'
+        && strlen((string) ($customReminderRecord['reminderId'] ?? '')) === 64,
+    'Custom reminder records must expose their exact provider-neutral trigger.'
+);
+assertCalendarViewApi(
+    $buildReminderRecordMethod->invoke($calendarView, $customReminderAppointment, $reminderCalendar)
+        === $customReminderRecord,
+    'Reminder IDs and normalized output must remain stable for unchanged appointment data.'
+);
+
+$defaultReminderAppointment = $customReminderAppointment;
+$defaultReminderAppointment['uid'] = 'default-reminder@example.com';
+$defaultReminderAppointment['summary'] = 'Default reminder';
+$defaultReminderAppointment['reminder'] = [
+    'mode'               => 'default',
+    'minutesBeforeStart' => null,
+    'editable'           => true
+];
+$defaultReminderRecord = $buildReminderRecordMethod->invoke(
+    $calendarView,
+    $defaultReminderAppointment,
+    $reminderCalendar
+);
+assertCalendarViewApi(
+    is_array($defaultReminderRecord)
+        && ($defaultReminderRecord['reminderMode'] ?? '') === 'default'
+        && ($defaultReminderRecord['minutesBeforeStart'] ?? -1) === 15
+        && ($defaultReminderRecord['reminderTimestamp'] ?? 0) === $reminderStart - (15 * 60),
+    'Calendar-default reminders must resolve to the selected calendar default when it has one exact trigger.'
+);
+
+$noneReminderAppointment = $customReminderAppointment;
+$noneReminderAppointment['reminder'] = [
+    'mode'               => 'none',
+    'minutesBeforeStart' => null,
+    'editable'           => true
+];
+assertCalendarViewApi(
+    $buildReminderRecordMethod->invoke($calendarView, $noneReminderAppointment, $reminderCalendar) === null,
+    'Disabled reminders must not produce due-reminder records.'
+);
+
+$complexReminderAppointment = $customReminderAppointment;
+$complexReminderAppointment['reminder'] = [
+    'mode'               => 'complex',
+    'minutesBeforeStart' => null,
+    'editable'           => false
+];
+assertCalendarViewApi(
+    $buildReminderRecordMethod->invoke($calendarView, $complexReminderAppointment, $reminderCalendar) === null,
+    'Complex reminder settings without one exact provider-neutral trigger must not be guessed.'
+);
+
+$noDefaultReminderCalendar = $reminderCalendar;
+$noDefaultReminderCalendar['defaultReminder'] = [
+    'mode'               => 'none',
+    'minutesBeforeStart' => null,
+    'editable'           => true
+];
+assertCalendarViewApi(
+    $buildReminderRecordMethod->invoke(
+        $calendarView,
+        $defaultReminderAppointment,
+        $noDefaultReminderCalendar
+    ) === null,
+    'A calendar default without an active reminder must not create an artificial reminder trigger.'
+);
+
+$validateReminderMinutesWindowMethod->invoke($calendarView, 1);
+$validateReminderMinutesWindowMethod->invoke($calendarView, 1095 * 24 * 60);
+assertCalendarViewApiThrows(
+    static fn (): mixed => $validateReminderMinutesWindowMethod->invoke($calendarView, 0),
+    'Reminder windows must reject zero minutes.'
+);
+assertCalendarViewApiThrows(
+    static fn (): mixed => $validateReminderMinutesWindowMethod->invoke(
+        $calendarView,
+        (1095 * 24 * 60) + 1
+    ),
+    'Reminder windows must reject values beyond the synchronized future range.'
+);
+
+date_default_timezone_set($previousReminderTimezone);
 
 fwrite(STDOUT, 'Calendar View PHP API checks passed.' . PHP_EOL);

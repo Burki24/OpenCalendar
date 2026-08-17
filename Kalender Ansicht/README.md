@@ -264,6 +264,26 @@ $count = IPSKALVIEW_GetUpcomingAppointmentCount(12345, 24);
 // Die nächsten drei noch nicht begonnenen Termine abrufen.
 $appointments = IPSKALVIEW_GetNextAppointments(12345, 3);
 
+// Alle exakt bestimmbaren Reminder eines lokalen Kalendertags abrufen.
+$reminders = IPSKALVIEW_GetDayReminders(12345, '2026-08-11');
+
+// Reminder eines inklusiven lokalen Datumsbereichs abrufen.
+// Der Zeitraum bezieht sich auf den Reminder-Zeitpunkt, nicht auf den Terminbeginn.
+$reminders = IPSKALVIEW_GetReminders(12345, '2026-08-11', '2026-08-17');
+
+// Reminder abrufen, die innerhalb der nächsten 30 Minuten fällig werden.
+$reminders = IPSKALVIEW_GetUpcomingReminders(12345, 30);
+
+// Den nächsten noch nicht ausgelösten Reminder abrufen.
+$reminder = IPSKALVIEW_GetNextReminder(12345);
+
+// Reminder abrufen, die in den letzten zwei Minuten fällig wurden.
+// reminderId kann im aufrufenden Skript zur Duplikaterkennung gespeichert werden.
+$reminders = IPSKALVIEW_GetDueReminders(12345, 2);
+
+// Alle Reminder-Funktionen können optional auf eine ausgewählte Kalenderinstanz gefiltert werden.
+$reminders = IPSKALVIEW_GetUpcomingReminders(12345, 30, 23456);
+
 // Metadaten aller in dieser Ansicht ausgewählten Kalender abrufen.
 $calendars = IPSKALVIEW_GetSelectedCalendars(12345);
 
@@ -339,6 +359,29 @@ können über `GetCurrentAppointments()` abgefragt werden. Das Zeitfenster darf 
 26280 Stunden betragen und kann über Mitternacht sowie mehrere Kalendertage reichen.
 `GetUpcomingAppointmentCount()` liefert für dieselbe Auswahl direkt die Anzahl.
 Beide Funktionen unterstützen den optionalen Kalenderfilter.
+
+Für Reminder stehen fünf providerübergreifende Lesefunktionen bereit.
+`GetDayReminders()` und `GetReminders()` liefern alle Erinnerungen, deren **effektiver
+Reminder-Zeitpunkt** auf den angegebenen Tag bzw. in den inklusiven Datumsbereich fällt.
+Der Termin selbst kann dabei später beginnen. `GetUpcomingReminders()` liefert
+Erinnerungen, die innerhalb der nächsten angegebenen Minuten fällig werden.
+`GetNextReminder()` liefert den nächsten exakt bestimmbaren Reminder oder JSON `null`.
+`GetDueReminders()` ist für zyklische Skripte gedacht und liefert ausschließlich
+Reminder, die innerhalb der angegebenen Toleranz **bereits fällig geworden** sind;
+zukünftige Reminder werden dabei nicht vorzeitig ausgegeben.
+
+Jeder Reminder-Eintrag enthält `reminderId`, `summary`, `calendarInstanceId`,
+`calendarName`, `calendarColor`, `start`, `startTimestamp`, `allDay`, `location`,
+`reminderMode`, `minutesBeforeStart`, `reminderTimestamp` und `reminderDateTime`.
+`reminderId` bleibt bei unverändertem Termin und Reminder stabil und kann vom
+aufrufenden Skript gespeichert werden, um bei überlappenden zyklischen Abfragen eine
+doppelte Verarbeitung zu vermeiden. `reminderMode` ist `custom` oder `default`;
+bei `default` wird ein exakt abbildbarer Kalenderstandard auf seine tatsächlichen
+Minuten vor Terminbeginn aufgelöst. Deaktivierte Reminder sowie komplexe
+Provider-Konfigurationen, für die OpenCalendar keinen einzelnen exakten
+providerneutralen Auslösezeitpunkt bestimmen kann, werden bewusst nicht erfunden und
+daher von diesen Reminder-APIs ausgelassen. Alle fünf Funktionen unterstützen den
+optionalen Kalenderfilter.
 
 `GetSelectedCalendars()` liefert die in der Instanz ausgewählten und aktivierten
 Kalender als JSON mit `instanceId`, `name`, `color`, `canWrite`, `timezone` und `canCreateRecurrence`. Der nur im
