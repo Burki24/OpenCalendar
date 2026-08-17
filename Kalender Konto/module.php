@@ -59,7 +59,7 @@ require_once __DIR__ . '/traits/MicrosoftOAuthTrait.php';
 require_once __DIR__ . '/traits/ICalendarAccountTrait.php';
 require_once __DIR__ . '/traits/ChildGatewayTrait.php';
 
-class KalenderKonto extends IPSModuleStrict
+class CalendarAccount extends IPSModuleStrict
 {
     use ChunkedJsonTransferHelper;
     use ConfigurationFormHelper;

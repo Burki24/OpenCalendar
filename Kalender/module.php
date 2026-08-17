@@ -20,7 +20,7 @@ require_once __DIR__ . '/../libs/CalendarEventCounter.php';
 require_once __DIR__ . '/../libs/CalendarEventRecurrence.php';
 require_once __DIR__ . '/../libs/SynchronizationSchedule.php';
 
-class Kalender extends IPSModuleStrict
+class Calendar extends IPSModuleStrict
 {
     use ChunkedJsonTransferHelper;
     use ConfigurationFormHelper;

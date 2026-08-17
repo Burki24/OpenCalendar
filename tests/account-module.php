@@ -218,8 +218,8 @@ assertAccountStructure(
     'The account child gateway must normalize recurring occurrence and series deletion metadata.'
 );
 
-$reflection = new ReflectionClass(KalenderKonto::class);
-$traits = class_uses(KalenderKonto::class);
+$reflection = new ReflectionClass(CalendarAccount::class);
+$traits = class_uses(CalendarAccount::class);
 foreach ([
     KalenderKontoSymconOAuthTrait::class,
     KalenderKontoGoogleOAuthTrait::class,
@@ -229,7 +229,7 @@ foreach ([
 ] as $trait) {
     assertAccountStructure(
         isset($traits[$trait]),
-        sprintf('KalenderKonto must use %s.', $trait)
+        sprintf('CalendarAccount must use %s.', $trait)
     );
 }
 
@@ -556,4 +556,4 @@ assertAccountStructure(
     'Provider debug output must only receive sanitized exception messages.'
 );
 
-fwrite(STDOUT, "KalenderKonto structure tests passed.\n");
+fwrite(STDOUT, "CalendarAccount structure tests passed.\n");

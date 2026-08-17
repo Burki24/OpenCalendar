@@ -30,10 +30,19 @@ foreach ($modules as $directory => [$englishName, $germanName]) {
         512,
         JSON_THROW_ON_ERROR
     );
+    $moduleSource = file_get_contents($root . '/' . $directory . '/module.php');
+    $expectedClass = str_replace(' ', '', $englishName);
 
     assertLocalization(
         ($module['name'] ?? '') === $englishName,
         sprintf('%s/module.json must use the English module name.', $directory)
+    );
+    assertLocalization(
+        preg_match(
+            '/\bclass\s+' . preg_quote($expectedClass, '/') . '\s+extends\s+IPSModuleStrict\b/',
+            $moduleSource
+        ) === 1,
+        sprintf('%s/module.php must declare class %s for module name %s.', $directory, $expectedClass, $englishName)
     );
     assertLocalization(
         (($locale['translations']['de'][$englishName] ?? '') === $germanName),

@@ -20,7 +20,7 @@ require_once __DIR__ . '/../libs/helper/VariableHelper.php';
 require_once __DIR__ . '/../libs/helper/VisualizationAssetHelper.php';
 require_once __DIR__ . '/../libs/helper/VisualizationThemeHelper.php';
 
-class KalenderAnsicht extends IPSModuleStrict
+class CalendarView extends IPSModuleStrict
 {
     use ConfigurationFormHelper;
     use IPSViewHTMLPageHelper;

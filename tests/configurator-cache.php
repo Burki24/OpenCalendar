@@ -164,14 +164,14 @@ function assertConfiguratorSame(mixed $expected, mixed $actual, string $message)
 }
 
 /** @return list<array<string,mixed>> */
-function readConfiguratorCache(KalenderKonfigurator $configurator): array
+function readConfiguratorCache(CalendarConfigurator $configurator): array
 {
-    $method = new ReflectionMethod(KalenderKonfigurator::class, 'readCachedCalendars');
+    $method = new ReflectionMethod(CalendarConfigurator::class, 'readCachedCalendars');
 
     return $method->invoke($configurator);
 }
 
-$configurator = new KalenderKonfigurator(100);
+$configurator = new CalendarConfigurator(100);
 $configurator->Create();
 $configurator->SeedCalendarCache(10, [['id' => 'account-a']]);
 $configurator->ApplyChanges();

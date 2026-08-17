@@ -15,13 +15,13 @@ function assertAnniversary(bool $condition, string $message): void
 $previousTimezone = date_default_timezone_get();
 date_default_timezone_set('Europe/Berlin');
 try {
-    $calendar = new Kalender(9001);
+    $calendar = new Calendar(9001);
     $registerAttribute = new ReflectionMethod(IPSModuleStrict::class, 'RegisterAttributeString');
     $registerAttribute->setAccessible(true);
     $registerAttribute->invoke($calendar, 'AnniversaryMetadata', '[]');
     $registerAttribute->invoke($calendar, 'BirthdayMetadata', '[]');
 
-    $applyDefaults = new ReflectionMethod(Kalender::class, 'applyAnniversaryEventDefaults');
+    $applyDefaults = new ReflectionMethod(Calendar::class, 'applyAnniversaryEventDefaults');
     $applyDefaults->setAccessible(true);
     $event = ['summary' => 'Max Mustermann'];
     $args = [&$event, '1993-07-20'];
@@ -36,7 +36,7 @@ try {
         'Annual-event defaults must create yearly recurrence.'
     );
 
-    $upsert = new ReflectionMethod(Kalender::class, 'upsertAnniversaryMetadata');
+    $upsert = new ReflectionMethod(Calendar::class, 'upsertAnniversaryMetadata');
     $upsert->setAccessible(true);
     $upsert->invoke(
         $calendar,
@@ -82,7 +82,7 @@ try {
         'Annual-event list must expose the stored date, next date, year count, and days until.'
     );
 
-    $setCalendar = new Kalender(9003);
+    $setCalendar = new Calendar(9003);
     $registerAttribute->invoke($setCalendar, 'AnniversaryMetadata', '[]');
     $registerAttribute->invoke($setCalendar, 'BirthdayMetadata', '[]');
     $registerAttribute->invoke($setCalendar, 'CachedEvents', '[]');
@@ -139,7 +139,7 @@ try {
         'Birthday compatibility API must keep the legacy birthday fields.'
     );
 
-    $legacyCalendar = new Kalender(9002);
+    $legacyCalendar = new Calendar(9002);
     $registerAttribute->invoke($legacyCalendar, 'AnniversaryMetadata', '[]');
     $registerAttribute->invoke(
         $legacyCalendar,
@@ -181,7 +181,7 @@ try {
     } catch (InvalidArgumentException) {
     }
 
-    $presentation = new ReflectionMethod(Kalender::class, 'applyAnniversaryPresentation');
+    $presentation = new ReflectionMethod(Calendar::class, 'applyAnniversaryPresentation');
     $presentation->setAccessible(true);
     $presented = $presentation->invoke($calendar, [
         'uid'           => 'wedding-1',
@@ -218,7 +218,7 @@ try {
         'Birthday events must retain the compatibility birthday fields.'
     );
 
-    $leap = new ReflectionMethod(Kalender::class, 'nextAnniversaryDate');
+    $leap = new ReflectionMethod(Calendar::class, 'nextAnniversaryDate');
     $leap->setAccessible(true);
     $nextLeap = $leap->invoke($calendar, '2000-02-29', new DateTimeImmutable('2026-08-17'));
     assertAnniversary(
