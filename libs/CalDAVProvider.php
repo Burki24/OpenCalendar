@@ -397,6 +397,8 @@ final class CalDAVProvider implements CalendarProviderInterface, RecurringCalend
                 // backing resource is recurring, an apparently single first instance
                 // must still be written as an exception instead of changing the master.
                 $updatedIcal = ICalendarCodec::updateRecurringOccurrence($getResponse->body, $uid, '', $event);
+            } elseif (is_array($event['recurrence'] ?? null) && $event['recurrence'] !== []) {
+                $updatedIcal = ICalendarCodec::convertEventToRecurringSeries($getResponse->body, $uid, $event);
             } else {
                 $updatedIcal = ICalendarCodec::updateEvent($getResponse->body, $uid, $event);
             }
@@ -1213,6 +1215,7 @@ final class CalDAVProvider implements CalendarProviderInterface, RecurringCalend
                     'update'           => $canWrite,
                     'delete'           => $canWrite,
                     'createRecurrence' => $canWrite,
+                    'updateRecurrence' => $canWrite,
                     'updateOccurrence' => $canWrite,
                     'deleteOccurrence' => $canWrite,
                     'updateFollowing'  => $canWrite,

@@ -238,10 +238,137 @@ final class ICalendarCodec
     }
 
     /**
+     * Converts one non-recurring VEVENT into a recurring series in place.
+     *
+     * Existing nested components such as VALARM and unrelated VCALENDAR
+     * components are retained. Timed recurrences use the requested timezone
+     * and add a matching VTIMEZONE component when one can be generated.
+     *
+     * @param array<string, mixed> $data
+     */
+    public static function convertEventToRecurringSeries(string $ical, string $uid, array $data): string
+    {
+        $uid = trim($uid);
+        if ($uid === '') {
+            throw new InvalidArgumentException('The event UID is missing.');
+        }
+
+        $recurrence = $data['recurrence'] ?? null;
+        if (!is_array($recurrence) || $recurrence === [] || array_is_list($recurrence)) {
+            throw new InvalidArgumentException('The recurrence settings are invalid.');
+        }
+
+        $lines = self::unfoldLines($ical);
+        $blocks = self::extractEventBlocksWithOffsets($lines);
+        $matches = [];
+        foreach ($blocks as $block) {
+            $properties = self::readTopLevelProperties($block['lines']);
+            if (!hash_equals($uid, self::propertyValue($properties, 'UID'))) {
+                continue;
+            }
+            if (self::propertyValue($properties, 'RRULE') !== ''
+                || self::propertyValue($properties, 'RDATE') !== ''
+                || self::propertyValue($properties, 'EXDATE') !== ''
+                || self::propertyValue($properties, 'EXRULE') !== ''
+                || self::propertyValue($properties, 'RECURRENCE-ID') !== '') {
+                throw new RuntimeException('Recurring events cannot be converted from a single event.');
+            }
+            $matches[] = $block;
+        }
+
+        if (count($matches) !== 1) {
+            throw new RuntimeException(
+                $matches === []
+                    ? 'The event was not found in the calendar resource.'
+                    : 'The calendar resource contains multiple matching events.'
+            );
+        }
+
+        $target = $matches[0];
+        $block = $target['lines'];
+        self::applyEventChangesToBlock($block, $data);
+
+        $properties = self::readTopLevelProperties($block);
+        $startProperty = self::firstProperty($properties, 'DTSTART');
+        if ($startProperty === null) {
+            throw new RuntimeException('The event has no start.');
+        }
+        $startData = self::parseDateProperty($startProperty);
+        $allDay = $startData['allDay'];
+        $timezoneName = trim((string) ($data['timezone'] ?? $startData['timezone']));
+        $timezoneLines = [];
+        $useTimezoneReference = false;
+        if (!$allDay) {
+            if ($timezoneName === '') {
+                $timezoneName = date_default_timezone_get();
+            }
+            $timezone = self::strictTimezone($timezoneName);
+            $start = (new DateTimeImmutable('@' . $startData['timestamp']))->setTimezone($timezone);
+            $timezoneLines = self::timezoneComponent($timezone, $start, $recurrence);
+            $useTimezoneReference = $timezoneLines !== [];
+            self::replaceProperty(
+                $block,
+                'DTSTART',
+                self::formatEventDateLine(
+                    'DTSTART',
+                    $start,
+                    false,
+                    $useTimezoneReference ? $timezoneName : ''
+                )
+            );
+
+            $properties = self::readTopLevelProperties($block);
+            $endProperty = self::firstProperty($properties, 'DTEND');
+            if ($endProperty !== null) {
+                $endData = self::parseDateProperty($endProperty);
+                $end = (new DateTimeImmutable('@' . $endData['timestamp']))->setTimezone($timezone);
+                self::replaceProperty(
+                    $block,
+                    'DTEND',
+                    self::formatEventDateLine(
+                        'DTEND',
+                        $end,
+                        false,
+                        $useTimezoneReference ? $timezoneName : ''
+                    )
+                );
+            }
+        }
+
+        $updatedProperties = self::readTopLevelProperties($block);
+        $updatedStartProperty = self::firstProperty($updatedProperties, 'DTSTART');
+        if ($updatedStartProperty === null) {
+            throw new RuntimeException('The event has no start.');
+        }
+        $updatedStart = self::parseDateProperty($updatedStartProperty);
+        $ruleTimezone = $allDay
+            ? self::timezone($updatedStart['timezone'])
+            : self::strictTimezone($timezoneName !== '' ? $timezoneName : $updatedStart['timezone']);
+        $start = (new DateTimeImmutable('@' . $updatedStart['timestamp']))->setTimezone($ruleTimezone);
+        self::replaceProperty(
+            $block,
+            'RRULE',
+            CalendarRecurrenceRule::toICalendarRule(
+                $recurrence,
+                $start,
+                $allDay,
+                $timezoneName !== '' ? $timezoneName : $updatedStart['timezone']
+            )
+        );
+
+        array_splice($lines, $target['start'], $target['end'] - $target['start'] + 1, $block);
+        self::ensureTimezoneComponent($lines, $timezoneLines);
+
+        return self::foldLines($lines);
+    }
+
+    /**
      * Updates the master VEVENT of a recurring iCalendar resource.
      *
-     * Detached RECURRENCE-ID overrides and other calendar components are retained.
-     * A replacement RRULE is accepted only when the existing recurrence can be
+     * Detached RECURRENCE-ID overrides and other calendar components are retained
+     * while the series remains recurring. Converting the series to a single event
+     * removes detached overrides and recurrence-only properties. A replacement RRULE
+     * is accepted only when the existing recurrence can be
      * represented losslessly by the common OpenCalendar recurrence editor.
      *
      * @param array<string, mixed> $data
@@ -260,9 +387,11 @@ final class ICalendarCodec
         $properties = $master['properties'];
         $recurrenceProvided = array_key_exists('recurrence', $data);
         $recurrence = $data['recurrence'] ?? null;
+        $removeRecurrence = $recurrenceProvided
+            && ($recurrence === null || (is_array($recurrence) && $recurrence === []));
 
-        if ($recurrenceProvided) {
-            if (!is_array($recurrence) || $recurrence === [] || array_is_list($recurrence)) {
+        if ($recurrenceProvided && !$removeRecurrence) {
+            if (!is_array($recurrence) || array_is_list($recurrence)) {
                 throw new InvalidArgumentException('The recurrence settings are invalid.');
             }
             $startProperty = self::firstProperty($properties, 'DTSTART');
@@ -284,6 +413,45 @@ final class ICalendarCodec
         }
 
         self::applyEventChangesToBlock($block, $data);
+
+        if ($removeRecurrence) {
+            foreach (['RRULE', 'RDATE', 'EXDATE', 'EXRULE'] as $property) {
+                self::replaceProperty($block, $property, null);
+            }
+
+            $operations = [[
+                'start'       => $master['start'],
+                'length'      => $master['end'] - $master['start'] + 1,
+                'replacement' => $block
+            ]];
+            foreach ($blocks as $eventBlock) {
+                $eventProperties = self::readTopLevelProperties($eventBlock['lines']);
+                if (!hash_equals($uid, self::propertyValue($eventProperties, 'UID'))
+                    || self::propertyValue($eventProperties, 'RECURRENCE-ID') === '') {
+                    continue;
+                }
+                $operations[] = [
+                    'start'       => $eventBlock['start'],
+                    'length'      => $eventBlock['end'] - $eventBlock['start'] + 1,
+                    'replacement' => []
+                ];
+            }
+
+            usort(
+                $operations,
+                static fn (array $left, array $right): int => $right['start'] <=> $left['start']
+            );
+            foreach ($operations as $operation) {
+                array_splice(
+                    $lines,
+                    $operation['start'],
+                    $operation['length'],
+                    $operation['replacement']
+                );
+            }
+
+            return self::foldLines($lines);
+        }
 
         if ($recurrenceProvided && is_array($recurrence)) {
             $updatedProperties = self::readTopLevelProperties($block);
@@ -1059,6 +1227,44 @@ final class ICalendarCodec
         } catch (Throwable $exception) {
             throw new InvalidArgumentException('The recurring event timezone is invalid.', 0, $exception);
         }
+    }
+
+    /**
+     * @param list<string> $lines
+     * @param list<string> $timezoneLines
+     */
+    private static function ensureTimezoneComponent(array &$lines, array $timezoneLines): void
+    {
+        if ($timezoneLines === []) {
+            return;
+        }
+
+        $timezoneId = '';
+        foreach ($timezoneLines as $line) {
+            if (str_starts_with(strtoupper($line), 'TZID:')) {
+                $timezoneId = trim(substr($line, 5));
+                break;
+            }
+        }
+        if ($timezoneId === '') {
+            return;
+        }
+
+        foreach ($lines as $line) {
+            if (strcasecmp(trim($line), 'TZID:' . $timezoneId) === 0) {
+                return;
+            }
+        }
+
+        $insertAt = array_search('BEGIN:VEVENT', array_map('strtoupper', $lines), true);
+        if ($insertAt === false) {
+            $insertAt = array_search('END:VCALENDAR', array_map('strtoupper', $lines), true);
+        }
+        if ($insertAt === false) {
+            throw new RuntimeException('The calendar resource is missing END:VCALENDAR.');
+        }
+
+        array_splice($lines, $insertAt, 0, $timezoneLines);
     }
 
     /**

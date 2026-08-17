@@ -189,6 +189,59 @@ function singleEventIcal(): string
         . "END:VCALENDAR\r\n";
 }
 
+function singleEventWithAlarmIcal(): string
+{
+    return "BEGIN:VCALENDAR\r\n"
+        . "VERSION:2.0\r\n"
+        . "PRODID:-//External Client//Calendar//EN\r\n"
+        . "X-WR-CALNAME:Preserved calendar data\r\n"
+        . "BEGIN:VEVENT\r\n"
+        . "UID:convert-single@example.com\r\n"
+        . "DTSTAMP:20260801T000000Z\r\n"
+        . "SEQUENCE:2\r\n"
+        . "DTSTART:20260817T100000Z\r\n"
+        . "DTEND:20260817T110000Z\r\n"
+        . "SUMMARY:Single before conversion\r\n"
+        . "BEGIN:VALARM\r\n"
+        . "ACTION:DISPLAY\r\n"
+        . "TRIGGER:-PT15M\r\n"
+        . "DESCRIPTION:Keep this reminder\r\n"
+        . "END:VALARM\r\n"
+        . "END:VEVENT\r\n"
+        . "END:VCALENDAR\r\n";
+}
+
+function recurringSeriesWithAlarmIcal(): string
+{
+    return "BEGIN:VCALENDAR\r\n"
+        . "VERSION:2.0\r\n"
+        . "PRODID:-//External Client//Calendar//EN\r\n"
+        . "X-WR-CALNAME:Preserved calendar data\r\n"
+        . "BEGIN:VEVENT\r\n"
+        . "UID:series-1@example.com\r\n"
+        . "DTSTAMP:20260801T000000Z\r\n"
+        . "SEQUENCE:1\r\n"
+        . "DTSTART:20260817T100000Z\r\n"
+        . "DTEND:20260817T110000Z\r\n"
+        . "RRULE:FREQ=WEEKLY;COUNT=4\r\n"
+        . "EXDATE:20260831T100000Z\r\n"
+        . "SUMMARY:Recurring before\r\n"
+        . "BEGIN:VALARM\r\n"
+        . "ACTION:DISPLAY\r\n"
+        . "TRIGGER:-PT10M\r\n"
+        . "DESCRIPTION:Keep master reminder\r\n"
+        . "END:VALARM\r\n"
+        . "END:VEVENT\r\n"
+        . "BEGIN:VEVENT\r\n"
+        . "UID:series-1@example.com\r\n"
+        . "RECURRENCE-ID:20260824T100000Z\r\n"
+        . "DTSTART:20260824T120000Z\r\n"
+        . "DTEND:20260824T130000Z\r\n"
+        . "SUMMARY:Detached override\r\n"
+        . "END:VEVENT\r\n"
+        . "END:VCALENDAR\r\n";
+}
+
 function recurringSeriesIcal(): string
 {
     return "BEGIN:VCALENDAR\r\n"
@@ -310,6 +363,7 @@ assertCalDAVSame('Work', $calendars[0]['name'], 'The CalDAV display name must be
 assertCalDAVSame('#123456', $calendars[0]['color'], 'Apple eight-digit calendar colors must be normalized.');
 assertCalDAVSame(true, $calendars[0]['capabilities']['create'], 'Write privileges must enable event creation.');
 assertCalDAVSame(true, $calendars[0]['capabilities']['createRecurrence'], 'Writable CalDAV calendars must advertise recurring event creation.');
+assertCalDAVSame(true, $calendars[0]['capabilities']['updateRecurrence'], 'Writable CalDAV calendars must advertise recurrence conversion.');
 assertCalDAVSame(true, $calendars[0]['capabilities']['updateOccurrence'], 'Writable CalDAV calendars must advertise recurring occurrence updates.');
 assertCalDAVSame(true, $calendars[0]['capabilities']['updateFollowing'], 'Writable CalDAV calendars must advertise this-and-following updates.');
 assertCalDAVSame(true, $calendars[0]['capabilities']['deleteOccurrence'], 'Writable CalDAV calendars must advertise recurring occurrence deletion.');
@@ -332,6 +386,7 @@ $unknownPrivilegeCalendars = (new CalDAVProvider($unknownPrivilegeClient, 'https
 assertCalDAVSame(false, $unknownPrivilegeCalendars[0]['writeAccessKnown'], 'Missing DAV privileges must remain distinguishable from explicit read-only access.');
 assertCalDAVSame(true, $unknownPrivilegeCalendars[0]['capabilities']['create'], 'Missing DAV privileges must not disable event creation optimistically.');
 assertCalDAVSame(true, $unknownPrivilegeCalendars[0]['capabilities']['createRecurrence'], 'Unknown DAV privileges must not hide recurring creation optimistically.');
+assertCalDAVSame(true, $unknownPrivilegeCalendars[0]['capabilities']['updateRecurrence'], 'Unknown DAV privileges must not hide recurrence conversion optimistically.');
 assertCalDAVSame(true, $unknownPrivilegeCalendars[0]['capabilities']['updateOccurrence'], 'Unknown DAV privileges must not hide recurring occurrence updates optimistically.');
 assertCalDAVSame(true, $unknownPrivilegeCalendars[0]['capabilities']['updateFollowing'], 'Unknown DAV privileges must not hide this-and-following updates optimistically.');
 assertCalDAVSame(true, $unknownPrivilegeCalendars[0]['capabilities']['deleteOccurrence'], 'Unknown DAV privileges must not hide recurring occurrence deletion optimistically.');
@@ -560,6 +615,55 @@ assertCalDAVSame('"etag-from-get"', $updateClient->requests[1]['headers']['If-Ma
 assertCalDAVTrue(str_contains($updateClient->requests[1]['body'], 'SUMMARY:After update'), 'The updated iCalendar body must contain the changed title.');
 assertCalDAVSame('"etag-after-put"', $updated['etag'], 'The updated ETag must be returned to the caller.');
 
+// Existing single CalDAV events can be converted into recurring series in place.
+$singleToSeriesUrl = 'https://calendar.example/calendars/user/work/convert-single.ics';
+$singleToSeriesClient = new FakeCalDAVHttpClient([
+    caldavResponseWithHeaders(200, ['etag' => '"single-current-etag"'], singleEventWithAlarmIcal(), $singleToSeriesUrl),
+    caldavResponseWithHeaders(204, ['etag' => '"single-series-etag"'], '', $singleToSeriesUrl)
+]);
+$provider = new CalDAVProvider($singleToSeriesClient, 'https://calendar.example/dav/');
+$convertedSeries = $provider->updateEvent(
+    'https://calendar.example/calendars/user/work/',
+    $singleToSeriesUrl,
+    '"single-editor-etag"',
+    'convert-single@example.com',
+    [
+        'summary'    => 'Series after conversion',
+        'allDay'     => false,
+        'start'      => '2026-08-17T10:00:00Z',
+        'end'        => '2026-08-17T11:00:00Z',
+        'timezone'   => 'Europe/Berlin',
+        'recurrence' => [
+            'frequency' => 'weekly',
+            'interval'  => 1,
+            'byDay'     => ['MO'],
+            'endMode'   => 'count',
+            'count'     => 3
+        ]
+    ]
+);
+assertCalDAVSame(2, count($singleToSeriesClient->requests), 'Converting a single CalDAV event to a series must update the existing resource in place.');
+assertCalDAVSame('GET', $singleToSeriesClient->requests[0]['method'], 'Single-to-series conversion must read the current resource first.');
+assertCalDAVSame('PUT', $singleToSeriesClient->requests[1]['method'], 'Single-to-series conversion must rewrite the existing resource.');
+assertCalDAVSame('"single-current-etag"', $singleToSeriesClient->requests[1]['headers']['If-Match'] ?? '', 'Single-to-series conversion must use the fresh GET ETag.');
+assertCalDAVTrue(
+    str_contains($singleToSeriesClient->requests[1]['body'], 'UID:convert-single@example.com')
+        && str_contains($singleToSeriesClient->requests[1]['body'], 'DTSTART;TZID=Europe/Berlin:20260817T120000')
+        && str_contains($singleToSeriesClient->requests[1]['body'], 'DTEND;TZID=Europe/Berlin:20260817T130000')
+        && str_contains($singleToSeriesClient->requests[1]['body'], 'RRULE:FREQ=WEEKLY;BYDAY=MO;COUNT=3')
+        && str_contains($singleToSeriesClient->requests[1]['body'], 'BEGIN:VTIMEZONE')
+        && str_contains($singleToSeriesClient->requests[1]['body'], 'TZID:Europe/Berlin'),
+    'Single-to-series conversion must preserve the existing UID while adding a timezone-safe recurrence rule.'
+);
+assertCalDAVTrue(
+    str_contains($singleToSeriesClient->requests[1]['body'], 'BEGIN:VALARM')
+        && str_contains($singleToSeriesClient->requests[1]['body'], 'TRIGGER:-PT15M')
+        && str_contains($singleToSeriesClient->requests[1]['body'], 'X-WR-CALNAME:Preserved calendar data'),
+    'Single-to-series conversion must preserve nested VALARM and unrelated calendar data.'
+);
+assertCalDAVSame('convert-single@example.com', $convertedSeries['uid'], 'Single-to-series conversion must retain the existing UID.');
+assertCalDAVSame('"single-series-etag"', $convertedSeries['etag'], 'Single-to-series conversion must return the new ETag.');
+
 // Recurring CalDAV events must be serialized as one RFC 5545 calendar object resource.
 $recurringCreateClient = new FakeCalDAVHttpClient([
     caldavResponseWithHeaders(201, ['etag' => '"series-etag"'], '', '')
@@ -743,6 +847,57 @@ assertCalDAVTrue(
     'Updating a complete CalDAV series must change only the master while preserving detached overrides.'
 );
 assertCalDAVSame('"series-after-full-update"', $updatedSeries['etag'], 'Full CalDAV series updates must return the new ETag.');
+
+// A complete CalDAV series can be converted back into one single event.
+$seriesToSingleClient = new FakeCalDAVHttpClient([
+    caldavResponseWithHeaders(
+        200,
+        ['etag' => '"series-single-current"'],
+        recurringSeriesWithAlarmIcal(),
+        $recurringResourceUrl
+    ),
+    caldavResponseWithHeaders(204, ['etag' => '"series-single-after"'], '', $recurringResourceUrl)
+]);
+$provider = new CalDAVProvider($seriesToSingleClient, 'https://calendar.example/dav/');
+$seriesToSingleIdentity = $recurringSeries;
+$seriesToSingleIdentity['writeScope'] = 'series';
+$convertedSingle = $provider->updateEvent(
+    'https://calendar.example/calendars/user/work/',
+    $recurringResourceUrl,
+    '"series-single-editor"',
+    'series-1@example.com',
+    [
+        'summary'    => 'Single after series',
+        'recurrence' => null
+    ],
+    $seriesToSingleIdentity
+);
+assertCalDAVSame(2, count($seriesToSingleClient->requests), 'Series-to-single conversion must update the existing CalDAV resource in place.');
+assertCalDAVSame('GET', $seriesToSingleClient->requests[0]['method'], 'Series-to-single conversion must read the current resource first.');
+assertCalDAVSame('PUT', $seriesToSingleClient->requests[1]['method'], 'Series-to-single conversion must rewrite the existing resource.');
+assertCalDAVSame('"series-single-current"', $seriesToSingleClient->requests[1]['headers']['If-Match'] ?? '', 'Series-to-single conversion must use the fresh GET ETag.');
+assertCalDAVTrue(
+    str_contains($seriesToSingleClient->requests[1]['body'], 'UID:series-1@example.com')
+        && str_contains($seriesToSingleClient->requests[1]['body'], 'SUMMARY:Single after series')
+        && !str_contains($seriesToSingleClient->requests[1]['body'], 'RRULE:')
+        && !str_contains($seriesToSingleClient->requests[1]['body'], 'RDATE:')
+        && !str_contains($seriesToSingleClient->requests[1]['body'], 'EXDATE:')
+        && !str_contains($seriesToSingleClient->requests[1]['body'], 'RECURRENCE-ID:'),
+    'Series-to-single conversion must remove all recurrence rules and detached overrides.'
+);
+assertCalDAVSame(
+    1,
+    substr_count($seriesToSingleClient->requests[1]['body'], 'UID:series-1@example.com'),
+    'Series-to-single conversion must retain exactly one VEVENT with the original UID.'
+);
+assertCalDAVTrue(
+    str_contains($seriesToSingleClient->requests[1]['body'], 'BEGIN:VALARM')
+        && str_contains($seriesToSingleClient->requests[1]['body'], 'TRIGGER:-PT10M')
+        && str_contains($seriesToSingleClient->requests[1]['body'], 'X-WR-CALNAME:Preserved calendar data'),
+    'Series-to-single conversion must preserve the master VALARM and unrelated calendar data.'
+);
+assertCalDAVSame('series-1@example.com', $convertedSingle['uid'], 'Series-to-single conversion must retain the existing UID.');
+assertCalDAVSame('"series-single-after"', $convertedSingle['etag'], 'Series-to-single conversion must return the new ETag.');
 
 // This-and-following updates split the calendar object into an old shortened series and a new future series.
 $followingUpdateClient = new FakeCalDAVHttpClient([
