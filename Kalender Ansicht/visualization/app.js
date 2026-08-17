@@ -32,6 +32,7 @@ let editScopeSourceDialog = null;
 let pendingEventEdit = null;
 let pendingSeriesEdit = null;
 let recurrencePatternContext = null;
+let eventDialogEditable = false;
 let deleteSourceDialog = null;
 let visibleCalendarIds = null;
 let pendingCalendarFilterIds = new Set();
@@ -65,6 +66,10 @@ const eventRecurrenceCountRow = document.getElementById('event-recurrence-count-
 const eventRecurrenceCount = document.getElementById('event-recurrence-count');
 const eventRecurrenceUntilRow = document.getElementById('event-recurrence-until-row');
 const eventRecurrenceUntil = document.getElementById('event-recurrence-until');
+const eventReminderMode = document.getElementById('event-reminder-mode');
+const eventReminderCustomRow = document.getElementById('event-reminder-custom-row');
+const eventReminderValue = document.getElementById('event-reminder-value');
+const eventReminderUnit = document.getElementById('event-reminder-unit');
 const dayEventsDialog = document.getElementById('day-events-dialog');
 const viewSelectorDialog = document.getElementById('view-selector-dialog');
 const viewSelectorButton = document.getElementById('view-selector-button');
@@ -892,6 +897,7 @@ function openNewEvent(preferredDay = null) {
     const end = new Date(start.getTime() + 60 * 60 * 1000);
     setDateInputs(start, end, false);
     resetRecurrenceEditor(start);
+    resetReminderEditor();
     setDialogEditable(true);
     document.getElementById('delete-button').classList.add('hidden');
     document.getElementById('dialog-note').classList.add('hidden');
@@ -920,6 +926,7 @@ function openEventDetails(event) {
         document.getElementById('details-end').textContent = formatDetailDateTime(end);
     }
 
+    setOptionalDetail('reminder', reminderDetailText(event));
     setOptionalDetail('location', event.location);
     setOptionalDetail('description', event.description);
     document.getElementById('details-edit-button').classList.toggle('hidden', !editable);
@@ -1133,6 +1140,7 @@ function eventCanUpdate(event) {
 
 function eventCanMove(event, writeScope = '') {
     if (!hasActionBridge() || !Boolean(event?.canWrite)) return false;
+    if (eventReminderState(event).mode === 'complex') return false;
     if (!Boolean(event?.recurring)) {
         return eventCanUpdateOccurrence(event) && eventCanDelete(event);
     }
@@ -1252,6 +1260,7 @@ function openExistingEvent(event, writeScope = '') {
     } else {
         updateRecurrenceAvailability();
     }
+    loadReminderEditor(selectedEvent);
     const descriptionEditable = editable && !Boolean(selectedEvent.onlineMeeting);
     setDialogEditable(editable, descriptionEditable);
     document.getElementById('delete-button').classList.toggle('hidden', !eventCanDelete(selectedEvent));
@@ -1375,6 +1384,140 @@ function handleCalendarOptionKeydown(event) {
 function selectedCalendarEntry() {
     const instanceId = Number(eventCalendarInput.value);
     return calendarState.calendars.find(calendar => Number(calendar.instanceId) === instanceId) || null;
+}
+
+function eventReminderState(event) {
+    const reminder = event?.reminder;
+    if (!reminder || typeof reminder !== 'object' || Array.isArray(reminder)) {
+        return { mode: 'none', minutesBeforeStart: null, editable: true };
+    }
+
+    const mode = ['default', 'none', 'custom', 'complex'].includes(reminder.mode)
+        ? reminder.mode
+        : 'complex';
+    const minutes = Number(reminder.minutesBeforeStart);
+    return {
+        mode,
+        minutesBeforeStart: mode === 'custom' && Number.isInteger(minutes) ? minutes : null,
+        editable: reminder.editable !== false && mode !== 'complex'
+    };
+}
+
+function resetReminderEditor() {
+    eventReminderMode.querySelector('option[value="default"]').disabled = false;
+    eventReminderMode.value = 'default';
+    eventReminderValue.value = '15';
+    eventReminderUnit.value = 'minutes';
+    updateReminderControls();
+}
+
+function loadReminderEditor(event) {
+    const reminder = eventReminderState(event);
+    const defaultOption = eventReminderMode.querySelector('option[value="default"]');
+    defaultOption.disabled = reminder.mode !== 'default';
+    eventReminderMode.value = reminder.mode;
+    if (reminder.mode === 'custom' && reminder.minutesBeforeStart !== null) {
+        setReminderValueFromMinutes(reminder.minutesBeforeStart);
+    } else {
+        eventReminderValue.value = '15';
+        eventReminderUnit.value = 'minutes';
+    }
+    updateReminderControls();
+}
+
+function setReminderValueFromMinutes(minutes) {
+    const value = Math.max(0, Math.min(40320, Number(minutes) || 0));
+    const units = [
+        ['weeks', 10080],
+        ['days', 1440],
+        ['hours', 60],
+        ['minutes', 1]
+    ];
+    const selected = units.find(([, multiplier]) => value > 0 && value % multiplier === 0)
+        || ['minutes', 1];
+    eventReminderUnit.value = selected[0];
+    eventReminderValue.value = String(value / selected[1]);
+}
+
+function reminderUnitMultiplier() {
+    return {
+        minutes: 1,
+        hours: 60,
+        days: 1440,
+        weeks: 10080
+    }[eventReminderUnit.value] || 1;
+}
+
+function updateReminderControls() {
+    const selectedReminder = selectedEvent ? eventReminderState(selectedEvent) : null;
+    const reminderEditable = eventDialogEditable
+        && (!selectedReminder || selectedReminder.editable);
+    const defaultOption = eventReminderMode.querySelector('option[value="default"]');
+    if (defaultOption) {
+        defaultOption.disabled = Boolean(selectedEvent) && selectedReminder?.mode !== 'default';
+    }
+
+    eventReminderMode.disabled = !reminderEditable;
+    const custom = reminderEditable && eventReminderMode.value === 'custom';
+    eventReminderCustomRow.classList.toggle('hidden', !custom);
+    eventReminderValue.disabled = !custom;
+    eventReminderUnit.disabled = !custom;
+    eventReminderValue.required = custom;
+
+    const limits = {
+        minutes: 40320,
+        hours: 672,
+        days: 28,
+        weeks: 4
+    };
+    eventReminderValue.max = String(limits[eventReminderUnit.value] || 40320);
+    if (Number(eventReminderValue.value) > Number(eventReminderValue.max)) {
+        eventReminderValue.value = eventReminderValue.max;
+    }
+}
+
+function reminderEditorValue() {
+    if (eventReminderMode.disabled || eventReminderMode.value === 'default'
+        || eventReminderMode.value === 'complex') {
+        return null;
+    }
+    if (eventReminderMode.value === 'none') {
+        return { mode: 'none' };
+    }
+    if (eventReminderMode.value !== 'custom') {
+        return null;
+    }
+
+    const value = Number(eventReminderValue.value);
+    const minutes = value * reminderUnitMultiplier();
+    if (!Number.isInteger(value) || value < 0 || !Number.isInteger(minutes) || minutes > 40320) {
+        return null;
+    }
+
+    return {
+        mode: 'custom',
+        minutesBeforeStart: minutes
+    };
+}
+
+function reminderDetailText(event) {
+    const reminder = eventReminderState(event);
+    if (reminder.mode === 'none') return '';
+    if (reminder.mode === 'default') return t('Calendar default');
+    if (reminder.mode === 'complex') return t('Existing reminder settings');
+
+    const minutes = reminder.minutesBeforeStart ?? 0;
+    const units = [
+        ['Week', 'Weeks', 10080],
+        ['Day', 'Days', 1440],
+        ['Hour', 'Hours', 60],
+        ['Minute', 'Minutes', 1]
+    ];
+    const selected = units.find(([, , multiplier]) => minutes > 0 && minutes % multiplier === 0)
+        || ['Minute', 'Minutes', 1];
+    const value = minutes / selected[2];
+    const unit = t(value === 1 ? selected[0] : selected[1]);
+    return `${value} ${unit} · ${t('Before start')}`;
 }
 
 function resetRecurrenceEditor(start) {
@@ -1671,11 +1814,13 @@ function updateRecurrenceWeekdayLabels() {
 }
 
 function setDialogEditable(editable, descriptionEditable = editable) {
+    eventDialogEditable = editable;
     ['event-summary', 'event-all-day', 'event-start', 'event-end', 'event-location'].forEach(id => {
         document.getElementById(id).disabled = !editable;
     });
     document.getElementById('event-description').disabled = !descriptionEditable;
     document.getElementById('save-button').classList.toggle('hidden', !editable);
+    updateReminderControls();
 }
 
 function setDateInputs(start, end, allDay, allDayEndExclusive = false) {
@@ -1751,6 +1896,10 @@ eventForm.addEventListener('submit', async event => {
         start: inputDateValue(document.getElementById('event-start').value, allDay),
         end: inputDateValue(document.getElementById('event-end').value, allDay, allDay)
     };
+    const reminder = reminderEditorValue();
+    if (reminder) {
+        eventData.reminder = reminder;
+    }
     const editingSeries = Boolean(selectedEvent?.recurring) && selectedEvent?.writeScope === 'series';
     const editingFollowing = Boolean(selectedEvent?.recurring) && selectedEvent?.writeScope === 'following';
     const recurrence = recurrenceEditorValue();
@@ -1783,6 +1932,7 @@ eventForm.addEventListener('submit', async event => {
                 uid: selectedEvent.uid,
                 resourceUrl: selectedEvent.resourceUrl,
                 etag: selectedEvent.etag,
+                reminder: selectedEvent.reminder || null,
                 ...recurrencePayload(selectedEvent)
             },
             event: eventData
@@ -1826,7 +1976,10 @@ eventCalendarInput.addEventListener('change', () => {
     updateDialogColor();
     updateSaveButtonLabel();
     updateRecurrenceAvailability();
+    updateReminderControls();
 });
+eventReminderMode.addEventListener('change', updateReminderControls);
+eventReminderUnit.addEventListener('change', updateReminderControls);
 eventRecurrenceFrequency.addEventListener('change', () => {
     const controls = recurrencePatternControls();
     const frequency = eventRecurrenceFrequency.value.toUpperCase();

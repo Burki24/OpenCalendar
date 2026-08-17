@@ -146,6 +146,22 @@ assertVisualization(
 );
 
 assertVisualization(
+    str_contains($indexSource, 'id="event-reminder-mode"')
+        && str_contains($indexSource, 'id="event-reminder-value"')
+        && str_contains($indexSource, 'id="event-reminder-unit"')
+        && str_contains($indexSource, 'id="details-reminder-row"')
+        && str_contains($script, 'function eventReminderState(event)')
+        && str_contains($script, 'function resetReminderEditor()')
+        && str_contains($script, 'function loadReminderEditor(event)')
+        && str_contains($script, 'function reminderEditorValue()')
+        && str_contains($script, 'eventData.reminder = reminder;')
+        && str_contains($script, 'reminder: selectedEvent.reminder || null')
+        && str_contains($script, "eventReminderState(event).mode === 'complex'")
+        && str_contains($script, "setOptionalDetail('reminder', reminderDetailText(event));"),
+    'The shared event dialog must edit one provider-neutral reminder, preserve provider defaults and protect complex reminder settings during moves.'
+);
+
+assertVisualization(
     str_contains($script, "const action = moving ? 'MoveEvent' : (selectedEvent ? 'UpdateEvent' : 'CreateEvent');")
         && str_contains($script, 'targetCalendarInstanceId: calendarInstanceId')
         && str_contains($script, "document.getElementById('save-button').textContent = t(moving ? 'Move' : 'Save');")
@@ -247,6 +263,12 @@ assertVisualization(
 
 $formSource = (string) file_get_contents(__DIR__ . '/../Kalender Ansicht/form.json');
 $moduleSource = (string) file_get_contents(__DIR__ . '/../Kalender Ansicht/module.php');
+assertVisualization(
+    str_contains($moduleSource, '\'Events with complex reminder settings cannot be moved safely.\'')
+        && str_contains($moduleSource, '($sourceReminder[\'mode\'] ?? \'\') === \'complex\'')
+        && str_contains($moduleSource, '($sourceReminder[\'editable\'] ?? true) === false'),
+    'The visualization backend must reject lossy moves when provider reminder settings are complex.'
+);
 $calendarModuleSource = (string) file_get_contents(__DIR__ . '/../Kalender/module.php');
 
 assertVisualization(

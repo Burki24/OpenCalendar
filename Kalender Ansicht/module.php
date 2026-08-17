@@ -1146,6 +1146,17 @@ class KalenderAnsicht extends IPSModuleStrict
             'End',
             'Location',
             'Description',
+            'Reminder',
+            'Calendar default',
+            'No reminder',
+            'Custom',
+            'Before start',
+            'Unit',
+            'Minute',
+            'Minutes',
+            'Hour',
+            'Hours',
+            'Existing reminder settings',
             'Repeat',
             'Does not repeat',
             'Daily',
@@ -1166,6 +1177,7 @@ class KalenderAnsicht extends IPSModuleStrict
             'Save',
             'Move',
             'Event moved.',
+            'Events with complex reminder settings cannot be moved safely.',
             'Delete',
             'Delete event',
             'Do you really want to delete this event?',
@@ -2050,6 +2062,15 @@ class KalenderAnsicht extends IPSModuleStrict
                 if (!is_array($sourceEvent) || array_is_list($sourceEvent)
                     || !is_array($event) || array_is_list($event)) {
                     throw new InvalidArgumentException($this->Translate('The event data is invalid.'));
+                }
+                $sourceReminder = is_array($sourceEvent['reminder'] ?? null)
+                    ? $sourceEvent['reminder']
+                    : [];
+                if (($sourceReminder['mode'] ?? '') === 'complex'
+                    || ($sourceReminder !== [] && ($sourceReminder['editable'] ?? true) === false)) {
+                    throw new RuntimeException(
+                        $this->Translate('Events with complex reminder settings cannot be moved safely.')
+                    );
                 }
 
                 $sourceRecurring = (bool) ($sourceEvent['recurring'] ?? false);

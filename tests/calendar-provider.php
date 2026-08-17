@@ -179,20 +179,25 @@ $eventClient = new FakeHttpClient([
         'timeZone' => 'Europe/Berlin',
         'items'    => [
             [
-                'id'       => 'all-day-id',
-                'iCalUID'  => 'all-day@example.com',
-                'etag'     => '"etag-1"',
-                'summary'  => 'Holiday',
-                'status'   => 'confirmed',
-                'start'    => ['date' => '2026-07-20'],
-                'end'      => ['date' => '2026-07-21'],
-                'htmlLink' => 'https://calendar.google.com/event?eid=1'
+                'id'        => 'all-day-id',
+                'iCalUID'   => 'all-day@example.com',
+                'etag'      => '"etag-1"',
+                'summary'   => 'Holiday',
+                'status'    => 'confirmed',
+                'reminders' => ['useDefault' => true],
+                'start'     => ['date' => '2026-07-20'],
+                'end'       => ['date' => '2026-07-21'],
+                'htmlLink'  => 'https://calendar.google.com/event?eid=1'
             ],
             [
                 'id'                => 'instance-id',
                 'iCalUID'           => 'series@example.com',
                 'summary'           => 'Meeting',
                 'status'            => 'confirmed',
+                'reminders'         => [
+                    'useDefault' => false,
+                    'overrides'  => [['method' => 'popup', 'minutes' => 15]]
+                ],
                 'recurringEventId'  => 'series-id',
                 'originalStartTime' => ['dateTime' => '2026-07-20T09:00:00+02:00', 'timeZone' => 'Europe/Berlin'],
                 'start'             => ['dateTime' => '2026-07-20T10:00:00+02:00', 'timeZone' => 'Europe/Berlin'],
@@ -215,6 +220,9 @@ $events = $provider->getEvents(
 assertSameValue(2, count($events), 'Cancelled events must be excluded.');
 assertSameValue(true, $events[0]['allDay'], 'Google date values must map to all-day events.');
 assertSameValue('2026-07-21', $events[0]['end'], 'The exclusive Google all-day end date must be retained.');
+assertSameValue('default', $events[0]['reminder']['mode'], 'Google calendar-default reminders must remain distinguishable.');
+assertSameValue('custom', $events[1]['reminder']['mode'], 'One Google popup reminder must use the shared reminder model.');
+assertSameValue(15, $events[1]['reminder']['minutesBeforeStart'], 'Google popup reminder offsets must be retained.');
 assertSameValue(true, $events[1]['recurring'], 'Expanded recurring instances must remain marked as recurring.');
 assertSameValue('occurrence', $events[1]['recurrenceType'], 'Expanded Google events must be identified as occurrences.');
 assertSameValue('series-id', $events[1]['seriesId'], 'The Google series ID must be retained separately.');
@@ -263,12 +271,22 @@ $created = $provider->createEvent('owner@example.com', [
     'allDay'   => false,
     'start'    => '2026-07-20T10:00:00+02:00',
     'end'      => '2026-07-20T11:00:00+02:00',
-    'location' => 'Berlin'
+    'location' => 'Berlin',
+    'reminder' => [
+        'mode'               => 'custom',
+        'minutesBeforeStart' => 30
+    ]
 ]);
 assertSameValue('created-id', $created['eventReference'], 'The created Google event ID must be returned.');
 assertSameValue('POST', $writeClient->requests[0]['method'], 'Events must be created via POST.');
 $createBody = json_decode($writeClient->requests[0]['body'], true, 512, JSON_THROW_ON_ERROR);
 assertSameValue('Test', $createBody['summary'], 'The event summary must be sent.');
+assertSameValue(false, $createBody['reminders']['useDefault'], 'Custom Google reminders must override calendar defaults.');
+assertSameValue(
+    [['method' => 'popup', 'minutes' => 30]],
+    $createBody['reminders']['overrides'],
+    'Custom Google reminders must be written as one popup override.'
+);
 
 $recurringCreateClient = new FakeHttpClient([
     response(200, ['id' => 'series-id', 'iCalUID' => 'series@example.com', 'etag' => '"series"'])
@@ -280,6 +298,10 @@ $recurringProvider->createEvent('owner@example.com', [
     'start'      => '2026-10-19T08:00:00Z',
     'end'        => '2026-10-19T09:00:00Z',
     'timezone'   => 'Europe/Berlin',
+    'reminder'   => [
+        'mode'               => 'custom',
+        'minutesBeforeStart' => 30
+    ],
     'recurrence' => [
         'frequency' => 'weekly',
         'interval'  => 2,
@@ -1034,18 +1056,20 @@ $msEventClient = new FakeHttpClient([
                 'type'        => 'singleInstance'
             ],
             [
-                'id'              => 'instance/id+1',
-                'iCalUId'         => 'series@example.com',
-                '@odata.etag'     => 'W/"etag-2"',
-                'subject'         => 'Teams meeting',
-                'body'            => ['contentType' => 'text', 'content' => 'Agenda'],
-                'location'        => ['displayName' => 'Berlin'],
-                'start'           => ['dateTime' => '2026-07-20T10:00:00.1234567', 'timeZone' => 'UTC'],
-                'end'             => ['dateTime' => '2026-07-20T11:00:00.1234567', 'timeZone' => 'UTC'],
-                'type'            => 'occurrence',
-                'seriesMasterId'  => 'series-master',
-                'isOnlineMeeting' => true,
-                'webLink'         => 'https://outlook.office.com/calendar/item/1'
+                'id'                         => 'instance/id+1',
+                'iCalUId'                    => 'series@example.com',
+                '@odata.etag'                => 'W/"etag-2"',
+                'subject'                    => 'Teams meeting',
+                'body'                       => ['contentType' => 'text', 'content' => 'Agenda'],
+                'location'                   => ['displayName' => 'Berlin'],
+                'start'                      => ['dateTime' => '2026-07-20T10:00:00.1234567', 'timeZone' => 'UTC'],
+                'end'                        => ['dateTime' => '2026-07-20T11:00:00.1234567', 'timeZone' => 'UTC'],
+                'type'                       => 'occurrence',
+                'seriesMasterId'             => 'series-master',
+                'isReminderOn'               => true,
+                'reminderMinutesBeforeStart' => 45,
+                'isOnlineMeeting'            => true,
+                'webLink'                    => 'https://outlook.office.com/calendar/item/1'
             ],
             [
                 'id'             => 'exception-id',
@@ -1089,6 +1113,8 @@ assertSameValue(
 assertSameValue(true, $msEvents[1]['canUpdateOccurrence'], 'Microsoft occurrences must advertise individual update support.');
 assertSameValue(true, $msEvents[1]['canDeleteOccurrence'], 'Microsoft occurrences must advertise individual delete support.');
 assertSameValue(true, $msEvents[1]['canUpdateFollowing'], 'Microsoft occurrences with a verified series start must advertise following-update support.');
+assertSameValue('custom', $msEvents[1]['reminder']['mode'], 'Microsoft reminders must use the shared reminder model.');
+assertSameValue(45, $msEvents[1]['reminder']['minutesBeforeStart'], 'Microsoft reminder offsets must be retained.');
 assertSameValue(true, $msEvents[1]['onlineMeeting'], 'Microsoft online-meeting state must be exposed to the calendar view.');
 assertSameValue('exception', $msEvents[2]['recurrenceType'], 'Modified Microsoft occurrences must be normalized as exceptions.');
 assertSameValue('2026-07-20T13:00:00Z', $msEvents[2]['originalStart'], 'Microsoft exception original starts must be retained when Graph supplies them.');
@@ -1175,13 +1201,19 @@ $msCreated = $msProvider->createEvent('AQMk-primary', [
     'location'    => 'Berlin',
     'allDay'      => false,
     'start'       => '2026-07-20T10:00:00+02:00',
-    'end'         => '2026-07-20T11:00:00+02:00'
+    'end'         => '2026-07-20T11:00:00+02:00',
+    'reminder'    => [
+        'mode'               => 'custom',
+        'minutesBeforeStart' => 20
+    ]
 ]);
 assertSameValue('created-id', $msCreated['eventReference'], 'The created Microsoft event ID must be returned.');
 assertSameValue('POST', $msWriteClient->requests[0]['method'], 'Microsoft events must be created via POST.');
 $msCreateBody = json_decode($msWriteClient->requests[0]['body'], true, 512, JSON_THROW_ON_ERROR);
 assertSameValue('Test', $msCreateBody['subject'], 'Microsoft event subjects must be sent.');
 assertSameValue('text', $msCreateBody['body']['contentType'], 'Microsoft event descriptions must be sent as text.');
+assertSameValue(true, $msCreateBody['isReminderOn'], 'Custom Microsoft reminders must enable the Graph reminder.');
+assertSameValue(20, $msCreateBody['reminderMinutesBeforeStart'], 'Microsoft reminder offsets must be written to Graph.');
 assertSameValue('UTC', $msCreateBody['start']['timeZone'], 'Microsoft event writes without a timezone must use unambiguous UTC times.');
 
 $msLocalTimeClient = new FakeHttpClient([
@@ -2245,6 +2277,10 @@ $calDavRecurringCreated = ICalendarCodec::createEvent([
     'start'      => '2026-10-19T08:00:00Z',
     'end'        => '2026-10-19T09:00:00Z',
     'timezone'   => 'Europe/Berlin',
+    'reminder'   => [
+        'mode'               => 'custom',
+        'minutesBeforeStart' => 30
+    ],
     'recurrence' => [
         'frequency' => 'weekly',
         'interval'  => 2,
@@ -2260,8 +2296,11 @@ assertTrueValue(
         && str_contains(
             $calDavRecurringCreated['ical'],
             'RRULE:FREQ=WEEKLY;INTERVAL=2;BYDAY=MO,TH;UNTIL=20261130T090000Z'
-        ),
-    'Recurring iCalendar creation must preserve local time and emit a self-contained RFC 5545 rule.'
+        )
+        && str_contains($calDavRecurringCreated['ical'], 'BEGIN:VALARM')
+        && str_contains($calDavRecurringCreated['ical'], 'TRIGGER:-PT30M')
+        && str_contains($calDavRecurringCreated['ical'], 'ACTION:DISPLAY'),
+    'Recurring iCalendar creation must preserve local time, recurrence and one standard display reminder.'
 );
 $calDavRecurringParsed = ICalendarCodec::parseEvents(
     $calDavRecurringCreated['ical'],
@@ -2271,11 +2310,81 @@ $calDavRecurringParsed = ICalendarCodec::parseEvents(
 assertSameValue(1, count($calDavRecurringParsed), 'A newly created recurring iCalendar resource must parse as one master event.');
 assertSameValue('master', $calDavRecurringParsed[0]['recurrenceType'], 'A created RRULE event must parse as a recurring master.');
 assertSameValue('Europe/Berlin', $calDavRecurringParsed[0]['timezone'], 'The recurring iCalendar TZID must survive parsing.');
+assertSameValue('custom', $calDavRecurringParsed[0]['reminder']['mode'], 'One CalDAV display alarm must use the shared reminder model.');
+assertSameValue(30, $calDavRecurringParsed[0]['reminder']['minutesBeforeStart'], 'CalDAV reminder offsets must survive parsing.');
 assertSameValue(
     'FREQ=WEEKLY;INTERVAL=2;BYDAY=MO,TH;UNTIL=20261130T090000Z',
     $calDavRecurringParsed[0]['recurrenceRule'],
     'The created RFC 5545 recurrence rule must survive parsing.'
 );
+
+$calDavReminderUpdated = ICalendarCodec::updateRecurringSeries(
+    $calDavRecurringCreated['ical'],
+    $calDavRecurringCreated['uid'],
+    [
+        'reminder' => [
+            'mode'               => 'custom',
+            'minutesBeforeStart' => 90
+        ]
+    ]
+);
+assertTrueValue(
+    str_contains($calDavReminderUpdated, 'TRIGGER:-PT90M')
+        && substr_count($calDavReminderUpdated, 'BEGIN:VALARM') === 1,
+    'Updating a CalDAV reminder must replace the supported VALARM without duplicating it.'
+);
+$calDavReminderRemoved = ICalendarCodec::updateRecurringSeries(
+    $calDavReminderUpdated,
+    $calDavRecurringCreated['uid'],
+    ['reminder' => ['mode' => 'none']]
+);
+assertTrueValue(
+    !str_contains($calDavReminderRemoved, 'BEGIN:VALARM'),
+    'Disabling a CalDAV reminder must remove the supported VALARM.'
+);
+
+$complexAlarmFixture = <<<'ICS'
+BEGIN:VCALENDAR
+VERSION:2.0
+BEGIN:VEVENT
+UID:complex-alarm@example.com
+DTSTART:20260817T100000Z
+DTEND:20260817T110000Z
+SUMMARY:Complex alarm
+BEGIN:VALARM
+TRIGGER:-PT15M
+ACTION:DISPLAY
+DESCRIPTION:First
+END:VALARM
+BEGIN:VALARM
+TRIGGER:-PT30M
+ACTION:DISPLAY
+DESCRIPTION:Second
+END:VALARM
+END:VEVENT
+END:VCALENDAR
+ICS;
+$complexAlarmFixture = str_replace("\n", "\r\n", $complexAlarmFixture) . "\r\n";
+$complexAlarmEvent = ICalendarCodec::parseEvents(
+    $complexAlarmFixture,
+    'https://calendar.example/work/complex.ics',
+    '"complex"'
+)[0];
+assertSameValue('complex', $complexAlarmEvent['reminder']['mode'], 'Multiple VALARMs must be preserved as complex reminder settings.');
+assertSameValue(false, $complexAlarmEvent['reminder']['editable'], 'Complex CalDAV alarms must not be exposed as editable.');
+try {
+    ICalendarCodec::updateEvent(
+        $complexAlarmFixture,
+        'complex-alarm@example.com',
+        ['reminder' => ['mode' => 'none']]
+    );
+    throw new RuntimeException('Complex CalDAV alarms were replaced destructively.');
+} catch (RuntimeException $exception) {
+    assertTrueValue(
+        str_contains($exception->getMessage(), 'cannot be edited safely'),
+        'Complex CalDAV alarms must be protected from lossy reminder edits.'
+    );
+}
 
 $calDavAllDayRecurringCreated = ICalendarCodec::createEvent([
     'summary'    => 'CalDAV yearly day',

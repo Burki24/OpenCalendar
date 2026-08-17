@@ -163,6 +163,30 @@
                     <input id="event-recurrence-until" type="date">
                 </div>
             </div>
+            <div class="form-row" id="event-reminder-row">
+                <label for="event-reminder-mode">Reminder</label>
+                <select id="event-reminder-mode">
+                    <option value="default" data-i18n="Calendar default">Calendar default</option>
+                    <option value="none" data-i18n="No reminder">No reminder</option>
+                    <option value="custom" data-i18n="Custom">Custom</option>
+                    <option value="complex" data-i18n="Existing reminder settings" disabled>Existing reminder settings</option>
+                </select>
+            </div>
+            <div class="form-row two hidden" id="event-reminder-custom-row">
+                <div class="form-row">
+                    <label for="event-reminder-value">Before start</label>
+                    <input id="event-reminder-value" type="number" min="0" max="40320" value="15">
+                </div>
+                <div class="form-row">
+                    <label for="event-reminder-unit">Unit</label>
+                    <select id="event-reminder-unit">
+                        <option value="minutes" data-i18n="Minutes">Minutes</option>
+                        <option value="hours" data-i18n="Hours">Hours</option>
+                        <option value="days" data-i18n="Days">Days</option>
+                        <option value="weeks" data-i18n="Weeks">Weeks</option>
+                    </select>
+                </div>
+            </div>
             <div class="form-row">
                 <label for="event-location">Location</label>
                 <input id="event-location" maxlength="500">
@@ -205,6 +229,10 @@
             <div class="event-details-row">
                 <dt id="details-end-label">End</dt>
                 <dd id="details-end"></dd>
+            </div>
+            <div class="event-details-row hidden" id="details-reminder-row">
+                <dt id="details-reminder-label">Reminder</dt>
+                <dd id="details-reminder"></dd>
             </div>
             <div class="event-details-row hidden" id="details-location-row">
                 <dt id="details-location-label">Location</dt>

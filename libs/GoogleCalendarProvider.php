@@ -16,6 +16,7 @@ require_once __DIR__ . '/CalendarEventLookupProviderInterface.php';
 require_once __DIR__ . '/RecurringCalendarProviderInterface.php';
 require_once __DIR__ . '/CalendarHttpClient.php';
 require_once __DIR__ . '/CalendarEventRecurrence.php';
+require_once __DIR__ . '/CalendarEventReminder.php';
 require_once __DIR__ . '/CalendarRecurrenceRule.php';
 
 final class GoogleCalendarProviderException extends RuntimeException
@@ -853,8 +854,45 @@ final class GoogleCalendarProvider implements CalendarEventLookupProviderInterfa
             'sequence'       => (int) ($item['sequence'] ?? 0),
             'created'        => trim((string) ($item['created'] ?? '')),
             'lastModified'   => trim((string) ($item['updated'] ?? '')),
-            'url'            => trim((string) ($item['htmlLink'] ?? ''))
+            'url'            => trim((string) ($item['htmlLink'] ?? '')),
+            'reminder'       => $this->mapReminder($item)
         ], $recurrenceIdentity);
+    }
+
+    /**
+     * @param array<string, mixed> $item
+     * @return array{mode: string, minutesBeforeStart: int|null, editable: bool}
+     */
+    private function mapReminder(array $item): array
+    {
+        $reminders = is_array($item['reminders'] ?? null) ? $item['reminders'] : [];
+        if ($reminders === [] || (bool) ($reminders['useDefault'] ?? false)) {
+            return CalendarEventReminder::providerDefault();
+        }
+
+        $overrides = is_array($reminders['overrides'] ?? null) ? $reminders['overrides'] : [];
+        if ($overrides === []) {
+            return CalendarEventReminder::none();
+        }
+        if (count($overrides) !== 1 || !is_array($overrides[0])) {
+            return CalendarEventReminder::complex();
+        }
+
+        $override = $overrides[0];
+        if (strtolower(trim((string) ($override['method'] ?? ''))) !== 'popup') {
+            return CalendarEventReminder::complex();
+        }
+
+        $minutes = filter_var(
+            $override['minutes'] ?? null,
+            FILTER_VALIDATE_INT,
+            ['options' => ['min_range' => 0, 'max_range' => CalendarEventReminder::MAX_MINUTES_BEFORE_START]]
+        );
+        if ($minutes === false) {
+            return CalendarEventReminder::complex();
+        }
+
+        return CalendarEventReminder::custom((int) $minutes);
     }
 
     /**
@@ -932,6 +970,23 @@ final class GoogleCalendarProvider implements CalendarEventLookupProviderInterfa
                 throw new InvalidArgumentException('The event status is invalid.');
             }
             $payload['status'] = $status;
+        }
+        if (array_key_exists('reminder', $data)) {
+            $reminder = CalendarEventReminder::normalizeInput($data['reminder'], true);
+            $payload['reminders'] = match ($reminder['mode']) {
+                CalendarEventReminder::MODE_DEFAULT => ['useDefault' => true],
+                CalendarEventReminder::MODE_NONE    => [
+                    'useDefault' => false,
+                    'overrides'  => []
+                ],
+                CalendarEventReminder::MODE_CUSTOM  => [
+                    'useDefault' => false,
+                    'overrides'  => [[
+                        'method'  => 'popup',
+                        'minutes' => $reminder['minutesBeforeStart']
+                    ]]
+                ]
+            };
         }
 
         $recurrence = null;

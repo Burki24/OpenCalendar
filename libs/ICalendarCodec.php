@@ -13,6 +13,7 @@ use Throwable;
 
 require_once __DIR__ . '/ICalendarRecurrence.php';
 require_once __DIR__ . '/CalendarEventRecurrence.php';
+require_once __DIR__ . '/CalendarEventReminder.php';
 require_once __DIR__ . '/CalendarRecurrenceRule.php';
 
 final class ICalendarCodec
@@ -81,7 +82,8 @@ final class ICalendarCodec
                 'sequence'              => (int) self::propertyValue($properties, 'SEQUENCE'),
                 'created'               => self::parseOptionalDate(self::firstProperty($properties, 'CREATED')),
                 'lastModified'          => self::parseOptionalDate(self::firstProperty($properties, 'LAST-MODIFIED')),
-                'url'                   => self::propertyValue($properties, 'URL')
+                'url'                   => self::propertyValue($properties, 'URL'),
+                'reminder'              => self::reminderState($block)
             ], $recurrenceIdentity);
         }
 
@@ -193,6 +195,19 @@ final class ICalendarCodec
         $status = self::normalizeStatus((string) ($data['status'] ?? 'CONFIRMED'));
         if ($status !== '') {
             $lines[] = 'STATUS:' . $status;
+        }
+
+        if (array_key_exists('reminder', $data)) {
+            $reminder = CalendarEventReminder::normalizeInput($data['reminder']);
+            if ($reminder['mode'] === CalendarEventReminder::MODE_CUSTOM) {
+                array_push(
+                    $lines,
+                    ...self::reminderAlarmLines(
+                        (int) $reminder['minutesBeforeStart'],
+                        $summary
+                    )
+                );
+            }
         }
 
         $lines[] = 'END:VEVENT';
@@ -1101,7 +1116,209 @@ final class ICalendarCodec
             throw new InvalidArgumentException('The event end must be later than the start.');
         }
 
+        if (array_key_exists('reminder', $data)) {
+            self::applyReminderChangesToBlock($block, $data['reminder']);
+        }
+
         self::touchEventBlock($block);
+    }
+
+    /**
+     * Returns the provider-neutral state of VALARM components nested in one VEVENT.
+     *
+     * Only one non-repeating DISPLAY alarm relative to DTSTART can be represented
+     * losslessly by the common OpenCalendar reminder editor.
+     *
+     * @param list<string> $block
+     * @return array{mode: string, minutesBeforeStart: int|null, editable: bool}
+     */
+    private static function reminderState(array $block): array
+    {
+        $alarms = self::extractNestedComponentBlocksWithOffsets($block, 'VALARM');
+        if ($alarms === []) {
+            return CalendarEventReminder::none();
+        }
+        if (count($alarms) !== 1) {
+            return CalendarEventReminder::complex();
+        }
+
+        $properties = self::readTopLevelProperties($alarms[0]['lines']);
+        if (strtoupper(self::propertyValue($properties, 'ACTION')) !== 'DISPLAY'
+            || self::propertyValue($properties, 'DESCRIPTION') === ''
+            || self::propertyValue($properties, 'REPEAT') !== ''
+            || self::propertyValue($properties, 'DURATION') !== '') {
+            return CalendarEventReminder::complex();
+        }
+
+        $trigger = self::firstProperty($properties, 'TRIGGER');
+        if ($trigger === null) {
+            return CalendarEventReminder::complex();
+        }
+        $related = strtoupper(trim((string) ($trigger['params']['RELATED'] ?? 'START')));
+        $valueType = strtoupper(trim((string) ($trigger['params']['VALUE'] ?? 'DURATION')));
+        if ($related !== 'START' || $valueType !== 'DURATION') {
+            return CalendarEventReminder::complex();
+        }
+
+        $minutes = self::relativeReminderMinutes((string) $trigger['value']);
+        if ($minutes === null) {
+            return CalendarEventReminder::complex();
+        }
+
+        return CalendarEventReminder::custom($minutes);
+    }
+
+    /**
+     * Replaces one supported VALARM without touching other VEVENT data.
+     *
+     * @param list<string> $block
+     */
+    private static function applyReminderChangesToBlock(array &$block, mixed $value): void
+    {
+        $reminder = CalendarEventReminder::normalizeInput($value);
+        $current = self::reminderState($block);
+        if ($current['mode'] === CalendarEventReminder::MODE_COMPLEX) {
+            throw new RuntimeException('The reminder settings cannot be edited safely.');
+        }
+
+        $alarms = self::extractNestedComponentBlocksWithOffsets($block, 'VALARM');
+        if ($reminder['mode'] === CalendarEventReminder::MODE_NONE) {
+            if ($alarms !== []) {
+                array_splice(
+                    $block,
+                    $alarms[0]['start'],
+                    $alarms[0]['end'] - $alarms[0]['start'] + 1
+                );
+            }
+            return;
+        }
+
+        $properties = self::readTopLevelProperties($block);
+        $summary = self::unescapeText(self::propertyValue($properties, 'SUMMARY'));
+        $alarmLines = self::reminderAlarmLines((int) $reminder['minutesBeforeStart'], $summary);
+        if ($alarms === []) {
+            $insertAt = array_search('END:VEVENT', array_map('strtoupper', $block), true);
+            if ($insertAt === false) {
+                throw new RuntimeException('The calendar event is missing END:VEVENT.');
+            }
+            array_splice($block, $insertAt, 0, $alarmLines);
+            return;
+        }
+
+        array_splice(
+            $block,
+            $alarms[0]['start'],
+            $alarms[0]['end'] - $alarms[0]['start'] + 1,
+            $alarmLines
+        );
+    }
+
+    /**
+     * @return list<string>
+     */
+    private static function reminderAlarmLines(int $minutesBeforeStart, string $summary): array
+    {
+        CalendarEventReminder::custom($minutesBeforeStart);
+        $trigger = $minutesBeforeStart === 0 ? 'PT0M' : '-PT' . $minutesBeforeStart . 'M';
+        $description = trim($summary) !== '' ? $summary : 'Reminder';
+
+        return [
+            'BEGIN:VALARM',
+            'TRIGGER:' . $trigger,
+            'ACTION:DISPLAY',
+            'DESCRIPTION:' . self::escapeText($description),
+            'END:VALARM'
+        ];
+    }
+
+    private static function relativeReminderMinutes(string $value): ?int
+    {
+        $value = strtoupper(trim($value));
+        $negative = str_starts_with($value, '-');
+        if ($negative) {
+            $value = substr($value, 1);
+        } elseif (str_starts_with($value, '+')) {
+            return null;
+        }
+
+        $weeks = 0;
+        $days = 0;
+        $hours = 0;
+        $minutes = 0;
+        $seconds = 0;
+        if (preg_match('/^P(\d+)W$/D', $value, $matches) === 1) {
+            $weeks = (int) $matches[1];
+        } elseif (preg_match(
+            '/^P(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?)?$/D',
+            $value,
+            $matches
+        ) === 1) {
+            if (!isset($matches[1]) && !isset($matches[2]) && !isset($matches[3]) && !isset($matches[4])) {
+                return null;
+            }
+            $days = (int) ($matches[1] ?? 0);
+            $hours = (int) ($matches[2] ?? 0);
+            $minutes = (int) ($matches[3] ?? 0);
+            $seconds = (int) ($matches[4] ?? 0);
+        } else {
+            return null;
+        }
+
+        $totalSeconds = (($weeks * 7 + $days) * 24 * 60 * 60)
+            + ($hours * 60 * 60)
+            + ($minutes * 60)
+            + $seconds;
+        if ($totalSeconds % 60 !== 0) {
+            return null;
+        }
+
+        $totalMinutes = intdiv($totalSeconds, 60);
+        if (!$negative && $totalMinutes > 0) {
+            return null;
+        }
+        if ($totalMinutes > CalendarEventReminder::MAX_MINUTES_BEFORE_START) {
+            return null;
+        }
+
+        return $totalMinutes;
+    }
+
+    /**
+     * @param list<string> $block
+     * @return list<array{start: int, end: int, lines: list<string>}>
+     */
+    private static function extractNestedComponentBlocksWithOffsets(array $block, string $component): array
+    {
+        $component = strtoupper(trim($component));
+        $blocks = [];
+        $depth = 0;
+        $start = null;
+
+        foreach ($block as $index => $line) {
+            $upper = strtoupper($line);
+            if (str_starts_with($upper, 'BEGIN:')) {
+                if ($depth === 1 && $upper === 'BEGIN:' . $component) {
+                    $start = $index;
+                }
+                ++$depth;
+                continue;
+            }
+            if (!str_starts_with($upper, 'END:')) {
+                continue;
+            }
+
+            --$depth;
+            if ($start !== null && $depth === 1 && $upper === 'END:' . $component) {
+                $blocks[] = [
+                    'start' => $start,
+                    'end'   => $index,
+                    'lines' => array_slice($block, $start, $index - $start + 1)
+                ];
+                $start = null;
+            }
+        }
+
+        return $blocks;
     }
 
     /** @param list<string> $block */

@@ -15,6 +15,7 @@ require_once __DIR__ . '/CalendarProviderInterface.php';
 require_once __DIR__ . '/RecurringCalendarProviderInterface.php';
 require_once __DIR__ . '/CalendarHttpClient.php';
 require_once __DIR__ . '/CalendarEventRecurrence.php';
+require_once __DIR__ . '/CalendarEventReminder.php';
 require_once __DIR__ . '/CalendarRecurrenceRule.php';
 
 final class MicrosoftCalendarProviderException extends RuntimeException
@@ -777,8 +778,31 @@ final class MicrosoftCalendarProvider implements CalendarProviderInterface, Recu
             'created'        => trim((string) ($item['createdDateTime'] ?? '')),
             'lastModified'   => trim((string) ($item['lastModifiedDateTime'] ?? '')),
             'url'            => trim((string) ($item['webLink'] ?? '')),
-            'onlineMeeting'  => (bool) ($item['isOnlineMeeting'] ?? false)
+            'onlineMeeting'  => (bool) ($item['isOnlineMeeting'] ?? false),
+            'reminder'       => $this->mapReminder($item)
         ], $recurrenceIdentity);
+    }
+
+    /**
+     * @param array<string, mixed> $item
+     * @return array{mode: string, minutesBeforeStart: int|null, editable: bool}
+     */
+    private function mapReminder(array $item): array
+    {
+        if (!(bool) ($item['isReminderOn'] ?? false)) {
+            return CalendarEventReminder::none();
+        }
+
+        $minutes = filter_var(
+            $item['reminderMinutesBeforeStart'] ?? null,
+            FILTER_VALIDATE_INT,
+            ['options' => ['min_range' => 0, 'max_range' => CalendarEventReminder::MAX_MINUTES_BEFORE_START]]
+        );
+        if ($minutes === false) {
+            return CalendarEventReminder::complex();
+        }
+
+        return CalendarEventReminder::custom((int) $minutes);
     }
 
     /**
@@ -882,6 +906,15 @@ final class MicrosoftCalendarProvider implements CalendarProviderInterface, Recu
         }
         if (array_key_exists('location', $data)) {
             $payload['location'] = ['displayName' => (string) $data['location']];
+        }
+        if (array_key_exists('reminder', $data)) {
+            $reminder = CalendarEventReminder::normalizeInput($data['reminder']);
+            if ($reminder['mode'] === CalendarEventReminder::MODE_NONE) {
+                $payload['isReminderOn'] = false;
+            } else {
+                $payload['isReminderOn'] = true;
+                $payload['reminderMinutesBeforeStart'] = $reminder['minutesBeforeStart'];
+            }
         }
 
         $recurrenceProvided = array_key_exists('recurrence', $data);

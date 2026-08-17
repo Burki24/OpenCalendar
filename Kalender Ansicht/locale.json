@@ -159,7 +159,18 @@
             "This and following events": "Diesen und alle folgenden Termine",
             "Changes will apply to this and all following occurrences.": "Änderungen werden auf diesen und alle folgenden Termine angewendet.",
             "This and following updates are not supported by this calendar.": "Dieser Kalender unterstützt das Bearbeiten dieses und aller folgenden Serientermine nicht.",
-            "Existing exceptions from this occurrence onward will be reset.": "Bestehende Ausnahmen ab diesem Termin werden dabei zurückgesetzt."
+            "Existing exceptions from this occurrence onward will be reset.": "Bestehende Ausnahmen ab diesem Termin werden dabei zurückgesetzt.",
+            "Reminder": "Erinnerung",
+            "Calendar default": "Kalenderstandard",
+            "No reminder": "Keine Erinnerung",
+            "Custom": "Benutzerdefiniert",
+            "Before start": "Vor Beginn",
+            "Minute": "Minute",
+            "Minutes": "Minuten",
+            "Hour": "Stunde",
+            "Hours": "Stunden",
+            "Existing reminder settings": "Vorhandene Erinnerungseinstellungen",
+            "Events with complex reminder settings cannot be moved safely.": "Termine mit komplexen Erinnerungseinstellungen können nicht sicher verschoben werden."
         }
     }
 }
