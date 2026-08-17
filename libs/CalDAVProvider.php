@@ -16,6 +16,7 @@ use Throwable;
 require_once __DIR__ . '/CalendarProviderInterface.php';
 require_once __DIR__ . '/RecurringCalendarProviderInterface.php';
 require_once __DIR__ . '/CalendarEventRecurrence.php';
+require_once __DIR__ . '/CalendarEventReminder.php';
 require_once __DIR__ . '/CalendarRecurrenceRule.php';
 require_once __DIR__ . '/CalendarHttpClient.php';
 require_once __DIR__ . '/CalDAVOriginPolicy.php';
@@ -1220,7 +1221,8 @@ final class CalDAVProvider implements CalendarProviderInterface, RecurringCalend
                     'deleteOccurrence' => $canWrite,
                     'updateFollowing'  => $canWrite,
                     'updateSeries'     => $canWrite,
-                    'deleteSeries'     => $canWrite
+                    'deleteSeries'     => $canWrite,
+                    'maxReminders'     => CalendarEventReminder::MAX_REMINDERS
                 ]
             ];
         }

@@ -698,6 +698,13 @@ class KalenderKonto extends IPSModuleStrict
             $accessRole = strtolower(trim((string) ($calendar['accessRole'] ?? '')));
             $canWrite = (bool) ($capabilities['create'] ?? false)
                 || in_array($accessRole, ['writer', 'owner'], true);
+            if (!array_key_exists('maxReminders', $capabilities)) {
+                $capabilities['maxReminders'] = in_array(
+                    $provider,
+                    [self::PROVIDER_APPLE, self::PROVIDER_CALDAV, self::PROVIDER_GOOGLE],
+                    true
+                ) ? 5 : 1;
+            }
             if (!array_key_exists('createRecurrence', $capabilities)) {
                 $capabilities['createRecurrence'] = $canWrite;
             }

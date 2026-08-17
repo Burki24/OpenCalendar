@@ -114,7 +114,8 @@ final class MicrosoftCalendarProvider implements CalendarProviderInterface, Recu
                         'updateFollowing'           => $canWrite,
                         'updateSeries'              => $canWrite,
                         'deleteSeries'              => $canWrite,
-                        'createWithDefaultReminder' => $canWrite
+                        'createWithDefaultReminder' => $canWrite,
+                        'maxReminders'              => 1
                     ]
                 ];
                 if (count($calendars) > self::MAX_CALENDARS) {
@@ -909,7 +910,7 @@ final class MicrosoftCalendarProvider implements CalendarProviderInterface, Recu
             $payload['location'] = ['displayName' => (string) $data['location']];
         }
         if (array_key_exists('reminder', $data)) {
-            $reminder = CalendarEventReminder::normalizeInput($data['reminder']);
+            $reminder = CalendarEventReminder::normalizeInput($data['reminder'], false, 1);
             if ($reminder['mode'] === CalendarEventReminder::MODE_NONE) {
                 $payload['isReminderOn'] = false;
             } else {

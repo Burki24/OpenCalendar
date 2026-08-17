@@ -184,8 +184,10 @@ assertCalendarViewApi(
         && str_contains($moduleSource, "'reminderMode'")
         && str_contains($moduleSource, "'minutesBeforeStart'")
         && str_contains($moduleSource, "'reminderTimestamp'")
-        && str_contains($moduleSource, "'reminderDateTime'"),
-    'Reminder API results must expose stable IDs, effective lead time and exact trigger timestamps.'
+        && str_contains($moduleSource, "'reminderDateTime'")
+        && str_contains($moduleSource, "'reminderIndex'")
+        && str_contains($moduleSource, "'reminderCount'"),
+    'Reminder API results must expose stable IDs, effective lead time, trigger timestamps and per-event reminder positions.'
 );
 $normalizedModuleSource = preg_replace('/\s+/', ' ', $moduleSource) ?? $moduleSource;
 assertCalendarViewApi(
@@ -194,8 +196,9 @@ assertCalendarViewApi(
         && str_contains($moduleSource, 'private function loadSelectedCalendars(): array')
         && str_contains($normalizedModuleSource, "'timezone' => trim((string) (\$calendarStatus['timezone'] ?? ''))")
         && str_contains($normalizedModuleSource, "'canCreateRecurrence' => (bool) (\$calendarStatus['canCreateRecurrence'] ?? false)")
-        && str_contains($normalizedModuleSource, "'canDeleteSeries' => (bool) (\$calendarStatus['canDeleteSeries'] ?? false)"),
-    'Calendar View must expose selected calendar metadata including recurrence capabilities and timezone without colliding with its internal loader.'
+        && str_contains($normalizedModuleSource, "'canDeleteSeries' => (bool) (\$calendarStatus['canDeleteSeries'] ?? false)")
+        && str_contains($normalizedModuleSource, "'maxReminders' => max(1, min(CalendarEventReminder::MAX_REMINDERS, (int) (\$calendarStatus['maxReminders'] ?? 1)))"),
+    'Calendar View must expose selected calendar metadata including recurrence capabilities, reminder limits and timezone without colliding with its internal loader.'
 );
 
 require_once __DIR__ . '/stubs/ModuleStrictStubs.php';
@@ -219,6 +222,8 @@ $validateUpcomingHoursMethod = new ReflectionMethod(KalenderAnsicht::class, 'val
 $validateUpcomingHoursMethod->setAccessible(true);
 $buildReminderRecordMethod = new ReflectionMethod(KalenderAnsicht::class, 'buildReminderRecord');
 $buildReminderRecordMethod->setAccessible(true);
+$buildReminderRecordsMethod = new ReflectionMethod(KalenderAnsicht::class, 'buildReminderRecords');
+$buildReminderRecordsMethod->setAccessible(true);
 $validateReminderMinutesWindowMethod = new ReflectionMethod(KalenderAnsicht::class, 'validateReminderMinutesWindow');
 $validateReminderMinutesWindowMethod->setAccessible(true);
 $calendarView = new KalenderAnsicht(1);
@@ -409,6 +414,7 @@ $reminderCalendar = [
     'name'                  => 'Calendar A',
     'color'                 => '#123456',
     'canUseDefaultReminder' => true,
+    'maxReminders'          => 5,
     'defaultReminder'       => [
         'mode'               => 'custom',
         'minutesBeforeStart' => 15,
@@ -453,6 +459,44 @@ assertCalendarViewApi(
     'Reminder IDs and normalized output must remain stable for unchanged appointment data.'
 );
 
+$multipleReminderAppointment = $customReminderAppointment;
+$multipleReminderAppointment['uid'] = 'multiple-reminders@example.com';
+$multipleReminderAppointment['summary'] = 'Multiple reminders';
+$multipleReminderAppointment['reminder'] = [
+    'mode'               => 'multiple',
+    'minutesBeforeStart' => null,
+    'reminders'          => [
+        ['minutesBeforeStart' => 10],
+        ['minutesBeforeStart' => 60]
+    ],
+    'editable'           => true
+];
+$multipleReminderRecords = $buildReminderRecordsMethod->invoke(
+    $calendarView,
+    $multipleReminderAppointment,
+    $reminderCalendar
+);
+assertCalendarViewApi(
+    is_array($multipleReminderRecords)
+        && count($multipleReminderRecords) === 2
+        && ($multipleReminderRecords[0]['reminderMode'] ?? '') === 'multiple'
+        && ($multipleReminderRecords[0]['minutesBeforeStart'] ?? -1) === 10
+        && ($multipleReminderRecords[0]['reminderIndex'] ?? -1) === 0
+        && ($multipleReminderRecords[0]['reminderCount'] ?? 0) === 2
+        && ($multipleReminderRecords[1]['minutesBeforeStart'] ?? -1) === 60
+        && ($multipleReminderRecords[1]['reminderIndex'] ?? -1) === 1
+        && ($multipleReminderRecords[1]['reminderCount'] ?? 0) === 2
+        && ($multipleReminderRecords[0]['reminderTimestamp'] ?? 0) === $reminderStart - (10 * 60)
+        && ($multipleReminderRecords[1]['reminderTimestamp'] ?? 0) === $reminderStart - (60 * 60)
+        && ($multipleReminderRecords[0]['reminderId'] ?? '') !== ($multipleReminderRecords[1]['reminderId'] ?? ''),
+    'One event with multiple reminders must produce one stable PHP API record per exact trigger.'
+);
+assertCalendarViewApi(
+    $buildReminderRecordsMethod->invoke($calendarView, $multipleReminderAppointment, $reminderCalendar)
+        === $multipleReminderRecords,
+    'Multiple-reminder API IDs and ordering must remain stable for unchanged appointment data.'
+);
+
 $defaultReminderAppointment = $customReminderAppointment;
 $defaultReminderAppointment['uid'] = 'default-reminder@example.com';
 $defaultReminderAppointment['summary'] = 'Default reminder';
@@ -472,6 +516,28 @@ assertCalendarViewApi(
         && ($defaultReminderRecord['minutesBeforeStart'] ?? -1) === 15
         && ($defaultReminderRecord['reminderTimestamp'] ?? 0) === $reminderStart - (15 * 60),
     'Calendar-default reminders must resolve to the selected calendar default when it has one exact trigger.'
+);
+
+$multipleDefaultReminderCalendar = $reminderCalendar;
+$multipleDefaultReminderCalendar['defaultReminder'] = [
+    'mode'               => 'multiple',
+    'minutesBeforeStart' => null,
+    'reminders'          => [
+        ['minutesBeforeStart' => 5],
+        ['minutesBeforeStart' => 45]
+    ],
+    'editable'           => true
+];
+$multipleDefaultReminderRecords = $buildReminderRecordsMethod->invoke(
+    $calendarView,
+    $defaultReminderAppointment,
+    $multipleDefaultReminderCalendar
+);
+assertCalendarViewApi(
+    count($multipleDefaultReminderRecords) === 2
+        && array_column($multipleDefaultReminderRecords, 'minutesBeforeStart') === [5, 45]
+        && array_column($multipleDefaultReminderRecords, 'reminderMode') === ['default', 'default'],
+    'Calendar-default reminder APIs must emit every exact trigger when the Google calendar default contains multiple reminders.'
 );
 
 $noneReminderAppointment = $customReminderAppointment;

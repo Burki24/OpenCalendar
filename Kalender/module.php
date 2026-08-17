@@ -73,6 +73,7 @@ class Kalender extends IPSModuleStrict
         $this->RegisterAttributeBoolean('DetectedCanDeleteSeries', false);
         $this->RegisterAttributeBoolean('DetectedCanUseDefaultReminder', false);
         $this->RegisterAttributeBoolean('DetectedCanCreateWithDefaultReminder', false);
+        $this->RegisterAttributeInteger('DetectedMaxReminders', 1);
         $this->RegisterAttributeString('DetectedDefaultReminder', '{}');
         $this->RegisterAttributeString('DetectedCalendarTimezone', '');
         $this->RegisterAttributeBoolean('DetectedWriteAccessKnown', false);
@@ -747,6 +748,9 @@ class Kalender extends IPSModuleStrict
                 'canCreateWithDefaultReminder' => $metadataAvailable
                     && $this->ReadAttributeBoolean('DetectedCanCreateWithDefaultReminder'),
                 'defaultReminder'              => $metadataAvailable ? $defaultReminder : [],
+                'maxReminders'                 => $metadataAvailable
+                    ? max(1, min(5, $this->ReadAttributeInteger('DetectedMaxReminders')))
+                    : 1,
                 'eventCount'                   => count($events),
                 'todayEventCount'              => CalendarEventCounter::countForDay(
                     $events,
@@ -830,6 +834,7 @@ class Kalender extends IPSModuleStrict
             $this->WriteAttributeBoolean('DetectedCanDeleteSeries', false);
             $this->WriteAttributeBoolean('DetectedCanUseDefaultReminder', false);
             $this->WriteAttributeBoolean('DetectedCanCreateWithDefaultReminder', false);
+            $this->WriteAttributeInteger('DetectedMaxReminders', 1);
             $this->WriteAttributeString('DetectedDefaultReminder', '{}');
             $this->WriteAttributeString('DetectedCalendarTimezone', '');
             $this->WriteAttributeBoolean('DetectedWriteAccessKnown', false);
@@ -855,6 +860,7 @@ class Kalender extends IPSModuleStrict
         $canDeleteSeries = (bool) ($capabilities['deleteSeries'] ?? false);
         $canUseDefaultReminder = (bool) ($capabilities['useDefaultReminder'] ?? false);
         $canCreateWithDefaultReminder = (bool) ($capabilities['createWithDefaultReminder'] ?? false);
+        $maxReminders = max(1, min(5, (int) ($capabilities['maxReminders'] ?? 1)));
         $defaultReminder = is_array($calendar['defaultReminder'] ?? null)
             && !array_is_list($calendar['defaultReminder'])
             ? $calendar['defaultReminder']
@@ -881,6 +887,7 @@ class Kalender extends IPSModuleStrict
             'DetectedCanCreateWithDefaultReminder',
             $canCreateWithDefaultReminder
         );
+        $this->WriteAttributeInteger('DetectedMaxReminders', $maxReminders);
         $this->WriteAttributeString(
             'DetectedDefaultReminder',
             json_encode(

@@ -164,12 +164,17 @@
             "Calendar default": "Kalenderstandard",
             "No reminder": "Keine Erinnerung",
             "Custom": "Benutzerdefiniert",
+            "Add reminder": "Erinnerung hinzufügen",
+            "Remove reminder": "Erinnerung entfernen",
             "Before start": "Vor Beginn",
             "Minute": "Minute",
             "Minutes": "Minuten",
             "Hour": "Stunde",
             "Hours": "Stunden",
             "Existing reminder settings": "Vorhandene Erinnerungseinstellungen",
+            "This calendar supports up to %d reminders.": "Dieser Kalender unterstützt bis zu %d Erinnerungen.",
+            "Reminder times must be unique.": "Erinnerungszeitpunkte müssen eindeutig sein.",
+            "The selected calendar does not support these reminder settings.": "Der ausgewählte Kalender unterstützt diese Erinnerungseinstellungen nicht.",
             "Events with complex reminder settings cannot be moved safely.": "Termine mit komplexen Erinnerungseinstellungen können nicht sicher verschoben werden."
         }
     }

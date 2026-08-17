@@ -369,6 +369,7 @@ assertCalDAVSame(true, $calendars[0]['capabilities']['updateFollowing'], 'Writab
 assertCalDAVSame(true, $calendars[0]['capabilities']['deleteOccurrence'], 'Writable CalDAV calendars must advertise recurring occurrence deletion.');
 assertCalDAVSame(true, $calendars[0]['capabilities']['updateSeries'], 'Writable CalDAV calendars must advertise recurring series updates.');
 assertCalDAVSame(true, $calendars[0]['capabilities']['deleteSeries'], 'Writable CalDAV calendars must advertise recurring series deletion.');
+assertCalDAVSame(5, $calendars[0]['capabilities']['maxReminders'], 'CalDAV calendars must advertise support for up to five editable OpenCalendar reminders.');
 assertCalDAVSame(true, $calendars[0]['writeAccessKnown'], 'Returned privileges must mark write access as known.');
 
 $calendarXmlWithoutPrivileges = preg_replace(
@@ -392,6 +393,7 @@ assertCalDAVSame(true, $unknownPrivilegeCalendars[0]['capabilities']['updateFoll
 assertCalDAVSame(true, $unknownPrivilegeCalendars[0]['capabilities']['deleteOccurrence'], 'Unknown DAV privileges must not hide recurring occurrence deletion optimistically.');
 assertCalDAVSame(true, $unknownPrivilegeCalendars[0]['capabilities']['updateSeries'], 'Unknown DAV privileges must not hide recurring series updates optimistically.');
 assertCalDAVSame(true, $unknownPrivilegeCalendars[0]['capabilities']['deleteSeries'], 'Unknown DAV privileges must not hide recurring series deletion optimistically.');
+assertCalDAVSame(5, $unknownPrivilegeCalendars[0]['capabilities']['maxReminders'], 'Unknown DAV privileges must not reduce the provider-neutral CalDAV reminder limit.');
 
 assertCalDAVSame('https://calendar.example/.well-known/caldav', $discoveryClient->requests[0]['url'], 'Root server URLs must start discovery at .well-known/caldav.');
 assertCalDAVSame('https://calendar.example/principals/user/', $discoveryClient->requests[1]['url'], 'The discovered principal must be queried.');

@@ -199,15 +199,7 @@ final class ICalendarCodec
 
         if (array_key_exists('reminder', $data)) {
             $reminder = CalendarEventReminder::normalizeInput($data['reminder']);
-            if ($reminder['mode'] === CalendarEventReminder::MODE_CUSTOM) {
-                array_push(
-                    $lines,
-                    ...self::reminderAlarmLines(
-                        (int) $reminder['minutesBeforeStart'],
-                        $summary
-                    )
-                );
-            }
+            array_push($lines, ...self::reminderAlarmBlocks($reminder, $summary));
         }
 
         $lines[] = 'END:VEVENT';
@@ -1126,11 +1118,11 @@ final class ICalendarCodec
     /**
      * Returns the provider-neutral state of VALARM components nested in one VEVENT.
      *
-     * Only one non-repeating DISPLAY alarm relative to DTSTART can be represented
-     * losslessly by the common OpenCalendar reminder editor.
+     * Multiple independent non-repeating DISPLAY alarms relative to DTSTART can be
+     * represented losslessly up to the common OpenCalendar reminder limit.
      *
      * @param list<string> $block
-     * @return array{mode: string, minutesBeforeStart: int|null, editable: bool}
+     * @return array<string, mixed>
      */
     private static function reminderState(array $block): array
     {
@@ -1138,38 +1130,43 @@ final class ICalendarCodec
         if ($alarms === []) {
             return CalendarEventReminder::none();
         }
-        if (count($alarms) !== 1) {
-            return CalendarEventReminder::complex();
+
+        $minutesBeforeStart = [];
+        foreach ($alarms as $alarm) {
+            $properties = self::readTopLevelProperties($alarm['lines']);
+            if (strtoupper(self::propertyValue($properties, 'ACTION')) !== 'DISPLAY'
+                || self::propertyValue($properties, 'DESCRIPTION') === ''
+                || self::propertyValue($properties, 'REPEAT') !== ''
+                || self::propertyValue($properties, 'DURATION') !== '') {
+                return CalendarEventReminder::complex();
+            }
+
+            $trigger = self::firstProperty($properties, 'TRIGGER');
+            if ($trigger === null) {
+                return CalendarEventReminder::complex();
+            }
+            $related = strtoupper(trim((string) ($trigger['params']['RELATED'] ?? 'START')));
+            $valueType = strtoupper(trim((string) ($trigger['params']['VALUE'] ?? 'DURATION')));
+            if ($related !== 'START' || $valueType !== 'DURATION') {
+                return CalendarEventReminder::complex();
+            }
+
+            $minutes = self::relativeReminderMinutes((string) $trigger['value']);
+            if ($minutes === null) {
+                return CalendarEventReminder::complex();
+            }
+            $minutesBeforeStart[] = $minutes;
         }
 
-        $properties = self::readTopLevelProperties($alarms[0]['lines']);
-        if (strtoupper(self::propertyValue($properties, 'ACTION')) !== 'DISPLAY'
-            || self::propertyValue($properties, 'DESCRIPTION') === ''
-            || self::propertyValue($properties, 'REPEAT') !== ''
-            || self::propertyValue($properties, 'DURATION') !== '') {
+        try {
+            return CalendarEventReminder::fromMinutes($minutesBeforeStart);
+        } catch (InvalidArgumentException) {
             return CalendarEventReminder::complex();
         }
-
-        $trigger = self::firstProperty($properties, 'TRIGGER');
-        if ($trigger === null) {
-            return CalendarEventReminder::complex();
-        }
-        $related = strtoupper(trim((string) ($trigger['params']['RELATED'] ?? 'START')));
-        $valueType = strtoupper(trim((string) ($trigger['params']['VALUE'] ?? 'DURATION')));
-        if ($related !== 'START' || $valueType !== 'DURATION') {
-            return CalendarEventReminder::complex();
-        }
-
-        $minutes = self::relativeReminderMinutes((string) $trigger['value']);
-        if ($minutes === null) {
-            return CalendarEventReminder::complex();
-        }
-
-        return CalendarEventReminder::custom($minutes);
     }
 
     /**
-     * Replaces one supported VALARM without touching other VEVENT data.
+     * Replaces supported VALARM components without touching other VEVENT data.
      *
      * @param list<string> $block
      */
@@ -1182,35 +1179,39 @@ final class ICalendarCodec
         }
 
         $alarms = self::extractNestedComponentBlocksWithOffsets($block, 'VALARM');
+        foreach (array_reverse($alarms) as $alarm) {
+            array_splice(
+                $block,
+                $alarm['start'],
+                $alarm['end'] - $alarm['start'] + 1
+            );
+        }
         if ($reminder['mode'] === CalendarEventReminder::MODE_NONE) {
-            if ($alarms !== []) {
-                array_splice(
-                    $block,
-                    $alarms[0]['start'],
-                    $alarms[0]['end'] - $alarms[0]['start'] + 1
-                );
-            }
             return;
         }
 
         $properties = self::readTopLevelProperties($block);
         $summary = self::unescapeText(self::propertyValue($properties, 'SUMMARY'));
-        $alarmLines = self::reminderAlarmLines((int) $reminder['minutesBeforeStart'], $summary);
-        if ($alarms === []) {
-            $insertAt = array_search('END:VEVENT', array_map('strtoupper', $block), true);
-            if ($insertAt === false) {
-                throw new RuntimeException('The calendar event is missing END:VEVENT.');
-            }
-            array_splice($block, $insertAt, 0, $alarmLines);
-            return;
+        $alarmLines = self::reminderAlarmBlocks($reminder, $summary);
+        $insertAt = array_search('END:VEVENT', array_map('strtoupper', $block), true);
+        if ($insertAt === false) {
+            throw new RuntimeException('The calendar event is missing END:VEVENT.');
+        }
+        array_splice($block, $insertAt, 0, $alarmLines);
+    }
+
+    /**
+     * @param array<string, mixed> $reminder Normalized reminder state.
+     * @return list<string>
+     */
+    private static function reminderAlarmBlocks(array $reminder, string $summary): array
+    {
+        $lines = [];
+        foreach (CalendarEventReminder::minutesBeforeStartValues($reminder) as $minutesBeforeStart) {
+            array_push($lines, ...self::reminderAlarmLines($minutesBeforeStart, $summary));
         }
 
-        array_splice(
-            $block,
-            $alarms[0]['start'],
-            $alarms[0]['end'] - $alarms[0]['start'] + 1,
-            $alarmLines
-        );
+        return $lines;
     }
 
     /**

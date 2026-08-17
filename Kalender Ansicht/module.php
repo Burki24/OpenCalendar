@@ -856,7 +856,7 @@ class KalenderAnsicht extends IPSModuleStrict
      *
      * The queried range applies to the reminder trigger, not to the event start. Events may
      * therefore start after the requested range when their reminder falls inside it.
-     * Disabled or complex reminder configurations without one exact provider-neutral trigger
+     * Disabled or complex reminder configurations without exact provider-neutral triggers
      * are intentionally omitted.
      *
      * @param string $From First local reminder date in YYYY-MM-DD format.
@@ -952,7 +952,7 @@ class KalenderAnsicht extends IPSModuleStrict
     /**
      * Returns the calendar instances selected and enabled in this Calendar View.
      *
-     * The result contains instanceId, name, color, canWrite, timezone and recurring-event capabilities for each selected calendar.
+     * The result contains instanceId, name, color, canWrite, timezone, recurring-event capabilities and the reminder limit for each selected calendar.
      * Client-side temporary calendar filters do not alter this configured selection.
      *
      * @return string JSON-encoded selected calendar list.
@@ -1272,6 +1272,11 @@ class KalenderAnsicht extends IPSModuleStrict
             'Hour',
             'Hours',
             'Existing reminder settings',
+            'Add reminder',
+            'Remove reminder',
+            'This calendar supports up to %d reminders.',
+            'Reminder times must be unique.',
+            'The selected calendar does not support these reminder settings.',
             'Repeat',
             'Does not repeat',
             'Daily',
@@ -1541,17 +1546,14 @@ class KalenderAnsicht extends IPSModuleStrict
                 continue;
             }
 
-            $reminder = $this->buildReminderRecord($appointment, $calendars[$calendarInstanceId]);
-            if ($reminder === null) {
-                continue;
-            }
+            foreach ($this->buildReminderRecords($appointment, $calendars[$calendarInstanceId]) as $reminder) {
+                $reminderTimestamp = (int) ($reminder['reminderTimestamp'] ?? 0);
+                if ($reminderTimestamp < $fromTimestamp || $reminderTimestamp > $toTimestamp) {
+                    continue;
+                }
 
-            $reminderTimestamp = (int) ($reminder['reminderTimestamp'] ?? 0);
-            if ($reminderTimestamp < $fromTimestamp || $reminderTimestamp > $toTimestamp) {
-                continue;
+                $reminders[] = $reminder;
             }
-
-            $reminders[] = $reminder;
         }
 
         usort(
@@ -1567,7 +1569,10 @@ class KalenderAnsicht extends IPSModuleStrict
     }
 
     /**
-     * Builds one script-friendly reminder record from a normalized appointment.
+     * Builds the first script-friendly reminder record from a normalized appointment.
+     *
+     * Kept as a small compatibility wrapper for existing internal tests and callers.
+     * Multiple reminder configurations are exposed completely through buildReminderRecords().
      *
      * @param array<string, mixed> $appointment Full normalized appointment.
      * @param array<string, mixed> $calendar Selected calendar metadata.
@@ -1575,67 +1580,83 @@ class KalenderAnsicht extends IPSModuleStrict
      */
     private function buildReminderRecord(array $appointment, array $calendar): ?array
     {
+        return $this->buildReminderRecords($appointment, $calendar)[0] ?? null;
+    }
+
+    /**
+     * Builds all script-friendly reminder records from a normalized appointment.
+     *
+     * @param array<string, mixed> $appointment Full normalized appointment.
+     * @param array<string, mixed> $calendar Selected calendar metadata.
+     * @return list<array<string, mixed>> Exact reminder records.
+     */
+    private function buildReminderRecords(array $appointment, array $calendar): array
+    {
         $startTimestamp = (int) ($appointment['startTimestamp'] ?? 0);
         $calendarInstanceId = (int) ($appointment['calendarInstanceId'] ?? $calendar['instanceId'] ?? 0);
         $reminder = $appointment['reminder'] ?? null;
         if ($startTimestamp <= 0 || $calendarInstanceId <= 0 || !is_array($reminder) || array_is_list($reminder)) {
-            return null;
+            return [];
         }
 
         try {
             $normalizedReminder = CalendarEventReminder::normalizeInput($reminder, true);
         } catch (InvalidArgumentException) {
-            return null;
+            return [];
         }
 
         $sourceMode = (string) ($normalizedReminder['mode'] ?? '');
         $effectiveReminder = $normalizedReminder;
         if ($sourceMode === CalendarEventReminder::MODE_DEFAULT) {
             if (!(bool) ($calendar['canUseDefaultReminder'] ?? false)) {
-                return null;
+                return [];
             }
 
             try {
                 $effectiveReminder = CalendarEventReminder::normalizeInput($calendar['defaultReminder'] ?? null);
             } catch (InvalidArgumentException) {
-                return null;
+                return [];
             }
         }
 
-        if (($effectiveReminder['mode'] ?? '') !== CalendarEventReminder::MODE_CUSTOM) {
-            return null;
+        $minutesBeforeStartValues = CalendarEventReminder::minutesBeforeStartValues($effectiveReminder);
+        if ($minutesBeforeStartValues === []) {
+            return [];
         }
 
-        $minutesBeforeStart = (int) ($effectiveReminder['minutesBeforeStart'] ?? -1);
-        if ($minutesBeforeStart < 0) {
-            return null;
-        }
-
-        $reminderTimestamp = $startTimestamp - ($minutesBeforeStart * 60);
         $timezone = new DateTimeZone(date_default_timezone_get());
         $eventIdentity = $this->reminderEventIdentity($appointment);
-        $reminderId = hash(
-            'sha256',
-            $calendarInstanceId . '|' . $eventIdentity . '|' . $startTimestamp . '|' . $reminderTimestamp
-        );
+        $reminderCount = count($minutesBeforeStartValues);
+        $records = [];
+        foreach ($minutesBeforeStartValues as $reminderIndex => $minutesBeforeStart) {
+            $reminderTimestamp = $startTimestamp - ($minutesBeforeStart * 60);
+            $reminderId = hash(
+                'sha256',
+                $calendarInstanceId . '|' . $eventIdentity . '|' . $startTimestamp . '|' . $reminderTimestamp
+            );
 
-        return [
-            'reminderId'         => $reminderId,
-            'summary'            => (string) ($appointment['summary'] ?? ''),
-            'calendarInstanceId' => $calendarInstanceId,
-            'calendarName'       => (string) ($appointment['calendarName'] ?? $calendar['name'] ?? ''),
-            'calendarColor'      => (string) ($appointment['calendarColor'] ?? $calendar['color'] ?? ''),
-            'start'              => (string) ($appointment['start'] ?? ''),
-            'startTimestamp'     => $startTimestamp,
-            'allDay'             => (bool) ($appointment['allDay'] ?? false),
-            'location'           => (string) ($appointment['location'] ?? ''),
-            'reminderMode'       => $sourceMode,
-            'minutesBeforeStart' => $minutesBeforeStart,
-            'reminderTimestamp'  => $reminderTimestamp,
-            'reminderDateTime'   => (new DateTimeImmutable('@' . $reminderTimestamp))
-                ->setTimezone($timezone)
-                ->format(DATE_ATOM)
-        ];
+            $records[] = [
+                'reminderId'         => $reminderId,
+                'summary'            => (string) ($appointment['summary'] ?? ''),
+                'calendarInstanceId' => $calendarInstanceId,
+                'calendarName'       => (string) ($appointment['calendarName'] ?? $calendar['name'] ?? ''),
+                'calendarColor'      => (string) ($appointment['calendarColor'] ?? $calendar['color'] ?? ''),
+                'start'              => (string) ($appointment['start'] ?? ''),
+                'startTimestamp'     => $startTimestamp,
+                'allDay'             => (bool) ($appointment['allDay'] ?? false),
+                'location'           => (string) ($appointment['location'] ?? ''),
+                'reminderMode'       => $sourceMode,
+                'reminderIndex'      => $reminderIndex,
+                'reminderCount'      => $reminderCount,
+                'minutesBeforeStart' => $minutesBeforeStart,
+                'reminderTimestamp'  => $reminderTimestamp,
+                'reminderDateTime'   => (new DateTimeImmutable('@' . $reminderTimestamp))
+                    ->setTimezone($timezone)
+                    ->format(DATE_ATOM)
+            ];
+        }
+
+        return $records;
     }
 
     /**
@@ -2061,7 +2082,7 @@ class KalenderAnsicht extends IPSModuleStrict
     }
 
     /**
-     * @return list<array{instanceId: int, name: string, color: string, canWrite: bool, timezone: string, canCreateRecurrence: bool, canUpdateRecurrence: bool, canUpdateOccurrence: bool, canDeleteOccurrence: bool, canUpdateFollowing: bool, canUpdateSeries: bool, canDeleteSeries: bool, canUseDefaultReminder: bool, canCreateWithDefaultReminder: bool, defaultReminder: array<string, mixed>}>
+     * @return list<array{instanceId: int, name: string, color: string, canWrite: bool, timezone: string, canCreateRecurrence: bool, canUpdateRecurrence: bool, canUpdateOccurrence: bool, canDeleteOccurrence: bool, canUpdateFollowing: bool, canUpdateSeries: bool, canDeleteSeries: bool, canUseDefaultReminder: bool, canCreateWithDefaultReminder: bool, defaultReminder: array<string, mixed>, maxReminders: int}>
      */
     private function loadSelectedCalendars(): array
     {
@@ -2118,7 +2139,8 @@ class KalenderAnsicht extends IPSModuleStrict
                 'defaultReminder'              => is_array($calendarStatus['defaultReminder'] ?? null)
                     && !array_is_list($calendarStatus['defaultReminder'])
                     ? $calendarStatus['defaultReminder']
-                    : []
+                    : [],
+                'maxReminders'                 => max(1, min(CalendarEventReminder::MAX_REMINDERS, (int) ($calendarStatus['maxReminders'] ?? 1)))
             ];
         }
 
@@ -2398,6 +2420,9 @@ class KalenderAnsicht extends IPSModuleStrict
                 if (($sourceReminder['mode'] ?? '') === CalendarEventReminder::MODE_DEFAULT) {
                     $event['reminder'] = $this->defaultReminderForMove($sourceInstanceId);
                 }
+                if (array_key_exists('reminder', $event)) {
+                    $this->assertReminderSupportedByCalendar($targetInstanceId, $event['reminder']);
+                }
 
                 $sourceRecurring = (bool) ($sourceEvent['recurring'] ?? false);
                 $writeScope = strtolower(trim((string) ($sourceEvent['writeScope'] ?? '')));
@@ -2620,7 +2645,44 @@ class KalenderAnsicht extends IPSModuleStrict
         throw new RuntimeException($this->Translate('Recurring event creation is not supported by this calendar.'));
     }
 
-    /** @return array{mode: string, minutesBeforeStart: int|null} */
+    private function assertReminderSupportedByCalendar(int $instanceId, mixed $value): void
+    {
+        foreach ($this->loadSelectedCalendars() as $calendar) {
+            if ($calendar['instanceId'] !== $instanceId) {
+                continue;
+            }
+
+            $maxReminders = max(1, min(CalendarEventReminder::MAX_REMINDERS, (int) ($calendar['maxReminders'] ?? 1)));
+            try {
+                $normalized = CalendarEventReminder::normalizeInput($value, true);
+                $reminderCount = count(CalendarEventReminder::minutesBeforeStartValues($normalized));
+                if ($reminderCount > $maxReminders) {
+                    throw new RuntimeException(sprintf(
+                        $this->Translate('This calendar supports up to %d reminders.'),
+                        $maxReminders
+                    ));
+                }
+                CalendarEventReminder::normalizeInput(
+                    $value,
+                    (bool) ($calendar['canUseDefaultReminder'] ?? false),
+                    $maxReminders
+                );
+                return;
+            } catch (RuntimeException $exception) {
+                throw $exception;
+            } catch (InvalidArgumentException $exception) {
+                throw new RuntimeException(
+                    $this->Translate('The selected calendar does not support these reminder settings.'),
+                    0,
+                    $exception
+                );
+            }
+        }
+
+        throw new RuntimeException($this->Translate('The selected calendar is not writable.'));
+    }
+
+    /** @return array<string, mixed> */
     private function defaultReminderForMove(int $instanceId): array
     {
         foreach ($this->loadSelectedCalendars() as $calendar) {

@@ -149,9 +149,16 @@ assertVisualization(
     str_contains($indexSource, 'id="event-reminder-mode"')
         && str_contains($indexSource, 'id="event-reminder-value"')
         && str_contains($indexSource, 'id="event-reminder-unit"')
+        && str_contains($indexSource, 'id="event-reminder-extra-list"')
+        && str_contains($indexSource, 'id="event-reminder-add-button"')
         && str_contains($indexSource, 'id="details-reminder-row"')
         && str_contains($script, 'function eventReminderState(event)')
         && str_contains($script, 'function calendarDefaultReminderState(calendar)')
+        && str_contains($script, 'function maxReminderCount(calendar = selectedCalendarEntry())')
+        && str_contains($script, 'function appendReminderEditorEntry(')
+        && str_contains($script, "mode: 'multiple'")
+        && str_contains($script, 'reminders: minutes.map(')
+        && str_contains($script, "t('Remove reminder')")
         && str_contains($script, 'function resolveDefaultReminderForCalendarMove()')
         && str_contains($script, 'calendar?.canUseDefaultReminder || calendar?.canCreateWithDefaultReminder')
         && str_contains($script, "? { mode: 'default' }")
@@ -159,7 +166,7 @@ assertVisualization(
         && str_contains($script, 'reminder: selectedEvent.reminder || null')
         && str_contains($script, "calendarDefaultReminderState(sourceCalendar).mode === 'complex'")
         && str_contains($script, "setOptionalDetail('reminder', reminderDetailText(event));"),
-    'The shared event dialog must distinguish persistent and create-only calendar defaults, resolve simple defaults during moves, and protect complex reminder settings.'
+    'The shared event dialog must edit one or multiple provider-neutral reminders, respect calendar limits, resolve defaults during moves, and protect complex reminder settings.'
 );
 
 assertVisualization(
@@ -270,8 +277,10 @@ assertVisualization(
         && str_contains($moduleSource, '($sourceReminder[\'editable\'] ?? true) === false')
         && str_contains($moduleSource, 'CalendarEventReminder::MODE_DEFAULT')
         && str_contains($moduleSource, '$event[\'reminder\'] = $this->defaultReminderForMove($sourceInstanceId);')
+        && str_contains($moduleSource, '$this->assertReminderSupportedByCalendar($targetInstanceId, $event[\'reminder\']);')
+        && str_contains($moduleSource, 'private function assertReminderSupportedByCalendar(')
         && str_contains($moduleSource, 'private function defaultReminderForMove(int $instanceId): array'),
-    'The visualization backend must resolve simple Google calendar defaults before cross-calendar moves and reject lossy complex defaults.'
+    'The visualization backend must preserve supported multiple reminders during moves, resolve Google calendar defaults, and reject reminder settings the target cannot represent.'
 );
 $calendarModuleSource = (string) file_get_contents(__DIR__ . '/../Kalender/module.php');
 
@@ -279,10 +288,12 @@ assertVisualization(
     str_contains($calendarModuleSource, 'DetectedCanUseDefaultReminder')
         && str_contains($calendarModuleSource, 'DetectedCanCreateWithDefaultReminder')
         && str_contains($calendarModuleSource, 'DetectedDefaultReminder')
+        && str_contains($calendarModuleSource, 'DetectedMaxReminders')
+        && str_contains($calendarModuleSource, '\'maxReminders\'')
         && str_contains($calendarModuleSource, '\'canUseDefaultReminder\'')
         && str_contains($calendarModuleSource, '\'canCreateWithDefaultReminder\'')
         && str_contains($calendarModuleSource, '\'defaultReminder\''),
-    'Calendar instances must expose provider reminder-default capabilities and the resolved calendar default to visualizations.'
+    'Calendar instances must expose provider reminder-default capabilities, reminder-count limits and the resolved calendar default to visualizations.'
 );
 
 assertVisualization(

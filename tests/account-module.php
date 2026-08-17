@@ -302,6 +302,8 @@ foreach ([0, 1] as $calDavProvider) {
             && ($normalizedCalDavCalendars[0]['capabilities']['updateFollowing'] ?? false) === true
             && ($normalizedCalDavCalendars[0]['capabilities']['updateSeries'] ?? false) === true
             && ($normalizedCalDavCalendars[0]['capabilities']['deleteSeries'] ?? false) === true
+            && ($normalizedCalDavCalendars[0]['capabilities']['maxReminders'] ?? 0) === 5
+            && ($normalizedCalDavCalendars[1]['capabilities']['maxReminders'] ?? 0) === 5
             && ($normalizedCalDavCalendars[1]['capabilities']['createRecurrence'] ?? true) === false
             && ($normalizedCalDavCalendars[1]['capabilities']['updateOccurrence'] ?? true) === false
             && ($normalizedCalDavCalendars[1]['capabilities']['deleteOccurrence'] ?? true) === false
@@ -339,6 +341,7 @@ assertAccountStructure(
         && ($normalizedGoogleCalendars[0]['capabilities']['deleteSeries'] ?? false) === true
         && ($normalizedGoogleCalendars[0]['capabilities']['useDefaultReminder'] ?? false) === true
         && ($normalizedGoogleCalendars[0]['capabilities']['createWithDefaultReminder'] ?? false) === true
+        && ($normalizedGoogleCalendars[0]['capabilities']['maxReminders'] ?? 0) === 5
         && ($normalizedGoogleCalendars[0]['defaultReminder']['mode'] ?? '') === 'complex'
         && ($normalizedGoogleCalendars[1]['capabilities']['createRecurrence'] ?? true) === false
         && ($normalizedGoogleCalendars[1]['capabilities']['updateFollowing'] ?? true) === false
@@ -377,6 +380,7 @@ assertAccountStructure(
         && ($normalizedMicrosoftCalendars[0]['capabilities']['updateSeries'] ?? false) === true
         && ($normalizedMicrosoftCalendars[0]['capabilities']['deleteSeries'] ?? false) === true
         && ($normalizedMicrosoftCalendars[0]['capabilities']['createWithDefaultReminder'] ?? false) === true
+        && ($normalizedMicrosoftCalendars[0]['capabilities']['maxReminders'] ?? 0) === 1
         && !isset($normalizedMicrosoftCalendars[0]['capabilities']['useDefaultReminder'])
         && ($normalizedMicrosoftCalendars[1]['capabilities']['createRecurrence'] ?? true) === false
         && ($normalizedMicrosoftCalendars[1]['capabilities']['updateRecurrence'] ?? true) === false

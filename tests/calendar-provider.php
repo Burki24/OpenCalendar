@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Burki24\SymconModuleHelper\SymconOAuthClient;
+use IPSKalender\CalendarEventReminder;
 use IPSKalender\CalendarEventTranslation;
 use IPSKalender\CalendarHttpClientInterface;
 use IPSKalender\CalendarHttpResponse;
@@ -116,6 +117,33 @@ function assertTrueValue(bool $condition, string $message): void
     }
 }
 
+$multipleReminder = CalendarEventReminder::fromMinutes([5, 30, 120]);
+assertSameValue('multiple', $multipleReminder['mode'], 'Multiple exact reminder offsets must use the shared multiple reminder mode.');
+assertSameValue(
+    [
+        ['minutesBeforeStart' => 5],
+        ['minutesBeforeStart' => 30],
+        ['minutesBeforeStart' => 120]
+    ],
+    $multipleReminder['reminders'],
+    'Multiple reminder offsets must remain individually addressable in the provider-neutral model.'
+);
+try {
+    CalendarEventReminder::normalizeInput([
+        'mode'      => 'multiple',
+        'reminders' => [
+            ['minutesBeforeStart' => 15],
+            ['minutesBeforeStart' => 15]
+        ]
+    ]);
+    throw new RuntimeException('Duplicate reminder offsets were accepted.');
+} catch (InvalidArgumentException $exception) {
+    assertTrueValue(
+        str_contains($exception->getMessage(), 'unique'),
+        'Provider-neutral multiple reminders must reject duplicate trigger times.'
+    );
+}
+
 $calendarClient = new FakeHttpClient([
     response(200, [
         'items'         => [
@@ -159,6 +187,7 @@ assertSameValue(true, $calendars[0]['capabilities']['updateSeries'], 'Writable G
 assertSameValue(true, $calendars[0]['capabilities']['deleteSeries'], 'Writable Google calendars must advertise recurring-series deletion support.');
 assertSameValue(true, $calendars[0]['capabilities']['useDefaultReminder'], 'Google calendars must advertise persistent calendar-default reminder support.');
 assertSameValue(true, $calendars[0]['capabilities']['createWithDefaultReminder'], 'Google calendars must allow new events to use the calendar default.');
+assertSameValue(5, $calendars[0]['capabilities']['maxReminders'], 'Google calendars must advertise support for up to five provider-neutral reminders.');
 assertSameValue('custom', $calendars[0]['defaultReminder']['mode'], 'One Google popup calendar default must use the shared reminder model.');
 assertSameValue(30, $calendars[0]['defaultReminder']['minutesBeforeStart'], 'Google calendar-default reminder offsets must be retained.');
 assertSameValue('Europe/Berlin', $calendars[0]['timezone'], 'Google calendar timezones must be retained for recurring events.');
@@ -245,6 +274,38 @@ assertSameValue(true, $events[1]['canDeleteSeries'], 'Google occurrences must ad
 assertTrueValue(str_contains($eventClient->requests[0]['url'], 'owner%40example.com'), 'Calendar IDs must be URL encoded.');
 assertSameValue('Bearer access-token', $eventClient->requests[0]['headers']['Authorization'], 'API requests must use Bearer authorization.');
 
+$googleMultipleReminderClient = new FakeHttpClient([
+    response(200, [
+        'timeZone' => 'Europe/Berlin',
+        'items'    => [[
+            'id'        => 'multi-reminder-id',
+            'iCalUID'   => 'multi-reminder@example.com',
+            'summary'   => 'Multiple reminders',
+            'status'    => 'confirmed',
+            'reminders' => [
+                'useDefault' => false,
+                'overrides'  => [
+                    ['method' => 'popup', 'minutes' => 10],
+                    ['method' => 'popup', 'minutes' => 60]
+                ]
+            ],
+            'start' => ['dateTime' => '2026-07-20T12:00:00+02:00', 'timeZone' => 'Europe/Berlin'],
+            'end'   => ['dateTime' => '2026-07-20T13:00:00+02:00', 'timeZone' => 'Europe/Berlin']
+        ]]
+    ])
+]);
+$googleMultipleReminderEvents = (new GoogleCalendarProvider($googleMultipleReminderClient, 'access-token'))->getEvents(
+    'owner@example.com',
+    new DateTimeImmutable('2026-07-20T00:00:00Z'),
+    new DateTimeImmutable('2026-07-21T00:00:00Z')
+);
+assertSameValue('multiple', $googleMultipleReminderEvents[0]['reminder']['mode'], 'Multiple Google popup reminders must stay editable in the shared reminder model.');
+assertSameValue(
+    [['minutesBeforeStart' => 10], ['minutesBeforeStart' => 60]],
+    $googleMultipleReminderEvents[0]['reminder']['reminders'],
+    'Google popup reminder offsets must survive provider mapping without loss.'
+);
+
 $freshEditClient = new FakeHttpClient([
     response(200, [
         'id'       => 'event-id',
@@ -294,6 +355,37 @@ assertSameValue(
     [['method' => 'popup', 'minutes' => 30]],
     $createBody['reminders']['overrides'],
     'Custom Google reminders must be written as one popup override.'
+);
+
+$googleMultipleWriteClient = new FakeHttpClient([
+    response(200, ['id' => 'multiple-reminder-id', 'iCalUID' => 'multiple-reminder@example.com'])
+]);
+(new GoogleCalendarProvider($googleMultipleWriteClient, 'access-token'))->createEvent('owner@example.com', [
+    'summary'  => 'Multiple reminders',
+    'allDay'   => false,
+    'start'    => '2026-07-20T10:00:00+02:00',
+    'end'      => '2026-07-20T11:00:00+02:00',
+    'reminder' => [
+        'mode'      => 'multiple',
+        'reminders' => [
+            ['minutesBeforeStart' => 10],
+            ['minutesBeforeStart' => 60]
+        ]
+    ]
+]);
+$googleMultipleWriteBody = json_decode(
+    $googleMultipleWriteClient->requests[0]['body'],
+    true,
+    512,
+    JSON_THROW_ON_ERROR
+);
+assertSameValue(
+    [
+        ['method' => 'popup', 'minutes' => 10],
+        ['method' => 'popup', 'minutes' => 60]
+    ],
+    $googleMultipleWriteBody['reminders']['overrides'],
+    'Multiple Google reminders must be written as separate popup overrides.'
 );
 
 $googleDefaultReminderClient = new FakeHttpClient([
@@ -1019,6 +1111,7 @@ assertSameValue(true, $msCalendars[0]['capabilities']['updateFollowing'], 'Edita
 assertSameValue(true, $msCalendars[0]['capabilities']['updateSeries'], 'Editable Microsoft calendars must advertise recurring series update support.');
 assertSameValue(true, $msCalendars[0]['capabilities']['deleteSeries'], 'Editable Microsoft calendars must advertise recurring series delete support.');
 assertSameValue(true, $msCalendars[0]['capabilities']['createWithDefaultReminder'], 'Microsoft calendars must allow the server default when creating events.');
+assertSameValue(1, $msCalendars[0]['capabilities']['maxReminders'], 'Microsoft calendars must advertise the single reminder supported by the shared model.');
 assertTrueValue(!isset($msCalendars[0]['capabilities']['useDefaultReminder']), 'Microsoft events must not advertise a persistent calendar-default reminder mode.');
 assertSameValue(false, $msCalendars[2]['capabilities']['create'], 'Read-only Microsoft calendars must remain read-only.');
 assertSameValue(false, $msCalendars[2]['capabilities']['createRecurrence'], 'Read-only Microsoft calendars must not advertise recurrence creation support.');
@@ -1247,6 +1340,28 @@ assertSameValue('text', $msCreateBody['body']['contentType'], 'Microsoft event d
 assertSameValue(true, $msCreateBody['isReminderOn'], 'Custom Microsoft reminders must enable the Graph reminder.');
 assertSameValue(20, $msCreateBody['reminderMinutesBeforeStart'], 'Microsoft reminder offsets must be written to Graph.');
 assertSameValue('UTC', $msCreateBody['start']['timeZone'], 'Microsoft event writes without a timezone must use unambiguous UTC times.');
+
+try {
+    (new MicrosoftCalendarProvider(new FakeHttpClient([]), 'ms-access-token'))->createEvent('AQMk-primary', [
+        'summary'  => 'Too many reminders',
+        'allDay'   => false,
+        'start'    => '2026-07-20T10:00:00+02:00',
+        'end'      => '2026-07-20T11:00:00+02:00',
+        'reminder' => [
+            'mode'      => 'multiple',
+            'reminders' => [
+                ['minutesBeforeStart' => 10],
+                ['minutesBeforeStart' => 30]
+            ]
+        ]
+    ]);
+    throw new RuntimeException('Microsoft accepted multiple event reminders.');
+} catch (InvalidArgumentException $exception) {
+    assertTrueValue(
+        str_contains($exception->getMessage(), 'does not support this many reminders'),
+        'Microsoft event writes must reject multiple reminders instead of dropping one silently.'
+    );
+}
 
 $msLocalTimeClient = new FakeHttpClient([
     response(201, [
@@ -2355,6 +2470,38 @@ assertSameValue(
     'The created RFC 5545 recurrence rule must survive parsing.'
 );
 
+$calDavMultipleReminderCreated = ICalendarCodec::createEvent([
+    'summary'  => 'CalDAV multiple reminders',
+    'allDay'   => false,
+    'start'    => '2026-10-19T08:00:00Z',
+    'end'      => '2026-10-19T09:00:00Z',
+    'timezone' => 'Europe/Berlin',
+    'reminder' => [
+        'mode'      => 'multiple',
+        'reminders' => [
+            ['minutesBeforeStart' => 10],
+            ['minutesBeforeStart' => 60]
+        ]
+    ]
+]);
+assertTrueValue(
+    substr_count($calDavMultipleReminderCreated['ical'], 'BEGIN:VALARM') === 2
+        && str_contains($calDavMultipleReminderCreated['ical'], 'TRIGGER:-PT10M')
+        && str_contains($calDavMultipleReminderCreated['ical'], 'TRIGGER:-PT60M'),
+    'iCalendar creation must emit one DISPLAY VALARM for every supported reminder trigger.'
+);
+$calDavMultipleReminderParsed = ICalendarCodec::parseEvents(
+    $calDavMultipleReminderCreated['ical'],
+    'https://calendar.example/work/multiple-reminders.ics',
+    '"multiple-reminders"'
+)[0];
+assertSameValue('multiple', $calDavMultipleReminderParsed['reminder']['mode'], 'Created multiple CalDAV alarms must parse back as editable multiple reminders.');
+assertSameValue(
+    [['minutesBeforeStart' => 10], ['minutesBeforeStart' => 60]],
+    $calDavMultipleReminderParsed['reminder']['reminders'],
+    'Created multiple CalDAV reminder offsets must round-trip through iCalendar.'
+);
+
 $calDavReminderUpdated = ICalendarCodec::updateRecurringSeries(
     $calDavRecurringCreated['ical'],
     $calDavRecurringCreated['uid'],
@@ -2407,7 +2554,43 @@ $complexAlarmEvent = ICalendarCodec::parseEvents(
     'https://calendar.example/work/complex.ics',
     '"complex"'
 )[0];
-assertSameValue('complex', $complexAlarmEvent['reminder']['mode'], 'Multiple VALARMs must be preserved as complex reminder settings.');
+assertSameValue('multiple', $complexAlarmEvent['reminder']['mode'], 'Multiple simple CalDAV display alarms must stay editable in the shared reminder model.');
+assertSameValue(
+    [['minutesBeforeStart' => 15], ['minutesBeforeStart' => 30]],
+    $complexAlarmEvent['reminder']['reminders'],
+    'Multiple CalDAV display alarm offsets must survive parsing without loss.'
+);
+$multipleAlarmUpdated = ICalendarCodec::updateEvent(
+    $complexAlarmFixture,
+    'complex-alarm@example.com',
+    [
+        'reminder' => [
+            'mode'      => 'multiple',
+            'reminders' => [
+                ['minutesBeforeStart' => 20],
+                ['minutesBeforeStart' => 120]
+            ]
+        ]
+    ]
+);
+assertTrueValue(
+    substr_count($multipleAlarmUpdated, 'BEGIN:VALARM') === 2
+        && str_contains($multipleAlarmUpdated, 'TRIGGER:-PT20M')
+        && str_contains($multipleAlarmUpdated, 'TRIGGER:-PT120M'),
+    'Editing multiple CalDAV reminders must replace all supported alarms with the requested triggers.'
+);
+
+$complexAlarmFixture = str_replace(
+    "ACTION:DISPLAY\r\nDESCRIPTION:Second",
+    "ACTION:EMAIL\r\nDESCRIPTION:Second",
+    $complexAlarmFixture
+);
+$complexAlarmEvent = ICalendarCodec::parseEvents(
+    $complexAlarmFixture,
+    'https://calendar.example/work/complex-email.ics',
+    '"complex-email"'
+)[0];
+assertSameValue('complex', $complexAlarmEvent['reminder']['mode'], 'Unsupported CalDAV alarm types must remain protected as complex reminder settings.');
 assertSameValue(false, $complexAlarmEvent['reminder']['editable'], 'Complex CalDAV alarms must not be exposed as editable.');
 try {
     ICalendarCodec::updateEvent(

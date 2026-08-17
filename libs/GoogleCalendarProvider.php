@@ -129,7 +129,8 @@ final class GoogleCalendarProvider implements CalendarEventLookupProviderInterfa
                         'updateSeries'              => $canWrite,
                         'deleteSeries'              => $canWrite,
                         'useDefaultReminder'        => true,
-                        'createWithDefaultReminder' => $canWrite
+                        'createWithDefaultReminder' => $canWrite,
+                        'maxReminders'              => CalendarEventReminder::MAX_REMINDERS
                     ]
                 ];
                 if (count($calendars) > self::MAX_CALENDARS) {
@@ -866,7 +867,7 @@ final class GoogleCalendarProvider implements CalendarEventLookupProviderInterfa
 
     /**
      * @param array<string, mixed> $item
-     * @return array{mode: string, minutesBeforeStart: int|null, editable: bool}
+     * @return array<string, mixed>
      */
     private function mapReminder(array $item): array
     {
@@ -880,35 +881,43 @@ final class GoogleCalendarProvider implements CalendarEventLookupProviderInterfa
     }
 
     /**
-     * Maps one simple popup reminder from an override/default reminder list.
+     * Maps simple popup reminders from an override/default reminder list.
      *
      * @param array<int, mixed> $reminders
-     * @return array{mode: string, minutesBeforeStart: int|null, editable: bool}
+     * @return array<string, mixed>
      */
     private function mapReminderOverrides(array $reminders): array
     {
         if ($reminders === []) {
             return CalendarEventReminder::none();
         }
-        if (count($reminders) !== 1 || !is_array($reminders[0])) {
+        if (count($reminders) > CalendarEventReminder::MAX_REMINDERS) {
             return CalendarEventReminder::complex();
         }
 
-        $reminder = $reminders[0];
-        if (strtolower(trim((string) ($reminder['method'] ?? ''))) !== 'popup') {
-            return CalendarEventReminder::complex();
+        $minutesBeforeStart = [];
+        foreach ($reminders as $reminder) {
+            if (!is_array($reminder)
+                || strtolower(trim((string) ($reminder['method'] ?? ''))) !== 'popup') {
+                return CalendarEventReminder::complex();
+            }
+
+            $minutes = filter_var(
+                $reminder['minutes'] ?? null,
+                FILTER_VALIDATE_INT,
+                ['options' => ['min_range' => 0, 'max_range' => CalendarEventReminder::MAX_MINUTES_BEFORE_START]]
+            );
+            if ($minutes === false) {
+                return CalendarEventReminder::complex();
+            }
+            $minutesBeforeStart[] = (int) $minutes;
         }
 
-        $minutes = filter_var(
-            $reminder['minutes'] ?? null,
-            FILTER_VALIDATE_INT,
-            ['options' => ['min_range' => 0, 'max_range' => CalendarEventReminder::MAX_MINUTES_BEFORE_START]]
-        );
-        if ($minutes === false) {
+        try {
+            return CalendarEventReminder::fromMinutes($minutesBeforeStart);
+        } catch (InvalidArgumentException) {
             return CalendarEventReminder::complex();
         }
-
-        return CalendarEventReminder::custom((int) $minutes);
     }
 
     /**
@@ -990,17 +999,27 @@ final class GoogleCalendarProvider implements CalendarEventLookupProviderInterfa
         if (array_key_exists('reminder', $data)) {
             $reminder = CalendarEventReminder::normalizeInput($data['reminder'], true);
             $payload['reminders'] = match ($reminder['mode']) {
-                CalendarEventReminder::MODE_DEFAULT => ['useDefault' => true],
-                CalendarEventReminder::MODE_NONE    => [
+                CalendarEventReminder::MODE_DEFAULT  => ['useDefault' => true],
+                CalendarEventReminder::MODE_NONE     => [
                     'useDefault' => false,
                     'overrides'  => []
                 ],
-                CalendarEventReminder::MODE_CUSTOM  => [
+                CalendarEventReminder::MODE_CUSTOM   => [
                     'useDefault' => false,
                     'overrides'  => [[
                         'method'  => 'popup',
                         'minutes' => $reminder['minutesBeforeStart']
                     ]]
+                ],
+                CalendarEventReminder::MODE_MULTIPLE => [
+                    'useDefault' => false,
+                    'overrides'  => array_map(
+                        static fn (array $item): array => [
+                            'method'  => 'popup',
+                            'minutes' => $item['minutesBeforeStart']
+                        ],
+                        $reminder['reminders']
+                    )
                 ]
             };
         }

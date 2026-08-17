@@ -71,6 +71,9 @@ const eventReminderMode = document.getElementById('event-reminder-mode');
 const eventReminderCustomRow = document.getElementById('event-reminder-custom-row');
 const eventReminderValue = document.getElementById('event-reminder-value');
 const eventReminderUnit = document.getElementById('event-reminder-unit');
+const eventReminderExtraList = document.getElementById('event-reminder-extra-list');
+const eventReminderAddRow = document.getElementById('event-reminder-add-row');
+const eventReminderAddButton = document.getElementById('event-reminder-add-button');
 const dayEventsDialog = document.getElementById('day-events-dialog');
 const viewSelectorDialog = document.getElementById('view-selector-dialog');
 const viewSelectorButton = document.getElementById('view-selector-button');
@@ -1399,43 +1402,161 @@ function selectedCalendarEntry() {
 function eventReminderState(event) {
     const reminder = event?.reminder;
     if (!reminder || typeof reminder !== 'object' || Array.isArray(reminder)) {
-        return { mode: 'none', minutesBeforeStart: null, editable: true };
+        return { mode: 'none', minutesBeforeStart: null, reminders: [], editable: true };
     }
 
-    const mode = ['default', 'none', 'custom', 'complex'].includes(reminder.mode)
+    const mode = ['default', 'none', 'custom', 'multiple', 'complex'].includes(reminder.mode)
         ? reminder.mode
         : 'complex';
-    const minutes = Number(reminder.minutesBeforeStart);
-    return {
-        mode,
-        minutesBeforeStart: mode === 'custom' && Number.isInteger(minutes) ? minutes : null,
-        editable: reminder.editable !== false && mode !== 'complex'
-    };
+    const editable = reminder.editable !== false && mode !== 'complex';
+    if (mode === 'custom') {
+        const minutes = Number(reminder.minutesBeforeStart);
+        if (!Number.isInteger(minutes) || minutes < 0 || minutes > 40320) {
+            return { mode: 'complex', minutesBeforeStart: null, reminders: [], editable: false };
+        }
+        return { mode, minutesBeforeStart: minutes, reminders: [minutes], editable };
+    }
+    if (mode === 'multiple') {
+        const items = Array.isArray(reminder.reminders) ? reminder.reminders : [];
+        const minutes = items.map(item => Number(item?.minutesBeforeStart));
+        if (minutes.length < 2
+            || minutes.length > 5
+            || minutes.some(value => !Number.isInteger(value) || value < 0 || value > 40320)
+            || new Set(minutes).size !== minutes.length) {
+            return { mode: 'complex', minutesBeforeStart: null, reminders: [], editable: false };
+        }
+        return { mode, minutesBeforeStart: null, reminders: minutes, editable };
+    }
+
+    return { mode, minutesBeforeStart: null, reminders: [], editable };
 }
 
 function calendarDefaultReminderState(calendar) {
     if (!calendar || !Boolean(calendar.canUseDefaultReminder)) {
-        return { mode: 'complex', minutesBeforeStart: null, editable: false };
+        return { mode: 'complex', minutesBeforeStart: null, reminders: [], editable: false };
     }
 
     const reminder = calendar.defaultReminder;
     if (!reminder || typeof reminder !== 'object' || Array.isArray(reminder)) {
-        return { mode: 'complex', minutesBeforeStart: null, editable: false };
+        return { mode: 'complex', minutesBeforeStart: null, reminders: [], editable: false };
     }
 
-    const mode = ['none', 'custom', 'complex'].includes(reminder.mode)
+    const mode = ['none', 'custom', 'multiple', 'complex'].includes(reminder.mode)
         ? reminder.mode
         : 'complex';
-    const minutes = Number(reminder.minutesBeforeStart);
-    if (mode === 'custom' && (!Number.isInteger(minutes) || minutes < 0 || minutes > 40320)) {
-        return { mode: 'complex', minutesBeforeStart: null, editable: false };
+    if (mode === 'custom') {
+        const minutes = Number(reminder.minutesBeforeStart);
+        if (!Number.isInteger(minutes) || minutes < 0 || minutes > 40320) {
+            return { mode: 'complex', minutesBeforeStart: null, reminders: [], editable: false };
+        }
+        return {
+            mode,
+            minutesBeforeStart: minutes,
+            reminders: [minutes],
+            editable: reminder.editable !== false
+        };
+    }
+    if (mode === 'multiple') {
+        const items = Array.isArray(reminder.reminders) ? reminder.reminders : [];
+        const minutes = items.map(item => Number(item?.minutesBeforeStart));
+        if (minutes.length < 2
+            || minutes.length > 5
+            || minutes.some(value => !Number.isInteger(value) || value < 0 || value > 40320)
+            || new Set(minutes).size !== minutes.length) {
+            return { mode: 'complex', minutesBeforeStart: null, reminders: [], editable: false };
+        }
+        return {
+            mode,
+            minutesBeforeStart: null,
+            reminders: minutes,
+            editable: reminder.editable !== false
+        };
     }
 
     return {
         mode,
-        minutesBeforeStart: mode === 'custom' ? minutes : null,
+        minutesBeforeStart: null,
+        reminders: [],
         editable: reminder.editable !== false && mode !== 'complex'
     };
+}
+
+function maxReminderCount(calendar = selectedCalendarEntry()) {
+    const value = Number(calendar?.maxReminders);
+    return Math.max(1, Math.min(5, Number.isInteger(value) ? value : 1));
+}
+
+function reminderEditorEntries() {
+    return [
+        { valueInput: eventReminderValue, unitSelect: eventReminderUnit, removeButton: null },
+        ...Array.from(eventReminderExtraList.querySelectorAll('.reminder-extra-entry')).map(entry => ({
+            valueInput: entry.querySelector('.event-reminder-extra-value'),
+            unitSelect: entry.querySelector('.event-reminder-extra-unit'),
+            removeButton: entry.querySelector('[data-reminder-remove]')
+        }))
+    ].filter(entry => entry.valueInput && entry.unitSelect);
+}
+
+function createReminderUnitSelect() {
+    const select = document.createElement('select');
+    select.className = 'event-reminder-extra-unit';
+    [
+        ['minutes', 'Minutes'],
+        ['hours', 'Hours'],
+        ['days', 'Days'],
+        ['weeks', 'Weeks']
+    ].forEach(([value, label]) => {
+        const option = document.createElement('option');
+        option.value = value;
+        option.textContent = t(label);
+        select.append(option);
+    });
+    return select;
+}
+
+function appendReminderEditorEntry(minutesBeforeStart) {
+    const entry = document.createElement('div');
+    entry.className = 'reminder-extra-entry';
+
+    const fields = document.createElement('div');
+    fields.className = 'form-row two';
+
+    const valueRow = document.createElement('div');
+    valueRow.className = 'form-row';
+    const valueLabel = document.createElement('label');
+    valueLabel.textContent = t('Before start');
+    const valueInput = document.createElement('input');
+    valueInput.type = 'number';
+    valueInput.min = '0';
+    valueInput.max = '40320';
+    valueInput.className = 'event-reminder-extra-value';
+    valueRow.append(valueLabel, valueInput);
+
+    const unitRow = document.createElement('div');
+    unitRow.className = 'form-row';
+    const unitLabel = document.createElement('label');
+    unitLabel.textContent = t('Unit');
+    const unitSelect = createReminderUnitSelect();
+    unitRow.append(unitLabel, unitSelect);
+
+    fields.append(valueRow, unitRow);
+
+    const actions = document.createElement('div');
+    actions.className = 'form-row';
+    const removeButton = document.createElement('button');
+    removeButton.type = 'button';
+    removeButton.className = 'secondary-button';
+    removeButton.dataset.reminderRemove = 'true';
+    removeButton.textContent = t('Remove reminder');
+    actions.append(removeButton);
+
+    entry.append(fields, actions);
+    eventReminderExtraList.append(entry);
+    setReminderFieldsFromMinutes(valueInput, unitSelect, minutesBeforeStart);
+}
+
+function clearExtraReminderEntries() {
+    eventReminderExtraList.replaceChildren();
 }
 
 function resetReminderEditor() {
@@ -1445,25 +1566,34 @@ function resetReminderEditor() {
     const defaultOption = eventReminderMode.querySelector('option[value="default"]');
     if (defaultOption) defaultOption.disabled = !allowDefault;
     eventReminderMode.value = allowDefault ? 'default' : 'none';
-    eventReminderValue.value = '15';
-    eventReminderUnit.value = 'minutes';
+    clearExtraReminderEntries();
+    setReminderFieldsFromMinutes(eventReminderValue, eventReminderUnit, 15);
     updateReminderControls();
 }
 
 function loadReminderEditor(event) {
     reminderDefaultResolvedForMove = false;
     const reminder = eventReminderState(event);
-    eventReminderMode.value = reminder.mode;
-    if (reminder.mode === 'custom' && reminder.minutesBeforeStart !== null) {
-        setReminderValueFromMinutes(reminder.minutesBeforeStart);
+    eventReminderMode.value = ['custom', 'multiple'].includes(reminder.mode) ? 'custom' : reminder.mode;
+    if (reminder.reminders.length > 0) {
+        setReminderEditorValues(reminder.reminders);
     } else {
-        eventReminderValue.value = '15';
-        eventReminderUnit.value = 'minutes';
+        clearExtraReminderEntries();
+        setReminderFieldsFromMinutes(eventReminderValue, eventReminderUnit, 15);
     }
     updateReminderControls();
 }
 
-function setReminderValueFromMinutes(minutes) {
+function setReminderEditorValues(minutesBeforeStart) {
+    const values = Array.isArray(minutesBeforeStart) && minutesBeforeStart.length > 0
+        ? minutesBeforeStart.slice(0, 5)
+        : [15];
+    clearExtraReminderEntries();
+    setReminderFieldsFromMinutes(eventReminderValue, eventReminderUnit, values[0]);
+    values.slice(1).forEach(value => appendReminderEditorEntry(value));
+}
+
+function setReminderFieldsFromMinutes(valueInput, unitSelect, minutes) {
     const value = Math.max(0, Math.min(40320, Number(minutes) || 0));
     const units = [
         ['weeks', 10080],
@@ -1473,17 +1603,30 @@ function setReminderValueFromMinutes(minutes) {
     ];
     const selected = units.find(([, multiplier]) => value > 0 && value % multiplier === 0)
         || ['minutes', 1];
-    eventReminderUnit.value = selected[0];
-    eventReminderValue.value = String(value / selected[1]);
+    unitSelect.value = selected[0];
+    valueInput.value = String(value / selected[1]);
 }
 
-function reminderUnitMultiplier() {
+function reminderUnitMultiplier(unit = eventReminderUnit.value) {
     return {
         minutes: 1,
         hours: 60,
         days: 1440,
         weeks: 10080
-    }[eventReminderUnit.value] || 1;
+    }[unit] || 1;
+}
+
+function reminderMinutesFromEntry(entry) {
+    const value = Number(entry.valueInput.value);
+    const minutes = value * reminderUnitMultiplier(entry.unitSelect.value);
+    return Number.isInteger(value) && value >= 0 && Number.isInteger(minutes) && minutes <= 40320
+        ? minutes
+        : null;
+}
+
+function nextReminderDefaultMinutes() {
+    const used = new Set(reminderEditorEntries().map(reminderMinutesFromEntry).filter(value => value !== null));
+    return [60, 1440, 10080, 30, 10, 5, 0].find(value => !used.has(value)) ?? 15;
 }
 
 function resolveDefaultReminderForCalendarMove() {
@@ -1494,8 +1637,8 @@ function resolveDefaultReminderForCalendarMove() {
     if (sourceInstanceId === targetInstanceId) {
         if (reminderDefaultResolvedForMove) {
             eventReminderMode.value = 'default';
-            eventReminderValue.value = '15';
-            eventReminderUnit.value = 'minutes';
+            clearExtraReminderEntries();
+            setReminderFieldsFromMinutes(eventReminderValue, eventReminderUnit, 15);
             reminderDefaultResolvedForMove = false;
         }
         return;
@@ -1506,11 +1649,15 @@ function resolveDefaultReminderForCalendarMove() {
     if (sourceDefault.mode === 'none') {
         eventReminderMode.value = 'none';
         reminderDefaultResolvedForMove = true;
-    } else if (sourceDefault.mode === 'custom' && sourceDefault.minutesBeforeStart !== null) {
+    } else if (['custom', 'multiple'].includes(sourceDefault.mode) && sourceDefault.reminders.length > 0) {
         eventReminderMode.value = 'custom';
-        setReminderValueFromMinutes(sourceDefault.minutesBeforeStart);
+        setReminderEditorValues(sourceDefault.reminders);
         reminderDefaultResolvedForMove = true;
     }
+}
+
+function reminderLimitMessage(maxReminders) {
+    return t('This calendar supports up to %d reminders.').replace('%d', String(maxReminders));
 }
 
 function updateReminderControls() {
@@ -1532,19 +1679,40 @@ function updateReminderControls() {
     eventReminderMode.disabled = !reminderEditable;
     const custom = reminderEditable && eventReminderMode.value === 'custom';
     eventReminderCustomRow.classList.toggle('hidden', !custom);
-    eventReminderValue.disabled = !custom;
-    eventReminderUnit.disabled = !custom;
-    eventReminderValue.required = custom;
+    eventReminderExtraList.classList.toggle('hidden', !custom);
 
+    const entries = reminderEditorEntries();
     const limits = {
         minutes: 40320,
         hours: 672,
         days: 28,
         weeks: 4
     };
-    eventReminderValue.max = String(limits[eventReminderUnit.value] || 40320);
-    if (Number(eventReminderValue.value) > Number(eventReminderValue.max)) {
-        eventReminderValue.value = eventReminderValue.max;
+    entries.forEach(entry => {
+        entry.valueInput.disabled = !custom;
+        entry.unitSelect.disabled = !custom;
+        entry.valueInput.required = custom;
+        entry.removeButton && (entry.removeButton.disabled = !custom);
+        entry.valueInput.max = String(limits[entry.unitSelect.value] || 40320);
+        if (Number(entry.valueInput.value) > Number(entry.valueInput.max)) {
+            entry.valueInput.value = entry.valueInput.max;
+        }
+    });
+
+    const maxReminders = maxReminderCount(selectedCalendar);
+    eventReminderAddRow.classList.toggle('hidden', !custom || entries.length >= maxReminders);
+    eventReminderAddButton.disabled = !custom || entries.length >= maxReminders;
+
+    eventReminderValue.setCustomValidity('');
+    if (custom && entries.length > maxReminders) {
+        eventReminderValue.setCustomValidity(reminderLimitMessage(maxReminders));
+        return;
+    }
+
+    const minutes = entries.map(reminderMinutesFromEntry);
+    const validMinutes = minutes.filter(value => value !== null);
+    if (custom && validMinutes.length === minutes.length && new Set(validMinutes).size !== validMinutes.length) {
+        eventReminderValue.setCustomValidity(t('Reminder times must be unique.'));
     }
 }
 
@@ -1564,15 +1732,23 @@ function reminderEditorValue() {
         return null;
     }
 
-    const value = Number(eventReminderValue.value);
-    const minutes = value * reminderUnitMultiplier();
-    if (!Number.isInteger(value) || value < 0 || !Number.isInteger(minutes) || minutes > 40320) {
+    const minutes = reminderEditorEntries().map(reminderMinutesFromEntry);
+    if (minutes.some(value => value === null)
+        || minutes.length < 1
+        || minutes.length > maxReminderCount()
+        || new Set(minutes).size !== minutes.length) {
         return null;
+    }
+    if (minutes.length === 1) {
+        return {
+            mode: 'custom',
+            minutesBeforeStart: minutes[0]
+        };
     }
 
     return {
-        mode: 'custom',
-        minutesBeforeStart: minutes
+        mode: 'multiple',
+        reminders: minutes.map(minutesBeforeStart => ({ minutesBeforeStart }))
     };
 }
 
@@ -1591,6 +1767,10 @@ function reminderOffsetText(minutes) {
     return `${value} ${unit} · ${t('Before start')}`;
 }
 
+function reminderOffsetsText(reminder) {
+    return reminder.reminders.map(reminderOffsetText).join(', ');
+}
+
 function reminderDetailText(event) {
     const reminder = eventReminderState(event);
     if (reminder.mode === 'none') return '';
@@ -1600,13 +1780,13 @@ function reminderDetailText(event) {
         if (sourceDefault.mode === 'none') {
             return `${t('Calendar default')} · ${t('No reminder')}`;
         }
-        if (sourceDefault.mode === 'custom' && sourceDefault.minutesBeforeStart !== null) {
-            return `${t('Calendar default')} · ${reminderOffsetText(sourceDefault.minutesBeforeStart)}`;
+        if (['custom', 'multiple'].includes(sourceDefault.mode) && sourceDefault.reminders.length > 0) {
+            return `${t('Calendar default')} · ${reminderOffsetsText(sourceDefault)}`;
         }
         return t('Calendar default');
     }
 
-    return reminderOffsetText(reminder.minutesBeforeStart ?? 0);
+    return reminderOffsetsText(reminder);
 }
 
 function resetRecurrenceEditor(start) {
@@ -2074,8 +2254,30 @@ eventReminderMode.addEventListener('change', () => {
 });
 eventReminderValue.addEventListener('input', () => {
     reminderDefaultResolvedForMove = false;
+    updateReminderControls();
 });
 eventReminderUnit.addEventListener('change', () => {
+    reminderDefaultResolvedForMove = false;
+    updateReminderControls();
+});
+eventReminderAddButton.addEventListener('click', () => {
+    if (reminderEditorEntries().length >= maxReminderCount()) return;
+    appendReminderEditorEntry(nextReminderDefaultMinutes());
+    reminderDefaultResolvedForMove = false;
+    updateReminderControls();
+});
+eventReminderExtraList.addEventListener('click', event => {
+    const button = event.target.closest('[data-reminder-remove]');
+    if (!button) return;
+    button.closest('.reminder-extra-entry')?.remove();
+    reminderDefaultResolvedForMove = false;
+    updateReminderControls();
+});
+eventReminderExtraList.addEventListener('input', () => {
+    reminderDefaultResolvedForMove = false;
+    updateReminderControls();
+});
+eventReminderExtraList.addEventListener('change', () => {
     reminderDefaultResolvedForMove = false;
     updateReminderControls();
 });

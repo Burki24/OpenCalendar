@@ -118,6 +118,8 @@ Ein Klick auf einen Termin öffnet zunächst eine reine Termindetail-Ansicht mit
 
 Beim Erstellen eines Termins bieten beschreibbare Google-, Microsoft-, Apple-iCloud- und CalDAV-Kalender zusätzlich den Bereich **Wiederholen**. Unterstützt werden tägliche, wöchentliche, monatliche und jährliche Serien, ein frei wählbares Intervall, bei wöchentlichen Serien mehrere Wochentage sowie die Endarten **Nie**, **Nach Anzahl** und **Am Datum**. Die Serienoption erscheint nur bei Kalendern, deren Provider das Anlegen von Serienterminen ausdrücklich unterstützt. Für zeitgebundene Google-Serien wird die Kalenderzeitzone verwendet; bei Microsoft und CalDAV dient die Zeitzone des Clients als Rückfallwert, wenn der Kalender selbst keine Zeitzone bereitstellt. CalDAV-Serien werden mit `TZID` und passendem `VTIMEZONE` gespeichert.
 
+Erinnerungen werden ebenfalls providerübergreifend bearbeitet. Google sowie Apple-iCloud/CalDAV können in OpenCalendar bis zu fünf einfache Erinnerungen relativ zum Terminbeginn verwalten; über **Erinnerung hinzufügen** lassen sich weitere Zeitpunkte ergänzen und einzeln wieder entfernen. Microsoft bleibt bei einer Erinnerung pro Termin. Beim Verschieben in einen Kalender mit kleinerem Limit wird keine Erinnerung stillschweigend verworfen: Der Vorgang wird abgelehnt, bis die Anzahl passend reduziert wurde. Nicht verlustfrei abbildbare Provider-Konfigurationen bleiben weiterhin als komplex geschützt und werden nicht automatisch vereinfacht.
+
 Beim Löschen erscheint eine eigene OpenCalendar-Bestätigung mit Terminname und Zeitraum. Die native Browser-Abfrage wird nicht verwendet; Abbrechen kehrt zum zuvor geöffneten Detail- oder Bearbeitungsdialog zurück.
 
 Die **Listenansicht** verzichtet bewusst auf Karten und zusätzliche
@@ -372,21 +374,23 @@ zukünftige Reminder werden dabei nicht vorzeitig ausgegeben.
 
 Jeder Reminder-Eintrag enthält `reminderId`, `summary`, `calendarInstanceId`,
 `calendarName`, `calendarColor`, `start`, `startTimestamp`, `allDay`, `location`,
-`reminderMode`, `minutesBeforeStart`, `reminderTimestamp` und `reminderDateTime`.
+`reminderMode`, `minutesBeforeStart`, `reminderTimestamp`, `reminderDateTime`,
+`reminderIndex` und `reminderCount`. Ein Termin mit mehreren Erinnerungen erzeugt
+für jeden exakt bestimmbaren Auslösezeitpunkt einen eigenen API-Eintrag. Die Einträge
+tragen dabei `reminderMode = multiple`; bei einem Kalenderstandard bleibt der Modus
+`default`, auch wenn dieser mehrere konkrete Auslösezeitpunkte enthält.
 `reminderId` bleibt bei unverändertem Termin und Reminder stabil und kann vom
 aufrufenden Skript gespeichert werden, um bei überlappenden zyklischen Abfragen eine
-doppelte Verarbeitung zu vermeiden. `reminderMode` ist `custom` oder `default`;
-bei `default` wird ein exakt abbildbarer Kalenderstandard auf seine tatsächlichen
-Minuten vor Terminbeginn aufgelöst. Deaktivierte Reminder sowie komplexe
-Provider-Konfigurationen, für die OpenCalendar keinen einzelnen exakten
-providerneutralen Auslösezeitpunkt bestimmen kann, werden bewusst nicht erfunden und
-daher von diesen Reminder-APIs ausgelassen. Alle fünf Funktionen unterstützen den
-optionalen Kalenderfilter.
+doppelte Verarbeitung zu vermeiden. Deaktivierte Reminder sowie komplexe
+Provider-Konfigurationen, für die OpenCalendar keine exakten providerneutralen
+Auslösezeitpunkte bestimmen kann, werden bewusst nicht erfunden und daher von diesen
+Reminder-APIs ausgelassen. Alle fünf Funktionen unterstützen den optionalen
+Kalenderfilter.
 
 `GetSelectedCalendars()` liefert die in der Instanz ausgewählten und aktivierten
-Kalender als JSON mit `instanceId`, `name`, `color`, `canWrite`, `timezone` und `canCreateRecurrence`. Der nur im
-Browser gesetzte temporäre Kalenderfilter verändert diese konfigurierte Auswahl
-nicht.
+Kalender als JSON mit `instanceId`, `name`, `color`, `canWrite`, `timezone`,
+`canCreateRecurrence` und `maxReminders`. Der nur im Browser gesetzte temporäre
+Kalenderfilter verändert diese konfigurierte Auswahl nicht.
 
 `SelectAllCalendars()` trägt alle vorhandenen Kalender-Instanzen ausschließlich
 in das aktuell geöffnete Konfigurationsformular ein und aktiviert sie dort. Eine
