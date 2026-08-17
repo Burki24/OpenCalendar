@@ -71,6 +71,9 @@ class Kalender extends IPSModuleStrict
         $this->RegisterAttributeBoolean('DetectedCanUpdateFollowing', false);
         $this->RegisterAttributeBoolean('DetectedCanUpdateSeries', false);
         $this->RegisterAttributeBoolean('DetectedCanDeleteSeries', false);
+        $this->RegisterAttributeBoolean('DetectedCanUseDefaultReminder', false);
+        $this->RegisterAttributeBoolean('DetectedCanCreateWithDefaultReminder', false);
+        $this->RegisterAttributeString('DetectedDefaultReminder', '{}');
         $this->RegisterAttributeString('DetectedCalendarTimezone', '');
         $this->RegisterAttributeBoolean('DetectedWriteAccessKnown', false);
         $this->RegisterAttributeBoolean('RuntimeReady', false);
@@ -704,44 +707,53 @@ class Kalender extends IPSModuleStrict
         $writeAccessKnown = $metadataAvailable
             && $this->ReadAttributeBoolean('DetectedWriteAccessKnown');
         $detectedColor = $this->ReadAttributeString('DetectedCalendarColor');
+        $defaultReminder = json_decode($this->ReadAttributeString('DetectedDefaultReminder'), true);
+        if (!is_array($defaultReminder) || array_is_list($defaultReminder)) {
+            $defaultReminder = [];
+        }
         $events = $this->readEvents();
 
         return json_encode(
             [
-                'calendarId'          => $this->effectiveCalendarId(),
-                'calendarColor'       => $metadataAvailable && $detectedColor !== ''
+                'calendarId'                   => $this->effectiveCalendarId(),
+                'calendarColor'                => $metadataAvailable && $detectedColor !== ''
                     ? $detectedColor
                     : $this->ReadPropertyString('CalendarColor'),
-                'canWrite'            => $metadataAvailable
+                'canWrite'                     => $metadataAvailable
                     ? ($writeAccessKnown
                         ? $this->ReadAttributeBoolean('DetectedCanWrite')
                         : $this->ReadAttributeBoolean('DetectedCanWrite')
                             || $this->ReadPropertyBoolean('CanWrite'))
                     : $this->ReadPropertyBoolean('CanWrite'),
-                'timezone'            => $metadataAvailable
+                'timezone'                     => $metadataAvailable
                     ? $this->ReadAttributeString('DetectedCalendarTimezone')
                     : '',
-                'canCreateRecurrence' => $metadataAvailable
+                'canCreateRecurrence'          => $metadataAvailable
                     && $this->ReadAttributeBoolean('DetectedCanCreateRecurrence'),
-                'canUpdateRecurrence' => $metadataAvailable
+                'canUpdateRecurrence'          => $metadataAvailable
                     && $this->ReadAttributeBoolean('DetectedCanUpdateRecurrence'),
-                'canUpdateOccurrence' => $metadataAvailable
+                'canUpdateOccurrence'          => $metadataAvailable
                     && $this->ReadAttributeBoolean('DetectedCanUpdateOccurrence'),
-                'canDeleteOccurrence' => $metadataAvailable
+                'canDeleteOccurrence'          => $metadataAvailable
                     && $this->ReadAttributeBoolean('DetectedCanDeleteOccurrence'),
-                'canUpdateFollowing'  => $metadataAvailable
+                'canUpdateFollowing'           => $metadataAvailable
                     && $this->ReadAttributeBoolean('DetectedCanUpdateFollowing'),
-                'canUpdateSeries'     => $metadataAvailable
+                'canUpdateSeries'              => $metadataAvailable
                     && $this->ReadAttributeBoolean('DetectedCanUpdateSeries'),
-                'canDeleteSeries'     => $metadataAvailable
+                'canDeleteSeries'              => $metadataAvailable
                     && $this->ReadAttributeBoolean('DetectedCanDeleteSeries'),
-                'eventCount'          => count($events),
-                'todayEventCount'     => CalendarEventCounter::countForDay(
+                'canUseDefaultReminder'        => $metadataAvailable
+                    && $this->ReadAttributeBoolean('DetectedCanUseDefaultReminder'),
+                'canCreateWithDefaultReminder' => $metadataAvailable
+                    && $this->ReadAttributeBoolean('DetectedCanCreateWithDefaultReminder'),
+                'defaultReminder'              => $metadataAvailable ? $defaultReminder : [],
+                'eventCount'                   => count($events),
+                'todayEventCount'              => CalendarEventCounter::countForDay(
                     $events,
                     new DateTimeImmutable('today')
                 ),
-                'lastSynchronization' => $this->ReadAttributeInteger('LastSynchronization'),
-                'lastError'           => $this->ReadAttributeString('LastError')
+                'lastSynchronization'          => $this->ReadAttributeInteger('LastSynchronization'),
+                'lastError'                    => $this->ReadAttributeString('LastError')
             ],
             JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR
         );
@@ -816,6 +828,9 @@ class Kalender extends IPSModuleStrict
             $this->WriteAttributeBoolean('DetectedCanUpdateFollowing', false);
             $this->WriteAttributeBoolean('DetectedCanUpdateSeries', false);
             $this->WriteAttributeBoolean('DetectedCanDeleteSeries', false);
+            $this->WriteAttributeBoolean('DetectedCanUseDefaultReminder', false);
+            $this->WriteAttributeBoolean('DetectedCanCreateWithDefaultReminder', false);
+            $this->WriteAttributeString('DetectedDefaultReminder', '{}');
             $this->WriteAttributeString('DetectedCalendarTimezone', '');
             $this->WriteAttributeBoolean('DetectedWriteAccessKnown', false);
             $this->WriteAttributeBoolean('CalendarMetadataAvailable', false);
@@ -838,6 +853,12 @@ class Kalender extends IPSModuleStrict
         $canUpdateFollowing = (bool) ($capabilities['updateFollowing'] ?? false);
         $canUpdateSeries = (bool) ($capabilities['updateSeries'] ?? false);
         $canDeleteSeries = (bool) ($capabilities['deleteSeries'] ?? false);
+        $canUseDefaultReminder = (bool) ($capabilities['useDefaultReminder'] ?? false);
+        $canCreateWithDefaultReminder = (bool) ($capabilities['createWithDefaultReminder'] ?? false);
+        $defaultReminder = is_array($calendar['defaultReminder'] ?? null)
+            && !array_is_list($calendar['defaultReminder'])
+            ? $calendar['defaultReminder']
+            : [];
         $timezone = trim((string) ($calendar['timezone'] ?? ''));
         // Cached calendar metadata created before writeAccessKnown existed cannot
         // distinguish an explicit read-only result from incomplete DAV privilege
@@ -855,6 +876,18 @@ class Kalender extends IPSModuleStrict
         $this->WriteAttributeBoolean('DetectedCanUpdateFollowing', $canUpdateFollowing);
         $this->WriteAttributeBoolean('DetectedCanUpdateSeries', $canUpdateSeries);
         $this->WriteAttributeBoolean('DetectedCanDeleteSeries', $canDeleteSeries);
+        $this->WriteAttributeBoolean('DetectedCanUseDefaultReminder', $canUseDefaultReminder);
+        $this->WriteAttributeBoolean(
+            'DetectedCanCreateWithDefaultReminder',
+            $canCreateWithDefaultReminder
+        );
+        $this->WriteAttributeString(
+            'DetectedDefaultReminder',
+            json_encode(
+                $canUseDefaultReminder ? $defaultReminder : [],
+                JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR
+            )
+        );
         $this->WriteAttributeString('DetectedCalendarTimezone', $timezone);
         $this->WriteAttributeBoolean('DetectedWriteAccessKnown', $writeAccessKnown);
         $this->WriteAttributeBoolean('CalendarMetadataAvailable', true);

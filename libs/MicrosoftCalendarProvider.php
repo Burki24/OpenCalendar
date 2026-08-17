@@ -103,17 +103,18 @@ final class MicrosoftCalendarProvider implements CalendarProviderInterface, Recu
                     'components'       => ['VEVENT'],
                     'writeAccessKnown' => true,
                     'capabilities'     => [
-                        'read'             => true,
-                        'create'           => $canWrite,
-                        'update'           => $canWrite,
-                        'delete'           => $canWrite,
-                        'createRecurrence' => $canWrite,
-                        'updateRecurrence' => $canWrite,
-                        'updateOccurrence' => $canWrite,
-                        'deleteOccurrence' => $canWrite,
-                        'updateFollowing'  => $canWrite,
-                        'updateSeries'     => $canWrite,
-                        'deleteSeries'     => $canWrite
+                        'read'                      => true,
+                        'create'                    => $canWrite,
+                        'update'                    => $canWrite,
+                        'delete'                    => $canWrite,
+                        'createRecurrence'          => $canWrite,
+                        'updateRecurrence'          => $canWrite,
+                        'updateOccurrence'          => $canWrite,
+                        'deleteOccurrence'          => $canWrite,
+                        'updateFollowing'           => $canWrite,
+                        'updateSeries'              => $canWrite,
+                        'deleteSeries'              => $canWrite,
+                        'createWithDefaultReminder' => $canWrite
                     ]
                 ];
                 if (count($calendars) > self::MAX_CALENDARS) {

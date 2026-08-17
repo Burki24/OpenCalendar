@@ -673,9 +673,10 @@ class KalenderKonto extends IPSModuleStrict
     /**
      * Adds capabilities introduced after calendar discovery to compatible cached entries.
      *
-     * Existing account caches survive module updates. Recurrence capabilities introduced
-     * later are therefore derived from the provider and the already cached write permission
-     * so child calendar instances can use them without a manual account resynchronization.
+     * Existing account caches survive module updates. Capabilities introduced later are
+     * therefore derived from the provider and the already cached write permission so child
+     * calendar instances can use them without a manual account resynchronization. Google
+     * calendar-default reminder details remain protected until the next discovery refresh.
      *
      * @param list<array<string, mixed>> $calendars Cached account calendars.
      * @return list<array<string, mixed>> Normalized calendars.
@@ -721,6 +722,9 @@ class KalenderKonto extends IPSModuleStrict
                 }
             }
             if ($provider === self::PROVIDER_MICROSOFT) {
+                if (!array_key_exists('createWithDefaultReminder', $capabilities)) {
+                    $capabilities['createWithDefaultReminder'] = $canWrite;
+                }
                 if (!array_key_exists('updateOccurrence', $capabilities)) {
                     $capabilities['updateOccurrence'] = $canWrite;
                 }
@@ -738,6 +742,19 @@ class KalenderKonto extends IPSModuleStrict
                 }
             }
             if ($provider === self::PROVIDER_GOOGLE) {
+                if (!array_key_exists('useDefaultReminder', $capabilities)) {
+                    $capabilities['useDefaultReminder'] = true;
+                }
+                if (!array_key_exists('createWithDefaultReminder', $capabilities)) {
+                    $capabilities['createWithDefaultReminder'] = $canWrite;
+                }
+                if (!array_key_exists('defaultReminder', $calendar)) {
+                    $calendar['defaultReminder'] = [
+                        'mode'               => 'complex',
+                        'minutesBeforeStart' => null,
+                        'editable'           => false
+                    ];
+                }
                 if (!array_key_exists('updateFollowing', $capabilities)) {
                     $capabilities['updateFollowing'] = $canWrite;
                 }

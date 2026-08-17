@@ -33,6 +33,7 @@ let pendingEventEdit = null;
 let pendingSeriesEdit = null;
 let recurrencePatternContext = null;
 let eventDialogEditable = false;
+let reminderDefaultResolvedForMove = false;
 let deleteSourceDialog = null;
 let visibleCalendarIds = null;
 let pendingCalendarFilterIds = new Set();
@@ -1140,7 +1141,12 @@ function eventCanUpdate(event) {
 
 function eventCanMove(event, writeScope = '') {
     if (!hasActionBridge() || !Boolean(event?.canWrite)) return false;
-    if (eventReminderState(event).mode === 'complex') return false;
+    const reminder = eventReminderState(event);
+    if (reminder.mode === 'complex') return false;
+    if (reminder.mode === 'default') {
+        const sourceCalendar = calendarEntryByInstanceId(event?.calendarInstanceId);
+        if (calendarDefaultReminderState(sourceCalendar).mode === 'complex') return false;
+    }
     if (!Boolean(event?.recurring)) {
         return eventCanUpdateOccurrence(event) && eventCanDelete(event);
     }
@@ -1381,9 +1387,13 @@ function handleCalendarOptionKeydown(event) {
     options[nextIndex]?.focus();
 }
 
+function calendarEntryByInstanceId(instanceId) {
+    const normalizedId = Number(instanceId);
+    return calendarState.calendars.find(calendar => Number(calendar.instanceId) === normalizedId) || null;
+}
+
 function selectedCalendarEntry() {
-    const instanceId = Number(eventCalendarInput.value);
-    return calendarState.calendars.find(calendar => Number(calendar.instanceId) === instanceId) || null;
+    return calendarEntryByInstanceId(eventCalendarInput.value);
 }
 
 function eventReminderState(event) {
@@ -1403,18 +1413,46 @@ function eventReminderState(event) {
     };
 }
 
+function calendarDefaultReminderState(calendar) {
+    if (!calendar || !Boolean(calendar.canUseDefaultReminder)) {
+        return { mode: 'complex', minutesBeforeStart: null, editable: false };
+    }
+
+    const reminder = calendar.defaultReminder;
+    if (!reminder || typeof reminder !== 'object' || Array.isArray(reminder)) {
+        return { mode: 'complex', minutesBeforeStart: null, editable: false };
+    }
+
+    const mode = ['none', 'custom', 'complex'].includes(reminder.mode)
+        ? reminder.mode
+        : 'complex';
+    const minutes = Number(reminder.minutesBeforeStart);
+    if (mode === 'custom' && (!Number.isInteger(minutes) || minutes < 0 || minutes > 40320)) {
+        return { mode: 'complex', minutesBeforeStart: null, editable: false };
+    }
+
+    return {
+        mode,
+        minutesBeforeStart: mode === 'custom' ? minutes : null,
+        editable: reminder.editable !== false && mode !== 'complex'
+    };
+}
+
 function resetReminderEditor() {
-    eventReminderMode.querySelector('option[value="default"]').disabled = false;
-    eventReminderMode.value = 'default';
+    reminderDefaultResolvedForMove = false;
+    const calendar = selectedCalendarEntry();
+    const allowDefault = Boolean(calendar?.canUseDefaultReminder || calendar?.canCreateWithDefaultReminder);
+    const defaultOption = eventReminderMode.querySelector('option[value="default"]');
+    if (defaultOption) defaultOption.disabled = !allowDefault;
+    eventReminderMode.value = allowDefault ? 'default' : 'none';
     eventReminderValue.value = '15';
     eventReminderUnit.value = 'minutes';
     updateReminderControls();
 }
 
 function loadReminderEditor(event) {
+    reminderDefaultResolvedForMove = false;
     const reminder = eventReminderState(event);
-    const defaultOption = eventReminderMode.querySelector('option[value="default"]');
-    defaultOption.disabled = reminder.mode !== 'default';
     eventReminderMode.value = reminder.mode;
     if (reminder.mode === 'custom' && reminder.minutesBeforeStart !== null) {
         setReminderValueFromMinutes(reminder.minutesBeforeStart);
@@ -1448,13 +1486,47 @@ function reminderUnitMultiplier() {
     }[eventReminderUnit.value] || 1;
 }
 
+function resolveDefaultReminderForCalendarMove() {
+    if (!selectedEvent || eventReminderState(selectedEvent).mode !== 'default') return;
+
+    const sourceInstanceId = Number(selectedEvent.calendarInstanceId);
+    const targetInstanceId = Number(eventCalendarInput.value);
+    if (sourceInstanceId === targetInstanceId) {
+        if (reminderDefaultResolvedForMove) {
+            eventReminderMode.value = 'default';
+            eventReminderValue.value = '15';
+            eventReminderUnit.value = 'minutes';
+            reminderDefaultResolvedForMove = false;
+        }
+        return;
+    }
+    if (eventReminderMode.value !== 'default') return;
+
+    const sourceDefault = calendarDefaultReminderState(calendarEntryByInstanceId(sourceInstanceId));
+    if (sourceDefault.mode === 'none') {
+        eventReminderMode.value = 'none';
+        reminderDefaultResolvedForMove = true;
+    } else if (sourceDefault.mode === 'custom' && sourceDefault.minutesBeforeStart !== null) {
+        eventReminderMode.value = 'custom';
+        setReminderValueFromMinutes(sourceDefault.minutesBeforeStart);
+        reminderDefaultResolvedForMove = true;
+    }
+}
+
 function updateReminderControls() {
     const selectedReminder = selectedEvent ? eventReminderState(selectedEvent) : null;
     const reminderEditable = eventDialogEditable
         && (!selectedReminder || selectedReminder.editable);
+    const selectedCalendar = selectedCalendarEntry();
+    const defaultAllowed = selectedEvent
+        ? Boolean(selectedCalendar?.canUseDefaultReminder)
+        : Boolean(selectedCalendar?.canUseDefaultReminder || selectedCalendar?.canCreateWithDefaultReminder);
     const defaultOption = eventReminderMode.querySelector('option[value="default"]');
     if (defaultOption) {
-        defaultOption.disabled = Boolean(selectedEvent) && selectedReminder?.mode !== 'default';
+        defaultOption.disabled = !defaultAllowed;
+    }
+    if (!selectedEvent && !defaultAllowed && eventReminderMode.value === 'default') {
+        eventReminderMode.value = 'none';
     }
 
     eventReminderMode.disabled = !reminderEditable;
@@ -1477,9 +1549,13 @@ function updateReminderControls() {
 }
 
 function reminderEditorValue() {
-    if (eventReminderMode.disabled || eventReminderMode.value === 'default'
-        || eventReminderMode.value === 'complex') {
+    if (eventReminderMode.disabled || eventReminderMode.value === 'complex') {
         return null;
+    }
+    if (eventReminderMode.value === 'default') {
+        return Boolean(selectedCalendarEntry()?.canUseDefaultReminder)
+            ? { mode: 'default' }
+            : null;
     }
     if (eventReminderMode.value === 'none') {
         return { mode: 'none' };
@@ -1500,24 +1576,37 @@ function reminderEditorValue() {
     };
 }
 
-function reminderDetailText(event) {
-    const reminder = eventReminderState(event);
-    if (reminder.mode === 'none') return '';
-    if (reminder.mode === 'default') return t('Calendar default');
-    if (reminder.mode === 'complex') return t('Existing reminder settings');
-
-    const minutes = reminder.minutesBeforeStart ?? 0;
+function reminderOffsetText(minutes) {
+    const normalizedMinutes = Math.max(0, Number(minutes) || 0);
     const units = [
         ['Week', 'Weeks', 10080],
         ['Day', 'Days', 1440],
         ['Hour', 'Hours', 60],
         ['Minute', 'Minutes', 1]
     ];
-    const selected = units.find(([, , multiplier]) => minutes > 0 && minutes % multiplier === 0)
+    const selected = units.find(([, , multiplier]) => normalizedMinutes > 0 && normalizedMinutes % multiplier === 0)
         || ['Minute', 'Minutes', 1];
-    const value = minutes / selected[2];
+    const value = normalizedMinutes / selected[2];
     const unit = t(value === 1 ? selected[0] : selected[1]);
     return `${value} ${unit} · ${t('Before start')}`;
+}
+
+function reminderDetailText(event) {
+    const reminder = eventReminderState(event);
+    if (reminder.mode === 'none') return '';
+    if (reminder.mode === 'complex') return t('Existing reminder settings');
+    if (reminder.mode === 'default') {
+        const sourceDefault = calendarDefaultReminderState(calendarEntryByInstanceId(event?.calendarInstanceId));
+        if (sourceDefault.mode === 'none') {
+            return `${t('Calendar default')} · ${t('No reminder')}`;
+        }
+        if (sourceDefault.mode === 'custom' && sourceDefault.minutesBeforeStart !== null) {
+            return `${t('Calendar default')} · ${reminderOffsetText(sourceDefault.minutesBeforeStart)}`;
+        }
+        return t('Calendar default');
+    }
+
+    return reminderOffsetText(reminder.minutesBeforeStart ?? 0);
 }
 
 function resetRecurrenceEditor(start) {
@@ -1976,10 +2065,20 @@ eventCalendarInput.addEventListener('change', () => {
     updateDialogColor();
     updateSaveButtonLabel();
     updateRecurrenceAvailability();
+    resolveDefaultReminderForCalendarMove();
     updateReminderControls();
 });
-eventReminderMode.addEventListener('change', updateReminderControls);
-eventReminderUnit.addEventListener('change', updateReminderControls);
+eventReminderMode.addEventListener('change', () => {
+    reminderDefaultResolvedForMove = false;
+    updateReminderControls();
+});
+eventReminderValue.addEventListener('input', () => {
+    reminderDefaultResolvedForMove = false;
+});
+eventReminderUnit.addEventListener('change', () => {
+    reminderDefaultResolvedForMove = false;
+    updateReminderControls();
+});
 eventRecurrenceFrequency.addEventListener('change', () => {
     const controls = recurrencePatternControls();
     const frequency = eventRecurrenceFrequency.value.toUpperCase();

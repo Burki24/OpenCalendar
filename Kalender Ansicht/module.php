@@ -9,8 +9,10 @@ use Burki24\SymconModuleHelper\VariableHelper;
 use Burki24\SymconModuleHelper\VisualizationAssetHelper;
 use Burki24\SymconModuleHelper\VisualizationThemeHelper;
 use IPSKalender\CalendarAppointmentRange;
+use IPSKalender\CalendarEventReminder;
 
 require_once __DIR__ . '/../libs/CalendarAppointmentRange.php';
+require_once __DIR__ . '/../libs/CalendarEventReminder.php';
 require_once __DIR__ . '/../libs/helper/ConfigurationFormHelper.php';
 require_once __DIR__ . '/../libs/helper/IPSViewHTMLPageHelper.php';
 require_once __DIR__ . '/../libs/helper/IPSViewStyleHelper.php';
@@ -1744,7 +1746,7 @@ class KalenderAnsicht extends IPSModuleStrict
     }
 
     /**
-     * @return list<array{instanceId: int, name: string, color: string, canWrite: bool, timezone: string, canCreateRecurrence: bool, canUpdateRecurrence: bool, canUpdateOccurrence: bool, canDeleteOccurrence: bool, canUpdateFollowing: bool, canUpdateSeries: bool, canDeleteSeries: bool}>
+     * @return list<array{instanceId: int, name: string, color: string, canWrite: bool, timezone: string, canCreateRecurrence: bool, canUpdateRecurrence: bool, canUpdateOccurrence: bool, canDeleteOccurrence: bool, canUpdateFollowing: bool, canUpdateSeries: bool, canDeleteSeries: bool, canUseDefaultReminder: bool, canCreateWithDefaultReminder: bool, defaultReminder: array<string, mixed>}>
      */
     private function loadSelectedCalendars(): array
     {
@@ -1783,19 +1785,25 @@ class KalenderAnsicht extends IPSModuleStrict
             }
 
             $result[] = [
-                'instanceId'          => $instanceId,
-                'name'                => IPS_GetName($instanceId),
-                'color'               => $color,
-                'canWrite'            => (bool) ($calendarStatus['canWrite']
+                'instanceId'                   => $instanceId,
+                'name'                         => IPS_GetName($instanceId),
+                'color'                        => $color,
+                'canWrite'                     => (bool) ($calendarStatus['canWrite']
                     ?? IPS_GetProperty($instanceId, 'CanWrite')),
-                'timezone'            => trim((string) ($calendarStatus['timezone'] ?? '')),
-                'canCreateRecurrence' => (bool) ($calendarStatus['canCreateRecurrence'] ?? false),
-                'canUpdateRecurrence' => (bool) ($calendarStatus['canUpdateRecurrence'] ?? false),
-                'canUpdateOccurrence' => (bool) ($calendarStatus['canUpdateOccurrence'] ?? false),
-                'canDeleteOccurrence' => (bool) ($calendarStatus['canDeleteOccurrence'] ?? false),
-                'canUpdateFollowing'  => (bool) ($calendarStatus['canUpdateFollowing'] ?? false),
-                'canUpdateSeries'     => (bool) ($calendarStatus['canUpdateSeries'] ?? false),
-                'canDeleteSeries'     => (bool) ($calendarStatus['canDeleteSeries'] ?? false)
+                'timezone'                     => trim((string) ($calendarStatus['timezone'] ?? '')),
+                'canCreateRecurrence'          => (bool) ($calendarStatus['canCreateRecurrence'] ?? false),
+                'canUpdateRecurrence'          => (bool) ($calendarStatus['canUpdateRecurrence'] ?? false),
+                'canUpdateOccurrence'          => (bool) ($calendarStatus['canUpdateOccurrence'] ?? false),
+                'canDeleteOccurrence'          => (bool) ($calendarStatus['canDeleteOccurrence'] ?? false),
+                'canUpdateFollowing'           => (bool) ($calendarStatus['canUpdateFollowing'] ?? false),
+                'canUpdateSeries'              => (bool) ($calendarStatus['canUpdateSeries'] ?? false),
+                'canDeleteSeries'              => (bool) ($calendarStatus['canDeleteSeries'] ?? false),
+                'canUseDefaultReminder'        => (bool) ($calendarStatus['canUseDefaultReminder'] ?? false),
+                'canCreateWithDefaultReminder' => (bool) ($calendarStatus['canCreateWithDefaultReminder'] ?? false),
+                'defaultReminder'              => is_array($calendarStatus['defaultReminder'] ?? null)
+                    && !array_is_list($calendarStatus['defaultReminder'])
+                    ? $calendarStatus['defaultReminder']
+                    : []
             ];
         }
 
@@ -2072,6 +2080,9 @@ class KalenderAnsicht extends IPSModuleStrict
                         $this->Translate('Events with complex reminder settings cannot be moved safely.')
                     );
                 }
+                if (($sourceReminder['mode'] ?? '') === CalendarEventReminder::MODE_DEFAULT) {
+                    $event['reminder'] = $this->defaultReminderForMove($sourceInstanceId);
+                }
 
                 $sourceRecurring = (bool) ($sourceEvent['recurring'] ?? false);
                 $writeScope = strtolower(trim((string) ($sourceEvent['writeScope'] ?? '')));
@@ -2292,6 +2303,29 @@ class KalenderAnsicht extends IPSModuleStrict
             }
         }
         throw new RuntimeException($this->Translate('Recurring event creation is not supported by this calendar.'));
+    }
+
+    /** @return array{mode: string, minutesBeforeStart: int|null} */
+    private function defaultReminderForMove(int $instanceId): array
+    {
+        foreach ($this->loadSelectedCalendars() as $calendar) {
+            if ($calendar['instanceId'] !== $instanceId) {
+                continue;
+            }
+            if (!$calendar['canUseDefaultReminder']) {
+                break;
+            }
+
+            try {
+                return CalendarEventReminder::normalizeInput($calendar['defaultReminder']);
+            } catch (InvalidArgumentException) {
+                break;
+            }
+        }
+
+        throw new RuntimeException(
+            $this->Translate('Events with complex reminder settings cannot be moved safely.')
+        );
     }
 
     /** @param array<string, mixed> $creationResult */

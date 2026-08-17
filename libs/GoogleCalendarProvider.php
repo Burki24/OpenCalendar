@@ -115,16 +115,21 @@ final class GoogleCalendarProvider implements CalendarEventLookupProviderInterfa
                     'accessRole'       => $accessRole,
                     'components'       => ['VEVENT'],
                     'writeAccessKnown' => true,
+                    'defaultReminder'  => $this->mapReminderOverrides(
+                        is_array($item['defaultReminders'] ?? null) ? $item['defaultReminders'] : []
+                    ),
                     'capabilities'     => [
-                        'read'             => true,
-                        'create'           => $canWrite,
-                        'update'           => $canWrite,
-                        'delete'           => $canWrite,
-                        'createRecurrence' => $canWrite,
-                        'updateRecurrence' => $canWrite,
-                        'updateFollowing'  => $canWrite,
-                        'updateSeries'     => $canWrite,
-                        'deleteSeries'     => $canWrite
+                        'read'                      => true,
+                        'create'                    => $canWrite,
+                        'update'                    => $canWrite,
+                        'delete'                    => $canWrite,
+                        'createRecurrence'          => $canWrite,
+                        'updateRecurrence'          => $canWrite,
+                        'updateFollowing'           => $canWrite,
+                        'updateSeries'              => $canWrite,
+                        'deleteSeries'              => $canWrite,
+                        'useDefaultReminder'        => true,
+                        'createWithDefaultReminder' => $canWrite
                     ]
                 ];
                 if (count($calendars) > self::MAX_CALENDARS) {
@@ -871,20 +876,31 @@ final class GoogleCalendarProvider implements CalendarEventLookupProviderInterfa
         }
 
         $overrides = is_array($reminders['overrides'] ?? null) ? $reminders['overrides'] : [];
-        if ($overrides === []) {
+        return $this->mapReminderOverrides($overrides);
+    }
+
+    /**
+     * Maps one simple popup reminder from an override/default reminder list.
+     *
+     * @param array<int, mixed> $reminders
+     * @return array{mode: string, minutesBeforeStart: int|null, editable: bool}
+     */
+    private function mapReminderOverrides(array $reminders): array
+    {
+        if ($reminders === []) {
             return CalendarEventReminder::none();
         }
-        if (count($overrides) !== 1 || !is_array($overrides[0])) {
+        if (count($reminders) !== 1 || !is_array($reminders[0])) {
             return CalendarEventReminder::complex();
         }
 
-        $override = $overrides[0];
-        if (strtolower(trim((string) ($override['method'] ?? ''))) !== 'popup') {
+        $reminder = $reminders[0];
+        if (strtolower(trim((string) ($reminder['method'] ?? ''))) !== 'popup') {
             return CalendarEventReminder::complex();
         }
 
         $minutes = filter_var(
-            $override['minutes'] ?? null,
+            $reminder['minutes'] ?? null,
             FILTER_VALIDATE_INT,
             ['options' => ['min_range' => 0, 'max_range' => CalendarEventReminder::MAX_MINUTES_BEFORE_START]]
         );

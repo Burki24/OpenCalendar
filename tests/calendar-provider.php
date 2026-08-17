@@ -120,12 +120,13 @@ $calendarClient = new FakeHttpClient([
     response(200, [
         'items'         => [
             [
-                'id'              => 'owner@example.com',
-                'summary'         => 'Primary',
-                'backgroundColor' => '#1a73e8',
-                'accessRole'      => 'owner',
-                'primary'         => true,
-                'timeZone'        => 'Europe/Berlin'
+                'id'               => 'owner@example.com',
+                'summary'          => 'Primary',
+                'backgroundColor'  => '#1a73e8',
+                'accessRole'       => 'owner',
+                'primary'          => true,
+                'timeZone'         => 'Europe/Berlin',
+                'defaultReminders' => [['method' => 'popup', 'minutes' => 30]]
             ],
             [
                 'id'         => 'availability@example.com',
@@ -137,10 +138,11 @@ $calendarClient = new FakeHttpClient([
     ]),
     response(200, [
         'items' => [[
-            'id'              => 'shared@example.com',
-            'summaryOverride' => 'Shared calendar',
-            'backgroundColor' => '#34a853',
-            'accessRole'      => 'reader'
+            'id'               => 'shared@example.com',
+            'summaryOverride'  => 'Shared calendar',
+            'backgroundColor'  => '#34a853',
+            'accessRole'       => 'reader',
+            'defaultReminders' => [['method' => 'email', 'minutes' => 60]]
         ]]
     ])
 ]);
@@ -155,8 +157,14 @@ assertSameValue(true, $calendars[0]['capabilities']['updateRecurrence'], 'Writab
 assertSameValue(true, $calendars[0]['capabilities']['updateFollowing'], 'Writable Google calendars must advertise this-and-following update support.');
 assertSameValue(true, $calendars[0]['capabilities']['updateSeries'], 'Writable Google calendars must advertise recurring-series update support.');
 assertSameValue(true, $calendars[0]['capabilities']['deleteSeries'], 'Writable Google calendars must advertise recurring-series deletion support.');
+assertSameValue(true, $calendars[0]['capabilities']['useDefaultReminder'], 'Google calendars must advertise persistent calendar-default reminder support.');
+assertSameValue(true, $calendars[0]['capabilities']['createWithDefaultReminder'], 'Google calendars must allow new events to use the calendar default.');
+assertSameValue('custom', $calendars[0]['defaultReminder']['mode'], 'One Google popup calendar default must use the shared reminder model.');
+assertSameValue(30, $calendars[0]['defaultReminder']['minutesBeforeStart'], 'Google calendar-default reminder offsets must be retained.');
 assertSameValue('Europe/Berlin', $calendars[0]['timezone'], 'Google calendar timezones must be retained for recurring events.');
 assertSameValue(false, $calendars[1]['capabilities']['create'], 'Readers must not have write access.');
+assertSameValue(false, $calendars[1]['capabilities']['createWithDefaultReminder'], 'Read-only Google calendars must not allow default-reminder event creation.');
+assertSameValue('complex', $calendars[1]['defaultReminder']['mode'], 'Non-popup Google calendar defaults must be protected as complex settings.');
 assertSameValue(false, $calendars[1]['capabilities']['updateRecurrence'], 'Read-only Google calendars must not advertise recurrence conversion support.');
 assertTrueValue(str_contains($calendarClient->requests[1]['url'], 'pageToken=page-2'), 'The second calendar page must be requested.');
 
@@ -286,6 +294,28 @@ assertSameValue(
     [['method' => 'popup', 'minutes' => 30]],
     $createBody['reminders']['overrides'],
     'Custom Google reminders must be written as one popup override.'
+);
+
+$googleDefaultReminderClient = new FakeHttpClient([
+    response(200, ['id' => 'default-reminder-id', 'iCalUID' => 'default-reminder@example.com'])
+]);
+(new GoogleCalendarProvider($googleDefaultReminderClient, 'access-token'))->createEvent('owner@example.com', [
+    'summary'  => 'Calendar default reminder',
+    'allDay'   => false,
+    'start'    => '2026-07-20T12:00:00+02:00',
+    'end'      => '2026-07-20T13:00:00+02:00',
+    'reminder' => ['mode' => 'default']
+]);
+$googleDefaultReminderBody = json_decode(
+    $googleDefaultReminderClient->requests[0]['body'],
+    true,
+    512,
+    JSON_THROW_ON_ERROR
+);
+assertSameValue(
+    ['useDefault' => true],
+    $googleDefaultReminderBody['reminders'],
+    'Google calendar-default reminders must be written explicitly when selected.'
 );
 
 $recurringCreateClient = new FakeHttpClient([
@@ -988,6 +1018,8 @@ assertSameValue(true, $msCalendars[0]['capabilities']['deleteOccurrence'], 'Edit
 assertSameValue(true, $msCalendars[0]['capabilities']['updateFollowing'], 'Editable Microsoft calendars must advertise this-and-following update support.');
 assertSameValue(true, $msCalendars[0]['capabilities']['updateSeries'], 'Editable Microsoft calendars must advertise recurring series update support.');
 assertSameValue(true, $msCalendars[0]['capabilities']['deleteSeries'], 'Editable Microsoft calendars must advertise recurring series delete support.');
+assertSameValue(true, $msCalendars[0]['capabilities']['createWithDefaultReminder'], 'Microsoft calendars must allow the server default when creating events.');
+assertTrueValue(!isset($msCalendars[0]['capabilities']['useDefaultReminder']), 'Microsoft events must not advertise a persistent calendar-default reminder mode.');
 assertSameValue(false, $msCalendars[2]['capabilities']['create'], 'Read-only Microsoft calendars must remain read-only.');
 assertSameValue(false, $msCalendars[2]['capabilities']['createRecurrence'], 'Read-only Microsoft calendars must not advertise recurrence creation support.');
 assertSameValue(false, $msCalendars[2]['capabilities']['updateRecurrence'], 'Read-only Microsoft calendars must not advertise recurrence conversion support.');
@@ -1231,6 +1263,11 @@ $msLocalTimeClient = new FakeHttpClient([
     'timezone' => 'Europe/Berlin'
 ]);
 $msLocalTimeBody = json_decode($msLocalTimeClient->requests[0]['body'], true, 512, JSON_THROW_ON_ERROR);
+assertTrueValue(
+    !array_key_exists('isReminderOn', $msLocalTimeBody)
+        && !array_key_exists('reminderMinutesBeforeStart', $msLocalTimeBody),
+    'Microsoft calendar-default reminder creation must be represented by omitting explicit reminder fields.'
+);
 assertSameValue(
     '2026-07-20T10:00:00',
     $msLocalTimeBody['start']['dateTime'],
@@ -3282,15 +3319,15 @@ assertTrueValue(
         && str_contains($calendarModuleSource, "\$capabilities['updateFollowing'] ?? false")
         && str_contains($calendarModuleSource, "\$capabilities['updateSeries'] ?? false")
         && str_contains($calendarModuleSource, "\$capabilities['deleteSeries'] ?? false")
-        && str_contains($calendarModuleSource, "'canCreateRecurrence' => \$metadataAvailable")
-        && str_contains($calendarModuleSource, "'canUpdateRecurrence' => \$metadataAvailable")
-        && str_contains($calendarModuleSource, "'canUpdateOccurrence' => \$metadataAvailable")
-        && str_contains($calendarModuleSource, "'canDeleteOccurrence' => \$metadataAvailable")
+        && preg_match('/\'canCreateRecurrence\'\s+=> \$metadataAvailable/', $calendarModuleSource) === 1
+        && preg_match('/\'canUpdateRecurrence\'\s+=> \$metadataAvailable/', $calendarModuleSource) === 1
+        && preg_match('/\'canUpdateOccurrence\'\s+=> \$metadataAvailable/', $calendarModuleSource) === 1
+        && preg_match('/\'canDeleteOccurrence\'\s+=> \$metadataAvailable/', $calendarModuleSource) === 1
         && str_contains($calendarModuleSource, "'canUpdateFollowing'")
         && str_contains($calendarModuleSource, "ReadAttributeBoolean('DetectedCanUpdateFollowing')")
-        && str_contains($calendarModuleSource, "'canUpdateSeries'     => \$metadataAvailable")
-        && str_contains($calendarModuleSource, "'canDeleteSeries'     => \$metadataAvailable")
-        && str_contains($calendarModuleSource, "'timezone'            => \$metadataAvailable")
+        && preg_match('/\'canUpdateSeries\'\s+=> \$metadataAvailable/', $calendarModuleSource) === 1
+        && preg_match('/\'canDeleteSeries\'\s+=> \$metadataAvailable/', $calendarModuleSource) === 1
+        && preg_match('/\'timezone\'\s+=> \$metadataAvailable/', $calendarModuleSource) === 1
         && str_contains($calendarModuleSource, "(!\$updating && !\$this->ReadAttributeBoolean('DetectedCanDeleteSeries'))")
         && str_contains($calendarModuleSource, "\$identity['canDeleteSeries'] = true;")
         && str_contains($calendarModuleSource, "trim((string) (\$cachedEvent['originalStart'] ?? '')) === ''")
@@ -3308,14 +3345,14 @@ assertTrueValue(
 );
 assertTrueValue(
     is_string($viewModuleSource)
-        && str_contains($viewModuleSource, "'canCreateRecurrence' => (bool) (\$calendarStatus['canCreateRecurrence'] ?? false)")
-        && str_contains($viewModuleSource, "'canUpdateRecurrence' => (bool) (\$calendarStatus['canUpdateRecurrence'] ?? false)")
-        && str_contains($viewModuleSource, "'canUpdateOccurrence' => (bool) (\$calendarStatus['canUpdateOccurrence'] ?? false)")
-        && str_contains($viewModuleSource, "'canDeleteOccurrence' => (bool) (\$calendarStatus['canDeleteOccurrence'] ?? false)")
-        && str_contains($viewModuleSource, "'canUpdateFollowing'  => (bool) (\$calendarStatus['canUpdateFollowing'] ?? false)")
-        && str_contains($viewModuleSource, "'canUpdateSeries'     => (bool) (\$calendarStatus['canUpdateSeries'] ?? false)")
-        && str_contains($viewModuleSource, "'canDeleteSeries'     => (bool) (\$calendarStatus['canDeleteSeries'] ?? false)")
-        && str_contains($viewModuleSource, "'timezone'            => trim((string) (\$calendarStatus['timezone'] ?? ''))")
+        && preg_match('/\'canCreateRecurrence\'\s+=> \(bool\) \(\$calendarStatus\[\'canCreateRecurrence\'\] \?\? false\)/', $viewModuleSource) === 1
+        && preg_match('/\'canUpdateRecurrence\'\s+=> \(bool\) \(\$calendarStatus\[\'canUpdateRecurrence\'\] \?\? false\)/', $viewModuleSource) === 1
+        && preg_match('/\'canUpdateOccurrence\'\s+=> \(bool\) \(\$calendarStatus\[\'canUpdateOccurrence\'\] \?\? false\)/', $viewModuleSource) === 1
+        && preg_match('/\'canDeleteOccurrence\'\s+=> \(bool\) \(\$calendarStatus\[\'canDeleteOccurrence\'\] \?\? false\)/', $viewModuleSource) === 1
+        && preg_match('/\'canUpdateFollowing\'\s+=> \(bool\) \(\$calendarStatus\[\'canUpdateFollowing\'\] \?\? false\)/', $viewModuleSource) === 1
+        && preg_match('/\'canUpdateSeries\'\s+=> \(bool\) \(\$calendarStatus\[\'canUpdateSeries\'\] \?\? false\)/', $viewModuleSource) === 1
+        && preg_match('/\'canDeleteSeries\'\s+=> \(bool\) \(\$calendarStatus\[\'canDeleteSeries\'\] \?\? false\)/', $viewModuleSource) === 1
+        && preg_match('/\'timezone\'\s+=> trim\(\(string\) \(\$calendarStatus\[\'timezone\'\] \?\? \'\'\)\)/', $viewModuleSource) === 1
         && str_contains($viewModuleSource, "\$event['canUpdateOccurrence'] = (bool) (\$event['canUpdateOccurrence'] ?? false)")
         && str_contains($viewModuleSource, "\$event['canDeleteOccurrence'] = (bool) (\$event['canDeleteOccurrence'] ?? false)")
         && str_contains($viewModuleSource, "\$event['canUpdateFollowing'] = (bool) (\$event['canUpdateFollowing'] ?? false)")

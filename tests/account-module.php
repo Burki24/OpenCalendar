@@ -337,11 +337,15 @@ assertAccountStructure(
         && ($normalizedGoogleCalendars[0]['capabilities']['updateFollowing'] ?? false) === true
         && ($normalizedGoogleCalendars[0]['capabilities']['updateSeries'] ?? false) === true
         && ($normalizedGoogleCalendars[0]['capabilities']['deleteSeries'] ?? false) === true
+        && ($normalizedGoogleCalendars[0]['capabilities']['useDefaultReminder'] ?? false) === true
+        && ($normalizedGoogleCalendars[0]['capabilities']['createWithDefaultReminder'] ?? false) === true
+        && ($normalizedGoogleCalendars[0]['defaultReminder']['mode'] ?? '') === 'complex'
         && ($normalizedGoogleCalendars[1]['capabilities']['createRecurrence'] ?? true) === false
         && ($normalizedGoogleCalendars[1]['capabilities']['updateFollowing'] ?? true) === false
         && ($normalizedGoogleCalendars[1]['capabilities']['updateSeries'] ?? true) === false
-        && ($normalizedGoogleCalendars[1]['capabilities']['deleteSeries'] ?? true) === false,
-    'Legacy Google calendar caches must derive recurring create/update/delete support from cached write access.'
+        && ($normalizedGoogleCalendars[1]['capabilities']['deleteSeries'] ?? true) === false
+        && ($normalizedGoogleCalendars[1]['capabilities']['createWithDefaultReminder'] ?? true) === false,
+    'Legacy Google calendar caches must derive recurring and default-reminder capabilities while protecting unknown default details.'
 );
 
 $legacyMicrosoftCalendars = [[
@@ -372,14 +376,17 @@ assertAccountStructure(
         && ($normalizedMicrosoftCalendars[0]['capabilities']['updateFollowing'] ?? false) === true
         && ($normalizedMicrosoftCalendars[0]['capabilities']['updateSeries'] ?? false) === true
         && ($normalizedMicrosoftCalendars[0]['capabilities']['deleteSeries'] ?? false) === true
+        && ($normalizedMicrosoftCalendars[0]['capabilities']['createWithDefaultReminder'] ?? false) === true
+        && !isset($normalizedMicrosoftCalendars[0]['capabilities']['useDefaultReminder'])
         && ($normalizedMicrosoftCalendars[1]['capabilities']['createRecurrence'] ?? true) === false
         && ($normalizedMicrosoftCalendars[1]['capabilities']['updateRecurrence'] ?? true) === false
         && ($normalizedMicrosoftCalendars[1]['capabilities']['updateOccurrence'] ?? true) === false
         && ($normalizedMicrosoftCalendars[1]['capabilities']['deleteOccurrence'] ?? true) === false
         && ($normalizedMicrosoftCalendars[1]['capabilities']['updateFollowing'] ?? true) === false
         && ($normalizedMicrosoftCalendars[1]['capabilities']['updateSeries'] ?? true) === false
-        && ($normalizedMicrosoftCalendars[1]['capabilities']['deleteSeries'] ?? true) === false,
-    'Legacy Microsoft calendar caches must derive supported recurrence writes from cached write access.'
+        && ($normalizedMicrosoftCalendars[1]['capabilities']['deleteSeries'] ?? true) === false
+        && ($normalizedMicrosoftCalendars[1]['capabilities']['createWithDefaultReminder'] ?? true) === false,
+    'Legacy Microsoft calendar caches must derive recurrence and creation-only default-reminder support from cached write access.'
 );
 
 $gatewaySource = file_get_contents(__DIR__ . '/../Kalender Konto/traits/ChildGatewayTrait.php');

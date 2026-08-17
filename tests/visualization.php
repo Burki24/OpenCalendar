@@ -151,14 +151,15 @@ assertVisualization(
         && str_contains($indexSource, 'id="event-reminder-unit"')
         && str_contains($indexSource, 'id="details-reminder-row"')
         && str_contains($script, 'function eventReminderState(event)')
-        && str_contains($script, 'function resetReminderEditor()')
-        && str_contains($script, 'function loadReminderEditor(event)')
-        && str_contains($script, 'function reminderEditorValue()')
+        && str_contains($script, 'function calendarDefaultReminderState(calendar)')
+        && str_contains($script, 'function resolveDefaultReminderForCalendarMove()')
+        && str_contains($script, 'calendar?.canUseDefaultReminder || calendar?.canCreateWithDefaultReminder')
+        && str_contains($script, "? { mode: 'default' }")
         && str_contains($script, 'eventData.reminder = reminder;')
         && str_contains($script, 'reminder: selectedEvent.reminder || null')
-        && str_contains($script, "eventReminderState(event).mode === 'complex'")
+        && str_contains($script, "calendarDefaultReminderState(sourceCalendar).mode === 'complex'")
         && str_contains($script, "setOptionalDetail('reminder', reminderDetailText(event));"),
-    'The shared event dialog must edit one provider-neutral reminder, preserve provider defaults and protect complex reminder settings during moves.'
+    'The shared event dialog must distinguish persistent and create-only calendar defaults, resolve simple defaults during moves, and protect complex reminder settings.'
 );
 
 assertVisualization(
@@ -266,10 +267,23 @@ $moduleSource = (string) file_get_contents(__DIR__ . '/../Kalender Ansicht/modul
 assertVisualization(
     str_contains($moduleSource, '\'Events with complex reminder settings cannot be moved safely.\'')
         && str_contains($moduleSource, '($sourceReminder[\'mode\'] ?? \'\') === \'complex\'')
-        && str_contains($moduleSource, '($sourceReminder[\'editable\'] ?? true) === false'),
-    'The visualization backend must reject lossy moves when provider reminder settings are complex.'
+        && str_contains($moduleSource, '($sourceReminder[\'editable\'] ?? true) === false')
+        && str_contains($moduleSource, 'CalendarEventReminder::MODE_DEFAULT')
+        && str_contains($moduleSource, '$event[\'reminder\'] = $this->defaultReminderForMove($sourceInstanceId);')
+        && str_contains($moduleSource, 'private function defaultReminderForMove(int $instanceId): array'),
+    'The visualization backend must resolve simple Google calendar defaults before cross-calendar moves and reject lossy complex defaults.'
 );
 $calendarModuleSource = (string) file_get_contents(__DIR__ . '/../Kalender/module.php');
+
+assertVisualization(
+    str_contains($calendarModuleSource, 'DetectedCanUseDefaultReminder')
+        && str_contains($calendarModuleSource, 'DetectedCanCreateWithDefaultReminder')
+        && str_contains($calendarModuleSource, 'DetectedDefaultReminder')
+        && str_contains($calendarModuleSource, '\'canUseDefaultReminder\'')
+        && str_contains($calendarModuleSource, '\'canCreateWithDefaultReminder\'')
+        && str_contains($calendarModuleSource, '\'defaultReminder\''),
+    'Calendar instances must expose provider reminder-default capabilities and the resolved calendar default to visualizations.'
+);
 
 assertVisualization(
     substr_count(
