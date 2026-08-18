@@ -18,6 +18,12 @@
             "sha256": "4c25828b283367692d0db1631d2b7d71ba6012883798bc5ffddb8f2d551d6dfb",
             "path": "libs/helper/DataFlowHelper.php"
         },
+        "DebugHelper": {
+            "version": "1.0.1",
+            "sha256": "c5433bf0cd7141c93d98f16ae23325a7f00ab9d11438c44fbfd12ad239e21373",
+            "path": "libs/helper/DebugHelper.php",
+            "source_sha": "6554d010400aae0bd94e49fe7e329652123af5d8"
+        },
         "HttpResponseHelper": {
             "version": "1.1.0",
             "sha256": "be4fae4c23f757ab462237d8e74d2a9dca1b504937ed4d4b51c7ff76004cf1cd",
