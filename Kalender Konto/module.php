@@ -1064,7 +1064,7 @@ class CalendarAccount extends IPSModuleStrict
         $provider = $this->ReadPropertyInteger('Provider');
         $verifyTls = match ($provider) {
             self::PROVIDER_APPLE, self::PROVIDER_GOOGLE, self::PROVIDER_MICROSOFT => true,
-            default => $this->ReadPropertyBoolean('VerifyTLS')
+            default                                                               => $this->ReadPropertyBoolean('VerifyTLS')
         };
         $this->SendSafeDebug('ProviderCreate', [
             'provider'       => $this->getProviderName($provider),
