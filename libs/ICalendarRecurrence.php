@@ -63,6 +63,164 @@ final class ICalendarRecurrence
     }
 
     /**
+     * Builds privacy-conscious recurrence diagnostics from already expanded events.
+     *
+     * The summary intentionally omits event identity, titles, descriptions, locations,
+     * and resource URLs. Equivalent rules are grouped so account-level debug output
+     * stays compact even when several calendars contain the same recurrence pattern.
+     *
+     * @param list<array<string, mixed>> $events
+     * @return array{
+     *     seriesCount: int,
+     *     supportedSeriesCount: int,
+     *     unsupportedSeriesCount: int,
+     *     rules: list<array{
+     *         rule: string,
+     *         timezone: string,
+     *         supported: bool,
+     *         unsupportedParts: list<string>,
+     *         seriesCount: int,
+     *         occurrencesInRange: int,
+     *         overrideOccurrencesInRange: int,
+     *         rDateCount: int,
+     *         exDateCount: int
+     *     }>
+     * }
+     */
+    public static function diagnostics(array $events): array
+    {
+        $series = [];
+        foreach ($events as $event) {
+            $rule = strtoupper(trim((string) ($event['recurrenceRule'] ?? '')));
+            $recurrenceDates = is_array($event['recurrenceDates'] ?? null)
+                ? $event['recurrenceDates']
+                : [];
+            $exceptionDates = is_array($event['exceptionDates'] ?? null)
+                ? $event['exceptionDates']
+                : [];
+            $recurrenceType = strtolower(trim((string) ($event['recurrenceType'] ?? '')));
+            if ($rule === ''
+                && $recurrenceDates === []
+                && $exceptionDates === []
+                && !(bool) ($event['recurring'] ?? false)
+                && !in_array($recurrenceType, ['master', 'occurrence', 'exception'], true)) {
+                continue;
+            }
+
+            $seriesId = trim((string) ($event['seriesId'] ?? ''));
+            if ($seriesId === '') {
+                $seriesId = trim((string) ($event['uid'] ?? ''));
+            }
+            $timezone = trim((string) ($event['timezone'] ?? ''));
+            $seriesKey = $seriesId !== ''
+                ? 'series:' . $seriesId
+                : 'fallback:' . hash(
+                    'sha256',
+                    $rule . '|' . $timezone . '|' . (string) ($event['startTimestamp'] ?? '')
+                );
+
+            if (!isset($series[$seriesKey])) {
+                $series[$seriesKey] = [
+                    'rule'                       => $rule,
+                    'timezone'                   => $timezone,
+                    'supported'                  => (bool) ($event['recurrenceExpansionSupported'] ?? true),
+                    'unsupportedParts'           => [],
+                    'occurrencesInRange'         => 0,
+                    'overrideOccurrencesInRange' => 0,
+                    'rDateCount'                 => count($recurrenceDates),
+                    'exDateCount'                => count($exceptionDates)
+                ];
+            }
+
+            if ($series[$seriesKey]['rule'] === '' && $rule !== '') {
+                $series[$seriesKey]['rule'] = $rule;
+            }
+            if ($series[$seriesKey]['timezone'] === '' && $timezone !== '') {
+                $series[$seriesKey]['timezone'] = $timezone;
+            }
+            if (array_key_exists('recurrenceExpansionSupported', $event)
+                && !(bool) $event['recurrenceExpansionSupported']) {
+                $series[$seriesKey]['supported'] = false;
+            }
+
+            $unsupportedParts = is_array($event['recurrenceUnsupportedRuleParts'] ?? null)
+                ? array_values(array_filter(
+                    array_map(
+                        static fn (mixed $part): string => strtoupper(trim((string) $part)),
+                        $event['recurrenceUnsupportedRuleParts']
+                    ),
+                    static fn (string $part): bool => $part !== ''
+                ))
+                : [];
+            $series[$seriesKey]['unsupportedParts'] = array_values(array_unique(array_merge(
+                $series[$seriesKey]['unsupportedParts'],
+                $unsupportedParts
+            )));
+            sort($series[$seriesKey]['unsupportedParts'], SORT_STRING);
+            $series[$seriesKey]['rDateCount'] = max(
+                $series[$seriesKey]['rDateCount'],
+                count($recurrenceDates)
+            );
+            $series[$seriesKey]['exDateCount'] = max(
+                $series[$seriesKey]['exDateCount'],
+                count($exceptionDates)
+            );
+            ++$series[$seriesKey]['occurrencesInRange'];
+            if ($recurrenceType === CalendarEventRecurrence::EXCEPTION) {
+                ++$series[$seriesKey]['overrideOccurrencesInRange'];
+            }
+        }
+
+        $rules = [];
+        $supportedSeriesCount = 0;
+        foreach ($series as $entry) {
+            if ($entry['supported']) {
+                ++$supportedSeriesCount;
+            }
+            $signature = hash(
+                'sha256',
+                $entry['rule'] . "\0"
+                    . $entry['timezone'] . "\0"
+                    . ($entry['supported'] ? '1' : '0') . "\0"
+                    . implode(',', $entry['unsupportedParts'])
+            );
+            if (!isset($rules[$signature])) {
+                $rules[$signature] = [
+                    'rule'                       => $entry['rule'] !== '' ? $entry['rule'] : 'RDATE',
+                    'timezone'                   => $entry['timezone'],
+                    'supported'                  => $entry['supported'],
+                    'unsupportedParts'           => $entry['unsupportedParts'],
+                    'seriesCount'                => 0,
+                    'occurrencesInRange'         => 0,
+                    'overrideOccurrencesInRange' => 0,
+                    'rDateCount'                 => 0,
+                    'exDateCount'                => 0
+                ];
+            }
+            ++$rules[$signature]['seriesCount'];
+            $rules[$signature]['occurrencesInRange'] += $entry['occurrencesInRange'];
+            $rules[$signature]['overrideOccurrencesInRange'] += $entry['overrideOccurrencesInRange'];
+            $rules[$signature]['rDateCount'] += $entry['rDateCount'];
+            $rules[$signature]['exDateCount'] += $entry['exDateCount'];
+        }
+
+        $rules = array_values($rules);
+        usort(
+            $rules,
+            static fn (array $left, array $right): int => strcmp($left['rule'], $right['rule'])
+                ?: strcmp($left['timezone'], $right['timezone'])
+                ?: ((int) $right['supported'] <=> (int) $left['supported'])
+        );
+
+        return [
+            'seriesCount'            => count($series),
+            'supportedSeriesCount'   => $supportedSeriesCount,
+            'unsupportedSeriesCount' => count($series) - $supportedSeriesCount,
+            'rules'                  => $rules
+        ];
+    }
+
+    /**
      * @param list<array<string, mixed>> $group
      * @return list<array<string, mixed>>
      */

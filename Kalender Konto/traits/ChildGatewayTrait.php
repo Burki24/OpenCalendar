@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use IPSKalender\CalendarEventLookupProviderInterface;
 use IPSKalender\CalendarEventRecurrence;
+use IPSKalender\ICalendarRecurrence;
 use IPSKalender\RecurringCalendarProviderInterface;
 
 trait KalenderKontoChildGatewayTrait
@@ -110,6 +111,12 @@ trait KalenderKontoChildGatewayTrait
             'eventCount' => count($events),
             'durationMs' => (int) round((microtime(true) - $startedAt) * 1000)
         ]);
+        if ($this->ReadPropertyInteger('Provider') === self::PROVIDER_ICS) {
+            $recurrenceDiagnostics = ICalendarRecurrence::diagnostics($events);
+            if ($recurrenceDiagnostics['seriesCount'] > 0) {
+                $this->SendSafeDebug('RecurrenceExpansion', $recurrenceDiagnostics);
+            }
+        }
 
         return $events;
     }

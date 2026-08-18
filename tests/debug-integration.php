@@ -75,7 +75,7 @@ assertDebugIntegration(
     !str_contains($gateway, '->SendDebug('),
     'Calendar Account gateway must use the safe debug wrapper instead of direct SendDebug calls.'
 );
-foreach (['ChildRequest', 'ChildRequestCompleted', 'ChildRequestError', 'ProviderEvents'] as $message) {
+foreach (['ChildRequest', 'ChildRequestCompleted', 'ChildRequestError', 'ProviderEvents', 'RecurrenceExpansion'] as $message) {
     assertDebugIntegration(
         str_contains($gateway, "SendSafeDebug('" . $message . "'"),
         'Calendar Account gateway debug contract is missing message: ' . $message
@@ -93,6 +93,14 @@ assertDebugIntegration(
 assertDebugIntegration(
     str_contains($gateway, "\$operation !== 'ReadEventsTransferPage'"),
     'Paged transfer reads must be excluded from per-request debug noise.'
+);
+assertDebugIntegration(
+    str_contains($gateway, 'ICalendarRecurrence::diagnostics($events)'),
+    'ICS/Webcal event reads must summarize recurrence diagnostics without provider-level Symcon coupling.'
+);
+assertDebugIntegration(
+    str_contains($gateway, "\$this->ReadPropertyInteger('Provider') === self::PROVIDER_ICS"),
+    'Recurrence expansion diagnostics must remain scoped to locally expanded ICS/Webcal events.'
 );
 
 fwrite(STDOUT, "OpenCalendar debug integration checks passed.\n");
