@@ -57,7 +57,7 @@ Sicherung wiederhergestellt, soweit diese verfügbar ist.
   Agenda-, Tage- und Wochenansicht
 - Zusammenführen beliebig vieler ausgewählter Kalender
 - Farben der einzelnen Kalender und Termine
-- optionale Anzeige von Kalendername, Ort und Beschreibung
+- optionale Anzeige von Kalendername, Anlass bei Jahresereignissen, Ort und Beschreibung
 - Navigation innerhalb des dargestellten Zeitraums; in der Tage-, Wochen- und Monatsansicht kann auf Touch-Geräten zusätzlich horizontal gewischt werden (links = weiter, rechts = zurück)
 - manuelle Synchronisation aller ausgewählten Kalender
 - Erstellen, Bearbeiten, Verschieben und Löschen von Terminen in beschreibbaren Kalendern
@@ -89,12 +89,12 @@ Standardansicht | Agenda, Liste, Tage, Woche oder Monat; wird nur verwendet, sol
 Kachel-Wochenausrichtung | Horizontale Wochenspalten oder vertikale Tageszeilen
 Vergangene/Zukünftige Tage | Datenzeitraum, aus dem Termine für alle Darstellungen geladen und zusammengeführt werden
 Maximale Termine | Obergrenze der in einer Antwort verarbeiteten Termine
-Anzeigeoptionen → Allgemein | Wochenenden, Kalendername, Ort und Beschreibung zentral im aufklappbaren Bereich konfigurieren
+Anzeigeoptionen → Allgemein | Wochenenden, Kalendername, Anlass bei Jahresereignissen, Ort und Beschreibung zentral im aufklappbaren Bereich konfigurieren
 Anzeigeoptionen → Terminanzahl | Je Ansicht separat für Agenda, Tage und Woche; im Monat wird keine Tages-Terminanzahl eingeblendet
 Anzeigeoptionen → Kalenderwoche | Je Ansicht separat für Agenda, Liste, Tage, Woche und Monat
 Anzeigeoptionen → Tageszahl | Je Ansicht separat für Agenda, Liste, Tage, Woche und Monat
 Anzeigeoptionen → Listenansicht | Bedienelemente der Listenansicht ein-/ausblenden; Zeitraum und Ansichtswechsel bleiben sichtbar
-Anzeigeoptionen → Listenspalten | Legt fest, welche Datenfelder in der Listenansicht als Spalten erscheinen
+Anzeigeoptionen → Listenspalten | Legt fest, welche Datenfelder in der Listenansicht als Spalten erscheinen; der Anlass von Jahresereignissen kann als eigene Spalte eingeblendet werden
 Ansichtszeiträume | Sichtbare Länge jeder Ansicht im aufklappbaren Bereich; Agenda/Liste/Tage in Tagen, Woche in Wochen und Monat in Monaten
 
 Die Kalenderwoche erscheint in der Wochenansicht in der Zeitraumüberschrift.
@@ -127,7 +127,7 @@ Beim Löschen erscheint eine eigene OpenCalendar-Bestätigung mit Terminname und
 Die **Listenansicht** verzichtet bewusst auf Karten und zusätzliche
 Gruppierungen. Jeder Termin wird in einer einfachen Tabellenzeile dargestellt;
 der schmale Farbbalken übernimmt die Farbe des jeweiligen Kalenders. Datum,
-Beginn, Ende, Titel, Kalendername, Ort und Beschreibung können unabhängig
+Beginn, Ende, Titel, Anlass, Kalendername, Ort und Beschreibung können unabhängig
 voneinander als Spalten ein- oder ausgeblendet werden. Optional lassen sich in
 dieser Ansicht die Schaltflächen für Zurück, Heute, Weiter, Termin erstellen und
 Aktualisieren ausblenden. Die Zeitraumüberschrift und die Auswahl der Ansichten

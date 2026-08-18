@@ -129,10 +129,12 @@ class CalendarView extends IPSModuleStrict
         $this->RegisterPropertyBoolean('ShowListEnd', true);
         $this->RegisterPropertyBoolean('ShowListTitle', true);
         $this->RegisterPropertyBoolean('ShowListCalendarName', true);
+        $this->RegisterPropertyBoolean('ShowListAnniversaryType', true);
         $this->RegisterPropertyBoolean('ShowListLocation', false);
         $this->RegisterPropertyBoolean('ShowListDescription', false);
         $this->RegisterPropertyBoolean('ShowListControls', true);
         $this->RegisterPropertyBoolean('ShowCalendarName', true);
+        $this->RegisterPropertyBoolean('ShowAnniversaryType', true);
         $this->RegisterPropertyBoolean('ShowLocation', true);
         $this->RegisterPropertyBoolean('ShowDescription', false);
         $this->RegisterIPSViewHTMLPageProperties();
@@ -1341,6 +1343,11 @@ class CalendarView extends IPSModuleStrict
             'Calendar',
             'Date',
             'Title',
+            'Occasion',
+            'Birthday',
+            'Anniversary',
+            'Wedding anniversary',
+            'Death anniversary',
             'Start',
             'End',
             'Location',
@@ -2187,10 +2194,12 @@ class CalendarView extends IPSModuleStrict
             'showListEnd'               => $this->ReadPropertyBoolean('ShowListEnd'),
             'showListTitle'             => $this->ReadPropertyBoolean('ShowListTitle'),
             'showListCalendarName'      => $this->ReadPropertyBoolean('ShowListCalendarName'),
+            'showListAnniversaryType'   => $this->ReadPropertyBoolean('ShowListAnniversaryType'),
             'showListLocation'          => $this->ReadPropertyBoolean('ShowListLocation'),
             'showListDescription'       => $this->ReadPropertyBoolean('ShowListDescription'),
             'showListControls'          => $this->ReadPropertyBoolean('ShowListControls'),
             'showCalendarName'          => $this->ReadPropertyBoolean('ShowCalendarName'),
+            'showAnniversaryType'       => $this->ReadPropertyBoolean('ShowAnniversaryType'),
             'showLocation'              => $this->ReadPropertyBoolean('ShowLocation'),
             'showDescription'           => $this->ReadPropertyBoolean('ShowDescription'),
             'tileFontScale'             => max(50, min(200, $this->ReadPropertyInteger('TileFontScale'))),

@@ -47,9 +47,11 @@ final class CalendarVisualizationRenderer
                     'showListEnd'               => false,
                     'showListTitle'             => true,
                     'showListCalendarName'      => true,
+                    'showListAnniversaryType'   => true,
                     'showListLocation'          => false,
                     'showListDescription'       => true,
-                    'showListControls'          => false
+                    'showListControls'          => false,
+                    'showAnniversaryType'       => true
                 ]
             ],
             'runtime'            => $ipsView
@@ -91,6 +93,9 @@ function assertVisualization(bool $condition, string $message): void
 $script = (string) file_get_contents(__DIR__ . '/../Kalender Ansicht/visualization/app.js');
 $indexSource = (string) file_get_contents(__DIR__ . '/../Kalender Ansicht/visualization/index.html');
 $style = (string) file_get_contents(__DIR__ . '/../Kalender Ansicht/visualization/style.css');
+$moduleSource = (string) file_get_contents(__DIR__ . '/../Kalender Ansicht/module.php');
+$formSource = (string) file_get_contents(__DIR__ . '/../Kalender Ansicht/form.json');
+$localeSource = (string) file_get_contents(__DIR__ . '/../Kalender Ansicht/locale.json');
 assertVisualization(
     str_contains($script, 'return event.allDay ? allDayDate(event.start, event.startTimestamp)')
         && str_contains($script, 'allDayDate(event.end, event.endTimestamp || event.startTimestamp)')
@@ -144,6 +149,40 @@ assertVisualization(
         && str_contains($script, 'if (timezone && (!allDay || recurrence || editingSeries || editingFollowing)) {')
         && str_contains($script, 'eventData.timezone = timezone;'),
     'The event dialog must support Microsoft recurrence conversion and preserve Outlook-specific weekly and relative recurrence metadata while submitting the correct timezone.'
+);
+
+assertVisualization(
+    str_contains($moduleSource, 'RegisterPropertyBoolean(\'ShowAnniversaryType\', true)')
+        && str_contains($moduleSource, 'RegisterPropertyBoolean(\'ShowListAnniversaryType\', true)')
+        && str_contains($moduleSource, '\'showAnniversaryType\'       => ')
+        && str_contains($moduleSource, '\'showListAnniversaryType\'   => ')
+        && str_contains($moduleSource, '\'Occasion\',')
+        && str_contains($moduleSource, '\'Birthday\',')
+        && str_contains($moduleSource, '\'Anniversary\',')
+        && str_contains($moduleSource, '\'Wedding anniversary\',')
+        && str_contains($moduleSource, '\'Death anniversary\',')
+        && str_contains($formSource, '"name": "ShowAnniversaryType"')
+        && str_contains($formSource, '"caption": "Show annual event occasion"')
+        && str_contains($formSource, '"name": "ShowListAnniversaryType"')
+        && str_contains($formSource, '"caption": "Occasion"')
+        && str_contains($localeSource, '"Show annual event occasion": "Anlass bei Jahresereignissen anzeigen"')
+        && str_contains($localeSource, '"Occasion": "Anlass"'),
+    'Calendar View must expose central and list-specific annual-event occasion display settings.'
+);
+
+assertVisualization(
+    str_contains($script, 'function annualEventLabel(event)')
+        && str_contains($script, 'birthday: t(\'Birthday\')')
+        && str_contains($script, 'anniversary: t(\'Anniversary\')')
+        && str_contains($script, 'wedding: t(\'Wedding anniversary\')')
+        && str_contains($script, 'death: t(\'Death anniversary\')')
+        && str_contains($script, 'calendarState.settings.showAnniversaryType !== false')
+        && str_contains($script, 'metaParts.push(annualEventLabel(event));')
+        && str_contains($script, 'key: \'occasion\'')
+        && str_contains($script, 'label: \'Occasion\'')
+        && str_contains($script, 'calendarState.settings.showListAnniversaryType !== false')
+        && str_contains($script, '+ (occasion ? \' · \' + occasion : \'\');'),
+    'Annual-event occasions must be visible across normal views and available as an independent list column.'
 );
 
 assertVisualization(

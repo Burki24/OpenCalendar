@@ -334,6 +334,7 @@ function createAgendaEvent(event) {
     main.appendChild(title);
     const metaParts = [];
     if (calendarState.settings.showCalendarName) metaParts.push(event.calendarName || '');
+    if (calendarState.settings.showAnniversaryType !== false) metaParts.push(annualEventLabel(event));
     if (calendarState.settings.showLocation && event.location) metaParts.push('⌖ ' + event.location);
     if (metaParts.length) {
         const meta = element('span', 'event-meta');
@@ -456,6 +457,13 @@ function listColumns() {
             value: event => eventDisplaySummary(event) || t('Untitled event')
         });
     }
+    if (calendarState.settings.showListAnniversaryType !== false) {
+        columns.push({
+            key: 'occasion',
+            label: 'Occasion',
+            value: event => annualEventLabel(event)
+        });
+    }
     if (calendarState.settings.showListCalendarName !== false) {
         columns.push({
             key: 'calendar',
@@ -537,7 +545,9 @@ function renderDayColumns(days, className, showDayOfYear, showEventCount) {
             const title = document.createElement('strong');
             title.textContent = eventDisplaySummary(event) || t('Untitled event');
             const time = document.createElement('span');
-            time.textContent = event.allDay ? t('All day') : formatTime(eventStart(event));
+            const timeParts = [event.allDay ? t('All day') : formatTime(eventStart(event))];
+            if (calendarState.settings.showAnniversaryType !== false) timeParts.push(annualEventLabel(event));
+            time.textContent = timeParts.filter(Boolean).join(' · ');
             item.append(title, time);
             eventList.appendChild(item);
         });
@@ -686,8 +696,10 @@ function createMonthEventChip(event) {
     const chip = element('button', 'event-chip');
     chip.type = 'button';
     chip.style.setProperty('--event-color', safeColor(event.calendarColor));
+    const occasion = calendarState.settings.showAnniversaryType !== false ? annualEventLabel(event) : '';
     chip.textContent = (event.allDay ? '' : formatTime(eventStart(event)) + ' ')
-        + (eventDisplaySummary(event) || t('Untitled event'));
+        + (eventDisplaySummary(event) || t('Untitled event'))
+        + (occasion ? ' · ' + occasion : '');
     chip.addEventListener('click', () => openEventDetails(event));
     return chip;
 }
@@ -723,9 +735,12 @@ function openDayEvents(day, events) {
         const summary = element('span', 'day-event-summary');
         summary.textContent = eventDisplaySummary(event) || t('Untitled event');
         item.append(time, summary);
-        if (calendarState.settings.showCalendarName !== false && event.calendarName) {
+        const metaParts = [];
+        if (calendarState.settings.showCalendarName !== false && event.calendarName) metaParts.push(event.calendarName);
+        if (calendarState.settings.showAnniversaryType !== false) metaParts.push(annualEventLabel(event));
+        if (metaParts.filter(Boolean).length > 0) {
             const calendar = element('span', 'day-event-calendar');
-            calendar.textContent = event.calendarName;
+            calendar.textContent = metaParts.filter(Boolean).join(' · ');
             item.appendChild(calendar);
         }
         item.addEventListener('click', () => {
@@ -896,6 +911,15 @@ function annualEventType(event) {
     const type = String(event?.anniversaryType || '').trim().toLowerCase();
     if (['birthday', 'anniversary', 'wedding', 'death'].includes(type)) return type;
     return event?.birthday ? 'birthday' : '';
+}
+
+function annualEventLabel(event) {
+    return {
+        birthday: t('Birthday'),
+        anniversary: t('Anniversary'),
+        wedding: t('Wedding anniversary'),
+        death: t('Death anniversary')
+    }[annualEventType(event)] || '';
 }
 
 function annualEventDate(event) {

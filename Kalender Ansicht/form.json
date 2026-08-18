@@ -143,6 +143,16 @@
                     ]
                 },
                 {
+                    "type": "RowLayout",
+                    "items": [
+                        {
+                            "type": "CheckBox",
+                            "name": "ShowAnniversaryType",
+                            "caption": "Show annual event occasion"
+                        }
+                    ]
+                },
+                {
                     "type": "Label",
                     "caption": "Per-view options"
                 },
@@ -349,6 +359,11 @@
                             "type": "CheckBox",
                             "name": "ShowListCalendarName",
                             "caption": "Calendar"
+                        },
+                        {
+                            "type": "CheckBox",
+                            "name": "ShowListAnniversaryType",
+                            "caption": "Occasion"
                         },
                         {
                             "type": "CheckBox",
