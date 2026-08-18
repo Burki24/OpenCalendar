@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Burki24\SymconModuleHelper\ChunkedJsonTransferHelper;
 use Burki24\SymconModuleHelper\ConfigurationFormHelper;
 use Burki24\SymconModuleHelper\DataFlowHelper;
+use Burki24\SymconModuleHelper\DebugHelper;
 use Burki24\SymconModuleHelper\PersistentJsonCacheHelper;
 use Burki24\SymconModuleHelper\VariableHelper;
 use IPSKalender\CalendarEventCounter;
@@ -14,6 +15,7 @@ use IPSKalender\SynchronizationSchedule;
 require_once __DIR__ . '/../libs/helper/ChunkedJsonTransferHelper.php';
 require_once __DIR__ . '/../libs/helper/ConfigurationFormHelper.php';
 require_once __DIR__ . '/../libs/helper/DataFlowHelper.php';
+require_once __DIR__ . '/../libs/helper/DebugHelper.php';
 require_once __DIR__ . '/../libs/helper/PersistentJsonCacheHelper.php';
 require_once __DIR__ . '/../libs/helper/VariableHelper.php';
 require_once __DIR__ . '/../libs/CalendarEventCounter.php';
@@ -25,6 +27,7 @@ class Calendar extends IPSModuleStrict
     use ChunkedJsonTransferHelper;
     use ConfigurationFormHelper;
     use DataFlowHelper;
+    use DebugHelper;
     use PersistentJsonCacheHelper;
     use VariableHelper;
 
@@ -295,7 +298,7 @@ class Calendar extends IPSModuleStrict
                 $this->applyCalendarMetadata($message['Payload']);
             }
         } catch (Throwable $exception) {
-            $this->SendDebug('CalendarMetadata', $exception->getMessage(), 0);
+            $this->SendSafeDebugException('CalendarMetadataError', $exception);
         }
 
         return '';
@@ -312,13 +315,22 @@ class Calendar extends IPSModuleStrict
             return false;
         }
 
+        $startedAt = microtime(true);
+        $this->SendSafeDebug('SynchronizationStart', [
+            'pastDays'   => max(0, min(1095, $this->ReadPropertyInteger('PastDays'))),
+            'futureDays' => max(1, min(1095, $this->ReadPropertyInteger('FutureDays')))
+        ]);
+
         try {
             $this->refreshCalendarMetadataSafely();
             $events = $this->requestEvents();
             $this->storeEvents($events);
             $this->WriteAttributeString('LastError', '');
             $this->SetStatus(IS_ACTIVE);
-            $this->SendDebug('Synchronize', sprintf('%d events synchronized.', count($events)), 0);
+            $this->SendSafeDebug('SynchronizationCompleted', [
+                'eventCount' => count($events),
+                'durationMs' => (int) round((microtime(true) - $startedAt) * 1000)
+            ]);
             return true;
         } catch (Throwable $exception) {
             $this->handleError($exception);
@@ -719,6 +731,15 @@ class Calendar extends IPSModuleStrict
                 $providerEvent['birthday'],
                 $providerEvent['birthDate']
             );
+            $this->SendSafeDebug('EventCreate', [
+                'allDay'      => (bool) ($event['allDay'] ?? false),
+                'recurring'   => is_array($recurrence) && $recurrence !== [],
+                'frequency'   => is_array($recurrence)
+                    ? strtoupper(trim((string) ($recurrence['frequency'] ?? '')))
+                    : '',
+                'timezone'    => trim((string) ($event['timezone'] ?? '')),
+                'annualEvent' => $anniversary !== null && $anniversary['enabled']
+            ]);
             $created = $this->sendRequest('CreateEvent', ['Event' => $providerEvent]);
             if ($anniversary !== null && $anniversary['enabled']) {
                 $this->upsertAnniversaryMetadata(
@@ -820,6 +841,14 @@ class Calendar extends IPSModuleStrict
                 throw new InvalidArgumentException('No event changes were supplied.');
             }
 
+            $this->SendSafeDebug('EventUpdate', [
+                'recurrenceType'     => $recurrenceType,
+                'writeScope'         => $writeScope,
+                'convertingToSeries' => $convertingSingleToSeries,
+                'changedFields'      => array_values(array_keys($changes)),
+                'annualEventChange'  => $anniversary !== null
+            ]);
+
             $updated = $changes === []
                 ? []
                 : $this->sendRequest(
@@ -864,6 +893,11 @@ class Calendar extends IPSModuleStrict
         try {
             $event = $this->decodeObject($EventJSON, 'event');
             $recurrence = $this->resolveWriteRecurrence($event, false);
+            $writeScope = (string) ($recurrence['writeScope'] ?? '');
+            $this->SendSafeDebug('EventDelete', [
+                'recurrenceType' => (string) ($recurrence['recurrenceType'] ?? CalendarEventRecurrence::SINGLE),
+                'writeScope'     => $writeScope
+            ]);
             $result = $this->sendRequest(
                 'DeleteEvent',
                 [
@@ -876,7 +910,6 @@ class Calendar extends IPSModuleStrict
             if (!(bool) ($result['success'] ?? false)) {
                 throw new RuntimeException('The calendar account did not confirm the deletion.');
             }
-            $writeScope = (string) ($recurrence['writeScope'] ?? '');
             if (!CalendarEventRecurrence::isOccurrence($recurrence)
                 || in_array(
                     $writeScope,
@@ -978,7 +1011,7 @@ class Calendar extends IPSModuleStrict
         try {
             $this->applyCalendarMetadata($this->sendRequest('GetCalendars'));
         } catch (Throwable $exception) {
-            $this->SendDebug('CalendarMetadata', $exception->getMessage(), 0);
+            $this->SendSafeDebugException('CalendarMetadataError', $exception);
         }
     }
 
@@ -1018,10 +1051,9 @@ class Calendar extends IPSModuleStrict
                 ) === 0
             ));
             if (count($nameMatches) === 1) {
-                $this->SendDebug(
+                $this->SendSafeDebug(
                     'CalendarResolution',
-                    'Recovered the calendar identity from the unique instance name.',
-                    0
+                    'Recovered the calendar identity from the unique instance name.'
                 );
                 $this->storeCalendarMetadata($nameMatches[0]);
                 return;
@@ -1108,6 +1140,20 @@ class Calendar extends IPSModuleStrict
         $this->WriteAttributeString('DetectedCalendarTimezone', $timezone);
         $this->WriteAttributeBoolean('DetectedWriteAccessKnown', $writeAccessKnown);
         $this->WriteAttributeBoolean('CalendarMetadataAvailable', true);
+        $this->SendSafeDebug('CalendarMetadata', [
+            'canWrite'                 => $canWrite,
+            'writeAccessKnown'         => $writeAccessKnown,
+            'timezone'                 => $timezone,
+            'canCreateRecurrence'      => $canCreateRecurrence,
+            'canUpdateRecurrence'      => $canUpdateRecurrence,
+            'canUpdateOccurrence'      => $canUpdateOccurrence,
+            'canUpdateFollowing'       => $canUpdateFollowing,
+            'canUpdateSeries'          => $canUpdateSeries,
+            'canDeleteSeries'          => $canDeleteSeries,
+            'maxReminders'             => $maxReminders,
+            'canUseDefaultReminder'    => $canUseDefaultReminder,
+            'canCreateDefaultReminder' => $canCreateWithDefaultReminder
+        ]);
     }
 
     /**
@@ -1120,6 +1166,11 @@ class Calendar extends IPSModuleStrict
         $today = new DateTimeImmutable('today');
         $start = $today->modify('-' . $pastDays . ' days');
         $end = $today->modify('+' . ($futureDays + 1) . ' days');
+        $startedAt = microtime(true);
+        $this->SendSafeDebug('EventTransferStart', [
+            'start' => $start->format(DATE_ATOM),
+            'end'   => $end->format(DATE_ATOM)
+        ]);
         $transfer = $this->sendRequest(
             'BeginEventsTransfer',
             ['Start' => $start->getTimestamp(), 'End' => $end->getTimestamp()]
@@ -1133,6 +1184,10 @@ class Calendar extends IPSModuleStrict
             || $itemCount < 0) {
             throw new UnexpectedValueException('The calendar account returned invalid event transfer metadata.');
         }
+        $this->SendSafeDebug('EventTransferMetadata', [
+            'pageCount' => $pageCount,
+            'itemCount' => $itemCount
+        ]);
 
         $events = [];
         try {
@@ -1165,6 +1220,10 @@ class Calendar extends IPSModuleStrict
         if (count($events) !== $itemCount) {
             throw new UnexpectedValueException('The calendar account returned an incomplete event transfer.');
         }
+        $this->SendSafeDebug('EventTransferCompleted', [
+            'eventCount' => count($events),
+            'durationMs' => (int) round((microtime(true) - $startedAt) * 1000)
+        ]);
 
         return $events;
     }
@@ -1174,7 +1233,7 @@ class Calendar extends IPSModuleStrict
         try {
             $this->sendRequest('FinishEventsTransfer', ['Token' => $token]);
         } catch (Throwable $exception) {
-            $this->SendDebug('EventTransferCleanup', $exception->getMessage(), 0);
+            $this->SendSafeDebugException('EventTransferCleanupError', $exception);
         }
     }
 
@@ -1846,7 +1905,11 @@ class Calendar extends IPSModuleStrict
             ? $this->Translate('Invalid JSON data.')
             : $this->translateErrorMessage($rawMessage);
         $this->WriteAttributeString('LastError', $message);
-        $this->SendDebug('CalendarError', $rawMessage, 0);
+        $this->SendSafeDebug('CalendarError', [
+            'type'    => $exception::class,
+            'message' => $rawMessage,
+            'code'    => $exception->getCode()
+        ]);
 
         return $message;
     }

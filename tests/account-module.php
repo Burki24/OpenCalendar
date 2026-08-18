@@ -551,8 +551,9 @@ assertAccountStructure(
 assertAccountStructure(
     is_string($accountSource)
         && str_contains($accountSource, '$rawMessage = $this->sanitizeError($exception->getMessage());')
-        && str_contains($accountSource, '$this->SendDebug(\'ProviderError\', $rawMessage, 0);')
-        && !str_contains($accountSource, '$this->SendDebug(\'ProviderError\', $exception->getMessage(), 0);'),
+        && str_contains($accountSource, '$this->SendSafeDebug(\'ProviderError\', [')
+        && str_contains($accountSource, '\'message\'    => $rawMessage')
+        && !str_contains($accountSource, '\'message\'    => $exception->getMessage()'),
     'Provider debug output must only receive sanitized exception messages.'
 );
 

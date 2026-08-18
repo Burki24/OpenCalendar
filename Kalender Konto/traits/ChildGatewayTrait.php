@@ -16,11 +16,22 @@ trait KalenderKontoChildGatewayTrait
      */
     public function ForwardData(string $JSONString): string
     {
+        $startedAt = microtime(true);
+
         try {
             $request = $this->DecodeDataFlowMessage($JSONString, self::DATA_ID_FROM_CHILD);
 
             $operation = (string) ($request['Operation'] ?? '');
             $requestID = (string) ($request['RequestID'] ?? '');
+            $debugRequest = $operation !== 'ReadEventsTransferPage';
+            if ($debugRequest) {
+                $this->SendSafeDebug('ChildRequest', [
+                    'operation'         => $operation,
+                    'provider'          => $this->getProviderName($this->ReadPropertyInteger('Provider')),
+                    'calendarSpecified' => trim((string) ($request['CalendarID'] ?? '')) !== '',
+                    'requestFields'     => array_values(array_keys($request))
+                ]);
+            }
 
             $payload = match ($operation) {
                 'GetCalendars'           => json_decode($this->GetCalendars(), true, 512, JSON_THROW_ON_ERROR),
@@ -42,9 +53,21 @@ trait KalenderKontoChildGatewayTrait
                 default                  => throw new InvalidArgumentException('Unsupported operation: ' . $operation)
             };
 
+            if ($debugRequest) {
+                $this->SendSafeDebug('ChildRequestCompleted', [
+                    'operation'  => $operation,
+                    'durationMs' => (int) round((microtime(true) - $startedAt) * 1000)
+                ]);
+            }
+
             return $this->encodeResponse(true, $operation, $requestID, $payload);
         } catch (Throwable $exception) {
-            $this->SendDebug('ForwardData', $this->sanitizeError($exception->getMessage()), 0);
+            $this->SendSafeDebug('ChildRequestError', [
+                'operation' => isset($operation) ? $operation : '',
+                'type'      => $exception::class,
+                'message'   => $this->sanitizeError($exception->getMessage()),
+                'code'      => $exception->getCode()
+            ]);
 
             return $this->encodeResponse(
                 false,
@@ -74,11 +97,21 @@ trait KalenderKontoChildGatewayTrait
             throw new InvalidArgumentException('The requested event time range is too large.');
         }
 
-        return $this->createProvider()->getEvents(
+        $startedAt = microtime(true);
+        $events = $this->createProvider()->getEvents(
             $this->calendarReference($calendar),
             new DateTimeImmutable('@' . $startTimestamp),
             new DateTimeImmutable('@' . $endTimestamp)
         );
+        $this->SendSafeDebug('ProviderEvents', [
+            'provider'   => $this->getProviderName($this->ReadPropertyInteger('Provider')),
+            'start'      => (new DateTimeImmutable('@' . $startTimestamp))->format(DATE_ATOM),
+            'end'        => (new DateTimeImmutable('@' . $endTimestamp))->format(DATE_ATOM),
+            'eventCount' => count($events),
+            'durationMs' => (int) round((microtime(true) - $startedAt) * 1000)
+        ]);
+
+        return $events;
     }
 
     /**
@@ -390,10 +423,9 @@ trait KalenderKontoChildGatewayTrait
             return null;
         }
 
-        $this->SendDebug(
+        $this->SendSafeDebug(
             'CalendarResolution',
-            'Using the only calendar exposed by the ICS/Webcal account because the stored calendar ID is missing or no longer matches.',
-            0
+            'Using the only calendar exposed by the ICS/Webcal account because the stored calendar ID is missing or no longer matches.'
         );
 
         return $available[0];
