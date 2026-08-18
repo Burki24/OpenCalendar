@@ -117,7 +117,7 @@ final class ICalendarRecurrence
             if ($seriesId === '') {
                 $seriesId = trim((string) ($event['uid'] ?? ''));
             }
-            $timezone = trim((string) ($event['timezone'] ?? ''));
+            $timezone = trim((string) ($event['timezoneReference'] ?? $event['timezone'] ?? ''));
             $seriesKey = $seriesId !== ''
                 ? 'series:' . $seriesId
                 : 'fallback:' . hash(
@@ -266,6 +266,12 @@ final class ICalendarRecurrence
         if (self::isCancelled($master)) {
             return [];
         }
+        $rule = trim((string) ($master['recurrenceRule'] ?? ''));
+        $recurrenceDates = is_array($master['recurrenceDates'] ?? null) ? $master['recurrenceDates'] : [];
+        if (!(bool) ($master['recurrenceTimezoneSupported'] ?? true)
+            && ($rule !== '' || $recurrenceDates !== [])) {
+            return self::unexpandedTimezoneGroup($master, $overrides, $rangeStart, $rangeEnd);
+        }
 
         $result = [];
         $usedOverrides = [];
@@ -355,6 +361,54 @@ final class ICalendarRecurrence
                 );
                 $result[] = $override;
             }
+        }
+
+        return $result;
+    }
+
+    /**
+     * Keeps the explicit master occurrence and detached overrides when an
+     * embedded custom TZID cannot be mapped losslessly to the host tzdb.
+     *
+     * @param array<string,mixed> $master
+     * @param array<int,array<string,mixed>> $overrides
+     * @return list<array<string,mixed>>
+     */
+    private static function unexpandedTimezoneGroup(
+        array $master,
+        array $overrides,
+        DateTimeImmutable $rangeStart,
+        DateTimeImmutable $rangeEnd
+    ): array {
+        $state = [
+            'recurrenceExpansionSupported'   => false,
+            'recurrenceUnsupportedRuleParts' => ['TZID']
+        ];
+        $result = [];
+        if (self::overlapsRange($master, $rangeStart, $rangeEnd)) {
+            $recurrenceId = trim((string) ($master['localValue'] ?? ''));
+            if ($recurrenceId === '') {
+                $recurrenceId = (string) ($master['start'] ?? '');
+            }
+            $masterOccurrence = array_merge(
+                $master,
+                $state,
+                CalendarEventRecurrence::occurrence(
+                    (string) ($master['uid'] ?? ''),
+                    (string) ($master['uid'] ?? '') . '|' . $recurrenceId,
+                    (string) ($master['start'] ?? ''),
+                    $recurrenceId
+                )
+            );
+            $masterOccurrence['recurrenceIdTimestamp'] = (int) ($master['startTimestamp'] ?? 0);
+            $result[] = $masterOccurrence;
+        }
+
+        foreach ($overrides as $override) {
+            if (self::isCancelled($override) || !self::overlapsRange($override, $rangeStart, $rangeEnd)) {
+                continue;
+            }
+            $result[] = array_merge($override, $state);
         }
 
         return $result;
