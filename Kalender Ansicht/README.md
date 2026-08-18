@@ -58,7 +58,7 @@ Sicherung wiederhergestellt, soweit diese verfügbar ist.
 - Zusammenführen beliebig vieler ausgewählter Kalender
 - Farben der einzelnen Kalender und Termine
 - optionale Anzeige von Kalendername, Ort und Beschreibung
-- Navigation innerhalb des dargestellten Zeitraums
+- Navigation innerhalb des dargestellten Zeitraums; in der Wochen- und Monatsansicht kann auf Touch-Geräten zusätzlich horizontal gewischt werden (links = weiter, rechts = zurück)
 - manuelle Synchronisation aller ausgewählten Kalender
 - Erstellen, Bearbeiten, Verschieben und Löschen von Terminen in beschreibbaren Kalendern
 - Komfortable Zeiteingabe: Wird beim Beginn nur das Datum geändert, folgt das Enddatum automatisch auf denselben Tag und behält seine Uhrzeit bei. Bei einer geänderten Beginn-Uhrzeit wird das Ende automatisch auf eine Stunde später gesetzt; Ganztagstermine bleiben auf demselben sichtbaren Tag.

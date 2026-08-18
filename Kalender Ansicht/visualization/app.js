@@ -20,6 +20,9 @@ const calendarViewStateStorageKey = Number(calendarOptions.instanceId) > 0
     : '';
 const calendarViews = new Set(['agenda', 'list', 'threeDays', 'week', 'month']);
 const calendarViewLabels = { agenda: 'Agenda', list: 'List', threeDays: 'Days', week: 'Week', month: 'Month' };
+const swipeNavigationViews = new Set(['week', 'month']);
+const swipeMinimumDistance = 60;
+const swipeAxisRatio = 1.3;
 document.documentElement.style.setProperty('--agenda-color-bar-width', `${calendarAgendaColorBarWidth}px`);
 document.documentElement.style.setProperty('--compact-color-bar-width', `${calendarCompactColorBarWidth}px`);
 
@@ -40,6 +43,8 @@ let pendingCalendarFilterIds = new Set();
 let toastTimer = null;
 let monthLayoutFrame = null;
 let selectedDayEventsDate = null;
+let swipeGesture = null;
+let suppressSwipeClickUntil = 0;
 const monthEventData = new WeakMap();
 
 const content = document.getElementById('calendar-content');
@@ -162,6 +167,7 @@ function applyTileFontScale() {
 
 function render() {
     updateToolbar();
+    content.style.touchAction = swipeNavigationViews.has(activeView) ? 'pan-y' : 'auto';
     content.replaceChildren();
     if (calendarState.calendars.length === 0) {
         renderEmpty('No calendars selected', 'Select at least one calendar in the instance configuration.');
@@ -2553,6 +2559,77 @@ window.addEventListener('resize', () => {
     if (activeView === 'month') scheduleMonthEventLayout();
 });
 document.addEventListener('wheel', containWheelInsideTile, { capture: true, passive: false });
+content.addEventListener('pointerdown', beginSwipeNavigation);
+content.addEventListener('pointerup', finishSwipeNavigation);
+content.addEventListener('pointercancel', cancelSwipeNavigation);
+content.addEventListener('click', suppressClickAfterSwipe, true);
+
+function beginSwipeNavigation(event) {
+    if (!swipeNavigationViews.has(activeView)
+        || !event.isPrimary
+        || !['touch', 'pen'].includes(event.pointerType)
+        || calendarDialogIsOpen()
+        || swipeNavigationTargetIsInteractive(event.target)) {
+        return;
+    }
+
+    swipeGesture = {
+        pointerId: event.pointerId,
+        startX: event.clientX,
+        startY: event.clientY
+    };
+    content.setPointerCapture?.(event.pointerId);
+}
+
+function finishSwipeNavigation(event) {
+    if (!swipeGesture || event.pointerId !== swipeGesture.pointerId) return;
+
+    const deltaX = event.clientX - swipeGesture.startX;
+    const deltaY = event.clientY - swipeGesture.startY;
+    cancelSwipeNavigation(event);
+
+    if (Math.abs(deltaX) < swipeMinimumDistance
+        || Math.abs(deltaX) < Math.abs(deltaY) * swipeAxisRatio) {
+        return;
+    }
+
+    suppressSwipeClickUntil = Date.now() + 500;
+    event.preventDefault();
+    navigate(deltaX < 0 ? 1 : -1);
+}
+
+function cancelSwipeNavigation(event = null) {
+    if (!swipeGesture) return;
+    const pointerId = swipeGesture.pointerId;
+    swipeGesture = null;
+    if (event && content.hasPointerCapture?.(pointerId)) {
+        content.releasePointerCapture?.(pointerId);
+    }
+}
+
+function suppressClickAfterSwipe(event) {
+    if (Date.now() > suppressSwipeClickUntil) return;
+    suppressSwipeClickUntil = 0;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+}
+
+function swipeNavigationTargetIsInteractive(target) {
+    return target instanceof Element
+        && Boolean(target.closest('button, a, input, select, textarea, label, .week-event, [role="button"], [contenteditable="true"]'));
+}
+
+function calendarDialogIsOpen() {
+    return [
+        eventDialog,
+        eventDetailsDialog,
+        editScopeDialog,
+        deleteConfirmDialog,
+        dayEventsDialog,
+        viewSelectorDialog,
+        calendarFilterDialog
+    ].some(dialog => dialog.open);
+}
 
 function containWheelInsideTile(event) {
     if (event.ctrlKey) return;

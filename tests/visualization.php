@@ -213,6 +213,25 @@ assertVisualization(
 );
 
 assertVisualization(
+    str_contains($script, 'const swipeNavigationViews = new Set([\'week\', \'month\']);')
+        && str_contains($script, 'const swipeMinimumDistance = 60;')
+        && str_contains($script, 'const swipeAxisRatio = 1.3;')
+        && str_contains($script, 'content.style.touchAction = swipeNavigationViews.has(activeView) ? \'pan-y\' : \'auto\';')
+        && str_contains($script, 'content.addEventListener(\'pointerdown\', beginSwipeNavigation);')
+        && str_contains($script, 'content.addEventListener(\'pointerup\', finishSwipeNavigation);')
+        && str_contains($script, 'content.addEventListener(\'pointercancel\', cancelSwipeNavigation);')
+        && str_contains($script, '![\'touch\', \'pen\'].includes(event.pointerType)')
+        && str_contains($script, 'calendarDialogIsOpen()')
+        && str_contains($script, 'swipeNavigationTargetIsInteractive(event.target)')
+        && str_contains($script, 'Math.abs(deltaX) < swipeMinimumDistance')
+        && str_contains($script, 'Math.abs(deltaX) < Math.abs(deltaY) * swipeAxisRatio')
+        && str_contains($script, 'suppressSwipeClickUntil = Date.now() + 500;')
+        && str_contains($script, 'navigate(deltaX < 0 ? 1 : -1);')
+        && str_contains($script, 'target.closest(\'button, a, input, select, textarea, label, .week-event, [role="button"], [contenteditable="true"]\')'),
+    'Week and month views must support guarded horizontal touch/pen swipe navigation without stealing vertical scrolling or control interactions.'
+);
+
+assertVisualization(
     str_contains($indexSource, 'id="event-details-dialog" class="oc-dialog oc-dialog-extra-large event-details-dialog"')
         && str_contains($script, 'function openEventDetails(event)')
         && str_contains($script, 'card.addEventListener(\'click\', () => openEventDetails(event));')
