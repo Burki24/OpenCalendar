@@ -1365,7 +1365,7 @@ class CalendarAccount extends IPSModuleStrict
             $exception instanceof MicrosoftCalendarProviderException,
             $exception instanceof ICalendarFeedProviderException,
             $exception instanceof ICalendarFileProviderException => $exception->httpStatus,
-            default => 0
+            default                                              => 0
         };
         $this->SendSafeDebug('ProviderError', [
             'provider'   => $this->getProviderName($this->ReadPropertyInteger('Provider')),
