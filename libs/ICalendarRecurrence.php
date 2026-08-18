@@ -14,6 +14,19 @@ require_once __DIR__ . '/CalendarEventRecurrence.php';
 final class ICalendarRecurrence
 {
     private const MAX_GENERATED_DAYS = 200_000;
+    private const SUPPORTED_FREQUENCIES = ['DAILY', 'WEEKLY', 'MONTHLY', 'YEARLY'];
+    private const SUPPORTED_RULE_PARTS = [
+        'FREQ',
+        'UNTIL',
+        'COUNT',
+        'INTERVAL',
+        'BYDAY',
+        'BYMONTHDAY',
+        'BYMONTH',
+        'BYSETPOS',
+        'WKST'
+    ];
+    private const SINGLE_VALUE_RULE_PARTS = ['FREQ', 'UNTIL', 'COUNT', 'INTERVAL', 'WKST'];
 
     /**
      * Expands recurring event masters, exceptions, and overrides within a time range.
@@ -92,6 +105,7 @@ final class ICalendarRecurrence
 
         $result = [];
         $usedOverrides = [];
+        $recurrenceExpansionState = ['recurrenceExpansionSupported' => true];
         foreach ([$master] as $master) {
             $rule = trim((string) ($master['recurrenceRule'] ?? ''));
             $recurrenceDates = is_array($master['recurrenceDates'] ?? null) ? $master['recurrenceDates'] : [];
@@ -102,7 +116,13 @@ final class ICalendarRecurrence
                 continue;
             }
 
-            $starts = self::generateRuleStarts($master, $rule, $rangeEnd);
+            $expansion = self::generateRuleStarts($master, $rule, $rangeEnd);
+            $starts = $expansion['starts'];
+            $recurrenceExpansionState = ['recurrenceExpansionSupported' => $expansion['supported']];
+            if ($expansion['unsupportedParts'] !== []) {
+                $recurrenceExpansionState['recurrenceUnsupportedRuleParts'] = $expansion['unsupportedParts'];
+            }
+            $master = array_merge($master, $recurrenceExpansionState);
             foreach ($recurrenceDates as $recurrenceDate) {
                 if (is_array($recurrenceDate) && isset($recurrenceDate['timestamp'])) {
                     $starts[(int) $recurrenceDate['timestamp']] = self::dateAtTimestamp(
@@ -128,6 +148,7 @@ final class ICalendarRecurrence
                         && self::overlapsRange($override, $rangeStart, $rangeEnd)) {
                         $override = array_merge(
                             $override,
+                            $recurrenceExpansionState,
                             CalendarEventRecurrence::occurrence(
                                 (string) ($override['uid'] ?? ''),
                                 (string) ($override['uid'] ?? '') . '|' . (string) ($override['recurrenceId'] ?? ''),
@@ -158,6 +179,7 @@ final class ICalendarRecurrence
                 && self::overlapsRange($override, $rangeStart, $rangeEnd)) {
                 $override = array_merge(
                     $override,
+                    $recurrenceExpansionState,
                     CalendarEventRecurrence::occurrence(
                         (string) ($override['uid'] ?? ''),
                         (string) ($override['uid'] ?? '') . '|' . (string) ($override['recurrenceId'] ?? ''),
@@ -176,7 +198,11 @@ final class ICalendarRecurrence
 
     /**
      * @param array<string, mixed> $master
-     * @return array<int, DateTimeImmutable>
+     * @return array{
+     *     starts: array<int, DateTimeImmutable>,
+     *     supported: bool,
+     *     unsupportedParts: list<string>
+     * }
      */
     private static function generateRuleStarts(
         array $master,
@@ -187,16 +213,25 @@ final class ICalendarRecurrence
         $seriesStart = (new DateTimeImmutable('@' . (int) $master['startTimestamp']))->setTimezone($timezone);
         $starts = [$seriesStart->getTimestamp() => $seriesStart];
         if ($ruleText === '') {
-            return $starts;
+            return [
+                'starts'           => $starts,
+                'supported'        => true,
+                'unsupportedParts' => []
+            ];
         }
 
-        $rule = self::parseRule($ruleText);
-        $frequency = $rule['FREQ'][0] ?? '';
-        if (!in_array($frequency, ['DAILY', 'WEEKLY', 'MONTHLY', 'YEARLY'], true)) {
-            return $starts;
+        $analysis = self::analyzeRule($ruleText, $timezone);
+        if (!$analysis['supported']) {
+            return [
+                'starts'           => $starts,
+                'supported'        => false,
+                'unsupportedParts' => $analysis['unsupportedParts']
+            ];
         }
 
-        $countLimit = isset($rule['COUNT'][0]) ? max(1, (int) $rule['COUNT'][0]) : null;
+        $rule = $analysis['rule'];
+        $frequency = $rule['FREQ'][0];
+        $countLimit = isset($rule['COUNT'][0]) ? (int) $rule['COUNT'][0] : null;
         $until = self::parseUntil($rule['UNTIL'][0] ?? '', $timezone);
         $day = $seriesStart->setTime(0, 0);
         $lastDay = $rangeEnd->setTimezone($timezone)->setTime(0, 0)->add(new DateInterval('P1D'));
@@ -226,7 +261,11 @@ final class ICalendarRecurrence
             $day = $day->add(new DateInterval('P1D'));
         }
 
-        return $starts;
+        return [
+            'starts'           => $starts,
+            'supported'        => true,
+            'unsupportedParts' => []
+        ];
     }
 
     /**
@@ -457,27 +496,170 @@ final class ICalendarRecurrence
     }
 
     /**
-     * @return array<string, list<string>>
+     * Parses an RFC 5545 recurrence rule and verifies that every rule part can be
+     * expanded losslessly by the local recurrence engine.
+     *
+     * Unsupported or malformed rules deliberately keep only DTSTART and explicit
+     * RDATE values. This prevents a partially understood rule from generating
+     * incorrect occurrences.
+     *
+     * @return array{
+     *     rule: array<string, list<string>>,
+     *     supported: bool,
+     *     unsupportedParts: list<string>
+     * }
      */
-    private static function parseRule(string $rule): array
+    private static function analyzeRule(string $ruleText, DateTimeZone $timezone): array
     {
-        $result = [];
-        foreach (explode(';', strtoupper(trim($rule))) as $part) {
+        $rule = [];
+        $unsupportedParts = [];
+        $seen = [];
+
+        foreach (explode(';', strtoupper(trim($ruleText))) as $part) {
+            $part = trim($part);
             $separator = strpos($part, '=');
-            if ($separator === false) {
+            if ($part === '' || $separator === false || $separator === 0) {
+                $unsupportedParts[] = $part !== '' ? $part : 'INVALID';
                 continue;
             }
+
             $name = trim(substr($part, 0, $separator));
             $values = array_values(array_filter(
                 array_map('trim', explode(',', substr($part, $separator + 1))),
                 static fn (string $value): bool => $value !== ''
             ));
-            if ($name !== '' && $values !== []) {
-                $result[$name] = $values;
+            if ($name === '' || $values === []) {
+                $unsupportedParts[] = $name !== '' ? $name : 'INVALID';
+                continue;
+            }
+            if (isset($seen[$name])) {
+                $unsupportedParts[] = $name;
+                continue;
+            }
+            $seen[$name] = true;
+            $rule[$name] = $values;
+
+            if (!in_array($name, self::SUPPORTED_RULE_PARTS, true)) {
+                $unsupportedParts[] = $name;
             }
         }
 
-        return $result;
+        foreach (self::SINGLE_VALUE_RULE_PARTS as $name) {
+            if (isset($rule[$name]) && count($rule[$name]) !== 1) {
+                $unsupportedParts[] = $name;
+            }
+        }
+
+        $frequency = $rule['FREQ'][0] ?? '';
+        if ($frequency === '' || !in_array($frequency, self::SUPPORTED_FREQUENCIES, true)) {
+            $unsupportedParts[] = $frequency !== '' ? 'FREQ=' . $frequency : 'FREQ';
+        }
+        if (isset($rule['COUNT'], $rule['UNTIL'])) {
+            $unsupportedParts[] = 'COUNT+UNTIL';
+        }
+        if (isset($rule['COUNT']) && !self::singlePositiveInteger($rule['COUNT'])) {
+            $unsupportedParts[] = 'COUNT';
+        }
+        if (isset($rule['INTERVAL']) && !self::singlePositiveInteger($rule['INTERVAL'])) {
+            $unsupportedParts[] = 'INTERVAL';
+        }
+        if (isset($rule['UNTIL'])
+            && (count($rule['UNTIL']) !== 1 || self::parseUntil($rule['UNTIL'][0], $timezone) === null)) {
+            $unsupportedParts[] = 'UNTIL';
+        }
+        if (isset($rule['WKST'])
+            && (count($rule['WKST']) !== 1
+                || preg_match('/^(MO|TU|WE|TH|FR|SA|SU)$/D', $rule['WKST'][0]) !== 1)) {
+            $unsupportedParts[] = 'WKST';
+        }
+        if (isset($rule['BYMONTH']) && !self::integerListInRange($rule['BYMONTH'], 1, 12, false)) {
+            $unsupportedParts[] = 'BYMONTH';
+        }
+        if (isset($rule['BYMONTHDAY']) && !self::integerListInRange($rule['BYMONTHDAY'], 1, 31, true)) {
+            $unsupportedParts[] = 'BYMONTHDAY';
+        }
+        if (isset($rule['BYSETPOS']) && !self::integerListInRange($rule['BYSETPOS'], 1, 366, true)) {
+            $unsupportedParts[] = 'BYSETPOS';
+        }
+        if (isset($rule['BYSETPOS']) && !isset($rule['BYDAY']) && !isset($rule['BYMONTHDAY'])) {
+            $unsupportedParts[] = 'BYSETPOS';
+        }
+        if (isset($rule['BYDAY']) && !self::supportedByDayValues($rule['BYDAY'], $frequency)) {
+            $unsupportedParts[] = 'BYDAY';
+        }
+        if ($frequency === 'WEEKLY' && isset($rule['BYMONTHDAY'])) {
+            $unsupportedParts[] = 'BYMONTHDAY';
+        }
+        if ($frequency === 'YEARLY' && !isset($rule['BYMONTH'])) {
+            $byDays = $rule['BYDAY'] ?? [];
+            if (!self::containsOrdinalByDay($byDays)) {
+                if ($byDays !== []) {
+                    $unsupportedParts[] = 'BYDAY';
+                }
+                if (isset($rule['BYMONTHDAY'])) {
+                    $unsupportedParts[] = 'BYMONTHDAY';
+                }
+            }
+        }
+
+        $unsupportedParts = array_values(array_unique($unsupportedParts));
+
+        return [
+            'rule'             => $rule,
+            'supported'        => $unsupportedParts === [],
+            'unsupportedParts' => $unsupportedParts
+        ];
+    }
+
+    /** @param list<string> $values */
+    private static function singlePositiveInteger(array $values): bool
+    {
+        return count($values) === 1
+            && preg_match('/^[1-9]\d*$/D', $values[0]) === 1;
+    }
+
+    /**
+     * @param list<string> $values
+     */
+    private static function integerListInRange(array $values, int $minimum, int $maximum, bool $allowNegative): bool
+    {
+        foreach ($values as $value) {
+            if (preg_match($allowNegative ? '/^[+-]?\d+$/D' : '/^\d+$/D', $value) !== 1) {
+                return false;
+            }
+            $number = (int) $value;
+            $absolute = abs($number);
+            if ($number === 0 || $absolute < $minimum || $absolute > $maximum) {
+                return false;
+            }
+            if (!$allowNegative && $number < 0) {
+                return false;
+            }
+        }
+
+        return $values !== [];
+    }
+
+    /**
+     * @param list<string> $values
+     */
+    private static function supportedByDayValues(array $values, string $frequency): bool
+    {
+        foreach ($values as $value) {
+            if (preg_match('/^([+-]?\d+)?(MO|TU|WE|TH|FR|SA|SU)$/D', $value, $matches) !== 1) {
+                return false;
+            }
+            if (($matches[1] ?? '') === '') {
+                continue;
+            }
+
+            $ordinal = (int) $matches[1];
+            if ($ordinal === 0 || abs($ordinal) > 53 || !in_array($frequency, ['MONTHLY', 'YEARLY'], true)) {
+                return false;
+            }
+        }
+
+        return $values !== [];
     }
 
     private static function parseUntil(string $value, DateTimeZone $timezone): ?DateTimeImmutable
