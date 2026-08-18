@@ -39,6 +39,9 @@
         },
         "VisualizationThemeHelper": {
             "target": "libs/helper/VisualizationThemeHelper.php"
+        },
+        "DebugHelper": {
+            "target": "libs/helper/DebugHelper.php"
         }
     }
 }
