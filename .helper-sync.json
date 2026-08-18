@@ -13,6 +13,9 @@
         "DataFlowHelper": {
             "target": "libs/helper/DataFlowHelper.php"
         },
+        "DebugHelper": {
+            "target": "libs/helper/DebugHelper.php"
+        },
         "HttpResponseHelper": {
             "target": "libs/helper/HttpResponseHelper.php"
         },
