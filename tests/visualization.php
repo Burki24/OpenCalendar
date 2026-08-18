@@ -684,8 +684,9 @@ assertVisualization(
     str_contains($style, '.form-row select option,')
         && str_contains($style, 'background: var(--cal-dialog);')
         && str_contains($style, '.form-row select option:checked')
-        && str_contains($style, 'background: var(--cal-surface-hover);'),
-    'Native select options in event dialogs must use the active OpenCalendar theme instead of the browser default popup colors.'
+        && str_contains($style, 'background: #f2f2f2;')
+        && str_contains($style, 'color: #111111;'),
+    'Native select options in event dialogs must keep a high-contrast selected row even when the browser paints the popup selection itself.'
 );
 assertVisualization(
     str_contains($style, '--cal-view-background: var(--ipsview-role-view-background);')
