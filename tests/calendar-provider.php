@@ -1340,6 +1340,66 @@ assertSameValue('text', $msCreateBody['body']['contentType'], 'Microsoft event d
 assertSameValue(true, $msCreateBody['isReminderOn'], 'Custom Microsoft reminders must enable the Graph reminder.');
 assertSameValue(20, $msCreateBody['reminderMinutesBeforeStart'], 'Microsoft reminder offsets must be written to Graph.');
 assertSameValue('UTC', $msCreateBody['start']['timeZone'], 'Microsoft event writes without a timezone must use unambiguous UTC times.');
+assertTrueValue(
+    !array_key_exists('showAs', $msCreateBody),
+    'Microsoft timed event creation must leave the Graph availability default unchanged.'
+);
+
+$msAllDayCreateClient = new FakeHttpClient([
+    response(201, [
+        'id'          => 'all-day-created-id',
+        'iCalUId'     => 'all-day-created@example.com',
+        '@odata.etag' => 'W/"all-day-created"'
+    ])
+]);
+(new MicrosoftCalendarProvider($msAllDayCreateClient, 'ms-access-token'))->createEvent('AQMk-primary', [
+    'summary' => 'All-day test',
+    'allDay'  => true,
+    'start'   => '2026-07-20',
+    'end'     => '2026-07-21'
+]);
+$msAllDayCreateBody = json_decode(
+    $msAllDayCreateClient->requests[0]['body'],
+    true,
+    512,
+    JSON_THROW_ON_ERROR
+);
+assertSameValue(true, $msAllDayCreateBody['isAllDay'], 'Microsoft all-day event creation must retain all-day mode.');
+assertSameValue(
+    'free',
+    $msAllDayCreateBody['showAs'] ?? '',
+    'New Microsoft all-day events must use Outlook\'s free availability default.'
+);
+
+$msAllDayUpdateClient = new FakeHttpClient([
+    response(200, [
+        'id'          => 'all-day-existing-id',
+        'iCalUId'     => 'all-day-existing@example.com',
+        '@odata.etag' => 'W/"all-day-existing"'
+    ])
+]);
+(new MicrosoftCalendarProvider($msAllDayUpdateClient, 'ms-access-token'))->updateEvent(
+    'AQMk-primary',
+    'all-day-existing-id',
+    'W/"all-day-before"',
+    'all-day-existing@example.com',
+    [
+        'summary' => 'Existing all-day test',
+        'allDay'  => true,
+        'start'   => '2026-07-20',
+        'end'     => '2026-07-21'
+    ]
+);
+$msAllDayUpdateBody = json_decode(
+    $msAllDayUpdateClient->requests[0]['body'],
+    true,
+    512,
+    JSON_THROW_ON_ERROR
+);
+assertTrueValue(
+    !array_key_exists('showAs', $msAllDayUpdateBody),
+    'Updating an existing Microsoft all-day event must preserve its current availability.'
+);
 
 try {
     (new MicrosoftCalendarProvider(new FakeHttpClient([]), 'ms-access-token'))->createEvent('AQMk-primary', [

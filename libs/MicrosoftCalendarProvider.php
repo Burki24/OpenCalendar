@@ -268,10 +268,14 @@ final class MicrosoftCalendarProvider implements CalendarProviderInterface, Recu
     public function createEvent(string $calendarReference, array $event): array
     {
         $calendarId = $this->calendarId($calendarReference);
+        $payload = $this->buildEventPayload($event, true);
+        if ((bool) ($event['allDay'] ?? false)) {
+            $payload['showAs'] = 'free';
+        }
         $created = $this->requestJson(
             'POST',
             '/me/calendars/' . rawurlencode($calendarId) . '/events',
-            $this->buildEventPayload($event, true),
+            $payload,
             [],
             [201]
         );
