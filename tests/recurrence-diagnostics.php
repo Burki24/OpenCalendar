@@ -61,7 +61,7 @@ $unsupportedMaster = [
     'endTimestamp'    => diagnosticTimestamp('2026-07-10T10:00:00Z'),
     'allDay'          => false,
     'timezone'        => 'UTC',
-    'recurrenceRule'  => 'FREQ=DAILY;BYHOUR=9,17;COUNT=4',
+    'recurrenceRule'  => 'FREQ=DAILY;BYSECOND=30;COUNT=4',
     'recurrenceDates' => [
         ['timestamp' => diagnosticTimestamp('2026-07-12T09:00:00Z')]
     ],
@@ -88,7 +88,7 @@ foreach ($diagnostics['rules'] as $rule) {
     $rules[$rule['rule']] = $rule;
 }
 $supported = $rules['FREQ=DAILY;COUNT=4'] ?? null;
-$unsupported = $rules['FREQ=DAILY;BYHOUR=9,17;COUNT=4'] ?? null;
+$unsupported = $rules['FREQ=DAILY;BYSECOND=30;COUNT=4'] ?? null;
 assertRecurrenceDiagnostic(true, is_array($supported), 'Supported RRULE diagnostics are missing.');
 assertRecurrenceDiagnostic(true, is_array($unsupported), 'Unsupported RRULE diagnostics are missing.');
 assertRecurrenceDiagnostic(true, $supported['supported'], 'Supported RRULE must remain marked as supported.');
@@ -101,7 +101,7 @@ assertRecurrenceDiagnostic(1, $supported['exDateCount'], 'EXDATE count is incorr
 assertRecurrenceDiagnostic('UTC', $supported['timezone'], 'Recurrence timezone must be retained in diagnostics.');
 
 assertRecurrenceDiagnostic(false, $unsupported['supported'], 'Unsupported RRULE must be marked as unsupported.');
-assertRecurrenceDiagnostic(['BYHOUR'], $unsupported['unsupportedParts'], 'Unsupported RRULE parts are incorrect.');
+assertRecurrenceDiagnostic(['BYSECOND'], $unsupported['unsupportedParts'], 'Unsupported RRULE parts are incorrect.');
 assertRecurrenceDiagnostic(2, $unsupported['occurrencesInRange'], 'Unsupported RRULE must only count safe explicit occurrences.');
 assertRecurrenceDiagnostic(0, $unsupported['overrideOccurrencesInRange'], 'Unsupported RRULE override count is incorrect.');
 assertRecurrenceDiagnostic(1, $unsupported['rDateCount'], 'Unsupported RRULE RDATE count is incorrect.');

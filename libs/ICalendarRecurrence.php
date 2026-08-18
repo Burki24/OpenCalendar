@@ -14,13 +14,17 @@ require_once __DIR__ . '/CalendarEventRecurrence.php';
 final class ICalendarRecurrence
 {
     private const MAX_GENERATED_DAYS = 200_000;
-    private const SUPPORTED_FREQUENCIES = ['DAILY', 'WEEKLY', 'MONTHLY', 'YEARLY'];
+    private const MAX_GENERATED_HOURS = 500_000;
+    private const MAX_GENERATED_OCCURRENCES = 250_000;
+    private const SUPPORTED_FREQUENCIES = ['HOURLY', 'DAILY', 'WEEKLY', 'MONTHLY', 'YEARLY'];
     private const SUPPORTED_RULE_PARTS = [
         'FREQ',
         'UNTIL',
         'COUNT',
         'INTERVAL',
         'BYDAY',
+        'BYHOUR',
+        'BYMINUTE',
         'BYMONTHDAY',
         'BYYEARDAY',
         'BYWEEKNO',
@@ -276,7 +280,7 @@ final class ICalendarRecurrence
                 continue;
             }
 
-            $expansion = self::generateRuleStarts($master, $rule, $rangeEnd);
+            $expansion = self::generateRuleStarts($master, $rule, $rangeStart, $rangeEnd);
             $starts = $expansion['starts'];
             $recurrenceExpansionState = ['recurrenceExpansionSupported' => $expansion['supported']];
             if ($expansion['unsupportedParts'] !== []) {
@@ -367,6 +371,7 @@ final class ICalendarRecurrence
     private static function generateRuleStarts(
         array $master,
         string $ruleText,
+        DateTimeImmutable $rangeStart,
         DateTimeImmutable $rangeEnd
     ): array {
         $timezone = self::timezone((string) ($master['timezone'] ?? 'UTC'));
@@ -380,7 +385,8 @@ final class ICalendarRecurrence
             ];
         }
 
-        $analysis = self::analyzeRule($ruleText, $timezone);
+        $allDay = (bool) ($master['allDay'] ?? false);
+        $analysis = self::analyzeRule($ruleText, $timezone, $allDay);
         if (!$analysis['supported']) {
             return [
                 'starts'           => $starts,
@@ -393,28 +399,98 @@ final class ICalendarRecurrence
         $frequency = $rule['FREQ'][0];
         $countLimit = isset($rule['COUNT'][0]) ? (int) $rule['COUNT'][0] : null;
         $until = self::parseUntil($rule['UNTIL'][0] ?? '', $timezone);
-        $day = $seriesStart->setTime(0, 0);
-        $lastDay = $rangeEnd->setTimezone($timezone)->setTime(0, 0)->add(new DateInterval('P1D'));
-        if ($until !== null && $until < $lastDay) {
-            $lastDay = $until->setTimezone($timezone)->setTime(0, 0)->add(new DateInterval('P1D'));
+        $scanStart = self::recurrenceScanStart($master, $seriesStart, $rangeStart, $countLimit);
+        if ($frequency === 'HOURLY') {
+            return self::generateHourlyRuleStarts(
+                $seriesStart,
+                $scanStart,
+                $rule,
+                $rangeEnd,
+                $until,
+                $countLimit
+            );
         }
 
+        return self::generateDayBasedRuleStarts(
+            $seriesStart,
+            $scanStart,
+            $rule,
+            $rangeEnd,
+            $until,
+            $countLimit,
+            $allDay
+        );
+    }
+
+    /**
+     * @param array<string, mixed> $master
+     */
+    private static function recurrenceScanStart(
+        array $master,
+        DateTimeImmutable $seriesStart,
+        DateTimeImmutable $rangeStart,
+        ?int $countLimit
+    ): DateTimeImmutable {
+        if ($countLimit !== null) {
+            return $seriesStart;
+        }
+
+        $durationSeconds = max(
+            0,
+            (int) ($master['endTimestamp'] ?? 0) - (int) ($master['startTimestamp'] ?? 0)
+        );
+        $scanTimestamp = max(
+            $seriesStart->getTimestamp(),
+            $rangeStart->getTimestamp() - $durationSeconds
+        );
+
+        return (new DateTimeImmutable('@' . $scanTimestamp))->setTimezone($seriesStart->getTimezone());
+    }
+
+    /**
+     * @param array<string, list<string>> $rule
+     * @return array{starts:array<int,DateTimeImmutable>,supported:bool,unsupportedParts:list<string>}
+     */
+    private static function generateDayBasedRuleStarts(
+        DateTimeImmutable $seriesStart,
+        DateTimeImmutable $scanStart,
+        array $rule,
+        DateTimeImmutable $rangeEnd,
+        ?DateTimeImmutable $until,
+        ?int $countLimit,
+        bool $allDay
+    ): array {
+        $starts = [$seriesStart->getTimestamp() => $seriesStart];
+        $day = $scanStart->setTime(0, 0);
+        $lastDay = $rangeEnd->setTimezone($seriesStart->getTimezone())->setTime(0, 0)->add(new DateInterval('P1D'));
+        if ($until !== null && $until < $lastDay) {
+            $lastDay = $until->setTimezone($seriesStart->getTimezone())->setTime(0, 0)->add(new DateInterval('P1D'));
+        }
+
+        $frequency = $rule['FREQ'][0];
         $occurrenceCount = 0;
         $iterations = 0;
-        while ($day <= $lastDay && $iterations++ < self::MAX_GENERATED_DAYS) {
+        while ($day <= $lastDay) {
+            if (++$iterations > self::MAX_GENERATED_DAYS) {
+                return self::expansionLimitResult($seriesStart);
+            }
             if (self::matchesRuleDate($day, $seriesStart, $rule, $frequency)) {
-                $candidate = $day->setTime(
-                    (int) $seriesStart->format('H'),
-                    (int) $seriesStart->format('i'),
-                    (int) $seriesStart->format('s')
-                );
-                if ($candidate >= $seriesStart && ($until === null || $candidate <= $until)) {
-                    $occurrenceCount++;
-                    if ($countLimit === null || $occurrenceCount <= $countLimit) {
-                        $starts[$candidate->getTimestamp()] = $candidate;
+                foreach (self::timeCandidatesForDay($day, $seriesStart, $rule, $allDay) as $candidate) {
+                    if ($candidate < $seriesStart || ($until !== null && $candidate > $until)) {
+                        continue;
                     }
+
+                    ++$occurrenceCount;
+                    if ($occurrenceCount > self::MAX_GENERATED_OCCURRENCES) {
+                        return self::expansionLimitResult($seriesStart);
+                    }
+                    $starts[$candidate->getTimestamp()] = $candidate;
                     if ($countLimit !== null && $occurrenceCount >= $countLimit) {
-                        break;
+                        return [
+                            'starts'           => $starts,
+                            'supported'        => true,
+                            'unsupportedParts' => []
+                        ];
                     }
                 }
             }
@@ -425,6 +501,164 @@ final class ICalendarRecurrence
             'starts'           => $starts,
             'supported'        => true,
             'unsupportedParts' => []
+        ];
+    }
+
+    /**
+     * @param array<string, list<string>> $rule
+     * @return array{starts:array<int,DateTimeImmutable>,supported:bool,unsupportedParts:list<string>}
+     */
+    private static function generateHourlyRuleStarts(
+        DateTimeImmutable $seriesStart,
+        DateTimeImmutable $scanStart,
+        array $rule,
+        DateTimeImmutable $rangeEnd,
+        ?DateTimeImmutable $until,
+        ?int $countLimit
+    ): array {
+        $starts = [$seriesStart->getTimestamp() => $seriesStart];
+        $interval = isset($rule['INTERVAL'][0]) ? max(1, (int) $rule['INTERVAL'][0]) : 1;
+        $hours = self::uniqueIntegerValues($rule['BYHOUR'] ?? []);
+        $minutes = self::uniqueIntegerValues($rule['BYMINUTE'] ?? []);
+        if ($minutes === []) {
+            $minutes = [(int) $seriesStart->format('i')];
+        }
+
+        $periodSeconds = $interval * 3600;
+        $elapsedSeconds = max(0, $scanStart->getTimestamp() - $seriesStart->getTimestamp());
+        $periodOffset = intdiv($elapsedSeconds, $periodSeconds) * $periodSeconds;
+        $period = (new DateTimeImmutable('@' . ($seriesStart->getTimestamp() + $periodOffset)))
+            ->setTimezone($seriesStart->getTimezone());
+        $lastPeriod = $rangeEnd->setTimezone($seriesStart->getTimezone());
+        if ($until !== null && $until < $lastPeriod) {
+            $lastPeriod = $until->setTimezone($seriesStart->getTimezone());
+        }
+
+        $occurrenceCount = 0;
+        $iterations = 0;
+        while ($period <= $lastPeriod) {
+            if (++$iterations > self::MAX_GENERATED_HOURS) {
+                return self::expansionLimitResult($seriesStart);
+            }
+            $periodHour = (int) $period->format('G');
+            if (self::matchesRuleDate($period, $seriesStart, $rule, 'HOURLY')
+                && ($hours === [] || in_array($periodHour, $hours, true))) {
+                foreach ($minutes as $minute) {
+                    $candidate = self::localTimeCandidate(
+                        $period,
+                        $periodHour,
+                        $minute,
+                        (int) $seriesStart->format('s')
+                    );
+                    if ($candidate === null
+                        || $candidate < $seriesStart
+                        || $candidate > $lastPeriod
+                        || ($until !== null && $candidate > $until)) {
+                        continue;
+                    }
+
+                    ++$occurrenceCount;
+                    if ($occurrenceCount > self::MAX_GENERATED_OCCURRENCES) {
+                        return self::expansionLimitResult($seriesStart);
+                    }
+                    $starts[$candidate->getTimestamp()] = $candidate;
+                    if ($countLimit !== null && $occurrenceCount >= $countLimit) {
+                        return [
+                            'starts'           => $starts,
+                            'supported'        => true,
+                            'unsupportedParts' => []
+                        ];
+                    }
+                }
+            }
+            $period = $period->add(new DateInterval('PT' . $interval . 'H'));
+        }
+
+        return [
+            'starts'           => $starts,
+            'supported'        => true,
+            'unsupportedParts' => []
+        ];
+    }
+
+    /**
+     * @param array<string, list<string>> $rule
+     * @return list<DateTimeImmutable>
+     */
+    private static function timeCandidatesForDay(
+        DateTimeImmutable $day,
+        DateTimeImmutable $seriesStart,
+        array $rule,
+        bool $allDay
+    ): array {
+        if ($allDay) {
+            return [$day->setTime(0, 0)];
+        }
+
+        $hours = self::uniqueIntegerValues($rule['BYHOUR'] ?? []);
+        if ($hours === []) {
+            $hours = [(int) $seriesStart->format('G')];
+        }
+        $minutes = self::uniqueIntegerValues($rule['BYMINUTE'] ?? []);
+        if ($minutes === []) {
+            $minutes = [(int) $seriesStart->format('i')];
+        }
+
+        $candidates = [];
+        foreach ($hours as $hour) {
+            foreach ($minutes as $minute) {
+                $candidate = self::localTimeCandidate(
+                    $day,
+                    $hour,
+                    $minute,
+                    (int) $seriesStart->format('s')
+                );
+                if ($candidate !== null) {
+                    $candidates[$candidate->getTimestamp()] = $candidate;
+                }
+            }
+        }
+        ksort($candidates);
+
+        return array_values($candidates);
+    }
+
+    private static function localTimeCandidate(
+        DateTimeImmutable $date,
+        int $hour,
+        int $minute,
+        int $second
+    ): ?DateTimeImmutable {
+        $candidate = $date->setTime($hour, $minute, $second);
+        $expected = sprintf('%s %02d:%02d:%02d', $date->format('Y-m-d'), $hour, $minute, $second);
+        if ($candidate->format('Y-m-d H:i:s') !== $expected) {
+            return null;
+        }
+
+        return $candidate;
+    }
+
+    /**
+     * @param list<string> $values
+     * @return list<int>
+     */
+    private static function uniqueIntegerValues(array $values): array
+    {
+        $integers = array_values(array_unique(self::integerValues($values)));
+        sort($integers, SORT_NUMERIC);
+
+        return $integers;
+    }
+
+    /**
+     * @return array{starts:array<int,DateTimeImmutable>,supported:bool,unsupportedParts:list<string>}
+     */
+    private static function expansionLimitResult(DateTimeImmutable $seriesStart): array
+    {
+        return [
+            'starts'           => [$seriesStart->getTimestamp() => $seriesStart],
+            'supported'        => false,
+            'unsupportedParts' => ['EXPANSION_LIMIT']
         ];
     }
 
@@ -445,6 +679,7 @@ final class ICalendarRecurrence
         }
 
         $matchesFrequency = match ($frequency) {
+            'HOURLY'  => true,
             'DAILY'   => self::calendarDayDifference($seriesStart, $date) % $interval === 0,
             'WEEKLY'  => self::matchesWeeklyInterval($date, $seriesStart, $rule, $interval),
             'MONTHLY' => self::calendarMonthDifference($seriesStart, $date) % $interval === 0,
@@ -817,7 +1052,7 @@ final class ICalendarRecurrence
      *     unsupportedParts: list<string>
      * }
      */
-    private static function analyzeRule(string $ruleText, DateTimeZone $timezone): array
+    private static function analyzeRule(string $ruleText, DateTimeZone $timezone, bool $allDay): array
     {
         $rule = [];
         $unsupportedParts = [];
@@ -858,9 +1093,16 @@ final class ICalendarRecurrence
             }
         }
 
+        if ($allDay) {
+            unset($rule['BYHOUR'], $rule['BYMINUTE']);
+        }
+
         $frequency = $rule['FREQ'][0] ?? '';
         if ($frequency === '' || !in_array($frequency, self::SUPPORTED_FREQUENCIES, true)) {
             $unsupportedParts[] = $frequency !== '' ? 'FREQ=' . $frequency : 'FREQ';
+        }
+        if ($allDay && $frequency === 'HOURLY') {
+            $unsupportedParts[] = 'FREQ=HOURLY';
         }
         if (isset($rule['COUNT'], $rule['UNTIL'])) {
             $unsupportedParts[] = 'COUNT+UNTIL';
@@ -880,6 +1122,12 @@ final class ICalendarRecurrence
                 || preg_match('/^(MO|TU|WE|TH|FR|SA|SU)$/D', $rule['WKST'][0]) !== 1)) {
             $unsupportedParts[] = 'WKST';
         }
+        if (isset($rule['BYHOUR']) && !self::integerListIncludingZero($rule['BYHOUR'], 23)) {
+            $unsupportedParts[] = 'BYHOUR';
+        }
+        if (isset($rule['BYMINUTE']) && !self::integerListIncludingZero($rule['BYMINUTE'], 59)) {
+            $unsupportedParts[] = 'BYMINUTE';
+        }
         if (isset($rule['BYMONTH']) && !self::integerListInRange($rule['BYMONTH'], 1, 12, false)) {
             $unsupportedParts[] = 'BYMONTH';
         }
@@ -897,7 +1145,7 @@ final class ICalendarRecurrence
         }
         if (isset($rule['BYSETPOS'])
             && !array_intersect(
-                ['BYMONTH', 'BYWEEKNO', 'BYYEARDAY', 'BYMONTHDAY', 'BYDAY'],
+                ['BYMONTH', 'BYWEEKNO', 'BYYEARDAY', 'BYMONTHDAY', 'BYDAY', 'BYHOUR', 'BYMINUTE'],
                 array_keys($rule)
             )) {
             $unsupportedParts[] = 'BYSETPOS';
@@ -908,7 +1156,7 @@ final class ICalendarRecurrence
         if ($frequency === 'WEEKLY' && isset($rule['BYMONTHDAY'])) {
             $unsupportedParts[] = 'BYMONTHDAY';
         }
-        if (isset($rule['BYYEARDAY']) && $frequency !== 'YEARLY') {
+        if (isset($rule['BYYEARDAY']) && !in_array($frequency, ['HOURLY', 'YEARLY'], true)) {
             $unsupportedParts[] = 'BYYEARDAY';
         }
         if (isset($rule['BYWEEKNO']) && $frequency !== 'YEARLY') {
@@ -922,6 +1170,10 @@ final class ICalendarRecurrence
                 }
             }
         }
+        if (isset($rule['BYSETPOS'])
+            && ($frequency === 'HOURLY' || isset($rule['BYHOUR']) || isset($rule['BYMINUTE']))) {
+            $unsupportedParts[] = 'BYSETPOS';
+        }
 
         $unsupportedParts = array_values(array_unique($unsupportedParts));
 
@@ -930,6 +1182,22 @@ final class ICalendarRecurrence
             'supported'        => $unsupportedParts === [],
             'unsupportedParts' => $unsupportedParts
         ];
+    }
+
+    /** @param list<string> $values */
+    private static function integerListIncludingZero(array $values, int $maximum): bool
+    {
+        foreach ($values as $value) {
+            if (preg_match('/^\d+$/D', $value) !== 1) {
+                return false;
+            }
+            $number = (int) $value;
+            if ($number < 0 || $number > $maximum) {
+                return false;
+            }
+        }
+
+        return $values !== [];
     }
 
     /** @param list<string> $values */

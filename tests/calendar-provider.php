@@ -3388,36 +3388,36 @@ $durationEvents = array_values(array_filter(
 ));
 assertSameValue('2026-07-05T11:30:00+02:00', $durationEvents[0]['end'], 'DURATION must define the event end when DTEND is absent.');
 
-$unsupportedRecurrenceFeed = "BEGIN:VCALENDAR\r\n"
+$recurrenceSafetyFeed = "BEGIN:VCALENDAR\r\n"
     . "VERSION:2.0\r\n"
     . "BEGIN:VEVENT\r\n"
-    . "UID:unsupported-byhour@example.com\r\n"
+    . "UID:supported-byhour@example.com\r\n"
     . "DTSTART:20260701T090000Z\r\n"
     . "DTEND:20260701T100000Z\r\n"
     . "RRULE:FREQ=DAILY;BYHOUR=9,17;COUNT=4\r\n"
     . "RDATE:20260705T090000Z\r\n"
-    . "SUMMARY:Unsupported BYHOUR\r\n"
+    . "SUMMARY:Supported BYHOUR\r\n"
     . "END:VEVENT\r\n"
     . "BEGIN:VEVENT\r\n"
-    . "UID:unsupported-year-day@example.com\r\n"
+    . "UID:supported-year-day@example.com\r\n"
     . "DTSTART;VALUE=DATE:20260410\r\n"
     . "DTEND;VALUE=DATE:20260411\r\n"
     . "RRULE:FREQ=YEARLY;BYYEARDAY=100;COUNT=2\r\n"
-    . "SUMMARY:Unsupported BYYEARDAY\r\n"
+    . "SUMMARY:Supported BYYEARDAY\r\n"
     . "END:VEVENT\r\n"
     . "BEGIN:VEVENT\r\n"
-    . "UID:unsupported-yearly-monthday@example.com\r\n"
+    . "UID:supported-yearly-monthday@example.com\r\n"
     . "DTSTART;VALUE=DATE:20260115\r\n"
     . "DTEND;VALUE=DATE:20260116\r\n"
     . "RRULE:FREQ=YEARLY;BYMONTHDAY=15;COUNT=2\r\n"
-    . "SUMMARY:Unsupported yearly BYMONTHDAY expansion\r\n"
+    . "SUMMARY:Supported yearly BYMONTHDAY expansion\r\n"
     . "END:VEVENT\r\n"
     . "BEGIN:VEVENT\r\n"
-    . "UID:unsupported-hourly@example.com\r\n"
+    . "UID:supported-hourly@example.com\r\n"
     . "DTSTART:20260701T120000Z\r\n"
     . "DTEND:20260701T123000Z\r\n"
     . "RRULE:FREQ=HOURLY;COUNT=4\r\n"
-    . "SUMMARY:Unsupported hourly frequency\r\n"
+    . "SUMMARY:Supported hourly frequency\r\n"
     . "END:VEVENT\r\n"
     . "BEGIN:VEVENT\r\n"
     . "UID:unsupported-extension@example.com\r\n"
@@ -3427,82 +3427,98 @@ $unsupportedRecurrenceFeed = "BEGIN:VCALENDAR\r\n"
     . "SUMMARY:Unsupported extension\r\n"
     . "END:VEVENT\r\n"
     . "END:VCALENDAR\r\n";
-$unsupportedRecurrenceEvents = ICalendarCodec::parseEventsInRange(
-    $unsupportedRecurrenceFeed,
+$recurrenceSafetyEvents = ICalendarCodec::parseEventsInRange(
+    $recurrenceSafetyFeed,
     'https://calendar.example/unsupported-recurrence.ics',
     '',
     new DateTimeImmutable('2026-01-01T00:00:00Z'),
     new DateTimeImmutable('2028-01-02T00:00:00Z')
 );
-$unsupportedByHourEvents = array_values(array_filter(
-    $unsupportedRecurrenceEvents,
-    static fn (array $event): bool => $event['uid'] === 'unsupported-byhour@example.com'
+$supportedByHourEvents = array_values(array_filter(
+    $recurrenceSafetyEvents,
+    static fn (array $event): bool => $event['uid'] === 'supported-byhour@example.com'
 ));
-$unsupportedYearDayEvents = array_values(array_filter(
-    $unsupportedRecurrenceEvents,
-    static fn (array $event): bool => $event['uid'] === 'unsupported-year-day@example.com'
+$supportedYearDayEvents = array_values(array_filter(
+    $recurrenceSafetyEvents,
+    static fn (array $event): bool => $event['uid'] === 'supported-year-day@example.com'
 ));
-$unsupportedYearlyMonthDayEvents = array_values(array_filter(
-    $unsupportedRecurrenceEvents,
-    static fn (array $event): bool => $event['uid'] === 'unsupported-yearly-monthday@example.com'
+$supportedYearlyMonthDayEvents = array_values(array_filter(
+    $recurrenceSafetyEvents,
+    static fn (array $event): bool => $event['uid'] === 'supported-yearly-monthday@example.com'
 ));
-$unsupportedHourlyEvents = array_values(array_filter(
-    $unsupportedRecurrenceEvents,
-    static fn (array $event): bool => $event['uid'] === 'unsupported-hourly@example.com'
+$supportedHourlyEvents = array_values(array_filter(
+    $recurrenceSafetyEvents,
+    static fn (array $event): bool => $event['uid'] === 'supported-hourly@example.com'
 ));
 $unsupportedExtensionEvents = array_values(array_filter(
-    $unsupportedRecurrenceEvents,
+    $recurrenceSafetyEvents,
     static fn (array $event): bool => $event['uid'] === 'unsupported-extension@example.com'
 ));
 assertSameValue(
-    ['2026-07-01T09:00:00+00:00', '2026-07-05T09:00:00+00:00'],
-    array_column($unsupportedByHourEvents, 'start'),
-    'Unsupported BYHOUR rules must keep only DTSTART and explicit RDATE values instead of inventing partial daily occurrences.'
+    [
+        '2026-07-01T09:00:00+00:00',
+        '2026-07-01T17:00:00+00:00',
+        '2026-07-02T09:00:00+00:00',
+        '2026-07-02T17:00:00+00:00',
+        '2026-07-05T09:00:00+00:00'
+    ],
+    array_column($supportedByHourEvents, 'start'),
+    'BYHOUR rules must expand each requested hour and retain explicit RDATE values.'
 );
 assertSameValue(
-    false,
-    $unsupportedByHourEvents[0]['recurrenceExpansionSupported'],
-    'Unsupported recurrence rules must be marked as not safely expandable.'
+    true,
+    $supportedByHourEvents[0]['recurrenceExpansionSupported'],
+    'BYHOUR recurrence rules must be marked as safely expandable.'
 );
 assertSameValue(
-    ['BYHOUR'],
-    $unsupportedByHourEvents[0]['recurrenceUnsupportedRuleParts'],
-    'Unsupported RFC rule parts must remain explicitly identifiable.'
+    [],
+    $supportedByHourEvents[0]['recurrenceUnsupportedRuleParts'] ?? [],
+    'Supported BYHOUR rules must not report unsupported rule parts.'
 );
 assertSameValue(
     ['2026-04-10', '2027-04-10'],
-    array_column($unsupportedYearDayEvents, 'start'),
+    array_column($supportedYearDayEvents, 'start'),
     'BYYEARDAY rules must expand the requested ordinal day of each year.'
 );
 assertSameValue(
     true,
-    $unsupportedYearDayEvents[0]['recurrenceExpansionSupported'],
+    $supportedYearDayEvents[0]['recurrenceExpansionSupported'],
     'BYYEARDAY rules must be marked as safely expandable.'
 );
 assertSameValue(
     [],
-    $unsupportedYearDayEvents[0]['recurrenceUnsupportedRuleParts'] ?? [],
+    $supportedYearDayEvents[0]['recurrenceUnsupportedRuleParts'] ?? [],
     'Supported BYYEARDAY rules must not report unsupported rule parts.'
 );
 assertSameValue(
     ['2026-01-15', '2026-02-15'],
-    array_column($unsupportedYearlyMonthDayEvents, 'start'),
+    array_column($supportedYearlyMonthDayEvents, 'start'),
     'YEARLY BYMONTHDAY rules must expand the requested month day across the recurrence year.'
 );
 assertSameValue(
     true,
-    $unsupportedYearlyMonthDayEvents[0]['recurrenceExpansionSupported'],
+    $supportedYearlyMonthDayEvents[0]['recurrenceExpansionSupported'],
     'YEARLY BYMONTHDAY rules must be marked as safely expandable.'
 );
 assertSameValue(
-    ['2026-07-01T12:00:00+00:00'],
-    array_column($unsupportedHourlyEvents, 'start'),
-    'Unsupported HOURLY rules must not be approximated by the day-based recurrence engine.'
+    [
+        '2026-07-01T12:00:00+00:00',
+        '2026-07-01T13:00:00+00:00',
+        '2026-07-01T14:00:00+00:00',
+        '2026-07-01T15:00:00+00:00'
+    ],
+    array_column($supportedHourlyEvents, 'start'),
+    'HOURLY recurrence rules must expand from DTSTART at hourly frequency.'
 );
 assertSameValue(
-    ['FREQ=HOURLY'],
-    $unsupportedHourlyEvents[0]['recurrenceUnsupportedRuleParts'],
-    'Unsupported recurrence frequencies must report the exact frequency.'
+    true,
+    $supportedHourlyEvents[0]['recurrenceExpansionSupported'],
+    'HOURLY recurrence rules must be marked as safely expandable.'
+);
+assertSameValue(
+    [],
+    $supportedHourlyEvents[0]['recurrenceUnsupportedRuleParts'] ?? [],
+    'Supported HOURLY rules must not report unsupported rule parts.'
 );
 assertSameValue(
     ['2026-07-01'],
