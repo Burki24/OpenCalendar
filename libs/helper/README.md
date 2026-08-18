@@ -8,6 +8,7 @@ The files in this directory are vendored from
 | `ChunkedJsonTransferHelper.php` | 1.0.0 | `b9922d52dab18a253b1a1b371d93aec1631396741cbd611cf34922219ec6ab30` |
 | `ConfigurationFormHelper.php` | 1.0.0 | `fa87dd4c67f43a3838fe87110387e4c1a1b98685c13403eeb52c189246045678` |
 | `DataFlowHelper.php` | 1.0.0 | `4c25828b283367692d0db1631d2b7d71ba6012883798bc5ffddb8f2d551d6dfb` |
+| `DebugHelper.php` | 1.0.1 | `c5433bf0cd7141c93d98f16ae23325a7f00ab9d11438c44fbfd12ad239e21373` |
 | `HttpResponseHelper.php` | 1.1.0 | `be4fae4c23f757ab462237d8e74d2a9dca1b504937ed4d4b51c7ff76004cf1cd` |
 | `IPSViewHTMLPageHelper.php` | 1.3.0 | `8fc9692ccc6143e4bdff1c262dbe138f7507a9c8816ac0326de0bc5c578a4236` |
 | `HelperTranslationHelper.php` | 1.0.0 | `d3deee581eca9f8eb11e9adce060170227a2dc836ee898bd134f93d27604f639` |
