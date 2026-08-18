@@ -651,9 +651,9 @@ class CalendarView extends IPSModuleStrict
     /**
      * Returns a compact appointment list for one local calendar day.
      *
-     * Each result contains only summary, start, end, startTime and endTime.
-     * Start and end are local YYYY-MM-DD dates. Timed appointments use local
-     * HH:MM values while all-day appointments use the localized "All day"
+     * Each result contains summary, start, end, startTime, endTime, hasReminder
+     * and calendarName. Start and end are local YYYY-MM-DD dates. Timed appointments
+     * use local HH:MM values while all-day appointments use the localized "All day"
      * label as startTime, an empty endTime and an inclusive visible end date.
      *
      * @param string $Date Local date in YYYY-MM-DD format.
@@ -679,7 +679,7 @@ class CalendarView extends IPSModuleStrict
     public function GetAppointmentsCompact(string $From, string $To, int $CalendarInstanceID = 0): string
     {
         [$rangeStart, $rangeEnd] = CalendarAppointmentRange::fromInclusiveDates($From, $To);
-        $appointments = $this->collectAppointmentsForRange($rangeStart, $rangeEnd);
+        $appointments = $this->collectAppointmentsForRange($rangeStart, $rangeEnd, true);
 
         return json_encode(
             $this->compactAppointments($this->filterAppointmentsByCalendarInstanceId($appointments, $CalendarInstanceID)),
@@ -1505,7 +1505,8 @@ class CalendarView extends IPSModuleStrict
      */
     private function collectAppointmentsForRange(
         DateTimeImmutable $rangeStart,
-        DateTimeImmutable $rangeEnd
+        DateTimeImmutable $rangeEnd,
+        bool $includeCompactMetadata = false
     ): array {
         $events = [];
         foreach ($this->loadSelectedCalendars() as $calendar) {
@@ -1548,6 +1549,9 @@ class CalendarView extends IPSModuleStrict
                     || ((bool) ($event['recurring'] ?? false)
                         && trim((string) ($event['seriesId'] ?? '')) !== ''
                         && $calendar['canDeleteSeries']);
+                if ($includeCompactMetadata) {
+                    $event['hasReminder'] = $this->appointmentHasReminder($event, $calendar);
+                }
                 $events[] = $event;
             }
         }
@@ -1561,6 +1565,51 @@ class CalendarView extends IPSModuleStrict
         );
 
         return $events;
+    }
+
+    /**
+     * Returns whether an appointment has an effective reminder configuration.
+     *
+     * Provider-default reminders are resolved against the selected calendar metadata.
+     * Complex reminder configurations count as active even when their exact trigger
+     * cannot be represented by the provider-neutral reminder API.
+     *
+     * @param array<string, mixed> $appointment Full normalized appointment.
+     * @param array<string, mixed> $calendar Selected calendar metadata.
+     */
+    private function appointmentHasReminder(array $appointment, array $calendar): bool
+    {
+        $reminder = $appointment['reminder'] ?? null;
+        if (!is_array($reminder) || array_is_list($reminder)) {
+            return false;
+        }
+
+        $mode = strtolower(trim((string) ($reminder['mode'] ?? '')));
+        if ($mode === CalendarEventReminder::MODE_NONE || $mode === '') {
+            return false;
+        }
+        if (in_array(
+            $mode,
+            [CalendarEventReminder::MODE_CUSTOM, CalendarEventReminder::MODE_MULTIPLE, CalendarEventReminder::MODE_COMPLEX],
+            true
+        )) {
+            return true;
+        }
+        if ($mode !== CalendarEventReminder::MODE_DEFAULT || !(bool) ($calendar['canUseDefaultReminder'] ?? false)) {
+            return false;
+        }
+
+        $defaultReminder = $calendar['defaultReminder'] ?? null;
+        if (!is_array($defaultReminder) || array_is_list($defaultReminder)) {
+            return false;
+        }
+        $defaultMode = strtolower(trim((string) ($defaultReminder['mode'] ?? '')));
+
+        return in_array(
+            $defaultMode,
+            [CalendarEventReminder::MODE_CUSTOM, CalendarEventReminder::MODE_MULTIPLE, CalendarEventReminder::MODE_COMPLEX],
+            true
+        );
     }
 
     /**
@@ -1924,7 +1973,7 @@ class CalendarView extends IPSModuleStrict
      * Reduces full appointment data to the compact scripting representation.
      *
      * @param list<array<string, mixed>> $appointments Full normalized appointments.
-     * @return list<array{summary: string, start: string, end: string, startTime: string, endTime: string}>
+     * @return list<array{summary: string, start: string, end: string, startTime: string, endTime: string, hasReminder: bool, calendarName: string}>
      */
     private function compactAppointments(array $appointments): array
     {
@@ -1948,11 +1997,13 @@ class CalendarView extends IPSModuleStrict
                 : $this->formatAppointmentDate($endTimestamp, $timezone);
 
             $result[] = [
-                'summary'   => (string) ($appointment['summary'] ?? ''),
-                'start'     => $startDate,
-                'end'       => $endDate,
-                'startTime' => $allDay ? $this->Translate('All day') : $this->formatAppointmentTime($startTimestamp, $timezone),
-                'endTime'   => $allDay ? '' : $this->formatAppointmentTime($endTimestamp, $timezone)
+                'summary'      => (string) ($appointment['summary'] ?? ''),
+                'start'        => $startDate,
+                'end'          => $endDate,
+                'startTime'    => $allDay ? $this->Translate('All day') : $this->formatAppointmentTime($startTimestamp, $timezone),
+                'endTime'      => $allDay ? '' : $this->formatAppointmentTime($endTimestamp, $timezone),
+                'hasReminder'  => (bool) ($appointment['hasReminder'] ?? false),
+                'calendarName' => (string) ($appointment['calendarName'] ?? '')
             ];
         }
 

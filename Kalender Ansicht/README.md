@@ -208,6 +208,8 @@ Kalenderauswahl ist leer oder unvollständig | **Alle Kalenderinstanzen auswähl
 
 ## PHP-Befehlsreferenz
 
+In den folgenden Beispielen ist `12345` die Instanz-ID der **Kalender Ansicht**. Bei allen Funktionen mit einem optionalen Parameter `CalendarInstanceID` wird der Wert `0` bewusst mit angegeben: `0` berücksichtigt alle in dieser Kalender Ansicht ausgewählten Kalender. Eine konkrete Kalender-Instanz-ID, beispielsweise `23456`, beschränkt die Abfrage auf genau diesen ausgewählten Kalender.
+
 ```php
 // Alle ausgewählten Kalender synchronisieren.
 $success = IPSKALVIEW_SynchronizeCalendars(12345);
@@ -220,56 +222,56 @@ $success = IPSKALVIEW_SelectAllCalendars(12345);
 $events = IPSKALVIEW_GetAggregatedEvents(12345);
 
 // Alle Termine eines lokalen Kalendertags providerübergreifend abrufen.
-$appointments = IPSKALVIEW_GetDayAppointments(12345, '2026-08-11');
+$appointments = IPSKALVIEW_GetDayAppointments(12345, '2026-08-11', 0);
 
 // Optional nur Termine einer ausgewählten Kalenderinstanz (z. B. ID 23456).
 $appointments = IPSKALVIEW_GetDayAppointments(12345, '2026-08-11', 23456);
 
 // Alle Termine eines inklusiven lokalen Datumsbereichs providerübergreifend abrufen.
-$appointments = IPSKALVIEW_GetAppointments(12345, '2026-08-11', '2026-08-17');
+$appointments = IPSKALVIEW_GetAppointments(12345, '2026-08-11', '2026-08-17', 0);
 
 // Auch die vollständige Bereichsabfrage kann nach Kalenderinstanz gefiltert werden.
 $appointments = IPSKALVIEW_GetAppointments(12345, '2026-08-11', '2026-08-17', 23456);
 
-// Kompakte Tagesliste: summary, start, end, startTime und endTime.
-$appointments = IPSKALVIEW_GetDayAppointmentsCompact(12345, '2026-08-11');
+// Kompakte Tagesliste: summary, start, end, startTime, endTime, hasReminder und calendarName.
+$appointments = IPSKALVIEW_GetDayAppointmentsCompact(12345, '2026-08-11', 0);
 
 // Optional nur Termine einer ausgewählten Kalenderinstanz (z. B. ID 23456).
 $appointments = IPSKALVIEW_GetDayAppointmentsCompact(12345, '2026-08-11', 23456);
 
 // Kompakte Terminliste für einen inklusiven Datumsbereich.
-$appointments = IPSKALVIEW_GetAppointmentsCompact(12345, '2026-08-11', '2026-08-17');
+$appointments = IPSKALVIEW_GetAppointmentsCompact(12345, '2026-08-11', '2026-08-17', 0);
 
 // Auch beim Datumsbereich kann optional nach Kalenderinstanz gefiltert werden.
 $appointments = IPSKALVIEW_GetAppointmentsCompact(12345, '2026-08-11', '2026-08-17', 23456);
 
 // Anzahl der Termine eines Tages oder Datumsbereichs ermitteln.
-$count = IPSKALVIEW_GetDayAppointmentCount(12345, '2026-08-11');
-$count = IPSKALVIEW_GetAppointmentCount(12345, '2026-08-11', '2026-08-17');
+$count = IPSKALVIEW_GetDayAppointmentCount(12345, '2026-08-11', 0);
+$count = IPSKALVIEW_GetAppointmentCount(12345, '2026-08-11', '2026-08-17', 0);
 
 // Optional kann auch bei den Zählfunktionen nach Kalenderinstanz gefiltert werden.
 $count = IPSKALVIEW_GetDayAppointmentCount(12345, '2026-08-11', 23456);
 
 // Alle heute noch laufenden oder bevorstehenden Termine abrufen bzw. zählen.
-$appointments = IPSKALVIEW_GetRemainingDayAppointments(12345);
-$count = IPSKALVIEW_GetRemainingDayAppointmentCount(12345);
+$appointments = IPSKALVIEW_GetRemainingDayAppointments(12345, 0);
+$count = IPSKALVIEW_GetRemainingDayAppointmentCount(12345, 0);
 
 // Den nächsten noch nicht begonnenen Termin abrufen.
-$appointment = IPSKALVIEW_GetNextAppointment(12345);
+$appointment = IPSKALVIEW_GetNextAppointment(12345, 0);
 
 // Alle aktuell laufenden Termine abrufen oder direkt zählen.
-$appointments = IPSKALVIEW_GetCurrentAppointments(12345);
-$count = IPSKALVIEW_GetCurrentAppointmentCount(12345);
+$appointments = IPSKALVIEW_GetCurrentAppointments(12345, 0);
+$count = IPSKALVIEW_GetCurrentAppointmentCount(12345, 0);
 
 // Alle Termine abrufen bzw. zählen, die innerhalb der nächsten 24 Stunden beginnen.
-$appointments = IPSKALVIEW_GetUpcomingAppointments(12345, 24);
-$count = IPSKALVIEW_GetUpcomingAppointmentCount(12345, 24);
+$appointments = IPSKALVIEW_GetUpcomingAppointments(12345, 24, 0);
+$count = IPSKALVIEW_GetUpcomingAppointmentCount(12345, 24, 0);
 
 // Die nächsten drei noch nicht begonnenen Termine abrufen.
-$appointments = IPSKALVIEW_GetNextAppointments(12345, 3);
+$appointments = IPSKALVIEW_GetNextAppointments(12345, 3, 0);
 
 // Alle Jahresereignisse aus allen ausgewählten Kalendern.
-$annualEvents = IPSKALVIEW_GetAnniversaryList(12345);
+$annualEvents = IPSKALVIEW_GetAnniversaryList(12345, 0, 0, '');
 
 // Nur Hochzeitstage der nächsten frei gewählten 90 Tage.
 $weddings = IPSKALVIEW_GetAnniversaryList(12345, 0, 90, 'wedding');
@@ -281,21 +283,21 @@ $deathAnniversaries = IPSKALVIEW_GetAnniversaryList(12345, 23456, 0, 'death');
 $birthdays = IPSKALVIEW_GetBirthdayList(12345, 0, 45);
 
 // Alle exakt bestimmbaren Reminder eines lokalen Kalendertags abrufen.
-$reminders = IPSKALVIEW_GetDayReminders(12345, '2026-08-11');
+$reminders = IPSKALVIEW_GetDayReminders(12345, '2026-08-11', 0);
 
 // Reminder eines inklusiven lokalen Datumsbereichs abrufen.
 // Der Zeitraum bezieht sich auf den Reminder-Zeitpunkt, nicht auf den Terminbeginn.
-$reminders = IPSKALVIEW_GetReminders(12345, '2026-08-11', '2026-08-17');
+$reminders = IPSKALVIEW_GetReminders(12345, '2026-08-11', '2026-08-17', 0);
 
 // Reminder abrufen, die innerhalb der nächsten 30 Minuten fällig werden.
-$reminders = IPSKALVIEW_GetUpcomingReminders(12345, 30);
+$reminders = IPSKALVIEW_GetUpcomingReminders(12345, 30, 0);
 
 // Den nächsten noch nicht ausgelösten Reminder abrufen.
-$reminder = IPSKALVIEW_GetNextReminder(12345);
+$reminder = IPSKALVIEW_GetNextReminder(12345, 0);
 
 // Reminder abrufen, die in den letzten zwei Minuten fällig wurden.
 // reminderId kann im aufrufenden Skript zur Duplikaterkennung gespeichert werden.
-$reminders = IPSKALVIEW_GetDueReminders(12345, 2);
+$reminders = IPSKALVIEW_GetDueReminders(12345, 2, 0);
 
 // Alle Reminder-Funktionen können optional auf eine ausgewählte Kalenderinstanz gefiltert werden.
 $reminders = IPSKALVIEW_GetUpcomingReminders(12345, 30, 23456);
@@ -328,7 +330,7 @@ Die Funktionen liefern JSON. Beispiel:
 
 ```php
 $appointments = json_decode(
-    IPSKALVIEW_GetDayAppointments(12345, date('Y-m-d')),
+    IPSKALVIEW_GetDayAppointments(12345, date('Y-m-d'), 0),
     true,
     512,
     JSON_THROW_ON_ERROR
@@ -338,14 +340,19 @@ $appointments = json_decode(
 Für einfache Skripte stehen zusätzlich `GetDayAppointmentsCompact()` und
 `GetAppointmentsCompact()` bereit. Sie verwenden dieselbe Kalenderauswahl und
 dieselben Bereichsregeln, liefern pro Termin aber ausschließlich `summary`,
-`start`, `end`, `startTime` und `endTime`. `start` und `end` sind dabei immer
-lokale Datumswerte im Format `YYYY-MM-DD`. Bei zeitgebundenen Terminen enthalten
-`startTime` und `endTime` die lokale Uhrzeit im Format `HH:MM`. Ganztagstermine
-liefern die lokalisierte Bezeichnung `Ganztägig`/`All day` als `startTime`, einen
-leeren `endTime`-Wert und in `end` das sichtbare inklusive Enddatum statt der
-providerseitig technischen exklusiven Endgrenze. Als letztes optionales Argument
-kann bei beiden Compact-Funktionen die Instanz-ID eines in dieser Kalender Ansicht
-ausgewählten Kalenders angegeben werden. Der Standardwert `0` liefert wie bisher
+`start`, `end`, `startTime`, `endTime`, `hasReminder` und `calendarName`. `start`
+und `end` sind dabei immer lokale Datumswerte im Format `YYYY-MM-DD`. Bei
+zeitgebundenen Terminen enthalten `startTime` und `endTime` die lokale Uhrzeit im
+Format `HH:MM`. Ganztagstermine liefern die lokalisierte Bezeichnung
+`Ganztägig`/`All day` als `startTime`, einen leeren `endTime`-Wert und in `end`
+das sichtbare inklusive Enddatum statt der providerseitig technischen exklusiven
+Endgrenze. `hasReminder` ist ein boolescher Wert und zeigt an, ob für den Termin
+eine wirksame Erinnerung konfiguriert ist; dabei werden auch aktive
+Kalender-Standarderinnerungen und komplexe Provider-Erinnerungen berücksichtigt.
+`calendarName` enthält immer den Namen des Quellkalenders und ist insbesondere bei
+`CalendarInstanceID = 0` zur Zuordnung zusammengeführter Termine gedacht. Als
+letztes optionales Argument kann bei beiden Compact-Funktionen die Instanz-ID eines
+in dieser Kalender Ansicht ausgewählten Kalenders angegeben werden. `0` liefert
 alle ausgewählten Kalender. Eine konkrete ID filtert ausschließlich auf diesen
 Kalender; eine nicht ausgewählte oder unbekannte ID liefert ein leeres JSON-Array.
 

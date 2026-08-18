@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use IPSKalender\CalendarAppointmentRange;
+use IPSKalender\CalendarEventReminder;
 
 require_once __DIR__ . '/../libs/CalendarAppointmentRange.php';
 
@@ -80,6 +81,43 @@ try {
 
 $moduleSource = (string) file_get_contents(__DIR__ . '/../Kalender Ansicht/module.php');
 $calendarModuleSource = (string) file_get_contents(__DIR__ . '/../Kalender/module.php');
+$readmeSource = (string) file_get_contents(__DIR__ . '/../Kalender Ansicht/README.md');
+$calendarFilterReferenceCalls = [
+    "IPSKALVIEW_GetDayAppointments(12345, '2026-08-11', 0)",
+    "IPSKALVIEW_GetAppointments(12345, '2026-08-11', '2026-08-17', 0)",
+    "IPSKALVIEW_GetDayAppointmentsCompact(12345, '2026-08-11', 0)",
+    "IPSKALVIEW_GetAppointmentsCompact(12345, '2026-08-11', '2026-08-17', 0)",
+    "IPSKALVIEW_GetDayAppointmentCount(12345, '2026-08-11', 0)",
+    "IPSKALVIEW_GetAppointmentCount(12345, '2026-08-11', '2026-08-17', 0)",
+    'IPSKALVIEW_GetRemainingDayAppointments(12345, 0)',
+    'IPSKALVIEW_GetRemainingDayAppointmentCount(12345, 0)',
+    'IPSKALVIEW_GetNextAppointment(12345, 0)',
+    'IPSKALVIEW_GetCurrentAppointments(12345, 0)',
+    'IPSKALVIEW_GetCurrentAppointmentCount(12345, 0)',
+    'IPSKALVIEW_GetUpcomingAppointments(12345, 24, 0)',
+    'IPSKALVIEW_GetUpcomingAppointmentCount(12345, 24, 0)',
+    'IPSKALVIEW_GetNextAppointments(12345, 3, 0)',
+    "IPSKALVIEW_GetAnniversaryList(12345, 0, 0, '')",
+    "IPSKALVIEW_GetBirthdayList(12345, 0, 45)",
+    "IPSKALVIEW_GetDayReminders(12345, '2026-08-11', 0)",
+    "IPSKALVIEW_GetReminders(12345, '2026-08-11', '2026-08-17', 0)",
+    'IPSKALVIEW_GetUpcomingReminders(12345, 30, 0)',
+    'IPSKALVIEW_GetNextReminder(12345, 0)',
+    'IPSKALVIEW_GetDueReminders(12345, 2, 0)'
+];
+foreach ($calendarFilterReferenceCalls as $referenceCall) {
+    assertCalendarViewApi(
+        str_contains($readmeSource, $referenceCall),
+        'Calendar View PHP reference must show CalendarInstanceID zero explicitly for all-calendar examples.'
+    );
+}
+assertCalendarViewApi(
+    str_contains($readmeSource, '`0` berücksichtigt alle in dieser Kalender Ansicht ausgewählten Kalender')
+        && str_contains($readmeSource, '`hasReminder`')
+        && str_contains($readmeSource, '`calendarName`'),
+    'Calendar View PHP reference must explain the zero calendar filter and compact reminder/calendar fields.'
+);
+
 assertCalendarViewApi(
     str_contains($calendarModuleSource, "RegisterAttributeString('AnniversaryMetadata', '[]')")
         && str_contains($calendarModuleSource, 'public function GetAnniversaryList(int $Days = 0, string $Type = \'\'): string')
@@ -131,16 +169,25 @@ assertCalendarViewApi(
     'Calendar View must expose a compact provider-independent appointment range function.'
 );
 assertCalendarViewApi(
-    str_contains($moduleSource, "'summary'   =>")
-        && str_contains($moduleSource, "'start'     =>")
-        && str_contains($moduleSource, "'end'       =>")
-        && str_contains($moduleSource, "'startTime' =>")
-        && str_contains($moduleSource, "'endTime'   =>")
+    str_contains($moduleSource, "'summary'      =>")
+        && str_contains($moduleSource, "'start'        =>")
+        && str_contains($moduleSource, "'end'          =>")
+        && str_contains($moduleSource, "'startTime'    =>")
+        && str_contains($moduleSource, "'endTime'      =>")
+        && str_contains($moduleSource, "'hasReminder'  =>")
+        && str_contains($moduleSource, "'calendarName' =>")
         && str_contains($moduleSource, "Translate('All day')")
         && str_contains($moduleSource, "->format('Y-m-d');")
         && str_contains($moduleSource, "->modify('-1 day')->format('Y-m-d');")
         && str_contains($moduleSource, "->format('H:i');"),
-    'Compact appointment results must contain only script-friendly dates and readable local clock values.'
+    'Compact appointment results must expose script-friendly dates, reminder state and source calendar.'
+);
+assertCalendarViewApi(
+    str_contains($moduleSource, 'bool $includeCompactMetadata = false')
+        && str_contains($moduleSource, '$this->collectAppointmentsForRange($rangeStart, $rangeEnd, true)')
+        && str_contains($moduleSource, "\$event['hasReminder'] = \$this->appointmentHasReminder(\$event, \$calendar);")
+        && str_contains($moduleSource, 'private function appointmentHasReminder(array $appointment, array $calendar): bool'),
+    'Compact appointment collection must resolve effective reminders with source calendar metadata.'
 );
 
 assertCalendarViewApi(
@@ -227,6 +274,8 @@ require_once __DIR__ . '/../Kalender Ansicht/module.php';
 
 $compactMethod = new ReflectionMethod(CalendarView::class, 'compactAppointments');
 $compactMethod->setAccessible(true);
+$hasReminderMethod = new ReflectionMethod(CalendarView::class, 'appointmentHasReminder');
+$hasReminderMethod->setAccessible(true);
 $filterMethod = new ReflectionMethod(CalendarView::class, 'filterAppointmentsByCalendarInstanceId');
 $filterMethod->setAccessible(true);
 $remainingMethod = new ReflectionMethod(CalendarView::class, 'filterRemainingAppointments');
@@ -258,32 +307,87 @@ try {
         'end'            => '2026-08-12T10:30:00+02:00',
         'startTimestamp' => (new DateTimeImmutable('2026-08-12T09:00:00+02:00'))->getTimestamp(),
         'endTimestamp'   => (new DateTimeImmutable('2026-08-12T10:30:00+02:00'))->getTimestamp(),
-        'allDay'         => false
+        'allDay'         => false,
+        'hasReminder'    => true,
+        'calendarName'   => 'Work'
     ], [
         'summary'        => 'All-day event',
         'start'          => '2026-08-12',
         'end'            => '2026-08-13',
         'startTimestamp' => (new DateTimeImmutable('2026-08-12T00:00:00+02:00'))->getTimestamp(),
         'endTimestamp'   => (new DateTimeImmutable('2026-08-13T00:00:00+02:00'))->getTimestamp(),
-        'allDay'         => true
+        'allDay'         => true,
+        'hasReminder'    => false,
+        'calendarName'   => 'Private'
     ], [
         'summary'        => 'Overnight event',
         'start'          => '2026-08-12T23:30:00+02:00',
         'end'            => '2026-08-13T00:30:00+02:00',
         'startTimestamp' => (new DateTimeImmutable('2026-08-12T23:30:00+02:00'))->getTimestamp(),
         'endTimestamp'   => (new DateTimeImmutable('2026-08-13T00:30:00+02:00'))->getTimestamp(),
-        'allDay'         => false
+        'allDay'         => false,
+        'hasReminder'    => true,
+        'calendarName'   => 'Work'
     ], [
         'summary'        => 'Multi-day all-day event',
         'start'          => '2026-08-12',
         'end'            => '2026-08-15',
         'startTimestamp' => (new DateTimeImmutable('2026-08-12T00:00:00+02:00'))->getTimestamp(),
         'endTimestamp'   => (new DateTimeImmutable('2026-08-15T00:00:00+02:00'))->getTimestamp(),
-        'allDay'         => true
+        'allDay'         => true,
+        'hasReminder'    => false,
+        'calendarName'   => 'Holidays'
     ]]);
 } finally {
     date_default_timezone_set($previousTimezone);
 }
+
+assertCalendarViewApi(
+    $hasReminderMethod->invoke(
+        $calendarView,
+        ['reminder' => CalendarEventReminder::custom(15)],
+        []
+    ) === true,
+    'A custom event reminder must set the compact reminder flag.'
+);
+assertCalendarViewApi(
+    $hasReminderMethod->invoke(
+        $calendarView,
+        ['reminder' => CalendarEventReminder::none()],
+        []
+    ) === false,
+    'A disabled event reminder must clear the compact reminder flag.'
+);
+assertCalendarViewApi(
+    $hasReminderMethod->invoke(
+        $calendarView,
+        ['reminder' => CalendarEventReminder::providerDefault()],
+        [
+            'canUseDefaultReminder' => true,
+            'defaultReminder'       => CalendarEventReminder::custom(30)
+        ]
+    ) === true,
+    'An active calendar-default reminder must set the compact reminder flag.'
+);
+assertCalendarViewApi(
+    $hasReminderMethod->invoke(
+        $calendarView,
+        ['reminder' => CalendarEventReminder::providerDefault()],
+        [
+            'canUseDefaultReminder' => true,
+            'defaultReminder'       => CalendarEventReminder::none()
+        ]
+    ) === false,
+    'A disabled calendar-default reminder must clear the compact reminder flag.'
+);
+assertCalendarViewApi(
+    $hasReminderMethod->invoke(
+        $calendarView,
+        ['reminder' => CalendarEventReminder::complex()],
+        []
+    ) === true,
+    'A complex provider reminder must still report that an event reminder exists.'
+);
 
 $filterSource = [
     ['summary' => 'Calendar A', 'calendarInstanceId' => 111],
@@ -305,41 +409,49 @@ assertCalendarViewApi(
 
 assertCalendarViewApi(
     $compact[0] === [
-        'summary'   => 'Timed event',
-        'start'     => '2026-08-12',
-        'end'       => '2026-08-12',
-        'startTime' => '09:00',
-        'endTime'   => '10:30'
+        'summary'      => 'Timed event',
+        'start'        => '2026-08-12',
+        'end'          => '2026-08-12',
+        'startTime'    => '09:00',
+        'endTime'      => '10:30',
+        'hasReminder'  => true,
+        'calendarName' => 'Work'
     ],
     'Compact timed appointments must expose local dates and readable start and end times.'
 );
 assertCalendarViewApi(
     $compact[1] === [
-        'summary'   => 'All-day event',
-        'start'     => '2026-08-12',
-        'end'       => '2026-08-12',
-        'startTime' => 'All day',
-        'endTime'   => ''
+        'summary'      => 'All-day event',
+        'start'        => '2026-08-12',
+        'end'          => '2026-08-12',
+        'startTime'    => 'All day',
+        'endTime'      => '',
+        'hasReminder'  => false,
+        'calendarName' => 'Private'
     ],
     'Compact all-day appointments must expose the visible inclusive end date and not invent clock times.'
 );
 assertCalendarViewApi(
     $compact[2] === [
-        'summary'   => 'Overnight event',
-        'start'     => '2026-08-12',
-        'end'       => '2026-08-13',
-        'startTime' => '23:30',
-        'endTime'   => '00:30'
+        'summary'      => 'Overnight event',
+        'start'        => '2026-08-12',
+        'end'          => '2026-08-13',
+        'startTime'    => '23:30',
+        'endTime'      => '00:30',
+        'hasReminder'  => true,
+        'calendarName' => 'Work'
     ],
     'Compact overnight appointments must keep separate local start and end dates.'
 );
 assertCalendarViewApi(
     $compact[3] === [
-        'summary'   => 'Multi-day all-day event',
-        'start'     => '2026-08-12',
-        'end'       => '2026-08-14',
-        'startTime' => 'All day',
-        'endTime'   => ''
+        'summary'      => 'Multi-day all-day event',
+        'start'        => '2026-08-12',
+        'end'          => '2026-08-14',
+        'startTime'    => 'All day',
+        'endTime'      => '',
+        'hasReminder'  => false,
+        'calendarName' => 'Holidays'
     ],
     'Compact multi-day all-day appointments must convert the exclusive provider end to the visible inclusive end date.'
 );
