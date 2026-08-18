@@ -44,6 +44,9 @@ final class ICalendarTimezoneResolver
         $this->definitions = $definitions;
     }
 
+    /**
+     * Creates a resolver from VTIMEZONE components embedded in an iCalendar resource.
+     */
     public static function fromCalendar(string $ical): self
     {
         $lines = self::unfoldLines($ical);
@@ -156,6 +159,9 @@ final class ICalendarTimezoneResolver
         ];
     }
 
+    /**
+     * Returns whether the calendar contains an embedded definition for the given TZID.
+     */
     public function hasDefinition(string $timezoneId): bool
     {
         $timezoneId = trim($timezoneId, " \t\n\r\0\x0B\"");
