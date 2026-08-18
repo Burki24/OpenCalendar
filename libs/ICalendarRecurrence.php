@@ -460,6 +460,20 @@ final class ICalendarRecurrence
         ?int $countLimit,
         bool $allDay
     ): array {
+        $timeAwareSetPosition = !$allDay
+            && isset($rule['BYSETPOS'])
+            && (isset($rule['BYHOUR']) || isset($rule['BYMINUTE']));
+        if ($timeAwareSetPosition) {
+            return self::generateTimedSetPositionRuleStarts(
+                $seriesStart,
+                $scanStart,
+                $rule,
+                $rangeEnd,
+                $until,
+                $countLimit
+            );
+        }
+
         $starts = [$seriesStart->getTimestamp() => $seriesStart];
         $day = $scanStart->setTime(0, 0);
         $lastDay = $rangeEnd->setTimezone($seriesStart->getTimezone())->setTime(0, 0)->add(new DateInterval('P1D'));
@@ -505,6 +519,81 @@ final class ICalendarRecurrence
     }
 
     /**
+     * Applies BYSETPOS after BYHOUR/BYMINUTE have expanded the candidate set
+     * for one DAILY, WEEKLY, MONTHLY, or YEARLY frequency interval.
+     *
+     * @param array<string, list<string>> $rule
+     * @return array{starts:array<int,DateTimeImmutable>,supported:bool,unsupportedParts:list<string>}
+     */
+    private static function generateTimedSetPositionRuleStarts(
+        DateTimeImmutable $seriesStart,
+        DateTimeImmutable $scanStart,
+        array $rule,
+        DateTimeImmutable $rangeEnd,
+        ?DateTimeImmutable $until,
+        ?int $countLimit
+    ): array {
+        $starts = [$seriesStart->getTimestamp() => $seriesStart];
+        $frequency = $rule['FREQ'][0];
+        $setPositions = self::integerValues($rule['BYSETPOS'] ?? []);
+        [$periodStart, $periodEnd] = self::setPositionPeriod($scanStart, $rule, $frequency);
+        $scanBoundary = $rangeEnd->setTimezone($seriesStart->getTimezone());
+        if ($until !== null && $until < $scanBoundary) {
+            $scanBoundary = $until->setTimezone($seriesStart->getTimezone());
+        }
+
+        $occurrenceCount = 0;
+        $generatedCandidateCount = 0;
+        $iterations = 0;
+        while ($periodStart <= $scanBoundary) {
+            $periodCandidates = [];
+            $day = $periodStart->setTime(0, 0);
+            while ($day < $periodEnd) {
+                if (++$iterations > self::MAX_GENERATED_DAYS) {
+                    return self::expansionLimitResult($seriesStart);
+                }
+                if (self::matchesRuleDate($day, $seriesStart, $rule, $frequency, false)) {
+                    foreach (self::timeCandidatesForDay($day, $seriesStart, $rule, false) as $candidate) {
+                        if (++$generatedCandidateCount > self::MAX_GENERATED_OCCURRENCES) {
+                            return self::expansionLimitResult($seriesStart);
+                        }
+                        $periodCandidates[$candidate->getTimestamp()] = $candidate;
+                    }
+                }
+                $day = $day->add(new DateInterval('P1D'));
+            }
+            ksort($periodCandidates);
+
+            foreach (self::selectSetPositionCandidates(array_values($periodCandidates), $setPositions) as $candidate) {
+                if ($candidate < $seriesStart || ($until !== null && $candidate > $until)) {
+                    continue;
+                }
+
+                ++$occurrenceCount;
+                if ($occurrenceCount > self::MAX_GENERATED_OCCURRENCES) {
+                    return self::expansionLimitResult($seriesStart);
+                }
+                $starts[$candidate->getTimestamp()] = $candidate;
+                if ($countLimit !== null && $occurrenceCount >= $countLimit) {
+                    return [
+                        'starts'           => $starts,
+                        'supported'        => true,
+                        'unsupportedParts' => []
+                    ];
+                }
+            }
+
+            [$periodStart, $periodEnd] = self::setPositionPeriod($periodEnd, $rule, $frequency);
+        }
+
+        return [
+            'starts'           => $starts,
+            'supported'        => true,
+            'unsupportedParts' => []
+        ];
+    }
+
+    /**
      * @param array<string, list<string>> $rule
      * @return array{starts:array<int,DateTimeImmutable>,supported:bool,unsupportedParts:list<string>}
      */
@@ -523,26 +612,29 @@ final class ICalendarRecurrence
         if ($minutes === []) {
             $minutes = [(int) $seriesStart->format('i')];
         }
+        $setPositions = self::integerValues($rule['BYSETPOS'] ?? []);
 
         $periodSeconds = $interval * 3600;
         $elapsedSeconds = max(0, $scanStart->getTimestamp() - $seriesStart->getTimestamp());
         $periodOffset = intdiv($elapsedSeconds, $periodSeconds) * $periodSeconds;
         $period = (new DateTimeImmutable('@' . ($seriesStart->getTimestamp() + $periodOffset)))
             ->setTimezone($seriesStart->getTimezone());
-        $lastPeriod = $rangeEnd->setTimezone($seriesStart->getTimezone());
-        if ($until !== null && $until < $lastPeriod) {
-            $lastPeriod = $until->setTimezone($seriesStart->getTimezone());
+        $scanBoundary = $rangeEnd->setTimezone($seriesStart->getTimezone());
+        if ($until !== null && $until < $scanBoundary) {
+            $scanBoundary = $until->setTimezone($seriesStart->getTimezone());
         }
 
         $occurrenceCount = 0;
+        $generatedCandidateCount = 0;
         $iterations = 0;
-        while ($period <= $lastPeriod) {
+        while ($period <= $scanBoundary) {
             if (++$iterations > self::MAX_GENERATED_HOURS) {
                 return self::expansionLimitResult($seriesStart);
             }
             $periodHour = (int) $period->format('G');
-            if (self::matchesRuleDate($period, $seriesStart, $rule, 'HOURLY')
+            if (self::matchesRuleDate($period, $seriesStart, $rule, 'HOURLY', false)
                 && ($hours === [] || in_array($periodHour, $hours, true))) {
+                $periodCandidates = [];
                 foreach ($minutes as $minute) {
                     $candidate = self::localTimeCandidate(
                         $period,
@@ -550,10 +642,21 @@ final class ICalendarRecurrence
                         $minute,
                         (int) $seriesStart->format('s')
                     );
-                    if ($candidate === null
-                        || $candidate < $seriesStart
-                        || $candidate > $lastPeriod
-                        || ($until !== null && $candidate > $until)) {
+                    if ($candidate === null) {
+                        continue;
+                    }
+                    if (++$generatedCandidateCount > self::MAX_GENERATED_OCCURRENCES) {
+                        return self::expansionLimitResult($seriesStart);
+                    }
+                    $periodCandidates[$candidate->getTimestamp()] = $candidate;
+                }
+                ksort($periodCandidates);
+
+                $selectedCandidates = $setPositions === []
+                    ? array_values($periodCandidates)
+                    : self::selectSetPositionCandidates(array_values($periodCandidates), $setPositions);
+                foreach ($selectedCandidates as $candidate) {
+                    if ($candidate < $seriesStart || ($until !== null && $candidate > $until)) {
                         continue;
                     }
 
@@ -922,6 +1025,65 @@ final class ICalendarRecurrence
     }
 
     /**
+     * @param list<DateTimeImmutable> $candidates
+     * @param list<int> $setPositions
+     * @return list<DateTimeImmutable>
+     */
+    private static function selectSetPositionCandidates(array $candidates, array $setPositions): array
+    {
+        if ($candidates === [] || $setPositions === []) {
+            return $candidates;
+        }
+
+        usort(
+            $candidates,
+            static fn (DateTimeImmutable $left, DateTimeImmutable $right): int => $left <=> $right
+        );
+        $selected = [];
+        $candidateCount = count($candidates);
+        foreach ($setPositions as $setPosition) {
+            $index = $setPosition > 0
+                ? $setPosition - 1
+                : $candidateCount + $setPosition;
+            if (!isset($candidates[$index])) {
+                continue;
+            }
+            $candidate = $candidates[$index];
+            $selected[$candidate->getTimestamp()] = $candidate;
+        }
+        ksort($selected);
+
+        return array_values($selected);
+    }
+
+    /**
+     * @param array<string, list<string>> $rule
+     * @return array{0:DateTimeImmutable,1:DateTimeImmutable}
+     */
+    private static function setPositionPeriod(
+        DateTimeImmutable $date,
+        array $rule,
+        string $frequency
+    ): array {
+        return match ($frequency) {
+            'WEEKLY'  => [
+                self::startOfWeek($date, self::weekdayNumber($rule['WKST'][0] ?? 'MO')),
+                self::startOfWeek($date, self::weekdayNumber($rule['WKST'][0] ?? 'MO'))
+                    ->add(new DateInterval('P7D'))
+            ],
+            'MONTHLY' => [
+                $date->modify('first day of this month')->setTime(0, 0),
+                $date->modify('first day of next month')->setTime(0, 0)
+            ],
+            'YEARLY'  => self::yearlySetPositionPeriod($date, $rule),
+            default   => [
+                $date->setTime(0, 0),
+                $date->setTime(0, 0)->add(new DateInterval('P1D'))
+            ]
+        };
+    }
+
+    /**
      * @param array<string, list<string>> $rule
      * @param list<int> $setPositions
      */
@@ -932,18 +1094,7 @@ final class ICalendarRecurrence
         string $frequency,
         array $setPositions
     ): bool {
-        [$periodStart, $periodEnd] = match ($frequency) {
-            'WEEKLY'  => [
-                self::startOfWeek($date, self::weekdayNumber($rule['WKST'][0] ?? 'MO')),
-                self::startOfWeek($date, self::weekdayNumber($rule['WKST'][0] ?? 'MO'))->add(new DateInterval('P7D'))
-            ],
-            'MONTHLY' => [
-                $date->modify('first day of this month')->setTime(0, 0),
-                $date->modify('first day of next month')->setTime(0, 0)
-            ],
-            'YEARLY'  => self::yearlySetPositionPeriod($date, $rule),
-            default   => [$date->setTime(0, 0), $date->setTime(0, 0)->add(new DateInterval('P1D'))]
-        };
+        [$periodStart, $periodEnd] = self::setPositionPeriod($date, $rule, $frequency);
 
         $matches = [];
         $candidate = $periodStart;
@@ -1169,10 +1320,6 @@ final class ICalendarRecurrence
                     break;
                 }
             }
-        }
-        if (isset($rule['BYSETPOS'])
-            && ($frequency === 'HOURLY' || isset($rule['BYHOUR']) || isset($rule['BYMINUTE']))) {
-            $unsupportedParts[] = 'BYSETPOS';
         }
 
         $unsupportedParts = array_values(array_unique($unsupportedParts));

@@ -99,11 +99,32 @@ $feed = "BEGIN:VCALENDAR\r\n"
     . "SUMMARY:Unsupported seconds\r\n"
     . "END:VEVENT\r\n"
     . "BEGIN:VEVENT\r\n"
-    . "UID:unsupported-setpos-time@example.com\r\n"
-    . "DTSTART:20260701T090000Z\r\n"
+    . "UID:daily-setpos-last@example.com\r\n"
+    . "DTSTART:20260701T173000Z\r\n"
+    . "DTEND:20260701T180000Z\r\n"
+    . "RRULE:FREQ=DAILY;BYHOUR=9,12,17;BYMINUTE=0,30;BYSETPOS=-1;COUNT=3\r\n"
+    . "SUMMARY:Last daily time candidate\r\n"
+    . "END:VEVENT\r\n"
+    . "BEGIN:VEVENT\r\n"
+    . "UID:daily-setpos-multiple@example.com\r\n"
+    . "DTSTART:20260701T093000Z\r\n"
     . "DTEND:20260701T100000Z\r\n"
-    . "RRULE:FREQ=DAILY;BYHOUR=9,17;BYSETPOS=-1;COUNT=2\r\n"
-    . "SUMMARY:Unsupported time set position\r\n"
+    . "RRULE:FREQ=DAILY;BYHOUR=9,12,17;BYMINUTE=0,30;BYSETPOS=2,5;COUNT=4\r\n"
+    . "SUMMARY:Multiple daily set positions\r\n"
+    . "END:VEVENT\r\n"
+    . "BEGIN:VEVENT\r\n"
+    . "UID:hourly-setpos-last@example.com\r\n"
+    . "DTSTART:20260701T095000Z\r\n"
+    . "DTEND:20260701T100000Z\r\n"
+    . "RRULE:FREQ=HOURLY;BYMINUTE=10,30,50;BYSETPOS=-1;COUNT=4\r\n"
+    . "SUMMARY:Last minute candidate per hour\r\n"
+    . "END:VEVENT\r\n"
+    . "BEGIN:VEVENT\r\n"
+    . "UID:weekly-setpos-time@example.com\r\n"
+    . "DTSTART:20260701T170000Z\r\n"
+    . "DTEND:20260701T173000Z\r\n"
+    . "RRULE:FREQ=WEEKLY;BYDAY=MO,WE;BYHOUR=9,17;BYSETPOS=-1;COUNT=3\r\n"
+    . "SUMMARY:Last weekly time candidate\r\n"
     . "END:VEVENT\r\n"
     . "BEGIN:VEVENT\r\n"
     . "UID:all-day-hourly@example.com\r\n"
@@ -126,7 +147,7 @@ $events = ICalendarCodec::parseEventsInRange(
     'https://calendar.example/hour-minute.ics',
     '',
     new DateTimeImmutable('2026-03-27T00:00:00Z'),
-    new DateTimeImmutable('2026-07-04T00:00:00Z')
+    new DateTimeImmutable('2026-07-20T00:00:00Z')
 );
 
 assertHourMinuteRecurrence(
@@ -186,6 +207,44 @@ assertHourMinuteRecurrence(
     hourMinuteStarts($events, 'all-day-ignore@example.com'),
     'BYHOUR and BYMINUTE must be ignored for DATE-valued DTSTART as required by RFC 5545.'
 );
+assertHourMinuteRecurrence(
+    [
+        '2026-07-01T17:30:00+00:00',
+        '2026-07-02T17:30:00+00:00',
+        '2026-07-03T17:30:00+00:00'
+    ],
+    hourMinuteStarts($events, 'daily-setpos-last@example.com'),
+    'DAILY BYSETPOS must select from the fully expanded BYHOUR/BYMINUTE candidate set.'
+);
+assertHourMinuteRecurrence(
+    [
+        '2026-07-01T09:30:00+00:00',
+        '2026-07-01T17:00:00+00:00',
+        '2026-07-02T09:30:00+00:00',
+        '2026-07-02T17:00:00+00:00'
+    ],
+    hourMinuteStarts($events, 'daily-setpos-multiple@example.com'),
+    'Multiple DAILY BYSETPOS values must preserve chronological candidate order and COUNT.'
+);
+assertHourMinuteRecurrence(
+    [
+        '2026-07-01T09:50:00+00:00',
+        '2026-07-01T10:50:00+00:00',
+        '2026-07-01T11:50:00+00:00',
+        '2026-07-01T12:50:00+00:00'
+    ],
+    hourMinuteStarts($events, 'hourly-setpos-last@example.com'),
+    'HOURLY BYSETPOS must select from BYMINUTE candidates inside each hour.'
+);
+assertHourMinuteRecurrence(
+    [
+        '2026-07-01T17:00:00+00:00',
+        '2026-07-08T17:00:00+00:00',
+        '2026-07-15T17:00:00+00:00'
+    ],
+    hourMinuteStarts($events, 'weekly-setpos-time@example.com'),
+    'WEEKLY BYSETPOS must operate across all expanded date/time candidates in the week.'
+);
 
 foreach ([
     'daily-grid@example.com',
@@ -193,7 +252,11 @@ foreach ([
     'hourly-minute@example.com',
     'hourly-hour-filter@example.com',
     'dst-gap@example.com',
-    'all-day-ignore@example.com'
+    'all-day-ignore@example.com',
+    'daily-setpos-last@example.com',
+    'daily-setpos-multiple@example.com',
+    'hourly-setpos-last@example.com',
+    'weekly-setpos-time@example.com'
 ] as $uid) {
     $matching = hourMinuteEvents($events, $uid);
     assertHourMinuteRecurrence(true, $matching[0]['recurrenceExpansionSupported'], $uid . ' must be safely expandable.');
@@ -208,7 +271,6 @@ foreach ([
     'invalid-hour@example.com'             => ['BYHOUR'],
     'invalid-minute@example.com'           => ['BYMINUTE'],
     'unsupported-bysecond@example.com'     => ['BYSECOND'],
-    'unsupported-setpos-time@example.com'  => ['BYSETPOS'],
     'all-day-hourly@example.com'           => ['FREQ=HOURLY'],
     'unsupported-minutely@example.com'     => ['FREQ=MINUTELY']
 ] as $uid => $unsupportedParts) {

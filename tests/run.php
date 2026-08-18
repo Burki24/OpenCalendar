@@ -11,6 +11,7 @@ $commands = [
     ['Check RFC recurrence diagnostics', [PHP_BINARY, 'tests/recurrence-diagnostics.php']],
     ['Check RFC year/week recurrence rules', [PHP_BINARY, 'tests/recurrence-year-week.php']],
     ['Check RFC hour/minute recurrence rules', [PHP_BINARY, 'tests/recurrence-hour-minute.php']],
+    ['Check RFC time-aware BYSETPOS rules', [PHP_BINARY, 'tests/recurrence-setpos-time.php']],
     ['Check module localization contract', [PHP_BINARY, 'tests/localization.php']],
     ['Verify chunked event transfers', [PHP_BINARY, 'tests/chunked-event-transfer.php']],
     ['Verify current-day event counting', [PHP_BINARY, 'tests/calendar-event-counter.php']],
