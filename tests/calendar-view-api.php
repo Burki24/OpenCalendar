@@ -98,7 +98,7 @@ $calendarFilterReferenceCalls = [
     'IPSKALVIEW_GetUpcomingAppointmentCount(12345, 24, 0)',
     'IPSKALVIEW_GetNextAppointments(12345, 3, 0)',
     "IPSKALVIEW_GetAnniversaryList(12345, 0, 0, '')",
-    "IPSKALVIEW_GetBirthdayList(12345, 0, 45)",
+    'IPSKALVIEW_GetBirthdayList(12345, 0, 45)',
     "IPSKALVIEW_GetDayReminders(12345, '2026-08-11', 0)",
     "IPSKALVIEW_GetReminders(12345, '2026-08-11', '2026-08-17', 0)",
     'IPSKALVIEW_GetUpcomingReminders(12345, 30, 0)',
