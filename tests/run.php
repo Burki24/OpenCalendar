@@ -9,6 +9,7 @@ $commands = [
     ['Verify DataFlowHelper integration', ['python3', 'tests/data_flow_integration.py']],
     ['Check safe debug integration', [PHP_BINARY, 'tests/debug-integration.php']],
     ['Check RFC recurrence diagnostics', [PHP_BINARY, 'tests/recurrence-diagnostics.php']],
+    ['Check RFC year/week recurrence rules', [PHP_BINARY, 'tests/recurrence-year-week.php']],
     ['Check module localization contract', [PHP_BINARY, 'tests/localization.php']],
     ['Verify chunked event transfers', [PHP_BINARY, 'tests/chunked-event-transfer.php']],
     ['Verify current-day event counting', [PHP_BINARY, 'tests/calendar-event-counter.php']],

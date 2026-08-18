@@ -22,6 +22,8 @@ final class ICalendarRecurrence
         'INTERVAL',
         'BYDAY',
         'BYMONTHDAY',
+        'BYYEARDAY',
+        'BYWEEKNO',
         'BYMONTH',
         'BYSETPOS',
         'WKST'
@@ -446,10 +448,24 @@ final class ICalendarRecurrence
             'DAILY'   => self::calendarDayDifference($seriesStart, $date) % $interval === 0,
             'WEEKLY'  => self::matchesWeeklyInterval($date, $seriesStart, $rule, $interval),
             'MONTHLY' => self::calendarMonthDifference($seriesStart, $date) % $interval === 0,
-            'YEARLY'  => ((int) $date->format('Y') - (int) $seriesStart->format('Y')) % $interval === 0,
+            'YEARLY'  => self::matchesYearlyInterval($date, $seriesStart, $rule, $interval),
             default   => false
         };
         if (!$matchesFrequency) {
+            return false;
+        }
+
+        $yearDays = self::integerValues($rule['BYYEARDAY'] ?? []);
+        if ($yearDays !== [] && !self::matchesYearDay($date, $yearDays)) {
+            return false;
+        }
+
+        $weekNumbers = self::integerValues($rule['BYWEEKNO'] ?? []);
+        if ($weekNumbers !== [] && !self::matchesWeekNumber(
+            $date,
+            $weekNumbers,
+            self::weekdayNumber($rule['WKST'][0] ?? 'MO')
+        )) {
             return false;
         }
 
@@ -472,11 +488,15 @@ final class ICalendarRecurrence
             return false;
         }
         if ($frequency === 'YEARLY') {
-            if ($months === [] && !($byDays !== [] && self::containsOrdinalByDay($byDays))
+            $hasExpandedDaySelector = $weekNumbers !== []
+                || $yearDays !== []
+                || $monthDays !== []
+                || $byDays !== [];
+            if ($months === [] && !$hasExpandedDaySelector
                 && (int) $date->format('n') !== (int) $seriesStart->format('n')) {
                 return false;
             }
-            if ($monthDays === [] && $byDays === []
+            if (!$hasExpandedDaySelector
                 && (int) $date->format('j') !== (int) $seriesStart->format('j')) {
                 return false;
             }
@@ -486,6 +506,27 @@ final class ICalendarRecurrence
         return !$applySetPosition
             || $setPositions === []
             || self::matchesSetPosition($date, $seriesStart, $rule, $frequency, $setPositions);
+    }
+
+    /**
+     * @param array<string, list<string>> $rule
+     */
+    private static function matchesYearlyInterval(
+        DateTimeImmutable $date,
+        DateTimeImmutable $seriesStart,
+        array $rule,
+        int $interval
+    ): bool {
+        $year = (int) $date->format('Y');
+        $seriesYear = (int) $seriesStart->format('Y');
+        if (isset($rule['BYWEEKNO'])) {
+            $weekStart = self::weekdayNumber($rule['WKST'][0] ?? 'MO');
+            [$year] = self::weekYearAndNumber($date, $weekStart);
+            [$seriesYear] = self::weekYearAndNumber($seriesStart, $weekStart);
+        }
+        $years = $year - $seriesYear;
+
+        return $years >= 0 && $years % $interval === 0;
     }
 
     /**
@@ -558,6 +599,94 @@ final class ICalendarRecurrence
     }
 
     /**
+     * @param list<int> $yearDays
+     */
+    private static function matchesYearDay(DateTimeImmutable $date, array $yearDays): bool
+    {
+        $day = (int) $date->format('z') + 1;
+        $daysInYear = $date->format('L') === '1' ? 366 : 365;
+        foreach ($yearDays as $yearDay) {
+            $normalized = $yearDay < 0 ? $daysInYear + $yearDay + 1 : $yearDay;
+            if ($normalized === $day) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @param list<int> $weekNumbers
+     */
+    private static function matchesWeekNumber(
+        DateTimeImmutable $date,
+        array $weekNumbers,
+        int $weekStart
+    ): bool {
+        [$weekYear, $weekNumber] = self::weekYearAndNumber($date, $weekStart);
+        $weeksInYear = self::weeksInWeekYear($date, $weekYear, $weekStart);
+        foreach ($weekNumbers as $requestedWeek) {
+            $normalized = $requestedWeek < 0
+                ? $weeksInYear + $requestedWeek + 1
+                : $requestedWeek;
+            if ($normalized === $weekNumber) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @return array{0:int,1:int}
+     */
+    private static function weekYearAndNumber(DateTimeImmutable $date, int $weekStart): array
+    {
+        $calendarYear = (int) $date->format('Y');
+        $weekYear = $calendarYear;
+        $firstWeek = self::firstWeekStart($date, $calendarYear, $weekStart);
+        if ($date->setTime(0, 0) < $firstWeek) {
+            --$weekYear;
+            $firstWeek = self::firstWeekStart($date, $weekYear, $weekStart);
+        } else {
+            $nextFirstWeek = self::firstWeekStart($date, $calendarYear + 1, $weekStart);
+            if ($date->setTime(0, 0) >= $nextFirstWeek) {
+                ++$weekYear;
+                $firstWeek = $nextFirstWeek;
+            }
+        }
+
+        $week = intdiv(
+            self::calendarDayDifference($firstWeek, self::startOfWeek($date, $weekStart)),
+            7
+        ) + 1;
+
+        return [$weekYear, $week];
+    }
+
+    private static function weeksInWeekYear(
+        DateTimeImmutable $date,
+        int $year,
+        int $weekStart
+    ): int {
+        return intdiv(
+            self::calendarDayDifference(
+                self::firstWeekStart($date, $year, $weekStart),
+                self::firstWeekStart($date, $year + 1, $weekStart)
+            ),
+            7
+        );
+    }
+
+    private static function firstWeekStart(
+        DateTimeImmutable $date,
+        int $year,
+        int $weekStart
+    ): DateTimeImmutable {
+        return self::startOfWeek($date->setDate($year, 1, 4)->setTime(0, 0), $weekStart);
+    }
+
+    /**
      * @param array<string, list<string>> $rule
      * @param list<int> $setPositions
      */
@@ -577,10 +706,7 @@ final class ICalendarRecurrence
                 $date->modify('first day of this month')->setTime(0, 0),
                 $date->modify('first day of next month')->setTime(0, 0)
             ],
-            'YEARLY'  => [
-                $date->setDate((int) $date->format('Y'), 1, 1)->setTime(0, 0),
-                $date->setDate((int) $date->format('Y') + 1, 1, 1)->setTime(0, 0)
-            ],
+            'YEARLY'  => self::yearlySetPositionPeriod($date, $rule),
             default   => [$date->setTime(0, 0), $date->setTime(0, 0)->add(new DateInterval('P1D'))]
         };
 
@@ -602,6 +728,30 @@ final class ICalendarRecurrence
         $negativePosition = $position - count($matches);
         return in_array($positivePosition, $setPositions, true)
             || in_array($negativePosition, $setPositions, true);
+    }
+
+    /**
+     * @param array<string, list<string>> $rule
+     * @return array{0:DateTimeImmutable,1:DateTimeImmutable}
+     */
+    private static function yearlySetPositionPeriod(DateTimeImmutable $date, array $rule): array
+    {
+        if (isset($rule['BYWEEKNO'])) {
+            $weekStart = self::weekdayNumber($rule['WKST'][0] ?? 'MO');
+            [$weekYear] = self::weekYearAndNumber($date, $weekStart);
+
+            return [
+                self::firstWeekStart($date, $weekYear, $weekStart),
+                self::firstWeekStart($date, $weekYear + 1, $weekStart)
+            ];
+        }
+
+        $year = (int) $date->format('Y');
+
+        return [
+            $date->setDate($year, 1, 1)->setTime(0, 0),
+            $date->setDate($year + 1, 1, 1)->setTime(0, 0)
+        ];
     }
 
     /**
@@ -736,10 +886,20 @@ final class ICalendarRecurrence
         if (isset($rule['BYMONTHDAY']) && !self::integerListInRange($rule['BYMONTHDAY'], 1, 31, true)) {
             $unsupportedParts[] = 'BYMONTHDAY';
         }
+        if (isset($rule['BYYEARDAY']) && !self::integerListInRange($rule['BYYEARDAY'], 1, 366, true)) {
+            $unsupportedParts[] = 'BYYEARDAY';
+        }
+        if (isset($rule['BYWEEKNO']) && !self::integerListInRange($rule['BYWEEKNO'], 1, 53, true)) {
+            $unsupportedParts[] = 'BYWEEKNO';
+        }
         if (isset($rule['BYSETPOS']) && !self::integerListInRange($rule['BYSETPOS'], 1, 366, true)) {
             $unsupportedParts[] = 'BYSETPOS';
         }
-        if (isset($rule['BYSETPOS']) && !isset($rule['BYDAY']) && !isset($rule['BYMONTHDAY'])) {
+        if (isset($rule['BYSETPOS'])
+            && !array_intersect(
+                ['BYMONTH', 'BYWEEKNO', 'BYYEARDAY', 'BYMONTHDAY', 'BYDAY'],
+                array_keys($rule)
+            )) {
             $unsupportedParts[] = 'BYSETPOS';
         }
         if (isset($rule['BYDAY']) && !self::supportedByDayValues($rule['BYDAY'], $frequency)) {
@@ -748,14 +908,17 @@ final class ICalendarRecurrence
         if ($frequency === 'WEEKLY' && isset($rule['BYMONTHDAY'])) {
             $unsupportedParts[] = 'BYMONTHDAY';
         }
-        if ($frequency === 'YEARLY' && !isset($rule['BYMONTH'])) {
-            $byDays = $rule['BYDAY'] ?? [];
-            if (!self::containsOrdinalByDay($byDays)) {
-                if ($byDays !== []) {
+        if (isset($rule['BYYEARDAY']) && $frequency !== 'YEARLY') {
+            $unsupportedParts[] = 'BYYEARDAY';
+        }
+        if (isset($rule['BYWEEKNO']) && $frequency !== 'YEARLY') {
+            $unsupportedParts[] = 'BYWEEKNO';
+        }
+        if ($frequency === 'YEARLY' && isset($rule['BYWEEKNO'])) {
+            foreach ($rule['BYDAY'] ?? [] as $byDay) {
+                if (preg_match('/^[+-]?\d+(?:MO|TU|WE|TH|FR|SA|SU)$/D', $byDay) === 1) {
                     $unsupportedParts[] = 'BYDAY';
-                }
-                if (isset($rule['BYMONTHDAY'])) {
-                    $unsupportedParts[] = 'BYMONTHDAY';
+                    break;
                 }
             }
         }
@@ -871,20 +1034,6 @@ final class ICalendarRecurrence
         }
 
         return $result;
-    }
-
-    /**
-     * @param list<string> $byDays
-     */
-    private static function containsOrdinalByDay(array $byDays): bool
-    {
-        foreach ($byDays as $value) {
-            if (preg_match('/^[+-]?\d+(?:MO|TU|WE|TH|FR|SA|SU)$/', strtoupper($value)) === 1) {
-                return true;
-            }
-        }
-
-        return false;
     }
 
     private static function matchesWeekdayOrdinalInMonth(DateTimeImmutable $date, int $ordinal): bool

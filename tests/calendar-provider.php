@@ -3400,8 +3400,8 @@ $unsupportedRecurrenceFeed = "BEGIN:VCALENDAR\r\n"
     . "END:VEVENT\r\n"
     . "BEGIN:VEVENT\r\n"
     . "UID:unsupported-year-day@example.com\r\n"
-    . "DTSTART;VALUE=DATE:20260101\r\n"
-    . "DTEND;VALUE=DATE:20260102\r\n"
+    . "DTSTART;VALUE=DATE:20260410\r\n"
+    . "DTEND;VALUE=DATE:20260411\r\n"
     . "RRULE:FREQ=YEARLY;BYYEARDAY=100;COUNT=2\r\n"
     . "SUMMARY:Unsupported BYYEARDAY\r\n"
     . "END:VEVENT\r\n"
@@ -3470,24 +3470,29 @@ assertSameValue(
     'Unsupported RFC rule parts must remain explicitly identifiable.'
 );
 assertSameValue(
-    ['2026-01-01'],
+    ['2026-04-10', '2027-04-10'],
     array_column($unsupportedYearDayEvents, 'start'),
-    'Unsupported BYYEARDAY rules must not be approximated as yearly DTSTART recurrences.'
+    'BYYEARDAY rules must expand the requested ordinal day of each year.'
 );
 assertSameValue(
-    ['BYYEARDAY'],
-    $unsupportedYearDayEvents[0]['recurrenceUnsupportedRuleParts'],
-    'Unsupported BYYEARDAY rules must report the unsupported rule part.'
+    true,
+    $unsupportedYearDayEvents[0]['recurrenceExpansionSupported'],
+    'BYYEARDAY rules must be marked as safely expandable.'
 );
 assertSameValue(
-    ['2026-01-15'],
+    [],
+    $unsupportedYearDayEvents[0]['recurrenceUnsupportedRuleParts'] ?? [],
+    'Supported BYYEARDAY rules must not report unsupported rule parts.'
+);
+assertSameValue(
+    ['2026-01-15', '2026-02-15'],
     array_column($unsupportedYearlyMonthDayEvents, 'start'),
-    'Known rule parts must also be rejected when the local engine cannot expand their RFC combination losslessly.'
+    'YEARLY BYMONTHDAY rules must expand the requested month day across the recurrence year.'
 );
 assertSameValue(
-    ['BYMONTHDAY'],
-    $unsupportedYearlyMonthDayEvents[0]['recurrenceUnsupportedRuleParts'],
-    'Unsupported combinations of otherwise known rule parts must remain identifiable.'
+    true,
+    $unsupportedYearlyMonthDayEvents[0]['recurrenceExpansionSupported'],
+    'YEARLY BYMONTHDAY rules must be marked as safely expandable.'
 );
 assertSameValue(
     ['2026-07-01T12:00:00+00:00'],
