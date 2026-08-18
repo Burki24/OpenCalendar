@@ -213,7 +213,7 @@ assertVisualization(
 );
 
 assertVisualization(
-    str_contains($script, 'const swipeNavigationViews = new Set([\'week\', \'month\']);')
+    str_contains($script, 'const swipeNavigationViews = new Set([\'threeDays\', \'week\', \'month\']);')
         && str_contains($script, 'const swipeMinimumDistance = 60;')
         && str_contains($script, 'const swipeAxisRatio = 1.3;')
         && str_contains($script, 'content.style.touchAction = swipeNavigationViews.has(activeView) ? \'pan-y\' : \'auto\';')
@@ -228,7 +228,7 @@ assertVisualization(
         && str_contains($script, 'suppressSwipeClickUntil = Date.now() + 500;')
         && str_contains($script, 'navigate(deltaX < 0 ? 1 : -1);')
         && str_contains($script, 'target.closest(\'button, a, input, select, textarea, label, .week-event, [role="button"], [contenteditable="true"]\')'),
-    'Week and month views must support guarded horizontal touch/pen swipe navigation without stealing vertical scrolling or control interactions.'
+    'Days, week and month views must support guarded horizontal touch/pen swipe navigation without stealing vertical scrolling or control interactions.'
 );
 
 assertVisualization(

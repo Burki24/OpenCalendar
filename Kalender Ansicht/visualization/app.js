@@ -20,7 +20,7 @@ const calendarViewStateStorageKey = Number(calendarOptions.instanceId) > 0
     : '';
 const calendarViews = new Set(['agenda', 'list', 'threeDays', 'week', 'month']);
 const calendarViewLabels = { agenda: 'Agenda', list: 'List', threeDays: 'Days', week: 'Week', month: 'Month' };
-const swipeNavigationViews = new Set(['week', 'month']);
+const swipeNavigationViews = new Set(['threeDays', 'week', 'month']);
 const swipeMinimumDistance = 60;
 const swipeAxisRatio = 1.3;
 document.documentElement.style.setProperty('--agenda-color-bar-width', `${calendarAgendaColorBarWidth}px`);
