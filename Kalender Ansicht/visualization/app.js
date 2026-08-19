@@ -1104,6 +1104,7 @@ function openEventDetails(event) {
         document.getElementById('details-end').textContent = formatDetailDateTime(end);
     }
 
+    setOptionalDetail('occasion', annualEventLabel(event));
     setOptionalDetail('reminder', reminderDetailText(event));
     setOptionalDetail('location', event.location);
     setOptionalDetail('description', event.description);
@@ -2943,7 +2944,7 @@ function applyStaticTranslations() {
     updateViewSelectorOptions();
     document.getElementById('calendar-filter-dialog-title').textContent = t('Filter calendars');
     document.getElementById('calendar-filter-note').textContent = t('This filter only changes the current view on this browser or monitor.');
-    ['calendar', 'start', 'end', 'location', 'description'].forEach(name => {
+    ['calendar', 'occasion', 'start', 'end', 'location', 'description'].forEach(name => {
         const label = document.getElementById(`details-${name}-label`);
         label.textContent = t(label.textContent.trim());
     });
