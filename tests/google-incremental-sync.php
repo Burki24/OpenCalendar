@@ -11,11 +11,11 @@ require_once __DIR__ . '/../libs/GoogleCalendarIncrementalSync.php';
 
 final class GoogleIncrementalSyncTestHttpClient implements CalendarHttpClientInterface
 {
-    /** @var list<CalendarHttpResponse> */
-    private array $responses;
-
     /** @var list<string> */
     public array $urls = [];
+
+    /** @var list<CalendarHttpResponse> */
+    private array $responses;
 
     /** @param list<CalendarHttpResponse> $responses */
     public function __construct(array $responses)
