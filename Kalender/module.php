@@ -1359,8 +1359,7 @@ class Calendar extends IPSModuleStrict
                         $eventReference,
                         $resourceUrl,
                         $deletedSeriesId
-                    ): bool
-                    {
+                    ): bool {
                         $candidateResource = trim((string) ($event['resourceUrl'] ?? ''));
                         if ($resourceUrl !== ''
                             && $candidateResource !== ''
@@ -1399,8 +1398,7 @@ class Calendar extends IPSModuleStrict
                     $resourceUrl,
                     $occurrenceId,
                     $replaceResource
-                ): bool
-                {
+                ): bool {
                     foreach ([
                         [$eventReference, trim((string) ($event['eventReference'] ?? ''))],
                         [$replaceResource ? '' : $resourceUrl, trim((string) ($event['resourceUrl'] ?? ''))],
