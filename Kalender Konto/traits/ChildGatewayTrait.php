@@ -2,8 +2,12 @@
 
 declare(strict_types=1);
 
+use IPSKalender\CalDAVIncrementalSync;
+use IPSKalender\CalDAVOriginPolicy;
+use IPSKalender\CalDAVProvider;
 use IPSKalender\CalendarEventLookupProviderInterface;
 use IPSKalender\CalendarEventRecurrence;
+use IPSKalender\CalendarHttpClient;
 use IPSKalender\GoogleCalendarIncrementalSync;
 use IPSKalender\GoogleCalendarOriginPolicy;
 use IPSKalender\GoogleCalendarProvider;
@@ -12,6 +16,7 @@ use IPSKalender\MicrosoftCalendarIncrementalSync;
 use IPSKalender\MicrosoftGraphOriginPolicy;
 use IPSKalender\RecurringCalendarProviderInterface;
 
+require_once __DIR__ . '/../../libs/CalDAVIncrementalSync.php';
 require_once __DIR__ . '/../../libs/GoogleCalendarIncrementalSync.php';
 require_once __DIR__ . '/../../libs/MicrosoftCalendarIncrementalSync.php';
 
@@ -138,7 +143,11 @@ trait KalenderKontoChildGatewayTrait
     private function beginEventsTransferForChild(array $request): array
     {
         $providerType = $this->ReadPropertyInteger('Provider');
-        if (!in_array($providerType, [self::PROVIDER_GOOGLE, self::PROVIDER_MICROSOFT], true)) {
+        if (!in_array(
+            $providerType,
+            [self::PROVIDER_APPLE, self::PROVIDER_CALDAV, self::PROVIDER_GOOGLE, self::PROVIDER_MICROSOFT],
+            true
+        )) {
             return $this->CreateChunkedJsonTransfer(
                 self::EVENT_TRANSFER_SCOPE,
                 $this->getEventsForChild($request)
@@ -166,11 +175,26 @@ trait KalenderKontoChildGatewayTrait
             $provider = new GoogleCalendarProvider($httpClient, $accessToken);
             $synchronizer = new GoogleCalendarIncrementalSync($provider, $httpClient, $accessToken);
             $debugName = 'GoogleEventSynchronization';
-        } else {
+        } elseif ($providerType === self::PROVIDER_MICROSOFT) {
             $accessToken = $this->getMicrosoftAccessToken();
             $httpClient = $this->createTrustedCloudHttpClient(new MicrosoftGraphOriginPolicy());
             $synchronizer = new MicrosoftCalendarIncrementalSync($httpClient, $accessToken);
             $debugName = 'MicrosoftEventSynchronization';
+        } else {
+            $serverUrl = $providerType === self::PROVIDER_APPLE
+                ? self::APPLE_CALDAV_URL
+                : trim($this->ReadPropertyString('ServerURL'));
+            $originPolicy = new CalDAVOriginPolicy($serverUrl);
+            $httpClient = new CalendarHttpClient(
+                max(5, min(120, $this->ReadPropertyInteger('RequestTimeout'))),
+                $providerType === self::PROVIDER_APPLE ? true : $this->ReadPropertyBoolean('VerifyTLS'),
+                trim($this->ReadPropertyString('Username')),
+                $this->ReadPropertyString('Password'),
+                $originPolicy
+            );
+            $provider = new CalDAVProvider($httpClient, $serverUrl, $originPolicy);
+            $synchronizer = new CalDAVIncrementalSync($provider, $httpClient, $originPolicy);
+            $debugName = 'CalDAVEventSynchronization';
         }
         $result = $synchronizer->synchronize($calendarReference, $start, $end, $syncToken);
 

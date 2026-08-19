@@ -1323,17 +1323,54 @@ class Calendar extends IPSModuleStrict
      */
     private function mergeIncrementalEvents(array $events, array $changes): array
     {
+        $replacedResources = [];
+        foreach ($changes as $change) {
+            if ((bool) ($change['_syncDeleted'] ?? false)
+                || !(bool) ($change['_syncReplaceResource'] ?? false)) {
+                continue;
+            }
+            $resourceUrl = trim((string) ($change['resourceUrl'] ?? ''));
+            if ($resourceUrl !== '') {
+                $replacedResources[$resourceUrl] = true;
+            }
+        }
+        if ($replacedResources !== []) {
+            $events = array_values(array_filter(
+                $events,
+                static function (array $event) use ($replacedResources): bool
+                {
+                    $resourceUrl = trim((string) ($event['resourceUrl'] ?? ''));
+                    return $resourceUrl === '' || !isset($replacedResources[$resourceUrl]);
+                }
+            ));
+        }
+
         foreach ($changes as $change) {
             $eventReference = trim((string) ($change['eventReference'] ?? ''));
+            $resourceUrl = trim((string) ($change['resourceUrl'] ?? ''));
             if ((bool) ($change['_syncDeleted'] ?? false)) {
-                if ($eventReference === '') {
+                if ($eventReference === '' && $resourceUrl === '') {
                     continue;
                 }
                 $deletedSeriesId = trim((string) ($change['seriesId'] ?? ''));
                 $events = array_values(array_filter(
                     $events,
-                    static function (array $event) use ($eventReference, $deletedSeriesId): bool
+                    static function (array $event) use (
+                        $eventReference,
+                        $resourceUrl,
+                        $deletedSeriesId
+                    ): bool
                     {
+                        $candidateResource = trim((string) ($event['resourceUrl'] ?? ''));
+                        if ($resourceUrl !== ''
+                            && $candidateResource !== ''
+                            && hash_equals($resourceUrl, $candidateResource)) {
+                            return false;
+                        }
+
+                        if ($eventReference === '') {
+                            return true;
+                        }
                         $candidateReference = trim((string) ($event['eventReference'] ?? ''));
                         $candidateOccurrence = trim((string) ($event['occurrenceId'] ?? ''));
                         if (($candidateReference !== '' && hash_equals($eventReference, $candidateReference))
@@ -1350,18 +1387,23 @@ class Calendar extends IPSModuleStrict
                 continue;
             }
 
-            $resourceUrl = trim((string) ($change['resourceUrl'] ?? ''));
             $occurrenceId = trim((string) ($change['occurrenceId'] ?? ''));
+            $replaceResource = (bool) ($change['_syncReplaceResource'] ?? false);
             if ($eventReference === '' && $resourceUrl === '' && $occurrenceId === '') {
                 continue;
             }
             $events = array_values(array_filter(
                 $events,
-                static function (array $event) use ($eventReference, $resourceUrl, $occurrenceId): bool
+                static function (array $event) use (
+                    $eventReference,
+                    $resourceUrl,
+                    $occurrenceId,
+                    $replaceResource
+                ): bool
                 {
                     foreach ([
                         [$eventReference, trim((string) ($event['eventReference'] ?? ''))],
-                        [$resourceUrl, trim((string) ($event['resourceUrl'] ?? ''))],
+                        [$replaceResource ? '' : $resourceUrl, trim((string) ($event['resourceUrl'] ?? ''))],
                         [$occurrenceId, trim((string) ($event['occurrenceId'] ?? ''))]
                     ] as [$expected, $actual]) {
                         if ($expected !== '' && $actual !== '' && hash_equals($expected, $actual)) {
@@ -1373,6 +1415,7 @@ class Calendar extends IPSModuleStrict
                 }
             ));
             if ($this->eventOverlapsConfiguredRange($change)) {
+                unset($change['_syncReplaceResource']);
                 $events[] = $change;
             }
         }
