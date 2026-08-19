@@ -76,6 +76,10 @@ class Calendar extends IPSModuleStrict
         $this->RegisterAttributeString('BirthdayMetadata', '[]');
         $this->RegisterAttributeInteger('LastSynchronization', 0);
         $this->RegisterAttributeString('LastError', '');
+        $this->RegisterAttributeString('IncrementalSyncToken', '');
+        $this->RegisterAttributeInteger('IncrementalSyncWindowStart', 0);
+        $this->RegisterAttributeInteger('IncrementalSyncWindowEnd', 0);
+        $this->RegisterAttributeString('IncrementalSyncCalendarID', '');
         $this->RegisterAttributeBoolean('CalendarMetadataAvailable', false);
         $this->RegisterAttributeString('ResolvedCalendarID', '');
         $this->RegisterAttributeString('DetectedCalendarColor', '');
@@ -175,6 +179,7 @@ class Calendar extends IPSModuleStrict
 
         $this->removeLegacyEventsVariable();
         $this->WriteAttributeBoolean('RuntimeReady', false);
+        $this->clearIncrementalSyncState();
         $this->RegisterMessage(0, IPS_KERNELSTARTED);
         $this->SetTimerInterval('InitializationTimer', 0);
         $this->SetTimerInterval('SynchronizationTimer', 0);
@@ -952,6 +957,7 @@ class Calendar extends IPSModuleStrict
      */
     public function ClearCache(): void
     {
+        $this->clearIncrementalSyncState();
         $this->storeEvents([]);
         $this->WriteAttributeInteger('LastSynchronization', 0);
         $this->SetValue('LastSynchronization', 0);
@@ -1187,18 +1193,31 @@ class Calendar extends IPSModuleStrict
         $today = new DateTimeImmutable('today');
         $start = $today->modify('-' . $pastDays . ' days');
         $end = $today->modify('+' . ($futureDays + 1) . ' days');
+        $startTimestamp = $start->getTimestamp();
+        $endTimestamp = $end->getTimestamp();
+        $syncToken = $this->incrementalSyncTokenForWindow($startTimestamp, $endTimestamp);
         $startedAt = microtime(true);
         $this->SendSafeDebug('EventTransferStart', [
-            'start' => $start->format(DATE_ATOM),
-            'end'   => $end->format(DATE_ATOM)
+            'start'                => $start->format(DATE_ATOM),
+            'end'                  => $end->format(DATE_ATOM),
+            'incrementalRequested' => $syncToken !== ''
         ]);
         $transfer = $this->sendRequest(
             'BeginEventsTransfer',
-            ['Start' => $start->getTimestamp(), 'End' => $end->getTimestamp()]
+            [
+                'Start'     => $startTimestamp,
+                'End'       => $endTimestamp,
+                'SyncToken' => $syncToken
+            ]
         );
         $token = trim((string) ($transfer['Token'] ?? ''));
         $pageCount = (int) ($transfer['PageCount'] ?? 0);
         $itemCount = (int) ($transfer['ItemCount'] ?? -1);
+        $nextSyncToken = trim((string) ($transfer['SyncToken'] ?? ''));
+        $incremental = (bool) ($transfer['Incremental'] ?? false);
+        if ($incremental && $syncToken === '') {
+            throw new UnexpectedValueException('The calendar account returned an unexpected incremental event transfer.');
+        }
         if (preg_match('/^[a-f0-9]{32}$/D', $token) !== 1
             || $pageCount < 1
             || $pageCount > 10_000
@@ -1206,11 +1225,12 @@ class Calendar extends IPSModuleStrict
             throw new UnexpectedValueException('The calendar account returned invalid event transfer metadata.');
         }
         $this->SendSafeDebug('EventTransferMetadata', [
-            'pageCount' => $pageCount,
-            'itemCount' => $itemCount
+            'pageCount'   => $pageCount,
+            'itemCount'   => $itemCount,
+            'incremental' => $incremental
         ]);
 
-        $events = [];
+        $transferredEvents = [];
         try {
             for ($page = 0; $page < $pageCount; ++$page) {
                 $payload = $this->sendRequest(
@@ -1231,20 +1251,138 @@ class Calendar extends IPSModuleStrict
                     if (!is_array($event) || array_is_list($event)) {
                         throw new UnexpectedValueException('The calendar account returned invalid event data.');
                     }
-                    $events[] = $event;
+                    $transferredEvents[] = $event;
                 }
             }
         } finally {
             $this->finishEventTransfer($token);
         }
 
-        if (count($events) !== $itemCount) {
+        if (count($transferredEvents) !== $itemCount) {
             throw new UnexpectedValueException('The calendar account returned an incomplete event transfer.');
         }
+
+        $events = $incremental
+            ? $this->mergeIncrementalEvents($this->readEvents(), $transferredEvents)
+            : array_values(array_filter(
+                $transferredEvents,
+                static fn (array $event): bool => !($event['_syncDeleted'] ?? false)
+            ));
+        if ($nextSyncToken !== '') {
+            $this->storeIncrementalSyncState($nextSyncToken, $startTimestamp, $endTimestamp);
+        } else {
+            $this->clearIncrementalSyncState();
+        }
+
         $this->SendSafeDebug('EventTransferCompleted', [
-            'eventCount' => count($events),
-            'durationMs' => (int) round((microtime(true) - $startedAt) * 1000)
+            'eventCount'        => count($events),
+            'transferredCount'  => count($transferredEvents),
+            'incremental'       => $incremental,
+            'durationMs'        => (int) round((microtime(true) - $startedAt) * 1000)
         ]);
+
+        return $events;
+    }
+
+    private function incrementalSyncTokenForWindow(int $startTimestamp, int $endTimestamp): string
+    {
+        $token = trim($this->ReadAttributeString('IncrementalSyncToken'));
+        if ($token === ''
+            || $this->ReadAttributeInteger('IncrementalSyncWindowStart') !== $startTimestamp
+            || $this->ReadAttributeInteger('IncrementalSyncWindowEnd') !== $endTimestamp
+            || !hash_equals(
+                $this->ReadAttributeString('IncrementalSyncCalendarID'),
+                $this->effectiveCalendarId()
+            )) {
+            return '';
+        }
+
+        return $token;
+    }
+
+    private function storeIncrementalSyncState(string $token, int $startTimestamp, int $endTimestamp): void
+    {
+        $this->WriteAttributeString('IncrementalSyncToken', trim($token));
+        $this->WriteAttributeInteger('IncrementalSyncWindowStart', $startTimestamp);
+        $this->WriteAttributeInteger('IncrementalSyncWindowEnd', $endTimestamp);
+        $this->WriteAttributeString('IncrementalSyncCalendarID', $this->effectiveCalendarId());
+    }
+
+    private function clearIncrementalSyncState(): void
+    {
+        $this->WriteAttributeString('IncrementalSyncToken', '');
+        $this->WriteAttributeInteger('IncrementalSyncWindowStart', 0);
+        $this->WriteAttributeInteger('IncrementalSyncWindowEnd', 0);
+        $this->WriteAttributeString('IncrementalSyncCalendarID', '');
+    }
+
+    /**
+     * @param list<array<string, mixed>> $events
+     * @param list<array<string, mixed>> $changes
+     * @return list<array<string, mixed>>
+     */
+    private function mergeIncrementalEvents(array $events, array $changes): array
+    {
+        foreach ($changes as $change) {
+            $eventReference = trim((string) ($change['eventReference'] ?? ''));
+            if ((bool) ($change['_syncDeleted'] ?? false)) {
+                if ($eventReference === '') {
+                    continue;
+                }
+                $deletedSeriesId = trim((string) ($change['seriesId'] ?? ''));
+                $events = array_values(array_filter(
+                    $events,
+                    static function (array $event) use ($eventReference, $deletedSeriesId): bool
+                    {
+                        $candidateReference = trim((string) ($event['eventReference'] ?? ''));
+                        $candidateOccurrence = trim((string) ($event['occurrenceId'] ?? ''));
+                        if (($candidateReference !== '' && hash_equals($eventReference, $candidateReference))
+                            || ($candidateOccurrence !== '' && hash_equals($eventReference, $candidateOccurrence))) {
+                            return false;
+                        }
+
+                        $candidateSeries = trim((string) ($event['seriesId'] ?? ''));
+                        return $deletedSeriesId !== ''
+                            || $candidateSeries === ''
+                            || !hash_equals($eventReference, $candidateSeries);
+                    }
+                ));
+                continue;
+            }
+
+            $resourceUrl = trim((string) ($change['resourceUrl'] ?? ''));
+            $occurrenceId = trim((string) ($change['occurrenceId'] ?? ''));
+            if ($eventReference === '' && $resourceUrl === '' && $occurrenceId === '') {
+                continue;
+            }
+            $events = array_values(array_filter(
+                $events,
+                static function (array $event) use ($eventReference, $resourceUrl, $occurrenceId): bool
+                {
+                    foreach ([
+                        [$eventReference, trim((string) ($event['eventReference'] ?? ''))],
+                        [$resourceUrl, trim((string) ($event['resourceUrl'] ?? ''))],
+                        [$occurrenceId, trim((string) ($event['occurrenceId'] ?? ''))]
+                    ] as [$expected, $actual]) {
+                        if ($expected !== '' && $actual !== '' && hash_equals($expected, $actual)) {
+                            return false;
+                        }
+                    }
+
+                    return true;
+                }
+            ));
+            if ($this->eventOverlapsConfiguredRange($change)) {
+                $events[] = $change;
+            }
+        }
+
+        usort(
+            $events,
+            static fn (array $left, array $right): int => ((int) ($left['startTimestamp'] ?? 0)
+                <=> (int) ($right['startTimestamp'] ?? 0))
+                ?: strcasecmp((string) ($left['summary'] ?? ''), (string) ($right['summary'] ?? ''))
+        );
 
         return $events;
     }
@@ -2037,6 +2175,7 @@ class Calendar extends IPSModuleStrict
 
     private function refreshAfterWrite(): void
     {
+        $this->clearIncrementalSyncState();
         $events = $this->requestEvents();
         $this->storeEvents($events);
         $this->WriteAttributeString('LastError', '');

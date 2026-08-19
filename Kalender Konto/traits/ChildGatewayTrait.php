@@ -4,8 +4,13 @@ declare(strict_types=1);
 
 use IPSKalender\CalendarEventLookupProviderInterface;
 use IPSKalender\CalendarEventRecurrence;
+use IPSKalender\GoogleCalendarIncrementalSync;
+use IPSKalender\GoogleCalendarOriginPolicy;
+use IPSKalender\GoogleCalendarProvider;
 use IPSKalender\ICalendarRecurrence;
 use IPSKalender\RecurringCalendarProviderInterface;
+
+require_once __DIR__ . '/../../libs/GoogleCalendarIncrementalSync.php';
 
 trait KalenderKontoChildGatewayTrait
 {
@@ -125,14 +130,49 @@ trait KalenderKontoChildGatewayTrait
      * Creates a temporary, paged transfer for the requested calendar events.
      *
      * @param array<string, mixed> $request
-     * @return array{Token:string,PageCount:int,ItemCount:int,ExpiresAt:int}
+     * @return array{Token:string,PageCount:int,ItemCount:int,ExpiresAt:int,SyncToken?:string,Incremental?:bool}
      */
     private function beginEventsTransferForChild(array $request): array
     {
-        return $this->CreateChunkedJsonTransfer(
-            self::EVENT_TRANSFER_SCOPE,
-            $this->getEventsForChild($request)
+        if ($this->ReadPropertyInteger('Provider') !== self::PROVIDER_GOOGLE) {
+            return $this->CreateChunkedJsonTransfer(
+                self::EVENT_TRANSFER_SCOPE,
+                $this->getEventsForChild($request)
+            );
+        }
+
+        $calendar = $this->resolveCalendar((string) ($request['CalendarID'] ?? ''));
+        $startTimestamp = (int) ($request['Start'] ?? 0);
+        $endTimestamp = (int) ($request['End'] ?? 0);
+        if ($startTimestamp <= 0 || $endTimestamp <= $startTimestamp) {
+            throw new InvalidArgumentException('The requested event time range is invalid.');
+        }
+        if (($endTimestamp - $startTimestamp) > 6 * 366 * 86400) {
+            throw new InvalidArgumentException('The requested event time range is too large.');
+        }
+
+        $startedAt = microtime(true);
+        $accessToken = $this->getGoogleAccessToken();
+        $httpClient = $this->createTrustedCloudHttpClient(new GoogleCalendarOriginPolicy());
+        $provider = new GoogleCalendarProvider($httpClient, $accessToken);
+        $synchronizer = new GoogleCalendarIncrementalSync($provider, $httpClient, $accessToken);
+        $result = $synchronizer->synchronize(
+            $this->calendarReference($calendar),
+            new DateTimeImmutable('@' . $startTimestamp),
+            new DateTimeImmutable('@' . $endTimestamp),
+            trim((string) ($request['SyncToken'] ?? ''))
         );
+
+        $transfer = $this->CreateChunkedJsonTransfer(self::EVENT_TRANSFER_SCOPE, $result['items']);
+        $transfer['SyncToken'] = $result['syncToken'];
+        $transfer['Incremental'] = $result['incremental'];
+        $this->SendSafeDebug('GoogleEventSynchronization', [
+            'incremental' => $result['incremental'],
+            'itemCount'   => count($result['items']),
+            'durationMs'  => (int) round((microtime(true) - $startedAt) * 1000)
+        ]);
+
+        return $transfer;
     }
 
     /**
