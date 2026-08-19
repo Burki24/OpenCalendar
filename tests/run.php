@@ -20,6 +20,7 @@ $commands = [
     ['Verify Calendar View PHP API', [PHP_BINARY, 'tests/calendar-view-api.php']],
     ['Verify calendar configurator cache isolation', [PHP_BINARY, 'tests/configurator-cache.php']],
     ['Verify Google incremental synchronization', [PHP_BINARY, 'tests/google-incremental-sync.php']],
+    ['Verify Microsoft incremental synchronization', [PHP_BINARY, 'tests/microsoft-incremental-sync.php']],
     ['Run OpenCalendar provider and integration tests', [PHP_BINARY, 'tests/calendar-provider.php']],
     ['Check shared visualization contract', [PHP_BINARY, 'tests/visualization.php']],
     ['Run account module structure tests', [PHP_BINARY, 'tests/account-module.php']],

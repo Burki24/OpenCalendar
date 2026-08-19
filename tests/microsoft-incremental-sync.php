@@ -1,0 +1,162 @@
+<?php
+
+declare(strict_types=1);
+
+use IPSKalender\CalendarHttpClientInterface;
+use IPSKalender\CalendarHttpResponse;
+use IPSKalender\MicrosoftCalendarIncrementalSync;
+
+require_once __DIR__ . '/../libs/MicrosoftCalendarIncrementalSync.php';
+
+final class MicrosoftIncrementalSyncTestHttpClient implements CalendarHttpClientInterface
+{
+    /** @var list<string> */
+    public array $urls = [];
+
+    /** @var list<CalendarHttpResponse> */
+    private array $responses;
+
+    /** @param list<CalendarHttpResponse> $responses */
+    public function __construct(array $responses)
+    {
+        $this->responses = $responses;
+    }
+
+    public function request(
+        string $method,
+        string $url,
+        array $headers = [],
+        string $body = '',
+        int $maxResponseBytes = 67_108_864
+    ): CalendarHttpResponse {
+        if ($method !== 'GET') {
+            throw new RuntimeException('The Microsoft incremental-sync test only expects GET requests.');
+        }
+        $this->urls[] = $url;
+        if ($this->responses === []) {
+            throw new RuntimeException('The Microsoft incremental-sync test has no queued response.');
+        }
+
+        return array_shift($this->responses);
+    }
+}
+
+/** @param array<string, mixed> $payload */
+function microsoftSyncResponse(int $statusCode, array $payload): CalendarHttpResponse
+{
+    return new CalendarHttpResponse(
+        $statusCode,
+        [],
+        json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR),
+        ''
+    );
+}
+
+function microsoftSyncExpect(bool $condition, string $message): void
+{
+    if (!$condition) {
+        throw new RuntimeException($message);
+    }
+}
+
+/** @return array<string, mixed> */
+function microsoftSyncEvent(string $id, string $summary, string $date): array
+{
+    return [
+        'id'                    => $id,
+        'iCalUId'               => $id . '@example.test',
+        'type'                  => 'singleInstance',
+        'subject'               => $summary,
+        'body'                  => ['contentType' => 'text', 'content' => $summary . ' description'],
+        'location'              => ['displayName' => 'Office'],
+        'start'                 => ['dateTime' => $date . 'T09:00:00.0000000', 'timeZone' => 'UTC'],
+        'end'                   => ['dateTime' => $date . 'T10:00:00.0000000', 'timeZone' => 'UTC'],
+        'isAllDay'              => false,
+        'isCancelled'           => false,
+        'isReminderOn'          => false,
+        'originalStartTimeZone' => 'UTC',
+        'createdDateTime'       => $date . 'T07:00:00Z',
+        'lastModifiedDateTime'  => $date . 'T08:00:00Z',
+        'webLink'               => 'https://outlook.office.com/calendar/item/' . $id,
+        'isOnlineMeeting'       => false,
+        '@odata.etag'           => '"' . $id . '-etag"'
+    ];
+}
+
+$start = new DateTimeImmutable('2026-08-01T00:00:00+00:00');
+$end = new DateTimeImmutable('2027-08-01T00:00:00+00:00');
+$initialNextLink = 'https://graph.microsoft.com/v1.0/me/calendars/primary/calendarView/delta?$skiptoken=page-2';
+$initialDeltaLink = 'https://graph.microsoft.com/v1.0/me/calendars/primary/calendarView/delta?$deltatoken=token-1';
+
+$initialHttp = new MicrosoftIncrementalSyncTestHttpClient([
+    microsoftSyncResponse(200, [
+        'value'           => [microsoftSyncEvent('initial-1', 'Initial', '2026-08-20')],
+        '@odata.nextLink' => $initialNextLink
+    ]),
+    microsoftSyncResponse(200, ['value' => [], '@odata.deltaLink' => $initialDeltaLink])
+]);
+$initialSynchronizer = new MicrosoftCalendarIncrementalSync($initialHttp, 'access-token');
+$initial = $initialSynchronizer->synchronize('primary', $start, $end);
+microsoftSyncExpect($initial['incremental'] === false, 'The first Microsoft synchronization must be a full synchronization.');
+microsoftSyncExpect($initial['syncToken'] === $initialDeltaLink, 'The first Microsoft synchronization did not preserve its delta link.');
+microsoftSyncExpect(count($initial['items']) === 1, 'The first Microsoft synchronization did not return the full event set.');
+microsoftSyncExpect(
+    str_contains($initialHttp->urls[0], '/calendarView/delta?')
+        && str_contains($initialHttp->urls[0], 'startDateTime=')
+        && str_contains($initialHttp->urls[0], 'endDateTime='),
+    'The initial Microsoft delta request must use the configured event window.'
+);
+microsoftSyncExpect(
+    $initialHttp->urls[1] === $initialNextLink,
+    'The initial Microsoft delta request did not follow the opaque nextLink unchanged.'
+);
+
+$incrementalDeltaLink = 'https://graph.microsoft.com/v1.0/me/calendars/primary/calendarView/delta?$deltatoken=token-2';
+$incrementalHttp = new MicrosoftIncrementalSyncTestHttpClient([
+    microsoftSyncResponse(200, [
+        'value'            => [
+            ['id' => 'changed-1'],
+            ['id' => 'deleted-1', '@removed' => ['reason' => 'deleted']]
+        ],
+        '@odata.deltaLink' => $incrementalDeltaLink
+    ]),
+    microsoftSyncResponse(200, microsoftSyncEvent('changed-1', 'Changed', '2026-08-21'))
+]);
+$incrementalSynchronizer = new MicrosoftCalendarIncrementalSync($incrementalHttp, 'access-token');
+$incremental = $incrementalSynchronizer->synchronize('primary', $start, $end, $initialDeltaLink);
+microsoftSyncExpect($incremental['incremental'] === true, 'A valid Microsoft delta link must trigger incremental synchronization.');
+microsoftSyncExpect($incremental['syncToken'] === $incrementalDeltaLink, 'The incremental Microsoft synchronization did not return the next delta link.');
+microsoftSyncExpect(count($incremental['items']) === 2, 'The incremental Microsoft synchronization returned an unexpected change count.');
+microsoftSyncExpect(
+    ($incremental['items'][0]['eventReference'] ?? '') === 'changed-1'
+        && ($incremental['items'][0]['summary'] ?? '') === 'Changed',
+    'A changed Microsoft event was not normalized from its current provider representation.'
+);
+microsoftSyncExpect(
+    ($incremental['items'][1]['_syncDeleted'] ?? false) === true
+        && ($incremental['items'][1]['eventReference'] ?? '') === 'deleted-1',
+    'A removed Microsoft event was not returned as a deletion marker.'
+);
+microsoftSyncExpect(
+    $incrementalHttp->urls[0] === $initialDeltaLink,
+    'The Microsoft delta link must be reused exactly as returned by Graph.'
+);
+
+$fallbackDeltaLink = 'https://graph.microsoft.com/v1.0/me/calendars/primary/calendarView/delta?$deltatoken=token-3';
+$fallbackHttp = new MicrosoftIncrementalSyncTestHttpClient([
+    microsoftSyncResponse(410, ['error' => ['code' => 'resyncRequired', 'message' => 'Resynchronization required.']]),
+    microsoftSyncResponse(200, [
+        'value'            => [microsoftSyncEvent('fallback-1', 'Fallback', '2026-08-22')],
+        '@odata.deltaLink' => $fallbackDeltaLink
+    ])
+]);
+$fallbackSynchronizer = new MicrosoftCalendarIncrementalSync($fallbackHttp, 'access-token');
+$fallback = $fallbackSynchronizer->synchronize('primary', $start, $end, $initialDeltaLink);
+microsoftSyncExpect($fallback['incremental'] === false, 'HTTP 410 must automatically fall back to a full Microsoft synchronization.');
+microsoftSyncExpect($fallback['syncToken'] === $fallbackDeltaLink, 'The HTTP 410 fallback did not return a fresh Microsoft delta link.');
+microsoftSyncExpect(
+    count($fallback['items']) === 1 && ($fallback['items'][0]['eventReference'] ?? '') === 'fallback-1',
+    'The HTTP 410 fallback did not return the new full Microsoft event set.'
+);
+
+echo "Microsoft incremental synchronization tests passed.\n";

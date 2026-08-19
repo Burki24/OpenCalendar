@@ -8,9 +8,12 @@ use IPSKalender\GoogleCalendarIncrementalSync;
 use IPSKalender\GoogleCalendarOriginPolicy;
 use IPSKalender\GoogleCalendarProvider;
 use IPSKalender\ICalendarRecurrence;
+use IPSKalender\MicrosoftCalendarIncrementalSync;
+use IPSKalender\MicrosoftGraphOriginPolicy;
 use IPSKalender\RecurringCalendarProviderInterface;
 
 require_once __DIR__ . '/../../libs/GoogleCalendarIncrementalSync.php';
+require_once __DIR__ . '/../../libs/MicrosoftCalendarIncrementalSync.php';
 
 trait KalenderKontoChildGatewayTrait
 {
@@ -134,7 +137,8 @@ trait KalenderKontoChildGatewayTrait
      */
     private function beginEventsTransferForChild(array $request): array
     {
-        if ($this->ReadPropertyInteger('Provider') !== self::PROVIDER_GOOGLE) {
+        $providerType = $this->ReadPropertyInteger('Provider');
+        if (!in_array($providerType, [self::PROVIDER_GOOGLE, self::PROVIDER_MICROSOFT], true)) {
             return $this->CreateChunkedJsonTransfer(
                 self::EVENT_TRANSFER_SCOPE,
                 $this->getEventsForChild($request)
@@ -152,21 +156,28 @@ trait KalenderKontoChildGatewayTrait
         }
 
         $startedAt = microtime(true);
-        $accessToken = $this->getGoogleAccessToken();
-        $httpClient = $this->createTrustedCloudHttpClient(new GoogleCalendarOriginPolicy());
-        $provider = new GoogleCalendarProvider($httpClient, $accessToken);
-        $synchronizer = new GoogleCalendarIncrementalSync($provider, $httpClient, $accessToken);
-        $result = $synchronizer->synchronize(
-            $this->calendarReference($calendar),
-            new DateTimeImmutable('@' . $startTimestamp),
-            new DateTimeImmutable('@' . $endTimestamp),
-            trim((string) ($request['SyncToken'] ?? ''))
-        );
+        $calendarReference = $this->calendarReference($calendar);
+        $start = new DateTimeImmutable('@' . $startTimestamp);
+        $end = new DateTimeImmutable('@' . $endTimestamp);
+        $syncToken = trim((string) ($request['SyncToken'] ?? ''));
+        if ($providerType === self::PROVIDER_GOOGLE) {
+            $accessToken = $this->getGoogleAccessToken();
+            $httpClient = $this->createTrustedCloudHttpClient(new GoogleCalendarOriginPolicy());
+            $provider = new GoogleCalendarProvider($httpClient, $accessToken);
+            $synchronizer = new GoogleCalendarIncrementalSync($provider, $httpClient, $accessToken);
+            $debugName = 'GoogleEventSynchronization';
+        } else {
+            $accessToken = $this->getMicrosoftAccessToken();
+            $httpClient = $this->createTrustedCloudHttpClient(new MicrosoftGraphOriginPolicy());
+            $synchronizer = new MicrosoftCalendarIncrementalSync($httpClient, $accessToken);
+            $debugName = 'MicrosoftEventSynchronization';
+        }
+        $result = $synchronizer->synchronize($calendarReference, $start, $end, $syncToken);
 
         $transfer = $this->CreateChunkedJsonTransfer(self::EVENT_TRANSFER_SCOPE, $result['items']);
         $transfer['SyncToken'] = $result['syncToken'];
         $transfer['Incremental'] = $result['incremental'];
-        $this->SendSafeDebug('GoogleEventSynchronization', [
+        $this->SendSafeDebug($debugName, [
             'incremental' => $result['incremental'],
             'itemCount'   => count($result['items']),
             'durationMs'  => (int) round((microtime(true) - $startedAt) * 1000)
