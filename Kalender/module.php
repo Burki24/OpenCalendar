@@ -749,7 +749,12 @@ class Calendar extends IPSModuleStrict
                     trim((string) ($event['summary'] ?? ''))
                 );
             }
-            $this->refreshAfterWrite();
+            $simpleSingleWrite = ($recurrence === null || $recurrence === [])
+                && ($anniversary === null || !$anniversary['enabled']);
+            if (!$simpleSingleWrite
+                || !$this->refreshSingleEventAfterWrite(array_merge($event, $created))) {
+                $this->refreshAfterWrite();
+            }
 
             return $this->encodeResult(true, $created);
         } catch (Throwable $exception) {
@@ -840,6 +845,11 @@ class Calendar extends IPSModuleStrict
             if ($changes === [] && !$anniversaryDisabled) {
                 throw new InvalidArgumentException('No event changes were supplied.');
             }
+            $simpleSingleWrite = $recurrenceType === CalendarEventRecurrence::SINGLE
+                && !$convertingSingleToSeries
+                && $anniversary === null
+                && $existingAnniversary === null;
+            $cachedEvent = $simpleSingleWrite ? $this->cachedEventForIdentity($event) : null;
 
             $this->SendSafeDebug('EventUpdate', [
                 'recurrenceType'     => $recurrenceType,
@@ -874,7 +884,14 @@ class Calendar extends IPSModuleStrict
                     $event
                 );
             }
-            $this->refreshAfterWrite();
+            if (!$simpleSingleWrite
+                || $cachedEvent === null
+                || !$this->refreshSingleEventAfterWrite(
+                    array_merge($cachedEvent, $changes, $updated),
+                    $event
+                )) {
+                $this->refreshAfterWrite();
+            }
 
             return $this->encodeResult(true, $updated);
         } catch (Throwable $exception) {
@@ -894,8 +911,9 @@ class Calendar extends IPSModuleStrict
             $event = $this->decodeObject($EventJSON, 'event');
             $recurrence = $this->resolveWriteRecurrence($event, false);
             $writeScope = (string) ($recurrence['writeScope'] ?? '');
+            $recurrenceType = (string) ($recurrence['recurrenceType'] ?? CalendarEventRecurrence::SINGLE);
             $this->SendSafeDebug('EventDelete', [
-                'recurrenceType' => (string) ($recurrence['recurrenceType'] ?? CalendarEventRecurrence::SINGLE),
+                'recurrenceType' => $recurrenceType,
                 'writeScope'     => $writeScope
             ]);
             $result = $this->sendRequest(
@@ -918,7 +936,10 @@ class Calendar extends IPSModuleStrict
                 )) {
                 $this->removeAnniversaryMetadata($event);
             }
-            $this->refreshAfterWrite();
+            if ($recurrenceType !== CalendarEventRecurrence::SINGLE
+                || !$this->removeSingleEventFromCache($event)) {
+                $this->refreshAfterWrite();
+            }
             return true;
         } catch (Throwable $exception) {
             $this->handleError($exception);
@@ -1849,6 +1870,169 @@ class Calendar extends IPSModuleStrict
         if ($this->VariableExists('Events')) {
             $this->UnregisterVariable('Events');
         }
+    }
+
+    /**
+     * Refreshes one non-recurring event directly from the provider and updates the local cache.
+     *
+     * @param array<string, mixed> $event Event identity and current time boundaries after the write.
+     * @param array<string, mixed> $sourceEvent Previous event identity when an existing event was updated.
+     */
+    private function refreshSingleEventAfterWrite(array $event, array $sourceEvent = []): bool
+    {
+        $startTimestamp = $this->eventBoundaryTimestamp($event, 'start');
+        $endTimestamp = $this->eventBoundaryTimestamp($event, 'end');
+        if ($startTimestamp <= 0) {
+            return false;
+        }
+        if ($endTimestamp <= $startTimestamp) {
+            $endTimestamp = $startTimestamp + 1;
+        }
+
+        try {
+            $currentEvent = $this->sendRequest(
+                'GetEventForEdit',
+                [
+                    'ResourceURL'    => trim((string) ($event['resourceUrl'] ?? '')),
+                    'EventReference' => trim((string) ($event['eventReference'] ?? '')),
+                    'UID'            => trim((string) ($event['uid'] ?? '')),
+                    'OccurrenceID'   => '',
+                    'OriginalStart'  => '',
+                    'RecurrenceID'   => '',
+                    'Start'          => $startTimestamp,
+                    'End'            => $endTimestamp
+                ]
+            );
+        } catch (Throwable $exception) {
+            $this->SendSafeDebugException('EventCacheRefreshFallback', $exception);
+            return false;
+        }
+
+        if ((bool) ($currentEvent['recurring'] ?? false)
+            || (string) ($currentEvent['recurrenceType'] ?? CalendarEventRecurrence::SINGLE)
+                !== CalendarEventRecurrence::SINGLE) {
+            return false;
+        }
+
+        $previousIdentity = $sourceEvent !== [] ? $sourceEvent : $event;
+        $events = array_values(array_filter(
+            $this->readEvents(),
+            fn (array $cachedEvent): bool => !$this->eventIdentityMatches($cachedEvent, $previousIdentity)
+                && !$this->eventIdentityMatches($cachedEvent, $currentEvent)
+        ));
+        if ($this->eventOverlapsConfiguredRange($currentEvent)) {
+            $events[] = $currentEvent;
+        }
+        $this->storeEventsAfterWrite($events);
+
+        return true;
+    }
+
+    /** @param array<string, mixed> $identity */
+    private function cachedEventForIdentity(array $identity): ?array
+    {
+        foreach ($this->readEvents() as $event) {
+            if ($this->eventIdentityMatches($event, $identity)) {
+                return $event;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @param array<string, mixed> $candidate
+     * @param array<string, mixed> $identity
+     */
+    private function eventIdentityMatches(array $candidate, array $identity): bool
+    {
+        foreach (['resourceUrl', 'eventReference', 'uid'] as $key) {
+            $expected = trim((string) ($identity[$key] ?? ''));
+            $actual = trim((string) ($candidate[$key] ?? ''));
+            if ($expected !== '' && $actual !== '' && hash_equals($expected, $actual)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /** @param array<string, mixed> $event */
+    private function removeSingleEventFromCache(array $event): bool
+    {
+        $events = $this->readEvents();
+        $filtered = array_values(array_filter(
+            $events,
+            fn (array $cachedEvent): bool => !$this->eventIdentityMatches($cachedEvent, $event)
+        ));
+        if (count($filtered) === count($events)) {
+            return false;
+        }
+
+        $this->storeEventsAfterWrite($filtered);
+        return true;
+    }
+
+    /** @param array<string, mixed> $event */
+    private function eventBoundaryTimestamp(array $event, string $key): int
+    {
+        $value = trim((string) ($event[$key] ?? ''));
+        if ($value !== '') {
+            try {
+                if (preg_match('/^\d{4}-\d{2}-\d{2}$/D', $value) === 1) {
+                    $date = DateTimeImmutable::createFromFormat('!Y-m-d', $value);
+                    if ($date !== false && $date->format('Y-m-d') === $value) {
+                        return $date->getTimestamp();
+                    }
+                }
+
+                return (new DateTimeImmutable($value))->getTimestamp();
+            } catch (Throwable) {
+                return 0;
+            }
+        }
+
+        return max(0, (int) ($event[$key . 'Timestamp'] ?? 0));
+    }
+
+    /** @param array<string, mixed> $event */
+    private function eventOverlapsConfiguredRange(array $event): bool
+    {
+        $startTimestamp = $this->eventBoundaryTimestamp($event, 'start');
+        if ($startTimestamp <= 0) {
+            return false;
+        }
+        $endTimestamp = $this->eventBoundaryTimestamp($event, 'end');
+        if ($endTimestamp <= $startTimestamp) {
+            $endTimestamp = $startTimestamp + 1;
+        }
+
+        $pastDays = max(0, min(1095, $this->ReadPropertyInteger('PastDays')));
+        $futureDays = max(1, min(1095, $this->ReadPropertyInteger('FutureDays')));
+        $today = new DateTimeImmutable('today');
+        $rangeStart = $today->modify('-' . $pastDays . ' days')->getTimestamp();
+        $rangeEnd = $today->modify('+' . ($futureDays + 1) . ' days')->getTimestamp();
+
+        return $endTimestamp >= $rangeStart && $startTimestamp < $rangeEnd;
+    }
+
+    /** @param list<array<string, mixed>> $events */
+    private function storeEventsAfterWrite(array $events): void
+    {
+        $events = $this->enrichAnniversaryEvents($events);
+        usort(
+            $events,
+            static fn (array $left, array $right): int => ((int) ($left['startTimestamp'] ?? 0)
+                <=> (int) ($right['startTimestamp'] ?? 0))
+                ?: strcasecmp((string) ($left['summary'] ?? ''), (string) ($right['summary'] ?? ''))
+        );
+        $this->WritePersistentJsonCache('CachedEvents', $events);
+        $this->updateEventCounters($events);
+        $this->WriteAttributeString('LastError', '');
+        $this->SetStatus($this->ReadPropertyBoolean('Active') ? IS_ACTIVE : IS_INACTIVE);
+
+        // Notify Calendar View instances without changing the true synchronization timestamp.
+        $this->SetValue('LastSynchronization', $this->ReadAttributeInteger('LastSynchronization'));
     }
 
     private function refreshAfterWrite(): void

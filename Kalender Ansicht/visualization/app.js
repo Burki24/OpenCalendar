@@ -45,6 +45,7 @@ let monthLayoutFrame = null;
 let selectedDayEventsDate = null;
 let swipeGesture = null;
 let suppressSwipeClickUntil = 0;
+let deferredCalendarState = null;
 const monthEventData = new WeakMap();
 
 const content = document.getElementById('calendar-content');
@@ -120,7 +121,15 @@ function handleMessage(data) {
         return;
     }
     if (message.type !== 'state' || !message.payload) return;
-    calendarState = message.payload;
+    if (eventDialog.open) {
+        deferredCalendarState = message.payload;
+        return;
+    }
+    applyCalendarState(message.payload);
+}
+
+function applyCalendarState(state) {
+    calendarState = state;
     const eventEdit = calendarState.eventEdit && typeof calendarState.eventEdit === 'object'
         ? calendarState.eventEdit
         : null;
@@ -156,6 +165,13 @@ function handleMessage(data) {
         pendingSeriesEdit = null;
         openExistingEvent(seriesEdit, writeScope);
     }
+}
+
+function applyDeferredCalendarState() {
+    if (!deferredCalendarState || eventDialog.open) return;
+    const state = deferredCalendarState;
+    deferredCalendarState = null;
+    applyCalendarState(state);
 }
 
 
@@ -2528,7 +2544,10 @@ eventDialog.addEventListener('cancel', event => {
         eventCalendarTrigger.focus();
     }
 });
-eventDialog.addEventListener('close', closeCalendarPicker);
+eventDialog.addEventListener('close', () => {
+    closeCalendarPicker();
+    applyDeferredCalendarState();
+});
 document.getElementById('details-close').addEventListener('click', () => eventDetailsDialog.close());
 document.getElementById('details-close-button').addEventListener('click', () => eventDetailsDialog.close());
 document.getElementById('details-edit-button').addEventListener('click', () => requestEdit(eventDetailsDialog));
