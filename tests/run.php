@@ -17,6 +17,7 @@ $commands = [
     ['Verify chunked event transfers', [PHP_BINARY, 'tests/chunked-event-transfer.php']],
     ['Verify current-day event counting', [PHP_BINARY, 'tests/calendar-event-counter.php']],
     ['Verify annual-event metadata and calculations', [PHP_BINARY, 'tests/birthday.php']],
+    ['Verify annual-event metadata synchronization', [PHP_BINARY, 'tests/anniversary-metadata-sync.php']],
     ['Verify Calendar View PHP API', [PHP_BINARY, 'tests/calendar-view-api.php']],
     ['Verify calendar configurator cache isolation', [PHP_BINARY, 'tests/configurator-cache.php']],
     ['Verify Google incremental synchronization', [PHP_BINARY, 'tests/google-incremental-sync.php']],

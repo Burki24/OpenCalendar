@@ -57,6 +57,7 @@ trait KalenderKontoChildGatewayTrait
                     'success' => $this->finishEventsTransferForChild($request)
                 ],
                 'GetEventForEdit'        => $this->getEventForEditForChild($request),
+                'CheckRecurringSeries'   => $this->checkRecurringSeriesForChild($request),
                 'GetRecurringSeries'     => $this->getRecurringSeriesForChild($request),
                 'GetRecurringFollowing'  => $this->getRecurringFollowingForChild($request),
                 'CreateEvent'            => $this->createEventForChild($request),
@@ -341,6 +342,46 @@ trait KalenderKontoChildGatewayTrait
         }
 
         return true;
+    }
+
+    /**
+     * Verifies whether a recurring parent event still exists without turning a
+     * provider-side deletion into an error response for the child calendar.
+     *
+     * @param array<string, mixed> $request
+     * @return array{supported: bool, exists: bool}
+     */
+    private function checkRecurringSeriesForChild(array $request): array
+    {
+        $calendar = $this->resolveCalendar((string) ($request['CalendarID'] ?? ''));
+        $provider = $this->createProvider();
+        if (!$provider instanceof RecurringCalendarProviderInterface) {
+            return ['supported' => false, 'exists' => false];
+        }
+
+        $seriesId = trim((string) ($request['SeriesID'] ?? ''));
+        if ($seriesId === '') {
+            throw new InvalidArgumentException('The recurring series ID is missing.');
+        }
+
+        try {
+            $provider->getRecurringSeries(
+                $this->calendarReference($calendar),
+                $seriesId,
+                trim((string) ($request['ResourceURL'] ?? ''))
+            );
+        } catch (Throwable $exception) {
+            $httpStatus = property_exists($exception, 'httpStatus')
+                ? (int) $exception->httpStatus
+                : 0;
+            if (in_array($httpStatus, [404, 410], true)) {
+                return ['supported' => true, 'exists' => false];
+            }
+
+            throw $exception;
+        }
+
+        return ['supported' => true, 'exists' => true];
     }
 
     /**

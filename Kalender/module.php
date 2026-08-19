@@ -1262,12 +1262,14 @@ class Calendar extends IPSModuleStrict
             throw new UnexpectedValueException('The calendar account returned an incomplete event transfer.');
         }
 
+        $cachedEvents = $this->readEvents();
         $events = $incremental
-            ? $this->mergeIncrementalEvents($this->readEvents(), $transferredEvents)
+            ? $this->mergeIncrementalEvents($cachedEvents, $transferredEvents)
             : array_values(array_filter(
                 $transferredEvents,
                 static fn (array $event): bool => !($event['_syncDeleted'] ?? false)
             ));
+        $this->reconcileAnniversaryMetadataAfterSynchronization($events, $cachedEvents);
         if ($nextSyncToken !== '') {
             $this->storeIncrementalSyncState($nextSyncToken, $startTimestamp, $endTimestamp);
         } else {
@@ -1719,6 +1721,178 @@ class Calendar extends IPSModuleStrict
             }
         }
         $this->writeAnniversaryMetadata($metadata);
+    }
+
+    /**
+     * Removes local annual-event metadata only after the provider has explicitly
+     * confirmed that a recurring parent event no longer exists.
+     *
+     * Missing cached occurrences alone are never treated as a deletion. This is
+     * important for excluded occurrences, short synchronization windows, and
+     * leap-day annual events.
+     *
+     * @param list<array<string, mixed>> $events Current synchronized event cache.
+     * @param list<array<string, mixed>> $previousEvents Event cache before synchronization.
+     */
+    private function reconcileAnniversaryMetadataAfterSynchronization(
+        array $events,
+        array $previousEvents
+    ): void {
+        $metadata = $this->readAnniversaryMetadata();
+        if ($metadata === []) {
+            return;
+        }
+
+        $dailyVerification = $this->shouldVerifyMissingAnniversaryMetadataToday();
+        $retained = [];
+        $removed = 0;
+        foreach ($metadata as $entry) {
+            if ($this->anniversaryMetadataMatchesEvents($entry, $events)) {
+                $retained[] = $entry;
+                continue;
+            }
+
+            $wasCached = $this->anniversaryMetadataMatchesEvents($entry, $previousEvents);
+            if (!$wasCached && !$dailyVerification) {
+                $retained[] = $entry;
+                continue;
+            }
+
+            $candidates = $this->anniversaryVerificationCandidates($entry);
+            if ($candidates === [] || $this->verifyAnniversarySeriesCandidates($candidates) !== false) {
+                $retained[] = $entry;
+                continue;
+            }
+
+            ++$removed;
+        }
+
+        if ($removed === 0) {
+            return;
+        }
+
+        $this->writeAnniversaryMetadata($retained);
+        $this->SendSafeDebug('AnniversaryMetadataCleanup', [
+            'removed'   => $removed,
+            'remaining' => count($retained)
+        ]);
+    }
+
+    /**
+     * @param array{keys: list<string>, type: string, date: string, summary: string} $metadata
+     * @param list<array<string, mixed>> $events
+     */
+    private function anniversaryMetadataMatchesEvents(array $metadata, array $events): bool
+    {
+        foreach ($events as $event) {
+            if (!is_array($event)) {
+                continue;
+            }
+            if (array_intersect($metadata['keys'], $this->anniversaryEventKeys($event)) !== []) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @param array{keys: list<string>, type: string, date: string, summary: string} $metadata
+     * @return list<array{seriesId: string, resourceUrl: string}>
+     */
+    private function anniversaryVerificationCandidates(array $metadata): array
+    {
+        $seriesIds = [];
+        $resourceUrls = [];
+        foreach ($metadata['keys'] as $key) {
+            if (str_starts_with($key, 'id:')) {
+                $seriesId = trim(substr($key, 3));
+                if ($seriesId !== '') {
+                    $seriesIds[] = $seriesId;
+                }
+            } elseif (str_starts_with($key, 'resource:')) {
+                $resourceUrl = trim(substr($key, 9));
+                if ($resourceUrl !== '') {
+                    $resourceUrls[] = $resourceUrl;
+                }
+            }
+        }
+
+        $seriesIds = array_values(array_unique($seriesIds));
+        $resourceUrls = array_values(array_unique($resourceUrls));
+        if ($seriesIds === []) {
+            return [];
+        }
+        if ($resourceUrls === []) {
+            $resourceUrls = [''];
+        }
+
+        $candidates = [];
+        foreach ($seriesIds as $seriesId) {
+            foreach ($resourceUrls as $resourceUrl) {
+                $candidates[] = [
+                    'seriesId'    => $seriesId,
+                    'resourceUrl' => $resourceUrl
+                ];
+                if (count($candidates) >= 16) {
+                    return $candidates;
+                }
+            }
+        }
+
+        return $candidates;
+    }
+
+    /**
+     * @param list<array{seriesId: string, resourceUrl: string}> $candidates
+     * @return bool|null True when a parent exists, false when every candidate is confirmed missing, null when unknown.
+     */
+    private function verifyAnniversarySeriesCandidates(array $candidates): ?bool
+    {
+        $confirmedMissing = false;
+        $unknown = false;
+        foreach ($candidates as $candidate) {
+            try {
+                $verification = $this->sendRequest('CheckRecurringSeries', [
+                    'SeriesID'    => $candidate['seriesId'],
+                    'ResourceURL' => $candidate['resourceUrl']
+                ]);
+            } catch (Throwable $exception) {
+                $this->SendSafeDebugException('AnniversaryMetadataVerificationError', $exception);
+                $unknown = true;
+                continue;
+            }
+
+            if (($verification['supported'] ?? false) !== true) {
+                $unknown = true;
+                continue;
+            }
+            if (($verification['exists'] ?? null) === true) {
+                return true;
+            }
+            if (($verification['exists'] ?? null) !== false) {
+                $unknown = true;
+                continue;
+            }
+            $confirmedMissing = true;
+        }
+
+        return !$unknown && $confirmedMissing ? false : null;
+    }
+
+    private function shouldVerifyMissingAnniversaryMetadataToday(): bool
+    {
+        $lastSynchronization = $this->ReadAttributeInteger('LastSynchronization');
+        if ($lastSynchronization <= 0) {
+            return true;
+        }
+
+        $timezone = new DateTimeZone(date_default_timezone_get());
+        $lastDate = (new DateTimeImmutable('@' . $lastSynchronization))
+            ->setTimezone($timezone)
+            ->format('Y-m-d');
+
+        return $lastDate !== (new DateTimeImmutable('now', $timezone))->format('Y-m-d');
     }
 
     /** @param array<string, mixed> $event */
