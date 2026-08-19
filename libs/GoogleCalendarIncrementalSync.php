@@ -22,6 +22,9 @@ final class GoogleCalendarIncrementalSync
     private const MAX_PAGES = 100;
     private const MAX_CHANGES = 100_000;
 
+    /**
+     * Creates an incremental Google Calendar synchronizer.
+     */
     public function __construct(
         private readonly GoogleCalendarProvider $provider,
         private readonly CalendarHttpClientInterface $httpClient,
@@ -208,7 +211,7 @@ final class GoogleCalendarIncrementalSync
 
     /**
      * @param array<string, mixed> $data
-     * @param array<string, true> $seenPageTokens
+     * @param array<string, true>  $seenPageTokens
      */
     private function validatedNextPageToken(array $data, array &$seenPageTokens, int $pageCount): string
     {
