@@ -46,6 +46,7 @@ let selectedDayEventsDate = null;
 let swipeGesture = null;
 let suppressSwipeClickUntil = 0;
 let deferredCalendarState = null;
+let importedIcsTimezone = '';
 const monthEventData = new WeakMap();
 
 const content = document.getElementById('calendar-content');
@@ -57,6 +58,8 @@ const editScopeConfirmButton = document.getElementById('edit-scope-confirm');
 const deleteConfirmDialog = document.getElementById('delete-confirm-dialog');
 const deleteConfirmButton = document.getElementById('delete-confirm-button');
 const eventForm = document.getElementById('event-form');
+const icsImportButton = document.getElementById('ics-import-button');
+const icsImportFile = document.getElementById('ics-import-file');
 const eventCalendarInput = document.getElementById('event-calendar');
 const eventCalendarPicker = document.getElementById('event-calendar-picker');
 const eventCalendarTrigger = document.getElementById('event-calendar-trigger');
@@ -1057,10 +1060,430 @@ function anniversaryEditorChange() {
     return { enabled: Boolean(type), type, date };
 }
 
+const icsImportMaximumBytes = 1024 * 1024;
+const icsImportMessages = {
+    de: {
+        'Import ICS': 'ICS importieren',
+        'ICS event imported.': 'ICS-Termin importiert.',
+        'The ICS file is too large.': 'Die ICS-Datei ist zu groß.',
+        'The selected file is not a valid single-event ICS file.': 'Die ausgewählte Datei ist keine gültige ICS-Datei mit einem einzelnen Termin.',
+        'This ICS file contains multiple events.': 'Diese ICS-Datei enthält mehrere Termine.',
+        'Recurring ICS invitations cannot be imported as a single event.': 'Wiederkehrende ICS-Einladungen können hier nicht als Einzeltermin importiert werden.'
+    }
+};
+
+function icsImportText(value) {
+    const translated = t(value);
+    if (translated !== value) return translated;
+    const language = String(document.documentElement.lang || '').toLowerCase().split('-')[0];
+    return icsImportMessages[language]?.[value] || value;
+}
+
+function unfoldIcsLines(value) {
+    const lines = [];
+    String(value || '').replace(/\r\n?/g, '\n').split('\n').forEach(line => {
+        if ((line.startsWith(' ') || line.startsWith('\t')) && lines.length > 0) {
+            lines[lines.length - 1] += line.slice(1);
+        } else {
+            lines.push(line);
+        }
+    });
+    return lines;
+}
+
+function parseIcsProperty(line) {
+    const separator = line.indexOf(':');
+    if (separator <= 0) return null;
+    const definition = line.slice(0, separator).split(';');
+    const propertyName = String(definition.shift() || '').split('.').pop().toUpperCase();
+    if (!propertyName) return null;
+    const parameters = {};
+    definition.forEach(parameter => {
+        const equals = parameter.indexOf('=');
+        if (equals <= 0) return;
+        const name = parameter.slice(0, equals).trim().toUpperCase();
+        let value = parameter.slice(equals + 1).trim();
+        if (value.startsWith('"') && value.endsWith('"') && value.length >= 2) {
+            value = value.slice(1, -1);
+        }
+        parameters[name] = value;
+    });
+    return {
+        name: propertyName,
+        parameters,
+        value: line.slice(separator + 1)
+    };
+}
+
+function unescapeIcsText(value) {
+    return String(value || '')
+        .replace(/\\[nN]/g, '\n')
+        .replace(/\\,/g, ',')
+        .replace(/\\;/g, ';')
+        .replace(/\\\\/g, '\\');
+}
+
+function collectIcsEventProperties(eventLines) {
+    const properties = {};
+    let nestedDepth = 0;
+    for (let index = 1; index < eventLines.length - 1; index++) {
+        const line = eventLines[index];
+        const upperLine = line.trim().toUpperCase();
+        if (upperLine.startsWith('BEGIN:')) {
+            nestedDepth++;
+            continue;
+        }
+        if (upperLine.startsWith('END:')) {
+            nestedDepth = Math.max(0, nestedDepth - 1);
+            continue;
+        }
+        if (nestedDepth > 0) continue;
+        const property = parseIcsProperty(line);
+        if (!property) continue;
+        if (!properties[property.name]) properties[property.name] = [];
+        properties[property.name].push(property);
+    }
+    return properties;
+}
+
+function normalizeIcsTimezone(value) {
+    let timezone = String(value || '').trim();
+    if (!timezone) return '';
+    const mappings = {
+        'GMT Standard Time': 'Europe/London',
+        'W. Europe Standard Time': 'Europe/Berlin',
+        'Central Europe Standard Time': 'Europe/Budapest',
+        'Romance Standard Time': 'Europe/Paris',
+        'Central European Standard Time': 'Europe/Warsaw',
+        'GTB Standard Time': 'Europe/Bucharest',
+        'FLE Standard Time': 'Europe/Kyiv',
+        'Turkey Standard Time': 'Europe/Istanbul',
+        'Russian Standard Time': 'Europe/Moscow',
+        'Eastern Standard Time': 'America/New_York',
+        'Central Standard Time': 'America/Chicago',
+        'Mountain Standard Time': 'America/Denver',
+        'Pacific Standard Time': 'America/Los_Angeles',
+        'Tokyo Standard Time': 'Asia/Tokyo',
+        'China Standard Time': 'Asia/Shanghai',
+        'India Standard Time': 'Asia/Kolkata',
+        'AUS Eastern Standard Time': 'Australia/Sydney',
+        'New Zealand Standard Time': 'Pacific/Auckland'
+    };
+    timezone = mappings[timezone] || timezone;
+    try {
+        new Intl.DateTimeFormat('en-US', { timeZone: timezone }).format(new Date());
+        return timezone;
+    } catch (error) {
+        const ianaMatch = timezone.match(/([A-Za-z_+-]+\/[A-Za-z0-9_+./-]+)$/);
+        if (!ianaMatch) return '';
+        try {
+            new Intl.DateTimeFormat('en-US', { timeZone: ianaMatch[1] }).format(new Date());
+            return ianaMatch[1];
+        } catch (nestedError) {
+            return '';
+        }
+    }
+}
+
+function datePartsInTimeZone(date, timezone) {
+    const values = {};
+    new Intl.DateTimeFormat('en-CA', {
+        timeZone: timezone,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hourCycle: 'h23'
+    }).formatToParts(date).forEach(part => {
+        if (part.type !== 'literal') values[part.type] = Number(part.value);
+    });
+    return values;
+}
+
+function dateFromIcsTimezone(parts, timezone) {
+    const target = Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute, parts.second);
+    let timestamp = target;
+    for (let attempt = 0; attempt < 3; attempt++) {
+        const observed = datePartsInTimeZone(new Date(timestamp), timezone);
+        const observedTimestamp = Date.UTC(
+            observed.year,
+            observed.month - 1,
+            observed.day,
+            observed.hour,
+            observed.minute,
+            observed.second
+        );
+        const adjustment = target - observedTimestamp;
+        timestamp += adjustment;
+        if (adjustment === 0) break;
+    }
+    return new Date(timestamp);
+}
+
+function validIcsDateParts(parts) {
+    const value = new Date(Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute, parts.second));
+    return value.getUTCFullYear() === parts.year
+        && value.getUTCMonth() === parts.month - 1
+        && value.getUTCDate() === parts.day
+        && value.getUTCHours() === parts.hour
+        && value.getUTCMinutes() === parts.minute
+        && value.getUTCSeconds() === parts.second;
+}
+
+function parseIcsDateProperty(property) {
+    if (!property) return null;
+    const value = String(property.value || '').trim();
+    const dateOnly = property.parameters.VALUE?.toUpperCase() === 'DATE' || /^\d{8}$/.test(value);
+    if (dateOnly) {
+        const match = /^(\d{4})(\d{2})(\d{2})$/.exec(value);
+        if (!match) return null;
+        const parts = {
+            year: Number(match[1]),
+            month: Number(match[2]),
+            day: Number(match[3]),
+            hour: 0,
+            minute: 0,
+            second: 0
+        };
+        if (!validIcsDateParts(parts)) return null;
+        return {
+            date: new Date(parts.year, parts.month - 1, parts.day),
+            allDay: true,
+            timezone: ''
+        };
+    }
+
+    const match = /^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})?(Z)?$/i.exec(value);
+    if (!match) return null;
+    const parts = {
+        year: Number(match[1]),
+        month: Number(match[2]),
+        day: Number(match[3]),
+        hour: Number(match[4]),
+        minute: Number(match[5]),
+        second: Number(match[6] || 0)
+    };
+    if (!validIcsDateParts(parts)) return null;
+
+    if (match[7]) {
+        return {
+            date: new Date(Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute, parts.second)),
+            allDay: false,
+            timezone: 'UTC'
+        };
+    }
+
+    const timezone = normalizeIcsTimezone(property.parameters.TZID || '');
+    return {
+        date: timezone
+            ? dateFromIcsTimezone(parts, timezone)
+            : new Date(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute, parts.second),
+        allDay: false,
+        timezone
+    };
+}
+
+function parseIcsDuration(value) {
+    const match = /^P(?:(\d+)W)?(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?)?$/i.exec(String(value || '').trim());
+    if (!match) return 0;
+    const seconds = (Number(match[1] || 0) * 7 * 86400)
+        + (Number(match[2] || 0) * 86400)
+        + (Number(match[3] || 0) * 3600)
+        + (Number(match[4] || 0) * 60)
+        + Number(match[5] || 0);
+    return seconds * 1000;
+}
+
+function parseIcsTriggerMinutes(property) {
+    if (!property || String(property.parameters.RELATED || 'START').toUpperCase() !== 'START') return null;
+    const value = String(property.value || '').trim().toUpperCase();
+    if (!value.startsWith('-')) return null;
+    const duration = parseIcsDuration(value.slice(1));
+    if (duration < 0 || duration > 40320 * 60 * 1000 || duration % 60000 !== 0) return null;
+    return duration / 60000;
+}
+
+function parseIcsReminder(eventLines) {
+    const reminders = [];
+    let inAlarm = false;
+    for (const line of eventLines) {
+        const upperLine = line.trim().toUpperCase();
+        if (upperLine === 'BEGIN:VALARM') {
+            inAlarm = true;
+            continue;
+        }
+        if (upperLine === 'END:VALARM') {
+            inAlarm = false;
+            continue;
+        }
+        if (!inAlarm) continue;
+        const property = parseIcsProperty(line);
+        if (property?.name !== 'TRIGGER') continue;
+        const minutes = parseIcsTriggerMinutes(property);
+        if (minutes !== null && !reminders.includes(minutes)) reminders.push(minutes);
+    }
+    reminders.sort((left, right) => right - left);
+    if (reminders.length === 0) {
+        return { mode: 'none', minutesBeforeStart: null, reminders: [], editable: true };
+    }
+    if (reminders.length === 1) {
+        return {
+            mode: 'custom',
+            minutesBeforeStart: reminders[0],
+            reminders: [{ minutesBeforeStart: reminders[0] }],
+            editable: true
+        };
+    }
+    return {
+        mode: 'multiple',
+        minutesBeforeStart: null,
+        reminders: reminders.slice(0, 5).map(minutesBeforeStart => ({ minutesBeforeStart })),
+        editable: true
+    };
+}
+
+function extractHttpUrl(value) {
+    const match = String(value || '').match(/https?:\/\/[^\s<>"']+/i);
+    return match ? match[0].replace(/[),.;]+$/, '') : '';
+}
+
+function conferenceUrlFromIcs(properties, description, location) {
+    const propertyNames = Object.keys(properties);
+    const preferredNames = propertyNames.filter(name => /(?:CONFERENCE|MEETING|JOIN)/i.test(name));
+    const genericNames = propertyNames.filter(name => name === 'URL');
+    for (const name of [...preferredNames, ...genericNames]) {
+        for (const property of properties[name]) {
+            const url = extractHttpUrl(unescapeIcsText(property.value));
+            if (url) return url;
+        }
+    }
+    return extractHttpUrl(description) || extractHttpUrl(location);
+}
+
+function appendConferenceUrl(description, conferenceUrl) {
+    const value = String(description || '').trim();
+    if (!conferenceUrl || value.includes(conferenceUrl)) return value.slice(0, 5000);
+    const separator = value ? '\n\n' : '';
+    const available = Math.max(0, 5000 - separator.length - conferenceUrl.length);
+    return value.slice(0, available).trimEnd() + separator + conferenceUrl;
+}
+
+function parseSingleIcsEvent(value) {
+    const lines = unfoldIcsLines(value);
+    if (!lines.some(line => line.trim().toUpperCase() === 'BEGIN:VCALENDAR')) {
+        throw new Error(icsImportText('The selected file is not a valid single-event ICS file.'));
+    }
+    if (lines.some(line => line.trim().toUpperCase() === 'METHOD:CANCEL')) {
+        throw new Error(icsImportText('The selected file is not a valid single-event ICS file.'));
+    }
+
+    const eventBlocks = [];
+    let eventStartIndex = -1;
+    lines.forEach((line, index) => {
+        const upperLine = line.trim().toUpperCase();
+        if (upperLine === 'BEGIN:VEVENT') {
+            if (eventStartIndex !== -1) {
+                throw new Error(icsImportText('The selected file is not a valid single-event ICS file.'));
+            }
+            eventStartIndex = index;
+        } else if (upperLine === 'END:VEVENT' && eventStartIndex !== -1) {
+            eventBlocks.push(lines.slice(eventStartIndex, index + 1));
+            eventStartIndex = -1;
+        }
+    });
+    if (eventStartIndex !== -1 || eventBlocks.length === 0) {
+        throw new Error(icsImportText('The selected file is not a valid single-event ICS file.'));
+    }
+    if (eventBlocks.length > 1) {
+        throw new Error(icsImportText('This ICS file contains multiple events.'));
+    }
+
+    const eventLines = eventBlocks[0];
+    const properties = collectIcsEventProperties(eventLines);
+    if ((properties.RRULE?.length || 0) > 0 || (properties.RDATE?.length || 0) > 0) {
+        throw new Error(icsImportText('Recurring ICS invitations cannot be imported as a single event.'));
+    }
+    if (String(properties.STATUS?.[0]?.value || '').trim().toUpperCase() === 'CANCELLED') {
+        throw new Error(icsImportText('The selected file is not a valid single-event ICS file.'));
+    }
+
+    const start = parseIcsDateProperty(properties.DTSTART?.[0]);
+    if (!start) {
+        throw new Error(icsImportText('The selected file is not a valid single-event ICS file.'));
+    }
+    let end = parseIcsDateProperty(properties.DTEND?.[0]);
+    if (end && end.allDay !== start.allDay) end = null;
+    if (!end) {
+        const duration = parseIcsDuration(properties.DURATION?.[0]?.value || '');
+        end = {
+            date: new Date(start.date.getTime() + (duration || (start.allDay ? 86400000 : 3600000))),
+            allDay: start.allDay,
+            timezone: start.timezone
+        };
+    }
+    if (end.date <= start.date) {
+        end.date = new Date(start.date.getTime() + (start.allDay ? 86400000 : 3600000));
+    }
+
+    const summary = unescapeIcsText(properties.SUMMARY?.[0]?.value || '').trim();
+    const location = unescapeIcsText(properties.LOCATION?.[0]?.value || '').trim();
+    const description = unescapeIcsText(properties.DESCRIPTION?.[0]?.value || '').trim();
+    const conferenceUrl = conferenceUrlFromIcs(properties, description, location);
+    return {
+        summary: (summary || icsImportText('Untitled event')).slice(0, 250),
+        location: location.slice(0, 500),
+        description: appendConferenceUrl(description, conferenceUrl),
+        allDay: start.allDay,
+        start: start.date,
+        end: end.date,
+        timezone: start.timezone || end.timezone || '',
+        reminder: parseIcsReminder(eventLines)
+    };
+}
+
+function applyImportedIcsEvent(importedEvent) {
+    if (selectedEvent !== null) return;
+    importedIcsTimezone = importedEvent.timezone || '';
+    document.getElementById('event-summary').value = importedEvent.summary;
+    document.getElementById('event-location').value = importedEvent.location;
+    document.getElementById('event-description').value = importedEvent.description;
+    document.getElementById('event-all-day').checked = importedEvent.allDay;
+    resetAnniversaryEditor();
+    setDateInputs(importedEvent.start, importedEvent.end, importedEvent.allDay, importedEvent.allDay);
+    resetRecurrenceEditor(importedEvent.start);
+    loadReminderEditor({ reminder: importedEvent.reminder });
+    updateRecurrenceAvailability();
+    updateAnniversaryControls();
+    updateReminderControls();
+}
+
+async function importIcsFile(file) {
+    if (!file || selectedEvent !== null) return;
+    if (file.size <= 0 || file.size > icsImportMaximumBytes) {
+        throw new Error(icsImportText(file.size > icsImportMaximumBytes
+            ? 'The ICS file is too large.'
+            : 'The selected file is not a valid single-event ICS file.'));
+    }
+    const content = typeof file.text === 'function'
+        ? await file.text()
+        : await new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(String(reader.result || ''));
+            reader.onerror = () => reject(new Error(icsImportText('The selected file is not a valid single-event ICS file.')));
+            reader.readAsText(file);
+        });
+    applyImportedIcsEvent(parseSingleIcsEvent(content));
+}
+
 function openNewEvent(preferredDay = null) {
     const writable = calendarState.calendars.filter(calendar => calendar.canWrite);
     if (!writable.length) return;
     selectedEvent = null;
+    importedIcsTimezone = '';
+    icsImportFile.value = '';
+    icsImportButton.classList.remove('hidden');
     populateCalendarSelect(writable, writable[0].instanceId);
     document.getElementById('dialog-title').textContent = t('Create event');
     document.getElementById('event-summary').value = '';
@@ -1424,6 +1847,9 @@ function formatDetailDateTime(date) {
 function openExistingEvent(event, writeScope = '') {
     const scope = event.recurring ? (writeScope || event.writeScope || 'occurrence') : '';
     selectedEvent = { ...event, writeScope: scope };
+    importedIcsTimezone = '';
+    icsImportFile.value = '';
+    icsImportButton.classList.add('hidden');
     const editingSeries = Boolean(selectedEvent.recurring) && scope === 'series';
     const editingFollowing = Boolean(selectedEvent.recurring) && scope === 'following';
     const recurringOccurrence = Boolean(selectedEvent.recurring) && !editingSeries && !editingFollowing;
@@ -2387,7 +2813,7 @@ eventForm.addEventListener('submit', async event => {
     }
     const browserTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone || '';
     const timezone = String(
-        selectedEvent?.timezone || selectedCalendarEntry()?.timezone || browserTimezone
+        selectedEvent?.timezone || importedIcsTimezone || selectedCalendarEntry()?.timezone || browserTimezone
     ).trim();
     if (timezone && (!allDay || recurrence || editingSeries || editingFollowing)) {
         eventData.timezone = timezone;
@@ -2435,6 +2861,26 @@ eventForm.addEventListener('submit', async event => {
 
     if (await sendAction(action, value)) {
         eventDialog.close();
+    }
+});
+
+icsImportButton.addEventListener('click', () => {
+    if (selectedEvent !== null) return;
+    icsImportFile.value = '';
+    icsImportFile.click();
+});
+icsImportFile.addEventListener('change', async () => {
+    const file = icsImportFile.files?.[0] || null;
+    if (!file) return;
+    icsImportButton.disabled = true;
+    try {
+        await importIcsFile(file);
+        showToast(icsImportText('ICS event imported.'), 'success');
+    } catch (error) {
+        showToast(error instanceof Error ? error.message : icsImportText('The selected file is not a valid single-event ICS file.'), 'error');
+    } finally {
+        icsImportButton.disabled = false;
+        icsImportFile.value = '';
     }
 });
 
@@ -2951,6 +3397,9 @@ function applyStaticTranslations() {
         ['calendar-filter-cancel', 'Cancel'],
         ['calendar-filter-apply', 'Apply']
     ].forEach(([id, text]) => { document.getElementById(id).textContent = t(text); });
+    icsImportButton.textContent = icsImportText('Import ICS');
+    icsImportButton.title = icsImportText('Import ICS');
+    icsImportButton.setAttribute('aria-label', icsImportText('Import ICS'));
     document.getElementById('all-day-label').textContent = t('All day');
     document.getElementById('dialog-title').textContent = t('Event');
     document.getElementById('details-dialog-title').textContent = t('Event details');
