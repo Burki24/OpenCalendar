@@ -132,6 +132,7 @@ function handleMessage(data) {
 }
 
 function applyCalendarState(state) {
+    const agendaScrollPosition = initialized ? captureAgendaScrollPosition() : null;
     calendarState = state;
     const eventEdit = calendarState.eventEdit && typeof calendarState.eventEdit === 'object'
         ? calendarState.eventEdit
@@ -152,6 +153,7 @@ function applyCalendarState(state) {
         initialized = true;
     }
     render();
+    restoreAgendaScrollPosition(agendaScrollPosition);
     if (eventEdit && pendingEventEdit
         && Number(eventEdit.calendarInstanceId) === pendingEventEdit.calendarInstanceId
         && (pendingEventEdit.eventReference === ''
@@ -177,6 +179,68 @@ function applyDeferredCalendarState() {
     applyCalendarState(state);
 }
 
+function captureAgendaScrollPosition() {
+    if (activeView !== 'agenda' || content.scrollTop <= 0) return null;
+
+    const viewport = content.getBoundingClientRect();
+    const eventAnchor = firstVisibleAgendaElement('.event-card[data-agenda-anchor]', viewport);
+    const dayAnchor = firstVisibleAgendaElement('.agenda-day[data-agenda-date]', viewport);
+
+    return {
+        cursorDate: dayKey(cursorDate),
+        scrollTop: content.scrollTop,
+        eventKey: eventAnchor?.dataset.agendaAnchor || '',
+        eventOffset: eventAnchor ? eventAnchor.getBoundingClientRect().top - viewport.top : 0,
+        dayKey: dayAnchor?.dataset.agendaDate || '',
+        dayOffset: dayAnchor ? dayAnchor.getBoundingClientRect().top - viewport.top : 0
+    };
+}
+
+function firstVisibleAgendaElement(selector, viewport) {
+    const elements = Array.from(content.querySelectorAll(selector));
+    return elements.find(entry => {
+        const rect = entry.getBoundingClientRect();
+        return rect.bottom > viewport.top && rect.top < viewport.bottom;
+    }) || elements.find(entry => entry.getBoundingClientRect().top >= viewport.top) || null;
+}
+
+function restoreAgendaScrollPosition(position) {
+    if (!position || activeView !== 'agenda' || position.cursorDate !== dayKey(cursorDate)) return;
+
+    const restore = () => {
+        if (activeView !== 'agenda' || position.cursorDate !== dayKey(cursorDate)) return;
+
+        let anchor = null;
+        let expectedOffset = 0;
+        if (position.eventKey) {
+            anchor = Array.from(content.querySelectorAll('.event-card[data-agenda-anchor]'))
+                .find(entry => entry.dataset.agendaAnchor === position.eventKey) || null;
+            expectedOffset = position.eventOffset;
+        }
+        if (!anchor && position.dayKey) {
+            anchor = Array.from(content.querySelectorAll('.agenda-day[data-agenda-date]'))
+                .find(entry => entry.dataset.agendaDate === position.dayKey) || null;
+            expectedOffset = position.dayOffset;
+        }
+
+        if (anchor) {
+            const currentOffset = anchor.getBoundingClientRect().top - content.getBoundingClientRect().top;
+            content.scrollTop += currentOffset - expectedOffset;
+            return;
+        }
+
+        content.scrollTop = Math.min(
+            position.scrollTop,
+            Math.max(0, content.scrollHeight - content.clientHeight)
+        );
+    };
+
+    if (typeof requestAnimationFrame === 'function') {
+        requestAnimationFrame(restore);
+    } else {
+        restore();
+    }
+}
 
 function applyTileFontScale() {
     if (calendarVisualization.mode === 'ipsview') return;
@@ -320,6 +384,7 @@ function renderAgenda() {
             }
         }
         const section = element('section', 'agenda-day');
+        section.dataset.agendaDate = dayKey(group.date);
         const heading = element('div', 'agenda-date');
         const strong = document.createElement('strong');
         strong.textContent = new Intl.DateTimeFormat(undefined, { weekday: 'long' }).format(group.date);
@@ -338,9 +403,29 @@ function renderAgenda() {
     });
 }
 
+function agendaEventAnchorKey(event) {
+    const calendarInstanceId = String(Number(event?.calendarInstanceId || 0));
+    const occurrenceId = String(event?.occurrenceId || '').trim();
+    const eventReference = String(event?.eventReference || '').trim();
+    if (occurrenceId) return `${calendarInstanceId}|occurrence:${occurrenceId}`;
+    if (eventReference) return `${calendarInstanceId}|reference:${eventReference}`;
+
+    const resourceUrl = String(event?.resourceUrl || '').trim();
+    const uid = String(event?.uid || '').trim();
+    const originalStart = String(event?.originalStart || '').trim();
+    const start = originalStart || String(event?.startTimestamp || event?.start || '').trim();
+    const summary = String(event?.summary || '').trim();
+    const identity = resourceUrl
+        ? `resource:${resourceUrl}`
+        : (uid ? `uid:${uid}` : `fallback:${summary}`);
+
+    return `${calendarInstanceId}|${identity}|${start}`;
+}
+
 function createAgendaEvent(event) {
     const card = element('button', 'event-card');
     card.type = 'button';
+    card.dataset.agendaAnchor = agendaEventAnchorKey(event);
     card.addEventListener('click', () => openEventDetails(event));
     const color = element('span', 'event-color');
     color.style.background = safeColor(event.calendarColor);
