@@ -372,7 +372,7 @@ class CalendarView extends IPSModuleStrict
             $this->SetStatus(self::STATUS_INVALID_CONFIGURATION);
         }
 
-        $this->broadcastState();
+        $this->broadcastState(null, true);
 
         return true;
     }
@@ -390,7 +390,7 @@ class CalendarView extends IPSModuleStrict
         }
         if ($this->IsIPSViewStyleMediaUpdate($SenderID, $Message)) {
             if ($this->isRuntimeReady()) {
-                $this->broadcastState();
+                $this->broadcastState(null, true);
             }
 
             return;
@@ -1170,7 +1170,7 @@ class CalendarView extends IPSModuleStrict
         }
     }
 
-    private function broadcastState(?array $state = null): void
+    private function broadcastState(?array $state = null, bool $updateIPSViewHTML = false): void
     {
         if (!$this->isRuntimeReady()) {
             return;
@@ -1192,7 +1192,7 @@ class CalendarView extends IPSModuleStrict
             $this->SendDebug('VisualizationUpdate', $exception->getMessage(), 0);
         }
 
-        if ($this->IsIPSViewHTMLPageEnabled()) {
+        if ($updateIPSViewHTML && $this->IsIPSViewHTMLPageEnabled()) {
             try {
                 $html = $this->renderNonEmptyIPSViewHTML($state, 'IPSViewUpdate');
                 if ($html !== null) {

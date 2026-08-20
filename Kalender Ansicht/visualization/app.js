@@ -27,6 +27,7 @@ const calendarViewLabels = { agenda: 'Agenda', list: 'List', threeDays: 'Days', 
 const swipeNavigationViews = new Set(['threeDays', 'week', 'month']);
 const swipeMinimumDistance = 60;
 const swipeAxisRatio = 1.3;
+const ipsViewStateRefreshIntervalMilliseconds = 15_000;
 document.documentElement.style.setProperty('--agenda-color-bar-width', `${calendarAgendaColorBarWidth}px`);
 document.documentElement.style.setProperty('--compact-color-bar-width', `${calendarCompactColorBarWidth}px`);
 
@@ -50,6 +51,12 @@ let selectedDayEventsDate = null;
 let swipeGesture = null;
 let suppressSwipeClickUntil = 0;
 let deferredCalendarState = null;
+let calendarStateSignature = '';
+let eventEditingActive = false;
+let eventEditingRevision = 0;
+let ipsViewStateRequestPending = false;
+let ipsViewStateRefreshRequested = false;
+let ipsViewStateRefreshTimer = null;
 let importedIcsTimezone = '';
 let preservedAgendaScrollPosition = null;
 let agendaScrollWorkflow = '';
@@ -110,6 +117,19 @@ monthResizeObserver?.observe(content);
 
 applySymconColorScheme();
 
+function calendarStateContentSignature(state) {
+    if (!state || typeof state !== 'object') return '';
+    try {
+        return JSON.stringify({
+            events: Array.isArray(state.events) ? state.events : [],
+            calendars: Array.isArray(state.calendars) ? state.calendars : [],
+            settings: state.settings && typeof state.settings === 'object' ? state.settings : {}
+        });
+    } catch (error) {
+        return '';
+    }
+}
+
 function handleMessage(data) {
     let message = data;
     if (typeof message === 'string') {
@@ -138,6 +158,10 @@ function handleMessage(data) {
         return;
     }
     if (message.type !== 'state' || !message.payload) return;
+    const containsEditPayload = Boolean(message.payload.eventEdit && typeof message.payload.eventEdit === 'object')
+        || Boolean(message.payload.seriesEdit && typeof message.payload.seriesEdit === 'object');
+    const nextStateSignature = calendarStateContentSignature(message.payload);
+    if (!containsEditPayload && nextStateSignature !== '' && nextStateSignature === calendarStateSignature) return;
     if (shouldDeferCalendarState()) {
         deferredCalendarState = message.payload;
         return;
@@ -163,6 +187,7 @@ function applyCalendarState(state) {
     calendarState.events = Array.isArray(calendarState.events) ? calendarState.events : [];
     calendarState.calendars = Array.isArray(calendarState.calendars) ? calendarState.calendars : [];
     calendarState.settings = calendarState.settings || {};
+    calendarStateSignature = calendarStateContentSignature(calendarState);
     normalizeVisibleCalendarIds();
     applyTileFontScale();
     if (!initialized) {
@@ -194,7 +219,8 @@ function applyCalendarState(state) {
 }
 
 function shouldDeferCalendarState() {
-    return eventDialog.open
+    return eventEditingActive
+        || eventDialog.open
         || (releaseAgendaScrollPositionAfterState
             && (eventDetailsDialog.open || editScopeDialog.open || deleteConfirmDialog.open));
 }
@@ -204,6 +230,17 @@ function applyDeferredCalendarState() {
     const state = deferredCalendarState;
     deferredCalendarState = null;
     applyCalendarState(state);
+}
+
+function beginEventEditing() {
+    eventEditingActive = true;
+    eventEditingRevision += 1;
+}
+
+function endEventEditing() {
+    if (!eventEditingActive) return;
+    eventEditingActive = false;
+    eventEditingRevision += 1;
 }
 
 function beginAgendaScrollWorkflow(workflow) {
@@ -1718,6 +1755,7 @@ function openNewEvent(preferredDay = null) {
     document.getElementById('dialog-note').classList.add('hidden');
     updateDialogColor();
     updateSaveButtonLabel();
+    beginEventEditing();
     eventDialog.showModal();
 }
 
@@ -2122,6 +2160,7 @@ function openExistingEvent(event, writeScope = '') {
     }
     updateDialogColor();
     updateSaveButtonLabel();
+    beginEventEditing();
     eventDialog.showModal();
 }
 
@@ -3200,12 +3239,14 @@ eventDialog.addEventListener('cancel', event => {
 });
 eventDialog.addEventListener('close', () => {
     closeCalendarPicker();
+    endEventEditing();
     restorePreservedAgendaScrollPosition();
     applyDeferredCalendarState();
     if (!releaseAgendaScrollPositionAfterState
         && ['create', 'edit', 'delete'].includes(agendaScrollWorkflow)) {
         clearAgendaScrollWorkflow(true);
     }
+    requestIPSViewStateRefresh();
 });
 eventDetailsDialog.addEventListener('close', () => {
     restorePreservedAgendaScrollPosition();
@@ -3273,6 +3314,9 @@ document.querySelectorAll('.view-selector-option').forEach(button => button.addE
 }));
 window.addEventListener('resize', () => {
     if (activeView === 'month') scheduleMonthEventLayout();
+});
+document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState !== 'hidden') requestIPSViewStateRefresh();
 });
 document.addEventListener('wheel', containWheelInsideTile, { capture: true, passive: false });
 content.addEventListener('pointerdown', beginSwipeNavigation);
@@ -3586,14 +3630,56 @@ async function calendarIPSViewRequest(action, value) {
     return payload;
 }
 
+function requestIPSViewStateRefresh() {
+    if (calendarVisualization.mode !== 'ipsview' || !hasIPSViewActionBridge()) return;
+    if (eventEditingActive || document.visibilityState === 'hidden' || ipsViewStateRequestPending) {
+        ipsViewStateRefreshRequested = true;
+        return;
+    }
+    void refreshIPSViewState();
+}
+
 async function refreshIPSViewState() {
     if (!hasIPSViewActionBridge()) return;
-
-    try {
-        handleMessage(await calendarIPSViewRequest('GetState', null));
-    } catch (error) {
-        console.warn('OpenCalendar IPSView state refresh failed; using embedded state.', error);
+    if (eventEditingActive || document.visibilityState === 'hidden') {
+        ipsViewStateRefreshRequested = true;
+        return;
     }
+    if (ipsViewStateRequestPending) {
+        ipsViewStateRefreshRequested = true;
+        return;
+    }
+
+    ipsViewStateRequestPending = true;
+    ipsViewStateRefreshRequested = false;
+    const editingRevision = eventEditingRevision;
+    try {
+        const message = await calendarIPSViewRequest('GetState', null);
+        if (eventEditingActive || editingRevision !== eventEditingRevision) {
+            ipsViewStateRefreshRequested = true;
+            return;
+        }
+        handleMessage(message);
+    } catch (error) {
+        console.warn('OpenCalendar IPSView state refresh failed; using the last known state.', error);
+    } finally {
+        ipsViewStateRequestPending = false;
+        if (ipsViewStateRefreshRequested && !eventEditingActive && document.visibilityState !== 'hidden') {
+            ipsViewStateRefreshRequested = false;
+            window.setTimeout(() => {
+                void refreshIPSViewState();
+            }, 0);
+        }
+    }
+}
+
+function startIPSViewStateRefresh() {
+    if (!hasIPSViewActionBridge() || ipsViewStateRefreshTimer !== null) return;
+    requestIPSViewStateRefresh();
+    ipsViewStateRefreshTimer = window.setInterval(
+        requestIPSViewStateRefresh,
+        ipsViewStateRefreshIntervalMilliseconds
+    );
 }
 
 function applyStaticTranslations() {
@@ -3830,5 +3916,5 @@ if (calendarVisualization.state && typeof calendarVisualization.state === 'objec
 }
 
 if (calendarVisualization.mode === 'ipsview') {
-    void refreshIPSViewState();
+    startIPSViewStateRefresh();
 }
