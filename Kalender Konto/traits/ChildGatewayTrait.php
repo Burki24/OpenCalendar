@@ -311,6 +311,10 @@ trait KalenderKontoChildGatewayTrait
         array $request,
         bool $stableMicrosoftIdentity = false
     ): bool {
+        if ($stableMicrosoftIdentity) {
+            return $this->microsoftEventMatchesEditRequest($event, $request);
+        }
+
         $primaryIdentity = [
             'OccurrenceID'   => 'occurrenceId',
             'EventReference' => 'eventReference',
@@ -337,13 +341,6 @@ trait KalenderKontoChildGatewayTrait
             return false;
         }
 
-        // Microsoft Graph immutable occurrence/event IDs are authoritative. Do not reject an otherwise
-        // identical event only because stale delta metadata contains a different original-start value.
-        if ($stableMicrosoftIdentity
-            && in_array($matchedPrimaryKey, ['occurrenceId', 'eventReference', 'resourceUrl'], true)) {
-            return true;
-        }
-
         foreach ([
             'OriginalStart' => 'originalStart',
             'RecurrenceID'  => 'recurrenceId'
@@ -356,6 +353,71 @@ trait KalenderKontoChildGatewayTrait
         }
 
         return true;
+    }
+
+    /**
+     * Matches a Microsoft event without treating a stale Graph event ID as authoritative.
+     *
+     * Microsoft exposes immutable IDs when requested, but existing cached occurrences can
+     * still carry an older identity after a series change. The per-occurrence iCalUId is a
+     * stable secondary identity. Recurring events additionally fall back to their series ID
+     * and original occurrence start so a refreshed calendarView result can still be edited.
+     *
+     * @param array<string, mixed> $event
+     * @param array<string, mixed> $request
+     */
+    private function microsoftEventMatchesEditRequest(array $event, array $request): bool
+    {
+        foreach ([
+            'OccurrenceID'   => 'occurrenceId',
+            'EventReference' => 'eventReference',
+            'ResourceURL'    => 'resourceUrl',
+            'UID'            => 'uid'
+        ] as $requestKey => $eventKey) {
+            $expected = trim((string) ($request[$requestKey] ?? ''));
+            $actual = trim((string) ($event[$eventKey] ?? ''));
+            if ($expected !== '' && $actual !== '' && hash_equals($expected, $actual)) {
+                return true;
+            }
+        }
+
+        $expectedSeriesId = trim((string) ($request['SeriesID'] ?? ''));
+        $actualSeriesId = trim((string) ($event['seriesId'] ?? ''));
+        $expectedOriginalStart = trim((string) ($request['OriginalStart'] ?? ''));
+        $actualOriginalStart = trim((string) ($event['originalStart'] ?? ''));
+
+        return $expectedSeriesId !== ''
+            && $actualSeriesId !== ''
+            && hash_equals($expectedSeriesId, $actualSeriesId)
+            && $this->microsoftOriginalStartMatches(
+                $expectedOriginalStart,
+                $actualOriginalStart,
+                (bool) ($event['allDay'] ?? false)
+            );
+    }
+
+    private function microsoftOriginalStartMatches(string $left, string $right, bool $allDay): bool
+    {
+        $left = trim($left);
+        $right = trim($right);
+        if ($left === '' || $right === '') {
+            return false;
+        }
+        if (hash_equals($left, $right)) {
+            return true;
+        }
+        if ($allDay
+            || preg_match('/^\d{4}-\d{2}-\d{2}$/D', $left) === 1
+            || preg_match('/^\d{4}-\d{2}-\d{2}$/D', $right) === 1) {
+            return substr($left, 0, 10) === substr($right, 0, 10);
+        }
+
+        try {
+            return (new DateTimeImmutable($left))->getTimestamp()
+                === (new DateTimeImmutable($right))->getTimestamp();
+        } catch (Throwable) {
+            return false;
+        }
     }
 
     /**

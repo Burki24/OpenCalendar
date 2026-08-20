@@ -506,6 +506,7 @@ class Calendar extends IPSModuleStrict
                 'ResourceURL'    => trim((string) ($event['resourceUrl'] ?? '')),
                 'EventReference' => trim((string) ($event['eventReference'] ?? '')),
                 'UID'            => trim((string) ($event['uid'] ?? '')),
+                'SeriesID'       => trim((string) ($event['seriesId'] ?? '')),
                 'OccurrenceID'   => trim((string) ($event['occurrenceId'] ?? '')),
                 'OriginalStart'  => trim((string) ($event['originalStart'] ?? '')),
                 'RecurrenceID'   => trim((string) ($event['recurrenceId'] ?? '')),
