@@ -147,7 +147,7 @@ trait KalenderKontoChildGatewayTrait
         $providerType = $this->ReadPropertyInteger('Provider');
         if (!in_array(
             $providerType,
-            [self::PROVIDER_APPLE, self::PROVIDER_CALDAV, self::PROVIDER_GOOGLE, self::PROVIDER_MICROSOFT],
+            [self::PROVIDER_APPLE, self::PROVIDER_CALDAV, self::PROVIDER_GOOGLE],
             true
         )) {
             return $this->CreateChunkedJsonTransfer(
@@ -177,11 +177,6 @@ trait KalenderKontoChildGatewayTrait
             $provider = new GoogleCalendarProvider($httpClient, $accessToken);
             $synchronizer = new GoogleCalendarIncrementalSync($provider, $httpClient, $accessToken);
             $debugName = 'GoogleEventSynchronization';
-        } elseif ($providerType === self::PROVIDER_MICROSOFT) {
-            $accessToken = $this->getMicrosoftAccessToken();
-            $httpClient = $this->createTrustedCloudHttpClient(new MicrosoftGraphOriginPolicy());
-            $synchronizer = new MicrosoftCalendarIncrementalSync($httpClient, $accessToken);
-            $debugName = 'MicrosoftEventSynchronization';
         } else {
             $serverUrl = $providerType === self::PROVIDER_APPLE
                 ? self::APPLE_CALDAV_URL
