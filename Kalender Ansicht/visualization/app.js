@@ -3062,8 +3062,7 @@ eventForm.addEventListener('submit', async event => {
             : { calendarInstanceId, event: eventData });
 
     releaseAgendaScrollWorkflowAfterState();
-    const success = await sendAction(action, value);
-    if (success) {
+    if (await sendAction(action, value)) {
         eventDialog.close();
     } else {
         cancelAgendaScrollWorkflowRelease();
