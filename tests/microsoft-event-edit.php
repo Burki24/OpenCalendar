@@ -28,9 +28,20 @@ function assertMicrosoftEventEdit(bool $condition, string $message): void
 }
 
 $calendarSource = (string) file_get_contents(__DIR__ . '/../Kalender/module.php');
+$visualizationSource = (string) file_get_contents(__DIR__ . '/../Kalender Ansicht/visualization/app.js');
 assertMicrosoftEventEdit(
     str_contains($calendarSource, "'SeriesID'       => trim((string) (\$event['seriesId'] ?? ''))"),
     'Calendar event-edit requests must forward the recurring series identity.'
+);
+
+assertMicrosoftEventEdit(
+    str_contains($visualizationSource, 'seriesId,')
+        && str_contains($visualizationSource, 'originalStart,')
+        && str_contains($visualizationSource, 'function pendingEventEditMatches(eventEdit)')
+        && str_contains($visualizationSource, 'function recurringOriginalStartMatches(left, right, allDay = false)')
+        && str_contains($visualizationSource, "String(eventEdit?.seriesId || '') === pendingEventEdit.seriesId")
+        && str_contains($visualizationSource, "openExistingEvent(eventEdit, 'occurrence');"),
+    'The visualization must reopen a Microsoft recurring occurrence even when Graph returns refreshed event IDs.'
 );
 
 $matcher = new MicrosoftEventEditMatchHarness();

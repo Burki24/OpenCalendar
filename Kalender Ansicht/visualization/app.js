@@ -200,12 +200,7 @@ function applyCalendarState(state) {
     if (releasePreservedAgendaScrollPosition) {
         clearAgendaScrollWorkflow();
     }
-    if (eventEdit && pendingEventEdit
-        && Number(eventEdit.calendarInstanceId) === pendingEventEdit.calendarInstanceId
-        && (pendingEventEdit.eventReference === ''
-            || String(eventEdit.eventReference || '') === pendingEventEdit.eventReference)
-        && (pendingEventEdit.occurrenceId === ''
-            || String(eventEdit.occurrenceId || '') === pendingEventEdit.occurrenceId)) {
+    if (eventEdit && pendingEventEdit && pendingEventEditMatches(eventEdit)) {
         pendingEventEdit = null;
         openExistingEvent(eventEdit, 'occurrence');
     }
@@ -216,6 +211,60 @@ function applyCalendarState(state) {
         pendingSeriesEdit = null;
         openExistingEvent(seriesEdit, writeScope);
     }
+}
+
+function pendingEventEditMatches(eventEdit) {
+    if (!pendingEventEdit
+        || Number(eventEdit?.calendarInstanceId || 0) !== pendingEventEdit.calendarInstanceId) {
+        return false;
+    }
+
+    const returnedOccurrenceId = String(eventEdit?.occurrenceId || '');
+    if (pendingEventEdit.occurrenceId !== ''
+        && returnedOccurrenceId !== ''
+        && returnedOccurrenceId === pendingEventEdit.occurrenceId) {
+        return true;
+    }
+
+    const returnedEventReference = String(eventEdit?.eventReference || '');
+    if (pendingEventEdit.eventReference !== ''
+        && returnedEventReference !== ''
+        && returnedEventReference === pendingEventEdit.eventReference) {
+        return true;
+    }
+
+    const returnedUid = String(eventEdit?.uid || '');
+    if (pendingEventEdit.uid !== ''
+        && returnedUid !== ''
+        && returnedUid === pendingEventEdit.uid
+        && (pendingEventEdit.seriesId === ''
+            || String(eventEdit?.seriesId || '') === pendingEventEdit.seriesId)) {
+        return true;
+    }
+
+    return pendingEventEdit.seriesId !== ''
+        && String(eventEdit?.seriesId || '') === pendingEventEdit.seriesId
+        && recurringOriginalStartMatches(
+            pendingEventEdit.originalStart,
+            String(eventEdit?.originalStart || ''),
+            Boolean(eventEdit?.allDay)
+        );
+}
+
+function recurringOriginalStartMatches(left, right, allDay = false) {
+    const expected = String(left || '').trim();
+    const actual = String(right || '').trim();
+    if (!expected || !actual) return false;
+    if (expected === actual) return true;
+    if (allDay || /^\d{4}-\d{2}-\d{2}$/.test(expected) || /^\d{4}-\d{2}-\d{2}$/.test(actual)) {
+        return expected.slice(0, 10) === actual.slice(0, 10);
+    }
+
+    const expectedTimestamp = Date.parse(expected);
+    const actualTimestamp = Date.parse(actual);
+    return Number.isFinite(expectedTimestamp)
+        && Number.isFinite(actualTimestamp)
+        && expectedTimestamp === actualTimestamp;
 }
 
 function shouldDeferCalendarState() {
@@ -1862,6 +1911,9 @@ async function prepareEventEdit(event) {
     const calendarInstanceId = Number(event?.calendarInstanceId || 0);
     const eventReference = String(event?.eventReference || '');
     const occurrenceId = String(event?.occurrenceId || '');
+    const uid = String(event?.uid || '');
+    const seriesId = String(event?.seriesId || '');
+    const originalStart = String(event?.originalStart || '');
     const startTimestamp = Number(event?.startTimestamp)
         || Math.floor(eventStart(event).getTime() / 1000);
     const endTimestamp = Number(event?.endTimestamp)
@@ -1870,16 +1922,20 @@ async function prepareEventEdit(event) {
     pendingEventEdit = {
         calendarInstanceId,
         eventReference,
-        occurrenceId
+        occurrenceId,
+        uid,
+        seriesId,
+        originalStart
     };
     const request = {
         calendarInstanceId,
         event: {
-            uid: String(event?.uid || ''),
+            uid,
             resourceUrl: String(event?.resourceUrl || ''),
             eventReference,
+            seriesId,
             occurrenceId,
-            originalStart: String(event?.originalStart || ''),
+            originalStart,
             recurrenceId: String(event?.recurrenceId || ''),
             startTimestamp,
             endTimestamp
