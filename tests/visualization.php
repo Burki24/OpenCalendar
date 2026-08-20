@@ -289,7 +289,8 @@ assertVisualization(
         && str_contains($script, 'Boolean(event.canDeleteOccurrence)')
         && str_contains($script, 'eventCanDeleteFollowing(event)')
         && str_contains($script, '...recurrencePayload(selectedEvent)')
-        && str_contains($script, "t('Only this occurrence of the recurring event will be changed.')"),
+        && str_contains($script, "t('Only this occurrence of the recurring event will be changed.')")
+        && str_contains($script, "'Open in provider': 'Extern öffnen'"),
     'Event clicks must open a read-first details modal and route editable events to the existing editor only on request.'
 );
 
@@ -773,8 +774,11 @@ assertVisualization(
         && str_contains($style, 'flex: 1 1 auto;')
         && str_contains($style, 'scrollbar-gutter: stable;')
         && str_contains($style, '.dialog-actions-start, .dialog-actions-end {')
+        && str_contains($style, '.event-details-dialog { --dialog-width: 720px; }')
+        && str_contains($style, 'html.ipsview-mode .event-details-dialog { --dialog-width: 840px; }')
+        && str_contains($style, '.event-details-dialog .dialog-actions { flex-wrap: wrap; }')
         && str_contains($style, '.event-details-dialog .dialog-actions-start,')
-        && str_contains($style, '.event-details-dialog .dialog-actions-end { flex-wrap: nowrap; }')
+        && str_contains($style, '.event-details-dialog .dialog-actions-end { flex-wrap: wrap; }')
         && str_contains($style, '.event-details-dialog .dialog-actions button { flex: 0 0 auto; white-space: nowrap; }')
         && str_contains($style, '.dialog-close-button {')
         && str_contains($style, '.delete-scope,')
