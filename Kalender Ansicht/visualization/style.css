@@ -785,6 +785,8 @@ html.ipsview-mode #event-dialog .dialog-actions {
     outline: 2px solid var(--cal-accent);
     outline-offset: 1px;
 }
+.event-details-dialog { --dialog-width: 720px; }
+html.ipsview-mode .event-details-dialog { --dialog-width: 840px; }
 .event-details-body { gap: 14px; }
 .event-details-summary { font-size: 1.08em; font-weight: 700; line-height: 1.35; overflow-wrap: anywhere; }
 .event-details-list { display: grid; gap: 0; margin: 0; }
@@ -792,8 +794,9 @@ html.ipsview-mode #event-dialog .dialog-actions {
 .event-details-row:first-child { border-top: 0; }
 .event-details-row dt { color: var(--cal-label-text); font-weight: 600; }
 .event-details-row dd { margin: 0; line-height: 1.45; overflow-wrap: anywhere; white-space: pre-wrap; }
+.event-details-dialog .dialog-actions { flex-wrap: wrap; }
 .event-details-dialog .dialog-actions-start,
-.event-details-dialog .dialog-actions-end { flex-wrap: nowrap; }
+.event-details-dialog .dialog-actions-end { flex-wrap: wrap; }
 .event-details-dialog .dialog-actions button { flex: 0 0 auto; white-space: nowrap; }
 
 .delete-confirm-body { gap: 8px; }

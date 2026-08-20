@@ -1322,7 +1322,7 @@ function icsImportText(value) {
 
 const providerLinkMessages = {
     de: {
-        'Open in provider': 'Beim Anbieter öffnen'
+        'Open in provider': 'Extern öffnen'
     }
 };
 
