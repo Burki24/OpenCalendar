@@ -47,6 +47,9 @@ let swipeGesture = null;
 let suppressSwipeClickUntil = 0;
 let deferredCalendarState = null;
 let importedIcsTimezone = '';
+let preservedAgendaScrollPosition = null;
+let agendaScrollWorkflow = '';
+let releaseAgendaScrollPositionAfterState = false;
 const monthEventData = new WeakMap();
 
 const content = document.getElementById('calendar-content');
@@ -112,6 +115,9 @@ function handleMessage(data) {
         if (message.toast.level === 'error') {
             pendingEventEdit = null;
             pendingSeriesEdit = null;
+            if (agendaScrollWorkflow) {
+                failAgendaScrollWorkflow();
+            }
         }
         showToast(t(message.toast.message || ''), message.toast.level || 'success');
     }
@@ -119,12 +125,15 @@ function handleMessage(data) {
         if (message.level === 'error') {
             pendingEventEdit = null;
             pendingSeriesEdit = null;
+            if (agendaScrollWorkflow) {
+                failAgendaScrollWorkflow();
+            }
         }
         showToast(t(message.message || ''), message.level || 'success');
         return;
     }
     if (message.type !== 'state' || !message.payload) return;
-    if (eventDialog.open) {
+    if (shouldDeferCalendarState()) {
         deferredCalendarState = message.payload;
         return;
     }
@@ -132,7 +141,11 @@ function handleMessage(data) {
 }
 
 function applyCalendarState(state) {
-    const agendaScrollPosition = initialized ? captureAgendaScrollPosition() : null;
+    const agendaScrollPosition = agendaScrollWorkflow
+        ? preservedAgendaScrollPosition
+        : (initialized ? captureAgendaScrollPosition() : null);
+    const releasePreservedAgendaScrollPosition = Boolean(agendaScrollWorkflow)
+        && releaseAgendaScrollPositionAfterState;
     calendarState = state;
     const eventEdit = calendarState.eventEdit && typeof calendarState.eventEdit === 'object'
         ? calendarState.eventEdit
@@ -154,6 +167,9 @@ function applyCalendarState(state) {
     }
     render();
     restoreAgendaScrollPosition(agendaScrollPosition);
+    if (releasePreservedAgendaScrollPosition) {
+        clearAgendaScrollWorkflow();
+    }
     if (eventEdit && pendingEventEdit
         && Number(eventEdit.calendarInstanceId) === pendingEventEdit.calendarInstanceId
         && (pendingEventEdit.eventReference === ''
@@ -172,11 +188,49 @@ function applyCalendarState(state) {
     }
 }
 
+function shouldDeferCalendarState() {
+    return eventDialog.open
+        || (releaseAgendaScrollPositionAfterState
+            && (eventDetailsDialog.open || editScopeDialog.open || deleteConfirmDialog.open));
+}
+
 function applyDeferredCalendarState() {
-    if (!deferredCalendarState || eventDialog.open) return;
+    if (!deferredCalendarState || shouldDeferCalendarState()) return;
     const state = deferredCalendarState;
     deferredCalendarState = null;
     applyCalendarState(state);
+}
+
+function beginAgendaScrollWorkflow(workflow) {
+    if (!agendaScrollWorkflow) {
+        preservedAgendaScrollPosition = captureAgendaScrollPosition();
+    }
+    agendaScrollWorkflow = workflow;
+    releaseAgendaScrollPositionAfterState = false;
+}
+
+function releaseAgendaScrollWorkflowAfterState() {
+    if (!agendaScrollWorkflow) return;
+    releaseAgendaScrollPositionAfterState = true;
+}
+
+function cancelAgendaScrollWorkflowRelease() {
+    releaseAgendaScrollPositionAfterState = false;
+}
+
+function failAgendaScrollWorkflow() {
+    cancelAgendaScrollWorkflowRelease();
+    if (!eventDialog.open && !eventDetailsDialog.open && !editScopeDialog.open && !deleteConfirmDialog.open) {
+        clearAgendaScrollWorkflow(true);
+    }
+}
+
+function clearAgendaScrollWorkflow(restore = false) {
+    const position = preservedAgendaScrollPosition;
+    preservedAgendaScrollPosition = null;
+    agendaScrollWorkflow = '';
+    releaseAgendaScrollPositionAfterState = false;
+    if (restore) restoreAgendaScrollPosition(position);
 }
 
 function captureAgendaScrollPosition() {
@@ -236,7 +290,10 @@ function restoreAgendaScrollPosition(position) {
     };
 
     if (typeof requestAnimationFrame === 'function') {
-        requestAnimationFrame(restore);
+        requestAnimationFrame(() => {
+            restore();
+            requestAnimationFrame(restore);
+        });
     } else {
         restore();
     }
@@ -1164,6 +1221,47 @@ function icsImportText(value) {
     return icsImportMessages[language]?.[value] || value;
 }
 
+const providerLinkMessages = {
+    de: {
+        'Open in provider': 'Beim Anbieter öffnen'
+    }
+};
+
+function providerLinkText(value) {
+    const translated = t(value);
+    if (translated !== value) return translated;
+    const language = String(document.documentElement.lang || '').toLowerCase().split('-')[0];
+    return providerLinkMessages[language]?.[value] || value;
+}
+
+function providerEventUrl(event) {
+    const value = String(event?.url || '').trim();
+    if (!value) return '';
+
+    let url;
+    try {
+        url = new URL(value);
+    } catch (error) {
+        return '';
+    }
+    if (url.protocol !== 'https:') return '';
+
+    const host = url.hostname.toLowerCase();
+    const path = url.pathname.toLowerCase();
+    const googleCalendar = (host === 'calendar.google.com' || host === 'www.google.com')
+        && path.startsWith('/calendar/');
+    const microsoftCalendar = ['outlook.office.com', 'outlook.office365.com', 'outlook.live.com'].includes(host);
+
+    return googleCalendar || microsoftCalendar ? url.href : '';
+}
+
+function openProviderEvent() {
+    if (!selectedEvent) return;
+    const url = providerEventUrl(selectedEvent);
+    if (!url) return;
+    window.open(url, '_blank', 'noopener,noreferrer');
+}
+
 function unfoldIcsLines(value) {
     const lines = [];
     String(value || '').replace(/\r\n?/g, '\n').split('\n').forEach(line => {
@@ -1565,6 +1663,7 @@ async function importIcsFile(file) {
 function openNewEvent(preferredDay = null) {
     const writable = calendarState.calendars.filter(calendar => calendar.canWrite);
     if (!writable.length) return;
+    beginAgendaScrollWorkflow('create');
     selectedEvent = null;
     importedIcsTimezone = '';
     icsImportFile.value = '';
@@ -1609,6 +1708,7 @@ function openNewEvent(preferredDay = null) {
 }
 
 function openEventDetails(event) {
+    beginAgendaScrollWorkflow('details');
     selectedEvent = event;
     const editable = eventCanUpdate(event);
     const deletable = eventCanDelete(event);
@@ -1632,6 +1732,7 @@ function openEventDetails(event) {
     setOptionalDetail('reminder', reminderDetailText(event));
     setOptionalDetail('location', event.location);
     setOptionalDetail('description', event.description);
+    document.getElementById('details-provider-button').classList.toggle('hidden', providerEventUrl(event) === '');
     document.getElementById('details-edit-button').classList.toggle('hidden', !editable);
     document.getElementById('details-delete-button').classList.toggle('hidden', !deletable);
 
@@ -1649,6 +1750,7 @@ function requestEdit(sourceDialog) {
     const followingAllowed = eventCanUpdateFollowing(event);
     const seriesAllowed = eventCanUpdateSeries(event);
     if (!event.recurring || (!followingAllowed && !seriesAllowed)) {
+        beginAgendaScrollWorkflow('edit');
         sourceDialog?.close();
         void prepareEventEdit(event);
         return;
@@ -1677,6 +1779,7 @@ async function confirmEditScope() {
     const scope = ['following', 'series'].includes(selected?.value) ? selected.value : 'occurrence';
     editScopeConfirmButton.disabled = true;
     try {
+        beginAgendaScrollWorkflow('edit');
         editScopeDialog.close();
         sourceDialog?.close();
         if (scope === 'occurrence') {
@@ -1696,6 +1799,7 @@ async function confirmEditScope() {
             || (scope === 'following' && (!pendingSeriesEdit.occurrenceId || !pendingSeriesEdit.originalStart))
             || !await sendAction('PrepareSeriesEdit', pendingSeriesEdit)) {
             pendingSeriesEdit = null;
+            clearAgendaScrollWorkflow(true);
         }
     } finally {
         editScopeConfirmButton.disabled = false;
@@ -1733,6 +1837,7 @@ async function prepareEventEdit(event) {
     if (!calendarInstanceId || startTimestamp <= 0
         || !(await sendAction('PrepareEventEdit', request))) {
         pendingEventEdit = null;
+        clearAgendaScrollWorkflow(true);
     }
 }
 
@@ -1794,6 +1899,8 @@ async function confirmDeleteEvent() {
 
     const event = selectedEvent;
     const sourceDialog = deleteSourceDialog;
+    beginAgendaScrollWorkflow('delete');
+    releaseAgendaScrollWorkflowAfterState();
     deleteConfirmButton.disabled = true;
     try {
         const success = await sendAction('DeleteEvent', {
@@ -1807,6 +1914,8 @@ async function confirmDeleteEvent() {
         if (success) {
             deleteConfirmDialog.close();
             sourceDialog?.close();
+        } else {
+            cancelAgendaScrollWorkflowRelease();
         }
     } finally {
         deleteConfirmButton.disabled = false;
@@ -2944,8 +3053,12 @@ eventForm.addEventListener('submit', async event => {
             }
             : { calendarInstanceId, event: eventData });
 
-    if (await sendAction(action, value)) {
+    releaseAgendaScrollWorkflowAfterState();
+    const success = await sendAction(action, value);
+    if (success) {
         eventDialog.close();
+    } else {
+        cancelAgendaScrollWorkflowRelease();
     }
 });
 
@@ -3078,9 +3191,21 @@ eventDialog.addEventListener('cancel', event => {
 eventDialog.addEventListener('close', () => {
     closeCalendarPicker();
     applyDeferredCalendarState();
+    if (!releaseAgendaScrollPositionAfterState
+        && ['create', 'edit', 'delete'].includes(agendaScrollWorkflow)) {
+        clearAgendaScrollWorkflow(true);
+    }
+});
+eventDetailsDialog.addEventListener('close', () => {
+    applyDeferredCalendarState();
+    if (!releaseAgendaScrollPositionAfterState
+        && ['details', 'delete'].includes(agendaScrollWorkflow)) {
+        clearAgendaScrollWorkflow(true);
+    }
 });
 document.getElementById('details-close').addEventListener('click', () => eventDetailsDialog.close());
 document.getElementById('details-close-button').addEventListener('click', () => eventDetailsDialog.close());
+document.getElementById('details-provider-button').addEventListener('click', openProviderEvent);
 document.getElementById('details-edit-button').addEventListener('click', () => requestEdit(eventDetailsDialog));
 document.getElementById('edit-scope-close').addEventListener('click', () => editScopeDialog.close());
 document.getElementById('edit-scope-cancel').addEventListener('click', () => editScopeDialog.close());
@@ -3094,6 +3219,7 @@ document.getElementById('delete-confirm-cancel').addEventListener('click', () =>
 deleteConfirmButton.addEventListener('click', confirmDeleteEvent);
 deleteConfirmDialog.addEventListener('close', () => {
     deleteSourceDialog = null;
+    applyDeferredCalendarState();
 });
 document.getElementById('day-events-close').addEventListener('click', () => dayEventsDialog.close());
 document.getElementById('day-events-close-button').addEventListener('click', () => dayEventsDialog.close());
@@ -3482,6 +3608,11 @@ function applyStaticTranslations() {
         ['calendar-filter-cancel', 'Cancel'],
         ['calendar-filter-apply', 'Apply']
     ].forEach(([id, text]) => { document.getElementById(id).textContent = t(text); });
+    const providerButtonText = providerLinkText('Open in provider');
+    const providerButton = document.getElementById('details-provider-button');
+    providerButton.textContent = providerButtonText;
+    providerButton.title = providerButtonText;
+    providerButton.setAttribute('aria-label', providerButtonText);
     icsImportButton.textContent = icsImportText('Import ICS');
     icsImportButton.title = icsImportText('Import ICS');
     icsImportButton.setAttribute('aria-label', icsImportText('Import ICS'));
