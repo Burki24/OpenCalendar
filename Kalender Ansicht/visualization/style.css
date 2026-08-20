@@ -656,12 +656,16 @@ html.ipsview-mode #event-dialog .dialog-body {
 html.ipsview-mode #event-dialog .dialog-header {
     position: sticky;
     top: 0;
-    z-index: 4;
+    z-index: 6;
+    background: var(--cal-dialog);
+    box-shadow: 0 1px 0 var(--cal-line, var(--cal-border));
 }
 html.ipsview-mode #event-dialog .dialog-actions {
     position: sticky;
     bottom: 0;
-    z-index: 4;
+    z-index: 6;
+    background: var(--cal-dialog);
+    box-shadow: 0 -1px 0 var(--cal-line, var(--cal-border));
 }
 
 .form-row { display: grid; min-width: 0; gap: 5px; }
