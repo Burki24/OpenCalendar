@@ -115,8 +115,31 @@ final class MicrosoftCalendarIncrementalSync
             false
         );
 
+        $items = [];
+        foreach ($round['items'] as $item) {
+            $eventReference = trim((string) ($item['eventReference'] ?? ''));
+            if ($eventReference !== '') {
+                $items[$eventReference] = $item;
+            }
+        }
+        foreach ($round['seriesMasters'] as $seriesMasterId) {
+            foreach ($this->seriesInstances($calendarId, $seriesMasterId, $start, $end) as $instance) {
+                $eventReference = trim((string) ($instance['eventReference'] ?? ''));
+                if ($eventReference !== '') {
+                    $items[$eventReference] = $instance;
+                }
+            }
+        }
+        $items = array_values($items);
+        usort(
+            $items,
+            static fn (array $left, array $right): int => ((int) ($left['startTimestamp'] ?? 0)
+                <=> (int) ($right['startTimestamp'] ?? 0))
+                ?: strcasecmp((string) ($left['summary'] ?? ''), (string) ($right['summary'] ?? ''))
+        );
+
         return [
-            'items'       => $round['items'],
+            'items'       => $items,
             'syncToken'   => $round['deltaLink'],
             'incremental' => false
         ];
@@ -138,7 +161,7 @@ final class MicrosoftCalendarIncrementalSync
     }
 
     /**
-     * @return array{items:list<array<string, mixed>>,deltaLink:string}
+     * @return array{items:list<array<string, mixed>>,deltaLink:string,seriesMasters:list<string>}
      */
     private function readDeltaRound(string $initialUrl, string $calendarId, bool $incremental): array
     {
@@ -146,6 +169,7 @@ final class MicrosoftCalendarIncrementalSync
         $pageCount = 0;
         $seenUrls = [];
         $changes = [];
+        $seriesMasters = [];
 
         while (true) {
             if (++$pageCount > self::MAX_PAGES) {
@@ -183,6 +207,11 @@ final class MicrosoftCalendarIncrementalSync
                         );
                     }
 
+                    // Microsoft normally expands recurring series in calendarView/delta. In practice,
+                    // a freshly created or changed series can transiently be returned as its master only.
+                    // Remember the master and explicitly load its concrete instances before accepting the
+                    // new delta baseline, otherwise the whole series can disappear from the local cache.
+                    $seriesMasters[$eventId] = true;
                     continue;
                 }
 
@@ -212,10 +241,86 @@ final class MicrosoftCalendarIncrementalSync
             }
 
             return [
-                'items'     => array_values($changes),
-                'deltaLink' => $this->validatedGraphStateUrl($deltaLink)
+                'items'         => array_values($changes),
+                'deltaLink'     => $this->validatedGraphStateUrl($deltaLink),
+                'seriesMasters' => array_keys($seriesMasters)
             ];
         }
+    }
+
+    /**
+     * Expands one recurring Microsoft series into the concrete occurrences in the tracked window.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function seriesInstances(
+        string $calendarId,
+        string $seriesMasterId,
+        DateTimeImmutable $start,
+        DateTimeImmutable $end
+    ): array {
+        $query = http_build_query(
+            [
+                'startDateTime' => $start->setTimezone(new DateTimeZone('UTC'))->format('Y-m-d\TH:i:s\Z'),
+                'endDateTime'   => $end->setTimezone(new DateTimeZone('UTC'))->format('Y-m-d\TH:i:s\Z'),
+                '$top'          => '1000'
+            ],
+            '',
+            '&',
+            PHP_QUERY_RFC3986
+        );
+        $url = self::API_URL
+            . '/me/calendars/' . rawurlencode($calendarId)
+            . '/events/' . rawurlencode($seriesMasterId)
+            . '/instances?' . $query;
+        $pageCount = 0;
+        $seenUrls = [];
+        $instances = [];
+
+        while ($url !== '') {
+            $url = $this->validatedGraphStateUrl($url);
+            if (++$pageCount > self::MAX_PAGES) {
+                throw new MicrosoftCalendarProviderException(
+                    'Microsoft recurring-series pagination exceeded the safe page limit.'
+                );
+            }
+            if (isset($seenUrls[$url])) {
+                throw new MicrosoftCalendarProviderException(
+                    'Microsoft Calendar returned a repeated recurring-series pagination link.'
+                );
+            }
+            $seenUrls[$url] = true;
+
+            $data = $this->requestJsonUrl($url);
+            foreach (is_array($data['value'] ?? null) ? $data['value'] : [] as $item) {
+                if (!is_array($item) || (bool) ($item['isCancelled'] ?? false)) {
+                    continue;
+                }
+                $type = strtolower(trim((string) ($item['type'] ?? '')));
+                if (!in_array($type, ['occurrence', 'exception'], true)) {
+                    continue;
+                }
+                $mapped = $this->mapEvent($calendarId, $item);
+                if ($mapped === null) {
+                    continue;
+                }
+                $eventReference = trim((string) ($mapped['eventReference'] ?? ''));
+                if ($eventReference === '') {
+                    continue;
+                }
+                $instances[$eventReference] = $mapped;
+                if (count($instances) > self::MAX_CHANGES) {
+                    throw new MicrosoftCalendarProviderException(
+                        'Microsoft recurring series returned too many event instances.'
+                    );
+                }
+            }
+
+            $nextLink = trim((string) ($data['@odata.nextLink'] ?? ''));
+            $url = $nextLink !== '' ? $this->validatedGraphStateUrl($nextLink) : '';
+        }
+
+        return array_values($instances);
     }
 
     /**

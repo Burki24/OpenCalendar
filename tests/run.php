@@ -22,6 +22,7 @@ $commands = [
     ['Verify calendar configurator cache isolation', [PHP_BINARY, 'tests/configurator-cache.php']],
     ['Verify Google incremental synchronization', [PHP_BINARY, 'tests/google-incremental-sync.php']],
     ['Verify Microsoft incremental synchronization', [PHP_BINARY, 'tests/microsoft-incremental-sync.php']],
+    ['Verify Microsoft series-master synchronization', [PHP_BINARY, 'tests/microsoft-series-master-sync.php']],
     ['Verify Microsoft post-write synchronization', [PHP_BINARY, 'tests/microsoft-write-sync.php']],
     ['Verify Microsoft event-edit identity', [PHP_BINARY, 'tests/microsoft-event-edit.php']],
     ['Verify CalDAV incremental synchronization', [PHP_BINARY, 'tests/caldav-incremental-sync.php']],
