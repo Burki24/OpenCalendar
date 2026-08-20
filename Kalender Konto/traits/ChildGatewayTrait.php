@@ -283,7 +283,11 @@ trait KalenderKontoChildGatewayTrait
                 new DateTimeImmutable('@' . $rangeEnd)
             ),
             fn (mixed $event): bool => is_array($event)
-                && $this->eventMatchesEditRequest($event, $request)
+                && $this->eventMatchesEditRequest(
+                    $event,
+                    $request,
+                    $this->ReadPropertyInteger('Provider') === self::PROVIDER_MICROSOFT
+                )
         ));
 
         if (count($matches) === 1) {
@@ -302,15 +306,18 @@ trait KalenderKontoChildGatewayTrait
      * @param array<string, mixed> $event
      * @param array<string, mixed> $request
      */
-    private function eventMatchesEditRequest(array $event, array $request): bool
-    {
+    private function eventMatchesEditRequest(
+        array $event,
+        array $request,
+        bool $stableMicrosoftIdentity = false
+    ): bool {
         $primaryIdentity = [
             'OccurrenceID'   => 'occurrenceId',
             'EventReference' => 'eventReference',
             'ResourceURL'    => 'resourceUrl',
             'UID'            => 'uid'
         ];
-        $matchedPrimary = false;
+        $matchedPrimaryKey = '';
         foreach ($primaryIdentity as $requestKey => $eventKey) {
             $expected = trim((string) ($request[$requestKey] ?? ''));
             if ($expected === '') {
@@ -323,11 +330,18 @@ trait KalenderKontoChildGatewayTrait
             if (!hash_equals($expected, $actual)) {
                 return false;
             }
-            $matchedPrimary = true;
+            $matchedPrimaryKey = $eventKey;
             break;
         }
-        if (!$matchedPrimary) {
+        if ($matchedPrimaryKey === '') {
             return false;
+        }
+
+        // Microsoft Graph immutable occurrence/event IDs are authoritative. Do not reject an otherwise
+        // identical event only because stale delta metadata contains a different original-start value.
+        if ($stableMicrosoftIdentity
+            && in_array($matchedPrimaryKey, ['occurrenceId', 'eventReference', 'resourceUrl'], true)) {
+            return true;
         }
 
         foreach ([

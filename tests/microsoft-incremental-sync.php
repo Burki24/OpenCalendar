@@ -83,6 +83,16 @@ function microsoftSyncEvent(string $id, string $summary, string $date): array
     ];
 }
 
+/** @return array<string, mixed> */
+function microsoftSyncOccurrence(string $id, string $seriesId, string $summary, string $date): array
+{
+    $event = microsoftSyncEvent($id, $summary, $date);
+    $event['type'] = 'occurrence';
+    $event['seriesMasterId'] = $seriesId;
+
+    return $event;
+}
+
 $start = new DateTimeImmutable('2026-08-01T00:00:00+00:00');
 $end = new DateTimeImmutable('2027-08-01T00:00:00+00:00');
 $initialNextLink = 'https://graph.microsoft.com/v1.0/me/calendars/primary/calendarView/delta?$skiptoken=page-2';
@@ -115,7 +125,13 @@ $incrementalDeltaLink = 'https://graph.microsoft.com/v1.0/me/calendars/primary/c
 $incrementalHttp = new MicrosoftIncrementalSyncTestHttpClient([
     microsoftSyncResponse(200, [
         'value'            => [
-            ['id' => 'changed-1'],
+            [
+                'id'       => 'changed-1',
+                'type'     => 'singleInstance',
+                'isAllDay' => false,
+                'start'    => ['dateTime' => '2026-08-21T09:00:00.0000000', 'timeZone' => 'UTC'],
+                'end'      => ['dateTime' => '2026-08-21T10:00:00.0000000', 'timeZone' => 'UTC']
+            ],
             ['id' => 'deleted-1', '@removed' => ['reason' => 'deleted']]
         ],
         '@odata.deltaLink' => $incrementalDeltaLink
@@ -142,6 +158,55 @@ microsoftSyncExpect(
     'The Microsoft delta link must be reused exactly as returned by Graph.'
 );
 
+$seriesDeltaLink = 'https://graph.microsoft.com/v1.0/me/calendars/primary/calendarView/delta?$deltatoken=series-change';
+$seriesRefreshDeltaLink = 'https://graph.microsoft.com/v1.0/me/calendars/primary/calendarView/delta?$deltatoken=series-refresh';
+$seriesHttp = new MicrosoftIncrementalSyncTestHttpClient([
+    microsoftSyncResponse(200, [
+        'value'            => [[
+            'id'       => 'series-master',
+            'type'     => 'seriesMaster',
+            'isAllDay' => false,
+            'start'    => ['dateTime' => '2026-08-20T09:00:00.0000000', 'timeZone' => 'UTC'],
+            'end'      => ['dateTime' => '2026-08-20T10:00:00.0000000', 'timeZone' => 'UTC']
+        ]],
+        '@odata.deltaLink' => $seriesDeltaLink
+    ]),
+    microsoftSyncResponse(200, [
+        'value'            => [
+            microsoftSyncOccurrence('series-occurrence-1', 'series-master', 'Sabine arbeiten', '2026-08-20'),
+            microsoftSyncOccurrence('series-occurrence-2', 'series-master', 'Sabine arbeiten', '2026-08-27')
+        ],
+        '@odata.deltaLink' => $seriesRefreshDeltaLink
+    ])
+]);
+$seriesSynchronizer = new MicrosoftCalendarIncrementalSync($seriesHttp, 'access-token');
+$seriesRefresh = $seriesSynchronizer->synchronize('primary', $start, $end, $initialDeltaLink);
+microsoftSyncExpect(
+    $seriesRefresh['incremental'] === false,
+    'A changed Microsoft series master must trigger a complete bounded calendar-view refresh.'
+);
+microsoftSyncExpect(
+    $seriesRefresh['syncToken'] === $seriesRefreshDeltaLink,
+    'The Microsoft series refresh must replace the previous delta state.'
+);
+microsoftSyncExpect(
+    count($seriesRefresh['items']) === 2
+        && ($seriesRefresh['items'][0]['summary'] ?? '') === 'Sabine arbeiten'
+        && ($seriesRefresh['items'][1]['summary'] ?? '') === 'Sabine arbeiten',
+    'A numbered Microsoft series must keep all concrete occurrences after a series-master change.'
+);
+microsoftSyncExpect(
+    ($seriesRefresh['items'][0]['recurrenceType'] ?? '') === 'occurrence'
+        && ($seriesRefresh['items'][1]['recurrenceType'] ?? '') === 'occurrence',
+    'Microsoft series masters must not be stored as visible calendar-view events.'
+);
+microsoftSyncExpect(
+    isset($seriesHttp->urls[1])
+        && str_contains($seriesHttp->urls[1], '/calendarView/delta?')
+        && str_contains($seriesHttp->urls[1], 'startDateTime='),
+    'A Microsoft series-master delta change must restart the bounded calendar-view synchronization.'
+);
+
 $fallbackDeltaLink = 'https://graph.microsoft.com/v1.0/me/calendars/primary/calendarView/delta?$deltatoken=token-3';
 $fallbackHttp = new MicrosoftIncrementalSyncTestHttpClient([
     microsoftSyncResponse(410, ['error' => ['code' => 'resyncRequired', 'message' => 'Resynchronization required.']]),
@@ -159,4 +224,52 @@ microsoftSyncExpect(
     'The HTTP 410 fallback did not return the new full Microsoft event set.'
 );
 
-echo "Microsoft incremental synchronization tests passed.\n";
+require_once __DIR__ . '/../Kalender Konto/traits/ChildGatewayTrait.php';
+
+final class MicrosoftEditIdentityTestHarness
+{
+    use KalenderKontoChildGatewayTrait;
+
+    /**
+     * Exposes the provider identity matcher for the Microsoft recurrence regression test.
+     *
+     * @param array<string, mixed> $event
+     * @param array<string, mixed> $request
+     */
+    public function matches(array $event, array $request, bool $stableMicrosoftIdentity): bool
+    {
+        return $this->eventMatchesEditRequest($event, $request, $stableMicrosoftIdentity);
+    }
+}
+
+$editIdentityHarness = new MicrosoftEditIdentityTestHarness();
+$editEvent = [
+    'occurrenceId'   => 'series-occurrence-1',
+    'eventReference' => 'series-occurrence-1',
+    'resourceUrl'    => 'https://graph.microsoft.com/v1.0/me/calendars/primary/events/series-occurrence-1',
+    'uid'            => 'series@example.test',
+    'originalStart'  => '2026-08-20T09:00:00+00:00',
+    'recurrenceId'   => ''
+];
+$staleEditRequest = [
+    'OccurrenceID'  => 'series-occurrence-1',
+    'OriginalStart' => '2026-08-20T08:00:00+00:00'
+];
+microsoftSyncExpect(
+    $editIdentityHarness->matches($editEvent, $staleEditRequest, true),
+    'A stable Microsoft occurrence ID must remain editable when cached original-start metadata is stale.'
+);
+microsoftSyncExpect(
+    !$editIdentityHarness->matches($editEvent, $staleEditRequest, false),
+    'Non-Microsoft edit matching must retain the stricter original-start identity check.'
+);
+microsoftSyncExpect(
+    !$editIdentityHarness->matches(
+        $editEvent,
+        ['OccurrenceID' => 'different-occurrence'],
+        true
+    ),
+    'Microsoft edit matching must still reject a different occurrence ID.'
+);
+
+echo "Microsoft incremental synchronization and recurring-edit tests passed.\n";

@@ -86,7 +86,7 @@ final class MicrosoftCalendarIncrementalSync
         $round = $this->readDeltaRound(
             self::API_URL . '/me/calendars/' . rawurlencode($calendarId) . '/calendarView/delta?' . $query,
             $calendarId,
-            true
+            false
         );
 
         return [
@@ -114,7 +114,7 @@ final class MicrosoftCalendarIncrementalSync
     /**
      * @return array{items:list<array<string, mixed>>,deltaLink:string}
      */
-    private function readDeltaRound(string $initialUrl, string $calendarId, bool $collectChanges): array
+    private function readDeltaRound(string $initialUrl, string $calendarId, bool $incremental): array
     {
         $url = $this->validatedGraphStateUrl($initialUrl);
         $pageCount = 0;
@@ -135,22 +135,36 @@ final class MicrosoftCalendarIncrementalSync
             $seenUrls[$url] = true;
 
             $data = $this->requestJsonUrl($url);
-            if ($collectChanges) {
-                foreach (is_array($data['value'] ?? null) ? $data['value'] : [] as $item) {
-                    if (!is_array($item)) {
-                        continue;
-                    }
-                    $eventId = trim((string) ($item['id'] ?? ''));
-                    if ($eventId === '') {
-                        continue;
-                    }
+            foreach (is_array($data['value'] ?? null) ? $data['value'] : [] as $item) {
+                if (!is_array($item)) {
+                    continue;
+                }
+                $eventId = trim((string) ($item['id'] ?? ''));
+                if ($eventId === '') {
+                    continue;
+                }
 
-                    $changes[$eventId] = $this->deltaItem($calendarId, $item);
-                    if (count($changes) > self::MAX_CHANGES) {
+                $removed = is_array($item['@removed'] ?? null) || (bool) ($item['isCancelled'] ?? false);
+                $type = strtolower(trim((string) ($item['type'] ?? '')));
+                if (!$removed && $type === 'seriesmaster') {
+                    if ($incremental) {
+                        // A series-master change can replace multiple occurrence IDs. Refresh the bounded
+                        // calendar view so no stale or partial instances survive in the local cache.
                         throw new MicrosoftCalendarProviderException(
-                            'Microsoft Calendar returned too many event changes.'
+                            'Microsoft recurring series changed and requires a full calendar-view synchronization.',
+                            0,
+                            'resyncRequired'
                         );
                     }
+
+                    continue;
+                }
+
+                $changes[$eventId] = $this->deltaItem($calendarId, $item, $incremental);
+                if (count($changes) > self::MAX_CHANGES) {
+                    throw new MicrosoftCalendarProviderException(
+                        'Microsoft Calendar returned too many event changes.'
+                    );
                 }
             }
 
@@ -182,16 +196,18 @@ final class MicrosoftCalendarIncrementalSync
      * @param array<string, mixed> $item
      * @return array<string, mixed>
      */
-    private function deltaItem(string $calendarId, array $item): array
+    private function deltaItem(string $calendarId, array $item, bool $refreshCurrent): array
     {
         $eventId = trim((string) ($item['id'] ?? ''));
         if (is_array($item['@removed'] ?? null) || (bool) ($item['isCancelled'] ?? false)) {
             return $this->deletionMarker($item);
         }
 
-        $mapped = $this->mapEvent($calendarId, $item);
-        if ($mapped !== null) {
-            return $mapped;
+        if (!$refreshCurrent && $this->isCompleteCalendarViewItem($item)) {
+            $mapped = $this->mapEvent($calendarId, $item);
+            if ($mapped !== null) {
+                return $mapped;
+            }
         }
 
         try {
@@ -213,6 +229,30 @@ final class MicrosoftCalendarIncrementalSync
         }
 
         return $mapped;
+    }
+
+    /** @param array<string, mixed> $item */
+    private function isCompleteCalendarViewItem(array $item): bool
+    {
+        foreach (['subject', 'type', 'isAllDay', 'start', 'end'] as $key) {
+            if (!array_key_exists($key, $item)) {
+                return false;
+            }
+        }
+        if (!is_array($item['start']) || !is_array($item['end'])) {
+            return false;
+        }
+
+        $type = strtolower(trim((string) $item['type']));
+        if (in_array($type, ['occurrence', 'exception'], true)
+            && trim((string) ($item['seriesMasterId'] ?? '')) === '') {
+            return false;
+        }
+        if ($type === 'exception' && trim((string) ($item['originalStart'] ?? '')) === '') {
+            return false;
+        }
+
+        return true;
     }
 
     /**
