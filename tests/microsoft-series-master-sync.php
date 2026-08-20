@@ -100,7 +100,7 @@ $http = new MicrosoftSeriesMasterSyncTestHttpClient([
         'value'            => [$seriesMaster],
         '@odata.deltaLink' => $newDeltaLink
     ]),
-    // The bounded full delta refresh can still expose the master before all occurrences are expanded.
+    // The bounded delta baseline can still expose only the master.
     microsoftSeriesMasterResponse([
         'value'            => [$seriesMaster],
         '@odata.deltaLink' => $newDeltaLink
@@ -129,7 +129,7 @@ microsoftSeriesMasterExpect(
 );
 microsoftSeriesMasterExpect(
     count($result['items']) === 5,
-    'A Microsoft series master returned by calendarView/delta must be expanded into all concrete instances.'
+    'The authoritative Microsoft calendarView snapshot must return all concrete series occurrences.'
 );
 foreach ($result['items'] as $item) {
     microsoftSeriesMasterExpect(
@@ -150,10 +150,11 @@ microsoftSeriesMasterExpect(
 );
 microsoftSeriesMasterExpect(
     isset($http->requests[2])
-        && str_contains($http->requests[2]['url'], '/events/series-master/instances?')
+        && str_contains($http->requests[2]['url'], '/calendarView?')
+        && !str_contains($http->requests[2]['url'], '/delta?')
         && str_contains($http->requests[2]['url'], 'startDateTime=')
         && str_contains($http->requests[2]['url'], 'endDateTime='),
-    'A series master returned during the full refresh must be expanded through the Graph instances endpoint.'
+    'A series-master resynchronization must rebuild the cache from the authoritative Graph calendarView.'
 );
 foreach ($http->requests as $request) {
     microsoftSeriesMasterExpect(

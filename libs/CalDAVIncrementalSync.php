@@ -24,6 +24,7 @@ require_once __DIR__ . '/ICalendarCodec.php';
 final class CalDAVIncrementalSync
 {
     private const DAV_NAMESPACE = 'DAV:';
+    private const CALDAV_NAMESPACE = 'urn:ietf:params:xml:ns:caldav';
     private const MAX_CHANGES = 100_000;
 
     /**
@@ -147,14 +148,24 @@ final class CalDAVIncrementalSync
                 throw new CalDAVProviderException('CalDAV returned a synchronization entry without a resource URL.');
             }
             $resourceUrl = $this->resolveResourceUrl($calendarUrl, $effectiveCalendarUrl, $href);
+            if ($this->sameCollectionUrl($calendarUrl, $resourceUrl)) {
+                continue;
+            }
             $statusCode = $this->resourceStatusCode($xpath, $resourceResponse);
             if (in_array($statusCode, [404, 410], true)) {
                 $changes[] = $this->deletionMarker($resourceUrl);
             } elseif ($statusCode === 0 || $statusCode === 200) {
-                array_push(
-                    $changes,
-                    ...$this->resourceChanges($calendarUrl, $resourceUrl, $start, $end)
-                );
+                try {
+                    array_push(
+                        $changes,
+                        ...$this->resourceChanges($calendarUrl, $resourceUrl, $start, $end)
+                    );
+                } catch (CalDAVProviderException $exception) {
+                    if (in_array($exception->httpStatus, [400, 405, 501], true)) {
+                        return $this->fullSync($calendarUrl, $start, $end, true);
+                    }
+                    throw $exception;
+                }
             } else {
                 throw new CalDAVProviderException(
                     sprintf('CalDAV returned HTTP %d for a synchronized resource.', $statusCode),
@@ -223,25 +234,63 @@ final class CalDAVIncrementalSync
         DateTimeImmutable $start,
         DateTimeImmutable $end
     ): array {
-        $response = $this->httpClient->request('GET', $resourceUrl, ['Accept' => 'text/calendar']);
-        if (in_array($response->statusCode, [404, 410], true)) {
+        $body = '<?xml version="1.0" encoding="utf-8" ?>'
+            . '<c:calendar-multiget xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav">'
+            . '<d:prop><d:getetag/><c:calendar-data/></d:prop>'
+            . '<d:href>' . htmlspecialchars($this->resourceHref($resourceUrl), ENT_QUOTES | ENT_XML1, 'UTF-8') . '</d:href>'
+            . '</c:calendar-multiget>';
+        $response = $this->httpClient->request(
+            'REPORT',
+            $calendarUrl,
+            [
+                'Accept'       => 'application/xml, text/xml',
+                'Content-Type' => 'application/xml; charset=utf-8'
+            ],
+            $body
+        );
+        $this->assertCollectionResponse($response, [207], 'changed calendar object retrieval');
+        $effectiveCalendarUrl = $this->trustedEffectiveUrl($response, $calendarUrl);
+
+        $document = $this->parseXml($response->body);
+        $xpath = new DOMXPath($document);
+        $xpath->registerNamespace('d', self::DAV_NAMESPACE);
+        $xpath->registerNamespace('c', self::CALDAV_NAMESPACE);
+        $resourceResponse = $xpath->query('/d:multistatus/d:response')?->item(0);
+        if (!$resourceResponse instanceof DOMElement) {
             return [$this->deletionMarker($resourceUrl)];
         }
-        $this->assertCollectionResponse($response, [200], 'changed calendar object retrieval');
-        $effectiveResourceUrl = $this->trustedEffectiveUrl($response, $resourceUrl);
-        $this->assertResourceBelongsToCalendar($calendarUrl, $effectiveResourceUrl);
-        $etag = trim((string) ($response->headers['etag'] ?? ''));
+
+        $href = $this->firstNodeValue($xpath, './d:href', $resourceResponse);
+        $resolvedResourceUrl = $href !== ''
+            ? $this->resolveResourceUrl($calendarUrl, $effectiveCalendarUrl, $href)
+            : $resourceUrl;
+        $statusCode = $this->resourceStatusCode($xpath, $resourceResponse);
+        if (in_array($statusCode, [404, 410], true)) {
+            return [$this->deletionMarker($resolvedResourceUrl)];
+        }
+        if ($statusCode !== 0 && $statusCode !== 200) {
+            throw new CalDAVProviderException(
+                sprintf('CalDAV returned HTTP %d for a changed calendar object.', $statusCode),
+                $statusCode
+            );
+        }
+
+        $calendarData = $this->firstNodeValue($xpath, './/c:calendar-data', $resourceResponse);
+        if ($calendarData === '') {
+            return [$this->deletionMarker($resolvedResourceUrl)];
+        }
+        $etag = $this->firstNodeValue($xpath, './/d:getetag', $resourceResponse);
         $events = $this->enableExpandedOccurrenceWrites(
             ICalendarCodec::parseEventsInRange(
-                $response->body,
-                $resourceUrl,
+                $calendarData,
+                $resolvedResourceUrl,
                 $etag,
                 $start,
                 $end
             )
         );
         if ($events === []) {
-            return [$this->deletionMarker($resourceUrl)];
+            return [$this->deletionMarker($resolvedResourceUrl)];
         }
 
         foreach ($events as &$event) {
@@ -390,6 +439,26 @@ final class CalDAVIncrementalSync
         $this->assertResourceBelongsToCalendar($calendarUrl, $resourceUrl);
 
         return $resourceUrl;
+    }
+
+    private function sameCollectionUrl(string $calendarUrl, string $resourceUrl): bool
+    {
+        return rtrim($calendarUrl, '/') === rtrim($resourceUrl, '/');
+    }
+
+    private function resourceHref(string $resourceUrl): string
+    {
+        $parts = parse_url($resourceUrl);
+        if ($parts === false) {
+            throw new CalDAVProviderException('The CalDAV resource URL is invalid.');
+        }
+
+        $href = (string) ($parts['path'] ?? '/');
+        if (isset($parts['query']) && $parts['query'] !== '') {
+            $href .= '?' . $parts['query'];
+        }
+
+        return $href;
     }
 
     private function trustedEffectiveUrl(CalendarHttpResponse $response, string $requestedUrl): string

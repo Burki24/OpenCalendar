@@ -157,7 +157,17 @@ $seriesHttp = new MicrosoftWriteSyncTestHttpClient([
         '@odata.deltaLink' => $seriesDeltaLink
     ]),
     microsoftWriteSyncResponse([
-        'value'            => [
+        'value'            => [[
+            'id'       => 'new-series-master',
+            'type'     => 'seriesMaster',
+            'isAllDay' => false,
+            'start'    => ['dateTime' => '2026-08-20T11:00:00.0000000', 'timeZone' => 'UTC'],
+            'end'      => ['dateTime' => '2026-08-20T12:00:00.0000000', 'timeZone' => 'UTC']
+        ]],
+        '@odata.deltaLink' => $seriesDeltaLink
+    ]),
+    microsoftWriteSyncResponse([
+        'value' => [
             microsoftWriteSyncOccurrence(
                 'new-series-occurrence-1',
                 'new-series-master',
@@ -170,8 +180,7 @@ $seriesHttp = new MicrosoftWriteSyncTestHttpClient([
                 'Created series',
                 '2026-08-27'
             )
-        ],
-        '@odata.deltaLink' => $seriesDeltaLink
+        ]
     ])
 ]);
 $seriesSynchronizer = new MicrosoftCalendarIncrementalSync($seriesHttp, 'access-token');

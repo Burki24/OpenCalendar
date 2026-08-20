@@ -115,6 +115,17 @@ function caldavSyncCollectionXml(string $syncToken): string
         . '</d:multistatus>';
 }
 
+function caldavMultigetXml(string $href, string $ical): string
+{
+    return '<?xml version="1.0" encoding="utf-8" ?>'
+        . '<d:multistatus xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav">'
+        . '<d:response><d:href>' . htmlspecialchars($href, ENT_QUOTES | ENT_XML1, 'UTF-8') . '</d:href>'
+        . '<d:propstat><d:prop><d:getetag>"changed-etag"</d:getetag>'
+        . '<c:calendar-data><![CDATA[' . $ical . ']]></c:calendar-data>'
+        . '</d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat>'
+        . '</d:response></d:multistatus>';
+}
+
 $calendarUrl = 'https://calendar.example/calendars/user/work/';
 $start = new DateTimeImmutable('2026-08-01T00:00:00Z');
 $end = new DateTimeImmutable('2027-08-01T00:00:00Z');
@@ -146,10 +157,11 @@ caldavIncrementalExpect(
 $incrementalHttp = new CalDAVIncrementalSyncTestHttpClient([
     caldavIncrementalResponse(207, caldavSyncCollectionXml('sync-2')),
     caldavIncrementalResponse(
-        200,
-        caldavSyncEventIcal('changed@example.test', 'Changed', '2026-08-21T10:00:00Z'),
-        'https://calendar.example/calendars/user/work/changed.ics',
-        ['etag' => '"changed-etag"']
+        207,
+        caldavMultigetXml(
+            '/calendars/user/work/changed.ics',
+            caldavSyncEventIcal('changed@example.test', 'Changed', '2026-08-21T10:00:00Z')
+        )
     )
 ]);
 $incrementalProvider = new CalDAVProvider($incrementalHttp, 'https://calendar.example/', $originPolicy);
@@ -179,6 +191,72 @@ caldavIncrementalExpect(
         && str_contains($incrementalHttp->requests[0]['body'] ?? '', '<d:sync-collection')
         && str_contains($incrementalHttp->requests[0]['body'] ?? '', '<d:sync-token>sync-1</d:sync-token>'),
     'The incremental CalDAV request did not use the previous sync token with WebDAV Depth 0.'
+);
+caldavIncrementalExpect(
+    ($incrementalHttp->requests[1]['method'] ?? '') === 'REPORT'
+        && !isset($incrementalHttp->requests[1]['headers']['Depth'])
+        && str_contains($incrementalHttp->requests[1]['body'] ?? '', '<c:calendar-multiget')
+        && str_contains($incrementalHttp->requests[1]['body'] ?? '', '<d:href>/calendars/user/work/changed.ics</d:href>'),
+    'Changed CalDAV resources must be retrieved through calendar-multiget instead of a direct object GET.'
+);
+
+$collectionEntryHttp = new CalDAVIncrementalSyncTestHttpClient([
+    caldavIncrementalResponse(
+        207,
+        '<?xml version="1.0" encoding="utf-8" ?>'
+            . '<d:multistatus xmlns:d="DAV:">'
+            . '<d:response><d:href>/calendars/user/work/</d:href>'
+            . '<d:propstat><d:prop><d:getetag>"collection-etag"</d:getetag></d:prop>'
+            . '<d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response>'
+            . '<d:sync-token>sync-collection-only</d:sync-token>'
+            . '</d:multistatus>'
+    )
+]);
+$collectionEntryProvider = new CalDAVProvider($collectionEntryHttp, 'https://calendar.example/', $originPolicy);
+$collectionEntrySynchronizer = new CalDAVIncrementalSync(
+    $collectionEntryProvider,
+    $collectionEntryHttp,
+    $originPolicy
+);
+$collectionEntry = $collectionEntrySynchronizer->synchronize($calendarUrl, $start, $end, 'sync-1');
+caldavIncrementalExpect(
+    $collectionEntry['incremental'] === true
+        && $collectionEntry['syncToken'] === 'sync-collection-only'
+        && $collectionEntry['items'] === []
+        && count($collectionEntryHttp->requests) === 1,
+    'A collection-level sync entry must not be retrieved as a calendar object.'
+);
+
+$badObjectHttp = new CalDAVIncrementalSyncTestHttpClient([
+    caldavIncrementalResponse(207, caldavSyncCollectionXml('sync-bad-object')),
+    caldavIncrementalResponse(400, ''),
+    caldavIncrementalResponse(
+        207,
+        caldavFullQueryXml(
+            '/calendars/user/work/recovered.ics',
+            caldavSyncEventIcal('recovered@example.test', 'Recovered', '2026-08-24T10:00:00Z')
+        )
+    )
+]);
+$badObjectProvider = new CalDAVProvider($badObjectHttp, 'https://calendar.example/', $originPolicy);
+$badObjectSynchronizer = new CalDAVIncrementalSync(
+    $badObjectProvider,
+    $badObjectHttp,
+    $originPolicy
+);
+$badObject = $badObjectSynchronizer->synchronize($calendarUrl, $start, $end, 'sync-1');
+caldavIncrementalExpect(
+    $badObject['incremental'] === false
+        && $badObject['syncToken'] === ''
+        && count($badObject['items']) === 1
+        && ($badObject['items'][0]['summary'] ?? '') === 'Recovered',
+    'A rejected changed-object retrieval must fall back to the proven full calendar query.'
+);
+caldavIncrementalExpect(
+    count($badObjectHttp->requests) === 3
+        && ($badObjectHttp->requests[2]['method'] ?? '') === 'REPORT'
+        && str_contains($badObjectHttp->requests[2]['body'] ?? '', '<c:calendar-query'),
+    'The changed-object HTTP 400 fallback must use the regular CalDAV calendar query.'
 );
 
 $unsupportedHttp = new CalDAVIncrementalSyncTestHttpClient([

@@ -103,13 +103,14 @@ $initialHttp = new MicrosoftIncrementalSyncTestHttpClient([
         'value'           => [microsoftSyncEvent('initial-1', 'Initial', '2026-08-20')],
         '@odata.nextLink' => $initialNextLink
     ]),
-    microsoftSyncResponse(200, ['value' => [], '@odata.deltaLink' => $initialDeltaLink])
+    microsoftSyncResponse(200, ['value' => [], '@odata.deltaLink' => $initialDeltaLink]),
+    microsoftSyncResponse(200, ['value' => [microsoftSyncEvent('initial-1', 'Initial', '2026-08-20')]])
 ]);
 $initialSynchronizer = new MicrosoftCalendarIncrementalSync($initialHttp, 'access-token');
 $initial = $initialSynchronizer->synchronize('primary', $start, $end);
 microsoftSyncExpect($initial['incremental'] === false, 'The first Microsoft synchronization must be a full synchronization.');
-microsoftSyncExpect($initial['syncToken'] === $initialDeltaLink, 'The first Microsoft synchronization did not preserve its delta link.');
-microsoftSyncExpect(count($initial['items']) === 1, 'The first Microsoft synchronization did not return the full event set.');
+microsoftSyncExpect($initial['syncToken'] === $initialDeltaLink, 'The initial Microsoft synchronization did not preserve its delta link.');
+microsoftSyncExpect(count($initial['items']) === 1, 'The initial Microsoft synchronization did not return the full event set.');
 microsoftSyncExpect(
     str_contains($initialHttp->urls[0], '/calendarView/delta?')
         && str_contains($initialHttp->urls[0], 'startDateTime=')
@@ -119,6 +120,12 @@ microsoftSyncExpect(
 microsoftSyncExpect(
     $initialHttp->urls[1] === $initialNextLink,
     'The initial Microsoft delta request did not follow the opaque nextLink unchanged.'
+);
+microsoftSyncExpect(
+    isset($initialHttp->urls[2])
+        && str_contains($initialHttp->urls[2], '/calendarView?')
+        && !str_contains($initialHttp->urls[2], '/calendarView/delta?'),
+    'The authoritative initial Microsoft snapshot must use the regular calendarView endpoint.'
 );
 
 $incrementalDeltaLink = 'https://graph.microsoft.com/v1.0/me/calendars/primary/calendarView/delta?$deltatoken=token-2';
@@ -172,11 +179,20 @@ $seriesHttp = new MicrosoftIncrementalSyncTestHttpClient([
         '@odata.deltaLink' => $seriesDeltaLink
     ]),
     microsoftSyncResponse(200, [
-        'value'            => [
+        'value'            => [[
+            'id'       => 'series-master',
+            'type'     => 'seriesMaster',
+            'isAllDay' => false,
+            'start'    => ['dateTime' => '2026-08-20T09:00:00.0000000', 'timeZone' => 'UTC'],
+            'end'      => ['dateTime' => '2026-08-20T10:00:00.0000000', 'timeZone' => 'UTC']
+        ]],
+        '@odata.deltaLink' => $seriesRefreshDeltaLink
+    ]),
+    microsoftSyncResponse(200, [
+        'value' => [
             microsoftSyncOccurrence('series-occurrence-1', 'series-master', 'Sabine arbeiten', '2026-08-20'),
             microsoftSyncOccurrence('series-occurrence-2', 'series-master', 'Sabine arbeiten', '2026-08-27')
-        ],
-        '@odata.deltaLink' => $seriesRefreshDeltaLink
+        ]
     ])
 ]);
 $seriesSynchronizer = new MicrosoftCalendarIncrementalSync($seriesHttp, 'access-token');
@@ -206,6 +222,12 @@ microsoftSyncExpect(
         && str_contains($seriesHttp->urls[1], 'startDateTime='),
     'A Microsoft series-master delta change must restart the bounded calendar-view synchronization.'
 );
+microsoftSyncExpect(
+    isset($seriesHttp->urls[2])
+        && str_contains($seriesHttp->urls[2], '/calendarView?')
+        && !str_contains($seriesHttp->urls[2], '/calendarView/delta?'),
+    'A Microsoft series refresh must rebuild the authoritative snapshot through regular calendarView.'
+);
 
 $fallbackDeltaLink = 'https://graph.microsoft.com/v1.0/me/calendars/primary/calendarView/delta?$deltatoken=token-3';
 $fallbackHttp = new MicrosoftIncrementalSyncTestHttpClient([
@@ -213,7 +235,8 @@ $fallbackHttp = new MicrosoftIncrementalSyncTestHttpClient([
     microsoftSyncResponse(200, [
         'value'            => [microsoftSyncEvent('fallback-1', 'Fallback', '2026-08-22')],
         '@odata.deltaLink' => $fallbackDeltaLink
-    ])
+    ]),
+    microsoftSyncResponse(200, ['value' => [microsoftSyncEvent('fallback-1', 'Fallback', '2026-08-22')]])
 ]);
 $fallbackSynchronizer = new MicrosoftCalendarIncrementalSync($fallbackHttp, 'access-token');
 $fallback = $fallbackSynchronizer->synchronize('primary', $start, $end, $initialDeltaLink);
