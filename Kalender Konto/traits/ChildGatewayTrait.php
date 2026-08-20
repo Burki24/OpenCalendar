@@ -57,6 +57,7 @@ trait KalenderKontoChildGatewayTrait
                     'success' => $this->finishEventsTransferForChild($request)
                 ],
                 'GetEventForEdit'        => $this->getEventForEditForChild($request),
+                'GetEventAfterWrite'     => $this->getEventAfterWriteForChild($request),
                 'CheckRecurringSeries'   => $this->checkRecurringSeriesForChild($request),
                 'GetRecurringSeries'     => $this->getRecurringSeriesForChild($request),
                 'GetRecurringFollowing'  => $this->getRecurringFollowingForChild($request),
@@ -237,6 +238,43 @@ trait KalenderKontoChildGatewayTrait
             self::EVENT_TRANSFER_SCOPE,
             (string) ($request['Token'] ?? '')
         );
+    }
+
+    /**
+     * Returns one freshly written event by its provider reference when direct lookup is available.
+     *
+     * @param array<string, mixed> $request
+     * @return array<string, mixed>
+     */
+    private function getEventAfterWriteForChild(array $request): array
+    {
+        $calendar = $this->resolveCalendar((string) ($request['CalendarID'] ?? ''));
+        $eventReference = trim((string) ($request['EventReference'] ?? ''));
+        if ($eventReference === '') {
+            throw new InvalidArgumentException('The selected event reference is missing.');
+        }
+
+        if ($this->ReadPropertyInteger('Provider') === self::PROVIDER_MICROSOFT) {
+            $synchronizer = new MicrosoftCalendarIncrementalSync(
+                $this->createTrustedCloudHttpClient(new MicrosoftGraphOriginPolicy()),
+                $this->getMicrosoftAccessToken()
+            );
+
+            return $synchronizer->getEventByReference(
+                $this->calendarReference($calendar),
+                $eventReference
+            );
+        }
+
+        $provider = $this->createProvider();
+        if ($provider instanceof CalendarEventLookupProviderInterface) {
+            return $provider->getEventForEdit(
+                $this->calendarReference($calendar),
+                $eventReference
+            );
+        }
+
+        throw new RuntimeException('Direct event lookup is not supported by this calendar provider.');
     }
 
     /**

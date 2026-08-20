@@ -2243,23 +2243,38 @@ class Calendar extends IPSModuleStrict
             $endTimestamp = $startTimestamp + 1;
         }
 
-        try {
-            $currentEvent = $this->sendRequest(
-                'GetEventForEdit',
-                [
-                    'ResourceURL'    => trim((string) ($event['resourceUrl'] ?? '')),
-                    'EventReference' => trim((string) ($event['eventReference'] ?? '')),
-                    'UID'            => trim((string) ($event['uid'] ?? '')),
-                    'OccurrenceID'   => '',
-                    'OriginalStart'  => '',
-                    'RecurrenceID'   => '',
-                    'Start'          => $startTimestamp,
-                    'End'            => $endTimestamp
-                ]
-            );
-        } catch (Throwable $exception) {
-            $this->SendSafeDebugException('EventCacheRefreshFallback', $exception);
-            return false;
+        $currentEvent = null;
+        $eventReference = trim((string) ($event['eventReference'] ?? ''));
+        if ($eventReference !== '') {
+            try {
+                $currentEvent = $this->sendRequest(
+                    'GetEventAfterWrite',
+                    ['EventReference' => $eventReference]
+                );
+            } catch (Throwable $exception) {
+                $this->SendSafeDebugException('EventDirectCacheRefreshFallback', $exception);
+            }
+        }
+
+        if ($currentEvent === null) {
+            try {
+                $currentEvent = $this->sendRequest(
+                    'GetEventForEdit',
+                    [
+                        'ResourceURL'    => trim((string) ($event['resourceUrl'] ?? '')),
+                        'EventReference' => $eventReference,
+                        'UID'            => trim((string) ($event['uid'] ?? '')),
+                        'OccurrenceID'   => '',
+                        'OriginalStart'  => '',
+                        'RecurrenceID'   => '',
+                        'Start'          => $startTimestamp,
+                        'End'            => $endTimestamp
+                    ]
+                );
+            } catch (Throwable $exception) {
+                $this->SendSafeDebugException('EventCacheRefreshFallback', $exception);
+                return false;
+            }
         }
 
         if ((bool) ($currentEvent['recurring'] ?? false)
@@ -2391,7 +2406,9 @@ class Calendar extends IPSModuleStrict
 
     private function refreshAfterWrite(): void
     {
-        $this->clearIncrementalSyncState();
+        // Preserve the existing incremental synchronization state after a successful write.
+        // Creating a fresh delta baseline immediately after a provider write can miss an event
+        // that is not yet visible in the provider's calendar view and permanently advance past it.
         $events = $this->requestEvents();
         $this->storeEvents($events);
         $this->WriteAttributeString('LastError', '');
