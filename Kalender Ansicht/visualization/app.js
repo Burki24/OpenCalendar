@@ -13,6 +13,10 @@ const calendarRuntime = calendarVisualization.runtime && typeof calendarVisualiz
     ? calendarVisualization.runtime
     : null;
 const calendarIPSViewConfig = calendarVisualization.mode === 'ipsview' ? calendarRuntime : null;
+const calendarIsAndroid = typeof navigator !== 'undefined'
+    && (/Android/i.test(navigator.userAgent || '')
+        || String(navigator.userAgentData?.platform || '').toLowerCase() === 'android');
+const calendarCanImportIcsFile = calendarVisualization.mode !== 'ipsview' || !calendarIsAndroid;
 const calendarAgendaColorBarWidth = Math.max(2, Math.min(16, Number(calendarOptions.agendaColorBarWidth) || 5));
 const calendarCompactColorBarWidth = Math.max(2, Math.min(16, Number(calendarOptions.compactColorBarWidth) || 3));
 const calendarViewStateStorageKey = Number(calendarOptions.instanceId) > 0
@@ -1676,7 +1680,8 @@ function openNewEvent(preferredDay = null) {
     selectedEvent = null;
     importedIcsTimezone = '';
     icsImportFile.value = '';
-    icsImportButton.classList.remove('hidden');
+    icsImportFile.disabled = !calendarCanImportIcsFile;
+    icsImportButton.classList.toggle('hidden', !calendarCanImportIcsFile);
     populateCalendarSelect(writable, writable[0].instanceId);
     document.getElementById('dialog-title').textContent = t('Create event');
     document.getElementById('event-summary').value = '';
