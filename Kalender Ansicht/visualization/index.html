@@ -220,8 +220,10 @@
         <div class="dialog-actions">
             <div class="dialog-actions-start">
                 <button type="button" class="danger-button hidden" id="delete-button">Delete</button>
-                <button type="button" class="secondary-button hidden" id="ics-import-button">Import ICS</button>
-                <input type="file" id="ics-import-file" accept=".ics,text/calendar,text/x-vcalendar" hidden>
+                <label class="secondary-button hidden" id="ics-import-button" style="position:relative;display:inline-flex;align-items:center;overflow:hidden">
+                    <span id="ics-import-button-label">Import ICS</span>
+                    <input type="file" id="ics-import-file" accept=".ics,text/calendar,text/x-vcalendar" style="position:absolute;inset:0;width:100%;height:100%;margin:0;opacity:0;cursor:pointer">
+                </label>
             </div>
             <div class="dialog-actions-end">
                 <button type="button" class="secondary-button" id="cancel-button">Cancel</button>

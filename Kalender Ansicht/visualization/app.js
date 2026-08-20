@@ -62,6 +62,7 @@ const deleteConfirmDialog = document.getElementById('delete-confirm-dialog');
 const deleteConfirmButton = document.getElementById('delete-confirm-button');
 const eventForm = document.getElementById('event-form');
 const icsImportButton = document.getElementById('ics-import-button');
+const icsImportButtonLabel = document.getElementById('ics-import-button-label');
 const icsImportFile = document.getElementById('ics-import-file');
 const eventCalendarInput = document.getElementById('event-calendar');
 const eventCalendarPicker = document.getElementById('event-calendar-picker');
@@ -3069,22 +3070,19 @@ eventForm.addEventListener('submit', async event => {
     }
 });
 
-icsImportButton.addEventListener('click', () => {
-    if (selectedEvent !== null) return;
-    icsImportFile.value = '';
-    icsImportFile.click();
-});
 icsImportFile.addEventListener('change', async () => {
     const file = icsImportFile.files?.[0] || null;
     if (!file) return;
-    icsImportButton.disabled = true;
+    icsImportFile.disabled = true;
+    icsImportButton.setAttribute('aria-disabled', 'true');
     try {
         await importIcsFile(file);
         showToast(icsImportText('ICS event imported.'), 'success');
     } catch (error) {
         showToast(error instanceof Error ? error.message : icsImportText('The selected file is not a valid single-event ICS file.'), 'error');
     } finally {
-        icsImportButton.disabled = false;
+        icsImportFile.disabled = false;
+        icsImportButton.setAttribute('aria-disabled', 'false');
         icsImportFile.value = '';
     }
 });
@@ -3625,9 +3623,9 @@ function applyStaticTranslations() {
     providerButton.textContent = providerButtonText;
     providerButton.title = providerButtonText;
     providerButton.setAttribute('aria-label', providerButtonText);
-    icsImportButton.textContent = icsImportText('Import ICS');
+    icsImportButtonLabel.textContent = icsImportText('Import ICS');
     icsImportButton.title = icsImportText('Import ICS');
-    icsImportButton.setAttribute('aria-label', icsImportText('Import ICS'));
+    icsImportFile.setAttribute('aria-label', icsImportText('Import ICS'));
     document.getElementById('all-day-label').textContent = t('All day');
     document.getElementById('dialog-title').textContent = t('Event');
     document.getElementById('details-dialog-title').textContent = t('Event details');
