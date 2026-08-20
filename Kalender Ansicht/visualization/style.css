@@ -616,6 +616,54 @@ html.ipsview-mode .danger-button { min-height: 48px; padding-inline: 18px; }
     touch-action: pan-y;
     scrollbar-gutter: stable;
 }
+html.ipsview-mode #event-dialog {
+    position: fixed;
+    top: 8px;
+    right: 8px;
+    bottom: 8px;
+    left: 8px;
+    width: calc(100% - 16px);
+    max-width: var(--cal-dialog-large-width);
+    height: auto;
+    max-height: none;
+    margin: auto;
+    overflow: hidden;
+}
+html.ipsview-mode #event-dialog[open] {
+    display: flex;
+    flex-direction: column;
+}
+html.ipsview-mode #event-dialog > .dialog-layout {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    height: 100%;
+    max-height: 100%;
+    min-height: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-y;
+}
+html.ipsview-mode #event-dialog .dialog-body {
+    flex: 0 0 auto;
+    min-height: auto;
+    overflow: visible;
+    overscroll-behavior: auto;
+    touch-action: auto;
+}
+html.ipsview-mode #event-dialog .dialog-header {
+    position: sticky;
+    top: 0;
+    z-index: 4;
+}
+html.ipsview-mode #event-dialog .dialog-actions {
+    position: sticky;
+    bottom: 0;
+    z-index: 4;
+}
+
 .form-row { display: grid; min-width: 0; gap: 5px; }
 .form-row.two { grid-template-columns: 1fr 1fr; gap: 10px; }
 .form-row label { color: var(--cal-label-text); font-weight: 600; }
