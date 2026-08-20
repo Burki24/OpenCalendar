@@ -289,14 +289,22 @@ function restoreAgendaScrollPosition(position) {
         );
     };
 
+    restore();
     if (typeof requestAnimationFrame === 'function') {
         requestAnimationFrame(() => {
             restore();
             requestAnimationFrame(restore);
         });
-    } else {
-        restore();
     }
+    if (typeof setTimeout === 'function') {
+        setTimeout(restore, 80);
+        setTimeout(restore, 180);
+    }
+}
+
+function restorePreservedAgendaScrollPosition() {
+    if (!agendaScrollWorkflow || !preservedAgendaScrollPosition) return;
+    restoreAgendaScrollPosition(preservedAgendaScrollPosition);
 }
 
 function applyTileFontScale() {
@@ -3190,6 +3198,7 @@ eventDialog.addEventListener('cancel', event => {
 });
 eventDialog.addEventListener('close', () => {
     closeCalendarPicker();
+    restorePreservedAgendaScrollPosition();
     applyDeferredCalendarState();
     if (!releaseAgendaScrollPositionAfterState
         && ['create', 'edit', 'delete'].includes(agendaScrollWorkflow)) {
@@ -3197,6 +3206,7 @@ eventDialog.addEventListener('close', () => {
     }
 });
 eventDetailsDialog.addEventListener('close', () => {
+    restorePreservedAgendaScrollPosition();
     applyDeferredCalendarState();
     if (!releaseAgendaScrollPositionAfterState
         && ['details', 'delete'].includes(agendaScrollWorkflow)) {
@@ -3212,6 +3222,8 @@ document.getElementById('edit-scope-cancel').addEventListener('click', () => edi
 editScopeConfirmButton.addEventListener('click', confirmEditScope);
 editScopeDialog.addEventListener('close', () => {
     editScopeSourceDialog = null;
+    restorePreservedAgendaScrollPosition();
+    applyDeferredCalendarState();
 });
 document.getElementById('details-delete-button').addEventListener('click', () => requestDelete(eventDetailsDialog));
 document.getElementById('delete-confirm-close').addEventListener('click', () => deleteConfirmDialog.close());
@@ -3219,6 +3231,7 @@ document.getElementById('delete-confirm-cancel').addEventListener('click', () =>
 deleteConfirmButton.addEventListener('click', confirmDeleteEvent);
 deleteConfirmDialog.addEventListener('close', () => {
     deleteSourceDialog = null;
+    restorePreservedAgendaScrollPosition();
     applyDeferredCalendarState();
 });
 document.getElementById('day-events-close').addEventListener('click', () => dayEventsDialog.close());
