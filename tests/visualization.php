@@ -430,7 +430,35 @@ assertVisualization(
         && str_contains($moduleSource, '$state[\'eventEdit\'] = $eventEdit;')
         && str_contains($calendarModuleSource, 'public function GetEventForEdit(string $EventJSON): string')
         && str_contains($calendarModuleSource, '$this->sendRequest(\'GetEventForEdit\', ['),
-    'Opening a normal or single-occurrence editor must refresh the event identity and ETag from the provider first.'
+    'Opening a normal or single-occurrence editor must refresh the event identity and ETag from the provider before editing is enabled.'
+);
+
+assertVisualization(
+    str_contains($script, "let eventDialogLoadingMode = '';")
+        && str_contains($script, "function openPendingEventEditor(event, writeScope = '')")
+        && str_contains($script, "setEventDialogLoading('provider');")
+        && str_contains($script, "openPendingEventEditor(event, 'occurrence');")
+        && str_contains($script, 'openPendingEventEditor(event, scope);')
+        && str_contains($script, 'const containsPendingEditPayload = containsPendingEventEditPayload || containsPendingSeriesEditPayload;')
+        && str_contains($script, 'pendingEventEditMatches(message.payload.eventEdit)')
+        && str_contains($script, "String(message.payload.seriesEdit.seriesId || '') === pendingSeriesEdit.seriesId")
+        && str_contains($script, 'shouldDeferCalendarState() && !containsPendingEditPayload')
+        && str_contains($script, "setEventDialogLoading('create');")
+        && str_contains($script, 'deferEventDialogSetup(() => {')
+        && str_contains($script, 'if (!eventDialog.open) eventDialog.showModal();')
+        && str_contains($script, "eventDialog.toggleAttribute('aria-busy', loading);"),
+    'Create and edit dialogs must become visible immediately while advanced or provider-backed editor setup completes safely.'
+);
+
+assertVisualization(
+    str_contains($script, 'if (preferredDay instanceof Date && !Number.isNaN(preferredDay.getTime()))')
+        && str_contains($script, 'if (dayKey(start) === dayKey(today))')
+        && str_contains($script, 'start.setHours(start.getHours() + 1);')
+        && str_contains($script, 'start.setHours(9, 0, 0, 0);')
+        && str_contains($script, 'const end = new Date(start.getTime() + 60 * 60 * 1000);')
+        && str_contains($script, 'start.setSeconds(0, 0);')
+        && !str_contains($script, 'start.setHours(23, 0, 0, 0);'),
+    'Creating from a day overview must keep the selected day, use a practical default time and never force an already-past 23:00 start.'
 );
 
 assertVisualization(

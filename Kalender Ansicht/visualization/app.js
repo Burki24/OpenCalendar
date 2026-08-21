@@ -63,6 +63,7 @@ let deferredCalendarState = null;
 let calendarStateSignature = '';
 let eventEditingActive = false;
 let eventEditingRevision = 0;
+let eventDialogLoadingMode = '';
 let ipsViewStateRequestPending = false;
 let ipsViewStateRefreshRequested = false;
 let ipsViewStateRefreshTimer = null;
@@ -109,6 +110,7 @@ const eventRecurrenceCountRow = document.getElementById('event-recurrence-count-
 const eventRecurrenceCount = document.getElementById('event-recurrence-count');
 const eventRecurrenceUntilRow = document.getElementById('event-recurrence-until-row');
 const eventRecurrenceUntil = document.getElementById('event-recurrence-until');
+const eventReminderRow = document.getElementById('event-reminder-row');
 const eventReminderMode = document.getElementById('event-reminder-mode');
 const eventReminderCustomRow = document.getElementById('event-reminder-custom-row');
 const eventReminderValue = document.getElementById('event-reminder-value');
@@ -161,8 +163,7 @@ function handleMessage(data) {
     }
     if (message.toast && typeof message.toast === 'object') {
         if (message.toast.level === 'error') {
-            pendingEventEdit = null;
-            pendingSeriesEdit = null;
+            cancelPendingProviderEditor();
             if (agendaScrollWorkflow) {
                 failAgendaScrollWorkflow();
             }
@@ -171,8 +172,7 @@ function handleMessage(data) {
     }
     if (message.type === 'toast') {
         if (message.level === 'error') {
-            pendingEventEdit = null;
-            pendingSeriesEdit = null;
+            cancelPendingProviderEditor();
             if (agendaScrollWorkflow) {
                 failAgendaScrollWorkflow();
             }
@@ -183,9 +183,21 @@ function handleMessage(data) {
     if (message.type !== 'state' || !message.payload) return;
     const containsEditPayload = Boolean(message.payload.eventEdit && typeof message.payload.eventEdit === 'object')
         || Boolean(message.payload.seriesEdit && typeof message.payload.seriesEdit === 'object');
+    const containsPendingEventEditPayload = Boolean(
+        message.payload.eventEdit
+        && pendingEventEdit
+        && pendingEventEditMatches(message.payload.eventEdit)
+    );
+    const containsPendingSeriesEditPayload = Boolean(
+        message.payload.seriesEdit
+        && pendingSeriesEdit
+        && Number(message.payload.seriesEdit.calendarInstanceId) === pendingSeriesEdit.calendarInstanceId
+        && String(message.payload.seriesEdit.seriesId || '') === pendingSeriesEdit.seriesId
+    );
+    const containsPendingEditPayload = containsPendingEventEditPayload || containsPendingSeriesEditPayload;
     const nextStateSignature = calendarStateContentSignature(message.payload);
     if (!containsEditPayload && nextStateSignature !== '' && nextStateSignature === calendarStateSignature) return;
-    if (shouldDeferCalendarState()) {
+    if (shouldDeferCalendarState() && !containsPendingEditPayload) {
         deferredCalendarState = message.payload;
         return;
     }
@@ -363,6 +375,51 @@ function endEventEditing() {
     if (!eventEditingActive) return;
     eventEditingActive = false;
     eventEditingRevision += 1;
+}
+
+function setEventDialogLoading(mode = '') {
+    eventDialogLoadingMode = mode;
+    const loading = mode !== '';
+    eventDialog.toggleAttribute('aria-busy', loading);
+    if (loading) {
+        eventRecurrenceRow.classList.add('hidden');
+        eventRecurrenceOptions.classList.add('hidden');
+        eventReminderRow.classList.add('hidden');
+        eventReminderCustomRow.classList.add('hidden');
+        eventReminderExtraList.classList.add('hidden');
+        eventReminderAddRow.classList.add('hidden');
+        document.getElementById('save-button').classList.add('hidden');
+        document.getElementById('delete-button').classList.add('hidden');
+        return;
+    }
+
+    eventReminderRow.classList.remove('hidden');
+}
+
+function showEventDialog() {
+    if (!eventEditingActive) beginEventEditing();
+    if (!eventDialog.open) eventDialog.showModal();
+}
+
+function deferEventDialogSetup(callback) {
+    const editingRevision = eventEditingRevision;
+    const run = () => window.setTimeout(() => {
+        if (!eventDialog.open || !eventEditingActive || editingRevision !== eventEditingRevision) return;
+        callback();
+    }, 0);
+    if (typeof requestAnimationFrame === 'function') {
+        requestAnimationFrame(run);
+    } else {
+        run();
+    }
+}
+
+function cancelPendingProviderEditor() {
+    pendingEventEdit = null;
+    pendingSeriesEdit = null;
+    if (eventDialogLoadingMode !== 'provider') return;
+    setEventDialogLoading();
+    if (eventDialog.open) eventDialog.close();
 }
 
 function beginAgendaScrollWorkflow(workflow) {
@@ -2255,8 +2312,8 @@ function openNewEvent(preferredDay = null) {
             start.setMinutes(0, 0, 0);
             start.setHours(start.getHours() + 1);
             if (dayKey(start) !== dayKey(today)) {
-                start = startOfDay(preferredDay);
-                start.setHours(23, 0, 0, 0);
+                start = new Date();
+                start.setSeconds(0, 0);
             }
         } else {
             start.setHours(9, 0, 0, 0);
@@ -2268,15 +2325,26 @@ function openNewEvent(preferredDay = null) {
     }
     const end = new Date(start.getTime() + 60 * 60 * 1000);
     setDateInputs(start, end, false);
-    resetRecurrenceEditor(start);
-    resetReminderEditor();
-    setDialogEditable(true);
-    document.getElementById('delete-button').classList.add('hidden');
+
+    eventRecurrenceFrequency.value = 'none';
+    eventRecurrenceOptions.classList.add('hidden');
+    eventReminderMode.value = 'none';
+    clearExtraReminderEntries();
+    setDialogEditable(false);
     document.getElementById('dialog-note').classList.add('hidden');
     updateDialogColor();
     updateSaveButtonLabel();
-    beginEventEditing();
-    eventDialog.showModal();
+    setEventDialogLoading('create');
+    showEventDialog();
+
+    deferEventDialogSetup(() => {
+        resetRecurrenceEditor(start);
+        resetReminderEditor();
+        setEventDialogLoading();
+        setDialogEditable(true);
+        updateDialogColor();
+        updateSaveButtonLabel();
+    });
 }
 
 function openEventDetails(event) {
@@ -2313,6 +2381,36 @@ function openEventDetails(event) {
     note.textContent = reason ? t(reason) : '';
     note.classList.toggle('hidden', reason === '');
     eventDetailsDialog.showModal();
+}
+
+function openPendingEventEditor(event, writeScope = '') {
+    const scope = event.recurring ? (writeScope || event.writeScope || 'occurrence') : '';
+    selectedEvent = { ...event, writeScope: scope };
+    importedIcsTimezone = '';
+    icsImportFile.value = '';
+    icsImportButton.classList.add('hidden');
+
+    const calendar = calendarEntryByInstanceId(selectedEvent.calendarInstanceId);
+    populateCalendarSelect(calendar ? [calendar] : [], selectedEvent.calendarInstanceId);
+    setCalendarSelectDisabled(true);
+    document.getElementById('dialog-title').textContent = t(scope === 'series' ? 'Edit recurring event' : 'Edit event');
+    document.getElementById('event-summary').value = selectedEvent.summary || '';
+    document.getElementById('event-location').value = selectedEvent.location || '';
+    document.getElementById('event-description').value = selectedEvent.description || '';
+    document.getElementById('event-all-day').checked = Boolean(selectedEvent.allDay);
+    loadAnniversaryEditor(selectedEvent);
+    setDateInputs(
+        eventStart(selectedEvent),
+        eventEnd(selectedEvent),
+        Boolean(selectedEvent.allDay),
+        Boolean(selectedEvent.allDay)
+    );
+    setDialogEditable(false);
+    document.getElementById('dialog-note').classList.add('hidden');
+    updateDialogColor();
+    updateSaveButtonLabel();
+    setEventDialogLoading('provider');
+    showEventDialog();
 }
 
 function requestEdit(sourceDialog) {
@@ -2368,9 +2466,15 @@ async function confirmEditScope() {
             writeScope: scope
         };
         if (!pendingSeriesEdit.calendarInstanceId || !pendingSeriesEdit.seriesId
-            || (scope === 'following' && (!pendingSeriesEdit.occurrenceId || !pendingSeriesEdit.originalStart))
-            || !await sendAction('PrepareSeriesEdit', pendingSeriesEdit)) {
+            || (scope === 'following' && (!pendingSeriesEdit.occurrenceId || !pendingSeriesEdit.originalStart))) {
             pendingSeriesEdit = null;
+            clearAgendaScrollWorkflow(true);
+            return;
+        }
+
+        openPendingEventEditor(event, scope);
+        if (!await sendAction('PrepareSeriesEdit', pendingSeriesEdit)) {
+            cancelPendingProviderEditor();
             clearAgendaScrollWorkflow(true);
         }
     } finally {
@@ -2413,9 +2517,15 @@ async function prepareEventEdit(event) {
         }
     };
 
-    if (!calendarInstanceId || startTimestamp <= 0
-        || !(await sendAction('PrepareEventEdit', request))) {
+    if (!calendarInstanceId || startTimestamp <= 0) {
         pendingEventEdit = null;
+        clearAgendaScrollWorkflow(true);
+        return;
+    }
+
+    openPendingEventEditor(event, 'occurrence');
+    if (!(await sendAction('PrepareEventEdit', request))) {
+        cancelPendingProviderEditor();
         clearAgendaScrollWorkflow(true);
     }
 }
@@ -2630,6 +2740,7 @@ function formatDetailDateTime(date) {
 }
 
 function openExistingEvent(event, writeScope = '') {
+    setEventDialogLoading();
     const scope = event.recurring ? (writeScope || event.writeScope || 'occurrence') : '';
     selectedEvent = { ...event, writeScope: scope };
     importedIcsTimezone = '';
@@ -2699,8 +2810,7 @@ function openExistingEvent(event, writeScope = '') {
     }
     updateDialogColor();
     updateSaveButtonLabel();
-    beginEventEditing();
-    eventDialog.showModal();
+    showEventDialog();
 }
 
 function populateCalendarSelect(calendars, selectedId) {
@@ -3778,6 +3888,11 @@ eventDialog.addEventListener('cancel', event => {
 });
 eventDialog.addEventListener('close', () => {
     closeCalendarPicker();
+    if (eventDialogLoadingMode === 'provider') {
+        pendingEventEdit = null;
+        pendingSeriesEdit = null;
+    }
+    setEventDialogLoading();
     endEventEditing();
     restorePreservedAgendaScrollPosition();
     applyDeferredCalendarState();
