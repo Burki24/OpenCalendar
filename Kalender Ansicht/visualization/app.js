@@ -57,6 +57,8 @@ let eventEditingRevision = 0;
 let ipsViewStateRequestPending = false;
 let ipsViewStateRefreshRequested = false;
 let ipsViewStateRefreshTimer = null;
+let pendingRangeRequestSignature = '';
+let pendingCalendarInvalidation = false;
 let importedIcsTimezone = '';
 let preservedAgendaScrollPosition = null;
 let agendaScrollWorkflow = '';
@@ -123,6 +125,7 @@ function calendarStateContentSignature(state) {
         return JSON.stringify({
             events: Array.isArray(state.events) ? state.events : [],
             calendars: Array.isArray(state.calendars) ? state.calendars : [],
+            eventRange: state.eventRange && typeof state.eventRange === 'object' ? state.eventRange : null,
             settings: state.settings && typeof state.settings === 'object' ? state.settings : {}
         });
     } catch (error) {
@@ -136,6 +139,14 @@ function handleMessage(data) {
         try { message = JSON.parse(message); } catch (error) { return; }
     }
     if (!message || typeof message !== 'object') return;
+    if (message.type === 'invalidate') {
+        pendingCalendarInvalidation = true;
+        if (!shouldDeferCalendarState()) {
+            pendingCalendarInvalidation = false;
+            void ensureVisibleRangeLoaded(true);
+        }
+        return;
+    }
     if (message.toast && typeof message.toast === 'object') {
         if (message.toast.level === 'error') {
             pendingEventEdit = null;
@@ -186,7 +197,14 @@ function applyCalendarState(state) {
     delete calendarState.seriesEdit;
     calendarState.events = Array.isArray(calendarState.events) ? calendarState.events : [];
     calendarState.calendars = Array.isArray(calendarState.calendars) ? calendarState.calendars : [];
+    calendarState.eventRange = calendarState.eventRange && typeof calendarState.eventRange === 'object'
+        ? calendarState.eventRange
+        : null;
     calendarState.settings = calendarState.settings || {};
+    const appliedRangeSignature = visualizationRangeSignature(calendarState.eventRange);
+    if (appliedRangeSignature !== '' && appliedRangeSignature === pendingRangeRequestSignature) {
+        pendingRangeRequestSignature = '';
+    }
     calendarStateSignature = calendarStateContentSignature(calendarState);
     normalizeVisibleCalendarIds();
     applyTileFontScale();
@@ -275,10 +293,16 @@ function shouldDeferCalendarState() {
 }
 
 function applyDeferredCalendarState() {
-    if (!deferredCalendarState || shouldDeferCalendarState()) return;
-    const state = deferredCalendarState;
-    deferredCalendarState = null;
-    applyCalendarState(state);
+    if (shouldDeferCalendarState()) return;
+    if (deferredCalendarState) {
+        const state = deferredCalendarState;
+        deferredCalendarState = null;
+        applyCalendarState(state);
+    }
+    if (pendingCalendarInvalidation) {
+        pendingCalendarInvalidation = false;
+        void ensureVisibleRangeLoaded(true);
+    }
 }
 
 function beginEventEditing() {
@@ -436,6 +460,7 @@ function render() {
     addButton.setAttribute('aria-label', t(addButtonText));
     updateCalendarFilterButton();
     if (activeView === 'month') scheduleMonthEventLayout();
+    void ensureVisibleRangeLoaded();
 }
 
 function listControlsVisible() {
@@ -3473,6 +3498,75 @@ function containWheelInsideTile(event) {
     event.stopImmediatePropagation();
 }
 
+function visibleViewRange() {
+    let start;
+    let end;
+
+    if (activeView === 'month') {
+        start = new Date(cursorDate.getFullYear(), cursorDate.getMonth(), 1);
+        end = new Date(start.getFullYear(), start.getMonth() + viewPeriod('month'), 1);
+    } else if (activeView === 'week') {
+        start = startOfWeek(cursorDate);
+        end = addDays(start, viewPeriod('week') * 7);
+    } else if (activeView === 'threeDays') {
+        const days = getVisibleDays(cursorDate, viewPeriod('threeDays'));
+        start = startOfDay(days[0] || cursorDate);
+        end = addDays(startOfDay(days[days.length - 1] || cursorDate), 1);
+    } else {
+        start = startOfDay(cursorDate);
+        end = addDays(start, viewPeriod(activeView === 'list' ? 'list' : 'agenda'));
+    }
+
+    return {
+        start: Math.floor(start.getTime() / 1000),
+        end: Math.floor(end.getTime() / 1000)
+    };
+}
+
+function visualizationRangeSignature(range) {
+    if (!range || typeof range !== 'object') return '';
+    const start = Number(range.start || 0);
+    const end = Number(range.end || 0);
+    return start > 0 && end > start ? `${start}:${end}` : '';
+}
+
+function loadedRangeCovers(range) {
+    const loadedRange = calendarState.eventRange;
+    if (!loadedRange || typeof loadedRange !== 'object') return false;
+
+    const loadedStart = Number(loadedRange.start || 0);
+    const loadedEnd = Number(loadedRange.end || 0);
+    return loadedStart > 0
+        && loadedEnd > loadedStart
+        && loadedStart <= range.start
+        && loadedEnd >= range.end;
+}
+
+async function ensureVisibleRangeLoaded(force = false) {
+    if (!initialized || eventEditingActive || document.visibilityState === 'hidden' || !hasActionBridge()) return;
+
+    const range = visibleViewRange();
+    const signature = visualizationRangeSignature(range);
+    if (signature === '') return;
+    if (!force && loadedRangeCovers(range)) return;
+    if (pendingRangeRequestSignature === signature) return;
+
+    pendingRangeRequestSignature = signature;
+    const success = await sendAction('LoadRange', {});
+    if (!success && pendingRangeRequestSignature === signature) {
+        pendingRangeRequestSignature = '';
+    }
+}
+
+function actionValueWithViewRange(value) {
+    const range = visibleViewRange();
+    if (value && typeof value === 'object' && !Array.isArray(value)) {
+        return { ...value, _viewRange: range };
+    }
+
+    return { _value: value, _viewRange: range };
+}
+
 function navigate(direction) {
     if (activeView === 'month') {
         cursorDate = new Date(
@@ -3615,9 +3709,10 @@ function moveVisibleDays(start, amount) {
 }
 
 async function sendAction(ident, value) {
+    const actionValue = actionValueWithViewRange(value);
     if (typeof requestAction === 'function'
         || (isNativeVisualization() && await waitForNativeActionBridge())) {
-        requestAction(ident, typeof value === 'string' ? value : JSON.stringify(value));
+        requestAction(ident, JSON.stringify(actionValue));
         return true;
     }
     if (!hasIPSViewActionBridge()) {
@@ -3626,7 +3721,7 @@ async function sendAction(ident, value) {
     }
 
     try {
-        const payload = await calendarIPSViewRequest(ident, value);
+        const payload = await calendarIPSViewRequest(ident, actionValue);
         handleMessage(payload);
         return true;
     } catch (error) {
@@ -3710,7 +3805,7 @@ async function refreshIPSViewState() {
     ipsViewStateRefreshRequested = false;
     const editingRevision = eventEditingRevision;
     try {
-        const message = await calendarIPSViewRequest('GetState', null);
+        const message = await calendarIPSViewRequest('LoadRange', actionValueWithViewRange({}));
         if (eventEditingActive || editingRevision !== eventEditingRevision) {
             ipsViewStateRefreshRequested = true;
             return;

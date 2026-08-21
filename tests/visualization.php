@@ -376,18 +376,11 @@ assertVisualization(
 );
 
 assertVisualization(
-    substr_count(
-        $moduleSource,
-        "if ((\$event['recurrenceType'] ?? '') === 'occurrence'\n"
-            . "                    && trim((string) (\$event['originalStart'] ?? '')) === '') {\n"
-            . "                    \$event['originalStart'] = trim((string) (\$event['start'] ?? ''));"
-    ) === 2
-        && substr_count(
-            $moduleSource,
-            "\$recurringOccurrence = (bool) (\$event['recurring'] ?? false)\n"
-                . "                    && trim((string) (\$event['occurrenceId'] ?? '')) !== ''\n"
-                . "                    && trim((string) (\$event['seriesId'] ?? '')) !== '';"
-        ) === 2,
+    substr_count($moduleSource, "if ((\$event['recurrenceType'] ?? '') === 'occurrence'") === 2
+        && substr_count($moduleSource, "\$event['originalStart'] = trim((string) (\$event['start'] ?? ''));") === 2
+        && substr_count($moduleSource, "\$recurringOccurrence = (bool) (\$event['recurring'] ?? false)") === 2
+        && substr_count($moduleSource, "trim((string) (\$event['occurrenceId'] ?? '')) !== ''") >= 2
+        && substr_count($moduleSource, "trim((string) (\$event['seriesId'] ?? '')) !== ''") >= 2,
     'Cached Microsoft occurrences must recover their original start and recurrence capabilities without manual cache deletion.'
 );
 
@@ -854,6 +847,34 @@ assertVisualization(
     'IPSView must expose a compact labelled creation button with a touch-sized control and a round narrow-screen fallback.'
 );
 
+assertVisualization(
+    str_contains($moduleSource, 'private const VISUALIZATION_BOOTSTRAP_FUTURE_DAYS = 42;')
+        && str_contains($moduleSource, 'private const VISUALIZATION_MAX_RANGE_DAYS = 370;')
+        && str_contains($moduleSource, 'private function buildState(?int $requestedRangeStart = null, ?int $requestedRangeEnd = null): array')
+        && str_contains($moduleSource, "'eventRange'  => [")
+        && str_contains($moduleSource, "case 'LoadRange':")
+        && str_contains($moduleSource, '$state = $this->buildStateForActionValue($value);')
+        && str_contains($moduleSource, 'private function visualizationRangeFromActionValue(mixed $value): ?array'),
+    'Calendar View must build bounded visualization states and expose a dedicated visible-range action.'
+);
+assertVisualization(
+    str_contains($script, 'function visibleViewRange()')
+        && str_contains($script, 'function ensureVisibleRangeLoaded(force = false)')
+        && str_contains($script, "await sendAction('LoadRange', {})")
+        && str_contains($script, 'return { ...value, _viewRange: range };')
+        && str_contains($script, 'eventRange: state.eventRange && typeof state.eventRange ===')
+        && str_contains($script, 'void ensureVisibleRangeLoaded();')
+        && str_contains($script, "message.type === 'invalidate'")
+        && str_contains($moduleSource, "['type' => 'invalidate']"),
+    'The visualization must request the exact visible range and refresh it without replacing the page with a full-horizon state.'
+);
+assertVisualization(
+    str_contains($moduleSource, '$totalEventCount = count($events);')
+        && str_contains($moduleSource, "'truncated'  => \$totalEventCount > \$maximumEvents")
+        && str_contains($moduleSource, '$events = array_slice($events, 0, $maximumEvents);'),
+    'The maximum-event setting must act as a safety limit for the requested visualization range.'
+);
+
 $renderer = new CalendarVisualizationRenderer();
 $native = $renderer->render(false);
 $ipsView = $renderer->render(true);
@@ -888,8 +909,8 @@ foreach ([$native, $ipsView] as $html) {
     assertVisualization(str_contains($html, '"showListControls":false'), 'The list controls setting must be serialized.');
     assertVisualization(str_contains($html, 'calendarVisualization.state'), 'The calendar script must consume the shared state contract.');
     assertVisualization(
-        str_contains($html, "calendarIPSViewRequest('GetState', null)"),
-        'IPSView must refresh the embedded calendar state from its authenticated action bridge on page load.'
+        str_contains($html, "calendarIPSViewRequest('LoadRange', actionValueWithViewRange({}))"),
+        'IPSView must refresh only the currently visible calendar range through its authenticated action bridge.'
     );
     assertVisualization(str_contains($html, 'id="add-button-label"'), 'The event creation control must expose a visible text label for touch users.');
 

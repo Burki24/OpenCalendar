@@ -32,6 +32,9 @@ class CalendarView extends IPSModuleStrict
     private const CALENDAR_MODULE_ID = '{227B63E4-4223-316B-76E9-FD3849689562}';
     private const INITIALIZATION_DELAY_MS = 5_000;
     private const APPOINTMENT_LOOKAHEAD_DAYS = 1095;
+    private const VISUALIZATION_BOOTSTRAP_PAST_DAYS = 7;
+    private const VISUALIZATION_BOOTSTRAP_FUTURE_DAYS = 42;
+    private const VISUALIZATION_MAX_RANGE_DAYS = 370;
     private const ATTRIBUTE_IPSVIEW_TOKEN_1 = 'IPSViewToken1';
     private const ATTRIBUTE_IPSVIEW_TOKEN_2 = 'IPSViewToken2';
     private const ATTRIBUTE_IPSVIEW_TOKEN_3 = 'IPSViewToken3';
@@ -399,7 +402,7 @@ class CalendarView extends IPSModuleStrict
             return;
         }
 
-        $this->broadcastState();
+        $this->broadcastStateInvalidation();
     }
 
     /**
@@ -477,7 +480,7 @@ class CalendarView extends IPSModuleStrict
     public function SynchronizeCalendars(): bool
     {
         $success = $this->synchronizeSelectedCalendars();
-        $this->broadcastState();
+        $this->broadcastStateInvalidation();
 
         return $success;
     }
@@ -1170,6 +1173,22 @@ class CalendarView extends IPSModuleStrict
         }
     }
 
+    private function broadcastStateInvalidation(): void
+    {
+        if (!$this->isRuntimeReady()) {
+            return;
+        }
+
+        try {
+            $this->UpdateVisualizationValue(json_encode(
+                ['type' => 'invalidate'],
+                JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR
+            ));
+        } catch (Throwable $exception) {
+            $this->SendDebug('VisualizationUpdate', $exception->getMessage(), 0);
+        }
+    }
+
     private function broadcastState(?array $state = null, bool $updateIPSViewHTML = false): void
     {
         if (!$this->isRuntimeReady()) {
@@ -1427,66 +1446,69 @@ class CalendarView extends IPSModuleStrict
     /**
      * @return array<string, mixed>
      */
-    private function buildState(): array
+    private function buildState(?int $requestedRangeStart = null, ?int $requestedRangeEnd = null): array
     {
         if (!$this->isRuntimeReady()) {
             return $this->emptyState();
         }
 
+        [$rangeStart, $rangeEnd] = $this->resolveVisualizationRange(
+            $requestedRangeStart,
+            $requestedRangeEnd
+        );
+        [$queryStart, $queryEnd] = $this->visualizationQueryRange($rangeStart, $rangeEnd);
+
         $calendars = $this->loadSelectedCalendars();
         $events = [];
-        $pastDays = max(0, min(1095, $this->ReadPropertyInteger('PastDays')));
-        $futureDays = max(1, min(1095, $this->ReadPropertyInteger('FutureDays')));
-        $rangeStart = (new DateTimeImmutable('today'))->modify('-' . $pastDays . ' days')->getTimestamp();
-        $rangeEnd = (new DateTimeImmutable('today'))->modify('+' . ($futureDays + 1) . ' days')->getTimestamp();
-
-        foreach ($calendars as $calendar) {
-            try {
-                $calendarEvents = $this->readCalendarEventsForRange(
-                    $calendar['instanceId'],
-                    $rangeStart,
-                    $rangeEnd
-                );
-            } catch (Throwable $exception) {
-                $this->SendDebug('CalendarData', $exception->getMessage(), 0);
-                continue;
-            }
-
-            foreach ($calendarEvents as $event) {
-                $startTimestamp = (int) ($event['startTimestamp'] ?? 0);
-                $endTimestamp = (int) ($event['endTimestamp'] ?? $startTimestamp);
-                if ($startTimestamp <= 0 || $endTimestamp < $rangeStart || $startTimestamp >= $rangeEnd) {
+        if ($queryEnd > $queryStart) {
+            foreach ($calendars as $calendar) {
+                try {
+                    $calendarEvents = $this->readCalendarEventsForRange(
+                        $calendar['instanceId'],
+                        $queryStart,
+                        $queryEnd
+                    );
+                } catch (Throwable $exception) {
+                    $this->SendDebug('CalendarData', $exception->getMessage(), 0);
                     continue;
                 }
-                $event['calendarInstanceId'] = $calendar['instanceId'];
-                $event['calendarName'] = $calendar['name'];
-                $event['calendarColor'] = $calendar['color'];
-                $event['canWrite'] = $calendar['canWrite'];
-                if (($event['recurrenceType'] ?? '') === 'occurrence'
-                    && trim((string) ($event['originalStart'] ?? '')) === '') {
-                    $event['originalStart'] = trim((string) ($event['start'] ?? ''));
-                }
-                $recurringOccurrence = (bool) ($event['recurring'] ?? false)
-                    && trim((string) ($event['occurrenceId'] ?? '')) !== ''
-                    && trim((string) ($event['seriesId'] ?? '')) !== '';
-                $event['canUpdateOccurrence'] = (bool) ($event['canUpdateOccurrence'] ?? false)
-                    || ($recurringOccurrence && $calendar['canUpdateOccurrence']);
-                $event['canDeleteOccurrence'] = (bool) ($event['canDeleteOccurrence'] ?? false)
-                    || ($recurringOccurrence && $calendar['canDeleteOccurrence']);
-                $event['canUpdateFollowing'] = (bool) ($event['canUpdateFollowing'] ?? false)
-                    || ((bool) ($event['recurring'] ?? false)
+
+                foreach ($calendarEvents as $event) {
+                    $startTimestamp = (int) ($event['startTimestamp'] ?? 0);
+                    $endTimestamp = (int) ($event['endTimestamp'] ?? $startTimestamp);
+                    if ($startTimestamp <= 0 || $endTimestamp < $rangeStart || $startTimestamp >= $rangeEnd) {
+                        continue;
+                    }
+                    $event['calendarInstanceId'] = $calendar['instanceId'];
+                    $event['calendarName'] = $calendar['name'];
+                    $event['calendarColor'] = $calendar['color'];
+                    $event['canWrite'] = $calendar['canWrite'];
+                    if (($event['recurrenceType'] ?? '') === 'occurrence'
+                        && trim((string) ($event['originalStart'] ?? '')) === '') {
+                        $event['originalStart'] = trim((string) ($event['start'] ?? ''));
+                    }
+                    $recurringOccurrence = (bool) ($event['recurring'] ?? false)
                         && trim((string) ($event['occurrenceId'] ?? '')) !== ''
-                        && trim((string) ($event['seriesId'] ?? '')) !== ''
-                        && $calendar['canUpdateFollowing']);
-                $event['canUpdateSeries'] = (bool) ($event['canUpdateSeries'] ?? false)
-                    || ((bool) ($event['recurring'] ?? false)
-                        && trim((string) ($event['seriesId'] ?? '')) !== ''
-                        && $calendar['canUpdateSeries']);
-                $event['canDeleteSeries'] = (bool) ($event['canDeleteSeries'] ?? false)
-                    || ((bool) ($event['recurring'] ?? false)
-                        && trim((string) ($event['seriesId'] ?? '')) !== ''
-                        && $calendar['canDeleteSeries']);
-                $events[] = $event;
+                        && trim((string) ($event['seriesId'] ?? '')) !== '';
+                    $event['canUpdateOccurrence'] = (bool) ($event['canUpdateOccurrence'] ?? false)
+                        || ($recurringOccurrence && $calendar['canUpdateOccurrence']);
+                    $event['canDeleteOccurrence'] = (bool) ($event['canDeleteOccurrence'] ?? false)
+                        || ($recurringOccurrence && $calendar['canDeleteOccurrence']);
+                    $event['canUpdateFollowing'] = (bool) ($event['canUpdateFollowing'] ?? false)
+                        || ((bool) ($event['recurring'] ?? false)
+                            && trim((string) ($event['occurrenceId'] ?? '')) !== ''
+                            && trim((string) ($event['seriesId'] ?? '')) !== ''
+                            && $calendar['canUpdateFollowing']);
+                    $event['canUpdateSeries'] = (bool) ($event['canUpdateSeries'] ?? false)
+                        || ((bool) ($event['recurring'] ?? false)
+                            && trim((string) ($event['seriesId'] ?? '')) !== ''
+                            && $calendar['canUpdateSeries']);
+                    $event['canDeleteSeries'] = (bool) ($event['canDeleteSeries'] ?? false)
+                        || ((bool) ($event['recurring'] ?? false)
+                            && trim((string) ($event['seriesId'] ?? '')) !== ''
+                            && $calendar['canDeleteSeries']);
+                    $events[] = $event;
+                }
             }
         }
 
@@ -1495,14 +1517,77 @@ class CalendarView extends IPSModuleStrict
             static fn (array $left, array $right): int => ((int) $left['startTimestamp'] <=> (int) $right['startTimestamp'])
                 ?: strcasecmp((string) ($left['summary'] ?? ''), (string) ($right['summary'] ?? ''))
         );
-        $events = array_slice($events, 0, max(1, min(1000, $this->ReadPropertyInteger('MaxEvents'))));
+        $totalEventCount = count($events);
+        $maximumEvents = max(1, min(1000, $this->ReadPropertyInteger('MaxEvents')));
+        $events = array_slice($events, 0, $maximumEvents);
 
         return [
             'events'      => $events,
             'calendars'   => array_values($calendars),
             'generatedAt' => time(),
+            'eventRange'  => [
+                'start'      => $rangeStart,
+                'end'        => $rangeEnd,
+                'truncated'  => $totalEventCount > $maximumEvents,
+                'totalCount' => $totalEventCount
+            ],
             'settings'    => $this->viewSettings()
         ];
+    }
+
+    /**
+     * Resolves the event interval embedded into one visualization state.
+     *
+     * The initial HTML only carries a compact bootstrap interval. After the client
+     * restores its view and cursor it requests the exact visible interval through
+     * the action bridge.
+     *
+     * @return array{0: int, 1: int}
+     */
+    private function resolveVisualizationRange(?int $requestedRangeStart, ?int $requestedRangeEnd): array
+    {
+        if ($requestedRangeStart === null || $requestedRangeEnd === null) {
+            $today = new DateTimeImmutable('today');
+
+            return [
+                $today->modify('-' . self::VISUALIZATION_BOOTSTRAP_PAST_DAYS . ' days')->getTimestamp(),
+                $today->modify('+' . (self::VISUALIZATION_BOOTSTRAP_FUTURE_DAYS + 1) . ' days')->getTimestamp()
+            ];
+        }
+
+        if ($requestedRangeStart <= 0 || $requestedRangeEnd <= $requestedRangeStart) {
+            throw new InvalidArgumentException($this->Translate('The visualization request is invalid.'));
+        }
+        if (($requestedRangeEnd - $requestedRangeStart) > self::VISUALIZATION_MAX_RANGE_DAYS * 86400) {
+            throw new InvalidArgumentException($this->Translate('The visualization request is invalid.'));
+        }
+
+        return [$requestedRangeStart, $requestedRangeEnd];
+    }
+
+    /**
+     * Intersects a requested visualization interval with the configured cache window.
+     *
+     * The requested interval itself remains part of the returned state so a client
+     * outside the configured past/future limits does not repeatedly request the same
+     * empty range.
+     *
+     * @return array{0: int, 1: int}
+     */
+    private function visualizationQueryRange(int $rangeStart, int $rangeEnd): array
+    {
+        $pastDays = max(0, min(1095, $this->ReadPropertyInteger('PastDays')));
+        $futureDays = max(1, min(1095, $this->ReadPropertyInteger('FutureDays')));
+        $today = new DateTimeImmutable('today');
+        $configuredStart = $today->modify('-' . $pastDays . ' days')->getTimestamp();
+        $configuredEnd = $today->modify('+' . ($futureDays + 1) . ' days')->getTimestamp();
+
+        $queryStart = max($rangeStart, $configuredStart);
+        $queryEnd = min($rangeEnd, $configuredEnd);
+
+        return $queryEnd > $queryStart
+            ? [$queryStart, $queryEnd]
+            : [$rangeStart, $rangeStart];
     }
 
     /**
@@ -2153,6 +2238,7 @@ class CalendarView extends IPSModuleStrict
             'events'      => [],
             'calendars'   => [],
             'generatedAt' => time(),
+            'eventRange'  => null,
             'settings'    => $this->viewSettings()
         ];
     }
@@ -2374,6 +2460,9 @@ class CalendarView extends IPSModuleStrict
         $seriesEdit = null;
 
         switch ($ident) {
+            case 'LoadRange':
+                break;
+
             case 'Refresh':
                 $success = $this->synchronizeSelectedCalendars();
                 $level = $success ? 'success' : 'error';
@@ -2659,7 +2748,7 @@ class CalendarView extends IPSModuleStrict
                 ));
         }
 
-        $state = $this->buildState();
+        $state = $this->buildStateForActionValue($value);
         if ($eventEdit !== null) {
             $state['eventEdit'] = $eventEdit;
         }
@@ -2745,6 +2834,52 @@ class CalendarView extends IPSModuleStrict
             $payload,
             JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES
         );
+    }
+
+    /**
+     * Builds the visualization state for the range supplied by an interactive action.
+     *
+     * @return array<string, mixed>
+     */
+    private function buildStateForActionValue(mixed $value): array
+    {
+        $range = $this->visualizationRangeFromActionValue($value);
+        if ($range === null) {
+            return $this->buildState();
+        }
+
+        return $this->buildState($range[0], $range[1]);
+    }
+
+    /**
+     * @return array{0: int, 1: int}|null
+     */
+    private function visualizationRangeFromActionValue(mixed $value): ?array
+    {
+        $request = $value;
+        if (is_string($value)) {
+            try {
+                $request = json_decode($value, true, 512, JSON_THROW_ON_ERROR);
+            } catch (JsonException) {
+                return null;
+            }
+        }
+        if (!is_array($request) || array_is_list($request)) {
+            return null;
+        }
+
+        $range = $request['_viewRange'] ?? null;
+        if (!is_array($range) || array_is_list($range)) {
+            return null;
+        }
+
+        $start = (int) ($range['start'] ?? 0);
+        $end = (int) ($range['end'] ?? 0);
+        if ($start <= 0 || $end <= $start) {
+            return null;
+        }
+
+        return [$start, $end];
     }
 
     /**
