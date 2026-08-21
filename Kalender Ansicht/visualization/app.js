@@ -832,19 +832,37 @@ function weekViewDays(workWeek = false) {
     return workWeek ? days.filter(day => !isWeekend(day)) : days;
 }
 
+function weekTimelineMinimumWidth(dayCount, ipsView) {
+    const timescaleWidth = ipsView ? 62 : 54;
+    const dayWidth = ipsView ? 128 : 120;
+    return timescaleWidth + (Math.max(1, dayCount) * dayWidth);
+}
+
 function renderWeek(workWeek = false) {
     const days = weekViewDays(workWeek);
     const ipsView = document.documentElement.classList.contains('ipsview-mode');
-    const vertical = (
+    const configuredVertical = (
         ipsView
             ? calendarState.settings.ipsViewWeekOrientation
             : calendarState.settings.tileWeekOrientation
     ) === 'vertical';
-    renderDayColumns(
+    const responsiveVertical = content.clientWidth > 0
+        && content.clientWidth < weekTimelineMinimumWidth(days.length, ipsView);
+    const vertical = configuredVertical || responsiveVertical;
+    if (vertical) {
+        renderDayColumns(
+            days,
+            'week-grid'
+                + (workWeek ? ' hide-weekends work-week-grid' : '')
+                + ' vertical-week-grid',
+            calendarState.settings.showWeekDayOfYear !== false,
+            calendarState.settings.showWeekEventCount !== false
+        );
+        return;
+    }
+
+    renderMultiDayTimeline(
         days,
-        'week-grid'
-            + (workWeek ? ' hide-weekends work-week-grid' : '')
-            + (vertical ? ' vertical-week-grid' : ''),
         calendarState.settings.showWeekDayOfYear !== false,
         calendarState.settings.showWeekEventCount !== false
     );
@@ -857,12 +875,14 @@ function renderThreeDays() {
         return;
     }
 
-    renderMultiDayTimeline(days);
+    renderMultiDayTimeline(
+        days,
+        calendarState.settings.showThreeDaysDayOfYear !== false,
+        calendarState.settings.showThreeDaysEventCount !== false
+    );
 }
 
-function renderMultiDayTimeline(days) {
-    const showDayOfYear = calendarState.settings.showThreeDaysDayOfYear !== false;
-    const showEventCount = calendarState.settings.showThreeDaysEventCount !== false;
+function renderMultiDayTimeline(days, showDayOfYear, showEventCount) {
     const dayData = days.map(day => {
         const dayStart = startOfDay(day);
         const dayEnd = addDays(dayStart, 1);
@@ -3788,7 +3808,11 @@ document.querySelectorAll('.view-selector-option').forEach(button => button.addE
     render();
 }));
 window.addEventListener('resize', () => {
-    if (activeView === 'month') scheduleMonthEventLayout();
+    if (activeView === 'month') {
+        scheduleMonthEventLayout();
+    } else if (activeView === 'week' || activeView === 'workWeek') {
+        render();
+    }
 });
 document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'hidden') return;

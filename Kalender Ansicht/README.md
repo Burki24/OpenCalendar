@@ -43,7 +43,9 @@ Sicherung wiederhergestellt, soweit diese verfügbar ist.
 
 - Agenda-, Listen-, Tage-, Wochen- und Monatsansicht
 - unabhängig wählbare horizontale oder vertikale Wochenansicht für Kachel und
-  IPSView
+  IPSView; die horizontale Woche und Arbeitswoche verwenden bei ausreichender
+  Breite eine gemeinsame Zeitachse, auf schmalen Anzeigen wird automatisch die
+  kompakte vertikale Tagesdarstellung verwendet
 - separat einstellbare Schriftgröße der Kachelvisualisierung von 50 bis 200 Prozent;
   die IPSView-Schrift-/Stilskalierung bleibt davon unabhängig
 - je Darstellung separat konfigurierbare Anzeige von Kalenderwoche und
@@ -436,6 +438,6 @@ Symcon-Designvariablen, IPSView-Stilrollen und die kontrollierte Verwaltung der
 WebContent-Variable. Kalender- und Terminfarben bleiben davon unabhängige
 fachliche Inhaltsfarben.
 
-### Tagesübersicht der Monatsansicht
+### Tagesübersicht der Kalenderansichten
 
-In der Monatsansicht öffnet ein Klick auf die Tageszahl oder einen freien Bereich der Tageszelle die Tagesübersicht; der Hinweis `+ weitere` bleibt ebenfalls direkt anklickbar. Die Übersicht zeigt alle Termine des Tages, ganztägige zuerst und anschließend zeitgebundene chronologisch, sowie die Terminanzahl. Ein Klick auf einen Termin öffnet zunächst die Termindetail-Ansicht. Von dort kann ein schreibbarer Einzeltermin gezielt bearbeitet werden. Ist mindestens ein beschreibbarer Kalender verfügbar, kann über **Termin an diesem Tag erstellen** direkt ein neuer Termin für den ausgewählten Tag angelegt werden. Der zusätzliche Floating-Button zum Erstellen eines Termins wird deshalb in der Monatsansicht ausgeblendet und bleibt nur in Agenda, Liste, Tage und Woche verfügbar.
+In der Monatsansicht öffnet ein Klick auf die Tageszahl oder einen freien Bereich der Tageszelle die Tagesübersicht; der Hinweis `+ weitere` bleibt ebenfalls direkt anklickbar. In der Tage-, Wochen- und Arbeitswochenansicht öffnet ein Klick auf einen freien Bereich des jeweiligen Tages dieselbe Tagesübersicht. Die Übersicht zeigt alle Termine des Tages, ganztägige zuerst und anschließend zeitgebundene chronologisch, sowie die Terminanzahl. Ein Klick auf einen Termin öffnet zunächst die Termindetail-Ansicht. Von dort kann ein schreibbarer Einzeltermin gezielt bearbeitet werden. Ist mindestens ein beschreibbarer Kalender verfügbar, kann über **Termin an diesem Tag erstellen** direkt ein neuer Termin für den ausgewählten Tag angelegt werden. Der zusätzliche Floating-Button zum Erstellen eines Termins bleibt deshalb nur in Agenda und Liste sichtbar.

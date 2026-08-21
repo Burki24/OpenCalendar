@@ -896,8 +896,7 @@ assertVisualization(
 );
 
 assertVisualization(
-    str_contains($script, 'renderMultiDayTimeline(days);')
-        && str_contains($script, 'function renderMultiDayTimeline(days)')
+    str_contains($script, 'function renderMultiDayTimeline(days, showDayOfYear, showEventCount)')
         && str_contains($script, 'const allTimedEntries = dayData.flatMap')
         && str_contains($script, 'const range = timelineMinuteRange(allTimedEntries);')
         && str_contains($script, 'appendTimelineEvents(canvas, entry.dayStart, entry.timedEntries, range);')
@@ -906,7 +905,7 @@ assertVisualization(
         && str_contains($style, 'grid-template-columns: 54px repeat(var(--multi-day-columns, 3), minmax(120px, 1fr));')
         && str_contains($style, '.multi-day-timescale,')
         && str_contains($style, '.multi-day-timeline-canvas { position: relative; }'),
-    'Multi-day Days views must use one shared time scale so equal times align vertically and later starts are visibly offset in native and IPSView modes.'
+    'Multi-day day and week views must use one shared time scale so equal times align vertically and later starts are visibly offset in native and IPSView modes.'
 );
 
 assertVisualization(
@@ -914,8 +913,19 @@ assertVisualization(
         && str_contains($script, 'function weekViewDays(workWeek = false)')
         && str_contains($script, 'return workWeek ? days.filter(day => !isWeekend(day)) : days;')
         && str_contains($script, "renderWeek(activeView === 'workWeek');")
+        && str_contains($script, 'function weekTimelineMinimumWidth(dayCount, ipsView)')
+        && str_contains($script, 'const responsiveVertical = content.clientWidth > 0')
+        && str_contains($script, 'content.clientWidth < weekTimelineMinimumWidth(days.length, ipsView);')
+        && str_contains($script, 'const vertical = configuredVertical || responsiveVertical;')
+        && str_contains($script, 'if (vertical) {')
+        && str_contains($script, "+ ' vertical-week-grid',")
+        && str_contains($script, 'renderMultiDayTimeline(')
+        && str_contains($script, 'calendarState.settings.showWeekDayOfYear !== false,')
+        && str_contains($script, 'calendarState.settings.showWeekEventCount !== false')
+        && str_contains($script, "else if (activeView === 'week' || activeView === 'workWeek') {")
+        && str_contains($script, 'render();')
         && str_contains($style, '.week-grid.hide-weekends { grid-template-columns: repeat(5, minmax(0, 1fr)); }'),
-    'The shared visualization must provide explicit seven-day and Monday-to-Friday week modes in native and IPSView modes.'
+    'Full-week and work-week views must use the shared time axis horizontally while preserving configured or responsive compact vertical day layouts in native and IPSView modes.'
 );
 
 assertVisualization(
