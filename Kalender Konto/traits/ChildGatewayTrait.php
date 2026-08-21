@@ -436,6 +436,10 @@ trait KalenderKontoChildGatewayTrait
             // established bounded calendar lookup and identity matching below.
         }
 
+        if (!$provider instanceof CalendarProviderInterface) {
+            throw new RuntimeException('The selected event could not be verified by this calendar provider.');
+        }
+
         [$rangeStart, $rangeEnd] = $this->eventEditLookupRange($request);
         $matches = array_values(array_filter(
             $provider->getEvents(
@@ -472,7 +476,7 @@ trait KalenderKontoChildGatewayTrait
      */
     private function directEventForEditForChild(
         array $calendar,
-        CalendarProviderInterface $provider,
+        CalendarProviderInterface|CalendarEventLookupProviderInterface $provider,
         array $request
     ): ?array {
         $calendarReference = $this->calendarReference($calendar);
