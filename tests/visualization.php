@@ -540,6 +540,13 @@ assertVisualization(
     'Native visualization actions must send refreshed state and toast together so the tile cannot remain stale after an action.'
 );
 assertVisualization(
+    !str_contains($formSource, '"name": "TileWeekOrientation"')
+        && !str_contains($formSource, '"name": "IPSViewWeekOrientation"')
+        && str_contains($moduleSource, "RegisterPropertyInteger('TileWeekOrientation', 0)")
+        && str_contains($moduleSource, "RegisterPropertyInteger('IPSViewWeekOrientation', 0)"),
+    'Obsolete week-orientation controls must stay hidden while their legacy properties remain registered for configuration compatibility.'
+);
+assertVisualization(
     str_contains($formSource, '"name": "TileFontScale"')
         && str_contains($formSource, '"caption": "Tile font size (%)"')
         && str_contains($moduleSource, "RegisterPropertyInteger('TileFontScale', 100)")
