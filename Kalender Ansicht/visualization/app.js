@@ -832,6 +832,42 @@ function weekViewDays(workWeek = false) {
     return workWeek ? days.filter(day => !isWeekend(day)) : days;
 }
 
+function emphasizeCurrentDaySurface(target, baseSurface = 'var(--cal-surface)', outlined = false) {
+    target.style.background = `color-mix(in srgb, var(--cal-accent) 14%, ${baseSurface})`;
+    if (outlined) {
+        target.style.borderColor = 'var(--cal-accent)';
+        target.style.boxShadow = 'inset 0 0 0 2px var(--cal-accent)';
+    }
+}
+
+function emphasizeCurrentDayHeading(heading) {
+    heading.style.color = 'var(--cal-accent)';
+    heading.style.borderBottomColor = 'var(--cal-accent)';
+    heading.style.fontWeight = '750';
+}
+
+function emphasizeCurrentDayTimelineSection(target, heading = false) {
+    emphasizeCurrentDaySurface(target);
+    target.style.boxShadow = heading
+        ? 'inset 0 3px 0 var(--cal-accent), inset 2px 0 0 color-mix(in srgb, var(--cal-accent) 70%, transparent), inset -2px 0 0 color-mix(in srgb, var(--cal-accent) 70%, transparent)'
+        : 'inset 2px 0 0 color-mix(in srgb, var(--cal-accent) 70%, transparent), inset -2px 0 0 color-mix(in srgb, var(--cal-accent) 70%, transparent)';
+    if (heading) emphasizeCurrentDayHeading(target);
+}
+
+function emphasizeCurrentMonthDay(cell, number) {
+    emphasizeCurrentDaySurface(cell, 'var(--cal-card)', true);
+    cell.style.boxShadow = 'inset 0 0 0 3px var(--cal-accent)';
+    number.style.display = 'inline-grid';
+    number.style.minWidth = '1.85em';
+    number.style.height = '1.85em';
+    number.style.marginLeft = 'auto';
+    number.style.placeItems = 'center';
+    number.style.borderRadius = '999px';
+    number.style.background = 'var(--cal-accent)';
+    number.style.color = 'var(--cal-accent-contrast)';
+    number.style.fontWeight = '750';
+}
+
 function renderWeek(workWeek = false) {
     const days = weekViewDays(workWeek);
     const columnsPerWeek = workWeek ? 5 : 7;
@@ -888,9 +924,11 @@ function renderMultiDayTimeline(days, showDayOfYear, showEventCount) {
     grid.appendChild(corner);
 
     dayData.forEach((entry, index) => {
-        const heading = element('div', 'week-heading multi-day-heading' + (isToday(entry.day) ? ' today' : ''));
+        const currentDay = isToday(entry.day);
+        const heading = element('div', 'week-heading multi-day-heading' + (currentDay ? ' today' : ''));
         heading.style.gridColumn = String(index + 2);
         heading.style.gridRow = '1';
+        if (currentDay) emphasizeCurrentDayTimelineSection(heading, true);
         heading.textContent = formatDayHeading(
             entry.day,
             { weekday: 'short', day: '2-digit', month: '2-digit' },
@@ -912,9 +950,11 @@ function renderMultiDayTimeline(days, showDayOfYear, showEventCount) {
         grid.appendChild(allDayLabel);
 
         dayData.forEach((entry, index) => {
-            const allDayCell = element('div', 'multi-day-all-day-cell' + (isToday(entry.day) ? ' today' : ''));
+            const currentDay = isToday(entry.day);
+            const allDayCell = element('div', 'multi-day-all-day-cell' + (currentDay ? ' today' : ''));
             allDayCell.style.gridColumn = String(index + 2);
             allDayCell.style.gridRow = '2';
+            if (currentDay) emphasizeCurrentDayTimelineSection(allDayCell);
             entry.allDayEvents.forEach(event => allDayCell.appendChild(createWeekEventElement(event)));
             bindDayOverview(allDayCell, entry.day, entry.events);
             grid.appendChild(allDayCell);
@@ -932,9 +972,11 @@ function renderMultiDayTimeline(days, showDayOfYear, showEventCount) {
         grid.appendChild(timescale);
 
         dayData.forEach((entry, index) => {
-            const canvas = element('div', 'multi-day-timeline-canvas' + (isToday(entry.day) ? ' today' : ''));
+            const currentDay = isToday(entry.day);
+            const canvas = element('div', 'multi-day-timeline-canvas' + (currentDay ? ' today' : ''));
             canvas.style.gridColumn = String(index + 2);
             canvas.style.gridRow = String(timelineRow);
+            if (currentDay) emphasizeCurrentDayTimelineSection(canvas);
             canvas.style.height = `${range.height}px`;
             appendTimelineHourLines(canvas, range);
             appendTimelineEvents(canvas, entry.dayStart, entry.timedEntries, range);
@@ -950,8 +992,13 @@ function renderSingleDayTimeline(day) {
     const dayStart = startOfDay(day);
     const dayEnd = addDays(dayStart, 1);
     const events = visibleCalendarEvents().filter(event => eventOverlaps(event, dayStart, dayEnd));
-    const column = element('section', 'week-column single-day-column' + (isToday(day) ? ' today' : ''));
+    const currentDay = isToday(day);
+    const column = element('section', 'week-column single-day-column' + (currentDay ? ' today' : ''));
     const heading = element('div', 'week-heading');
+    if (currentDay) {
+        emphasizeCurrentDaySurface(column, 'var(--cal-surface)', true);
+        emphasizeCurrentDayHeading(heading);
+    }
     heading.textContent = formatDayHeading(
         day,
         { weekday: 'short', day: '2-digit', month: '2-digit' },
@@ -1097,10 +1144,15 @@ function createSingleDayTimelineEvent(event) {
 function renderDayColumns(days, className, showDayOfYear, showEventCount) {
     const grid = element('div', className);
     days.forEach(day => {
-        const column = element('section', 'week-column' + (isToday(day) ? ' today' : ''));
+        const currentDay = isToday(day);
+        const column = element('section', 'week-column' + (currentDay ? ' today' : ''));
         const dayEnd = addDays(day, 1);
         const events = visibleCalendarEvents().filter(event => eventOverlaps(event, day, dayEnd));
         const heading = element('div', 'week-heading');
+        if (currentDay) {
+            emphasizeCurrentDaySurface(column, 'var(--cal-surface)', true);
+            emphasizeCurrentDayHeading(heading);
+        }
         heading.textContent = formatDayHeading(
             day,
             { weekday: 'short', day: '2-digit', month: '2-digit' },
@@ -1270,6 +1322,7 @@ function createMonthGrid(month, showOutsideDetails) {
             const dateMeta = element('div', 'month-day-date');
             const number = element('div', 'day-number');
             number.textContent = String(day.getDate());
+            if (isToday(day) && (!outside || showOutsideDetails)) emphasizeCurrentMonthDay(cell, number);
             dateMeta.appendChild(number);
             if (calendarState.settings.showMonthDayOfYear !== false) {
                 const dayOfYearMeta = element('span', 'month-day-of-year');
