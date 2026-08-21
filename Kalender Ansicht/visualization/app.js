@@ -500,7 +500,9 @@ function render() {
     const hasWritableCalendar = actionBridgeAvailable
         && calendarState.calendars.some(calendar => calendar.canWrite);
     const addButton = document.getElementById('add-button');
-    const showAddButton = actionBridgeAvailable && listControlsVisible() && activeView !== 'month';
+    const showAddButton = actionBridgeAvailable
+        && listControlsVisible()
+        && ['agenda', 'list'].includes(activeView);
     addButton.classList.toggle('visible', showAddButton);
     addButton.disabled = !hasWritableCalendar;
     addButton.setAttribute('aria-disabled', String(!hasWritableCalendar));
@@ -898,6 +900,7 @@ function renderMultiDayTimeline(days) {
             entry.events.length,
             showEventCount
         );
+        bindDayOverview(heading, entry.day, entry.events);
         grid.appendChild(heading);
     });
 
@@ -915,6 +918,7 @@ function renderMultiDayTimeline(days) {
             allDayCell.style.gridColumn = String(index + 2);
             allDayCell.style.gridRow = '2';
             entry.allDayEvents.forEach(event => allDayCell.appendChild(createWeekEventElement(event)));
+            bindDayOverview(allDayCell, entry.day, entry.events);
             grid.appendChild(allDayCell);
         });
         timelineRow = 3;
@@ -936,6 +940,7 @@ function renderMultiDayTimeline(days) {
             canvas.style.height = `${range.height}px`;
             appendTimelineHourLines(canvas, range);
             appendTimelineEvents(canvas, entry.dayStart, entry.timedEntries, range);
+            bindDayOverview(canvas, entry.day, entry.events);
             grid.appendChild(canvas);
         });
     }
@@ -956,6 +961,7 @@ function renderSingleDayTimeline(day) {
         events.length,
         calendarState.settings.showThreeDaysEventCount !== false
     );
+    bindDayOverview(column, day, events);
     column.appendChild(heading);
 
     const allDayEvents = events.filter(event => event.allDay);
@@ -1104,6 +1110,7 @@ function renderDayColumns(days, className, showDayOfYear, showEventCount) {
             events.length,
             showEventCount
         );
+        bindDayOverview(column, day, events);
         column.appendChild(heading);
         const eventList = element('div', 'week-events');
         renderWeekEventLayout(eventList, events, day, dayEnd);
@@ -1294,6 +1301,14 @@ function bindMonthDayOverview(cell, day, events) {
     cell.classList.add('month-day-overview-enabled');
     cell.addEventListener('click', clickEvent => {
         if (clickEvent.target.closest?.('button, a, input, select, textarea, label')) return;
+        openDayEvents(day, events);
+    });
+}
+
+function bindDayOverview(target, day, events) {
+    target.classList.add('day-overview-enabled');
+    target.addEventListener('click', clickEvent => {
+        if (clickEvent.target.closest?.('button, a, input, select, textarea, label, .week-event')) return;
         openDayEvents(day, events);
     });
 }

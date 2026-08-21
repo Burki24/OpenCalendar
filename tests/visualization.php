@@ -252,6 +252,19 @@ assertVisualization(
 );
 
 assertVisualization(
+    str_contains($script, 'function bindDayOverview(target, day, events)')
+        && str_contains($script, 'target.classList.add(\'day-overview-enabled\');')
+        && str_contains($script, 'clickEvent.target.closest?.(\'button, a, input, select, textarea, label, .week-event\')')
+        && substr_count($script, 'bindDayOverview(column, day, events);') >= 2
+        && str_contains($script, 'bindDayOverview(heading, entry.day, entry.events);')
+        && str_contains($script, 'bindDayOverview(allDayCell, entry.day, entry.events);')
+        && str_contains($script, 'bindDayOverview(canvas, entry.day, entry.events);')
+        && str_contains($style, '.week-column.day-overview-enabled,')
+        && str_contains($style, '.multi-day-timeline-canvas.day-overview-enabled { cursor: pointer; }'),
+    'Days, full-week and work-week views must open the existing day-events modal from a selected day without intercepting event controls.'
+);
+
+assertVisualization(
     str_contains($script, 'const swipeNavigationViews = new Set([\'threeDays\', \'week\', \'workWeek\', \'month\']);')
         && str_contains($script, 'const swipeMinimumDistance = 60;')
         && str_contains($script, 'const swipeAxisRatio = 1.3;')
@@ -591,7 +604,8 @@ assertVisualization(
         && str_contains($script, "activeView !== 'list' || calendarState.settings.showListControls !== false")
         && str_contains($script, "document.getElementById('previous-button').parentElement.classList.toggle('hidden', !showControls)")
         && str_contains($script, "document.getElementById('refresh-button').classList.toggle('hidden', !showControls)")
-        && str_contains($script, 'actionBridgeAvailable && listControlsVisible()'),
+        && str_contains($script, 'const showAddButton = actionBridgeAvailable')
+        && str_contains($script, '&& listControlsVisible()'),
     'The list-view controls setting must hide navigation, event creation and refresh while preserving the period and view selector.'
 );
 foreach ([
@@ -849,9 +863,10 @@ assertVisualization(
 );
 
 assertVisualization(
-    str_contains($script, 'const showAddButton = actionBridgeAvailable && listControlsVisible() && activeView !== \'month\';')
+    str_contains($script, 'const showAddButton = actionBridgeAvailable')
+        && str_contains($script, '&& [\'agenda\', \'list\'].includes(activeView);')
         && str_contains($script, 'addButton.classList.toggle(\'visible\', showAddButton);'),
-    'The floating event creation button must stay available in non-month views and remain hidden in the month view.'
+    'The floating event creation button must remain limited to agenda and list views after direct day selection is available elsewhere.'
 );
 
 assertVisualization(
