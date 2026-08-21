@@ -182,6 +182,8 @@ assertSameValue(true, $calendars[0]['writeAccessKnown'], 'Google access roles mu
 assertSameValue(true, $calendars[0]['capabilities']['create'], 'Owners must have write access.');
 assertSameValue(true, $calendars[0]['capabilities']['createRecurrence'], 'Writable Google calendars must advertise recurrence creation support.');
 assertSameValue(true, $calendars[0]['capabilities']['updateRecurrence'], 'Writable Google calendars must advertise recurrence conversion support.');
+assertSameValue(true, $calendars[0]['capabilities']['updateOccurrence'], 'Writable Google calendars must advertise single-occurrence update support.');
+assertSameValue(true, $calendars[0]['capabilities']['deleteOccurrence'], 'Writable Google calendars must advertise single-occurrence deletion support.');
 assertSameValue(true, $calendars[0]['capabilities']['updateFollowing'], 'Writable Google calendars must advertise this-and-following update support.');
 assertSameValue(true, $calendars[0]['capabilities']['updateSeries'], 'Writable Google calendars must advertise recurring-series update support.');
 assertSameValue(true, $calendars[0]['capabilities']['deleteSeries'], 'Writable Google calendars must advertise recurring-series deletion support.');
@@ -195,6 +197,8 @@ assertSameValue(false, $calendars[1]['capabilities']['create'], 'Readers must no
 assertSameValue(false, $calendars[1]['capabilities']['createWithDefaultReminder'], 'Read-only Google calendars must not allow default-reminder event creation.');
 assertSameValue('complex', $calendars[1]['defaultReminder']['mode'], 'Non-popup Google calendar defaults must be protected as complex settings.');
 assertSameValue(false, $calendars[1]['capabilities']['updateRecurrence'], 'Read-only Google calendars must not advertise recurrence conversion support.');
+assertSameValue(false, $calendars[1]['capabilities']['updateOccurrence'], 'Read-only Google calendars must not advertise single-occurrence update support.');
+assertSameValue(false, $calendars[1]['capabilities']['deleteOccurrence'], 'Read-only Google calendars must not advertise single-occurrence deletion support.');
 assertTrueValue(str_contains($calendarClient->requests[1]['url'], 'pageToken=page-2'), 'The second calendar page must be requested.');
 
 $googleRepeatedPageClient = new FakeHttpClient([

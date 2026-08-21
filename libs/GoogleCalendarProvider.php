@@ -125,6 +125,8 @@ final class GoogleCalendarProvider implements CalendarEventLookupProviderInterfa
                         'delete'                    => $canWrite,
                         'createRecurrence'          => $canWrite,
                         'updateRecurrence'          => $canWrite,
+                        'updateOccurrence'          => $canWrite,
+                        'deleteOccurrence'          => $canWrite,
                         'updateFollowing'           => $canWrite,
                         'updateSeries'              => $canWrite,
                         'deleteSeries'              => $canWrite,
