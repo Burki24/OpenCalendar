@@ -488,6 +488,52 @@ assertCalDAVSame('1', $eventClient->requests[0]['headers']['Depth'] ?? '', 'Cale
 assertCalDAVTrue(str_contains($eventClient->requests[0]['body'], '20260724T000000Z'), 'The REPORT body must contain the UTC start boundary.');
 assertCalDAVTrue(str_contains($eventClient->requests[0]['body'], '20260725T000000Z'), 'The REPORT body must contain the UTC end boundary.');
 
+// Edit preparation can read an already known calendar object directly instead of
+// repeating a calendar-wide REPORT. The current GET ETag must be retained.
+$directEditResourceUrl = 'https://calendar.example/calendars/user/work/event-1.ics';
+$directEditClient = new FakeCalDAVHttpClient([
+    caldavResponseWithHeaders(
+        200,
+        ['etag' => '"direct-edit-etag"'],
+        singleEventIcal(),
+        $directEditResourceUrl
+    )
+]);
+$provider = new CalDAVProvider($directEditClient, 'https://calendar.example/dav/');
+$directEditEvents = $provider->getEventsForEditByResource(
+    'https://calendar.example/calendars/user/work/',
+    $directEditResourceUrl,
+    new DateTimeImmutable('2026-07-24T00:00:00Z'),
+    new DateTimeImmutable('2026-07-25T00:00:00Z')
+);
+assertCalDAVSame(1, count($directEditEvents), 'Direct CalDAV edit lookup must return the selected resource event.');
+assertCalDAVSame('Before update', $directEditEvents[0]['summary'], 'Direct CalDAV edit lookup must parse the current resource body.');
+assertCalDAVSame('"direct-edit-etag"', $directEditEvents[0]['etag'], 'Direct CalDAV edit lookup must retain the current GET ETag.');
+assertCalDAVSame($directEditResourceUrl, $directEditEvents[0]['resourceUrl'], 'Direct CalDAV edit lookup must retain the effective resource URL.');
+assertCalDAVSame(1, count($directEditClient->requests), 'Direct CalDAV edit lookup must use exactly one resource request.');
+assertCalDAVSame('GET', $directEditClient->requests[0]['method'], 'Direct CalDAV edit lookup must avoid a calendar REPORT.');
+
+$directRecurringEditClient = new FakeCalDAVHttpClient([
+    caldavResponseWithHeaders(
+        200,
+        ['etag' => '"direct-recurring-edit-etag"'],
+        recurringSeriesIcal(),
+        'https://calendar.example/calendars/user/work/series-1.ics'
+    )
+]);
+$provider = new CalDAVProvider($directRecurringEditClient, 'https://calendar.example/dav/');
+$directRecurringEditEvents = $provider->getEventsForEditByResource(
+    'https://calendar.example/calendars/user/work/',
+    'https://calendar.example/calendars/user/work/series-1.ics',
+    new DateTimeImmutable('2026-08-24T00:00:00Z'),
+    new DateTimeImmutable('2026-08-25T00:00:00Z')
+);
+assertCalDAVSame(1, count($directRecurringEditEvents), 'Direct CalDAV edit lookup must locally expand the selected recurring occurrence.');
+assertCalDAVSame('occurrence', $directRecurringEditEvents[0]['recurrenceType'], 'A directly loaded recurring resource must expose the selected occurrence.');
+assertCalDAVSame(true, $directRecurringEditEvents[0]['canUpdateOccurrence'], 'Directly loaded CalDAV occurrences must remain individually editable.');
+assertCalDAVSame(true, $directRecurringEditEvents[0]['canDeleteOccurrence'], 'Directly loaded CalDAV occurrences must remain individually deletable.');
+assertCalDAVSame('2026-08-24T10:00:00+00:00', $directRecurringEditEvents[0]['originalStart'], 'Direct recurring edit lookup must retain the immutable occurrence start.');
+
 $recurringResourceUrl = 'https://calendar.example/calendars/user/work/series-1.ics';
 $recurringEventClient = new FakeCalDAVHttpClient([
     caldavResponse(

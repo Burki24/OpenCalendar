@@ -8,6 +8,7 @@ use IPSKalender\CalDAVProvider;
 use IPSKalender\CalendarEventLookupProviderInterface;
 use IPSKalender\CalendarEventRecurrence;
 use IPSKalender\CalendarHttpClient;
+use IPSKalender\CalendarProviderInterface;
 use IPSKalender\GoogleCalendarIncrementalSync;
 use IPSKalender\GoogleCalendarOriginPolicy;
 use IPSKalender\GoogleCalendarProvider;
@@ -421,14 +422,107 @@ trait KalenderKontoChildGatewayTrait
     {
         $calendar = $this->resolveCalendar((string) ($request['CalendarID'] ?? ''));
         $provider = $this->createProvider();
-        $eventReference = trim((string) ($request['EventReference'] ?? ''));
-        if ($eventReference !== '' && $provider instanceof CalendarEventLookupProviderInterface) {
-            return $provider->getEventForEdit(
+        $stableMicrosoftIdentity = $provider instanceof MicrosoftCalendarProvider;
+
+        try {
+            $directEvent = $this->directEventForEditForChild($calendar, $provider, $request);
+            if ($directEvent !== null
+                && $this->eventMatchesEditRequest($directEvent, $request, $stableMicrosoftIdentity)) {
+                return $directEvent;
+            }
+        } catch (Throwable) {
+            // A stale provider reference or a temporarily unavailable direct lookup
+            // must not make a previously editable event unusable. Fall back to the
+            // established bounded calendar lookup and identity matching below.
+        }
+
+        [$rangeStart, $rangeEnd] = $this->eventEditLookupRange($request);
+        $matches = array_values(array_filter(
+            $provider->getEvents(
                 $this->calendarReference($calendar),
-                $eventReference
+                $rangeStart,
+                $rangeEnd
+            ),
+            fn (mixed $event): bool => is_array($event)
+                && $this->eventMatchesEditRequest(
+                    $event,
+                    $request,
+                    $stableMicrosoftIdentity
+                )
+        ));
+
+        if (count($matches) === 1) {
+            return $matches[0];
+        }
+        if ($matches === []) {
+            throw new RuntimeException(
+                'The selected event is no longer available. Synchronize the calendar and try again.'
             );
         }
 
+        throw new RuntimeException('The selected event could not be identified uniquely.');
+    }
+
+    /**
+     * Tries the fastest provider-specific event lookup before the bounded fallback query.
+     *
+     * @param array<string, mixed> $calendar
+     * @param array<string, mixed> $request
+     * @return array<string, mixed>|null
+     */
+    private function directEventForEditForChild(
+        array $calendar,
+        CalendarProviderInterface $provider,
+        array $request
+    ): ?array {
+        $calendarReference = $this->calendarReference($calendar);
+        $eventReference = trim((string) ($request['EventReference'] ?? ''));
+
+        if ($eventReference !== '' && $provider instanceof CalendarEventLookupProviderInterface) {
+            return $provider->getEventForEdit($calendarReference, $eventReference);
+        }
+
+        if ($eventReference !== '' && $provider instanceof MicrosoftCalendarProvider) {
+            $synchronizer = new MicrosoftCalendarIncrementalSync(
+                $this->createTrustedCloudHttpClient(new MicrosoftGraphOriginPolicy()),
+                $this->getMicrosoftAccessToken()
+            );
+
+            return $synchronizer->getEventByReference($calendarReference, $eventReference);
+        }
+
+        if ($provider instanceof CalDAVProvider) {
+            $resourceUrl = trim((string) ($request['ResourceURL'] ?? ''));
+            if ($resourceUrl === '') {
+                return null;
+            }
+
+            [$rangeStart, $rangeEnd] = $this->eventEditLookupRange($request);
+            $matches = array_values(array_filter(
+                $provider->getEventsForEditByResource(
+                    $calendarReference,
+                    $resourceUrl,
+                    $rangeStart,
+                    $rangeEnd
+                ),
+                fn (mixed $event): bool => is_array($event)
+                    && $this->eventMatchesEditRequest($event, $request)
+            ));
+
+            return count($matches) === 1 ? $matches[0] : null;
+        }
+
+        return null;
+    }
+
+    /**
+     * Builds the narrow edit lookup range used by direct CalDAV and fallback queries.
+     *
+     * @param array<string, mixed> $request
+     * @return array{0: DateTimeImmutable, 1: DateTimeImmutable}
+     */
+    private function eventEditLookupRange(array $request): array
+    {
         $startTimestamp = (int) ($request['Start'] ?? 0);
         $endTimestamp = (int) ($request['End'] ?? 0);
         if ($startTimestamp <= 0) {
@@ -444,30 +538,10 @@ trait KalenderKontoChildGatewayTrait
             throw new InvalidArgumentException('The selected event time range is too large.');
         }
 
-        $matches = array_values(array_filter(
-            $provider->getEvents(
-                $this->calendarReference($calendar),
-                new DateTimeImmutable('@' . $rangeStart),
-                new DateTimeImmutable('@' . $rangeEnd)
-            ),
-            fn (mixed $event): bool => is_array($event)
-                && $this->eventMatchesEditRequest(
-                    $event,
-                    $request,
-                    $this->ReadPropertyInteger('Provider') === self::PROVIDER_MICROSOFT
-                )
-        ));
-
-        if (count($matches) === 1) {
-            return $matches[0];
-        }
-        if ($matches === []) {
-            throw new RuntimeException(
-                'The selected event is no longer available. Synchronize the calendar and try again.'
-            );
-        }
-
-        throw new RuntimeException('The selected event could not be identified uniquely.');
+        return [
+            new DateTimeImmutable('@' . $rangeStart),
+            new DateTimeImmutable('@' . $rangeEnd)
+        ];
     }
 
     /**

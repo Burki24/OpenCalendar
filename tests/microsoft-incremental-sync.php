@@ -95,6 +95,23 @@ function microsoftSyncOccurrence(string $id, string $seriesId, string $summary, 
 
 $start = new DateTimeImmutable('2026-08-01T00:00:00+00:00');
 $end = new DateTimeImmutable('2027-08-01T00:00:00+00:00');
+
+$directLookupHttp = new MicrosoftIncrementalSyncTestHttpClient([
+    microsoftSyncResponse(200, microsoftSyncEvent('direct-edit-1', 'Direct edit', '2026-08-19'))
+]);
+$directLookupSynchronizer = new MicrosoftCalendarIncrementalSync($directLookupHttp, 'access-token');
+$directLookupEvent = $directLookupSynchronizer->getEventByReference('primary', 'direct-edit-1');
+microsoftSyncExpect(
+    ($directLookupEvent['eventReference'] ?? '') === 'direct-edit-1'
+        && ($directLookupEvent['summary'] ?? '') === 'Direct edit',
+    'Microsoft edit preparation must support a direct event lookup by provider reference.'
+);
+microsoftSyncExpect(
+    count($directLookupHttp->urls) === 1
+        && str_contains($directLookupHttp->urls[0], '/me/calendars/primary/events/direct-edit-1'),
+    'Direct Microsoft edit lookup must request exactly the selected event instead of a calendar view.'
+);
+
 $initialNextLink = 'https://graph.microsoft.com/v1.0/me/calendars/primary/calendarView/delta?$skiptoken=page-2';
 $initialDeltaLink = 'https://graph.microsoft.com/v1.0/me/calendars/primary/calendarView/delta?$deltatoken=token-1';
 

@@ -159,6 +159,50 @@ final class CalDAVProvider implements CalendarProviderInterface, RecurringCalend
         return $events;
     }
 
+    /**
+     * Reads events from one already known CalDAV object resource for edit preparation.
+     *
+     * This avoids a calendar-wide REPORT when synchronization already supplied the
+     * concrete object URL. Recurrences are expanded locally only inside the requested
+     * edit window and retain the current resource ETag.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function getEventsForEditByResource(
+        string $calendarUrl,
+        string $resourceUrl,
+        DateTimeImmutable $start,
+        DateTimeImmutable $end
+    ): array {
+        if ($end <= $start) {
+            throw new CalDAVProviderException('The event query end must be later than the start.');
+        }
+
+        $calendarUrl = $this->normalizeAbsoluteUrl($calendarUrl);
+        $resourceUrl = $this->normalizeAbsoluteUrl($resourceUrl);
+        $this->assertResourceBelongsToCalendar($calendarUrl, $resourceUrl);
+
+        $response = $this->httpClient->request(
+            'GET',
+            $resourceUrl,
+            ['Accept' => 'text/calendar']
+        );
+        $this->assertResponseStatus($response, [200], 'event retrieval');
+        $effectiveResourceUrl = $this->trustedEffectiveUrl($response, $resourceUrl);
+        $this->assertResourceBelongsToCalendar($calendarUrl, $effectiveResourceUrl);
+        $etag = trim((string) ($response->headers['etag'] ?? ''));
+
+        return $this->enableExpandedOccurrenceWrites(
+            ICalendarCodec::parseEventsInRange(
+                $response->body,
+                $effectiveResourceUrl,
+                $etag,
+                $start,
+                $end
+            )
+        );
+    }
+
     /** @inheritDoc */
     public function getRecurringSeries(
         string $calendarUrl,

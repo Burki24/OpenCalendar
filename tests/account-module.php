@@ -402,6 +402,12 @@ assertAccountStructure(
         && str_contains($gatewaySource, 'getEventForEditForChild($request)')
         && str_contains($gatewaySource, 'instanceof CalendarEventLookupProviderInterface')
         && str_contains($gatewaySource, '->getEventForEdit(')
+        && str_contains($gatewaySource, 'directEventForEditForChild(')
+        && str_contains($gatewaySource, 'new MicrosoftCalendarIncrementalSync(')
+        && str_contains($gatewaySource, '->getEventByReference(')
+        && str_contains($gatewaySource, '->getEventsForEditByResource(')
+        && str_contains($gatewaySource, 'eventEditLookupRange(')
+        && str_contains($gatewaySource, 'catch (Throwable)')
         && str_contains($gatewaySource, "'GetRecurringSeries'")
         && str_contains($gatewaySource, 'getRecurringSeriesForChild($request)')
         && str_contains($gatewaySource, "'GetRecurringFollowing'")
@@ -409,7 +415,7 @@ assertAccountStructure(
         && str_contains($gatewaySource, 'instanceof RecurringCalendarProviderInterface')
         && str_contains($gatewaySource, '->getRecurringSeries(')
         && str_contains($gatewaySource, '->getRecurringFollowing('),
-    'The account child gateway must route recurring parent and following reads only through recurrence-capable providers.'
+    'The account child gateway must prefer direct provider event lookup with a bounded fallback and route recurrence reads only through recurrence-capable providers.'
 );
 
 $accountSource = file_get_contents(__DIR__ . '/../Kalender Konto/module.php');
