@@ -630,6 +630,19 @@ function renderAgenda() {
             calendarState.settings.showAgendaEventCount !== false
         );
         heading.append(strong, fullDate);
+        const dayEnd = addDays(group.date, 1);
+        const dayEvents = events.filter(event => eventOverlaps(event, group.date, dayEnd));
+        heading.classList.add('agenda-date-overview-enabled');
+        heading.tabIndex = 0;
+        heading.setAttribute('role', 'button');
+        heading.setAttribute('aria-label', `${formatDayEventsTitle(group.date)} · ${t('Day events')}`);
+        heading.style.cursor = 'pointer';
+        heading.addEventListener('click', () => openDayEvents(group.date, dayEvents));
+        heading.addEventListener('keydown', key => {
+            if (!['Enter', ' '].includes(key.key)) return;
+            key.preventDefault();
+            openDayEvents(group.date, dayEvents);
+        });
         section.appendChild(heading);
         group.events.forEach(event => section.appendChild(createAgendaEvent(event)));
         content.appendChild(section);

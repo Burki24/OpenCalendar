@@ -265,6 +265,18 @@ assertVisualization(
 );
 
 assertVisualization(
+    str_contains($script, "heading.classList.add('agenda-date-overview-enabled');")
+        && str_contains($script, 'heading.tabIndex = 0;')
+        && str_contains($script, "heading.setAttribute('role', 'button');")
+        && str_contains($script, "heading.setAttribute('aria-label', `${formatDayEventsTitle(group.date)} · ${t('Day events')}`);")
+        && str_contains($script, 'const dayEvents = events.filter(event => eventOverlaps(event, group.date, dayEnd));')
+        && str_contains($script, "heading.addEventListener('click', () => openDayEvents(group.date, dayEvents));")
+        && str_contains($script, "if (!['Enter', ' '].includes(key.key)) return;")
+        && str_contains($script, 'openDayEvents(group.date, dayEvents);'),
+    'Agenda day headings must open the shared day-events modal by pointer and keyboard with all events overlapping that day.'
+);
+
+assertVisualization(
     str_contains($script, 'const swipeNavigationViews = new Set([\'threeDays\', \'week\', \'workWeek\', \'month\']);')
         && str_contains($script, 'const swipeMinimumDistance = 60;')
         && str_contains($script, 'const swipeAxisRatio = 1.3;')
