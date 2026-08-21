@@ -1773,7 +1773,8 @@ assertTrueValue(
         && str_contains($viewScriptSource, "document.getElementById('previous-button').parentElement.classList.toggle('hidden', !showControls)")
         && str_contains($viewScriptSource, "document.getElementById('refresh-button').classList.toggle('hidden', !showControls)")
         && str_contains($viewScriptSource, 'const showAddButton = actionBridgeAvailable')
-        && str_contains($viewScriptSource, '&& listControlsVisible()'),
+        && str_contains($viewScriptSource, '&& listControlsVisible()')
+        && str_contains($viewScriptSource, '&& [\'agenda\', \'list\'].includes(activeView);'),
     'List controls must be independently configurable without hiding the period title or view selector.'
 );
 

@@ -57,8 +57,8 @@ Sicherung wiederhergestellt, soweit diese verfügbar ist.
   Agenda-, Tage- und Wochenansicht
 - Zusammenführen beliebig vieler ausgewählter Kalender
 - Farben der einzelnen Kalender und Termine
-- optionale Anzeige von Kalendername, Anlass bei Jahresereignissen, Ort und Beschreibung
-- Navigation innerhalb des dargestellten Zeitraums; in der Tage-, Wochen- und Monatsansicht kann auf Touch-Geräten zusätzlich horizontal gewischt werden (links = weiter, rechts = zurück)
+- optionale Anzeige von Kalendername, Ort und Beschreibung
+- Navigation innerhalb des dargestellten Zeitraums
 - manuelle Synchronisation aller ausgewählten Kalender
 - Erstellen, Bearbeiten, Verschieben und Löschen von Terminen in beschreibbaren Kalendern
 - Komfortable Zeiteingabe: Wird beim Beginn nur das Datum geändert, folgt das Enddatum automatisch auf denselben Tag und behält seine Uhrzeit bei. Bei einer geänderten Beginn-Uhrzeit wird das Ende automatisch auf eine Stunde später gesetzt; Ganztagstermine bleiben auf demselben sichtbaren Tag.
@@ -66,7 +66,9 @@ Sicherung wiederhergestellt, soweit diese verfügbar ist.
 - responsive Bedienung auf großen Kacheln und schmalen Mobilansichten
 - optionale IPSView-Ausgabe über eine WebContent-Variable
 
-Google-, Microsoft-, Apple-iCloud- und CalDAV-Serienvorkommnisse können einzeln, ab dem ausgewählten Vorkommnis oder als vollständige Serie bearbeitet und gelöscht werden, sofern die Wiederholungsregel verlustfrei geteilt werden kann. Beim **Bearbeiten** teilt OpenCalendar die bestehende Serie am gewählten Vorkommnis: Der vordere Serienteil bleibt unverändert, ab dem gewählten Termin entsteht ein neuer Serienteil mit den Änderungen. Bereits vorhandene Ausnahmen ab diesem Termin werden dabei zurückgesetzt. Beim **Löschen** beendet OpenCalendar die bestehende Serie direkt vor dem gewählten Vorkommnis; beim ersten Vorkommnis wird die komplette Serie entfernt. Bei nummerierten Serien wird beim Teilen nur die verbleibende Anzahl in den neuen Serienteil übernommen.
+Wiederkehrende, vom Anbieter expandierte Einzelvorkommen werden derzeit nur
+lesend dargestellt. Dadurch kann nicht versehentlich die vollständige
+Terminserie verändert werden.
 
 Normale Einzeltermine können im Bearbeitungsdialog in einen anderen, in dieser
 Kalender Ansicht ausgewählten und beschreibbaren Kalender verschoben werden.
@@ -89,12 +91,12 @@ Standardansicht | Agenda, Liste, Tage, Woche oder Monat; wird nur verwendet, sol
 Kachel-Wochenausrichtung | Horizontale Wochenspalten oder vertikale Tageszeilen
 Vergangene/Zukünftige Tage | Datenzeitraum, aus dem Termine für alle Darstellungen geladen und zusammengeführt werden
 Maximale Termine | Obergrenze der in einer Antwort verarbeiteten Termine
-Anzeigeoptionen → Allgemein | Wochenenden, Kalendername, Anlass bei Jahresereignissen, Ort und Beschreibung zentral im aufklappbaren Bereich konfigurieren
+Anzeigeoptionen → Allgemein | Wochenenden, Kalendername, Ort und Beschreibung zentral im aufklappbaren Bereich konfigurieren
 Anzeigeoptionen → Terminanzahl | Je Ansicht separat für Agenda, Tage und Woche; im Monat wird keine Tages-Terminanzahl eingeblendet
 Anzeigeoptionen → Kalenderwoche | Je Ansicht separat für Agenda, Liste, Tage, Woche und Monat
 Anzeigeoptionen → Tageszahl | Je Ansicht separat für Agenda, Liste, Tage, Woche und Monat
 Anzeigeoptionen → Listenansicht | Bedienelemente der Listenansicht ein-/ausblenden; Zeitraum und Ansichtswechsel bleiben sichtbar
-Anzeigeoptionen → Listenspalten | Legt fest, welche Datenfelder in der Listenansicht als Spalten erscheinen; der Anlass von Jahresereignissen kann als eigene Spalte eingeblendet werden
+Anzeigeoptionen → Listenspalten | Legt fest, welche Datenfelder in der Listenansicht als Spalten erscheinen
 Ansichtszeiträume | Sichtbare Länge jeder Ansicht im aufklappbaren Bereich; Agenda/Liste/Tage in Tagen, Woche in Wochen und Monat in Monaten
 
 Die Kalenderwoche erscheint in der Wochenansicht in der Zeitraumüberschrift.
@@ -114,20 +116,13 @@ Die zuletzt am jeweiligen Browser/Monitor gewählte Ansicht und das zugehörige 
 
 Alle eingebetteten Dialoge verwenden ein gemeinsames responsives OpenCalendar-Modaldesign. Kopf- und Aktionsbereich bleiben bei kleinen Darstellungsflächen sichtbar, während nur der Inhaltsbereich scrollt. Einheitliche Größenklassen, Abstände, Schließen-Schaltflächen, Fokusdarstellung, Popup-Farben, Rahmen und Schatten gelten gleichermaßen für Kachelvisualisierung und IPSView.
 
-Ein Klick auf einen Termin öffnet zunächst eine reine Termindetail-Ansicht mit Kalender, Beginn, Ende, Ort und Beschreibung. Bei unterstützten Google-, Microsoft-, Apple-iCloud- und CalDAV-Serienvorkommnissen stehen beim Bearbeiten und Löschen **Nur diesen Termin**, **Diesen und alle folgenden Termine** und **Gesamte Serie** zur Wahl. Für die vollständige Serie lädt OpenCalendar zuerst den Parent-Termin; bei CalDAV wird die bereits beim Synchronisieren bekannte Kalenderobjekt-URL direkt verwendet, sodass keine erneute UID-Suche notwendig ist. Bei „Diesen und alle folgenden Termine“ werden zusätzlich das konkrete Zielvorkommnis und die verbleibende Serienlänge verifiziert, bevor der Editor geöffnet wird. Unterstützte RRULEs werden nur geteilt, wenn OpenCalendar sie verlustfrei abbilden kann; komplexere Regeln werden nicht automatisch vereinfacht. Bei CalDAV wird beim Bearbeiten zunächst der neue zukünftige Serienteil angelegt und erst danach die ursprüngliche Ressource gekürzt. Bei Microsoft-Onlinebesprechungen und Serien mit Anhängen wird kein neuer Serienteil erzeugt, um Besprechungs- oder Anhangsdaten nicht zu beschädigen. Schreibgeschützte Kalender bleiben geschützt.
-
-Beim Erstellen eines Termins bieten beschreibbare Google-, Microsoft-, Apple-iCloud- und CalDAV-Kalender zusätzlich den Bereich **Wiederholen**. Unterstützt werden tägliche, wöchentliche, monatliche und jährliche Serien, ein frei wählbares Intervall, bei wöchentlichen Serien mehrere Wochentage sowie die Endarten **Nie**, **Nach Anzahl** und **Am Datum**. Die Serienoption erscheint nur bei Kalendern, deren Provider das Anlegen von Serienterminen ausdrücklich unterstützt. Für zeitgebundene Google-Serien wird die Kalenderzeitzone verwendet; bei Microsoft und CalDAV dient die Zeitzone des Clients als Rückfallwert, wenn der Kalender selbst keine Zeitzone bereitstellt. CalDAV-Serien werden mit `TZID` und passendem `VTIMEZONE` gespeichert.
-
-Jährlich wiederkehrende persönliche Ereignisse können im selben Termin-Dialog über **Jahresereignis** als **Geburtstag**, **Jahrestag**, **Hochzeitstag** oder **Todestag** markiert werden. Sobald ein Typ gewählt ist, wird das zugehörige Ausgangsdatum hinterlegt und OpenCalendar legt den Termin als ganztägige jährliche Serie an. Tag und Monat des im Kalender gewählten Termins werden dabei als Datums-Vorschlag übernommen. Typ und Ausgangsdatum werden ausschließlich als lokale OpenCalendar-Metainformation gespeichert; der sichtbare Terminname beim Provider bleibt unverändert. In den OpenCalendar-Ansichten wird die Zahl der vergangenen Jahre dynamisch ergänzt, beispielsweise `Max Mustermann (33J)`. Beim Bearbeiten eines einzelnen Serienvorkommnisses bleibt die Jahresereignis-Information geschützt; geändert werden kann sie beim vollständigen Serientermin.
-
-Erinnerungen werden ebenfalls providerübergreifend bearbeitet. Google sowie Apple-iCloud/CalDAV können in OpenCalendar bis zu fünf einfache Erinnerungen relativ zum Terminbeginn verwalten; über **Erinnerung hinzufügen** lassen sich weitere Zeitpunkte ergänzen und einzeln wieder entfernen. Microsoft bleibt bei einer Erinnerung pro Termin. Beim Verschieben in einen Kalender mit kleinerem Limit wird keine Erinnerung stillschweigend verworfen: Der Vorgang wird abgelehnt, bis die Anzahl passend reduziert wurde. Nicht verlustfrei abbildbare Provider-Konfigurationen bleiben weiterhin als komplex geschützt und werden nicht automatisch vereinfacht.
-
+Ein Klick auf einen Termin öffnet zunächst eine reine Termindetail-Ansicht mit Kalender, Beginn, Ende, Ort und Beschreibung. Schreibbare Einzeltermine und einzelne Google-Serienvorkommnisse können von dort gezielt bearbeitet oder gelöscht werden. Vollständige Serien, Microsoft- und CalDAV-Vorkommnisse sowie schreibgeschützte Kalender bleiben in der Detailansicht lesbar.
 Beim Löschen erscheint eine eigene OpenCalendar-Bestätigung mit Terminname und Zeitraum. Die native Browser-Abfrage wird nicht verwendet; Abbrechen kehrt zum zuvor geöffneten Detail- oder Bearbeitungsdialog zurück.
 
 Die **Listenansicht** verzichtet bewusst auf Karten und zusätzliche
 Gruppierungen. Jeder Termin wird in einer einfachen Tabellenzeile dargestellt;
 der schmale Farbbalken übernimmt die Farbe des jeweiligen Kalenders. Datum,
-Beginn, Ende, Titel, Anlass, Kalendername, Ort und Beschreibung können unabhängig
+Beginn, Ende, Titel, Kalendername, Ort und Beschreibung können unabhängig
 voneinander als Spalten ein- oder ausgeblendet werden. Optional lassen sich in
 dieser Ansicht die Schaltflächen für Zurück, Heute, Weiter, Termin erstellen und
 Aktualisieren ausblenden. Die Zeitraumüberschrift und die Auswahl der Ansichten
@@ -208,8 +203,6 @@ Kalenderauswahl ist leer oder unvollständig | **Alle Kalenderinstanzen auswähl
 
 ## PHP-Befehlsreferenz
 
-In den folgenden Beispielen ist `12345` die Instanz-ID der **Kalender Ansicht**. Bei allen Funktionen mit einem optionalen Parameter `CalendarInstanceID` wird der Wert `0` bewusst mit angegeben: `0` berücksichtigt alle in dieser Kalender Ansicht ausgewählten Kalender. Eine konkrete Kalender-Instanz-ID, beispielsweise `23456`, beschränkt die Abfrage auf genau diesen ausgewählten Kalender.
-
 ```php
 // Alle ausgewählten Kalender synchronisieren.
 $success = IPSKALVIEW_SynchronizeCalendars(12345);
@@ -233,7 +226,7 @@ $appointments = IPSKALVIEW_GetAppointments(12345, '2026-08-11', '2026-08-17', 0)
 // Auch die vollständige Bereichsabfrage kann nach Kalenderinstanz gefiltert werden.
 $appointments = IPSKALVIEW_GetAppointments(12345, '2026-08-11', '2026-08-17', 23456);
 
-// Kompakte Tagesliste: summary, start, end, startTime, endTime, hasReminder und calendarName.
+// Kompakte Tagesliste: summary, start, end, startTime und endTime.
 $appointments = IPSKALVIEW_GetDayAppointmentsCompact(12345, '2026-08-11', 0);
 
 // Optional nur Termine einer ausgewählten Kalenderinstanz (z. B. ID 23456).
@@ -270,37 +263,20 @@ $count = IPSKALVIEW_GetUpcomingAppointmentCount(12345, 24, 0);
 // Die nächsten drei noch nicht begonnenen Termine abrufen.
 $appointments = IPSKALVIEW_GetNextAppointments(12345, 3, 0);
 
-// Alle Jahresereignisse aus allen ausgewählten Kalendern.
-$annualEvents = IPSKALVIEW_GetAnniversaryList(12345, 0, 0, '');
+// Jahrestage aller ausgewählten Kalender abrufen; Typ leer = alle Jahrestagstypen.
+$anniversaries = IPSKALVIEW_GetAnniversaryList(12345, 0, 0, '');
 
-// Nur Hochzeitstage der nächsten frei gewählten 90 Tage.
-$weddings = IPSKALVIEW_GetAnniversaryList(12345, 0, 90, 'wedding');
-
-// Nur Todestage aus Kalenderinstanz 23456, ohne Zeitbegrenzung.
-$deathAnniversaries = IPSKALVIEW_GetAnniversaryList(12345, 23456, 0, 'death');
-
-// Die kompatible Geburtstagsfunktion bleibt erhalten.
+// Geburtstage der nächsten 45 Tage aus allen ausgewählten Kalendern abrufen.
 $birthdays = IPSKALVIEW_GetBirthdayList(12345, 0, 45);
 
-// Alle exakt bestimmbaren Reminder eines lokalen Kalendertags abrufen.
+// Erinnerungen eines Tages oder Datumsbereichs aus allen ausgewählten Kalendern abrufen.
 $reminders = IPSKALVIEW_GetDayReminders(12345, '2026-08-11', 0);
-
-// Reminder eines inklusiven lokalen Datumsbereichs abrufen.
-// Der Zeitraum bezieht sich auf den Reminder-Zeitpunkt, nicht auf den Terminbeginn.
 $reminders = IPSKALVIEW_GetReminders(12345, '2026-08-11', '2026-08-17', 0);
 
-// Reminder abrufen, die innerhalb der nächsten 30 Minuten fällig werden.
+// Erinnerungen der nächsten 30 Minuten, die nächste Erinnerung und fällige Erinnerungen abrufen.
 $reminders = IPSKALVIEW_GetUpcomingReminders(12345, 30, 0);
-
-// Den nächsten noch nicht ausgelösten Reminder abrufen.
 $reminder = IPSKALVIEW_GetNextReminder(12345, 0);
-
-// Reminder abrufen, die in den letzten zwei Minuten fällig wurden.
-// reminderId kann im aufrufenden Skript zur Duplikaterkennung gespeichert werden.
 $reminders = IPSKALVIEW_GetDueReminders(12345, 2, 0);
-
-// Alle Reminder-Funktionen können optional auf eine ausgewählte Kalenderinstanz gefiltert werden.
-$reminders = IPSKALVIEW_GetUpcomingReminders(12345, 30, 23456);
 
 // Metadaten aller in dieser Ansicht ausgewählten Kalender abrufen.
 $calendars = IPSKALVIEW_GetSelectedCalendars(12345);
@@ -323,14 +299,14 @@ gecached haben. `GetAppointments()` behandelt das angegebene Enddatum inklusiv.
 Ganztagstermine berücksichtigen weiterhin das providerseitig exklusive Enddatum
 korrekt. Jeder Eintrag enthält zusätzlich `calendarInstanceId`, `calendarName`,
 `calendarColor` und `canWrite`. Als letztes optionales Argument kann bei beiden
-Funktionen die Instanz-ID eines ausgewählten Kalenders angegeben werden. Der
-Standardwert `0` liefert alle ausgewählten Kalender.
+Funktionen die Instanz-ID eines ausgewählten Kalenders angegeben werden.
+`0` berücksichtigt alle in dieser Kalender Ansicht ausgewählten Kalender.
 
 Die Funktionen liefern JSON. Beispiel:
 
 ```php
 $appointments = json_decode(
-    IPSKALVIEW_GetDayAppointments(12345, date('Y-m-d'), 0),
+    IPSKALVIEW_GetDayAppointments(12345, date('Y-m-d')),
     true,
     512,
     JSON_THROW_ON_ERROR
@@ -339,20 +315,15 @@ $appointments = json_decode(
 
 Für einfache Skripte stehen zusätzlich `GetDayAppointmentsCompact()` und
 `GetAppointmentsCompact()` bereit. Sie verwenden dieselbe Kalenderauswahl und
-dieselben Bereichsregeln, liefern pro Termin aber ausschließlich `summary`,
-`start`, `end`, `startTime`, `endTime`, `hasReminder` und `calendarName`. `start`
-und `end` sind dabei immer lokale Datumswerte im Format `YYYY-MM-DD`. Bei
-zeitgebundenen Terminen enthalten `startTime` und `endTime` die lokale Uhrzeit im
-Format `HH:MM`. Ganztagstermine liefern die lokalisierte Bezeichnung
-`Ganztägig`/`All day` als `startTime`, einen leeren `endTime`-Wert und in `end`
-das sichtbare inklusive Enddatum statt der providerseitig technischen exklusiven
-Endgrenze. `hasReminder` ist ein boolescher Wert und zeigt an, ob für den Termin
-eine wirksame Erinnerung konfiguriert ist; dabei werden auch aktive
-Kalender-Standarderinnerungen und komplexe Provider-Erinnerungen berücksichtigt.
-`calendarName` enthält immer den Namen des Quellkalenders und ist insbesondere bei
-`CalendarInstanceID = 0` zur Zuordnung zusammengeführter Termine gedacht. Als
-letztes optionales Argument kann bei beiden Compact-Funktionen die Instanz-ID eines
-in dieser Kalender Ansicht ausgewählten Kalenders angegeben werden. `0` liefert
+dieselben Bereichsregeln und liefern pro Termin `summary`, `start`, `end`,
+`startTime`, `endTime`, `hasReminder` und `calendarName`. `start` und `end` sind dabei immer
+lokale Datumswerte im Format `YYYY-MM-DD`. Bei zeitgebundenen Terminen enthalten
+`startTime` und `endTime` die lokale Uhrzeit im Format `HH:MM`. Ganztagstermine
+liefern die lokalisierte Bezeichnung `Ganztägig`/`All day` als `startTime`, einen
+leeren `endTime`-Wert und in `end` das sichtbare inklusive Enddatum statt der
+providerseitig technischen exklusiven Endgrenze. Als letztes optionales Argument
+kann bei beiden Compact-Funktionen die Instanz-ID eines in dieser Kalender Ansicht
+ausgewählten Kalenders angegeben werden. Der Standardwert `0` liefert wie bisher
 alle ausgewählten Kalender. Eine konkrete ID filtert ausschließlich auf diesen
 Kalender; eine nicht ausgewählte oder unbekannte ID liefert ein leeres JSON-Array.
 
@@ -383,37 +354,10 @@ können über `GetCurrentAppointments()` abgefragt werden. Das Zeitfenster darf 
 `GetUpcomingAppointmentCount()` liefert für dieselbe Auswahl direkt die Anzahl.
 Beide Funktionen unterstützen den optionalen Kalenderfilter.
 
-`GetAnniversaryList()` liefert die von OpenCalendar verwalteten Jahresereignisse unabhängig vom normalen Synchronisationszeitraum der Terminansicht. Das erste optionale Argument ist die Kalenderinstanz: `0` berücksichtigt alle in dieser Kalender Ansicht ausgewählten Kalender, eine konkrete Instanz-ID nur diesen Kalender. Das zweite optionale Argument ist die frei wählbare Anzahl der nächsten Tage. `0` liefert alle hinterlegten Jahresereignisse, jeder positive Wert filtert auf Einträge, deren nächstes Vorkommnis innerhalb dieses Zeitraums liegt. Das dritte optionale Argument filtert auf `birthday`, `anniversary`, `wedding` oder `death`; ein leerer Wert liefert alle Typen. Pro Eintrag werden `name`, `anniversaryType`, `anniversaryDate`, `nextDate`, `years`, `displayName`, `daysUntil`, `calendarInstanceId`, `calendarName` und `calendarColor` geliefert. Geburtstage enthalten zusätzlich `birthDate`, `nextBirthday` und `age`. `GetBirthdayList()` bleibt als kompatibler Spezialfall für Geburtstage erhalten.
-
-Für Reminder stehen fünf providerübergreifende Lesefunktionen bereit.
-`GetDayReminders()` und `GetReminders()` liefern alle Erinnerungen, deren **effektiver
-Reminder-Zeitpunkt** auf den angegebenen Tag bzw. in den inklusiven Datumsbereich fällt.
-Der Termin selbst kann dabei später beginnen. `GetUpcomingReminders()` liefert
-Erinnerungen, die innerhalb der nächsten angegebenen Minuten fällig werden.
-`GetNextReminder()` liefert den nächsten exakt bestimmbaren Reminder oder JSON `null`.
-`GetDueReminders()` ist für zyklische Skripte gedacht und liefert ausschließlich
-Reminder, die innerhalb der angegebenen Toleranz **bereits fällig geworden** sind;
-zukünftige Reminder werden dabei nicht vorzeitig ausgegeben.
-
-Jeder Reminder-Eintrag enthält `reminderId`, `summary`, `calendarInstanceId`,
-`calendarName`, `calendarColor`, `start`, `startTimestamp`, `allDay`, `location`,
-`reminderMode`, `minutesBeforeStart`, `reminderTimestamp`, `reminderDateTime`,
-`reminderIndex` und `reminderCount`. Ein Termin mit mehreren Erinnerungen erzeugt
-für jeden exakt bestimmbaren Auslösezeitpunkt einen eigenen API-Eintrag. Die Einträge
-tragen dabei `reminderMode = multiple`; bei einem Kalenderstandard bleibt der Modus
-`default`, auch wenn dieser mehrere konkrete Auslösezeitpunkte enthält.
-`reminderId` bleibt bei unverändertem Termin und Reminder stabil und kann vom
-aufrufenden Skript gespeichert werden, um bei überlappenden zyklischen Abfragen eine
-doppelte Verarbeitung zu vermeiden. Deaktivierte Reminder sowie komplexe
-Provider-Konfigurationen, für die OpenCalendar keine exakten providerneutralen
-Auslösezeitpunkte bestimmen kann, werden bewusst nicht erfunden und daher von diesen
-Reminder-APIs ausgelassen. Alle fünf Funktionen unterstützen den optionalen
-Kalenderfilter.
-
 `GetSelectedCalendars()` liefert die in der Instanz ausgewählten und aktivierten
-Kalender als JSON mit `instanceId`, `name`, `color`, `canWrite`, `timezone`,
-`canCreateRecurrence` und `maxReminders`. Der nur im Browser gesetzte temporäre
-Kalenderfilter verändert diese konfigurierte Auswahl nicht.
+Kalender als JSON mit `instanceId`, `name`, `color` und `canWrite`. Der nur im
+Browser gesetzte temporäre Kalenderfilter verändert diese konfigurierte Auswahl
+nicht.
 
 `SelectAllCalendars()` trägt alle vorhandenen Kalender-Instanzen ausschließlich
 in das aktuell geöffnete Konfigurationsformular ein und aktiviert sie dort. Eine
