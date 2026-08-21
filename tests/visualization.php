@@ -881,6 +881,20 @@ assertVisualization(
 );
 
 assertVisualization(
+    str_contains($script, 'renderMultiDayTimeline(days);')
+        && str_contains($script, 'function renderMultiDayTimeline(days)')
+        && str_contains($script, 'const allTimedEntries = dayData.flatMap')
+        && str_contains($script, 'const range = timelineMinuteRange(allTimedEntries);')
+        && str_contains($script, 'appendTimelineEvents(canvas, entry.dayStart, entry.timedEntries, range);')
+        && str_contains($script, 'function timelineMinuteRange(entries)')
+        && str_contains($style, '.multi-day-timeline-grid {')
+        && str_contains($style, 'grid-template-columns: 54px repeat(var(--multi-day-columns, 3), minmax(120px, 1fr));')
+        && str_contains($style, '.multi-day-timescale,')
+        && str_contains($style, '.multi-day-timeline-canvas { position: relative; }'),
+    'Multi-day Days views must use one shared time scale so equal times align vertically and later starts are visibly offset in native and IPSView modes.'
+);
+
+assertVisualization(
     str_contains($script, "const calendarViews = new Set(['agenda', 'list', 'threeDays', 'week', 'workWeek', 'month']);")
         && str_contains($script, 'function weekViewDays(workWeek = false)')
         && str_contains($script, 'return workWeek ? days.filter(day => !isWeekend(day)) : days;')

@@ -855,13 +855,92 @@ function renderThreeDays() {
         return;
     }
 
-    const grid = renderDayColumns(
-        days,
-        'week-grid three-day-grid',
-        calendarState.settings.showThreeDaysDayOfYear !== false,
-        calendarState.settings.showThreeDaysEventCount !== false
-    );
-    grid.style.setProperty('--day-grid-columns', String(Math.min(days.length, 7)));
+    renderMultiDayTimeline(days);
+}
+
+function renderMultiDayTimeline(days) {
+    const showDayOfYear = calendarState.settings.showThreeDaysDayOfYear !== false;
+    const showEventCount = calendarState.settings.showThreeDaysEventCount !== false;
+    const dayData = days.map(day => {
+        const dayStart = startOfDay(day);
+        const dayEnd = addDays(dayStart, 1);
+        const events = visibleCalendarEvents().filter(event => eventOverlaps(event, dayStart, dayEnd));
+        const timedEvents = events.filter(event => !event.allDay);
+        return {
+            day,
+            dayStart,
+            dayEnd,
+            events,
+            allDayEvents: events.filter(event => event.allDay),
+            timedEntries: createTimelineEntries(dayStart, dayEnd, timedEvents)
+        };
+    });
+    const allTimedEntries = dayData.flatMap(entry => entry.timedEntries.map(timedEntry => ({
+        ...timedEntry,
+        dayStartTimestamp: entry.dayStart.getTime()
+    })));
+    const grid = element('div', 'multi-day-timeline-grid');
+    grid.style.setProperty('--multi-day-columns', String(days.length));
+
+    const corner = element('div', 'multi-day-timeline-corner');
+    corner.style.gridColumn = '1';
+    corner.style.gridRow = '1';
+    grid.appendChild(corner);
+
+    dayData.forEach((entry, index) => {
+        const heading = element('div', 'week-heading multi-day-heading' + (isToday(entry.day) ? ' today' : ''));
+        heading.style.gridColumn = String(index + 2);
+        heading.style.gridRow = '1';
+        heading.textContent = formatDayHeading(
+            entry.day,
+            { weekday: 'short', day: '2-digit', month: '2-digit' },
+            showDayOfYear,
+            entry.events.length,
+            showEventCount
+        );
+        grid.appendChild(heading);
+    });
+
+    const hasAllDayEvents = dayData.some(entry => entry.allDayEvents.length > 0);
+    let timelineRow = 2;
+    if (hasAllDayEvents) {
+        const allDayLabel = element('div', 'multi-day-all-day-label');
+        allDayLabel.style.gridColumn = '1';
+        allDayLabel.style.gridRow = '2';
+        allDayLabel.textContent = t('All day');
+        grid.appendChild(allDayLabel);
+
+        dayData.forEach((entry, index) => {
+            const allDayCell = element('div', 'multi-day-all-day-cell' + (isToday(entry.day) ? ' today' : ''));
+            allDayCell.style.gridColumn = String(index + 2);
+            allDayCell.style.gridRow = '2';
+            entry.allDayEvents.forEach(event => allDayCell.appendChild(createWeekEventElement(event)));
+            grid.appendChild(allDayCell);
+        });
+        timelineRow = 3;
+    }
+
+    if (allTimedEntries.length > 0) {
+        const range = timelineMinuteRange(allTimedEntries);
+        const timescale = element('div', 'multi-day-timescale');
+        timescale.style.gridColumn = '1';
+        timescale.style.gridRow = String(timelineRow);
+        timescale.style.height = `${range.height}px`;
+        appendTimelineHourLabels(timescale, dayData[0].dayStart, range);
+        grid.appendChild(timescale);
+
+        dayData.forEach((entry, index) => {
+            const canvas = element('div', 'multi-day-timeline-canvas' + (isToday(entry.day) ? ' today' : ''));
+            canvas.style.gridColumn = String(index + 2);
+            canvas.style.gridRow = String(timelineRow);
+            canvas.style.height = `${range.height}px`;
+            appendTimelineHourLines(canvas, range);
+            appendTimelineEvents(canvas, entry.dayStart, entry.timedEntries, range);
+            grid.appendChild(canvas);
+        });
+    }
+
+    content.appendChild(grid);
 }
 
 function renderSingleDayTimeline(day) {
@@ -895,6 +974,24 @@ function renderSingleDayTimeline(day) {
 }
 
 function createSingleDayTimeline(dayStart, dayEnd, events) {
+    const entries = createTimelineEntries(dayStart, dayEnd, events);
+    const range = timelineMinuteRange(entries.map(entry => ({
+        ...entry,
+        dayStartTimestamp: dayStart.getTime()
+    })));
+    const timeline = element('div', 'single-day-timeline');
+    const scale = element('div', 'single-day-timescale');
+    const canvas = element('div', 'single-day-timeline-canvas');
+    scale.style.height = `${range.height}px`;
+    canvas.style.height = `${range.height}px`;
+    appendTimelineHourLabels(scale, dayStart, range);
+    appendTimelineHourLines(canvas, range);
+    appendTimelineEvents(canvas, dayStart, entries, range);
+    timeline.append(scale, canvas);
+    return timeline;
+}
+
+function createTimelineEntries(dayStart, dayEnd, events) {
     const dayStartTimestamp = dayStart.getTime();
     const dayEndTimestamp = dayEnd.getTime();
     const minimumDisplayDuration = 30 * 60_000;
@@ -912,56 +1009,67 @@ function createSingleDayTimeline(dayStart, dayEnd, events) {
         const laneCount = group.reduce((maximum, entry) => Math.max(maximum, entry.lane + 1), 1);
         group.forEach(entry => { entry.laneCount = laneCount; });
     });
+    return entries;
+}
 
+function timelineMinuteRange(entries) {
     const minute = 60_000;
-    const earliestMinute = Math.max(0, Math.floor(
-        Math.min(...entries.map(entry => entry.startTimestamp - dayStartTimestamp)) / minute
-    ));
-    const latestMinute = Math.min(24 * 60, Math.ceil(
-        Math.max(...entries.map(entry => entry.endTimestamp - dayStartTimestamp)) / minute
-    ));
-    const rangeStartMinute = Math.floor(earliestMinute / 60) * 60;
-    const rangeEndMinute = Math.min(24 * 60, Math.max(
-        rangeStartMinute + 120,
+    const earliestMinute = Math.max(0, Math.floor(Math.min(...entries.map(entry =>
+        (entry.startTimestamp - entry.dayStartTimestamp) / minute
+    ))));
+    const latestMinute = Math.min(24 * 60, Math.ceil(Math.max(...entries.map(entry =>
+        (entry.endTimestamp - entry.dayStartTimestamp) / minute
+    ))));
+    const startMinute = Math.floor(earliestMinute / 60) * 60;
+    const endMinute = Math.min(24 * 60, Math.max(
+        startMinute + 120,
         Math.ceil(latestMinute / 60) * 60
     ));
     const pixelsPerMinute = 1;
-    const timelineHeight = Math.max(120, Math.round((rangeEndMinute - rangeStartMinute) * pixelsPerMinute));
+    return {
+        startMinute,
+        endMinute,
+        pixelsPerMinute,
+        height: Math.max(120, Math.round((endMinute - startMinute) * pixelsPerMinute))
+    };
+}
 
-    const timeline = element('div', 'single-day-timeline');
-    const scale = element('div', 'single-day-timescale');
-    const canvas = element('div', 'single-day-timeline-canvas');
-    scale.style.height = `${timelineHeight}px`;
-    canvas.style.height = `${timelineHeight}px`;
-
-    for (let tick = rangeStartMinute; tick <= rangeEndMinute; tick += 60) {
-        const top = Math.min(timelineHeight, Math.round((tick - rangeStartMinute) * pixelsPerMinute));
-        const tickDate = new Date(dayStartTimestamp + (tick * minute));
+function appendTimelineHourLabels(container, dayStart, range) {
+    const minute = 60_000;
+    for (let tick = range.startMinute; tick <= range.endMinute; tick += 60) {
+        const top = Math.min(range.height, Math.round((tick - range.startMinute) * range.pixelsPerMinute));
+        const tickDate = new Date(dayStart.getTime() + (tick * minute));
         const label = element('span', 'single-day-hour-label');
         label.style.top = `${top}px`;
         label.textContent = formatTime(tickDate);
-        scale.appendChild(label);
+        container.appendChild(label);
+    }
+}
 
+function appendTimelineHourLines(container, range) {
+    for (let tick = range.startMinute; tick <= range.endMinute; tick += 60) {
+        const top = Math.min(range.height, Math.round((tick - range.startMinute) * range.pixelsPerMinute));
         const line = element('span', 'single-day-hour-line');
         line.style.top = `${top}px`;
-        canvas.appendChild(line);
+        container.appendChild(line);
     }
+}
 
+function appendTimelineEvents(container, dayStart, entries, range) {
+    const minute = 60_000;
+    const dayStartTimestamp = dayStart.getTime();
     entries.forEach(entry => {
         const item = createSingleDayTimelineEvent(entry.event);
         const startMinute = (entry.startTimestamp - dayStartTimestamp) / minute;
         const endMinute = (entry.endTimestamp - dayStartTimestamp) / minute;
-        const top = Math.max(0, (startMinute - rangeStartMinute) * pixelsPerMinute);
-        const naturalHeight = Math.max(1, (endMinute - startMinute) * pixelsPerMinute);
+        const top = Math.max(0, (startMinute - range.startMinute) * range.pixelsPerMinute);
+        const naturalHeight = Math.max(1, (endMinute - startMinute) * range.pixelsPerMinute);
         item.style.top = `${Math.round(top)}px`;
         item.style.height = `${Math.max(30, Math.round(naturalHeight - 2))}px`;
         item.style.setProperty('--single-day-lane', String(entry.lane || 0));
         item.style.setProperty('--single-day-lanes', String(entry.laneCount || 1));
-        canvas.appendChild(item);
+        container.appendChild(item);
     });
-
-    timeline.append(scale, canvas);
-    return timeline;
 }
 
 function createSingleDayTimelineEvent(event) {
