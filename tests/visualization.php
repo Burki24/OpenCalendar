@@ -268,7 +268,7 @@ assertVisualization(
     str_contains($script, "heading.classList.add('agenda-date-overview-enabled');")
         && str_contains($script, 'heading.tabIndex = 0;')
         && str_contains($script, "heading.setAttribute('role', 'button');")
-        && str_contains($script, "heading.setAttribute('aria-label', `${formatDayEventsTitle(group.date)} · ${t('Day events')}`);")
+        && str_contains($script, 'heading.setAttribute(\'aria-label\', `${formatDayEventsTitle(group.date)} · ${t(\'Day events\')}`);')
         && str_contains($script, 'const dayEvents = events.filter(event => eventOverlaps(event, group.date, dayEnd));')
         && str_contains($script, "heading.addEventListener('click', () => openDayEvents(group.date, dayEvents));")
         && str_contains($script, "if (!['Enter', ' '].includes(key.key)) return;")
