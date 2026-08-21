@@ -863,26 +863,108 @@ function renderDayColumns(days, className, showDayOfYear, showEventCount) {
         );
         column.appendChild(heading);
         const eventList = element('div', 'week-events');
-        events.forEach(event => {
-            const item = element('div', 'week-event');
-            item.style.setProperty('--event-color', safeColor(event.calendarColor));
-            item.tabIndex = 0;
-            item.addEventListener('click', () => openEventDetails(event));
-            item.addEventListener('keydown', key => { if (key.key === 'Enter') openEventDetails(event); });
-            const title = document.createElement('strong');
-            title.textContent = eventDisplaySummary(event) || t('Untitled event');
-            const time = document.createElement('span');
-            const timeParts = [event.allDay ? t('All day') : formatTime(eventStart(event))];
-            if (calendarState.settings.showAnniversaryType !== false) timeParts.push(annualEventLabel(event));
-            time.textContent = timeParts.filter(Boolean).join(' · ');
-            item.append(title, time);
-            eventList.appendChild(item);
-        });
+        renderWeekEventLayout(eventList, events, day, dayEnd);
         column.appendChild(eventList);
         grid.appendChild(column);
     });
     content.appendChild(grid);
     return grid;
+}
+
+function renderWeekEventLayout(eventList, events, dayStart, dayEnd) {
+    const timedEvents = [];
+    const fallbackEvents = [];
+
+    events.forEach((event, index) => {
+        if (event.allDay) {
+            eventList.appendChild(createWeekEventElement(event));
+            return;
+        }
+
+        const startTimestamp = Math.max(eventStart(event).getTime(), dayStart.getTime());
+        const endTimestamp = Math.min(eventEnd(event).getTime(), dayEnd.getTime());
+        if (!Number.isFinite(startTimestamp) || !Number.isFinite(endTimestamp)) {
+            fallbackEvents.push(event);
+            return;
+        }
+
+        timedEvents.push({
+            event,
+            index,
+            startTimestamp,
+            endTimestamp: Math.max(startTimestamp + 1, endTimestamp)
+        });
+    });
+
+    fallbackEvents.forEach(event => eventList.appendChild(createWeekEventElement(event)));
+    buildWeekEventOverlapGroups(timedEvents).forEach(group => {
+        const laneCount = group.reduce((maximum, entry) => Math.max(maximum, entry.lane + 1), 1);
+        if (laneCount <= 1) {
+            group.forEach(entry => eventList.appendChild(createWeekEventElement(entry.event)));
+            return;
+        }
+
+        const overlapGroup = element('div', 'week-event-overlap-group');
+        overlapGroup.style.setProperty('--week-event-columns', String(laneCount));
+        const lanes = Array.from({ length: laneCount }, () => element('div', 'week-event-overlap-lane'));
+        group.forEach(entry => lanes[entry.lane].appendChild(createWeekEventElement(entry.event)));
+        lanes.forEach(lane => overlapGroup.appendChild(lane));
+        eventList.appendChild(overlapGroup);
+    });
+}
+
+function buildWeekEventOverlapGroups(entries) {
+    const sortedEntries = [...entries].sort((left, right) =>
+        (left.startTimestamp - right.startTimestamp)
+        || (left.endTimestamp - right.endTimestamp)
+        || (left.index - right.index)
+    );
+    const groups = [];
+    let group = [];
+    let groupEnd = Number.NEGATIVE_INFINITY;
+
+    const finishGroup = () => {
+        if (group.length === 0) return;
+        const laneEnds = [];
+        group.forEach(entry => {
+            let lane = laneEnds.findIndex(laneEnd => laneEnd <= entry.startTimestamp);
+            if (lane < 0) {
+                lane = laneEnds.length;
+                laneEnds.push(entry.endTimestamp);
+            } else {
+                laneEnds[lane] = entry.endTimestamp;
+            }
+            entry.lane = lane;
+        });
+        groups.push(group);
+        group = [];
+        groupEnd = Number.NEGATIVE_INFINITY;
+    };
+
+    sortedEntries.forEach(entry => {
+        if (group.length > 0 && entry.startTimestamp >= groupEnd) finishGroup();
+        group.push(entry);
+        groupEnd = Math.max(groupEnd, entry.endTimestamp);
+    });
+    finishGroup();
+
+    return groups;
+}
+
+function createWeekEventElement(event) {
+    const item = element('div', 'week-event');
+    item.style.setProperty('--event-color', safeColor(event.calendarColor));
+    item.tabIndex = 0;
+    item.addEventListener('click', () => openEventDetails(event));
+    item.addEventListener('keydown', key => { if (key.key === 'Enter') openEventDetails(event); });
+    const title = document.createElement('strong');
+    title.textContent = eventDisplaySummary(event) || t('Untitled event');
+    const time = document.createElement('span');
+    const timeParts = [event.allDay ? t('All day') : formatTime(eventStart(event))];
+    if (calendarState.settings.showAnniversaryType !== false) timeParts.push(annualEventLabel(event));
+    time.textContent = timeParts.filter(Boolean).join(' · ');
+    item.append(title, time);
+    return item;
 }
 
 function getVisibleDays(start, count) {

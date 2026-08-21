@@ -844,6 +844,19 @@ assertVisualization(
 );
 
 assertVisualization(
+    str_contains($script, 'renderWeekEventLayout(eventList, events, day, dayEnd);')
+        && str_contains($script, 'function renderWeekEventLayout(eventList, events, dayStart, dayEnd)')
+        && str_contains($script, 'function buildWeekEventOverlapGroups(entries)')
+        && str_contains($script, 'laneEnd <= entry.startTimestamp')
+        && str_contains($script, 'entry.startTimestamp >= groupEnd')
+        && str_contains($script, "element('div', 'week-event-overlap-group')")
+        && str_contains($style, '.week-event-overlap-group {')
+        && str_contains($style, 'grid-template-columns: repeat(var(--week-event-columns, 2), minmax(0, 1fr));')
+        && str_contains($style, '.week-grid.vertical-week-grid .week-event-overlap-group { grid-column: 1 / -1; margin: 0; }'),
+    'Timed collisions in the shared three-day/week renderer must use provider-independent side-by-side lanes in native and IPSView modes.'
+);
+
+assertVisualization(
     !str_contains($style, 'html.ipsview-mode #add-button { display: none !important; }')
         && str_contains($style, 'html.ipsview-mode .floating-add {')
         && str_contains($style, 'height: 46px;')

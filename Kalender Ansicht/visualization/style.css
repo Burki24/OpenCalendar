@@ -420,7 +420,17 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .week-column.today { border-color: var(--cal-accent); }
 .week-heading { margin-bottom: 8px; padding-bottom: 6px; border-bottom: var(--cal-line-width, 1px) solid var(--cal-line, var(--cal-border)); font-size: .74em; font-weight: 650; text-align: center; }
 .week-events { min-width: 0; }
-.week-event { margin: 4px 0; padding: 6px; overflow: hidden; border-left: var(--compact-color-bar-width) solid var(--event-color); border-radius: max(4px, calc(var(--cal-radius) - 2px)); background: color-mix(in srgb, var(--event-color) 15%, transparent); cursor: pointer; font-size: .68em; }
+.week-event-overlap-group {
+    display: grid;
+    min-width: 0;
+    margin: 4px 0;
+    grid-template-columns: repeat(var(--week-event-columns, 2), minmax(0, 1fr));
+    gap: 4px;
+    align-items: start;
+}
+.week-event-overlap-lane { display: grid; min-width: 0; gap: 4px; align-content: start; }
+.week-event { min-width: 0; margin: 4px 0; padding: 6px; overflow: hidden; border-left: var(--compact-color-bar-width) solid var(--event-color); border-radius: max(4px, calc(var(--cal-radius) - 2px)); background: color-mix(in srgb, var(--event-color) 15%, transparent); cursor: pointer; font-size: .68em; }
+.week-event-overlap-group .week-event { margin: 0; }
 .week-event strong {
     display: -webkit-box;
     margin-bottom: 2px;
@@ -457,6 +467,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
     grid-template-columns: repeat(auto-fit, minmax(min(210px, 100%), 1fr));
     gap: 6px;
 }
+.week-grid.vertical-week-grid .week-event-overlap-group { grid-column: 1 / -1; margin: 0; }
 .week-grid.vertical-week-grid .week-event { margin: 0; }
 
 .floating-add {
