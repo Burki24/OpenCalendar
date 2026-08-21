@@ -99,7 +99,8 @@ assertDebugIntegration(
     'ICS/Webcal event reads must summarize recurrence diagnostics without provider-level Symcon coupling.'
 );
 assertDebugIntegration(
-    str_contains($gateway, "\$this->ReadPropertyInteger('Provider') === self::PROVIDER_ICS"),
+    str_contains($gateway, "\$providerType = \$this->ReadPropertyInteger('Provider');")
+        && str_contains($gateway, '$providerType === self::PROVIDER_ICS'),
     'Recurrence expansion diagnostics must remain scoped to locally expanded ICS/Webcal events.'
 );
 
