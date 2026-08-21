@@ -1917,7 +1917,7 @@ function requestEdit(sourceDialog) {
     const occurrenceAllowed = eventCanUpdateOccurrence(event);
     const followingAllowed = eventCanUpdateFollowing(event);
     const seriesAllowed = eventCanUpdateSeries(event);
-    if (!event.recurring || (!followingAllowed && !seriesAllowed)) {
+    if (!eventIsRecurring(event) || (!followingAllowed && !seriesAllowed)) {
         beginAgendaScrollWorkflow('edit');
         sourceDialog?.close();
         void prepareEventEdit(event);
@@ -2097,17 +2097,29 @@ async function confirmDeleteEvent() {
     }
 }
 
+function eventIsRecurring(event) {
+    const recurrenceType = String(event?.recurrenceType || '').trim().toLowerCase();
+    return Boolean(event?.recurring)
+        || Boolean(event?.seriesId)
+        || ['master', 'occurrence', 'exception', 'unknown'].includes(recurrenceType);
+}
+
+function eventWriteCapability(event, capability) {
+    const calendar = calendarEntryByInstanceId(event?.calendarInstanceId);
+    return Boolean(event?.[capability]) || Boolean(calendar?.[capability]);
+}
+
 function eventCanUpdateOccurrence(event) {
     return hasActionBridge()
         && Boolean(event.canWrite)
-        && (!event.recurring || Boolean(event.canUpdateOccurrence));
+        && (!eventIsRecurring(event) || eventWriteCapability(event, 'canUpdateOccurrence'));
 }
 
 function eventCanUpdateFollowing(event) {
     return hasActionBridge()
         && Boolean(event.canWrite)
-        && Boolean(event.recurring)
-        && Boolean(event.canUpdateFollowing)
+        && eventIsRecurring(event)
+        && eventWriteCapability(event, 'canUpdateFollowing')
         && Boolean(event.seriesId)
         && Boolean(event.occurrenceId)
         && Boolean(event.originalStart);
@@ -2116,8 +2128,8 @@ function eventCanUpdateFollowing(event) {
 function eventCanUpdateSeries(event) {
     return hasActionBridge()
         && Boolean(event.canWrite)
-        && Boolean(event.recurring)
-        && Boolean(event.canUpdateSeries)
+        && eventIsRecurring(event)
+        && eventWriteCapability(event, 'canUpdateSeries')
         && Boolean(event.seriesId);
 }
 
