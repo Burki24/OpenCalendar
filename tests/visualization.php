@@ -867,7 +867,6 @@ assertVisualization(
     'Timed collisions in the shared three-day/week renderer must use provider-independent side-by-side lanes in native and IPSView modes.'
 );
 
-
 assertVisualization(
     str_contains($script, 'if (days.length === 1) {')
         && str_contains($script, 'renderSingleDayTimeline(days[0]);')
@@ -883,8 +882,8 @@ assertVisualization(
 
 assertVisualization(
     str_contains($script, "const calendarViews = new Set(['agenda', 'list', 'threeDays', 'week', 'workWeek', 'month']);")
-        && str_contains($script, "function weekViewDays(workWeek = false)")
-        && str_contains($script, "return workWeek ? days.filter(day => !isWeekend(day)) : days;")
+        && str_contains($script, 'function weekViewDays(workWeek = false)')
+        && str_contains($script, 'return workWeek ? days.filter(day => !isWeekend(day)) : days;')
         && str_contains($script, "renderWeek(activeView === 'workWeek');")
         && str_contains($style, '.week-grid.hide-weekends { grid-template-columns: repeat(5, minmax(0, 1fr)); }'),
     'The shared visualization must provide explicit seven-day and Monday-to-Friday week modes in native and IPSView modes.'
