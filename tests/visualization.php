@@ -280,10 +280,17 @@ assertVisualization(
     str_contains($script, 'const swipeNavigationViews = new Set([\'threeDays\', \'week\', \'workWeek\', \'month\']);')
         && str_contains($script, 'const swipeMinimumDistance = 60;')
         && str_contains($script, 'const swipeAxisRatio = 1.3;')
-        && str_contains($script, 'content.style.touchAction = swipeNavigationViews.has(activeView) ? \'pan-y\' : \'auto\';')
+        && str_contains($script, 'function calendarViewRequiresHorizontalPan()')
+        && str_contains($script, 'content.scrollWidth > content.clientWidth + 1')
+        && str_contains($script, 'function updateSwipeNavigationMode()')
+        && str_contains($script, "content.style.touchAction = 'auto';")
+        && str_contains($script, "? 'pan-x pan-y'")
+        && str_contains($script, ": 'pan-y';")
+        && str_contains($script, 'updateSwipeNavigationMode();')
         && str_contains($script, 'content.addEventListener(\'pointerdown\', beginSwipeNavigation);')
         && str_contains($script, 'content.addEventListener(\'pointerup\', finishSwipeNavigation);')
         && str_contains($script, 'content.addEventListener(\'pointercancel\', cancelSwipeNavigation);')
+        && str_contains($script, 'calendarViewRequiresHorizontalPan()')
         && str_contains($script, '![\'touch\', \'pen\'].includes(event.pointerType)')
         && str_contains($script, 'calendarDialogIsOpen()')
         && str_contains($script, 'swipeNavigationTargetIsInteractive(event.target)')
@@ -292,7 +299,7 @@ assertVisualization(
         && str_contains($script, 'suppressSwipeClickUntil = Date.now() + 500;')
         && str_contains($script, 'navigate(deltaX < 0 ? 1 : -1);')
         && str_contains($script, 'target.closest(\'button, a, input, select, textarea, label, .week-event, [role="button"], [contenteditable="true"]\')'),
-    'Days, week and month views must support guarded horizontal touch/pen swipe navigation without stealing vertical scrolling or control interactions.'
+    'Days, week and month views must preserve native horizontal panning on narrow displays and use guarded touch/pen swipe navigation only when the visible layout fits.'
 );
 
 assertVisualization(

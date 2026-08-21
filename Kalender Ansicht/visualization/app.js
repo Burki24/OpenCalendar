@@ -479,7 +479,6 @@ function applyTileFontScale() {
 
 function render() {
     updateToolbar();
-    content.style.touchAction = swipeNavigationViews.has(activeView) ? 'pan-y' : 'auto';
     content.replaceChildren();
     if (calendarState.calendars.length === 0) {
         renderEmpty('No calendars selected', 'Select at least one calendar in the instance configuration.');
@@ -511,6 +510,7 @@ function render() {
     addButton.setAttribute('aria-label', t(addButtonText));
     updateCalendarFilterButton();
     if (activeView === 'month') scheduleMonthEventLayout();
+    updateSwipeNavigationMode();
     void ensureVisibleRangeLoaded();
 }
 
@@ -3856,7 +3856,9 @@ window.addEventListener('resize', () => {
         scheduleMonthEventLayout();
     } else if (activeView === 'week' || activeView === 'workWeek') {
         render();
+        return;
     }
+    updateSwipeNavigationMode();
 });
 document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'hidden') return;
@@ -3869,8 +3871,25 @@ content.addEventListener('pointerup', finishSwipeNavigation);
 content.addEventListener('pointercancel', cancelSwipeNavigation);
 content.addEventListener('click', suppressClickAfterSwipe, true);
 
+function calendarViewRequiresHorizontalPan() {
+    return swipeNavigationViews.has(activeView)
+        && content.scrollWidth > content.clientWidth + 1;
+}
+
+function updateSwipeNavigationMode() {
+    if (!swipeNavigationViews.has(activeView)) {
+        content.style.touchAction = 'auto';
+        return;
+    }
+
+    content.style.touchAction = calendarViewRequiresHorizontalPan()
+        ? 'pan-x pan-y'
+        : 'pan-y';
+}
+
 function beginSwipeNavigation(event) {
     if (!swipeNavigationViews.has(activeView)
+        || calendarViewRequiresHorizontalPan()
         || !event.isPrimary
         || !['touch', 'pen'].includes(event.pointerType)
         || calendarDialogIsOpen()
