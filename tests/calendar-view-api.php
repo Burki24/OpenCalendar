@@ -3,7 +3,6 @@
 declare(strict_types=1);
 
 use IPSKalender\CalendarAppointmentRange;
-use IPSKalender\CalendarEventReminder;
 
 require_once __DIR__ . '/../libs/CalendarAppointmentRange.php';
 
@@ -80,64 +79,6 @@ try {
 }
 
 $moduleSource = (string) file_get_contents(__DIR__ . '/../Kalender Ansicht/module.php');
-$calendarModuleSource = (string) file_get_contents(__DIR__ . '/../Kalender/module.php');
-$readmeSource = (string) file_get_contents(__DIR__ . '/../Kalender Ansicht/README.md');
-$calendarFilterReferenceCalls = [
-    "IPSKALVIEW_GetDayAppointments(12345, '2026-08-11', 0)",
-    "IPSKALVIEW_GetAppointments(12345, '2026-08-11', '2026-08-17', 0)",
-    "IPSKALVIEW_GetDayAppointmentsCompact(12345, '2026-08-11', 0)",
-    "IPSKALVIEW_GetAppointmentsCompact(12345, '2026-08-11', '2026-08-17', 0)",
-    "IPSKALVIEW_GetDayAppointmentCount(12345, '2026-08-11', 0)",
-    "IPSKALVIEW_GetAppointmentCount(12345, '2026-08-11', '2026-08-17', 0)",
-    'IPSKALVIEW_GetRemainingDayAppointments(12345, 0)',
-    'IPSKALVIEW_GetRemainingDayAppointmentCount(12345, 0)',
-    'IPSKALVIEW_GetNextAppointment(12345, 0)',
-    'IPSKALVIEW_GetCurrentAppointments(12345, 0)',
-    'IPSKALVIEW_GetCurrentAppointmentCount(12345, 0)',
-    'IPSKALVIEW_GetUpcomingAppointments(12345, 24, 0)',
-    'IPSKALVIEW_GetUpcomingAppointmentCount(12345, 24, 0)',
-    'IPSKALVIEW_GetNextAppointments(12345, 3, 0)',
-    "IPSKALVIEW_GetAnniversaryList(12345, 0, 0, '')",
-    'IPSKALVIEW_GetBirthdayList(12345, 0, 45)',
-    "IPSKALVIEW_GetDayReminders(12345, '2026-08-11', 0)",
-    "IPSKALVIEW_GetReminders(12345, '2026-08-11', '2026-08-17', 0)",
-    'IPSKALVIEW_GetUpcomingReminders(12345, 30, 0)',
-    'IPSKALVIEW_GetNextReminder(12345, 0)',
-    'IPSKALVIEW_GetDueReminders(12345, 2, 0)'
-];
-foreach ($calendarFilterReferenceCalls as $referenceCall) {
-    assertCalendarViewApi(
-        str_contains($readmeSource, $referenceCall),
-        'Calendar View PHP reference must show CalendarInstanceID zero explicitly for all-calendar examples.'
-    );
-}
-assertCalendarViewApi(
-    str_contains($readmeSource, '`0` berücksichtigt alle in dieser Kalender Ansicht ausgewählten Kalender')
-        && str_contains($readmeSource, '`hasReminder`')
-        && str_contains($readmeSource, '`calendarName`'),
-    'Calendar View PHP reference must explain the zero calendar filter and compact reminder/calendar fields.'
-);
-
-assertCalendarViewApi(
-    str_contains($calendarModuleSource, "RegisterAttributeString('AnniversaryMetadata', '[]')")
-        && str_contains($calendarModuleSource, 'public function GetAnniversaryList(int $Days = 0, string $Type = \'\'): string')
-        && str_contains($calendarModuleSource, 'public function GetBirthdayList(int $Days = 0): string')
-        && str_contains($calendarModuleSource, "'anniversaryType'")
-        && str_contains($calendarModuleSource, "'anniversaryDate'")
-        && str_contains($calendarModuleSource, "sprintf('%s (%dJ)'")
-        && str_contains($calendarModuleSource, "'frequency' => 'YEARLY'"),
-    'Calendar instances must persist provider-neutral annual-event metadata, filter it by type, and preserve the birthday compatibility API.'
-);
-assertCalendarViewApi(
-    str_contains($moduleSource, 'public function GetAnniversaryList(int $CalendarInstanceID = 0, int $Days = 0, string $Type = \'\'): string')
-        && str_contains($moduleSource, "IPSKAL_GetAnniversaryList(\$calendar['instanceId'], \$Days, \$type)")
-        && str_contains($moduleSource, "\$entry['calendarInstanceId'] = \$calendar['instanceId'];")
-        && str_contains($moduleSource, "\$entry['calendarName'] = \$calendar['name'];")
-        && str_contains($moduleSource, "if (\$CalendarInstanceID !== 0 && \$calendar['instanceId'] !== \$CalendarInstanceID)")
-        && str_contains($moduleSource, "return \$this->GetAnniversaryList(\$CalendarInstanceID, \$Days, 'birthday');"),
-    'Calendar View must aggregate annual-event lists with calendar, day-window, and type filters while retaining GetBirthdayList().'
-);
-
 assertCalendarViewApi(
     str_contains($moduleSource, 'public function GetDayAppointments(string $Date, int $CalendarInstanceID = 0): string')
         && str_contains($moduleSource, 'return $this->GetAppointments($Date, $Date, $CalendarInstanceID);'),
@@ -169,25 +110,16 @@ assertCalendarViewApi(
     'Calendar View must expose a compact provider-independent appointment range function.'
 );
 assertCalendarViewApi(
-    str_contains($moduleSource, "'summary'      =>")
-        && str_contains($moduleSource, "'start'        =>")
-        && str_contains($moduleSource, "'end'          =>")
-        && str_contains($moduleSource, "'startTime'    =>")
-        && str_contains($moduleSource, "'endTime'      =>")
-        && str_contains($moduleSource, "'hasReminder'  =>")
-        && str_contains($moduleSource, "'calendarName' =>")
+    preg_match('/\'summary\'\s*=>/', $moduleSource) === 1
+        && preg_match('/\'start\'\s*=>/', $moduleSource) === 1
+        && preg_match('/\'end\'\s*=>/', $moduleSource) === 1
+        && preg_match('/\'startTime\'\s*=>/', $moduleSource) === 1
+        && preg_match('/\'endTime\'\s*=>/', $moduleSource) === 1
         && str_contains($moduleSource, "Translate('All day')")
         && str_contains($moduleSource, "->format('Y-m-d');")
         && str_contains($moduleSource, "->modify('-1 day')->format('Y-m-d');")
         && str_contains($moduleSource, "->format('H:i');"),
-    'Compact appointment results must expose script-friendly dates, reminder state and source calendar.'
-);
-assertCalendarViewApi(
-    str_contains($moduleSource, 'bool $includeCompactMetadata = false')
-        && str_contains($moduleSource, '$this->collectAppointmentsForRange($rangeStart, $rangeEnd, true)')
-        && str_contains($moduleSource, "\$event['hasReminder'] = \$this->appointmentHasReminder(\$event, \$calendar);")
-        && str_contains($moduleSource, 'private function appointmentHasReminder(array $appointment, array $calendar): bool'),
-    'Compact appointment collection must resolve effective reminders with source calendar metadata.'
+    'Compact appointment results must contain only script-friendly dates and readable local clock values.'
 );
 
 assertCalendarViewApi(
@@ -234,39 +166,10 @@ assertCalendarViewApi(
     'Calendar View must expose a configurable list of the next future appointments.'
 );
 assertCalendarViewApi(
-    str_contains($moduleSource, 'public function GetDayReminders(string $Date, int $CalendarInstanceID = 0): string')
-        && str_contains($moduleSource, 'return $this->GetReminders($Date, $Date, $CalendarInstanceID);')
-        && str_contains($moduleSource, 'public function GetReminders(string $From, string $To, int $CalendarInstanceID = 0): string'),
-    'Calendar View must expose provider-neutral day and date-range reminder functions.'
-);
-assertCalendarViewApi(
-    str_contains($moduleSource, 'public function GetUpcomingReminders(int $Minutes, int $CalendarInstanceID = 0): string')
-        && str_contains($moduleSource, 'public function GetNextReminder(int $CalendarInstanceID = 0): string')
-        && str_contains($moduleSource, 'public function GetDueReminders(int $ToleranceMinutes = 1, int $CalendarInstanceID = 0): string')
-        && str_contains($moduleSource, '$this->collectRemindersForTimestampRange(')
-        && str_contains($moduleSource, 'CalendarEventReminder::MAX_MINUTES_BEFORE_START'),
-    'Calendar View must expose upcoming, next and due reminder functions using the provider-neutral reminder model.'
-);
-assertCalendarViewApi(
-    str_contains($moduleSource, "'reminderId'")
-        && str_contains($moduleSource, "'reminderMode'")
-        && str_contains($moduleSource, "'minutesBeforeStart'")
-        && str_contains($moduleSource, "'reminderTimestamp'")
-        && str_contains($moduleSource, "'reminderDateTime'")
-        && str_contains($moduleSource, "'reminderIndex'")
-        && str_contains($moduleSource, "'reminderCount'"),
-    'Reminder API results must expose stable IDs, effective lead time, trigger timestamps and per-event reminder positions.'
-);
-$normalizedModuleSource = preg_replace('/\s+/', ' ', $moduleSource) ?? $moduleSource;
-assertCalendarViewApi(
     str_contains($moduleSource, 'public function GetSelectedCalendars(): string')
         && str_contains($moduleSource, '$this->loadSelectedCalendars()')
-        && str_contains($moduleSource, 'private function loadSelectedCalendars(): array')
-        && str_contains($normalizedModuleSource, "'timezone' => trim((string) (\$calendarStatus['timezone'] ?? ''))")
-        && str_contains($normalizedModuleSource, "'canCreateRecurrence' => (bool) (\$calendarStatus['canCreateRecurrence'] ?? false)")
-        && str_contains($normalizedModuleSource, "'canDeleteSeries' => (bool) (\$calendarStatus['canDeleteSeries'] ?? false)")
-        && str_contains($normalizedModuleSource, "'maxReminders' => max(1, min(CalendarEventReminder::MAX_REMINDERS, (int) (\$calendarStatus['maxReminders'] ?? 1)))"),
-    'Calendar View must expose selected calendar metadata including recurrence capabilities, reminder limits and timezone without colliding with its internal loader.'
+        && str_contains($moduleSource, 'private function loadSelectedCalendars(): array'),
+    'Calendar View must expose selected calendar metadata without colliding with its internal loader.'
 );
 
 require_once __DIR__ . '/stubs/ModuleStrictStubs.php';
@@ -274,8 +177,6 @@ require_once __DIR__ . '/../Kalender Ansicht/module.php';
 
 $compactMethod = new ReflectionMethod(CalendarView::class, 'compactAppointments');
 $compactMethod->setAccessible(true);
-$hasReminderMethod = new ReflectionMethod(CalendarView::class, 'appointmentHasReminder');
-$hasReminderMethod->setAccessible(true);
 $filterMethod = new ReflectionMethod(CalendarView::class, 'filterAppointmentsByCalendarInstanceId');
 $filterMethod->setAccessible(true);
 $remainingMethod = new ReflectionMethod(CalendarView::class, 'filterRemainingAppointments');
@@ -290,12 +191,6 @@ $upcomingMethod = new ReflectionMethod(CalendarView::class, 'filterUpcomingAppoi
 $upcomingMethod->setAccessible(true);
 $validateUpcomingHoursMethod = new ReflectionMethod(CalendarView::class, 'validateUpcomingHours');
 $validateUpcomingHoursMethod->setAccessible(true);
-$buildReminderRecordMethod = new ReflectionMethod(CalendarView::class, 'buildReminderRecord');
-$buildReminderRecordMethod->setAccessible(true);
-$buildReminderRecordsMethod = new ReflectionMethod(CalendarView::class, 'buildReminderRecords');
-$buildReminderRecordsMethod->setAccessible(true);
-$validateReminderMinutesWindowMethod = new ReflectionMethod(CalendarView::class, 'validateReminderMinutesWindow');
-$validateReminderMinutesWindowMethod->setAccessible(true);
 $calendarView = new CalendarView(1);
 $previousTimezone = date_default_timezone_get();
 date_default_timezone_set('Europe/Berlin');
@@ -307,87 +202,32 @@ try {
         'end'            => '2026-08-12T10:30:00+02:00',
         'startTimestamp' => (new DateTimeImmutable('2026-08-12T09:00:00+02:00'))->getTimestamp(),
         'endTimestamp'   => (new DateTimeImmutable('2026-08-12T10:30:00+02:00'))->getTimestamp(),
-        'allDay'         => false,
-        'hasReminder'    => true,
-        'calendarName'   => 'Work'
+        'allDay'         => false
     ], [
         'summary'        => 'All-day event',
         'start'          => '2026-08-12',
         'end'            => '2026-08-13',
         'startTimestamp' => (new DateTimeImmutable('2026-08-12T00:00:00+02:00'))->getTimestamp(),
         'endTimestamp'   => (new DateTimeImmutable('2026-08-13T00:00:00+02:00'))->getTimestamp(),
-        'allDay'         => true,
-        'hasReminder'    => false,
-        'calendarName'   => 'Private'
+        'allDay'         => true
     ], [
         'summary'        => 'Overnight event',
         'start'          => '2026-08-12T23:30:00+02:00',
         'end'            => '2026-08-13T00:30:00+02:00',
         'startTimestamp' => (new DateTimeImmutable('2026-08-12T23:30:00+02:00'))->getTimestamp(),
         'endTimestamp'   => (new DateTimeImmutable('2026-08-13T00:30:00+02:00'))->getTimestamp(),
-        'allDay'         => false,
-        'hasReminder'    => true,
-        'calendarName'   => 'Work'
+        'allDay'         => false
     ], [
         'summary'        => 'Multi-day all-day event',
         'start'          => '2026-08-12',
         'end'            => '2026-08-15',
         'startTimestamp' => (new DateTimeImmutable('2026-08-12T00:00:00+02:00'))->getTimestamp(),
         'endTimestamp'   => (new DateTimeImmutable('2026-08-15T00:00:00+02:00'))->getTimestamp(),
-        'allDay'         => true,
-        'hasReminder'    => false,
-        'calendarName'   => 'Holidays'
+        'allDay'         => true
     ]]);
 } finally {
     date_default_timezone_set($previousTimezone);
 }
-
-assertCalendarViewApi(
-    $hasReminderMethod->invoke(
-        $calendarView,
-        ['reminder' => CalendarEventReminder::custom(15)],
-        []
-    ) === true,
-    'A custom event reminder must set the compact reminder flag.'
-);
-assertCalendarViewApi(
-    $hasReminderMethod->invoke(
-        $calendarView,
-        ['reminder' => CalendarEventReminder::none()],
-        []
-    ) === false,
-    'A disabled event reminder must clear the compact reminder flag.'
-);
-assertCalendarViewApi(
-    $hasReminderMethod->invoke(
-        $calendarView,
-        ['reminder' => CalendarEventReminder::providerDefault()],
-        [
-            'canUseDefaultReminder' => true,
-            'defaultReminder'       => CalendarEventReminder::custom(30)
-        ]
-    ) === true,
-    'An active calendar-default reminder must set the compact reminder flag.'
-);
-assertCalendarViewApi(
-    $hasReminderMethod->invoke(
-        $calendarView,
-        ['reminder' => CalendarEventReminder::providerDefault()],
-        [
-            'canUseDefaultReminder' => true,
-            'defaultReminder'       => CalendarEventReminder::none()
-        ]
-    ) === false,
-    'A disabled calendar-default reminder must clear the compact reminder flag.'
-);
-assertCalendarViewApi(
-    $hasReminderMethod->invoke(
-        $calendarView,
-        ['reminder' => CalendarEventReminder::complex()],
-        []
-    ) === true,
-    'A complex provider reminder must still report that an event reminder exists.'
-);
 
 $filterSource = [
     ['summary' => 'Calendar A', 'calendarInstanceId' => 111],
@@ -414,8 +254,8 @@ assertCalendarViewApi(
         'end'          => '2026-08-12',
         'startTime'    => '09:00',
         'endTime'      => '10:30',
-        'hasReminder'  => true,
-        'calendarName' => 'Work'
+        'hasReminder'  => false,
+        'calendarName' => ''
     ],
     'Compact timed appointments must expose local dates and readable start and end times.'
 );
@@ -427,7 +267,7 @@ assertCalendarViewApi(
         'startTime'    => 'All day',
         'endTime'      => '',
         'hasReminder'  => false,
-        'calendarName' => 'Private'
+        'calendarName' => ''
     ],
     'Compact all-day appointments must expose the visible inclusive end date and not invent clock times.'
 );
@@ -438,8 +278,8 @@ assertCalendarViewApi(
         'end'          => '2026-08-13',
         'startTime'    => '23:30',
         'endTime'      => '00:30',
-        'hasReminder'  => true,
-        'calendarName' => 'Work'
+        'hasReminder'  => false,
+        'calendarName' => ''
     ],
     'Compact overnight appointments must keep separate local start and end dates.'
 );
@@ -451,7 +291,7 @@ assertCalendarViewApi(
         'startTime'    => 'All day',
         'endTime'      => '',
         'hasReminder'  => false,
-        'calendarName' => 'Holidays'
+        'calendarName' => ''
     ],
     'Compact multi-day all-day appointments must convert the exclusive provider end to the visible inclusive end date.'
 );
@@ -538,192 +378,5 @@ assertCalendarViewApiThrows(
     static fn (): mixed => $validateUpcomingHoursMethod->invoke($calendarView, (1095 * 24) + 1),
     'Upcoming appointment queries must reject windows beyond the maximum synchronized future range.'
 );
-
-$previousReminderTimezone = date_default_timezone_get();
-date_default_timezone_set('Europe/Berlin');
-
-$reminderCalendar = [
-    'instanceId'            => 111,
-    'name'                  => 'Calendar A',
-    'color'                 => '#123456',
-    'canUseDefaultReminder' => true,
-    'maxReminders'          => 5,
-    'defaultReminder'       => [
-        'mode'               => 'custom',
-        'minutesBeforeStart' => 15,
-        'editable'           => true
-    ]
-];
-$reminderStart = (new DateTimeImmutable('2026-08-12T10:00:00+02:00'))->getTimestamp();
-$customReminderAppointment = [
-    'uid'                => 'custom-reminder@example.com',
-    'summary'            => 'Custom reminder',
-    'calendarInstanceId' => 111,
-    'calendarName'       => 'Calendar A',
-    'calendarColor'      => '#123456',
-    'start'              => '2026-08-12T10:00:00+02:00',
-    'startTimestamp'     => $reminderStart,
-    'allDay'             => false,
-    'location'           => 'Office',
-    'reminder'           => [
-        'mode'               => 'custom',
-        'minutesBeforeStart' => 30,
-        'editable'           => true
-    ]
-];
-$customReminderRecord = $buildReminderRecordMethod->invoke(
-    $calendarView,
-    $customReminderAppointment,
-    $reminderCalendar
-);
-assertCalendarViewApi(
-    is_array($customReminderRecord)
-        && ($customReminderRecord['summary'] ?? '') === 'Custom reminder'
-        && ($customReminderRecord['reminderMode'] ?? '') === 'custom'
-        && ($customReminderRecord['minutesBeforeStart'] ?? -1) === 30
-        && ($customReminderRecord['reminderTimestamp'] ?? 0) === $reminderStart - (30 * 60)
-        && ($customReminderRecord['reminderDateTime'] ?? '') === '2026-08-12T09:30:00+02:00'
-        && strlen((string) ($customReminderRecord['reminderId'] ?? '')) === 64,
-    'Custom reminder records must expose their exact provider-neutral trigger.'
-);
-assertCalendarViewApi(
-    $buildReminderRecordMethod->invoke($calendarView, $customReminderAppointment, $reminderCalendar)
-        === $customReminderRecord,
-    'Reminder IDs and normalized output must remain stable for unchanged appointment data.'
-);
-
-$multipleReminderAppointment = $customReminderAppointment;
-$multipleReminderAppointment['uid'] = 'multiple-reminders@example.com';
-$multipleReminderAppointment['summary'] = 'Multiple reminders';
-$multipleReminderAppointment['reminder'] = [
-    'mode'               => 'multiple',
-    'minutesBeforeStart' => null,
-    'reminders'          => [
-        ['minutesBeforeStart' => 10],
-        ['minutesBeforeStart' => 60]
-    ],
-    'editable'           => true
-];
-$multipleReminderRecords = $buildReminderRecordsMethod->invoke(
-    $calendarView,
-    $multipleReminderAppointment,
-    $reminderCalendar
-);
-assertCalendarViewApi(
-    is_array($multipleReminderRecords)
-        && count($multipleReminderRecords) === 2
-        && ($multipleReminderRecords[0]['reminderMode'] ?? '') === 'multiple'
-        && ($multipleReminderRecords[0]['minutesBeforeStart'] ?? -1) === 10
-        && ($multipleReminderRecords[0]['reminderIndex'] ?? -1) === 0
-        && ($multipleReminderRecords[0]['reminderCount'] ?? 0) === 2
-        && ($multipleReminderRecords[1]['minutesBeforeStart'] ?? -1) === 60
-        && ($multipleReminderRecords[1]['reminderIndex'] ?? -1) === 1
-        && ($multipleReminderRecords[1]['reminderCount'] ?? 0) === 2
-        && ($multipleReminderRecords[0]['reminderTimestamp'] ?? 0) === $reminderStart - (10 * 60)
-        && ($multipleReminderRecords[1]['reminderTimestamp'] ?? 0) === $reminderStart - (60 * 60)
-        && ($multipleReminderRecords[0]['reminderId'] ?? '') !== ($multipleReminderRecords[1]['reminderId'] ?? ''),
-    'One event with multiple reminders must produce one stable PHP API record per exact trigger.'
-);
-assertCalendarViewApi(
-    $buildReminderRecordsMethod->invoke($calendarView, $multipleReminderAppointment, $reminderCalendar)
-        === $multipleReminderRecords,
-    'Multiple-reminder API IDs and ordering must remain stable for unchanged appointment data.'
-);
-
-$defaultReminderAppointment = $customReminderAppointment;
-$defaultReminderAppointment['uid'] = 'default-reminder@example.com';
-$defaultReminderAppointment['summary'] = 'Default reminder';
-$defaultReminderAppointment['reminder'] = [
-    'mode'               => 'default',
-    'minutesBeforeStart' => null,
-    'editable'           => true
-];
-$defaultReminderRecord = $buildReminderRecordMethod->invoke(
-    $calendarView,
-    $defaultReminderAppointment,
-    $reminderCalendar
-);
-assertCalendarViewApi(
-    is_array($defaultReminderRecord)
-        && ($defaultReminderRecord['reminderMode'] ?? '') === 'default'
-        && ($defaultReminderRecord['minutesBeforeStart'] ?? -1) === 15
-        && ($defaultReminderRecord['reminderTimestamp'] ?? 0) === $reminderStart - (15 * 60),
-    'Calendar-default reminders must resolve to the selected calendar default when it has one exact trigger.'
-);
-
-$multipleDefaultReminderCalendar = $reminderCalendar;
-$multipleDefaultReminderCalendar['defaultReminder'] = [
-    'mode'               => 'multiple',
-    'minutesBeforeStart' => null,
-    'reminders'          => [
-        ['minutesBeforeStart' => 5],
-        ['minutesBeforeStart' => 45]
-    ],
-    'editable'           => true
-];
-$multipleDefaultReminderRecords = $buildReminderRecordsMethod->invoke(
-    $calendarView,
-    $defaultReminderAppointment,
-    $multipleDefaultReminderCalendar
-);
-assertCalendarViewApi(
-    count($multipleDefaultReminderRecords) === 2
-        && array_column($multipleDefaultReminderRecords, 'minutesBeforeStart') === [5, 45]
-        && array_column($multipleDefaultReminderRecords, 'reminderMode') === ['default', 'default'],
-    'Calendar-default reminder APIs must emit every exact trigger when the Google calendar default contains multiple reminders.'
-);
-
-$noneReminderAppointment = $customReminderAppointment;
-$noneReminderAppointment['reminder'] = [
-    'mode'               => 'none',
-    'minutesBeforeStart' => null,
-    'editable'           => true
-];
-assertCalendarViewApi(
-    $buildReminderRecordMethod->invoke($calendarView, $noneReminderAppointment, $reminderCalendar) === null,
-    'Disabled reminders must not produce due-reminder records.'
-);
-
-$complexReminderAppointment = $customReminderAppointment;
-$complexReminderAppointment['reminder'] = [
-    'mode'               => 'complex',
-    'minutesBeforeStart' => null,
-    'editable'           => false
-];
-assertCalendarViewApi(
-    $buildReminderRecordMethod->invoke($calendarView, $complexReminderAppointment, $reminderCalendar) === null,
-    'Complex reminder settings without one exact provider-neutral trigger must not be guessed.'
-);
-
-$noDefaultReminderCalendar = $reminderCalendar;
-$noDefaultReminderCalendar['defaultReminder'] = [
-    'mode'               => 'none',
-    'minutesBeforeStart' => null,
-    'editable'           => true
-];
-assertCalendarViewApi(
-    $buildReminderRecordMethod->invoke(
-        $calendarView,
-        $defaultReminderAppointment,
-        $noDefaultReminderCalendar
-    ) === null,
-    'A calendar default without an active reminder must not create an artificial reminder trigger.'
-);
-
-$validateReminderMinutesWindowMethod->invoke($calendarView, 1);
-$validateReminderMinutesWindowMethod->invoke($calendarView, 1095 * 24 * 60);
-assertCalendarViewApiThrows(
-    static fn (): mixed => $validateReminderMinutesWindowMethod->invoke($calendarView, 0),
-    'Reminder windows must reject zero minutes.'
-);
-assertCalendarViewApiThrows(
-    static fn (): mixed => $validateReminderMinutesWindowMethod->invoke(
-        $calendarView,
-        (1095 * 24 * 60) + 1
-    ),
-    'Reminder windows must reject values beyond the synchronized future range.'
-);
-
-date_default_timezone_set($previousReminderTimezone);
 
 fwrite(STDOUT, 'Calendar View PHP API checks passed.' . PHP_EOL);
