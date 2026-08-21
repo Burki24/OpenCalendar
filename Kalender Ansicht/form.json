@@ -50,8 +50,12 @@
                     "value": 3
                 },
                 {
-                    "caption": "Week",
+                    "caption": "Full week",
                     "value": 1
+                },
+                {
+                    "caption": "Work week",
+                    "value": 5
                 },
                 {
                     "caption": "Month",

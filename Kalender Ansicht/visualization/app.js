@@ -22,9 +22,16 @@ const calendarCompactColorBarWidth = Math.max(2, Math.min(16, Number(calendarOpt
 const calendarViewStateStorageKey = Number(calendarOptions.instanceId) > 0
     ? `OpenCalendar.ViewState.${Number(calendarOptions.instanceId)}`
     : '';
-const calendarViews = new Set(['agenda', 'list', 'threeDays', 'week', 'month']);
-const calendarViewLabels = { agenda: 'Agenda', list: 'List', threeDays: 'Days', week: 'Week', month: 'Month' };
-const swipeNavigationViews = new Set(['threeDays', 'week', 'month']);
+const calendarViews = new Set(['agenda', 'list', 'threeDays', 'week', 'workWeek', 'month']);
+const calendarViewLabels = {
+    agenda: 'Agenda',
+    list: 'List',
+    threeDays: 'Days',
+    week: 'Full week',
+    workWeek: 'Work week',
+    month: 'Month'
+};
+const swipeNavigationViews = new Set(['threeDays', 'week', 'workWeek', 'month']);
 const swipeMinimumDistance = 60;
 const swipeAxisRatio = 1.3;
 const ipsViewStateRefreshIntervalMilliseconds = 15_000;
@@ -480,8 +487,8 @@ function render() {
         renderEmpty('No calendars visible', 'Select one or more calendars in the calendar filter.');
     } else if (activeView === 'month') {
         renderMonth();
-    } else if (activeView === 'week') {
-        renderWeek();
+    } else if (activeView === 'week' || activeView === 'workWeek') {
+        renderWeek(activeView === 'workWeek');
     } else if (activeView === 'threeDays') {
         renderThreeDays();
     } else if (activeView === 'list') {
@@ -561,11 +568,12 @@ function updateToolbar() {
         periodTitle.textContent = monthCount === 1
             ? formatMonth(start)
             : `${formatMonth(start)} – ${formatMonth(end)}`;
-    } else if (activeView === 'week') {
-        const start = startOfWeek(cursorDate);
-        const end = addDays(start, (viewPeriod('week') * 7) - 1);
+    } else if (activeView === 'week' || activeView === 'workWeek') {
+        const days = weekViewDays(activeView === 'workWeek');
+        const start = days[0] || startOfWeek(cursorDate);
+        const end = days[days.length - 1] || start;
         const calendarWeek = calendarState.settings.showWeekCalendarWeek !== false
-            ? `${formatCalendarWeekLabel(daysBetween(start, end))} · `
+            ? `${formatCalendarWeekLabel(days)} · `
             : '';
         periodTitle.textContent = calendarWeek + formatRange(start, end);
     } else if (activeView === 'threeDays') {
@@ -815,11 +823,15 @@ function listColumns() {
     return columns;
 }
 
-function renderWeek() {
+function weekViewDays(workWeek = false) {
     const weekStart = startOfWeek(cursorDate);
-    const periodDays = viewPeriod('week') * 7;
-    const days = Array.from({ length: periodDays }, (_, index) => addDays(weekStart, index))
-        .filter(day => calendarState.settings.showWeekends !== false || !isWeekend(day));
+    const periodDays = viewPeriod(workWeek ? 'workWeek' : 'week') * 7;
+    const days = Array.from({ length: periodDays }, (_, index) => addDays(weekStart, index));
+    return workWeek ? days.filter(day => !isWeekend(day)) : days;
+}
+
+function renderWeek(workWeek = false) {
+    const days = weekViewDays(workWeek);
     const ipsView = document.documentElement.classList.contains('ipsview-mode');
     const vertical = (
         ipsView
@@ -829,7 +841,7 @@ function renderWeek() {
     renderDayColumns(
         days,
         'week-grid'
-            + (calendarState.settings.showWeekends === false ? ' hide-weekends' : '')
+            + (workWeek ? ' hide-weekends work-week-grid' : '')
             + (vertical ? ' vertical-week-grid' : ''),
         calendarState.settings.showWeekDayOfYear !== false,
         calendarState.settings.showWeekEventCount !== false
@@ -838,6 +850,11 @@ function renderWeek() {
 
 function renderThreeDays() {
     const days = getVisibleDays(cursorDate, viewPeriod('threeDays'));
+    if (days.length === 1) {
+        renderSingleDayTimeline(days[0]);
+        return;
+    }
+
     const grid = renderDayColumns(
         days,
         'week-grid three-day-grid',
@@ -845,6 +862,124 @@ function renderThreeDays() {
         calendarState.settings.showThreeDaysEventCount !== false
     );
     grid.style.setProperty('--day-grid-columns', String(Math.min(days.length, 7)));
+}
+
+function renderSingleDayTimeline(day) {
+    const dayStart = startOfDay(day);
+    const dayEnd = addDays(dayStart, 1);
+    const events = visibleCalendarEvents().filter(event => eventOverlaps(event, dayStart, dayEnd));
+    const column = element('section', 'week-column single-day-column' + (isToday(day) ? ' today' : ''));
+    const heading = element('div', 'week-heading');
+    heading.textContent = formatDayHeading(
+        day,
+        { weekday: 'short', day: '2-digit', month: '2-digit' },
+        calendarState.settings.showThreeDaysDayOfYear !== false,
+        events.length,
+        calendarState.settings.showThreeDaysEventCount !== false
+    );
+    column.appendChild(heading);
+
+    const allDayEvents = events.filter(event => event.allDay);
+    if (allDayEvents.length > 0) {
+        const allDayList = element('div', 'single-day-all-day');
+        allDayEvents.forEach(event => allDayList.appendChild(createWeekEventElement(event)));
+        column.appendChild(allDayList);
+    }
+
+    const timedEvents = events.filter(event => !event.allDay);
+    if (timedEvents.length > 0) {
+        column.appendChild(createSingleDayTimeline(dayStart, dayEnd, timedEvents));
+    }
+
+    content.appendChild(column);
+}
+
+function createSingleDayTimeline(dayStart, dayEnd, events) {
+    const dayStartTimestamp = dayStart.getTime();
+    const dayEndTimestamp = dayEnd.getTime();
+    const minimumDisplayDuration = 30 * 60_000;
+    const entries = events.map((event, index) => {
+        const startTimestamp = Math.max(dayStartTimestamp, eventStart(event).getTime());
+        const rawEndTimestamp = Math.min(dayEndTimestamp, eventEnd(event).getTime());
+        const endTimestamp = Math.min(
+            dayEndTimestamp,
+            Math.max(startTimestamp + minimumDisplayDuration, rawEndTimestamp)
+        );
+        return { event, index, startTimestamp, endTimestamp };
+    });
+
+    buildWeekEventOverlapGroups(entries).forEach(group => {
+        const laneCount = group.reduce((maximum, entry) => Math.max(maximum, entry.lane + 1), 1);
+        group.forEach(entry => { entry.laneCount = laneCount; });
+    });
+
+    const minute = 60_000;
+    const earliestMinute = Math.max(0, Math.floor(
+        Math.min(...entries.map(entry => entry.startTimestamp - dayStartTimestamp)) / minute
+    ));
+    const latestMinute = Math.min(24 * 60, Math.ceil(
+        Math.max(...entries.map(entry => entry.endTimestamp - dayStartTimestamp)) / minute
+    ));
+    const rangeStartMinute = Math.floor(earliestMinute / 60) * 60;
+    const rangeEndMinute = Math.min(24 * 60, Math.max(
+        rangeStartMinute + 120,
+        Math.ceil(latestMinute / 60) * 60
+    ));
+    const pixelsPerMinute = 1;
+    const timelineHeight = Math.max(120, Math.round((rangeEndMinute - rangeStartMinute) * pixelsPerMinute));
+
+    const timeline = element('div', 'single-day-timeline');
+    const scale = element('div', 'single-day-timescale');
+    const canvas = element('div', 'single-day-timeline-canvas');
+    scale.style.height = `${timelineHeight}px`;
+    canvas.style.height = `${timelineHeight}px`;
+
+    for (let tick = rangeStartMinute; tick <= rangeEndMinute; tick += 60) {
+        const top = Math.min(timelineHeight, Math.round((tick - rangeStartMinute) * pixelsPerMinute));
+        const tickDate = new Date(dayStartTimestamp + (tick * minute));
+        const label = element('span', 'single-day-hour-label');
+        label.style.top = `${top}px`;
+        label.textContent = formatTime(tickDate);
+        scale.appendChild(label);
+
+        const line = element('span', 'single-day-hour-line');
+        line.style.top = `${top}px`;
+        canvas.appendChild(line);
+    }
+
+    entries.forEach(entry => {
+        const item = createSingleDayTimelineEvent(entry.event);
+        const startMinute = (entry.startTimestamp - dayStartTimestamp) / minute;
+        const endMinute = (entry.endTimestamp - dayStartTimestamp) / minute;
+        const top = Math.max(0, (startMinute - rangeStartMinute) * pixelsPerMinute);
+        const naturalHeight = Math.max(1, (endMinute - startMinute) * pixelsPerMinute);
+        item.style.top = `${Math.round(top)}px`;
+        item.style.height = `${Math.max(30, Math.round(naturalHeight - 2))}px`;
+        item.style.setProperty('--single-day-lane', String(entry.lane || 0));
+        item.style.setProperty('--single-day-lanes', String(entry.laneCount || 1));
+        canvas.appendChild(item);
+    });
+
+    timeline.append(scale, canvas);
+    return timeline;
+}
+
+function createSingleDayTimelineEvent(event) {
+    const item = element('button', 'single-day-timeline-event');
+    item.type = 'button';
+    item.style.setProperty('--event-color', safeColor(event.calendarColor));
+    item.setAttribute(
+        'aria-label',
+        `${eventDisplaySummary(event) || t('Untitled event')}, ${formatTime(eventStart(event))} – ${formatTime(eventEnd(event))}`
+    );
+
+    const title = document.createElement('strong');
+    title.textContent = eventDisplaySummary(event) || t('Untitled event');
+    const time = element('span', 'single-day-timeline-time');
+    time.textContent = formatTime(eventStart(event));
+    item.append(title, time);
+    item.addEventListener('click', () => openEventDetails(event));
+    return item;
 }
 
 function renderDayColumns(days, className, showDayOfYear, showEventCount) {
@@ -3643,9 +3778,10 @@ function visibleViewRange() {
     if (activeView === 'month') {
         start = new Date(cursorDate.getFullYear(), cursorDate.getMonth(), 1);
         end = new Date(start.getFullYear(), start.getMonth() + viewPeriod('month'), 1);
-    } else if (activeView === 'week') {
-        start = startOfWeek(cursorDate);
-        end = addDays(start, viewPeriod('week') * 7);
+    } else if (activeView === 'week' || activeView === 'workWeek') {
+        const days = weekViewDays(activeView === 'workWeek');
+        start = startOfDay(days[0] || startOfWeek(cursorDate));
+        end = addDays(startOfDay(days[days.length - 1] || start), 1);
     } else if (activeView === 'threeDays') {
         const days = getVisibleDays(cursorDate, viewPeriod('threeDays'));
         start = startOfDay(days[0] || cursorDate);
@@ -3771,8 +3907,8 @@ function navigate(direction) {
     } else if (activeView === 'threeDays') {
         const firstVisibleDay = getVisibleDays(cursorDate, 1)[0];
         cursorDate = moveVisibleDays(firstVisibleDay, direction * viewPeriod('threeDays'));
-    } else if (activeView === 'week') {
-        cursorDate = addDays(startOfWeek(cursorDate), direction * viewPeriod('week') * 7);
+    } else if (activeView === 'week' || activeView === 'workWeek') {
+        cursorDate = addDays(startOfWeek(cursorDate), direction * viewPeriod(activeView) * 7);
     } else {
         cursorDate = addDays(cursorDate, direction * viewPeriod(activeView === 'list' ? 'list' : 'agenda'));
     }
@@ -4219,6 +4355,7 @@ function viewPeriod(view) {
         list: ['listPeriodDays', 14, 1, 366],
         threeDays: ['threeDaysPeriodDays', 3, 1, 31],
         week: ['weekPeriodWeeks', 1, 1, 12],
+        workWeek: ['weekPeriodWeeks', 1, 1, 12],
         month: ['monthPeriodMonths', 1, 1, 12]
     };
     const [setting, fallback, minimum, maximum] = periods[view] || periods.agenda;
@@ -4232,6 +4369,7 @@ function formatViewPeriod(view) {
         list: ['Day', 'Days'],
         threeDays: ['Day', 'Days'],
         week: ['Week', 'Weeks'],
+        workWeek: ['Week', 'Weeks'],
         month: ['Month', 'Months']
     };
     const [singular, plural] = units[view] || units.agenda;

@@ -1335,6 +1335,8 @@ class CalendarView extends IPSModuleStrict
             'Days',
             'Week',
             'Weeks',
+            'Full week',
+            'Work week',
             'Month',
             'Months',
             'CW',
@@ -2261,6 +2263,7 @@ class CalendarView extends IPSModuleStrict
                 2       => 'month',
                 3       => 'threeDays',
                 4       => 'list',
+                5       => 'workWeek',
                 default => 'agenda'
             },
             'agendaPeriodDays'          => max(1, min(366, $this->ReadPropertyInteger('AgendaPeriodDays'))),

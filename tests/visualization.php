@@ -252,7 +252,7 @@ assertVisualization(
 );
 
 assertVisualization(
-    str_contains($script, 'const swipeNavigationViews = new Set([\'threeDays\', \'week\', \'month\']);')
+    str_contains($script, 'const swipeNavigationViews = new Set([\'threeDays\', \'week\', \'workWeek\', \'month\']);')
         && str_contains($script, 'const swipeMinimumDistance = 60;')
         && str_contains($script, 'const swipeAxisRatio = 1.3;')
         && str_contains($script, 'content.style.touchAction = swipeNavigationViews.has(activeView) ? \'pan-y\' : \'auto\';')
@@ -614,7 +614,7 @@ assertVisualization(
         && str_contains($script, "viewPeriod('agenda')")
         && str_contains($script, "viewPeriod('list')")
         && str_contains($script, "viewPeriod('threeDays')")
-        && str_contains($script, "viewPeriod('week')")
+        && str_contains($script, "viewPeriod(workWeek ? 'workWeek' : 'week')")
         && str_contains($script, "viewPeriod('month')")
         && str_contains($script, 'function viewPeriod(view)'),
     'View periods must use a collapsible section and every visualization view must use its independently configured display period.'
@@ -663,25 +663,36 @@ assertVisualization(
 assertVisualization(
     str_contains($indexSource, 'id="view-selector-button"')
         && str_contains($indexSource, 'id="view-selector-options"')
-        && substr_count($indexSource, 'class="view-selector-option"') === 5
-        && substr_count($indexSource, 'class="view-selector-option-period"') === 5
+        && substr_count($indexSource, 'class="view-selector-option"') === 6
+        && substr_count($indexSource, 'class="view-selector-option-period"') === 6
         && str_contains($indexSource, 'data-view="threeDays"')
         && str_contains($indexSource, '<span class="view-selector-option-label">Days</span>')
+        && str_contains($indexSource, '<span class="view-selector-option-label">Full week</span>')
+        && str_contains($indexSource, 'data-view="workWeek"')
+        && str_contains($indexSource, '<span class="view-selector-option-label">Work week</span>')
         && str_contains($script, "threeDays: 'Days'")
+        && str_contains($script, "week: 'Full week'")
+        && str_contains($script, "workWeek: 'Work week'")
         && str_contains($script, 'function formatViewPeriod(view)')
         && str_contains($script, "agenda: ['Day', 'Days']")
         && str_contains($script, "week: ['Week', 'Weeks']")
+        && str_contains($script, "workWeek: ['Week', 'Weeks']")
         && str_contains($script, "month: ['Month', 'Months']")
         && str_contains($script, "button.querySelector('.view-selector-option-period')")
         && !str_contains($formSource, '"caption": "3 Days"')
         && substr_count($formSource, '"caption": "Days"') >= 3
         && str_contains($moduleSource, "'Weeks'")
+        && str_contains($moduleSource, "'Full week'")
+        && str_contains($moduleSource, "'Work week'")
+        && str_contains($moduleSource, "5       => 'workWeek'")
+        && str_contains($formSource, '"caption": "Full week"')
+        && str_contains($formSource, '"caption": "Work week"')
         && str_contains($moduleSource, "'Months'")
         && str_contains($script, 'function openViewSelector()')
         && str_contains($script, 'document.querySelectorAll(\'.view-selector-option\')')
         && str_contains($script, 'viewSelectorDialog.showModal()')
         && str_contains($script, 'viewSelectorDialog.close()'),
-    'The calendar view switcher must show all five views with their configured periods and use a generic days label for the configurable multi-day view.'
+    'The calendar view switcher must show all six views, including full-week and work-week variants, with their configured periods.'
 );
 
 assertVisualization(
@@ -854,6 +865,29 @@ assertVisualization(
         && str_contains($style, 'grid-template-columns: repeat(var(--week-event-columns, 2), minmax(0, 1fr));')
         && str_contains($style, '.week-grid.vertical-week-grid .week-event-overlap-group { grid-column: 1 / -1; margin: 0; }'),
     'Timed collisions in the shared three-day/week renderer must use provider-independent side-by-side lanes in native and IPSView modes.'
+);
+
+
+assertVisualization(
+    str_contains($script, 'if (days.length === 1) {')
+        && str_contains($script, 'renderSingleDayTimeline(days[0]);')
+        && str_contains($script, 'function createSingleDayTimeline(dayStart, dayEnd, events)')
+        && str_contains($script, 'buildWeekEventOverlapGroups(entries).forEach(group => {')
+        && str_contains($script, 'item.style.top = `${Math.round(top)}px`;')
+        && str_contains($script, "item.style.setProperty('--single-day-lane', String(entry.lane || 0));")
+        && str_contains($style, '.single-day-timeline {')
+        && str_contains($style, '.single-day-timeline-event {')
+        && str_contains($style, 'left: calc((100% / var(--single-day-lanes, 1)) * var(--single-day-lane, 0) + 3px);'),
+    'A one-day Days view must place timed events proportionally by start time and offset overlaps like Outlook in native and IPSView modes.'
+);
+
+assertVisualization(
+    str_contains($script, "const calendarViews = new Set(['agenda', 'list', 'threeDays', 'week', 'workWeek', 'month']);")
+        && str_contains($script, "function weekViewDays(workWeek = false)")
+        && str_contains($script, "return workWeek ? days.filter(day => !isWeekend(day)) : days;")
+        && str_contains($script, "renderWeek(activeView === 'workWeek');")
+        && str_contains($style, '.week-grid.hide-weekends { grid-template-columns: repeat(5, minmax(0, 1fr)); }'),
+    'The shared visualization must provide explicit seven-day and Monday-to-Friday week modes in native and IPSView modes.'
 );
 
 assertVisualization(
