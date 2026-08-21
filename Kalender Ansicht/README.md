@@ -211,6 +211,8 @@ Kalenderauswahl ist leer oder unvollständig | **Alle Kalenderinstanzen auswähl
 
 In den folgenden Beispielen ist `12345` die Instanz-ID der **Kalender Ansicht**. Bei allen Funktionen mit einem optionalen Parameter `CalendarInstanceID` wird der Wert `0` bewusst mit angegeben: `0` berücksichtigt alle in dieser Kalender Ansicht ausgewählten Kalender. Eine konkrete Kalender-Instanz-ID, beispielsweise `23456`, beschränkt die Abfrage auf genau diesen ausgewählten Kalender.
 
+Der Modul-Prefix lautet `IPSKALVIEW`. Die folgenden Befehle bilden die offiziell unterstützte Skript-API der Kalender Ansicht. Symcon-Lebenszyklusmethoden und interne Visualisierungs-Callbacks wie `Create()`, `ApplyChanges()`, `RequestAction()` oder `Initialize()` gehören nicht zu dieser Befehlsreferenz.
+
 ```php
 // Alle ausgewählten Kalender synchronisieren.
 $success = IPSKALVIEW_SynchronizeCalendars(12345);
@@ -219,8 +221,9 @@ $success = IPSKALVIEW_SynchronizeCalendars(12345);
 // Anschließend muss die Konfiguration mit „Übernehmen“ gespeichert werden.
 $success = IPSKALVIEW_SelectAllCalendars(12345);
 
-// Die zusammengeführten Termine als JSON abrufen.
-$events = IPSKALVIEW_GetAggregatedEvents(12345);
+// Den kompletten aggregierten Visualisierungszustand als JSON abrufen.
+// Enthalten sind events, calendars, eventRange und settings.
+$state = IPSKALVIEW_GetAggregatedEvents(12345);
 
 // Alle Termine eines lokalen Kalendertags providerübergreifend abrufen.
 $appointments = IPSKALVIEW_GetDayAppointments(12345, '2026-08-11', 0);
@@ -313,6 +316,7 @@ $html = IPSKALVIEW_GetIPSViewHTML(12345);
 $success = IPSKALVIEW_RegenerateIPSViewHTML(12345);
 ```
 
+`GetAggregatedEvents()` behält seinen Namen aus Kompatibilitätsgründen. Die Funktion liefert keinen nackten Termin-Array, sondern den vollständigen initialen Visualisierungszustand mit `events`, `calendars`, `eventRange` und `settings`. Für gezielte Skriptabfragen sind die Termin-, Zähl-, Jahresereignis- und Reminder-Funktionen darunter die stabilere Schnittstelle.
 
 `GetDayAppointments()` und `GetAppointments()` verwenden ausschließlich die in
 dieser **Kalender Ansicht** ausgewählten Kalender und führen deren lokal

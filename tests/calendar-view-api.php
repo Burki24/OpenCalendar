@@ -82,6 +82,91 @@ try {
 $moduleSource = (string) file_get_contents(__DIR__ . '/../Kalender Ansicht/module.php');
 $calendarModuleSource = (string) file_get_contents(__DIR__ . '/../Kalender/module.php');
 $readmeSource = (string) file_get_contents(__DIR__ . '/../Kalender Ansicht/README.md');
+$moduleMetadata = json_decode(
+    (string) file_get_contents(__DIR__ . '/../Kalender Ansicht/module.json'),
+    true,
+    512,
+    JSON_THROW_ON_ERROR
+);
+assertCalendarViewApi(
+    is_array($moduleMetadata) && ($moduleMetadata['prefix'] ?? '') === 'IPSKALVIEW',
+    'Calendar View must keep the public Symcon wrapper prefix IPSKALVIEW.'
+);
+
+$supportedScriptApiMethods = [
+    'SynchronizeCalendars',
+    'SelectAllCalendars',
+    'GetAggregatedEvents',
+    'GetDayAppointments',
+    'GetAnniversaryList',
+    'GetBirthdayList',
+    'GetAppointments',
+    'GetDayAppointmentsCompact',
+    'GetAppointmentsCompact',
+    'GetDayAppointmentCount',
+    'GetAppointmentCount',
+    'GetRemainingDayAppointments',
+    'GetRemainingDayAppointmentCount',
+    'GetNextAppointment',
+    'GetCurrentAppointments',
+    'GetCurrentAppointmentCount',
+    'GetUpcomingAppointments',
+    'GetUpcomingAppointmentCount',
+    'GetNextAppointments',
+    'GetDayReminders',
+    'GetReminders',
+    'GetUpcomingReminders',
+    'GetNextReminder',
+    'GetDueReminders',
+    'GetSelectedCalendars',
+    'GetIPSViewHTML',
+    'RegenerateIPSViewHTML'
+];
+$frameworkPublicMethods = [
+    'Create',
+    'GetConfigurationForm',
+    'Migrate',
+    'ApplyChanges',
+    'Initialize',
+    'MessageSink',
+    'GetVisualizationTile',
+    'RequestAction'
+];
+
+preg_match_all('/^\s+public function ([A-Za-z0-9_]+)\s*\(/m', $moduleSource, $publicMethodMatches);
+$declaredPublicMethods = array_values(array_unique($publicMethodMatches[1] ?? []));
+sort($declaredPublicMethods, SORT_STRING);
+$expectedPublicMethods = array_merge($frameworkPublicMethods, $supportedScriptApiMethods);
+sort($expectedPublicMethods, SORT_STRING);
+assertCalendarViewApi(
+    $declaredPublicMethods === $expectedPublicMethods,
+    'Every Calendar View public method must be classified as framework lifecycle or supported script API.'
+);
+
+foreach ($supportedScriptApiMethods as $method) {
+    assertCalendarViewApi(
+        str_contains($moduleSource, 'public function ' . $method . '(')
+            && str_contains($readmeSource, 'IPSKALVIEW_' . $method . '('),
+        'Every supported Calendar View script API method must have a matching IPSKALVIEW wrapper in the PHP reference.'
+    );
+}
+
+preg_match_all('/\bIPSKALVIEW_([A-Za-z0-9_]+)\s*\(/', $readmeSource, $documentedWrapperMatches);
+$documentedScriptApiMethods = array_values(array_unique($documentedWrapperMatches[1] ?? []));
+sort($documentedScriptApiMethods, SORT_STRING);
+$expectedDocumentedScriptApiMethods = $supportedScriptApiMethods;
+sort($expectedDocumentedScriptApiMethods, SORT_STRING);
+assertCalendarViewApi(
+    $documentedScriptApiMethods === $expectedDocumentedScriptApiMethods,
+    'Calendar View PHP reference must document every supported wrapper exactly and must not expose internal lifecycle callbacks.'
+);
+assertCalendarViewApi(
+    str_contains($readmeSource, 'Der Modul-Prefix lautet `IPSKALVIEW`')
+        && str_contains($readmeSource, 'events, calendars, eventRange und settings')
+        && str_contains($readmeSource, 'liefert keinen nackten Termin-Array')
+        && str_contains($readmeSource, '$state = IPSKALVIEW_GetAggregatedEvents(12345);'),
+    'Calendar View PHP reference must explain the wrapper prefix and the complete GetAggregatedEvents state payload.'
+);
 $calendarFilterReferenceCalls = [
     "IPSKALVIEW_GetDayAppointments(12345, '2026-08-11', 0)",
     "IPSKALVIEW_GetAppointments(12345, '2026-08-11', '2026-08-17', 0)",
