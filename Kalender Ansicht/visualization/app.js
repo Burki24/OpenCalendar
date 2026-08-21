@@ -832,40 +832,18 @@ function weekViewDays(workWeek = false) {
     return workWeek ? days.filter(day => !isWeekend(day)) : days;
 }
 
-function weekTimelineMinimumWidth(dayCount, ipsView) {
-    const timescaleWidth = ipsView ? 62 : 54;
-    const dayWidth = ipsView ? 128 : 120;
-    return timescaleWidth + (Math.max(1, dayCount) * dayWidth);
-}
-
 function renderWeek(workWeek = false) {
     const days = weekViewDays(workWeek);
-    const ipsView = document.documentElement.classList.contains('ipsview-mode');
-    const configuredVertical = (
-        ipsView
-            ? calendarState.settings.ipsViewWeekOrientation
-            : calendarState.settings.tileWeekOrientation
-    ) === 'vertical';
-    const responsiveVertical = content.clientWidth > 0
-        && content.clientWidth < weekTimelineMinimumWidth(days.length, ipsView);
-    const vertical = configuredVertical || responsiveVertical;
-    if (vertical) {
-        renderDayColumns(
-            days,
-            'week-grid'
-                + (workWeek ? ' hide-weekends work-week-grid' : '')
-                + ' vertical-week-grid',
-            calendarState.settings.showWeekDayOfYear !== false,
-            calendarState.settings.showWeekEventCount !== false
-        );
-        return;
-    }
-
-    renderMultiDayTimeline(
+    const columnsPerWeek = workWeek ? 5 : 7;
+    const grid = renderDayColumns(
         days,
+        'week-grid' + (workWeek ? ' hide-weekends work-week-grid' : ''),
         calendarState.settings.showWeekDayOfYear !== false,
         calendarState.settings.showWeekEventCount !== false
     );
+    grid.style.gridTemplateColumns = `repeat(${columnsPerWeek}, minmax(120px, 1fr))`;
+    grid.style.minWidth = `${columnsPerWeek * 120}px`;
+    grid.style.rowGap = '12px';
 }
 
 function renderThreeDays() {

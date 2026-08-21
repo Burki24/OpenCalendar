@@ -913,19 +913,19 @@ assertVisualization(
         && str_contains($script, 'function weekViewDays(workWeek = false)')
         && str_contains($script, 'return workWeek ? days.filter(day => !isWeekend(day)) : days;')
         && str_contains($script, "renderWeek(activeView === 'workWeek');")
-        && str_contains($script, 'function weekTimelineMinimumWidth(dayCount, ipsView)')
-        && str_contains($script, 'const responsiveVertical = content.clientWidth > 0')
-        && str_contains($script, 'content.clientWidth < weekTimelineMinimumWidth(days.length, ipsView);')
-        && str_contains($script, 'const vertical = configuredVertical || responsiveVertical;')
-        && str_contains($script, 'if (vertical) {')
-        && str_contains($script, "+ ' vertical-week-grid',")
-        && str_contains($script, 'renderMultiDayTimeline(')
+        && str_contains($script, 'const columnsPerWeek = workWeek ? 5 : 7;')
+        && str_contains($script, "'week-grid' + (workWeek ? ' hide-weekends work-week-grid' : ''),")
+        && str_contains($script, 'grid.style.gridTemplateColumns = `repeat(${columnsPerWeek}, minmax(120px, 1fr))`;')
+        && str_contains($script, 'grid.style.minWidth = `${columnsPerWeek * 120}px`;')
+        && str_contains($script, "grid.style.rowGap = '12px';")
+        && !str_contains($script, 'function weekTimelineMinimumWidth(dayCount, ipsView)')
+        && !str_contains($script, 'configuredVertical')
+        && !str_contains($script, 'responsiveVertical')
         && str_contains($script, 'calendarState.settings.showWeekDayOfYear !== false,')
         && str_contains($script, 'calendarState.settings.showWeekEventCount !== false')
         && str_contains($script, "else if (activeView === 'week' || activeView === 'workWeek') {")
-        && str_contains($script, 'render();')
-        && str_contains($style, '.week-grid.hide-weekends { grid-template-columns: repeat(5, minmax(0, 1fr)); }'),
-    'Full-week and work-week views must use the shared time axis horizontally while preserving configured or responsive compact vertical day layouts in native and IPSView modes.'
+        && str_contains($script, 'render();'),
+    'Full-week and work-week views must keep each week on one fixed five- or seven-day grid row and stack additional weeks below it.'
 );
 
 assertVisualization(

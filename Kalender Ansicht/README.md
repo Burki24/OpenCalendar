@@ -17,8 +17,8 @@ verwendet werden.
 1. Über **Instanz hinzufügen** eine Instanz **Kalender Ansicht** erstellen.
 2. In der Liste **Kalender** für jede gewünschte Zeile eine Kalender-Instanz
    auswählen und **Aktiviert** einschalten.
-3. Standardansicht, Kachel-Wochenausrichtung, Kachel-Schriftgröße, geladenen
-   Terminzeitraum und maximale Terminanzahl festlegen. Die Kachel-Schriftgröße
+3. Standardansicht, Kachel-Schriftgröße, geladenen Terminzeitraum und
+   maximale Terminanzahl festlegen. Die Kachel-Schriftgröße
    kann zwischen 50 und 200 Prozent eingestellt werden; 100 Prozent entspricht
    der bisherigen Darstellung.
 4. Den aufklappbaren Bereich **Anzeigeoptionen** öffnen. Dort sind die
@@ -42,10 +42,9 @@ Sicherung wiederhergestellt, soweit diese verfügbar ist.
 ## Funktionsumfang
 
 - Agenda-, Listen-, Tage-, Wochen- und Monatsansicht
-- unabhängig wählbare horizontale oder vertikale Wochenansicht für Kachel und
-  IPSView; die horizontale Woche und Arbeitswoche verwenden bei ausreichender
-  Breite eine gemeinsame Zeitachse, auf schmalen Anzeigen wird automatisch die
-  kompakte vertikale Tagesdarstellung verwendet
+- Wochenansicht als festes Wochenraster: In **Arbeitswoche** stehen Montag bis
+  Freitag nebeneinander, in **Ganze Woche** Montag bis Sonntag; mehrere sichtbare
+  Wochen werden vollständig untereinander angeordnet
 - separat einstellbare Schriftgröße der Kachelvisualisierung von 50 bis 200 Prozent;
   die IPSView-Schrift-/Stilskalierung bleibt davon unabhängig
 - je Darstellung separat konfigurierbare Anzeige von Kalenderwoche und
@@ -88,7 +87,6 @@ Eigenschaft | Beschreibung
 --- | ---
 Kalender | Ausgewählte Kalender-Instanzen und ihre Aktivierung
 Standardansicht | Agenda, Liste, Tage, Woche oder Monat; wird nur verwendet, solange der jeweilige Client noch keinen eigenen Ansichtsstand gespeichert hat
-Kachel-Wochenausrichtung | Horizontale Wochenspalten oder vertikale Tageszeilen
 Vergangene/Zukünftige Tage | Datenzeitraum, aus dem Termine für alle Darstellungen geladen und zusammengeführt werden
 Maximale Termine | Obergrenze der in einer Antwort verarbeiteten Termine
 Anzeigeoptionen → Allgemein | Wochenenden, Kalendername, Anlass bei Jahresereignissen, Ort und Beschreibung zentral im aufklappbaren Bereich konfigurieren
@@ -161,8 +159,7 @@ Ansicht, ohne Symcons Größenlimit für einzelne PHP-Rückgaben zu überschreit
    Popup- und Statusfarben sowie Typografie und Effekte einstellen.
 6. Mit **Transparenter Hintergrund** festlegen, ob die umgebende IPSView sichtbar
    bleiben soll.
-7. IPSView-Wochenausrichtung und Farbbalkenbreite einstellen und die
-   Konfiguration übernehmen.
+7. Farbbalkenbreite einstellen und die Konfiguration übernehmen.
 8. Unterhalb der Instanz wird die String-Variable **IPSView-Kalender** mit der
    Darstellung **Webinhalt** angelegt.
 9. Im IPSView Designer ein Steuerelement vom Typ **HTML-Box** einfügen und die
