@@ -239,7 +239,7 @@ trait KalenderKontoChildGatewayTrait
         $providerType = $this->ReadPropertyInteger('Provider');
         if (!in_array(
             $providerType,
-            [self::PROVIDER_APPLE, self::PROVIDER_CALDAV, self::PROVIDER_GOOGLE],
+            [self::PROVIDER_APPLE, self::PROVIDER_CALDAV, self::PROVIDER_GOOGLE, self::PROVIDER_MICROSOFT],
             true
         )) {
             return $this->CreateChunkedJsonTransfer(
@@ -263,7 +263,17 @@ trait KalenderKontoChildGatewayTrait
         $start = new DateTimeImmutable('@' . $startTimestamp);
         $end = new DateTimeImmutable('@' . $endTimestamp);
         $syncToken = trim((string) ($request['SyncToken'] ?? ''));
-        if ($providerType === self::PROVIDER_GOOGLE) {
+        $microsoftDebugClient = null;
+        if ($providerType === self::PROVIDER_MICROSOFT) {
+            $microsoftDebugClient = new MicrosoftCalendarDebugHttpClient(
+                $this->createTrustedCloudHttpClient(new MicrosoftGraphOriginPolicy())
+            );
+            $synchronizer = new MicrosoftCalendarIncrementalSync(
+                $microsoftDebugClient,
+                $this->getMicrosoftAccessToken()
+            );
+            $debugName = 'MicrosoftEventSynchronization';
+        } elseif ($providerType === self::PROVIDER_GOOGLE) {
             $accessToken = $this->getGoogleAccessToken();
             $httpClient = $this->createTrustedCloudHttpClient(new GoogleCalendarOriginPolicy());
             $provider = new GoogleCalendarProvider($httpClient, $accessToken);
@@ -286,15 +296,48 @@ trait KalenderKontoChildGatewayTrait
             $debugName = 'CalDAVEventSynchronization';
         }
         $result = $synchronizer->synchronize($calendarReference, $start, $end, $syncToken);
+        $nextSyncToken = trim((string) ($result['syncToken'] ?? ''));
+        $items = $result['items'];
+        $deletedCount = count(array_filter(
+            $items,
+            static fn (mixed $item): bool => is_array($item)
+                && (bool) ($item['_syncDeleted'] ?? false)
+        ));
+        $recurringCount = count(array_filter(
+            $items,
+            static fn (mixed $item): bool => is_array($item)
+                && ((bool) ($item['recurring'] ?? false)
+                    || trim((string) ($item['seriesId'] ?? '')) !== '')
+        ));
+        $syncTokenAdvanced = $nextSyncToken !== ''
+            && ($syncToken === '' || !hash_equals($syncToken, $nextSyncToken));
 
-        $transfer = $this->CreateChunkedJsonTransfer(self::EVENT_TRANSFER_SCOPE, $result['items']);
-        $transfer['SyncToken'] = $result['syncToken'];
+        $transfer = $this->CreateChunkedJsonTransfer(self::EVENT_TRANSFER_SCOPE, $items);
+        $transfer['SyncToken'] = $nextSyncToken;
         $transfer['Incremental'] = $result['incremental'];
         $this->SendSafeDebug($debugName, [
-            'incremental' => $result['incremental'],
-            'itemCount'   => count($result['items']),
-            'durationMs'  => (int) round((microtime(true) - $startedAt) * 1000)
+            'requestedIncremental' => $syncToken !== '',
+            'incremental'          => $result['incremental'],
+            'fallbackToFull'       => $syncToken !== '' && !$result['incremental'],
+            'itemCount'            => count($items),
+            'deletedCount'         => $deletedCount,
+            'recurringCount'       => $recurringCount,
+            'syncTokenAvailable'   => $nextSyncToken !== '',
+            'syncTokenAdvanced'    => $syncTokenAdvanced,
+            'durationMs'           => (int) round((microtime(true) - $startedAt) * 1000)
         ]);
+        if ($providerType === self::PROVIDER_MICROSOFT && $microsoftDebugClient !== null) {
+            $graphDiagnostics = $microsoftDebugClient->diagnostics();
+            if ((int) ($graphDiagnostics['requestCount'] ?? 0) > 0) {
+                $this->SendSafeDebug('MicrosoftGraphCalendarView', $graphDiagnostics);
+            }
+            $mappedItems = array_values(array_filter(
+                $items,
+                static fn (mixed $item): bool => is_array($item)
+                    && !(bool) ($item['_syncDeleted'] ?? false)
+            ));
+            $this->SendSafeDebug('MicrosoftMappedEvents', $this->microsoftMappedEventDiagnostics($mappedItems));
+        }
 
         return $transfer;
     }

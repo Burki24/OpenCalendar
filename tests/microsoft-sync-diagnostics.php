@@ -113,5 +113,17 @@ microsoftSyncDiagnosticsExpect(
         && str_contains($gatewaySource, "SendSafeDebug('MicrosoftMappedEvents'"),
     'The Microsoft full synchronization path must emit raw and mapped diagnostics.'
 );
+microsoftSyncDiagnosticsExpect(
+    str_contains($gatewaySource, "\$debugName = 'MicrosoftEventSynchronization';")
+        && str_contains($gatewaySource, '$microsoftDebugClient = new MicrosoftCalendarDebugHttpClient(')
+        && str_contains($gatewaySource, "'requestedIncremental' => \$syncToken !== ''")
+        && str_contains($gatewaySource, "'fallbackToFull'       => \$syncToken !== '' && !\$result['incremental']")
+        && str_contains($gatewaySource, "'deletedCount'         => \$deletedCount")
+        && str_contains($gatewaySource, "'recurringCount'       => \$recurringCount")
+        && str_contains($gatewaySource, "'syncTokenAdvanced'    => \$syncTokenAdvanced")
+        && str_contains($gatewaySource, '$graphDiagnostics = $microsoftDebugClient->diagnostics();')
+        && str_contains($gatewaySource, '$mappedItems = array_values(array_filter('),
+    'Microsoft incremental synchronization must keep compact transfer diagnostics.'
+);
 
 fwrite(STDOUT, "Microsoft synchronization diagnostics tests passed.\n");

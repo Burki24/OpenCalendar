@@ -33,22 +33,41 @@ $transferMethod = microsoftFullSyncRoutingMethod(
 microsoftFullSyncRoutingExpect(
     str_contains(
         $transferMethod,
-        '[self::PROVIDER_APPLE, self::PROVIDER_CALDAV, self::PROVIDER_GOOGLE]'
+        '[self::PROVIDER_APPLE, self::PROVIDER_CALDAV, self::PROVIDER_GOOGLE, self::PROVIDER_MICROSOFT]'
     ),
-    'Only Apple, CalDAV, and Google may use the incremental event-transfer path.'
+    'Apple, CalDAV, Google, and Microsoft must use the incremental event-transfer path.'
 );
 microsoftFullSyncRoutingExpect(
-    !str_contains($transferMethod, 'self::PROVIDER_MICROSOFT'),
-    'Microsoft 365 must not use the incremental event-transfer path.'
+    str_contains($transferMethod, '$providerType === self::PROVIDER_MICROSOFT')
+        && str_contains($transferMethod, '$microsoftDebugClient = new MicrosoftCalendarDebugHttpClient(')
+        && str_contains($transferMethod, 'new MicrosoftCalendarIncrementalSync(')
+        && str_contains($transferMethod, '$microsoftDebugClient,')
+        && str_contains($transferMethod, "\$debugName = 'MicrosoftEventSynchronization';"),
+    'Microsoft 365 must route event transfers through the Microsoft incremental synchronizer.'
 );
 microsoftFullSyncRoutingExpect(
-    str_contains($transferMethod, '$this->getEventsForChild($request)'),
-    'Microsoft 365 must fall back to the regular full provider event transfer.'
+    str_contains($transferMethod, "'requestedIncremental' => \$syncToken !== ''")
+        && str_contains($transferMethod, "'fallbackToFull'       => \$syncToken !== '' && !\$result['incremental']")
+        && str_contains($transferMethod, "'deletedCount'         => \$deletedCount")
+        && str_contains($transferMethod, "'recurringCount'       => \$recurringCount")
+        && str_contains($transferMethod, "'syncTokenAdvanced'    => \$syncTokenAdvanced"),
+    'Incremental transfer diagnostics must report request mode, fallback, changes, and token progress.'
 );
 microsoftFullSyncRoutingExpect(
-    str_contains($gatewaySource, 'new MicrosoftCalendarIncrementalSync(')
-        && str_contains($gatewaySource, 'getEventByReference('),
+    str_contains($gatewaySource, 'getEventByReference('),
     'Microsoft direct post-write event lookup must remain available.'
+);
+
+$incrementalSource = (string) file_get_contents(__DIR__ . '/../libs/MicrosoftCalendarIncrementalSync.php');
+$fullSyncMethod = microsoftFullSyncRoutingMethod(
+    $incrementalSource,
+    'private function fullSync('
+);
+microsoftFullSyncRoutingExpect(
+    str_contains($fullSyncMethod, "'/calendarView/delta?'")
+        && str_contains($fullSyncMethod, 'new MicrosoftCalendarProvider(')
+        && str_contains($fullSyncMethod, '$provider->getEvents($calendarReference, $start, $end)'),
+    'The initial Microsoft sync must establish a delta token while keeping regular calendarView authoritative.'
 );
 
 $providerSource = (string) file_get_contents(__DIR__ . '/../libs/MicrosoftCalendarProvider.php');
@@ -59,7 +78,7 @@ $getEventsMethod = microsoftFullSyncRoutingMethod(
 microsoftFullSyncRoutingExpect(
     str_contains($getEventsMethod, "'/calendarView?'")
         && !str_contains($getEventsMethod, "'/calendarView/delta?'"),
-    'The regular Microsoft event provider must retrieve the authoritative calendarView snapshot.'
+    'The authoritative Microsoft full snapshot must continue to use regular calendarView.'
 );
 
 $calendarSource = (string) file_get_contents(__DIR__ . '/../Kalender/module.php');
@@ -69,8 +88,9 @@ $requestEventsMethod = microsoftFullSyncRoutingMethod(
 );
 microsoftFullSyncRoutingExpect(
     str_contains($requestEventsMethod, '$nextSyncToken !== \'\'')
-        && str_contains($requestEventsMethod, '$this->clearIncrementalSyncState();'),
-    'A full Microsoft transfer without a sync token must clear stale incremental state.'
+        && str_contains($requestEventsMethod, '$this->storeIncrementalSyncState(')
+        && str_contains($requestEventsMethod, '$this->mergeIncrementalEvents($cachedEvents, $transferredEvents)'),
+    'The calendar child must persist Microsoft delta state and merge incremental event changes.'
 );
 
-fwrite(STDOUT, "Microsoft full synchronization routing tests passed.\n");
+fwrite(STDOUT, "Microsoft incremental synchronization routing tests passed.\n");
