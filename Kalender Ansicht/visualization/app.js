@@ -28,6 +28,8 @@ const swipeNavigationViews = new Set(['threeDays', 'week', 'month']);
 const swipeMinimumDistance = 60;
 const swipeAxisRatio = 1.3;
 const ipsViewStateRefreshIntervalMilliseconds = 15_000;
+const visibleRangeRetryDelayMilliseconds = 300;
+const visibleRangeRetryMaxAttempts = 40;
 document.documentElement.style.setProperty('--agenda-color-bar-width', `${calendarAgendaColorBarWidth}px`);
 document.documentElement.style.setProperty('--compact-color-bar-width', `${calendarCompactColorBarWidth}px`);
 
@@ -58,6 +60,9 @@ let ipsViewStateRequestPending = false;
 let ipsViewStateRefreshRequested = false;
 let ipsViewStateRefreshTimer = null;
 let pendingRangeRequestSignature = '';
+let visibleRangeRetryTimer = null;
+let visibleRangeRetryAttempts = 0;
+let visibleRangeRetryForce = false;
 let pendingCalendarInvalidation = false;
 let importedIcsTimezone = '';
 let preservedAgendaScrollPosition = null;
@@ -186,6 +191,17 @@ function applyCalendarState(state) {
         : (initialized ? captureAgendaScrollPosition() : null);
     const releasePreservedAgendaScrollPosition = Boolean(agendaScrollWorkflow)
         && releaseAgendaScrollPositionAfterState;
+    const previousEvents = Array.isArray(calendarState.events) ? calendarState.events : [];
+    const previousRangeSignature = visualizationRangeSignature(calendarState.eventRange);
+    const incomingRange = state?.eventRange && typeof state.eventRange === 'object'
+        ? state.eventRange
+        : null;
+    const incomingRangeSignature = visualizationRangeSignature(incomingRange);
+    const incomingOffset = Math.max(0, Math.floor(Number(incomingRange?.offset) || 0));
+    const appendRangePage = incomingOffset > 0
+        && incomingRangeSignature !== ''
+        && incomingRangeSignature === previousRangeSignature;
+
     calendarState = state;
     const eventEdit = calendarState.eventEdit && typeof calendarState.eventEdit === 'object'
         ? calendarState.eventEdit
@@ -195,14 +211,15 @@ function applyCalendarState(state) {
         : null;
     delete calendarState.eventEdit;
     delete calendarState.seriesEdit;
-    calendarState.events = Array.isArray(calendarState.events) ? calendarState.events : [];
+    const incomingEvents = Array.isArray(calendarState.events) ? calendarState.events : [];
+    calendarState.events = appendRangePage
+        ? mergeRangePageEvents(previousEvents, incomingEvents)
+        : incomingEvents;
     calendarState.calendars = Array.isArray(calendarState.calendars) ? calendarState.calendars : [];
-    calendarState.eventRange = calendarState.eventRange && typeof calendarState.eventRange === 'object'
-        ? calendarState.eventRange
-        : null;
+    calendarState.eventRange = incomingRange;
     calendarState.settings = calendarState.settings || {};
-    const appliedRangeSignature = visualizationRangeSignature(calendarState.eventRange);
-    if (appliedRangeSignature !== '' && appliedRangeSignature === pendingRangeRequestSignature) {
+    const appliedRequestSignature = visualizationRangePageSignature(incomingRange, incomingOffset);
+    if (appliedRequestSignature !== '' && appliedRequestSignature === pendingRangeRequestSignature) {
         pendingRangeRequestSignature = '';
     }
     calendarStateSignature = calendarStateContentSignature(calendarState);
@@ -229,6 +246,31 @@ function applyCalendarState(state) {
         pendingSeriesEdit = null;
         openExistingEvent(seriesEdit, writeScope);
     }
+}
+
+function mergeRangePageEvents(previousEvents, incomingEvents) {
+    const merged = [];
+    const seen = new Set();
+    [...previousEvents, ...incomingEvents].forEach(event => {
+        const key = calendarEventRangeIdentity(event);
+        if (key !== '' && seen.has(key)) return;
+        if (key !== '') seen.add(key);
+        merged.push(event);
+    });
+    return merged;
+}
+
+function calendarEventRangeIdentity(event) {
+    if (!event || typeof event !== 'object') return '';
+    return [
+        Number(event.calendarInstanceId || 0),
+        String(event.occurrenceId || event.eventReference || event.uid || ''),
+        String(event.seriesId || ''),
+        String(event.originalStart || ''),
+        Number(event.startTimestamp || 0),
+        Number(event.endTimestamp || 0),
+        String(event.summary || '')
+    ].join('|');
 }
 
 function pendingEventEditMatches(eventEdit) {
@@ -3397,7 +3439,9 @@ window.addEventListener('resize', () => {
     if (activeView === 'month') scheduleMonthEventLayout();
 });
 document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState !== 'hidden') requestIPSViewStateRefresh();
+    if (document.visibilityState === 'hidden') return;
+    void ensureVisibleRangeLoaded();
+    requestIPSViewStateRefresh();
 });
 document.addEventListener('wheel', containWheelInsideTile, { capture: true, passive: false });
 content.addEventListener('pointerdown', beginSwipeNavigation);
@@ -3530,9 +3574,15 @@ function visualizationRangeSignature(range) {
     return start > 0 && end > start ? `${start}:${end}` : '';
 }
 
+function visualizationRangePageSignature(range, offset = 0) {
+    const signature = visualizationRangeSignature(range);
+    if (signature === '') return '';
+    return `${signature}@${Math.max(0, Math.floor(Number(offset) || 0))}`;
+}
+
 function loadedRangeCovers(range) {
     const loadedRange = calendarState.eventRange;
-    if (!loadedRange || typeof loadedRange !== 'object') return false;
+    if (!loadedRange || typeof loadedRange !== 'object' || loadedRange.hasMore === true) return false;
 
     const loadedStart = Number(loadedRange.start || 0);
     const loadedEnd = Number(loadedRange.end || 0);
@@ -3548,20 +3598,70 @@ async function ensureVisibleRangeLoaded(force = false) {
     const range = visibleViewRange();
     const signature = visualizationRangeSignature(range);
     if (signature === '') return;
-    if (!force && loadedRangeCovers(range)) return;
-    if (pendingRangeRequestSignature === signature) return;
 
-    pendingRangeRequestSignature = signature;
-    const success = await sendAction('LoadRange', {});
-    if (!success && pendingRangeRequestSignature === signature) {
-        pendingRangeRequestSignature = '';
+    if (isNativeVisualization() && typeof requestAction !== 'function') {
+        scheduleVisibleRangeRetry(force);
+        return;
     }
+
+    cancelVisibleRangeRetry();
+    const loadedRange = calendarState.eventRange;
+    const loadedSignature = visualizationRangeSignature(loadedRange);
+    if (!force && loadedSignature === signature && loadedRange?.hasMore === true) {
+        const nextOffset = Math.max(0, Math.floor(Number(loadedRange.nextOffset) || 0));
+        if (nextOffset > 0) {
+            await requestVisibleRangePage(range, nextOffset);
+            return;
+        }
+    }
+    if (!force && loadedRangeCovers(range)) return;
+
+    await requestVisibleRangePage(range, 0, force);
+}
+
+async function requestVisibleRangePage(range, offset, force = false) {
+    const requestSignature = visualizationRangePageSignature(range, offset);
+    if (requestSignature === '' || pendingRangeRequestSignature === requestSignature) return;
+
+    pendingRangeRequestSignature = requestSignature;
+    const success = await sendAction('LoadRange', {
+        _viewRange: range,
+        _eventOffset: Math.max(0, Math.floor(Number(offset) || 0))
+    });
+    if (!success && pendingRangeRequestSignature === requestSignature) {
+        pendingRangeRequestSignature = '';
+        scheduleVisibleRangeRetry(force);
+    }
+}
+
+function scheduleVisibleRangeRetry(force = false) {
+    visibleRangeRetryForce = visibleRangeRetryForce || force;
+    if (visibleRangeRetryTimer !== null || visibleRangeRetryAttempts >= visibleRangeRetryMaxAttempts) return;
+
+    visibleRangeRetryTimer = window.setTimeout(() => {
+        visibleRangeRetryTimer = null;
+        visibleRangeRetryAttempts += 1;
+        const retryForce = visibleRangeRetryForce;
+        visibleRangeRetryForce = false;
+        void ensureVisibleRangeLoaded(retryForce);
+    }, visibleRangeRetryDelayMilliseconds);
+}
+
+function cancelVisibleRangeRetry() {
+    if (visibleRangeRetryTimer !== null) {
+        window.clearTimeout(visibleRangeRetryTimer);
+        visibleRangeRetryTimer = null;
+    }
+    visibleRangeRetryAttempts = 0;
+    visibleRangeRetryForce = false;
 }
 
 function actionValueWithViewRange(value) {
     const range = visibleViewRange();
     if (value && typeof value === 'object' && !Array.isArray(value)) {
-        return { ...value, _viewRange: range };
+        return Object.prototype.hasOwnProperty.call(value, '_viewRange')
+            ? { ...value }
+            : { ...value, _viewRange: range };
     }
 
     return { _value: value, _viewRange: range };

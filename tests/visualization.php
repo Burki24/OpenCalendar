@@ -850,18 +850,22 @@ assertVisualization(
 assertVisualization(
     str_contains($moduleSource, 'private const VISUALIZATION_BOOTSTRAP_FUTURE_DAYS = 42;')
         && str_contains($moduleSource, 'private const VISUALIZATION_MAX_RANGE_DAYS = 370;')
-        && str_contains($moduleSource, 'private function buildState(?int $requestedRangeStart = null, ?int $requestedRangeEnd = null): array')
+        && str_contains($moduleSource, 'private function buildState(?int $requestedRangeStart = null, ?int $requestedRangeEnd = null, int $eventOffset = 0): array')
         && str_contains($moduleSource, "'eventRange'  => [")
         && str_contains($moduleSource, "case 'LoadRange':")
+        && str_contains($moduleSource, "if (\$ident !== 'LoadRange') {")
         && str_contains($moduleSource, '$state = $this->buildStateForActionValue($value);')
-        && str_contains($moduleSource, 'private function visualizationRangeFromActionValue(mixed $value): ?array'),
+        && str_contains($moduleSource, 'private function visualizationRangeFromActionValue(mixed $value): ?array')
+        && str_contains($moduleSource, 'private function visualizationEventOffsetFromActionValue(mixed $value): int'),
     'Calendar View must build bounded visualization states and expose a dedicated visible-range action.'
 );
 assertVisualization(
     str_contains($script, 'function visibleViewRange()')
         && str_contains($script, 'function ensureVisibleRangeLoaded(force = false)')
-        && str_contains($script, "await sendAction('LoadRange', {})")
-        && str_contains($script, 'return { ...value, _viewRange: range };')
+        && str_contains($script, 'async function requestVisibleRangePage(range, offset, force = false)')
+        && str_contains($script, "const success = await sendAction('LoadRange', {")
+        && str_contains($script, '_eventOffset: Math.max(0, Math.floor(Number(offset) || 0))')
+        && str_contains($script, "Object.prototype.hasOwnProperty.call(value, '_viewRange')")
         && str_contains($script, 'eventRange: state.eventRange && typeof state.eventRange ===')
         && str_contains($script, 'void ensureVisibleRangeLoaded();')
         && str_contains($script, "message.type === 'invalidate'")
@@ -870,9 +874,22 @@ assertVisualization(
 );
 assertVisualization(
     str_contains($moduleSource, '$totalEventCount = count($events);')
-        && str_contains($moduleSource, "'truncated'  => \$totalEventCount > \$maximumEvents")
-        && str_contains($moduleSource, '$events = array_slice($events, 0, $maximumEvents);'),
-    'The maximum-event setting must act as a safety limit for the requested visualization range.'
+        && str_contains($moduleSource, '$events = array_slice($events, $eventOffset, $maximumEvents);')
+        && str_contains($moduleSource, '$hasMore = $nextOffset < $totalEventCount;')
+        && str_contains($moduleSource, "'offset'     => \$eventOffset")
+        && str_contains($moduleSource, "'nextOffset' => \$hasMore ? \$nextOffset : null")
+        && str_contains($script, 'loadedRange?.hasMore === true')
+        && str_contains($script, 'mergeRangePageEvents(previousEvents, incomingEvents)'),
+    'The maximum-event setting must page large visible ranges instead of permanently truncating later events.'
+);
+assertVisualization(
+    str_contains($script, 'const visibleRangeRetryDelayMilliseconds = 300;')
+        && str_contains($script, 'function scheduleVisibleRangeRetry(force = false)')
+        && str_contains($script, "isNativeVisualization() && typeof requestAction !== 'function'")
+        && str_contains($script, 'scheduleVisibleRangeRetry(force);')
+        && str_contains($script, "document.addEventListener('visibilitychange', () => {")
+        && str_contains($script, 'void ensureVisibleRangeLoaded();'),
+    'The native tile must retry its initial visible-range request until the Symcon action bridge becomes available.'
 );
 
 $renderer = new CalendarVisualizationRenderer();

@@ -1446,7 +1446,7 @@ class CalendarView extends IPSModuleStrict
     /**
      * @return array<string, mixed>
      */
-    private function buildState(?int $requestedRangeStart = null, ?int $requestedRangeEnd = null): array
+    private function buildState(?int $requestedRangeStart = null, ?int $requestedRangeEnd = null, int $eventOffset = 0): array
     {
         if (!$this->isRuntimeReady()) {
             return $this->emptyState();
@@ -1519,7 +1519,10 @@ class CalendarView extends IPSModuleStrict
         );
         $totalEventCount = count($events);
         $maximumEvents = max(1, min(1000, $this->ReadPropertyInteger('MaxEvents')));
-        $events = array_slice($events, 0, $maximumEvents);
+        $eventOffset = max(0, $eventOffset);
+        $events = array_slice($events, $eventOffset, $maximumEvents);
+        $nextOffset = $eventOffset + count($events);
+        $hasMore = $nextOffset < $totalEventCount;
 
         return [
             'events'      => $events,
@@ -1528,7 +1531,11 @@ class CalendarView extends IPSModuleStrict
             'eventRange'  => [
                 'start'      => $rangeStart,
                 'end'        => $rangeEnd,
-                'truncated'  => $totalEventCount > $maximumEvents,
+                'offset'     => $eventOffset,
+                'pageCount'  => count($events),
+                'truncated'  => $hasMore,
+                'hasMore'    => $hasMore,
+                'nextOffset' => $hasMore ? $nextOffset : null,
                 'totalCount' => $totalEventCount
             ],
             'settings'    => $this->viewSettings()
@@ -2755,7 +2762,9 @@ class CalendarView extends IPSModuleStrict
         if ($seriesEdit !== null) {
             $state['seriesEdit'] = $seriesEdit;
         }
-        $this->broadcastState($state);
+        if ($ident !== 'LoadRange') {
+            $this->broadcastState($state);
+        }
 
         return [
             'state'   => $state,
@@ -2848,7 +2857,11 @@ class CalendarView extends IPSModuleStrict
             return $this->buildState();
         }
 
-        return $this->buildState($range[0], $range[1]);
+        return $this->buildState(
+            $range[0],
+            $range[1],
+            $this->visualizationEventOffsetFromActionValue($value)
+        );
     }
 
     /**
@@ -2880,6 +2893,26 @@ class CalendarView extends IPSModuleStrict
         }
 
         return [$start, $end];
+    }
+
+    /**
+     * Returns the zero-based event offset requested for a paged visualization range.
+     */
+    private function visualizationEventOffsetFromActionValue(mixed $value): int
+    {
+        $request = $value;
+        if (is_string($value)) {
+            try {
+                $request = json_decode($value, true, 512, JSON_THROW_ON_ERROR);
+            } catch (JsonException) {
+                return 0;
+            }
+        }
+        if (!is_array($request) || array_is_list($request)) {
+            return 0;
+        }
+
+        return max(0, (int) ($request['_eventOffset'] ?? 0));
     }
 
     /**
