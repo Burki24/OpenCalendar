@@ -12,12 +12,15 @@ use IPSKalender\GoogleCalendarIncrementalSync;
 use IPSKalender\GoogleCalendarOriginPolicy;
 use IPSKalender\GoogleCalendarProvider;
 use IPSKalender\ICalendarRecurrence;
+use IPSKalender\MicrosoftCalendarDebugHttpClient;
 use IPSKalender\MicrosoftCalendarIncrementalSync;
+use IPSKalender\MicrosoftCalendarProvider;
 use IPSKalender\MicrosoftGraphOriginPolicy;
 use IPSKalender\RecurringCalendarProviderInterface;
 
 require_once __DIR__ . '/../../libs/CalDAVIncrementalSync.php';
 require_once __DIR__ . '/../../libs/GoogleCalendarIncrementalSync.php';
+require_once __DIR__ . '/../../libs/MicrosoftCalendarDebugHttpClient.php';
 require_once __DIR__ . '/../../libs/MicrosoftCalendarIncrementalSync.php';
 
 trait KalenderKontoChildGatewayTrait
@@ -114,7 +117,20 @@ trait KalenderKontoChildGatewayTrait
         }
 
         $startedAt = microtime(true);
-        $events = $this->createProvider()->getEvents(
+        $providerType = $this->ReadPropertyInteger('Provider');
+        $microsoftDebugClient = null;
+        if ($providerType === self::PROVIDER_MICROSOFT) {
+            $microsoftDebugClient = new MicrosoftCalendarDebugHttpClient(
+                $this->createTrustedCloudHttpClient(new MicrosoftGraphOriginPolicy())
+            );
+            $provider = new MicrosoftCalendarProvider(
+                $microsoftDebugClient,
+                $this->getMicrosoftAccessToken()
+            );
+        } else {
+            $provider = $this->createProvider();
+        }
+        $events = $provider->getEvents(
             $this->calendarReference($calendar),
             new DateTimeImmutable('@' . $startTimestamp),
             new DateTimeImmutable('@' . $endTimestamp)
@@ -126,7 +142,10 @@ trait KalenderKontoChildGatewayTrait
             'eventCount' => count($events),
             'durationMs' => (int) round((microtime(true) - $startedAt) * 1000)
         ]);
-        if ($this->ReadPropertyInteger('Provider') === self::PROVIDER_ICS) {
+        if ($providerType === self::PROVIDER_MICROSOFT && $microsoftDebugClient !== null) {
+            $this->SendSafeDebug('MicrosoftGraphCalendarView', $microsoftDebugClient->diagnostics());
+            $this->SendSafeDebug('MicrosoftMappedEvents', $this->microsoftMappedEventDiagnostics($events));
+        } elseif ($providerType === self::PROVIDER_ICS) {
             $recurrenceDiagnostics = ICalendarRecurrence::diagnostics($events);
             if ($recurrenceDiagnostics['seriesCount'] > 0) {
                 $this->SendSafeDebug('RecurrenceExpansion', $recurrenceDiagnostics);
@@ -134,6 +153,79 @@ trait KalenderKontoChildGatewayTrait
         }
 
         return $events;
+    }
+
+    /**
+     * Summarizes the normalized Microsoft events after provider mapping.
+     *
+     * @param list<array<string, mixed>> $events
+     * @return array<string, mixed>
+     */
+    private function microsoftMappedEventDiagnostics(array $events): array
+    {
+        $typeCounts = [];
+        $recurringSamples = [];
+        $firstStart = '';
+        $lastStart = '';
+
+        foreach ($events as $event) {
+            $type = strtolower(trim((string) ($event['recurrenceType'] ?? '')));
+            if ($type === '') {
+                $type = (bool) ($event['recurring'] ?? false) ? 'recurring-unknown' : 'single';
+            }
+            $typeCounts[$type] = ($typeCounts[$type] ?? 0) + 1;
+
+            $start = trim((string) ($event['start'] ?? ''));
+            if ($start !== '') {
+                if ($firstStart === '' || strcmp($start, $firstStart) < 0) {
+                    $firstStart = $start;
+                }
+                if ($lastStart === '' || strcmp($start, $lastStart) > 0) {
+                    $lastStart = $start;
+                }
+            }
+
+            if (!(bool) ($event['recurring'] ?? false) || count($recurringSamples) >= 50) {
+                continue;
+            }
+
+            $recurringSamples[] = [
+                'summary'        => $this->microsoftDebugSummary((string) ($event['summary'] ?? '')),
+                'type'           => $type,
+                'start'          => $start,
+                'eventHash'      => $this->microsoftDebugReferenceHash((string) ($event['eventReference'] ?? '')),
+                'seriesHash'     => $this->microsoftDebugReferenceHash((string) ($event['seriesId'] ?? '')),
+                'occurrenceHash' => $this->microsoftDebugReferenceHash((string) ($event['occurrenceId'] ?? ''))
+            ];
+        }
+
+        ksort($typeCounts, SORT_NATURAL);
+
+        return [
+            'eventCount'       => count($events),
+            'typeCounts'       => $typeCounts,
+            'firstStart'       => $firstStart,
+            'lastStart'        => $lastStart,
+            'recurringSamples' => $recurringSamples
+        ];
+    }
+
+    private function microsoftDebugReferenceHash(string $value): string
+    {
+        $value = trim($value);
+        return $value === '' ? '' : substr(hash('sha256', $value), 0, 12);
+    }
+
+    private function microsoftDebugSummary(string $summary): string
+    {
+        $summary = trim((string) preg_replace('/\s+/u', ' ', $summary));
+        if ($summary === '') {
+            return '';
+        }
+
+        return function_exists('mb_substr')
+            ? mb_substr($summary, 0, 80, 'UTF-8')
+            : substr($summary, 0, 80);
     }
 
     /**
