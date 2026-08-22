@@ -92,8 +92,7 @@
                                     },
                                     {
                                         "caption": "Use an existing calendar account",
-                                        "value": "existing",
-                                        "enabled": false
+                                        "value": "existing"
                                     }
                                 ]
                             },
@@ -104,22 +103,17 @@
                                 "value": ""
                             },
                             {
-                                "type": "Select",
+                                "type": "SelectInstance",
                                 "name": "ExistingAccountID",
                                 "caption": "Existing calendar account",
-                                "enabled": false,
-                                "value": 0,
-                                "options": [
-                                    {
-                                        "caption": "Select a calendar provider first.",
-                                        "value": 0,
-                                        "enabled": false
-                                    }
-                                ]
+                                "validModules": [
+                                    "{966D6119-7FF3-5CA5-06C3-536FBF8100C4}"
+                                ],
+                                "value": 0
                             },
                             {
                                 "type": "Label",
-                                "caption": "Only calendar accounts for the selected provider are offered."
+                                "caption": "For a new account, enter a name. For an existing account, select an account that uses the chosen provider."
                             }
                         ],
                         "validate": "return IPSKALDISCOVERY_ValidateWizardAccountSelection($id, $AccountMode, $ExistingAccountID, $AccountName);",

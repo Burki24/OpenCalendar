@@ -21,11 +21,13 @@ Der Assistent führt aktuell durch folgende Schritte:
 3. Kalender Konto auswählen oder ein neues Konto vorbereiten
 4. Kontoauswahl bestätigen
 
-Bei einem **vorhandenen Kalender Konto** werden in der Auswahl nur Konten des
-zuvor gewählten Kalenderanbieters angeboten. Gibt es für diesen Anbieter noch
-kein passendes Konto, ist die Auswahl **Vorhandenes Kalender Konto verwenden**
-deaktiviert. Die Provider-Prüfung im Modul bleibt zusätzlich als Schutz gegen
-ungültige oder manipulierte Aufrufe erhalten.
+Bei einem **vorhandenen Kalender Konto** öffnet die Auswahl den nativen
+Symcon-Objektbaum und ist auf Instanzen vom Typ **Calendar Account** beschränkt.
+Dadurch sind neben dem Instanznamen auch die von Symcon dargestellten
+Objektinformationen sichtbar; bei den Kalender-Konten zeigt die Spalte **Wert**
+bereits den Anbieter beziehungsweise die Kontoinformation an. OpenCalendar prüft
+zusätzlich weiterhin, ob der Anbieter der ausgewählten Instanz zur Auswahl im
+Wizard passt.
 
 Bei einem **neuen Kalender Konto** wird die Instanz erst mit **OK** auf der
 Bestätigungsseite erzeugt. Der gewählte Anbieter und der eingegebene Name werden
