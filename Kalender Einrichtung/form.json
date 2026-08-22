@@ -1,0 +1,95 @@
+{
+    "actions": [
+        {
+            "type": "Label",
+            "caption": "OpenCalendar can be configured step by step with the setup assistant."
+        },
+        {
+            "type": "PopupButton",
+            "name": "SetupWizard",
+            "caption": "Start OpenCalendar setup",
+            "width": "300px",
+            "popup": {
+                "caption": "OpenCalendar setup",
+                "closeCaption": "Cancel",
+                "items": [
+                    {
+                        "type": "Label",
+                        "caption": "This fallback content is not shown while wizard pages are available."
+                    }
+                ],
+                "pages": [
+                    {
+                        "name": "welcome",
+                        "caption": "Welcome to OpenCalendar",
+                        "items": [
+                            {
+                                "type": "Label",
+                                "caption": "This assistant will guide you through the initial OpenCalendar setup."
+                            },
+                            {
+                                "type": "Label",
+                                "caption": "No calendar objects are created in this first technical wizard step."
+                            }
+                        ],
+                        "nextPage": "provider"
+                    },
+                    {
+                        "name": "provider",
+                        "caption": "Choose calendar provider",
+                        "items": [
+                            {
+                                "type": "RadioButtonGroup",
+                                "name": "Provider",
+                                "caption": "Calendar provider",
+                                "value": "",
+                                "options": [
+                                    {
+                                        "caption": "Please select a provider",
+                                        "value": ""
+                                    },
+                                    {
+                                        "caption": "Google Calendar",
+                                        "value": "google"
+                                    },
+                                    {
+                                        "caption": "Microsoft 365 / Outlook.com",
+                                        "value": "microsoft"
+                                    },
+                                    {
+                                        "caption": "Apple iCloud",
+                                        "value": "apple"
+                                    },
+                                    {
+                                        "caption": "CalDAV",
+                                        "value": "caldav"
+                                    },
+                                    {
+                                        "caption": "ICS / Webcal",
+                                        "value": "ics"
+                                    }
+                                ]
+                            }
+                        ],
+                        "validate": "return $Provider === '' ? 'Please select a calendar provider.' : '';",
+                        "nextPage": "summary"
+                    },
+                    {
+                        "name": "summary",
+                        "caption": "Setup overview",
+                        "items": [
+                            {
+                                "type": "Label",
+                                "caption": "The Symcon 9.1 wizard framework is working and the provider selection was accepted."
+                            },
+                            {
+                                "type": "Label",
+                                "caption": "Press OK to close the assistant. No instances or calendar objects are created yet."
+                            }
+                        ]
+                    }
+                ]
+            }
+        }
+    ]
+}

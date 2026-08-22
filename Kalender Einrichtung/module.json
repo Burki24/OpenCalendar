@@ -1,0 +1,12 @@
+{
+    "id": "{3CD8AB0E-BDB4-4B3F-A838-B4003A3BAD81}",
+    "name": "OpenCalendar Discovery",
+    "type": 5,
+    "vendor": "Burkhard Kneiseler",
+    "aliases": [],
+    "parentRequirements": [],
+    "childRequirements": [],
+    "implemented": [],
+    "prefix": "IPSKALDISCOVERY",
+    "url": "https://github.com/Burki24/OpenCalendar/blob/main/Kalender%20Einrichtung/README.md"
+}

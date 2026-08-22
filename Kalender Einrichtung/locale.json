@@ -1,0 +1,27 @@
+{
+    "translations": {
+        "de": {
+            "OpenCalendar Discovery": "Kalender Einrichtung",
+            "OpenCalendar can be configured step by step with the setup assistant.": "OpenCalendar kann mit dem Einrichtungsassistenten Schritt für Schritt konfiguriert werden.",
+            "Start OpenCalendar setup": "OpenCalendar einrichten",
+            "OpenCalendar setup": "OpenCalendar Einrichtung",
+            "Cancel": "Abbrechen",
+            "This fallback content is not shown while wizard pages are available.": "Dieser Ersatzinhalt wird nicht angezeigt, solange Wizard-Seiten verfügbar sind.",
+            "Welcome to OpenCalendar": "Willkommen bei OpenCalendar",
+            "This assistant will guide you through the initial OpenCalendar setup.": "Dieser Assistent führt durch die erstmalige Einrichtung von OpenCalendar.",
+            "No calendar objects are created in this first technical wizard step.": "In diesem ersten technischen Wizard-Schritt werden noch keine Kalenderobjekte angelegt.",
+            "Choose calendar provider": "Kalenderanbieter auswählen",
+            "Calendar provider": "Kalenderanbieter",
+            "Please select a provider": "Bitte einen Anbieter auswählen",
+            "Google Calendar": "Google Kalender",
+            "Microsoft 365 / Outlook.com": "Microsoft 365 / Outlook.com",
+            "Apple iCloud": "Apple iCloud",
+            "CalDAV": "CalDAV",
+            "ICS / Webcal": "ICS / Webcal",
+            "Please select a calendar provider.": "Bitte einen Kalenderanbieter auswählen.",
+            "Setup overview": "Einrichtungsübersicht",
+            "The Symcon 9.1 wizard framework is working and the provider selection was accepted.": "Das Symcon-9.1-Wizard-Grundgerüst funktioniert und die Anbieterauswahl wurde übernommen.",
+            "Press OK to close the assistant. No instances or calendar objects are created yet.": "Mit OK wird der Assistent geschlossen. Es werden noch keine Instanzen oder Kalenderobjekte angelegt."
+        }
+    }
+}
