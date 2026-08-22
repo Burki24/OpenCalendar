@@ -356,6 +356,15 @@ assertCalendarViewApi(
 );
 $normalizedModuleSource = preg_replace('/\s+/', ' ', $moduleSource) ?? $moduleSource;
 assertCalendarViewApi(
+    str_contains($moduleSource, "case 'LoadRange':")
+        && str_contains($moduleSource, '$this->validateVisualizationActionRange($value);')
+        && str_contains($moduleSource, 'private function validateVisualizationActionRange(mixed $value): void')
+        && str_contains($moduleSource, '$this->Translate(\'The visualization request is invalid.\')')
+        && str_contains($moduleSource, '$this->resolveVisualizationRange($range[0], $range[1]);'),
+    'Explicit visualization range loads must reject malformed or oversized client ranges instead of falling back to bootstrap data.'
+);
+
+assertCalendarViewApi(
     str_contains($moduleSource, 'public function GetSelectedCalendars(): string')
         && str_contains($moduleSource, '$this->loadSelectedCalendars(true)')
         && str_contains($moduleSource, 'private function loadSelectedCalendars(bool $includeOperationalMetadata = false): array')
@@ -404,6 +413,8 @@ $buildReminderRecordsMethod = new ReflectionMethod(CalendarView::class, 'buildRe
 $buildReminderRecordsMethod->setAccessible(true);
 $validateReminderMinutesWindowMethod = new ReflectionMethod(CalendarView::class, 'validateReminderMinutesWindow');
 $validateReminderMinutesWindowMethod->setAccessible(true);
+$validateVisualizationActionRangeMethod = new ReflectionMethod(CalendarView::class, 'validateVisualizationActionRange');
+$validateVisualizationActionRangeMethod->setAccessible(true);
 $calendarView = new CalendarView(1);
 $previousTimezone = date_default_timezone_get();
 date_default_timezone_set('Europe/Berlin');
@@ -816,6 +827,49 @@ assertCalendarViewApi(
         $noDefaultReminderCalendar
     ) === null,
     'A calendar default without an active reminder must not create an artificial reminder trigger.'
+);
+
+$rangeStartTimestamp = (new DateTimeImmutable('2026-08-01T00:00:00+02:00'))->getTimestamp();
+$validateVisualizationActionRangeMethod->invoke(
+    $calendarView,
+    [
+        '_viewRange' => [
+            'start' => $rangeStartTimestamp,
+            'end'   => $rangeStartTimestamp + (370 * 86400)
+        ]
+    ]
+);
+assertCalendarViewApiThrows(
+    static fn (): mixed => $validateVisualizationActionRangeMethod->invoke($calendarView, []),
+    'LoadRange validation must reject a missing explicit view range.'
+);
+assertCalendarViewApiThrows(
+    static fn (): mixed => $validateVisualizationActionRangeMethod->invoke(
+        $calendarView,
+        [
+            '_viewRange' => [
+                'start' => $rangeStartTimestamp,
+                'end'   => $rangeStartTimestamp
+            ]
+        ]
+    ),
+    'LoadRange validation must reject empty or reversed view ranges.'
+);
+assertCalendarViewApiThrows(
+    static fn (): mixed => $validateVisualizationActionRangeMethod->invoke(
+        $calendarView,
+        [
+            '_viewRange' => [
+                'start' => $rangeStartTimestamp,
+                'end'   => $rangeStartTimestamp + (370 * 86400) + 1
+            ]
+        ]
+    ),
+    'LoadRange validation must reject ranges beyond the visualization safety limit.'
+);
+assertCalendarViewApiThrows(
+    static fn (): mixed => $validateVisualizationActionRangeMethod->invoke($calendarView, '{invalid json'),
+    'LoadRange validation must reject malformed JSON action values.'
 );
 
 $validateReminderMinutesWindowMethod->invoke($calendarView, 1);

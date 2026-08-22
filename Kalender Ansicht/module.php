@@ -2583,6 +2583,7 @@ class CalendarView extends IPSModuleStrict
 
         switch ($ident) {
             case 'LoadRange':
+                $this->validateVisualizationActionRange($value);
                 break;
 
             case 'Refresh':
@@ -2958,6 +2959,23 @@ class CalendarView extends IPSModuleStrict
             $payload,
             JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES
         );
+    }
+
+    /**
+     * Rejects malformed or oversized explicit range requests.
+     *
+     * LoadRange is the only action whose sole purpose is to retrieve one client-specific
+     * interval, so silently falling back to the bootstrap range would return unrelated
+     * data and can make concurrent clients overwrite each other's visible state.
+     */
+    private function validateVisualizationActionRange(mixed $value): void
+    {
+        $range = $this->visualizationRangeFromActionValue($value);
+        if ($range === null) {
+            throw new InvalidArgumentException($this->Translate('The visualization request is invalid.'));
+        }
+
+        $this->resolveVisualizationRange($range[0], $range[1]);
     }
 
     /**
