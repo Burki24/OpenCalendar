@@ -96,6 +96,29 @@ $style = (string) file_get_contents(__DIR__ . '/../Kalender Ansicht/visualizatio
 $moduleSource = (string) file_get_contents(__DIR__ . '/../Kalender Ansicht/module.php');
 $formSource = (string) file_get_contents(__DIR__ . '/../Kalender Ansicht/form.json');
 $localeSource = (string) file_get_contents(__DIR__ . '/../Kalender Ansicht/locale.json');
+$localeData = json_decode($localeSource, true, 512, JSON_THROW_ON_ERROR);
+$germanTranslations = is_array($localeData['translations']['de'] ?? null)
+    ? $localeData['translations']['de']
+    : [];
+preg_match_all('/Translate\\(\'([^\']+)\'\\)/', $moduleSource, $moduleTranslationMatches);
+foreach (array_unique($moduleTranslationMatches[1] ?? []) as $translationKey) {
+    assertVisualization(
+        array_key_exists($translationKey, $germanTranslations),
+        'Every literal Calendar View Translate() key must have a German locale entry: ' . $translationKey
+    );
+}
+foreach ([
+    'Tile week orientation',
+    'IPSView week orientation',
+    'Horizontal',
+    'Vertical',
+    'Recurring events cannot be moved yet.'
+] as $obsoleteTranslationKey) {
+    assertVisualization(
+        !array_key_exists($obsoleteTranslationKey, $germanTranslations),
+        'Obsolete Calendar View locale entries must be removed: ' . $obsoleteTranslationKey
+    );
+}
 assertVisualization(
     str_contains($script, 'return event.allDay ? allDayDate(event.start, event.startTimestamp)')
         && str_contains($script, 'allDayDate(event.end, event.endTimestamp || event.startTimestamp)')

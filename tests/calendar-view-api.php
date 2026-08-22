@@ -206,6 +206,16 @@ assertCalendarViewApi(
         && str_contains($readmeSource, '`calendarName`'),
     'Calendar View PHP reference must explain the zero calendar filter and compact reminder/calendar fields.'
 );
+assertCalendarViewApi(
+    str_contains($readmeSource, 'Einzeltermine sowie unterstützte Bereiche von Serienterminen')
+        && str_contains($readmeSource, 'Termin** als einzelner Termin ins Ziel verschoben werden.')
+        && str_contains($readmeSource, 'folgenden Termine** sowie die **Gesamte Serie** lassen sich verschieben')
+        && str_contains($readmeSource, 'Zielkalender neue Serientermine anlegen kann.')
+        && str_contains($readmeSource, 'Schlägt das Löschen im Quellkalender fehl')
+        && str_contains($readmeSource, 'gerade im Ziel angelegten Termin wieder zu löschen. Nur wenn auch dieser Rollback')
+        && str_contains($readmeSource, 'scheitert, bleibt die Zielkopie bestehen'),
+    'Calendar View documentation must describe supported recurring moves and the target rollback behavior accurately.'
+);
 
 assertCalendarViewApi(
     str_contains($calendarModuleSource, "RegisterAttributeString('AnniversaryMetadata', '[]')")

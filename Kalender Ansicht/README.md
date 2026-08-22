@@ -69,17 +69,26 @@ Sicherung wiederhergestellt, soweit diese verfügbar ist.
 
 Google-, Microsoft-, Apple-iCloud- und CalDAV-Serienvorkommnisse können einzeln, ab dem ausgewählten Vorkommnis oder als vollständige Serie bearbeitet und gelöscht werden, sofern die Wiederholungsregel verlustfrei geteilt werden kann. Beim **Bearbeiten** teilt OpenCalendar die bestehende Serie am gewählten Vorkommnis: Der vordere Serienteil bleibt unverändert, ab dem gewählten Termin entsteht ein neuer Serienteil mit den Änderungen. Bereits vorhandene Ausnahmen ab diesem Termin werden dabei zurückgesetzt. Beim **Löschen** beendet OpenCalendar die bestehende Serie direkt vor dem gewählten Vorkommnis; beim ersten Vorkommnis wird die komplette Serie entfernt. Bei nummerierten Serien wird beim Teilen nur die verbleibende Anzahl in den neuen Serienteil übernommen.
 
-Normale Einzeltermine können im Bearbeitungsdialog in einen anderen, in dieser
-Kalender Ansicht ausgewählten und beschreibbaren Kalender verschoben werden.
-Dazu wird im Feld **Kalender** einfach ein anderes Ziel gewählt; die
-Schaltfläche **Speichern** wechselt dann auf **Verschieben**. OpenCalendar legt
-den Termin zuerst im Zielkalender an und löscht ihn erst anschließend im
-Quellkalender. Scheitert das Löschen, bleibt die Zielkopie bewusst erhalten und
-der Anwender wird aufgefordert, beide Kalender zu prüfen, damit kein Termin
-durch einen unsicheren Rollback verloren geht. Providerübergreifendes
-Verschieben, beispielsweise Google → Microsoft oder CalDAV → Google, ist damit
-möglich. Provider-spezifische Zusatzdaten, die OpenCalendar nicht im gemeinsamen
-Terminmodell führt, werden dabei nicht übertragen.
+Einzeltermine sowie unterstützte Bereiche von Serienterminen können im
+Bearbeitungsdialog in einen anderen, in dieser Kalender Ansicht ausgewählten und
+beschreibbaren Kalender verschoben werden. Bei einer Serie kann **Nur diesen
+Termin** als einzelner Termin ins Ziel verschoben werden. **Diesen und alle
+folgenden Termine** sowie die **Gesamte Serie** lassen sich verschieben, wenn der
+Quellkalender den jeweiligen Schreibumfang erlaubt, die Wiederholungsregel
+verlustfrei bearbeitbar ist und der Zielkalender neue Serientermine anlegen kann.
+Komplexe oder nicht verlustfrei übertragbare Erinnerungseinstellungen blockieren
+den Vorgang.
+
+Dazu wird im Feld **Kalender** ein anderes Ziel gewählt; die Schaltfläche
+**Speichern** wechselt dann auf **Verschieben**. OpenCalendar legt den Termin
+zuerst im Zielkalender an und löscht ihn erst anschließend im Quellkalender.
+Schlägt das Löschen im Quellkalender fehl, versucht OpenCalendar zunächst, den
+gerade im Ziel angelegten Termin wieder zu löschen. Nur wenn auch dieser Rollback
+scheitert, bleibt die Zielkopie bestehen und der Anwender wird aufgefordert,
+beide Kalender zu prüfen. Providerübergreifendes Verschieben, beispielsweise
+Google → Microsoft oder CalDAV → Google, ist damit möglich. Provider-spezifische
+Zusatzdaten, die OpenCalendar nicht im gemeinsamen Terminmodell führt, werden
+dabei nicht übertragen.
 
 ## Einstellungen
 
