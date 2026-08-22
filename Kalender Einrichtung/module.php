@@ -33,11 +33,13 @@ class OpenCalendarDiscovery extends IPSModuleStrict
                 $this->assertSupportedProvider($provider);
                 $this->SetBuffer('WizardProvider', $provider);
                 $this->SetBuffer('WizardAccountSelection', '');
+                $this->updateCalendarAccountSelectionForm($provider);
                 break;
 
             case 'WizardProviderUndo':
                 $this->SetBuffer('WizardProvider', '');
                 $this->SetBuffer('WizardAccountSelection', '');
+                $this->resetCalendarAccountSelectionForm();
                 break;
 
             case 'WizardAccountSelection':
@@ -157,6 +159,125 @@ class OpenCalendarDiscovery extends IPSModuleStrict
         }
 
         return $accountID;
+    }
+
+    private function updateCalendarAccountSelectionForm(string $provider): void
+    {
+        $accountOptions = $this->calendarAccountOptions($provider);
+        $hasExistingAccount = count($accountOptions) > 1;
+
+        $accountModeOptions = [
+            [
+                'caption' => $this->Translate('Create a new calendar account'),
+                'value'   => self::ACCOUNT_MODE_NEW
+            ],
+            [
+                'caption' => $this->Translate('Use an existing calendar account'),
+                'value'   => self::ACCOUNT_MODE_EXISTING,
+                'enabled' => $hasExistingAccount
+            ]
+        ];
+
+        $this->UpdateFormField(
+            'AccountMode',
+            'options',
+            json_encode($accountModeOptions, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE)
+        );
+        $this->UpdateFormField('AccountMode', 'value', self::ACCOUNT_MODE_NEW);
+        $this->UpdateFormField(
+            'ExistingAccountID',
+            'options',
+            json_encode($accountOptions, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE)
+        );
+        $this->UpdateFormField('ExistingAccountID', 'value', 0);
+        $this->UpdateFormField('ExistingAccountID', 'enabled', $hasExistingAccount);
+    }
+
+    private function resetCalendarAccountSelectionForm(): void
+    {
+        $accountModeOptions = [
+            [
+                'caption' => $this->Translate('Create a new calendar account'),
+                'value'   => self::ACCOUNT_MODE_NEW
+            ],
+            [
+                'caption' => $this->Translate('Use an existing calendar account'),
+                'value'   => self::ACCOUNT_MODE_EXISTING,
+                'enabled' => false
+            ]
+        ];
+        $accountOptions = [
+            [
+                'caption' => $this->Translate('Select a calendar provider first.'),
+                'value'   => 0,
+                'enabled' => false
+            ]
+        ];
+
+        $this->UpdateFormField(
+            'AccountMode',
+            'options',
+            json_encode($accountModeOptions, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE)
+        );
+        $this->UpdateFormField('AccountMode', 'value', self::ACCOUNT_MODE_NEW);
+        $this->UpdateFormField(
+            'ExistingAccountID',
+            'options',
+            json_encode($accountOptions, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE)
+        );
+        $this->UpdateFormField('ExistingAccountID', 'value', 0);
+        $this->UpdateFormField('ExistingAccountID', 'enabled', false);
+    }
+
+    /**
+     * @return list<array{caption: string, value: int, enabled?: bool}>
+     */
+    private function calendarAccountOptions(string $provider): array
+    {
+        $this->assertSupportedProvider($provider);
+
+        $accounts = [];
+        foreach (IPS_GetInstanceListByModuleID(self::CALENDAR_ACCOUNT_MODULE_ID) as $accountID) {
+            if ((int) IPS_GetProperty($accountID, 'Provider') !== self::PROVIDERS[$provider]) {
+                continue;
+            }
+
+            $name = trim(IPS_GetName($accountID));
+            if ($name === '') {
+                $name = $this->Translate('Calendar account') . ' #' . $accountID;
+            }
+
+            $accounts[] = [
+                'caption' => $name,
+                'value'   => $accountID
+            ];
+        }
+
+        usort(
+            $accounts,
+            static fn (array $left, array $right): int => strnatcasecmp($left['caption'], $right['caption'])
+                ?: ($left['value'] <=> $right['value'])
+        );
+
+        if ($accounts === []) {
+            return [
+                [
+                    'caption' => $this->Translate('No matching calendar account available.'),
+                    'value'   => 0,
+                    'enabled' => false
+                ]
+            ];
+        }
+
+        array_unshift(
+            $accounts,
+            [
+                'caption' => $this->Translate('Please select an existing calendar account.'),
+                'value'   => 0
+            ]
+        );
+
+        return $accounts;
     }
 
     /**

@@ -21,9 +21,11 @@ Der Assistent führt aktuell durch folgende Schritte:
 3. Kalender Konto auswählen oder ein neues Konto vorbereiten
 4. Kontoauswahl bestätigen
 
-Bei einem **vorhandenen Kalender Konto** prüft OpenCalendar, ob die ausgewählte
-Instanz tatsächlich ein Kalender Konto ist und ob dessen Anbieter zur Auswahl im
-Wizard passt.
+Bei einem **vorhandenen Kalender Konto** werden in der Auswahl nur Konten des
+zuvor gewählten Kalenderanbieters angeboten. Gibt es für diesen Anbieter noch
+kein passendes Konto, ist die Auswahl **Vorhandenes Kalender Konto verwenden**
+deaktiviert. Die Provider-Prüfung im Modul bleibt zusätzlich als Schutz gegen
+ungültige oder manipulierte Aufrufe erhalten.
 
 Bei einem **neuen Kalender Konto** wird die Instanz erst mit **OK** auf der
 Bestätigungsseite erzeugt. Der gewählte Anbieter und der eingegebene Name werden

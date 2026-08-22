@@ -92,7 +92,8 @@
                                     },
                                     {
                                         "caption": "Use an existing calendar account",
-                                        "value": "existing"
+                                        "value": "existing",
+                                        "enabled": false
                                     }
                                 ]
                             },
@@ -103,15 +104,22 @@
                                 "value": ""
                             },
                             {
-                                "type": "SelectModule",
+                                "type": "Select",
                                 "name": "ExistingAccountID",
                                 "caption": "Existing calendar account",
-                                "moduleID": "{966D6119-7FF3-5CA5-06C3-536FBF8100C4}",
-                                "value": 0
+                                "enabled": false,
+                                "value": 0,
+                                "options": [
+                                    {
+                                        "caption": "Select a calendar provider first.",
+                                        "value": 0,
+                                        "enabled": false
+                                    }
+                                ]
                             },
                             {
                                 "type": "Label",
-                                "caption": "For a new account, enter a name. For an existing account, select an account that uses the chosen provider."
+                                "caption": "Only calendar accounts for the selected provider are offered."
                             }
                         ],
                         "validate": "return IPSKALDISCOVERY_ValidateWizardAccountSelection($id, $AccountMode, $ExistingAccountID, $AccountName);",

@@ -101,14 +101,22 @@ foreach ($pages[2]['items'] ?? [] as $item) {
 }
 
 assertDiscoveryWizard(
-    is_array($accountMode) && ($accountMode['type'] ?? '') === 'RadioButtonGroup',
-    'Calendar account mode must use a RadioButtonGroup.'
+    is_array($accountMode)
+        && ($accountMode['type'] ?? '') === 'RadioButtonGroup'
+        && (($accountMode['options'][1]['enabled'] ?? true) === false),
+    'Existing calendar account mode must start disabled until a provider was selected.'
 );
 assertDiscoveryWizard(
     is_array($existingAccount)
-        && ($existingAccount['type'] ?? '') === 'SelectModule'
-        && ($existingAccount['moduleID'] ?? '') === '{966D6119-7FF3-5CA5-06C3-536FBF8100C4}',
-    'Existing calendar account selection must be restricted to Calendar Account instances.'
+        && ($existingAccount['type'] ?? '') === 'Select'
+        && ($existingAccount['enabled'] ?? true) === false
+        && ($existingAccount['value'] ?? -1) === 0,
+    'Existing calendar accounts must use a dynamically filtered Select.'
+);
+assertDiscoveryWizard(
+    (($existingAccount['options'][0]['value'] ?? -1) === 0)
+        && (($existingAccount['options'][0]['enabled'] ?? true) === false),
+    'Existing calendar account Select must start with a disabled provider placeholder.'
 );
 assertDiscoveryWizard(
     str_contains((string) ($pages[2]['validate'] ?? ''), 'ValidateWizardAccountSelection')
@@ -129,6 +137,11 @@ foreach ([
     'IPS_ApplyChanges($accountID)',
     'IPS_DeleteInstance($accountID)',
     'IPS_GetInstanceListByModuleID(self::CALENDAR_ACCOUNT_MODULE_ID)',
+    'IPS_GetProperty($accountID, \'Provider\')',
+    'IPS_GetName($accountID)',
+    'updateCalendarAccountSelectionForm($provider)',
+    'calendarAccountOptions(string $provider)',
+    'UpdateFormField(',
     'RegisterAttributeInteger(\'SelectedCalendarAccountID\', 0)'
 ] as $requiredSource) {
     assertDiscoveryWizard(
@@ -143,6 +156,9 @@ foreach ([
     'Choose calendar account',
     'Create a new calendar account',
     'Use an existing calendar account',
+    'Select a calendar provider first.',
+    'No matching calendar account available.',
+    'Only calendar accounts for the selected provider are offered.',
     'Please enter a name for the calendar account.',
     'The selected calendar account uses a different calendar provider.',
     'Calendar account setup'
