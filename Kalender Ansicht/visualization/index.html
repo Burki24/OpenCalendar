@@ -399,6 +399,139 @@
 <script>
 window.SYMC_VISUALIZATION = {{BOOTSTRAP_JSON}};
 {{MODULE_SCRIPT}}
+
+(() => {
+    'use strict';
+
+    const target = document.getElementById('details-description');
+    if (!target || typeof MutationObserver !== 'function' || typeof DOMParser !== 'function') return;
+
+    function decodeHtmlEntities(value) {
+        const decoder = document.createElement('textarea');
+        decoder.innerHTML = String(value || '');
+        return decoder.value;
+    }
+
+    function looksLikeHtml(value) {
+        return /<\/?(?:html|head|body|table|thead|tbody|tfoot|tr|th|td|div|span|p|br|hr|h[1-6]|ul|ol|li|a|img|strong|b|em|i|u|blockquote|pre|font|center)\b[^>]*>/i
+            .test(String(value || ''));
+    }
+
+    function htmlDescriptionSource(value) {
+        const source = String(value || '').trim();
+        if (looksLikeHtml(source)) return source;
+        const decoded = decodeHtmlEntities(source);
+        return decoded !== source && looksLikeHtml(decoded) ? decoded : '';
+    }
+
+    function sanitizeLink(value) {
+        const href = String(value || '').trim();
+        return /^(?:https?:|mailto:)/i.test(href) ? href : '';
+    }
+
+    function sanitizeImageSource(value) {
+        const source = String(value || '').trim();
+        return /^data:image\/(?:png|gif|jpe?g|webp);base64,/i.test(source) ? source : '';
+    }
+
+    function sanitizeHtmlDocument(source) {
+        const parsed = new DOMParser().parseFromString(source, 'text/html');
+        parsed.querySelectorAll('script, iframe, frame, frameset, object, embed, form, input, button, select, textarea, base, link, svg, math')
+            .forEach(element => element.remove());
+        parsed.querySelectorAll('meta').forEach(element => element.remove());
+
+        parsed.querySelectorAll('*').forEach(element => {
+            Array.from(element.attributes).forEach(attribute => {
+                const name = attribute.name.toLowerCase();
+                if (name.startsWith('on') || ['srcdoc', 'action', 'formaction'].includes(name)) {
+                    element.removeAttribute(attribute.name);
+                    return;
+                }
+
+                if (name === 'href') {
+                    const href = sanitizeLink(attribute.value);
+                    if (!href) {
+                        element.removeAttribute('href');
+                        element.removeAttribute('target');
+                    } else {
+                        element.setAttribute('href', href);
+                        element.setAttribute('target', '_blank');
+                        element.setAttribute('rel', 'noopener noreferrer');
+                    }
+                    return;
+                }
+
+                if (element.tagName === 'IMG' && name === 'src') {
+                    const source = sanitizeImageSource(attribute.value);
+                    if (source) element.setAttribute('src', source);
+                    else element.removeAttribute('src');
+                }
+            });
+        });
+
+        const charset = parsed.createElement('meta');
+        charset.setAttribute('charset', 'UTF-8');
+        const policy = parsed.createElement('meta');
+        policy.setAttribute('http-equiv', 'Content-Security-Policy');
+        policy.setAttribute(
+            'content',
+            "default-src 'none'; img-src data:; style-src 'unsafe-inline'; font-src data:; base-uri 'none'; form-action 'none'"
+        );
+        const defaults = parsed.createElement('style');
+        defaults.textContent = `
+            html, body { box-sizing:border-box; max-width:100%; margin:0; padding:0; }
+            body { padding:12px; background:#fff; color:#111; overflow-wrap:anywhere; }
+            img { max-width:100%; height:auto; }
+            table { max-width:100%; }
+        `;
+        parsed.head.prepend(charset, policy, defaults);
+
+        return '<!DOCTYPE html>\n' + parsed.documentElement.outerHTML;
+    }
+
+    function renderHtmlDescription(source) {
+        const frame = document.createElement('iframe');
+        frame.className = 'open-calendar-html-description';
+        frame.title = document.getElementById('details-description-label')?.textContent || 'Description';
+        frame.setAttribute('sandbox', 'allow-same-origin allow-popups allow-popups-to-escape-sandbox');
+        frame.setAttribute('referrerpolicy', 'no-referrer');
+        frame.style.display = 'block';
+        frame.style.boxSizing = 'border-box';
+        frame.style.width = '100%';
+        frame.style.maxWidth = '100%';
+        frame.style.minHeight = '180px';
+        frame.style.height = 'clamp(260px, 50vh, 640px)';
+        frame.style.border = '1px solid rgba(127, 127, 127, .28)';
+        frame.style.borderRadius = '6px';
+        frame.style.background = '#fff';
+        frame.addEventListener('load', () => {
+            try {
+                const documentHeight = frame.contentDocument?.documentElement?.scrollHeight || 0;
+                const maximumHeight = Math.max(260, Math.round(window.innerHeight * 0.6));
+                if (documentHeight > 0) {
+                    frame.style.height = `${Math.min(Math.max(180, documentHeight + 4), maximumHeight)}px`;
+                }
+            } catch (error) {
+                // The fixed fallback height remains available if iframe sizing is not accessible.
+            }
+        });
+        frame.srcdoc = sanitizeHtmlDocument(source);
+        target.replaceChildren(frame);
+    }
+
+    function updateDescriptionRendering() {
+        if (target.querySelector('.open-calendar-html-description')) return;
+        const source = htmlDescriptionSource(target.textContent);
+        if (!source) return;
+        renderHtmlDescription(source);
+    }
+
+    new MutationObserver(updateDescriptionRendering).observe(target, {
+        childList: true,
+        characterData: true,
+        subtree: true
+    });
+})();
 </script>
 </body>
 </html>
