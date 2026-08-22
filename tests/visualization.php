@@ -540,6 +540,10 @@ assertVisualization(
     'Native visualization actions must send refreshed state and toast together so the tile cannot remain stale after an action.'
 );
 assertVisualization(
+    !str_contains($script, 'function daysBetween('),
+    'Visualization code must not retain the unused daysBetween helper.'
+);
+assertVisualization(
     !str_contains($formSource, '"name": "TileWeekOrientation"')
         && !str_contains($formSource, '"name": "IPSViewWeekOrientation"')
         && str_contains($moduleSource, "RegisterPropertyInteger('TileWeekOrientation', 0)")

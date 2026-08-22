@@ -4736,16 +4736,6 @@ function formatViewPeriod(view) {
     const [singular, plural] = units[view] || units.agenda;
     return `${count} ${t(count === 1 ? singular : plural)}`;
 }
-function daysBetween(start, end) {
-    const days = [];
-    let current = startOfDay(start);
-    const last = startOfDay(end);
-    while (current <= last) {
-        days.push(current);
-        current = addDays(current, 1);
-    }
-    return days;
-}
 function formatMonth(date) {
     return new Intl.DateTimeFormat(undefined, { month: 'long', year: 'numeric' }).format(date);
 }
