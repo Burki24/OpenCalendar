@@ -9,7 +9,7 @@
             "This fallback content is not shown while wizard pages are available.": "Dieser Ersatzinhalt wird nicht angezeigt, solange Wizard-Seiten verfügbar sind.",
             "Welcome to OpenCalendar": "Willkommen bei OpenCalendar",
             "This assistant will guide you through the initial OpenCalendar setup.": "Dieser Assistent führt durch die erstmalige Einrichtung von OpenCalendar.",
-            "No calendar objects are created in this first technical wizard step.": "In diesem ersten technischen Wizard-Schritt werden noch keine Kalenderobjekte angelegt.",
+            "The assistant can use an existing calendar account or create a new one.": "Der Assistent kann ein vorhandenes Kalender Konto verwenden oder ein neues anlegen.",
             "Choose calendar provider": "Kalenderanbieter auswählen",
             "Calendar provider": "Kalenderanbieter",
             "Please select a provider": "Bitte einen Anbieter auswählen",
@@ -19,9 +19,23 @@
             "CalDAV": "CalDAV",
             "ICS / Webcal": "ICS / Webcal",
             "Please select a calendar provider.": "Bitte einen Kalenderanbieter auswählen.",
-            "Setup overview": "Einrichtungsübersicht",
-            "The Symcon 9.1 wizard framework is working and the provider selection was accepted.": "Das Symcon-9.1-Wizard-Grundgerüst funktioniert und die Anbieterauswahl wurde übernommen.",
-            "Press OK to close the assistant. No instances or calendar objects are created yet.": "Mit OK wird der Assistent geschlossen. Es werden noch keine Instanzen oder Kalenderobjekte angelegt."
+            "Choose calendar account": "Kalender Konto auswählen",
+            "Calendar account": "Kalender Konto",
+            "Create a new calendar account": "Neues Kalender Konto anlegen",
+            "Use an existing calendar account": "Vorhandenes Kalender Konto verwenden",
+            "Name for the new calendar account": "Name des neuen Kalender Kontos",
+            "Existing calendar account": "Vorhandenes Kalender Konto",
+            "For a new account, enter a name. For an existing account, select an account that uses the chosen provider.": "Für ein neues Konto einen Namen eingeben. Bei einem vorhandenen Konto ein Konto auswählen, das den gewählten Anbieter verwendet.",
+            "Please enter a name for the calendar account.": "Bitte einen Namen für das Kalender Konto eingeben.",
+            "Please choose how the calendar account should be provided.": "Bitte auswählen, wie das Kalender Konto bereitgestellt werden soll.",
+            "Please select an existing calendar account.": "Bitte ein vorhandenes Kalender Konto auswählen.",
+            "The selected instance is not a calendar account.": "Die ausgewählte Instanz ist kein Kalender Konto.",
+            "The selected calendar account uses a different calendar provider.": "Das ausgewählte Kalender Konto verwendet einen anderen Kalenderanbieter.",
+            "The calendar account selection is invalid.": "Die Auswahl des Kalender Kontos ist ungültig.",
+            "The calendar account could not be created.": "Das Kalender Konto konnte nicht angelegt werden.",
+            "Calendar account setup": "Kalender Konto einrichten",
+            "With OK, OpenCalendar will create the new calendar account or select the existing account.": "Mit OK legt OpenCalendar das neue Kalender Konto an oder übernimmt das ausgewählte vorhandene Konto.",
+            "A newly created account remains inactive. Access data or OAuth will be configured in the next setup step.": "Ein neu angelegtes Konto bleibt zunächst inaktiv. Zugangsdaten beziehungsweise OAuth werden im nächsten Einrichtungsschritt konfiguriert."
         }
     }
 }

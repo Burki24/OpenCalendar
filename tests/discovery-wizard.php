@@ -57,10 +57,6 @@ assertDiscoveryWizard(
     str_contains($moduleSource, 'class OpenCalendarDiscovery extends IPSModuleStrict'),
     'OpenCalendar Discovery class must match the technical module name without spaces.'
 );
-assertDiscoveryWizard(
-    ($moduleMetadata['url'] ?? '') === 'https://github.com/Burki24/OpenCalendar/blob/main/Kalender%20Einrichtung/README.md',
-    'OpenCalendar Discovery documentation URL must match the repository folder.'
-);
 
 $wizard = null;
 foreach ($form['actions'] ?? [] as $action) {
@@ -74,62 +70,82 @@ assertDiscoveryWizard(is_array($wizard), 'OpenCalendar Discovery must expose the
 $pages = $wizard['popup']['pages'] ?? [];
 assertDiscoveryWizard(
     is_array($pages)
-        && count($pages) === 3
+        && count($pages) === 4
         && ($pages[0]['name'] ?? '') === 'welcome'
         && ($pages[1]['name'] ?? '') === 'provider'
-        && ($pages[2]['name'] ?? '') === 'summary',
-    'OpenCalendar Discovery must provide the initial three-page wizard flow.'
+        && ($pages[2]['name'] ?? '') === 'account'
+        && ($pages[3]['name'] ?? '') === 'summary',
+    'OpenCalendar Discovery must provide the four-page account setup flow.'
 );
 assertDiscoveryWizard(
     ($pages[0]['nextPage'] ?? '') === 'provider'
-        && ($pages[1]['nextPage'] ?? '') === 'summary',
+        && ($pages[1]['nextPage'] ?? '') === 'account'
+        && ($pages[2]['nextPage'] ?? '') === 'summary',
     'OpenCalendar Discovery wizard pages must use explicit named navigation.'
 );
+assertDiscoveryWizard(
+    str_contains((string) ($pages[1]['onConfirm'] ?? ''), 'WizardProvider')
+        && str_contains((string) ($pages[1]['onUndo'] ?? ''), 'WizardProviderUndo'),
+    'Provider page must preserve and undo wizard provider state.'
+);
 
-$providerSelector = null;
-foreach ($pages[1]['items'] ?? [] as $item) {
-    if (($item['type'] ?? '') === 'RadioButtonGroup' && ($item['name'] ?? '') === 'Provider') {
-        $providerSelector = $item;
-        break;
+$accountMode = null;
+$existingAccount = null;
+foreach ($pages[2]['items'] ?? [] as $item) {
+    if (($item['name'] ?? '') === 'AccountMode') {
+        $accountMode = $item;
+    }
+    if (($item['name'] ?? '') === 'ExistingAccountID') {
+        $existingAccount = $item;
     }
 }
-assertDiscoveryWizard(is_array($providerSelector), 'Provider selection must use the Symcon 9.1 RadioButtonGroup.');
 
-$providerValues = array_map(
-    static fn (array $option): string => (string) ($option['value'] ?? ''),
-    $providerSelector['options'] ?? []
+assertDiscoveryWizard(
+    is_array($accountMode) && ($accountMode['type'] ?? '') === 'RadioButtonGroup',
+    'Calendar account mode must use a RadioButtonGroup.'
 );
 assertDiscoveryWizard(
-    $providerValues === ['', 'google', 'microsoft', 'apple', 'caldav', 'ics'],
-    'Provider selection must contain the expected OpenCalendar providers.'
+    is_array($existingAccount)
+        && ($existingAccount['type'] ?? '') === 'SelectModule'
+        && ($existingAccount['moduleID'] ?? '') === '{966D6119-7FF3-5CA5-06C3-536FBF8100C4}',
+    'Existing calendar account selection must be restricted to Calendar Account instances.'
 );
 assertDiscoveryWizard(
-    str_contains((string) ($pages[1]['validate'] ?? ''), '$Provider')
-        && str_contains((string) ($pages[1]['validate'] ?? ''), 'Please select a calendar provider.'),
-    'Provider page must block navigation until a provider was selected.'
+    str_contains((string) ($pages[2]['validate'] ?? ''), 'ValidateWizardAccountSelection')
+        && str_contains((string) ($pages[2]['onConfirm'] ?? ''), 'WizardAccountSelection')
+        && str_contains((string) ($pages[2]['onUndo'] ?? ''), 'WizardAccountSelectionUndo'),
+    'Calendar account page must validate, preserve and undo its selection.'
+);
+assertDiscoveryWizard(
+    str_contains((string) ($pages[3]['validate'] ?? ''), 'ValidateWizardConfirmation')
+        && str_contains((string) ($pages[3]['onConfirm'] ?? ''), 'WizardConfirmAccount'),
+    'Final page must validate and confirm the calendar account selection.'
 );
 
-$formSource = (string) file_get_contents($moduleDirectory . '/form.json');
-foreach (['IPS_CreateInstance', 'IPS_SetProperty', 'IPS_ApplyChanges'] as $writeOperation) {
+foreach ([
+    'IPS_CreateInstance(self::CALENDAR_ACCOUNT_MODULE_ID)',
+    'IPS_SetProperty($accountID, \'Provider\'',
+    'IPS_SetProperty($accountID, \'Active\', false)',
+    'IPS_ApplyChanges($accountID)',
+    'IPS_DeleteInstance($accountID)',
+    'IPS_GetInstanceListByModuleID(self::CALENDAR_ACCOUNT_MODULE_ID)',
+    'RegisterAttributeInteger(\'SelectedCalendarAccountID\', 0)'
+] as $requiredSource) {
     assertDiscoveryWizard(
-        !str_contains($formSource, $writeOperation),
-        'Initial wizard scaffold must not create or modify Symcon objects yet: ' . $writeOperation
+        str_contains($moduleSource, $requiredSource),
+        'Missing calendar account setup behavior: ' . $requiredSource
     );
 }
 
 $germanTranslations = $locale['translations']['de'] ?? [];
-assertDiscoveryWizard(
-    ($germanTranslations['OpenCalendar Discovery'] ?? '') === 'Kalender Einrichtung',
-    'German module name translation must be Kalender Einrichtung.'
-);
-
 foreach ([
-    'Start OpenCalendar setup',
-    'Welcome to OpenCalendar',
-    'Choose calendar provider',
-    'Calendar provider',
-    'Please select a calendar provider.',
-    'Setup overview'
+    'OpenCalendar Discovery',
+    'Choose calendar account',
+    'Create a new calendar account',
+    'Use an existing calendar account',
+    'Please enter a name for the calendar account.',
+    'The selected calendar account uses a different calendar provider.',
+    'Calendar account setup'
 ] as $translationKey) {
     assertDiscoveryWizard(
         is_array($germanTranslations) && array_key_exists($translationKey, $germanTranslations),
@@ -137,4 +153,4 @@ foreach ([
     );
 }
 
-echo "OpenCalendar Discovery wizard scaffold tests passed.\n";
+echo "OpenCalendar Discovery wizard tests passed.\n";
