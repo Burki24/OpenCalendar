@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - dev
+      - dev_9.1
 
 permissions:
   contents: read

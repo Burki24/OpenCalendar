@@ -4,9 +4,9 @@
     "author": "Burkhard Kneiseler",
     "url": "https://github.com/Burki24/OpenCalendar",
     "compatibility": {
-        "version": "9.0"
+        "version": "9.1"
     },
-    "version": "1.0",
+    "version": "3.0",
     "build": 734,
     "date": 1787373716
 }

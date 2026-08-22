@@ -4,10 +4,12 @@ on:
   push:
     branches:
       - dev
+      - dev_9.1
       - main
   pull_request:
     branches:
       - dev
+      - dev_9.1
       - main
   workflow_dispatch:
 
