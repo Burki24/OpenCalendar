@@ -271,8 +271,14 @@ $count = IPSKALVIEW_GetCurrentAppointmentCount(12345, 0);
 $appointments = IPSKALVIEW_GetUpcomingAppointments(12345, 24, 0);
 $count = IPSKALVIEW_GetUpcomingAppointmentCount(12345, 24, 0);
 
+// Dieselbe 24-Stunden-Abfrage in der kompakten Darstellung.
+$appointments = IPSKALVIEW_GetUpcomingAppointmentsCompact(12345, 24, 0);
+
 // Die nächsten drei noch nicht begonnenen Termine abrufen.
 $appointments = IPSKALVIEW_GetNextAppointments(12345, 3, 0);
+
+// Die nächsten drei Termine in der kompakten Darstellung abrufen.
+$appointments = IPSKALVIEW_GetNextAppointmentsCompact(12345, 3, 0);
 
 // Alle Jahresereignisse aus allen ausgewählten Kalendern.
 $annualEvents = IPSKALVIEW_GetAnniversaryList(12345, 0, 0, '');
@@ -342,10 +348,12 @@ $appointments = json_decode(
 );
 ```
 
-Für einfache Skripte stehen zusätzlich `GetDayAppointmentsCompact()` und
-`GetAppointmentsCompact()` bereit. Sie verwenden dieselbe Kalenderauswahl und
-dieselben Bereichsregeln, liefern pro Termin aber ausschließlich `summary`,
-`start`, `end`, `startTime`, `endTime`, `hasReminder` und `calendarName`. `start`
+Für einfache Skripte stehen zusätzlich `GetDayAppointmentsCompact()`,
+`GetAppointmentsCompact()`, `GetUpcomingAppointmentsCompact()` und
+`GetNextAppointmentsCompact()` bereit. Sie verwenden dieselben Auswahl-, Zeitfenster-
+und Mengenregeln wie ihre vollständigen Gegenstücke, liefern pro Termin aber
+ausschließlich `summary`, `start`, `end`, `startTime`, `endTime`, `hasReminder` und
+`calendarName`. `start`
 und `end` sind dabei immer lokale Datumswerte im Format `YYYY-MM-DD`. Bei
 zeitgebundenen Terminen enthalten `startTime` und `endTime` die lokale Uhrzeit im
 Format `HH:MM`. Ganztagstermine liefern die lokalisierte Bezeichnung
@@ -356,7 +364,7 @@ eine wirksame Erinnerung konfiguriert ist; dabei werden auch aktive
 Kalender-Standarderinnerungen und komplexe Provider-Erinnerungen berücksichtigt.
 `calendarName` enthält immer den Namen des Quellkalenders und ist insbesondere bei
 `CalendarInstanceID = 0` zur Zuordnung zusammengeführter Termine gedacht. Als
-letztes optionales Argument kann bei beiden Compact-Funktionen die Instanz-ID eines
+letztes optionales Argument kann bei allen Compact-Funktionen die Instanz-ID eines
 in dieser Kalender Ansicht ausgewählten Kalenders angegeben werden. `0` liefert
 alle ausgewählten Kalender. Eine konkrete ID filtert ausschließlich auf diesen
 Kalender; eine nicht ausgewählte oder unbekannte ID liefert ein leeres JSON-Array.
@@ -378,15 +386,18 @@ ausgewählte Kalenderinstanz eingeschränkt werden.
 nicht begonnenen Termin aus dem lokal synchronisierten Zukunftsbestand. Ist kein
 kommender Termin im Cache vorhanden, wird JSON `null` zurückgegeben.
 `GetNextAppointments()` liefert entsprechend die nächsten 1 bis 1000 noch nicht
-begonnenen Termine als Liste. Alle Funktionen unterstützen den optionalen
-Kalenderfilter.
+begonnenen Termine als Liste. `GetNextAppointmentsCompact()` verwendet dieselbe
+Auswahl und Mengenbegrenzung, reduziert die Einträge jedoch auf die oben beschriebene
+kompakte Darstellung. Alle Funktionen unterstützen den optionalen Kalenderfilter.
 
 `GetUpcomingAppointments()` liefert Termine, die innerhalb der angegebenen nächsten
 Stunden beginnen. Bereits laufende Termine werden bewusst nicht berücksichtigt und
 können über `GetCurrentAppointments()` abgefragt werden. Das Zeitfenster darf 1 bis
 26280 Stunden betragen und kann über Mitternacht sowie mehrere Kalendertage reichen.
-`GetUpcomingAppointmentCount()` liefert für dieselbe Auswahl direkt die Anzahl.
-Beide Funktionen unterstützen den optionalen Kalenderfilter.
+`GetUpcomingAppointmentsCompact()` verwendet exakt dasselbe Zeitfenster und liefert
+die kompakte Darstellung. `GetUpcomingAppointmentCount()` liefert für dieselbe
+Auswahl direkt die Anzahl. Alle drei Funktionen unterstützen den optionalen
+Kalenderfilter.
 
 `GetAnniversaryList()` liefert die von OpenCalendar verwalteten Jahresereignisse unabhängig vom normalen Synchronisationszeitraum der Terminansicht. Das erste optionale Argument ist die Kalenderinstanz: `0` berücksichtigt alle in dieser Kalender Ansicht ausgewählten Kalender, eine konkrete Instanz-ID nur diesen Kalender. Das zweite optionale Argument ist die frei wählbare Anzahl der nächsten Tage. `0` liefert alle hinterlegten Jahresereignisse, jeder positive Wert filtert auf Einträge, deren nächstes Vorkommnis innerhalb dieses Zeitraums liegt. Das dritte optionale Argument filtert auf `birthday`, `anniversary`, `wedding` oder `death`; ein leerer Wert liefert alle Typen. Pro Eintrag werden `name`, `anniversaryType`, `anniversaryDate`, `nextDate`, `years`, `displayName`, `daysUntil`, `calendarInstanceId`, `calendarName` und `calendarColor` geliefert. Geburtstage enthalten zusätzlich `birthDate`, `nextBirthday` und `age`. `GetBirthdayList()` bleibt als kompatibler Spezialfall für Geburtstage erhalten.
 
@@ -416,9 +427,16 @@ Reminder-APIs ausgelassen. Alle fünf Funktionen unterstützen den optionalen
 Kalenderfilter.
 
 `GetSelectedCalendars()` liefert die in der Instanz ausgewählten und aktivierten
-Kalender als JSON mit `instanceId`, `name`, `color`, `canWrite`, `timezone`,
-`canCreateRecurrence` und `maxReminders`. Der nur im Browser gesetzte temporäre
-Kalenderfilter verändert diese konfigurierte Auswahl nicht.
+Kalender als JSON. Neben `instanceId`, `name`, `color`, `canWrite`, `timezone`, den
+Serientermin-Fähigkeiten und `maxReminders` enthält jeder Eintrag zusätzlich
+`provider`, `lastSynchronization`, `status` und `lastError`. `provider` ist ein
+stabiler Schlüssel mit `apple`, `caldav`, `google`, `microsoft`, `ics` oder
+`unknown`. `lastSynchronization` ist der Unix-Zeitstempel der letzten erfolgreichen
+Synchronisation und bleibt `0`, solange noch keine erfolgreiche Synchronisation
+stattgefunden hat. `status` enthält den numerischen Symcon-Instanzstatus;
+`lastError` ist leer, wenn kein letzter Synchronisationsfehler gespeichert ist. Der
+nur im Browser gesetzte temporäre Kalenderfilter verändert diese konfigurierte
+Auswahl nicht.
 
 `SelectAllCalendars()` trägt alle vorhandenen Kalender-Instanzen ausschließlich
 in das aktuell geöffnete Konfigurationsformular ein und aktiviert sie dort. Eine

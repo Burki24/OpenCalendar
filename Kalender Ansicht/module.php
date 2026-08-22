@@ -30,6 +30,7 @@ class CalendarView extends IPSModuleStrict
     use VisualizationThemeHelper;
 
     private const CALENDAR_MODULE_ID = '{227B63E4-4223-316B-76E9-FD3849689562}';
+    private const CALENDAR_ACCOUNT_MODULE_ID = '{966D6119-7FF3-5CA5-06C3-536FBF8100C4}';
     private const INITIALIZATION_DELAY_MS = 5_000;
     private const APPOINTMENT_LOOKAHEAD_DAYS = 1095;
     private const VISUALIZATION_BOOTSTRAP_PAST_DAYS = 7;
@@ -869,6 +870,43 @@ class CalendarView extends IPSModuleStrict
     }
 
     /**
+     * Returns a compact list of appointments starting within the next number of hours.
+     *
+     * The time-window and calendar-filter semantics are identical to GetUpcomingAppointments(),
+     * but provider metadata and technical timestamps are omitted.
+     *
+     * @param int $Hours Number of hours to look ahead, from 1 up to the maximum synchronized future range.
+     * @param int $CalendarInstanceID Optional selected calendar instance ID. Zero includes all selected calendars.
+     * @return string JSON-encoded compact appointment list.
+     */
+    public function GetUpcomingAppointmentsCompact(int $Hours, int $CalendarInstanceID = 0): string
+    {
+        $this->validateUpcomingHours($Hours);
+
+        $now = new DateTimeImmutable('now');
+        $until = $now->modify('+' . $Hours . ' hours');
+        [$rangeStart, $rangeEnd] = CalendarAppointmentRange::fromInclusiveDates(
+            $now->format('Y-m-d'),
+            $until->format('Y-m-d')
+        );
+        $appointments = $this->collectAppointmentsForRange($rangeStart, $rangeEnd, true);
+        $appointments = $this->filterAppointmentsByCalendarInstanceId($appointments, $CalendarInstanceID);
+
+        return json_encode(
+            $this->compactAppointments(
+                $this->filterUpcomingAppointments(
+                    $appointments,
+                    $now->getTimestamp(),
+                    $until->getTimestamp()
+                )
+            ),
+            JSON_UNESCAPED_SLASHES
+                | JSON_UNESCAPED_UNICODE
+                | JSON_THROW_ON_ERROR
+        );
+    }
+
+    /**
      * Counts appointments starting within the next number of hours.
      *
      * Appointments already in progress are intentionally excluded.
@@ -922,6 +960,43 @@ class CalendarView extends IPSModuleStrict
 
         return $this->encodeAppointmentList(
             array_slice($this->filterFutureAppointments($appointments, $now->getTimestamp()), 0, $Count)
+        );
+    }
+
+    /**
+     * Returns a compact list of the next requested appointments that have not started yet.
+     *
+     * The count and calendar-filter semantics are identical to GetNextAppointments(),
+     * but provider metadata and technical timestamps are omitted.
+     *
+     * @param int $Count Number of future appointments to return, between 1 and 1000.
+     * @param int $CalendarInstanceID Optional selected calendar instance ID. Zero includes all selected calendars.
+     * @return string JSON-encoded compact appointment list.
+     */
+    public function GetNextAppointmentsCompact(int $Count, int $CalendarInstanceID = 0): string
+    {
+        if ($Count < 1 || $Count > 1000) {
+            throw new InvalidArgumentException('Count must be between 1 and 1000.');
+        }
+
+        $now = new DateTimeImmutable('now');
+        $today = $now->format('Y-m-d');
+        $lastDay = $now->modify('+' . self::APPOINTMENT_LOOKAHEAD_DAYS . ' days')->format('Y-m-d');
+        [$rangeStart, $rangeEnd] = CalendarAppointmentRange::fromInclusiveDates($today, $lastDay);
+        $appointments = $this->collectAppointmentsForRange($rangeStart, $rangeEnd, true);
+        $appointments = $this->filterAppointmentsByCalendarInstanceId($appointments, $CalendarInstanceID);
+
+        return json_encode(
+            $this->compactAppointments(
+                array_slice(
+                    $this->filterFutureAppointments($appointments, $now->getTimestamp()),
+                    0,
+                    $Count
+                )
+            ),
+            JSON_UNESCAPED_SLASHES
+                | JSON_UNESCAPED_UNICODE
+                | JSON_THROW_ON_ERROR
         );
     }
 
@@ -1041,7 +1116,8 @@ class CalendarView extends IPSModuleStrict
     /**
      * Returns the calendar instances selected and enabled in this Calendar View.
      *
-     * The result contains instanceId, name, color, canWrite, timezone, recurring-event capabilities and the reminder limit for each selected calendar.
+     * In addition to display and capability metadata, the result contains the provider key,
+     * last successful synchronization timestamp, current Symcon instance status, and last error.
      * Client-side temporary calendar filters do not alter this configured selection.
      *
      * @return string JSON-encoded selected calendar list.
@@ -1049,7 +1125,7 @@ class CalendarView extends IPSModuleStrict
     public function GetSelectedCalendars(): string
     {
         return json_encode(
-            $this->loadSelectedCalendars(),
+            $this->loadSelectedCalendars(true),
             JSON_UNESCAPED_SLASHES
                 | JSON_UNESCAPED_UNICODE
                 | JSON_THROW_ON_ERROR
@@ -2322,9 +2398,9 @@ class CalendarView extends IPSModuleStrict
     }
 
     /**
-     * @return list<array{instanceId: int, name: string, color: string, canWrite: bool, timezone: string, canCreateRecurrence: bool, canUpdateRecurrence: bool, canUpdateOccurrence: bool, canDeleteOccurrence: bool, canUpdateFollowing: bool, canUpdateSeries: bool, canDeleteSeries: bool, canUseDefaultReminder: bool, canCreateWithDefaultReminder: bool, defaultReminder: array<string, mixed>, maxReminders: int}>
+     * @return list<array{instanceId: int, name: string, color: string, canWrite: bool, timezone: string, canCreateRecurrence: bool, canUpdateRecurrence: bool, canUpdateOccurrence: bool, canDeleteOccurrence: bool, canUpdateFollowing: bool, canUpdateSeries: bool, canDeleteSeries: bool, canUseDefaultReminder: bool, canCreateWithDefaultReminder: bool, defaultReminder: array<string, mixed>, maxReminders: int, provider?: string, lastSynchronization?: int, status?: int, lastError?: string}>
      */
-    private function loadSelectedCalendars(): array
+    private function loadSelectedCalendars(bool $includeOperationalMetadata = false): array
     {
         $configuration = $this->effectiveCalendarConfiguration();
 
@@ -2360,7 +2436,7 @@ class CalendarView extends IPSModuleStrict
                 $color = $palette[abs(crc32((string) $instanceId)) % count($palette)];
             }
 
-            $result[] = [
+            $calendar = [
                 'instanceId'                   => $instanceId,
                 'name'                         => IPS_GetName($instanceId),
                 'color'                        => $color,
@@ -2382,9 +2458,43 @@ class CalendarView extends IPSModuleStrict
                     : [],
                 'maxReminders'                 => max(1, min(CalendarEventReminder::MAX_REMINDERS, (int) ($calendarStatus['maxReminders'] ?? 1)))
             ];
+            if ($includeOperationalMetadata) {
+                $calendar['provider'] = $this->calendarProviderKey($instance);
+                $calendar['lastSynchronization'] = max(0, (int) ($calendarStatus['lastSynchronization'] ?? 0));
+                $calendar['status'] = (int) ($instance['InstanceStatus'] ?? 0);
+                $calendar['lastError'] = trim((string) ($calendarStatus['lastError'] ?? ''));
+            }
+            $result[] = $calendar;
         }
 
         return $result;
+    }
+
+    /**
+     * Returns the stable provider key for one Calendar instance.
+     *
+     * @param array<string, mixed> $calendarInstance Calendar instance metadata returned by Symcon.
+     */
+    private function calendarProviderKey(array $calendarInstance): string
+    {
+        $accountInstanceId = (int) ($calendarInstance['ConnectionID'] ?? 0);
+        if ($accountInstanceId <= 0 || !IPS_InstanceExists($accountInstanceId)) {
+            return 'unknown';
+        }
+
+        $accountInstance = IPS_GetInstance($accountInstanceId);
+        if (($accountInstance['ModuleInfo']['ModuleID'] ?? '') !== self::CALENDAR_ACCOUNT_MODULE_ID) {
+            return 'unknown';
+        }
+
+        return match ((int) IPS_GetProperty($accountInstanceId, 'Provider')) {
+            0       => 'apple',
+            1       => 'caldav',
+            2       => 'google',
+            3       => 'microsoft',
+            4       => 'ics',
+            default => 'unknown'
+        };
     }
 
     /**

@@ -111,8 +111,10 @@ $supportedScriptApiMethods = [
     'GetCurrentAppointments',
     'GetCurrentAppointmentCount',
     'GetUpcomingAppointments',
+    'GetUpcomingAppointmentsCompact',
     'GetUpcomingAppointmentCount',
     'GetNextAppointments',
+    'GetNextAppointmentsCompact',
     'GetDayReminders',
     'GetReminders',
     'GetUpcomingReminders',
@@ -180,8 +182,10 @@ $calendarFilterReferenceCalls = [
     'IPSKALVIEW_GetCurrentAppointments(12345, 0)',
     'IPSKALVIEW_GetCurrentAppointmentCount(12345, 0)',
     'IPSKALVIEW_GetUpcomingAppointments(12345, 24, 0)',
+    'IPSKALVIEW_GetUpcomingAppointmentsCompact(12345, 24, 0)',
     'IPSKALVIEW_GetUpcomingAppointmentCount(12345, 24, 0)',
     'IPSKALVIEW_GetNextAppointments(12345, 3, 0)',
+    'IPSKALVIEW_GetNextAppointmentsCompact(12345, 3, 0)',
     "IPSKALVIEW_GetAnniversaryList(12345, 0, 0, '')",
     'IPSKALVIEW_GetBirthdayList(12345, 0, 45)',
     "IPSKALVIEW_GetDayReminders(12345, '2026-08-11', 0)",
@@ -308,15 +312,20 @@ assertCalendarViewApi(
 );
 assertCalendarViewApi(
     str_contains($moduleSource, 'public function GetUpcomingAppointments(int $Hours, int $CalendarInstanceID = 0): string')
+        && str_contains($moduleSource, 'public function GetUpcomingAppointmentsCompact(int $Hours, int $CalendarInstanceID = 0): string')
         && str_contains($moduleSource, 'public function GetUpcomingAppointmentCount(int $Hours, int $CalendarInstanceID = 0): int')
         && str_contains($moduleSource, '$this->filterUpcomingAppointments(')
-        && str_contains($moduleSource, '$this->validateUpcomingHours($Hours);'),
-    'Calendar View must expose upcoming appointment list and count functions with a bounded hour window.'
+        && str_contains($moduleSource, '$this->validateUpcomingHours($Hours);')
+        && substr_count($moduleSource, '$this->collectAppointmentsForRange($rangeStart, $rangeEnd, true)') >= 3,
+    'Calendar View must expose full and compact upcoming appointment lists plus the count with one bounded hour window.'
 );
 assertCalendarViewApi(
     str_contains($moduleSource, 'public function GetNextAppointments(int $Count, int $CalendarInstanceID = 0): string')
-        && str_contains($moduleSource, 'array_slice($this->filterFutureAppointments($appointments, $now->getTimestamp()), 0, $Count)'),
-    'Calendar View must expose a configurable list of the next future appointments.'
+        && str_contains($moduleSource, 'public function GetNextAppointmentsCompact(int $Count, int $CalendarInstanceID = 0): string')
+        && substr_count($moduleSource, "throw new InvalidArgumentException('Count must be between 1 and 1000.');") >= 2
+        && str_contains($moduleSource, 'array_slice($this->filterFutureAppointments($appointments, $now->getTimestamp()), 0, $Count)')
+        && str_contains($moduleSource, '$this->compactAppointments('),
+    'Calendar View must expose full and compact configurable lists of the next future appointments.'
 );
 assertCalendarViewApi(
     str_contains($moduleSource, 'public function GetDayReminders(string $Date, int $CalendarInstanceID = 0): string')
@@ -345,13 +354,24 @@ assertCalendarViewApi(
 $normalizedModuleSource = preg_replace('/\s+/', ' ', $moduleSource) ?? $moduleSource;
 assertCalendarViewApi(
     str_contains($moduleSource, 'public function GetSelectedCalendars(): string')
-        && str_contains($moduleSource, '$this->loadSelectedCalendars()')
-        && str_contains($moduleSource, 'private function loadSelectedCalendars(): array')
+        && str_contains($moduleSource, '$this->loadSelectedCalendars(true)')
+        && str_contains($moduleSource, 'private function loadSelectedCalendars(bool $includeOperationalMetadata = false): array')
+        && str_contains($moduleSource, "private const CALENDAR_ACCOUNT_MODULE_ID = '{966D6119-7FF3-5CA5-06C3-536FBF8100C4}';")
+        && str_contains($moduleSource, 'private function calendarProviderKey(array $calendarInstance): string')
         && str_contains($normalizedModuleSource, "'timezone' => trim((string) (\$calendarStatus['timezone'] ?? ''))")
         && str_contains($normalizedModuleSource, "'canCreateRecurrence' => (bool) (\$calendarStatus['canCreateRecurrence'] ?? false)")
         && str_contains($normalizedModuleSource, "'canDeleteSeries' => (bool) (\$calendarStatus['canDeleteSeries'] ?? false)")
-        && str_contains($normalizedModuleSource, "'maxReminders' => max(1, min(CalendarEventReminder::MAX_REMINDERS, (int) (\$calendarStatus['maxReminders'] ?? 1)))"),
-    'Calendar View must expose selected calendar metadata including recurrence capabilities, reminder limits and timezone without colliding with its internal loader.'
+        && str_contains($normalizedModuleSource, "'maxReminders' => max(1, min(CalendarEventReminder::MAX_REMINDERS, (int) (\$calendarStatus['maxReminders'] ?? 1)))")
+        && str_contains($moduleSource, "\$calendar['provider'] = \$this->calendarProviderKey(\$instance);")
+        && str_contains($moduleSource, "\$calendar['lastSynchronization'] = max(0, (int) (\$calendarStatus['lastSynchronization'] ?? 0));")
+        && str_contains($moduleSource, "\$calendar['status'] = (int) (\$instance['InstanceStatus'] ?? 0);")
+        && str_contains($moduleSource, "\$calendar['lastError'] = trim((string) (\$calendarStatus['lastError'] ?? ''));")
+        && str_contains($moduleSource, "0       => 'apple'")
+        && str_contains($moduleSource, "1       => 'caldav'")
+        && str_contains($moduleSource, "2       => 'google'")
+        && str_contains($moduleSource, "3       => 'microsoft'")
+        && str_contains($moduleSource, "4       => 'ics'"),
+    'Calendar View must expose selected calendar capabilities and opt-in provider, synchronization, status, and error metadata.'
 );
 
 require_once __DIR__ . '/stubs/ModuleStrictStubs.php';
