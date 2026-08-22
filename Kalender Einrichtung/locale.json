@@ -82,7 +82,27 @@
             "The calendar account connection has not been verified yet.": "Die Verbindung des Kalender Kontos wurde noch nicht erfolgreich geprüft.",
             "Calendar account ready": "Kalender Konto bereit",
             "The calendar account connection was verified successfully.": "Die Verbindung des Kalender Kontos wurde erfolgreich geprüft.",
-            "With OK, OpenCalendar activates a newly created calendar account and completes this setup step. Existing accounts keep their current activation state.": "Mit OK aktiviert OpenCalendar ein neu angelegtes Kalender Konto und schließt diesen Einrichtungsschritt ab. Vorhandene Konten behalten ihren bisherigen Aktivierungszustand."
+            "With OK, OpenCalendar activates a newly created calendar account and completes this setup step. Existing accounts keep their current activation state.": "Mit OK aktiviert OpenCalendar ein neu angelegtes Kalender Konto und schließt diesen Einrichtungsschritt ab. Vorhandene Konten behalten ihren bisherigen Aktivierungszustand.",
+            "Choose calendars": "Kalender auswählen",
+            "Select the calendars that OpenCalendar should prepare for this setup.": "Die Kalender auswählen, die OpenCalendar für diese Einrichtung vorbereiten soll.",
+            "Available calendars": "Verfügbare Kalender",
+            "Use": "Verwenden",
+            "Calendar": "Kalender",
+            "Access": "Zugriff",
+            "Default": "Standard",
+            "Calendar ID": "Kalender-ID",
+            "Read and write": "Lesen und schreiben",
+            "Read only": "Nur lesen",
+            "Yes": "Ja",
+            "Select at least one calendar. A primary calendar, or the only available calendar, is preselected automatically.": "Mindestens einen Kalender auswählen. Ein primärer Kalender beziehungsweise der einzige verfügbare Kalender wird automatisch vorausgewählt.",
+            "Please select at least one calendar.": "Bitte mindestens einen Kalender auswählen.",
+            "The calendar selection is invalid.": "Die Kalenderauswahl ist ungültig.",
+            "No discovered calendars are available.": "Es sind keine ermittelten Kalender verfügbar.",
+            "The calendar account did not return calendar data.": "Das Kalender Konto hat keine Kalenderdaten zurückgegeben.",
+            "The calendar account returned invalid calendar data.": "Das Kalender Konto hat ungültige Kalenderdaten zurückgegeben.",
+            "Calendar discovery failed.": "Die Kalenderermittlung ist fehlgeschlagen.",
+            "No calendars were found for this account.": "Für dieses Kalender Konto wurden keine Kalender gefunden.",
+            "The selected calendars have been saved for the next setup step.": "Die ausgewählten Kalender wurden für den nächsten Einrichtungsschritt gespeichert."
         }
     }
 }

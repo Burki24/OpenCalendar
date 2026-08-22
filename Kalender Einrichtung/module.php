@@ -2,9 +2,16 @@
 
 declare(strict_types=1);
 
+use Burki24\SymconModuleHelper\DataFlowHelper;
+
+require_once __DIR__ . '/../libs/helper/DataFlowHelper.php';
+
 class OpenCalendarDiscovery extends IPSModuleStrict
 {
+    use DataFlowHelper;
+
     private const CALENDAR_ACCOUNT_MODULE_ID = '{966D6119-7FF3-5CA5-06C3-536FBF8100C4}';
+    private const DATA_ID_TO_CALENDAR_ACCOUNT = '{4E535B1D-69C7-AC77-1372-0282B21BAEC9}';
     private const APPLE_CALDAV_URL = 'https://caldav.icloud.com';
 
     /** @var array<string, int> */
@@ -36,6 +43,7 @@ class OpenCalendarDiscovery extends IPSModuleStrict
         parent::Create();
 
         $this->RegisterAttributeInteger('SelectedCalendarAccountID', 0);
+        $this->RegisterAttributeString('SelectedCalendarIDs', '[]');
     }
 
     public function GetConfigurationForm(): string
@@ -53,18 +61,19 @@ class OpenCalendarDiscovery extends IPSModuleStrict
             }
 
             foreach ($action['popup']['pages'] as &$page) {
-                if (($page['name'] ?? '') !== 'account') {
+                $pageName = (string) ($page['name'] ?? '');
+                if (!in_array($pageName, ['account', 'calendars'], true)) {
                     continue;
                 }
 
                 foreach ($page['items'] as &$item) {
-                    if (($item['name'] ?? '') === 'ExistingAccountID') {
+                    if ($pageName === 'account' && ($item['name'] ?? '') === 'ExistingAccountID') {
                         $item['options'] = $this->calendarAccountSelectOptions();
-                        break;
+                    } elseif ($pageName === 'calendars' && ($item['name'] ?? '') === 'WizardCalendars') {
+                        $item['values'] = $this->wizardCalendarListValues($this->readWizardCalendars());
                     }
                 }
                 unset($item);
-                break;
             }
             unset($page);
             break;
@@ -83,12 +92,14 @@ class OpenCalendarDiscovery extends IPSModuleStrict
                 $this->SetBuffer('WizardProvider', $provider);
                 $this->SetBuffer('WizardAccountSelection', '');
                 $this->SetBuffer('WizardConnectionVerified', '0');
+                $this->clearWizardCalendarSelection(true);
                 break;
 
             case 'WizardProviderUndo':
                 $this->SetBuffer('WizardProvider', '');
                 $this->SetBuffer('WizardAccountSelection', '');
                 $this->SetBuffer('WizardConnectionVerified', '0');
+                $this->clearWizardCalendarSelection(true);
                 break;
 
             case 'WizardPrepareAccount':
@@ -99,6 +110,15 @@ class OpenCalendarDiscovery extends IPSModuleStrict
                 $this->cleanupPreparedWizardAccount();
                 $this->SetBuffer('WizardAccountSelection', '');
                 $this->SetBuffer('WizardConnectionVerified', '0');
+                $this->clearWizardCalendarSelection(true);
+                break;
+
+            case 'WizardSelectCalendars':
+                $this->storeWizardCalendarSelection($Value);
+                break;
+
+            case 'WizardCalendarSelectionUndo':
+                $this->SetBuffer('WizardSelectedCalendarIDs', '[]');
                 break;
 
             case 'WizardFinishAccount':
@@ -336,6 +356,20 @@ class OpenCalendarDiscovery extends IPSModuleStrict
         }
     }
 
+    public function ValidateWizardCalendarSelection(string $CalendarSelection): string
+    {
+        try {
+            $selectedCalendarIDs = $this->selectedCalendarIDsFromWizardValue($CalendarSelection);
+            if ($selectedCalendarIDs === []) {
+                throw new InvalidArgumentException($this->Translate('Please select at least one calendar.'));
+            }
+        } catch (InvalidArgumentException | RuntimeException $exception) {
+            return $exception->getMessage();
+        }
+
+        return '';
+    }
+
     public function ValidateWizardConfirmation(): string
     {
         try {
@@ -344,6 +378,9 @@ class OpenCalendarDiscovery extends IPSModuleStrict
                 throw new InvalidArgumentException(
                     $this->Translate('The calendar account connection has not been verified yet.')
                 );
+            }
+            if ($this->readWizardSelectedCalendarIDs() === []) {
+                throw new InvalidArgumentException($this->Translate('Please select at least one calendar.'));
             }
         } catch (InvalidArgumentException | RuntimeException $exception) {
             return $exception->getMessage();
@@ -380,6 +417,7 @@ class OpenCalendarDiscovery extends IPSModuleStrict
         );
         $this->SetBuffer('WizardAccountID', (string) $accountID);
         $this->SetBuffer('WizardConnectionVerified', '0');
+        $this->clearWizardCalendarSelection(true);
     }
 
     private function finishWizardAccount(): void
@@ -397,11 +435,13 @@ class OpenCalendarDiscovery extends IPSModuleStrict
         }
 
         $this->WriteAttributeInteger('SelectedCalendarAccountID', $accountID);
+        $this->WriteAttributeString('SelectedCalendarIDs', $this->GetBuffer('WizardSelectedCalendarIDs'));
         $this->SetBuffer('WizardProvider', '');
         $this->SetBuffer('WizardAccountSelection', '');
         $this->SetBuffer('WizardAccountID', '');
         $this->SetBuffer('WizardCreatedAccountID', '');
         $this->SetBuffer('WizardConnectionVerified', '0');
+        $this->clearWizardCalendarSelection(true);
     }
 
     private function createCalendarAccount(string $provider, string $accountName): int
@@ -445,6 +485,7 @@ class OpenCalendarDiscovery extends IPSModuleStrict
         $this->SetBuffer('WizardAccountID', '');
         $this->SetBuffer('WizardCreatedAccountID', '');
         $this->SetBuffer('WizardConnectionVerified', '0');
+        $this->clearWizardCalendarSelection(true);
     }
 
     private function testWizardConnection(int $accountID): string
@@ -470,9 +511,230 @@ class OpenCalendarDiscovery extends IPSModuleStrict
                 : $this->Translate('The calendar account connection test failed.');
         }
 
+        try {
+            $calendars = $this->discoverWizardCalendars($accountID);
+            $this->SetBuffer(
+                'WizardCalendars',
+                json_encode($calendars, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)
+            );
+            $this->SetBuffer('WizardSelectedCalendarIDs', '[]');
+            $this->UpdateFormField(
+                'WizardCalendars',
+                'values',
+                json_encode(
+                    $this->wizardCalendarListValues($calendars),
+                    JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES
+                )
+            );
+        } catch (Throwable $exception) {
+            $this->SetBuffer('WizardConnectionVerified', '0');
+            return $exception->getMessage();
+        }
+
         $this->SetBuffer('WizardConnectionVerified', '1');
 
         return '';
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    private function discoverWizardCalendars(int $accountID): array
+    {
+        $responseJson = IPSKALACC_ForwardData(
+            $accountID,
+            $this->EncodeDataFlowMessage(
+                self::DATA_ID_TO_CALENDAR_ACCOUNT,
+                [
+                    'Operation' => 'DiscoverCalendars',
+                    'RequestID' => bin2hex(random_bytes(8))
+                ]
+            )
+        );
+        if ($responseJson === '') {
+            throw new RuntimeException($this->Translate('The calendar account did not return calendar data.'));
+        }
+
+        try {
+            $response = json_decode($responseJson, true, 512, JSON_THROW_ON_ERROR);
+        } catch (JsonException $exception) {
+            throw new RuntimeException(
+                $this->Translate('The calendar account returned invalid calendar data.'),
+                0,
+                $exception
+            );
+        }
+        if (!is_array($response) || !($response['Success'] ?? false)) {
+            $error = is_array($response) ? trim((string) ($response['Error'] ?? '')) : '';
+            throw new RuntimeException(
+                $error !== '' ? $error : $this->Translate('Calendar discovery failed.')
+            );
+        }
+
+        $payload = $response['Payload'] ?? null;
+        if (!is_array($payload)) {
+            throw new RuntimeException($this->Translate('The calendar account returned invalid calendar data.'));
+        }
+
+        $calendars = array_values(array_filter(
+            $payload,
+            static fn (mixed $calendar): bool => is_array($calendar)
+                && trim((string) ($calendar['id'] ?? '')) !== ''
+        ));
+        if ($calendars === []) {
+            throw new RuntimeException($this->Translate('No calendars were found for this account.'));
+        }
+
+        return $calendars;
+    }
+
+    /**
+     * @param list<array<string, mixed>> $calendars
+     * @return list<array<string, mixed>>
+     */
+    private function wizardCalendarListValues(array $calendars): array
+    {
+        $selectedCalendarIDs = $this->readWizardSelectedCalendarIDs();
+        $hasStoredSelection = $selectedCalendarIDs !== [];
+        $hasPrimaryCalendar = count(array_filter(
+            $calendars,
+            static fn (array $calendar): bool => (bool) ($calendar['primary'] ?? false)
+        )) > 0;
+        $singleCalendar = count($calendars) === 1;
+        $values = [];
+
+        foreach ($calendars as $calendar) {
+            $calendarID = trim((string) ($calendar['id'] ?? ''));
+            if ($calendarID === '') {
+                continue;
+            }
+
+            $name = trim((string) ($calendar['name'] ?? ''));
+            if ($name === '') {
+                $name = $calendarID;
+            }
+            $capabilities = is_array($calendar['capabilities'] ?? null)
+                ? $calendar['capabilities']
+                : [];
+            $canWrite = (bool) ($capabilities['create'] ?? false)
+                || (bool) ($capabilities['update'] ?? false)
+                || (bool) ($capabilities['delete'] ?? false);
+            $selected = $hasStoredSelection
+                ? in_array($calendarID, $selectedCalendarIDs, true)
+                : (($hasPrimaryCalendar && (bool) ($calendar['primary'] ?? false)) || $singleCalendar);
+
+            $values[] = [
+                'selected'   => $selected,
+                'name'       => $name,
+                'access'     => $this->Translate($canWrite ? 'Read and write' : 'Read only'),
+                'primary'    => (bool) ($calendar['primary'] ?? false) ? $this->Translate('Yes') : '',
+                'calendarId' => $calendarID
+            ];
+        }
+
+        return $values;
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    private function readWizardCalendars(): array
+    {
+        try {
+            $calendars = json_decode($this->GetBuffer('WizardCalendars') ?: '[]', true, 512, JSON_THROW_ON_ERROR);
+        } catch (JsonException) {
+            return [];
+        }
+
+        return is_array($calendars) ? array_values(array_filter($calendars, 'is_array')) : [];
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function readWizardSelectedCalendarIDs(): array
+    {
+        try {
+            $calendarIDs = json_decode(
+                $this->GetBuffer('WizardSelectedCalendarIDs') ?: '[]',
+                true,
+                512,
+                JSON_THROW_ON_ERROR
+            );
+        } catch (JsonException) {
+            return [];
+        }
+
+        if (!is_array($calendarIDs)) {
+            return [];
+        }
+
+        return array_values(array_unique(array_filter(
+            array_map(static fn (mixed $calendarID): string => trim((string) $calendarID), $calendarIDs),
+            static fn (string $calendarID): bool => $calendarID !== ''
+        )));
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function selectedCalendarIDsFromWizardValue(string $value): array
+    {
+        try {
+            $rows = json_decode($value, true, 512, JSON_THROW_ON_ERROR);
+        } catch (JsonException) {
+            throw new InvalidArgumentException($this->Translate('The calendar selection is invalid.'));
+        }
+        if (!is_array($rows)) {
+            throw new InvalidArgumentException($this->Translate('The calendar selection is invalid.'));
+        }
+
+        $availableCalendarIDs = array_values(array_filter(array_map(
+            static fn (array $calendar): string => trim((string) ($calendar['id'] ?? '')),
+            $this->readWizardCalendars()
+        )));
+        if ($availableCalendarIDs === []) {
+            throw new RuntimeException($this->Translate('No discovered calendars are available.'));
+        }
+
+        $selectedCalendarIDs = [];
+        foreach ($rows as $row) {
+            if (!is_array($row) || !($row['selected'] ?? false)) {
+                continue;
+            }
+            $calendarID = trim((string) ($row['calendarId'] ?? ''));
+            if ($calendarID === '' || !in_array($calendarID, $availableCalendarIDs, true)) {
+                throw new InvalidArgumentException($this->Translate('The calendar selection is invalid.'));
+            }
+            $selectedCalendarIDs[] = $calendarID;
+        }
+
+        return array_values(array_unique($selectedCalendarIDs));
+    }
+
+    private function storeWizardCalendarSelection(mixed $value): void
+    {
+        if (!is_string($value)) {
+            throw new InvalidArgumentException($this->Translate('The calendar selection is invalid.'));
+        }
+
+        $selectedCalendarIDs = $this->selectedCalendarIDsFromWizardValue($value);
+        if ($selectedCalendarIDs === []) {
+            throw new InvalidArgumentException($this->Translate('Please select at least one calendar.'));
+        }
+
+        $this->SetBuffer(
+            'WizardSelectedCalendarIDs',
+            json_encode($selectedCalendarIDs, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)
+        );
+    }
+
+    private function clearWizardCalendarSelection(bool $clearDiscovery): void
+    {
+        if ($clearDiscovery) {
+            $this->SetBuffer('WizardCalendars', '[]');
+        }
+        $this->SetBuffer('WizardSelectedCalendarIDs', '[]');
     }
 
     private function wizardAccountID(): int

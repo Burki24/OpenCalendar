@@ -157,7 +157,7 @@
                             }
                         ],
                         "validate": "return IPSKALDISCOVERY_ValidateWizardAppleConfiguration($id, $AppleUsername, $ApplePassword);",
-                        "nextPage": "summary"
+                        "nextPage": "calendars"
                     },
                     {
                         "name": "caldav",
@@ -190,7 +190,7 @@
                             }
                         ],
                         "validate": "return IPSKALDISCOVERY_ValidateWizardCalDAVConfiguration($id, $CalDAVServerURL, $CalDAVUsername, $CalDAVPassword);",
-                        "nextPage": "summary"
+                        "nextPage": "calendars"
                     },
                     {
                         "name": "google",
@@ -217,7 +217,7 @@
                             }
                         ],
                         "validate": "return IPSKALDISCOVERY_ValidateWizardOAuthConnection($id);",
-                        "nextPage": "summary"
+                        "nextPage": "calendars"
                     },
                     {
                         "name": "microsoft",
@@ -244,7 +244,7 @@
                             }
                         ],
                         "validate": "return IPSKALDISCOVERY_ValidateWizardOAuthConnection($id);",
-                        "nextPage": "summary"
+                        "nextPage": "calendars"
                     },
                     {
                         "name": "ics",
@@ -302,6 +302,75 @@
                             }
                         ],
                         "validate": "return IPSKALDISCOVERY_ValidateWizardICalendarConfiguration($id, $ICSURL, $ICSCalendarName, $ICSAuthenticationMode, $ICSUsername, $ICSPassword);",
+                        "nextPage": "calendars"
+                    },
+                    {
+                        "name": "calendars",
+                        "caption": "Choose calendars",
+                        "closeCaption": "Set up later",
+                        "items": [
+                            {
+                                "type": "Label",
+                                "caption": "Select the calendars that OpenCalendar should prepare for this setup."
+                            },
+                            {
+                                "type": "List",
+                                "name": "WizardCalendars",
+                                "caption": "Available calendars",
+                                "rowCount": 8,
+                                "add": false,
+                                "delete": false,
+                                "changeOrder": false,
+                                "loadValuesFromConfiguration": false,
+                                "columns": [
+                                    {
+                                        "caption": "Use",
+                                        "name": "selected",
+                                        "width": "70px",
+                                        "align": "center",
+                                        "save": true,
+                                        "edit": {
+                                            "type": "CheckBox"
+                                        }
+                                    },
+                                    {
+                                        "caption": "Calendar",
+                                        "name": "name",
+                                        "width": "auto"
+                                    },
+                                    {
+                                        "caption": "Access",
+                                        "name": "access",
+                                        "width": "140px"
+                                    },
+                                    {
+                                        "caption": "Default",
+                                        "name": "primary",
+                                        "width": "90px",
+                                        "align": "center"
+                                    },
+                                    {
+                                        "caption": "Calendar ID",
+                                        "name": "calendarId",
+                                        "width": "1px",
+                                        "visible": false,
+                                        "save": true
+                                    }
+                                ],
+                                "values": []
+                            },
+                            {
+                                "type": "Label",
+                                "caption": "Select at least one calendar. A primary calendar, or the only available calendar, is preselected automatically."
+                            },
+                            {
+                                "type": "Label",
+                                "caption": "If you choose Set up later, a newly created calendar account remains disabled until setup is completed."
+                            }
+                        ],
+                        "validate": "return IPSKALDISCOVERY_ValidateWizardCalendarSelection($id, json_encode($WizardCalendars, JSON_THROW_ON_ERROR));",
+                        "onConfirm": "IPS_RequestAction($id, 'WizardSelectCalendars', json_encode($WizardCalendars, JSON_THROW_ON_ERROR));",
+                        "onUndo": "IPS_RequestAction($id, 'WizardCalendarSelectionUndo', '');",
                         "nextPage": "summary"
                     },
                     {
@@ -311,6 +380,10 @@
                             {
                                 "type": "Label",
                                 "caption": "The calendar account connection was verified successfully."
+                            },
+                            {
+                                "type": "Label",
+                                "caption": "The selected calendars have been saved for the next setup step."
                             },
                             {
                                 "type": "Label",

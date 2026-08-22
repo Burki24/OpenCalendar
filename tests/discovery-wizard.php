@@ -78,9 +78,10 @@ assertDiscoveryWizard(
         'google',
         'microsoft',
         'ics',
+        'calendars',
         'summary'
     ],
-    'OpenCalendar Discovery must provide all provider-specific wizard pages.'
+    'OpenCalendar Discovery must provide provider setup and calendar selection wizard pages.'
 );
 
 $accountPage = $pages[2];
@@ -108,6 +109,12 @@ assertDiscoveryWizard(
         && str_contains((string) ($providerPages['microsoft']['validate'] ?? ''), 'ValidateWizardOAuthConnection'),
     'OAuth provider pages must verify the completed authorization.'
 );
+foreach (['apple', 'caldav', 'google', 'microsoft', 'ics'] as $providerPageName) {
+    assertDiscoveryWizard(
+        ($providerPages[$providerPageName]['nextPage'] ?? '') === 'calendars',
+        'Every provider setup page must continue to calendar selection.'
+    );
+}
 
 foreach (['google', 'microsoft'] as $providerPageName) {
     $oauthButton = null;
@@ -125,6 +132,38 @@ foreach (['google', 'microsoft'] as $providerPageName) {
     );
 }
 
+$calendarPage = $providerPages['calendars'];
+$calendarList = null;
+foreach ($calendarPage['items'] ?? [] as $item) {
+    if (($item['type'] ?? '') === 'List' && ($item['name'] ?? '') === 'WizardCalendars') {
+        $calendarList = $item;
+        break;
+    }
+}
+assertDiscoveryWizard(is_array($calendarList), 'Calendar selection page must expose the discovered calendar list.');
+$calendarColumns = [];
+foreach ($calendarList['columns'] ?? [] as $column) {
+    $calendarColumns[(string) ($column['name'] ?? '')] = $column;
+}
+assertDiscoveryWizard(
+    isset(
+        $calendarColumns['selected'],
+        $calendarColumns['name'],
+        $calendarColumns['access'],
+        $calendarColumns['calendarId']
+    )
+        && (($calendarColumns['selected']['edit']['type'] ?? '') === 'CheckBox')
+        && (($calendarColumns['calendarId']['visible'] ?? true) === false),
+    'Calendar selection list must provide a checkbox and preserve the hidden calendar identity.'
+);
+assertDiscoveryWizard(
+    str_contains((string) ($calendarPage['validate'] ?? ''), 'ValidateWizardCalendarSelection')
+        && str_contains((string) ($calendarPage['onConfirm'] ?? ''), 'WizardSelectCalendars')
+        && str_contains((string) ($calendarPage['onUndo'] ?? ''), 'WizardCalendarSelectionUndo')
+        && ($calendarPage['nextPage'] ?? '') === 'summary',
+    'Calendar selection page must validate and store the selected calendar IDs.'
+);
+
 $summaryPage = $providerPages['summary'];
 assertDiscoveryWizard(
     str_contains((string) ($summaryPage['validate'] ?? ''), 'ValidateWizardConfirmation')
@@ -133,23 +172,32 @@ assertDiscoveryWizard(
 );
 
 foreach ([
+    'use Burki24\\SymconModuleHelper\\DataFlowHelper;',
+    "private const DATA_ID_TO_CALENDAR_ACCOUNT = '{4E535B1D-69C7-AC77-1372-0282B21BAEC9}';",
+    "RegisterAttributeString('SelectedCalendarIDs', '[]')",
     'public function GetWizardProviderPage(): string',
     'public function ValidateWizardAppleConfiguration(',
     'public function ValidateWizardCalDAVConfiguration(',
     'public function ValidateWizardICalendarConfiguration(',
     'public function BeginWizardOAuth(): string',
     'public function ValidateWizardOAuthConnection(): string',
+    'public function ValidateWizardCalendarSelection(string $CalendarSelection): string',
     'private function testWizardConnection(int $accountID): string',
+    'private function discoverWizardCalendars(int $accountID): array',
+    'private function wizardCalendarListValues(array $calendars): array',
     'IPSKALACC_TestConnection($accountID)',
+    'IPSKALACC_ForwardData(',
+    "'Operation' => 'DiscoverCalendars'",
     'IPSKALACC_ConnectGoogle($accountID)',
     'IPSKALACC_ConnectMicrosoft($accountID)',
     'IPSKALACC_GetAccountStatus($accountID)',
     'IPS_SetProperty($accountID, \'Active\', true)',
+    "WriteAttributeString('SelectedCalendarIDs'",
     'cleanupPreparedWizardAccount()'
 ] as $requiredSource) {
     assertDiscoveryWizard(
         str_contains($moduleSource, $requiredSource),
-        'Missing provider setup behavior: ' . $requiredSource
+        'Missing provider/calendar setup behavior: ' . $requiredSource
     );
 }
 
@@ -162,6 +210,10 @@ foreach ([
     'Connect Microsoft 365',
     'Configure ICS / Webcal',
     'Set up later',
+    'Choose calendars',
+    'Available calendars',
+    'Please select at least one calendar.',
+    'The selected calendars have been saved for the next setup step.',
     'The calendar account connection was verified successfully.',
     'The calendar account connection has not been verified yet.'
 ] as $translationKey) {
@@ -171,4 +223,4 @@ foreach ([
     );
 }
 
-echo "OpenCalendar Discovery provider setup tests passed.\n";
+echo "OpenCalendar Discovery provider and calendar selection tests passed.\n";
