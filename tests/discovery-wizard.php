@@ -172,8 +172,6 @@ assertDiscoveryWizard(
 );
 
 foreach ([
-    'use Burki24\\SymconModuleHelper\\DataFlowHelper;',
-    "private const DATA_ID_TO_CALENDAR_ACCOUNT = '{4E535B1D-69C7-AC77-1372-0282B21BAEC9}';",
     "RegisterAttributeString('SelectedCalendarIDs', '[]')",
     'public function GetWizardProviderPage(): string',
     'public function ValidateWizardAppleConfiguration(',
@@ -186,8 +184,11 @@ foreach ([
     'private function discoverWizardCalendars(int $accountID): array',
     'private function wizardCalendarListValues(array $calendars): array',
     'IPSKALACC_TestConnection($accountID)',
-    'IPSKALACC_ForwardData(',
-    "'Operation' => 'DiscoverCalendars'",
+    'IPSKALACC_Synchronize($accountID)',
+    'IPSKALACC_GetCalendars($accountID)',
+    '$wasActive = (bool) IPS_GetProperty($accountID, \'Active\');',
+    'finally {',
+    'IPS_SetProperty($accountID, \'Active\', false);',
     'IPSKALACC_ConnectGoogle($accountID)',
     'IPSKALACC_ConnectMicrosoft($accountID)',
     'IPSKALACC_GetAccountStatus($accountID)',

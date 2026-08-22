@@ -2,16 +2,9 @@
 
 declare(strict_types=1);
 
-use Burki24\SymconModuleHelper\DataFlowHelper;
-
-require_once __DIR__ . '/../libs/helper/DataFlowHelper.php';
-
 class OpenCalendarDiscovery extends IPSModuleStrict
 {
-    use DataFlowHelper;
-
     private const CALENDAR_ACCOUNT_MODULE_ID = '{966D6119-7FF3-5CA5-06C3-536FBF8100C4}';
-    private const DATA_ID_TO_CALENDAR_ACCOUNT = '{4E535B1D-69C7-AC77-1372-0282B21BAEC9}';
     private const APPLE_CALDAV_URL = 'https://caldav.icloud.com';
 
     /** @var array<string, int> */
@@ -541,37 +534,46 @@ class OpenCalendarDiscovery extends IPSModuleStrict
      */
     private function discoverWizardCalendars(int $accountID): array
     {
-        $responseJson = IPSKALACC_ForwardData(
-            $accountID,
-            $this->EncodeDataFlowMessage(
-                self::DATA_ID_TO_CALENDAR_ACCOUNT,
-                [
-                    'Operation' => 'DiscoverCalendars',
-                    'RequestID' => bin2hex(random_bytes(8))
-                ]
-            )
-        );
-        if ($responseJson === '') {
-            throw new RuntimeException($this->Translate('The calendar account did not return calendar data.'));
-        }
+        $wasActive = (bool) IPS_GetProperty($accountID, 'Active');
 
         try {
-            $response = json_decode($responseJson, true, 512, JSON_THROW_ON_ERROR);
+            if (!$wasActive) {
+                IPS_SetProperty($accountID, 'Active', true);
+                IPS_ApplyChanges($accountID);
+            }
+
+            if (!IPSKALACC_Synchronize($accountID)) {
+                $status = json_decode(
+                    IPSKALACC_GetAccountStatus($accountID),
+                    true,
+                    512,
+                    JSON_THROW_ON_ERROR
+                );
+                $error = is_array($status) ? trim((string) ($status['lastError'] ?? '')) : '';
+                throw new RuntimeException(
+                    $error !== '' ? $error : $this->Translate('Calendar discovery failed.')
+                );
+            }
+
+            $payload = json_decode(
+                IPSKALACC_GetCalendars($accountID),
+                true,
+                512,
+                JSON_THROW_ON_ERROR
+            );
         } catch (JsonException $exception) {
             throw new RuntimeException(
                 $this->Translate('The calendar account returned invalid calendar data.'),
                 0,
                 $exception
             );
-        }
-        if (!is_array($response) || !($response['Success'] ?? false)) {
-            $error = is_array($response) ? trim((string) ($response['Error'] ?? '')) : '';
-            throw new RuntimeException(
-                $error !== '' ? $error : $this->Translate('Calendar discovery failed.')
-            );
+        } finally {
+            if (!$wasActive && IPS_InstanceExists($accountID)) {
+                IPS_SetProperty($accountID, 'Active', false);
+                IPS_ApplyChanges($accountID);
+            }
         }
 
-        $payload = $response['Payload'] ?? null;
         if (!is_array($payload)) {
             throw new RuntimeException($this->Translate('The calendar account returned invalid calendar data.'));
         }
