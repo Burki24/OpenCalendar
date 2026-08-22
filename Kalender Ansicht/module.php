@@ -687,11 +687,8 @@ class CalendarView extends IPSModuleStrict
         [$rangeStart, $rangeEnd] = CalendarAppointmentRange::fromInclusiveDates($From, $To);
         $appointments = $this->collectAppointmentsForRange($rangeStart, $rangeEnd, true);
 
-        return json_encode(
-            $this->compactAppointments($this->filterAppointmentsByCalendarInstanceId($appointments, $CalendarInstanceID)),
-            JSON_UNESCAPED_SLASHES
-                | JSON_UNESCAPED_UNICODE
-                | JSON_THROW_ON_ERROR
+        return $this->encodeCompactAppointmentList(
+            $this->filterAppointmentsByCalendarInstanceId($appointments, $CalendarInstanceID)
         );
     }
 
@@ -892,17 +889,12 @@ class CalendarView extends IPSModuleStrict
         $appointments = $this->collectAppointmentsForRange($rangeStart, $rangeEnd, true);
         $appointments = $this->filterAppointmentsByCalendarInstanceId($appointments, $CalendarInstanceID);
 
-        return json_encode(
-            $this->compactAppointments(
-                $this->filterUpcomingAppointments(
-                    $appointments,
-                    $now->getTimestamp(),
-                    $until->getTimestamp()
-                )
-            ),
-            JSON_UNESCAPED_SLASHES
-                | JSON_UNESCAPED_UNICODE
-                | JSON_THROW_ON_ERROR
+        return $this->encodeCompactAppointmentList(
+            $this->filterUpcomingAppointments(
+                $appointments,
+                $now->getTimestamp(),
+                $until->getTimestamp()
+            )
         );
     }
 
@@ -947,9 +939,7 @@ class CalendarView extends IPSModuleStrict
      */
     public function GetNextAppointments(int $Count, int $CalendarInstanceID = 0): string
     {
-        if ($Count < 1 || $Count > 1000) {
-            throw new InvalidArgumentException('Count must be between 1 and 1000.');
-        }
+        $this->validateAppointmentCount($Count);
 
         $now = new DateTimeImmutable('now');
         $today = $now->format('Y-m-d');
@@ -975,9 +965,7 @@ class CalendarView extends IPSModuleStrict
      */
     public function GetNextAppointmentsCompact(int $Count, int $CalendarInstanceID = 0): string
     {
-        if ($Count < 1 || $Count > 1000) {
-            throw new InvalidArgumentException('Count must be between 1 and 1000.');
-        }
+        $this->validateAppointmentCount($Count);
 
         $now = new DateTimeImmutable('now');
         $today = $now->format('Y-m-d');
@@ -986,17 +974,12 @@ class CalendarView extends IPSModuleStrict
         $appointments = $this->collectAppointmentsForRange($rangeStart, $rangeEnd, true);
         $appointments = $this->filterAppointmentsByCalendarInstanceId($appointments, $CalendarInstanceID);
 
-        return json_encode(
-            $this->compactAppointments(
-                array_slice(
-                    $this->filterFutureAppointments($appointments, $now->getTimestamp()),
-                    0,
-                    $Count
-                )
-            ),
-            JSON_UNESCAPED_SLASHES
-                | JSON_UNESCAPED_UNICODE
-                | JSON_THROW_ON_ERROR
+        return $this->encodeCompactAppointmentList(
+            array_slice(
+                $this->filterFutureAppointments($appointments, $now->getTimestamp()),
+                0,
+                $Count
+            )
         );
     }
 
@@ -2099,6 +2082,16 @@ class CalendarView extends IPSModuleStrict
     }
 
     /**
+     * Validates the requested number of future appointments.
+     */
+    private function validateAppointmentCount(int $Count): void
+    {
+        if ($Count < 1 || $Count > 1000) {
+            throw new InvalidArgumentException('Count must be between 1 and 1000.');
+        }
+    }
+
+    /**
      * Validates the requested upcoming appointment time window.
      */
     private function validateUpcomingHours(int $Hours): void
@@ -2142,6 +2135,21 @@ class CalendarView extends IPSModuleStrict
             JSON_UNESCAPED_SLASHES
                 | JSON_UNESCAPED_UNICODE
                 | JSON_PRESERVE_ZERO_FRACTION
+                | JSON_THROW_ON_ERROR
+        );
+    }
+
+    /**
+     * Encodes compact provider-independent appointments for PHP callers.
+     *
+     * @param list<array<string, mixed>> $appointments Full normalized appointments.
+     */
+    private function encodeCompactAppointmentList(array $appointments): string
+    {
+        return json_encode(
+            $this->compactAppointments($appointments),
+            JSON_UNESCAPED_SLASHES
+                | JSON_UNESCAPED_UNICODE
                 | JSON_THROW_ON_ERROR
         );
     }
@@ -2374,13 +2382,7 @@ class CalendarView extends IPSModuleStrict
             'showAnniversaryType'       => $this->ReadPropertyBoolean('ShowAnniversaryType'),
             'showLocation'              => $this->ReadPropertyBoolean('ShowLocation'),
             'showDescription'           => $this->ReadPropertyBoolean('ShowDescription'),
-            'tileFontScale'             => max(50, min(200, $this->ReadPropertyInteger('TileFontScale'))),
-            'tileWeekOrientation'       => $this->ReadPropertyInteger('TileWeekOrientation') === 1
-                ? 'vertical'
-                : 'horizontal',
-            'ipsViewWeekOrientation'    => $this->ReadPropertyInteger('IPSViewWeekOrientation') === 1
-                ? 'vertical'
-                : 'horizontal'
+            'tileFontScale'             => max(50, min(200, $this->ReadPropertyInteger('TileFontScale')))
         ];
     }
 

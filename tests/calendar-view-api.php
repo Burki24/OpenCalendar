@@ -254,8 +254,10 @@ assertCalendarViewApi(
 );
 assertCalendarViewApi(
     str_contains($moduleSource, 'public function GetAppointmentsCompact(string $From, string $To, int $CalendarInstanceID = 0): string')
-        && str_contains($moduleSource, '$this->filterAppointmentsByCalendarInstanceId($appointments, $CalendarInstanceID)'),
-    'Calendar View must expose a compact provider-independent appointment range function.'
+        && str_contains($moduleSource, '$this->filterAppointmentsByCalendarInstanceId($appointments, $CalendarInstanceID)')
+        && str_contains($moduleSource, 'private function encodeCompactAppointmentList(array $appointments): string')
+        && substr_count($moduleSource, '$this->encodeCompactAppointmentList(') >= 3,
+    'Compact appointment APIs must share one provider-independent encoding path.'
 );
 assertCalendarViewApi(
     str_contains($moduleSource, "'summary'      =>")
@@ -322,10 +324,11 @@ assertCalendarViewApi(
 assertCalendarViewApi(
     str_contains($moduleSource, 'public function GetNextAppointments(int $Count, int $CalendarInstanceID = 0): string')
         && str_contains($moduleSource, 'public function GetNextAppointmentsCompact(int $Count, int $CalendarInstanceID = 0): string')
-        && substr_count($moduleSource, "throw new InvalidArgumentException('Count must be between 1 and 1000.');") >= 2
-        && str_contains($moduleSource, 'array_slice($this->filterFutureAppointments($appointments, $now->getTimestamp()), 0, $Count)')
-        && str_contains($moduleSource, '$this->compactAppointments('),
-    'Calendar View must expose full and compact configurable lists of the next future appointments.'
+        && str_contains($moduleSource, 'private function validateAppointmentCount(int $Count): void')
+        && substr_count($moduleSource, '$this->validateAppointmentCount($Count);') >= 2
+        && substr_count($moduleSource, "throw new InvalidArgumentException('Count must be between 1 and 1000.');") === 1
+        && str_contains($moduleSource, 'array_slice($this->filterFutureAppointments($appointments, $now->getTimestamp()), 0, $Count)'),
+    'Full and compact next-appointment APIs must share one count-validation path.'
 );
 assertCalendarViewApi(
     str_contains($moduleSource, 'public function GetDayReminders(string $Date, int $CalendarInstanceID = 0): string')

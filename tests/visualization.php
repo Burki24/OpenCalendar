@@ -543,8 +543,10 @@ assertVisualization(
     !str_contains($formSource, '"name": "TileWeekOrientation"')
         && !str_contains($formSource, '"name": "IPSViewWeekOrientation"')
         && str_contains($moduleSource, "RegisterPropertyInteger('TileWeekOrientation', 0)")
-        && str_contains($moduleSource, "RegisterPropertyInteger('IPSViewWeekOrientation', 0)"),
-    'Obsolete week-orientation controls must stay hidden while their legacy properties remain registered for configuration compatibility.'
+        && str_contains($moduleSource, "RegisterPropertyInteger('IPSViewWeekOrientation', 0)")
+        && !str_contains($moduleSource, "'tileWeekOrientation'")
+        && !str_contains($moduleSource, "'ipsViewWeekOrientation'"),
+    'Obsolete week-orientation controls must stay hidden and out of runtime state while their legacy properties remain registered for configuration compatibility.'
 );
 assertVisualization(
     str_contains($formSource, '"name": "TileFontScale"')
