@@ -15,6 +15,15 @@ class OpenCalendarDiscovery extends IPSModuleStrict
         'ics'       => 4
     ];
 
+    /** @var array<int, string> */
+    private const PROVIDER_LABELS = [
+        0 => 'Apple iCloud',
+        1 => 'CalDAV',
+        2 => 'Google Calendar',
+        3 => 'Microsoft 365 / Outlook.com',
+        4 => 'ICS / Webcal'
+    ];
+
     private const ACCOUNT_MODE_NEW = 'new';
     private const ACCOUNT_MODE_EXISTING = 'existing';
 
@@ -23,6 +32,42 @@ class OpenCalendarDiscovery extends IPSModuleStrict
         parent::Create();
 
         $this->RegisterAttributeInteger('SelectedCalendarAccountID', 0);
+    }
+
+    public function GetConfigurationForm(): string
+    {
+        $form = json_decode(
+            (string) file_get_contents(__DIR__ . '/form.json'),
+            true,
+            512,
+            JSON_THROW_ON_ERROR
+        );
+
+        foreach ($form['actions'] as &$action) {
+            if (($action['name'] ?? '') !== 'SetupWizard') {
+                continue;
+            }
+
+            foreach ($action['popup']['pages'] as &$page) {
+                if (($page['name'] ?? '') !== 'account') {
+                    continue;
+                }
+
+                foreach ($page['items'] as &$item) {
+                    if (($item['name'] ?? '') === 'ExistingAccountID') {
+                        $item['options'] = $this->calendarAccountSelectOptions();
+                        break;
+                    }
+                }
+                unset($item);
+                break;
+            }
+            unset($page);
+            break;
+        }
+        unset($action);
+
+        return json_encode($form, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE);
     }
 
     public function RequestAction(string $Ident, mixed $Value): void
@@ -157,6 +202,47 @@ class OpenCalendarDiscovery extends IPSModuleStrict
         }
 
         return $accountID;
+    }
+
+    /**
+     * @return list<array{caption: string, value: int}>
+     */
+    private function calendarAccountSelectOptions(): array
+    {
+        $options = [
+            [
+                'caption' => $this->Translate('Please select an existing calendar account.'),
+                'value'   => 0
+            ]
+        ];
+
+        $accounts = [];
+        foreach (IPS_GetInstanceListByModuleID(self::CALENDAR_ACCOUNT_MODULE_ID) as $accountID) {
+            $provider = (int) IPS_GetProperty($accountID, 'Provider');
+            $providerLabel = self::PROVIDER_LABELS[$provider] ?? $this->Translate('Calendar account');
+            $name = trim(IPS_GetName($accountID));
+            if ($name === '') {
+                $name = $this->Translate('Calendar account');
+            }
+
+            $accounts[] = [
+                'caption' => sprintf(
+                    '%s — %s (#%d)',
+                    $this->Translate($providerLabel),
+                    $name,
+                    $accountID
+                ),
+                'value' => $accountID
+            ];
+        }
+
+        usort(
+            $accounts,
+            static fn (array $left, array $right): int => strnatcasecmp($left['caption'], $right['caption'])
+                ?: ($left['value'] <=> $right['value'])
+        );
+
+        return array_merge($options, $accounts);
     }
 
     /**

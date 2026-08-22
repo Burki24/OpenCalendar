@@ -106,9 +106,18 @@ assertDiscoveryWizard(
 );
 assertDiscoveryWizard(
     is_array($existingAccount)
-        && ($existingAccount['type'] ?? '') === 'SelectInstance'
-        && ($existingAccount['validModules'] ?? []) === ['{966D6119-7FF3-5CA5-06C3-536FBF8100C4}'],
-    'Existing calendar account selection must use the native instance tree restricted to Calendar Account instances.'
+        && ($existingAccount['type'] ?? '') === 'Select'
+        && ($existingAccount['value'] ?? -1) === 0
+        && ($existingAccount['options'][0]['value'] ?? -1) === 0,
+    'Existing calendar account selection must use a provider-labelled Select.'
+);
+assertDiscoveryWizard(
+    str_contains($moduleSource, 'public function GetConfigurationForm(): string')
+        && str_contains($moduleSource, 'calendarAccountSelectOptions()')
+        && str_contains($moduleSource, 'IPS_GetName($accountID)')
+        && str_contains($moduleSource, 'IPS_GetProperty($accountID, \'Provider\')')
+        && str_contains($moduleSource, '\'%s — %s (#%d)\''),
+    'Calendar account options must include provider, instance name and instance ID.'
 );
 assertDiscoveryWizard(
     str_contains((string) ($pages[2]['validate'] ?? ''), 'ValidateWizardAccountSelection')

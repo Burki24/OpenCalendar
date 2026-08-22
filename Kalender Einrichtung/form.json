@@ -103,13 +103,16 @@
                                 "value": ""
                             },
                             {
-                                "type": "SelectInstance",
+                                "type": "Select",
                                 "name": "ExistingAccountID",
                                 "caption": "Existing calendar account",
-                                "validModules": [
-                                    "{966D6119-7FF3-5CA5-06C3-536FBF8100C4}"
-                                ],
-                                "value": 0
+                                "value": 0,
+                                "options": [
+                                    {
+                                        "caption": "Please select an existing calendar account.",
+                                        "value": 0
+                                    }
+                                ]
                             },
                             {
                                 "type": "Label",

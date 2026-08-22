@@ -21,11 +21,11 @@ Der Assistent führt aktuell durch folgende Schritte:
 3. Kalender Konto auswählen oder ein neues Konto vorbereiten
 4. Kontoauswahl bestätigen
 
-Bei einem **vorhandenen Kalender Konto** öffnet die Auswahl den nativen
-Symcon-Objektbaum und ist auf Instanzen vom Typ **Calendar Account** beschränkt.
-Dadurch sind neben dem Instanznamen auch die von Symcon dargestellten
-Objektinformationen sichtbar; bei den Kalender-Konten zeigt die Spalte **Wert**
-bereits den Anbieter beziehungsweise die Kontoinformation an. OpenCalendar prüft
+Bei einem **vorhandenen Kalender Konto** baut OpenCalendar die Auswahl beim
+Öffnen der Discovery-Konfiguration aus allen vorhandenen **Calendar Account**-
+Instanzen auf. Jeder Eintrag zeigt den Provider, den Instanznamen und die
+Instanz-ID, beispielsweise `Google Kalender — Kalender Konto (#35780)`. Dadurch
+ist der Anbieter bereits vor der Auswahl eindeutig erkennbar. OpenCalendar prüft
 zusätzlich weiterhin, ob der Anbieter der ausgewählten Instanz zur Auswahl im
 Wizard passt.
 
