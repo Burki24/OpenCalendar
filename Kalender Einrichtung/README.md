@@ -19,33 +19,67 @@ Der Assistent führt aktuell durch folgende Schritte:
 1. Willkommen
 2. Kalenderanbieter auswählen
 3. Kalender Konto auswählen oder ein neues Konto vorbereiten
-4. Kontoauswahl bestätigen
+4. anbieterabhängige Kontoeinrichtung
+5. Verbindung prüfen
+6. Kalender Konto aktivieren
 
 Bei einem **vorhandenen Kalender Konto** baut OpenCalendar die Auswahl beim
 Öffnen der Discovery-Konfiguration aus allen vorhandenen **Calendar Account**-
-Instanzen auf. Jeder Eintrag zeigt den Provider, den Instanznamen und die
-Instanz-ID, beispielsweise `Google Kalender — Kalender Konto (#35780)`. Dadurch
-ist der Anbieter bereits vor der Auswahl eindeutig erkennbar. OpenCalendar prüft
-zusätzlich weiterhin, ob der Anbieter der ausgewählten Instanz zur Auswahl im
-Wizard passt.
+Instanzen auf. Jeder Eintrag zeigt Provider, Instanzname und Instanz-ID,
+beispielsweise `Google Kalender — Kalender Konto (#35780)`.
 
-Bei einem **neuen Kalender Konto** wird die Instanz erst mit **OK** auf der
-Bestätigungsseite erzeugt. Der gewählte Anbieter und der eingegebene Name werden
-übernommen. Das Konto bleibt zunächst inaktiv, damit noch keine Verbindung zum
-Kalenderanbieter hergestellt wird, bevor Zugangsdaten beziehungsweise OAuth im
-nächsten Entwicklungsschritt eingerichtet werden.
+Bei einem **neuen Kalender Konto** wird vor der anbieterabhängigen Einrichtung
+eine inaktive Calendar-Account-Instanz angelegt. Dies ist insbesondere für den
+OAuth-Ablauf von Google und Microsoft notwendig, da der OAuth-Callback einer
+konkreten Symcon-Instanz zugeordnet werden muss.
 
-Wird das Anlegen einer neuen Instanz während der Einrichtung mit einem Fehler
-abgebrochen, versucht OpenCalendar die unvollständig angelegte Instanz wieder zu
-entfernen.
+Wird von der anbieterabhängigen Seite mit **Zurück** zur Kontoauswahl gewechselt,
+entfernt OpenCalendar ein in diesem Wizard-Lauf neu vorbereitetes Konto wieder.
+Wird der Wizard dagegen über **Später einrichten** geschlossen, bleibt die
+inaktive Instanz erhalten und kann beim nächsten Start als vorhandenes Konto
+weiterverwendet werden.
+
+### Apple iCloud
+
+Der Wizard übernimmt Apple-Account-E-Mail-Adresse und app-spezifisches Passwort.
+Die bekannte iCloud-CalDAV-Adresse wird automatisch gesetzt. Beim Klick auf
+**Weiter** wird die Verbindung mit der vorhandenen
+`IPSKALACC_TestConnection()`-Funktion geprüft.
+
+### CalDAV
+
+Server-URL sowie optional Benutzername und Passwort können direkt im Wizard
+gesetzt werden. Bei vorhandenen Konten bleiben leere Felder unverändert. Auch
+hier wird die Verbindung vor dem Wechsel zur Abschlussseite geprüft.
+
+### Google und Microsoft 365
+
+Für Google und Microsoft verwendet der Wizard keine eigenen Zugangsdaten,
+sondern startet die bereits vorhandenen nativen Symcon-OAuth-Funktionen des
+Kalender Kontos. Nach erfolgreicher Autorisierung kehrt der Anwender zum Wizard
+zurück und klickt auf **Weiter**. Der Wizard prüft anschließend OAuth-Status und
+Provider-Verbindung.
+
+### ICS / Webcal
+
+Für eine einfache Online-iCalendar-Quelle können URL, Kalendername und
+Authentifizierung direkt im Wizard gesetzt werden. Unterstützt werden
+**URL / Zugriffsschlüssel** sowie **Benutzername / Passwort**. Komplexere
+Mehrfach-Abonnements und lokale ICS-Dateien bleiben weiterhin der vollständigen
+Konfiguration des Kalender Kontos vorbehalten.
+
+Bei einem bereits eingerichteten ICS/Webcal-Konto kann die URL leer bleiben.
+Dann verändert der Wizard die bestehende iCalendar-Konfiguration nicht und führt
+nur den Verbindungstest aus.
+
+Nach erfolgreichem Verbindungstest wird das Konto auf der Abschlussseite mit
+**OK** aktiviert.
 
 ## Geplanter Ausbau
 
 Der Assistent soll anschließend schrittweise um folgende Funktionen erweitert
 werden:
 
-- Zugangsdaten beziehungsweise OAuth für das ausgewählte Kalender Konto einrichten
-- Verbindung prüfen
 - verfügbare Kalender ermitteln und auswählen
 - Kalenderinstanzen erzeugen
 - Kalender Ansicht anlegen oder eine vorhandene auswählen

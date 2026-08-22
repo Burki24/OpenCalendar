@@ -120,25 +120,181 @@
                             }
                         ],
                         "validate": "return IPSKALDISCOVERY_ValidateWizardAccountSelection($id, $AccountMode, $ExistingAccountID, $AccountName);",
-                        "onConfirm": "IPS_RequestAction($id, 'WizardAccountSelection', json_encode(['mode' => $AccountMode, 'existingAccountID' => $ExistingAccountID, 'accountName' => $AccountName], JSON_THROW_ON_ERROR));",
+                        "onConfirm": "IPS_RequestAction($id, 'WizardPrepareAccount', json_encode(['mode' => $AccountMode, 'existingAccountID' => $ExistingAccountID, 'accountName' => $AccountName], JSON_THROW_ON_ERROR));",
                         "onUndo": "IPS_RequestAction($id, 'WizardAccountSelectionUndo', '');",
+                        "nextPage": "return IPSKALDISCOVERY_GetWizardProviderPage($id);"
+                    },
+                    {
+                        "name": "apple",
+                        "caption": "Configure Apple iCloud",
+                        "closeCaption": "Set up later",
+                        "items": [
+                            {
+                                "type": "Label",
+                                "caption": "Enter the Apple Account email address and an app-specific password."
+                            },
+                            {
+                                "type": "ValidationTextBox",
+                                "name": "AppleUsername",
+                                "caption": "Apple Account email address"
+                            },
+                            {
+                                "type": "PasswordTextBox",
+                                "name": "ApplePassword",
+                                "caption": "App-specific password"
+                            },
+                            {
+                                "type": "Label",
+                                "caption": "For an existing account, empty fields keep the currently stored values."
+                            }
+                        ],
+                        "validate": "return IPSKALDISCOVERY_ValidateWizardAppleConfiguration($id, $AppleUsername, $ApplePassword);",
+                        "nextPage": "summary"
+                    },
+                    {
+                        "name": "caldav",
+                        "caption": "Configure CalDAV",
+                        "closeCaption": "Set up later",
+                        "items": [
+                            {
+                                "type": "ValidationTextBox",
+                                "name": "CalDAVServerURL",
+                                "caption": "CalDAV server URL",
+                                "validate": "^$|^https?://.+"
+                            },
+                            {
+                                "type": "ValidationTextBox",
+                                "name": "CalDAVUsername",
+                                "caption": "Username"
+                            },
+                            {
+                                "type": "PasswordTextBox",
+                                "name": "CalDAVPassword",
+                                "caption": "Password"
+                            },
+                            {
+                                "type": "Label",
+                                "caption": "For an existing account, empty fields keep the currently stored values."
+                            }
+                        ],
+                        "validate": "return IPSKALDISCOVERY_ValidateWizardCalDAVConfiguration($id, $CalDAVServerURL, $CalDAVUsername, $CalDAVPassword);",
+                        "nextPage": "summary"
+                    },
+                    {
+                        "name": "google",
+                        "caption": "Connect Google Calendar",
+                        "closeCaption": "Set up later",
+                        "items": [
+                            {
+                                "type": "Label",
+                                "caption": "Connect the Google account through the native Symcon OAuth flow."
+                            },
+                            {
+                                "type": "Label",
+                                "caption": "After the authorization window reports success, return here and click Next."
+                            },
+                            {
+                                "type": "Button",
+                                "caption": "Connect Google account",
+                                "link": true,
+                                "onClick": "echo IPSKALDISCOVERY_BeginWizardOAuth($id);"
+                            }
+                        ],
+                        "validate": "return IPSKALDISCOVERY_ValidateWizardOAuthConnection($id);",
+                        "nextPage": "summary"
+                    },
+                    {
+                        "name": "microsoft",
+                        "caption": "Connect Microsoft 365",
+                        "closeCaption": "Set up later",
+                        "items": [
+                            {
+                                "type": "Label",
+                                "caption": "Connect the Microsoft 365 or Outlook.com account through the native Symcon OAuth flow."
+                            },
+                            {
+                                "type": "Label",
+                                "caption": "After the authorization window reports success, return here and click Next."
+                            },
+                            {
+                                "type": "Button",
+                                "caption": "Connect Microsoft account",
+                                "link": true,
+                                "onClick": "echo IPSKALDISCOVERY_BeginWizardOAuth($id);"
+                            }
+                        ],
+                        "validate": "return IPSKALDISCOVERY_ValidateWizardOAuthConnection($id);",
+                        "nextPage": "summary"
+                    },
+                    {
+                        "name": "ics",
+                        "caption": "Configure ICS / Webcal",
+                        "closeCaption": "Set up later",
+                        "items": [
+                            {
+                                "type": "ValidationTextBox",
+                                "name": "ICSURL",
+                                "caption": "iCalendar URL",
+                                "validate": "^$|^(https?|webcal)://.+"
+                            },
+                            {
+                                "type": "ValidationTextBox",
+                                "name": "ICSCalendarName",
+                                "caption": "Calendar name"
+                            },
+                            {
+                                "type": "RadioButtonGroup",
+                                "name": "ICSAuthenticationMode",
+                                "caption": "Authentication",
+                                "value": 1,
+                                "options": [
+                                    {
+                                        "caption": "URL / access key",
+                                        "value": 1
+                                    },
+                                    {
+                                        "caption": "Username / password",
+                                        "value": 2
+                                    }
+                                ]
+                            },
+                            {
+                                "type": "ValidationTextBox",
+                                "name": "ICSUsername",
+                                "caption": "Username"
+                            },
+                            {
+                                "type": "PasswordTextBox",
+                                "name": "ICSPassword",
+                                "caption": "Password"
+                            },
+                            {
+                                "type": "Label",
+                                "caption": "Username and password are only used when Username / password is selected."
+                            },
+                            {
+                                "type": "Label",
+                                "caption": "For an existing account, leave the URL empty to test the existing iCalendar configuration unchanged."
+                            }
+                        ],
+                        "validate": "return IPSKALDISCOVERY_ValidateWizardICalendarConfiguration($id, $ICSURL, $ICSCalendarName, $ICSAuthenticationMode, $ICSUsername, $ICSPassword);",
                         "nextPage": "summary"
                     },
                     {
                         "name": "summary",
-                        "caption": "Calendar account setup",
+                        "caption": "Calendar account ready",
                         "items": [
                             {
                                 "type": "Label",
-                                "caption": "With OK, OpenCalendar will create the new calendar account or select the existing account."
+                                "caption": "The calendar account connection was verified successfully."
                             },
                             {
                                 "type": "Label",
-                                "caption": "A newly created account remains inactive. Access data or OAuth will be configured in the next setup step."
+                                "caption": "With OK, OpenCalendar activates the calendar account and completes this setup step."
                             }
                         ],
                         "validate": "return IPSKALDISCOVERY_ValidateWizardConfirmation($id);",
-                        "onConfirm": "IPS_RequestAction($id, 'WizardConfirmAccount', '');"
+                        "onConfirm": "IPS_RequestAction($id, 'WizardFinishAccount', '');"
                     }
                 ]
             }
