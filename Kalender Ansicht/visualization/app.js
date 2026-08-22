@@ -195,6 +195,7 @@ function handleMessage(data) {
         && String(message.payload.seriesEdit.seriesId || '') === pendingSeriesEdit.seriesId
     );
     const containsPendingEditPayload = containsPendingEventEditPayload || containsPendingSeriesEditPayload;
+    if (!calendarStateBelongsToThisClient(message.payload, containsPendingEditPayload)) return;
     const nextStateSignature = calendarStateContentSignature(message.payload);
     if (!containsEditPayload && nextStateSignature !== '' && nextStateSignature === calendarStateSignature) return;
     if (shouldDeferCalendarState() && !containsPendingEditPayload) {
@@ -4135,16 +4136,51 @@ function visualizationRangePageSignature(range, offset = 0) {
     return `${signature}@${Math.max(0, Math.floor(Number(offset) || 0))}`;
 }
 
-function loadedRangeCovers(range) {
-    const loadedRange = calendarState.eventRange;
-    if (!loadedRange || typeof loadedRange !== 'object' || loadedRange.hasMore === true) return false;
+function calendarRangeCovers(loadedRange, requestedRange) {
+    if (!loadedRange || typeof loadedRange !== 'object'
+        || !requestedRange || typeof requestedRange !== 'object') {
+        return false;
+    }
 
     const loadedStart = Number(loadedRange.start || 0);
     const loadedEnd = Number(loadedRange.end || 0);
+    const requestedStart = Number(requestedRange.start || 0);
+    const requestedEnd = Number(requestedRange.end || 0);
     return loadedStart > 0
         && loadedEnd > loadedStart
-        && loadedStart <= range.start
-        && loadedEnd >= range.end;
+        && requestedStart > 0
+        && requestedEnd > requestedStart
+        && loadedStart <= requestedStart
+        && loadedEnd >= requestedEnd;
+}
+
+function calendarStateBelongsToThisClient(state, containsPendingEditPayload = false) {
+    if (!initialized || containsPendingEditPayload) return true;
+
+    const containsEditPayload = Boolean(state?.eventEdit && typeof state.eventEdit === 'object')
+        || Boolean(state?.seriesEdit && typeof state.seriesEdit === 'object');
+    if (containsEditPayload) return false;
+
+    const incomingRange = state?.eventRange && typeof state.eventRange === 'object'
+        ? state.eventRange
+        : null;
+    const incomingRangeSignature = visualizationRangeSignature(incomingRange);
+    if (incomingRangeSignature === '') {
+        return visualizationRangeSignature(calendarState.eventRange) === '';
+    }
+
+    const incomingOffset = Math.max(0, Math.floor(Number(incomingRange?.offset) || 0));
+    const incomingPageSignature = visualizationRangePageSignature(incomingRange, incomingOffset);
+    if (pendingRangeRequestSignature !== '' && incomingPageSignature === pendingRangeRequestSignature) {
+        return true;
+    }
+
+    return calendarRangeCovers(incomingRange, visibleViewRange());
+}
+
+function loadedRangeCovers(range) {
+    const loadedRange = calendarState.eventRange;
+    return loadedRange?.hasMore !== true && calendarRangeCovers(loadedRange, range);
 }
 
 async function ensureVisibleRangeLoaded(force = false) {

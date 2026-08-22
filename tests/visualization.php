@@ -1038,6 +1038,17 @@ assertVisualization(
     'The native tile must retry its initial visible-range request until the Symcon action bridge becomes available.'
 );
 
+assertVisualization(
+    str_contains($script, 'function calendarStateBelongsToThisClient(state, containsPendingEditPayload = false)')
+        && str_contains($script, 'if (!calendarStateBelongsToThisClient(message.payload, containsPendingEditPayload)) return;')
+        && str_contains($script, 'if (containsEditPayload) return false;')
+        && str_contains($script, "pendingRangeRequestSignature !== '' && incomingPageSignature === pendingRangeRequestSignature")
+        && str_contains($script, 'return calendarRangeCovers(incomingRange, visibleViewRange());')
+        && str_contains($script, 'function calendarRangeCovers(loadedRange, requestedRange)')
+        && str_contains($script, 'return loadedRange?.hasMore !== true && calendarRangeCovers(loadedRange, range);'),
+    'Native visualization clients must ignore state ranges and edit payloads that belong to another open browser or device.'
+);
+
 $renderer = new CalendarVisualizationRenderer();
 $native = $renderer->render(false);
 $ipsView = $renderer->render(true);
