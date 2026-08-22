@@ -165,7 +165,6 @@ class OpenCalendarDiscovery extends IPSModuleStrict
             IPS_SetProperty($accountID, 'ServerURL', self::APPLE_CALDAV_URL);
             IPS_SetProperty($accountID, 'Username', $username);
             IPS_SetProperty($accountID, 'Password', $password);
-            IPS_SetProperty($accountID, 'Active', false);
             IPS_ApplyChanges($accountID);
 
             return $this->testWizardConnection($accountID);
@@ -199,7 +198,6 @@ class OpenCalendarDiscovery extends IPSModuleStrict
             if ($Password !== '') {
                 IPS_SetProperty($accountID, 'Password', $Password);
             }
-            IPS_SetProperty($accountID, 'Active', false);
             IPS_ApplyChanges($accountID);
 
             return $this->testWizardConnection($accountID);
@@ -281,7 +279,6 @@ class OpenCalendarDiscovery extends IPSModuleStrict
             IPS_SetProperty($accountID, 'ICalendarAuthenticationMode', $AuthenticationMode);
             IPS_SetProperty($accountID, 'Username', $username);
             IPS_SetProperty($accountID, 'Password', $password);
-            IPS_SetProperty($accountID, 'Active', false);
             IPS_ApplyChanges($accountID);
 
             return $this->testWizardConnection($accountID);
@@ -393,8 +390,11 @@ class OpenCalendarDiscovery extends IPSModuleStrict
         }
 
         $accountID = $this->wizardAccountID();
-        IPS_SetProperty($accountID, 'Active', true);
-        IPS_ApplyChanges($accountID);
+        $createdAccountID = (int) $this->GetBuffer('WizardCreatedAccountID');
+        if ($createdAccountID === $accountID) {
+            IPS_SetProperty($accountID, 'Active', true);
+            IPS_ApplyChanges($accountID);
+        }
 
         $this->WriteAttributeInteger('SelectedCalendarAccountID', $accountID);
         $this->SetBuffer('WizardProvider', '');

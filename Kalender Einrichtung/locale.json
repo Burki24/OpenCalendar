@@ -26,6 +26,8 @@
             "Name for the new calendar account": "Name des neuen Kalender Kontos",
             "Existing calendar account": "Vorhandenes Kalender Konto",
             "For a new account, enter a name. For an existing account, select an account that uses the chosen provider.": "Für ein neues Konto einen Namen eingeben. Bei einem vorhandenen Konto ein Konto auswählen, das den gewählten Anbieter verwendet.",
+            "A new calendar account remains disabled while setup is incomplete. OpenCalendar activates it automatically after a successful connection test and completed setup.": "Ein neues Kalender Konto bleibt während der unvollständigen Einrichtung deaktiviert. Nach erfolgreicher Verbindungsprüfung und abgeschlossener Einrichtung aktiviert OpenCalendar es automatisch.",
+            "If you choose Set up later, a newly created calendar account remains disabled until setup is completed.": "Bei „Später einrichten“ bleibt ein neu angelegtes Kalender Konto deaktiviert, bis die Einrichtung abgeschlossen wird.",
             "Please enter a name for the calendar account.": "Bitte einen Namen für das Kalender Konto eingeben.",
             "Please choose how the calendar account should be provided.": "Bitte auswählen, wie das Kalender Konto bereitgestellt werden soll.",
             "Please select an existing calendar account.": "Bitte ein vorhandenes Kalender Konto auswählen.",
@@ -80,7 +82,7 @@
             "The calendar account connection has not been verified yet.": "Die Verbindung des Kalender Kontos wurde noch nicht erfolgreich geprüft.",
             "Calendar account ready": "Kalender Konto bereit",
             "The calendar account connection was verified successfully.": "Die Verbindung des Kalender Kontos wurde erfolgreich geprüft.",
-            "With OK, OpenCalendar activates the calendar account and completes this setup step.": "Mit OK aktiviert OpenCalendar das Kalender Konto und schließt diesen Einrichtungsschritt ab."
+            "With OK, OpenCalendar activates a newly created calendar account and completes this setup step. Existing accounts keep their current activation state.": "Mit OK aktiviert OpenCalendar ein neu angelegtes Kalender Konto und schließt diesen Einrichtungsschritt ab. Vorhandene Konten behalten ihren bisherigen Aktivierungszustand."
         }
     }
 }

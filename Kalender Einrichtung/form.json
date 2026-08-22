@@ -117,6 +117,10 @@
                             {
                                 "type": "Label",
                                 "caption": "For a new account, enter a name. For an existing account, select an account that uses the chosen provider."
+                            },
+                            {
+                                "type": "Label",
+                                "caption": "A new calendar account remains disabled while setup is incomplete. OpenCalendar activates it automatically after a successful connection test and completed setup."
                             }
                         ],
                         "validate": "return IPSKALDISCOVERY_ValidateWizardAccountSelection($id, $AccountMode, $ExistingAccountID, $AccountName);",
@@ -146,6 +150,10 @@
                             {
                                 "type": "Label",
                                 "caption": "For an existing account, empty fields keep the currently stored values."
+                            },
+                            {
+                                "type": "Label",
+                                "caption": "If you choose Set up later, a newly created calendar account remains disabled until setup is completed."
                             }
                         ],
                         "validate": "return IPSKALDISCOVERY_ValidateWizardAppleConfiguration($id, $AppleUsername, $ApplePassword);",
@@ -175,6 +183,10 @@
                             {
                                 "type": "Label",
                                 "caption": "For an existing account, empty fields keep the currently stored values."
+                            },
+                            {
+                                "type": "Label",
+                                "caption": "If you choose Set up later, a newly created calendar account remains disabled until setup is completed."
                             }
                         ],
                         "validate": "return IPSKALDISCOVERY_ValidateWizardCalDAVConfiguration($id, $CalDAVServerURL, $CalDAVUsername, $CalDAVPassword);",
@@ -198,6 +210,10 @@
                                 "caption": "Connect Google account",
                                 "link": true,
                                 "onClick": "echo IPSKALDISCOVERY_BeginWizardOAuth($id);"
+                            },
+                            {
+                                "type": "Label",
+                                "caption": "If you choose Set up later, a newly created calendar account remains disabled until setup is completed."
                             }
                         ],
                         "validate": "return IPSKALDISCOVERY_ValidateWizardOAuthConnection($id);",
@@ -221,6 +237,10 @@
                                 "caption": "Connect Microsoft account",
                                 "link": true,
                                 "onClick": "echo IPSKALDISCOVERY_BeginWizardOAuth($id);"
+                            },
+                            {
+                                "type": "Label",
+                                "caption": "If you choose Set up later, a newly created calendar account remains disabled until setup is completed."
                             }
                         ],
                         "validate": "return IPSKALDISCOVERY_ValidateWizardOAuthConnection($id);",
@@ -275,6 +295,10 @@
                             {
                                 "type": "Label",
                                 "caption": "For an existing account, leave the URL empty to test the existing iCalendar configuration unchanged."
+                            },
+                            {
+                                "type": "Label",
+                                "caption": "If you choose Set up later, a newly created calendar account remains disabled until setup is completed."
                             }
                         ],
                         "validate": "return IPSKALDISCOVERY_ValidateWizardICalendarConfiguration($id, $ICSURL, $ICSCalendarName, $ICSAuthenticationMode, $ICSUsername, $ICSPassword);",
@@ -290,7 +314,7 @@
                             },
                             {
                                 "type": "Label",
-                                "caption": "With OK, OpenCalendar activates the calendar account and completes this setup step."
+                                "caption": "With OK, OpenCalendar activates a newly created calendar account and completes this setup step. Existing accounts keep their current activation state."
                             }
                         ],
                         "validate": "return IPSKALDISCOVERY_ValidateWizardConfirmation($id);",
