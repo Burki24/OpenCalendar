@@ -7,6 +7,7 @@ class OpenCalendarDiscovery extends IPSModuleStrict
     private const CALENDAR_ACCOUNT_MODULE_ID = '{966D6119-7FF3-5CA5-06C3-536FBF8100C4}';
     private const CALENDAR_CONFIGURATOR_MODULE_ID = '{4A013D9D-3611-9900-5815-A8EC8A91287D}';
     private const CALENDAR_MODULE_ID = '{227B63E4-4223-316B-76E9-FD3849689562}';
+    private const CALENDAR_VIEW_MODULE_ID = '{1B19AB6B-9052-EA85-F158-86A13FE6F5BA}';
     private const APPLE_CALDAV_URL = 'https://caldav.icloud.com';
 
     /** @var array<string, int> */
@@ -38,6 +39,8 @@ class OpenCalendarDiscovery extends IPSModuleStrict
 
     private const ACCOUNT_MODE_NEW = 'new';
     private const ACCOUNT_MODE_EXISTING = 'existing';
+    private const VIEW_MODE_NEW = 'new';
+    private const VIEW_MODE_EXISTING = 'existing';
 
     private const ICALENDAR_AUTH_URL_ACCESS_KEY = 1;
     private const ICALENDAR_AUTH_USERNAME_PASSWORD = 2;
@@ -50,6 +53,7 @@ class OpenCalendarDiscovery extends IPSModuleStrict
         $this->RegisterAttributeInteger('SelectedCalendarConfiguratorID', 0);
         $this->RegisterAttributeString('SelectedCalendarIDs', '[]');
         $this->RegisterAttributeString('SelectedCalendarInstanceIDs', '[]');
+        $this->RegisterAttributeInteger('SelectedCalendarViewID', 0);
     }
 
     public function GetConfigurationForm(): string
@@ -68,7 +72,7 @@ class OpenCalendarDiscovery extends IPSModuleStrict
 
             foreach ($action['popup']['pages'] as &$page) {
                 $pageName = (string) ($page['name'] ?? '');
-                if (!in_array($pageName, ['account', 'calendars'], true)) {
+                if (!in_array($pageName, ['account', 'calendars', 'view'], true)) {
                     continue;
                 }
 
@@ -77,6 +81,8 @@ class OpenCalendarDiscovery extends IPSModuleStrict
                         $item['options'] = $this->calendarAccountSelectOptions();
                     } elseif ($pageName === 'calendars' && ($item['name'] ?? '') === 'WizardCalendars') {
                         $item['values'] = $this->wizardCalendarListValues($this->readWizardCalendars());
+                    } elseif ($pageName === 'view' && ($item['name'] ?? '') === 'ExistingViewID') {
+                        $item['options'] = $this->calendarViewSelectOptions();
                     }
                 }
                 unset($item);
@@ -103,6 +109,7 @@ class OpenCalendarDiscovery extends IPSModuleStrict
                 $this->SetBuffer('WizardAccountSelection', '');
                 $this->SetBuffer('WizardConnectionVerified', '0');
                 $this->clearWizardCalendarSelection(true);
+                $this->clearWizardCalendarViewSelection();
                 break;
 
             case 'WizardProviderUndo':
@@ -111,6 +118,7 @@ class OpenCalendarDiscovery extends IPSModuleStrict
                 $this->SetBuffer('WizardAccountSelection', '');
                 $this->SetBuffer('WizardConnectionVerified', '0');
                 $this->clearWizardCalendarSelection(true);
+                $this->clearWizardCalendarViewSelection();
                 break;
 
             case 'WizardPrepareAccount':
@@ -122,6 +130,7 @@ class OpenCalendarDiscovery extends IPSModuleStrict
                 $this->SetBuffer('WizardAccountSelection', '');
                 $this->SetBuffer('WizardConnectionVerified', '0');
                 $this->clearWizardCalendarSelection(true);
+                $this->clearWizardCalendarViewSelection();
                 break;
 
             case 'WizardCalendarSelectionChanged':
@@ -134,6 +143,15 @@ class OpenCalendarDiscovery extends IPSModuleStrict
 
             case 'WizardCalendarSelectionUndo':
                 $this->SetBuffer('WizardSelectedCalendarIDs', '[]');
+                $this->clearWizardCalendarViewSelection();
+                break;
+
+            case 'WizardSelectCalendarView':
+                $this->storeWizardCalendarViewSelection($Value);
+                break;
+
+            case 'WizardCalendarViewSelectionUndo':
+                $this->clearWizardCalendarViewSelection();
                 break;
 
             case 'WizardFinishAccount':
@@ -382,6 +400,20 @@ class OpenCalendarDiscovery extends IPSModuleStrict
         return '';
     }
 
+    public function ValidateWizardCalendarViewSelection(
+        string $ViewMode,
+        int $ExistingViewID,
+        string $ViewName
+    ): string {
+        try {
+            $this->assertWizardCalendarViewSelectionValid($ViewMode, $ExistingViewID, $ViewName);
+        } catch (InvalidArgumentException | RuntimeException $exception) {
+            return $exception->getMessage();
+        }
+
+        return '';
+    }
+
     public function ValidateWizardConfirmation(): string
     {
         try {
@@ -394,6 +426,12 @@ class OpenCalendarDiscovery extends IPSModuleStrict
             if ($this->readWizardSelectedCalendarIDs() === []) {
                 throw new InvalidArgumentException($this->Translate('Please select at least one calendar.'));
             }
+            $viewSelection = $this->readWizardCalendarViewSelection();
+            $this->assertWizardCalendarViewSelectionValid(
+                $viewSelection['mode'],
+                $viewSelection['existingViewID'],
+                $viewSelection['viewName']
+            );
         } catch (InvalidArgumentException | RuntimeException $exception) {
             return $exception->getMessage();
         }
@@ -430,6 +468,7 @@ class OpenCalendarDiscovery extends IPSModuleStrict
         $this->SetBuffer('WizardAccountID', (string) $accountID);
         $this->SetBuffer('WizardConnectionVerified', '0');
         $this->clearWizardCalendarSelection(true);
+        $this->clearWizardCalendarViewSelection();
     }
 
     private function finishWizardAccount(): void
@@ -442,6 +481,8 @@ class OpenCalendarDiscovery extends IPSModuleStrict
         $accountID = $this->wizardAccountID();
         $provider = $this->wizardProvider();
         $selectedCalendarIDs = $this->readWizardSelectedCalendarIDs();
+        $viewSelection = $this->readWizardCalendarViewSelection();
+        $existingCalendarInstanceIDs = array_values($this->existingCalendarInstancesForAccount($accountID));
         $createdAccountID = (int) $this->GetBuffer('WizardCreatedAccountID');
         $activateNewAccount = $createdAccountID === $accountID;
         $wasActive = (bool) IPS_GetProperty($accountID, 'Active');
@@ -499,8 +540,40 @@ class OpenCalendarDiscovery extends IPSModuleStrict
             );
         }
 
+        $createdCalendarInstanceIDs = array_values(array_diff(
+            $calendarInstanceIDs,
+            $existingCalendarInstanceIDs
+        ));
+        try {
+            $calendarView = $this->prepareCalendarView(
+                $accountID,
+                $viewSelection,
+                $calendarInstanceIDs
+            );
+        } catch (Throwable $exception) {
+            foreach (array_reverse($createdCalendarInstanceIDs) as $calendarInstanceID) {
+                if (IPS_InstanceExists($calendarInstanceID)) {
+                    IPS_DeleteInstance($calendarInstanceID);
+                }
+            }
+            if ($createdConfiguratorInstanceID > 0 && IPS_InstanceExists($createdConfiguratorInstanceID)) {
+                IPS_DeleteInstance($createdConfiguratorInstanceID);
+            }
+            if ($activateNewAccount && !$wasActive && IPS_InstanceExists($accountID)) {
+                IPS_SetProperty($accountID, 'Active', false);
+                IPS_ApplyChanges($accountID);
+            }
+
+            throw new RuntimeException(
+                $this->Translate('The calendar view could not be configured.') . ' ' . $exception->getMessage(),
+                0,
+                $exception
+            );
+        }
+
         $this->WriteAttributeInteger('SelectedCalendarAccountID', $accountID);
         $this->WriteAttributeInteger('SelectedCalendarConfiguratorID', $configuratorInstanceID);
+        $this->WriteAttributeInteger('SelectedCalendarViewID', $calendarView['instanceID']);
         $this->WriteAttributeString('SelectedCalendarIDs', $this->GetBuffer('WizardSelectedCalendarIDs'));
         $this->WriteAttributeString(
             'SelectedCalendarInstanceIDs',
@@ -516,6 +589,152 @@ class OpenCalendarDiscovery extends IPSModuleStrict
         $this->SetBuffer('WizardCreatedAccountID', '');
         $this->SetBuffer('WizardConnectionVerified', '0');
         $this->clearWizardCalendarSelection(true);
+        $this->clearWizardCalendarViewSelection();
+    }
+
+    /**
+     * @param array{mode: string, existingViewID: int, viewName: string} $selection
+     * @param list<int> $calendarInstanceIDs
+     * @return array{instanceID: int, created: bool}
+     */
+    private function prepareCalendarView(int $accountID, array $selection, array $calendarInstanceIDs): array
+    {
+        $this->assertWizardCalendarViewSelectionValid(
+            $selection['mode'],
+            $selection['existingViewID'],
+            $selection['viewName']
+        );
+
+        if ($selection['mode'] === self::VIEW_MODE_NEW) {
+            return [
+                'instanceID' => $this->createCalendarView($accountID, $selection['viewName'], $calendarInstanceIDs),
+                'created'    => true
+            ];
+        }
+
+        $viewID = $selection['existingViewID'];
+        $previousCalendars = (string) IPS_GetProperty($viewID, 'Calendars');
+        $updatedCalendars = $this->mergeCalendarViewConfiguration($previousCalendars, $calendarInstanceIDs);
+
+        try {
+            if ($updatedCalendars !== $previousCalendars) {
+                IPS_SetProperty($viewID, 'Calendars', $updatedCalendars);
+                IPS_ApplyChanges($viewID);
+            }
+        } catch (Throwable $exception) {
+            if (IPS_InstanceExists($viewID)) {
+                IPS_SetProperty($viewID, 'Calendars', $previousCalendars);
+                IPS_ApplyChanges($viewID);
+            }
+            throw $exception;
+        }
+
+        return [
+            'instanceID' => $viewID,
+            'created'    => false
+        ];
+    }
+
+    /**
+     * @param list<int> $calendarInstanceIDs
+     */
+    private function createCalendarView(int $accountID, string $viewName, array $calendarInstanceIDs): int
+    {
+        $viewID = 0;
+
+        try {
+            $viewID = IPS_CreateInstance(self::CALENDAR_VIEW_MODULE_ID);
+            IPS_SetName($viewID, trim($viewName));
+
+            $parentID = IPS_GetParent($accountID);
+            if ($parentID > 0) {
+                IPS_SetParent($viewID, $parentID);
+            }
+
+            IPS_SetProperty(
+                $viewID,
+                'Calendars',
+                $this->encodeCalendarViewConfiguration($calendarInstanceIDs)
+            );
+            IPS_ApplyChanges($viewID);
+        } catch (Throwable $exception) {
+            if ($viewID > 0 && IPS_InstanceExists($viewID)) {
+                IPS_DeleteInstance($viewID);
+            }
+            throw $exception;
+        }
+
+        return $viewID;
+    }
+
+    /**
+     * @param list<int> $calendarInstanceIDs
+     */
+    private function encodeCalendarViewConfiguration(array $calendarInstanceIDs): string
+    {
+        return json_encode(
+            array_map(
+                static fn (int $calendarInstanceID): array => [
+                    'InstanceID' => $calendarInstanceID,
+                    'Enabled'    => true
+                ],
+                array_values(array_unique($calendarInstanceIDs))
+            ),
+            JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES
+        );
+    }
+
+    /**
+     * @param list<int> $calendarInstanceIDs
+     */
+    private function mergeCalendarViewConfiguration(string $configuration, array $calendarInstanceIDs): string
+    {
+        try {
+            $rows = json_decode($configuration !== '' ? $configuration : '[]', true, 512, JSON_THROW_ON_ERROR);
+        } catch (JsonException $exception) {
+            throw new RuntimeException(
+                $this->Translate('The selected calendar view contains invalid calendar configuration.'),
+                0,
+                $exception
+            );
+        }
+        if (!is_array($rows)) {
+            throw new RuntimeException(
+                $this->Translate('The selected calendar view contains invalid calendar configuration.')
+            );
+        }
+
+        $selectedIDs = array_values(array_unique($calendarInstanceIDs));
+        $configuredIDs = [];
+        foreach ($rows as &$row) {
+            if (!is_array($row)) {
+                continue;
+            }
+            $instanceID = (int) ($row['InstanceID'] ?? 0);
+            if ($instanceID <= 0) {
+                continue;
+            }
+            $configuredIDs[$instanceID] = true;
+            if (in_array($instanceID, $selectedIDs, true)) {
+                $row['Enabled'] = true;
+            }
+        }
+        unset($row);
+
+        foreach ($selectedIDs as $instanceID) {
+            if (isset($configuredIDs[$instanceID])) {
+                continue;
+            }
+            $rows[] = [
+                'InstanceID' => $instanceID,
+                'Enabled'    => true
+            ];
+        }
+
+        return json_encode(
+            $rows,
+            JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES
+        );
     }
 
     /**
@@ -780,6 +999,7 @@ class OpenCalendarDiscovery extends IPSModuleStrict
         $this->SetBuffer('WizardCreatedAccountID', '');
         $this->SetBuffer('WizardConnectionVerified', '0');
         $this->clearWizardCalendarSelection(true);
+        $this->clearWizardCalendarViewSelection();
     }
 
     private function testWizardConnection(int $accountID): string
@@ -1099,6 +1319,115 @@ class OpenCalendarDiscovery extends IPSModuleStrict
             $this->SetBuffer('WizardCalendars', '[]');
         }
         $this->SetBuffer('WizardSelectedCalendarIDs', '[]');
+    }
+
+    /**
+     * @return list<array{caption: string, value: int}>
+     */
+    private function calendarViewSelectOptions(): array
+    {
+        $options = [[
+            'caption' => $this->Translate('Please select an existing calendar view.'),
+            'value'   => 0
+        ]];
+        $views = [];
+
+        foreach (IPS_GetInstanceListByModuleID(self::CALENDAR_VIEW_MODULE_ID) as $viewID) {
+            $name = trim(IPS_GetName($viewID));
+            if ($name === '') {
+                $name = $this->Translate('Calendar view');
+            }
+            $views[] = [
+                'caption' => sprintf('%s (#%d)', $name, $viewID),
+                'value'   => $viewID
+            ];
+        }
+
+        usort(
+            $views,
+            static fn (array $left, array $right): int => strnatcasecmp($left['caption'], $right['caption'])
+                ?: ($left['value'] <=> $right['value'])
+        );
+
+        return array_merge($options, $views);
+    }
+
+    private function storeWizardCalendarViewSelection(mixed $value): void
+    {
+        $selection = $this->decodeWizardCalendarViewSelection($value);
+        $this->assertWizardCalendarViewSelectionValid(
+            $selection['mode'],
+            $selection['existingViewID'],
+            $selection['viewName']
+        );
+        $this->SetBuffer(
+            'WizardCalendarViewSelection',
+            json_encode($selection, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE)
+        );
+    }
+
+    /**
+     * @return array{mode: string, existingViewID: int, viewName: string}
+     */
+    private function readWizardCalendarViewSelection(): array
+    {
+        return $this->decodeWizardCalendarViewSelection($this->GetBuffer('WizardCalendarViewSelection'));
+    }
+
+    /**
+     * @return array{mode: string, existingViewID: int, viewName: string}
+     */
+    private function decodeWizardCalendarViewSelection(mixed $value): array
+    {
+        if (!is_string($value) || trim($value) === '') {
+            throw new InvalidArgumentException($this->Translate('The calendar view selection is invalid.'));
+        }
+
+        try {
+            $selection = json_decode($value, true, 512, JSON_THROW_ON_ERROR);
+        } catch (JsonException) {
+            throw new InvalidArgumentException($this->Translate('The calendar view selection is invalid.'));
+        }
+        if (!is_array($selection)) {
+            throw new InvalidArgumentException($this->Translate('The calendar view selection is invalid.'));
+        }
+
+        return [
+            'mode'           => (string) ($selection['mode'] ?? ''),
+            'existingViewID' => (int) ($selection['existingViewID'] ?? 0),
+            'viewName'       => trim((string) ($selection['viewName'] ?? ''))
+        ];
+    }
+
+    private function assertWizardCalendarViewSelectionValid(
+        string $viewMode,
+        int $existingViewID,
+        string $viewName
+    ): void {
+        if ($viewMode === self::VIEW_MODE_NEW) {
+            if (trim($viewName) === '') {
+                throw new InvalidArgumentException($this->Translate('Please enter a name for the calendar view.'));
+            }
+
+            return;
+        }
+
+        if ($viewMode !== self::VIEW_MODE_EXISTING) {
+            throw new InvalidArgumentException(
+                $this->Translate('Please choose how the calendar view should be provided.')
+            );
+        }
+        if ($existingViewID <= 0 || !IPS_InstanceExists($existingViewID)) {
+            throw new InvalidArgumentException($this->Translate('Please select an existing calendar view.'));
+        }
+        if (!in_array($existingViewID, IPS_GetInstanceListByModuleID(self::CALENDAR_VIEW_MODULE_ID), true)) {
+            throw new InvalidArgumentException($this->Translate('The selected instance is not a calendar view.'));
+        }
+    }
+
+    private function clearWizardCalendarViewSelection(): void
+    {
+        $this->SetBuffer('WizardCalendarViewSelection', '');
     }
 
     /**

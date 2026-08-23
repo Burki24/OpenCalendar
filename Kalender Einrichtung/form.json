@@ -30,6 +30,10 @@
         },
         {
             "type": "Label",
+            "caption": "6. Choose or create a Calendar View. OpenCalendar assigns the selected calendar instances to it automatically."
+        },
+        {
+            "type": "Label",
             "caption": "For easier identification, newly created calendar instances receive the provider as a name prefix, for example O365 - Family, Apple - Private, Google - Work, CalDAV - Family or ICS - Holidays."
         },
         {
@@ -426,11 +430,64 @@
                         "validate": "return IPSKALDISCOVERY_ValidateWizardCalendarSelection($id);",
                         "onConfirm": "IPS_RequestAction($id, 'WizardSelectCalendars', '');",
                         "onUndo": "IPS_RequestAction($id, 'WizardCalendarSelectionUndo', '');",
-                        "nextPage": "summary"
+                        "nextPage": "view"
+                    },
+                    {
+                        "name": "view",
+                        "caption": "Choose calendar view",
+                        "items": [
+                            {
+                                "type": "RadioButtonGroup",
+                                "name": "ViewMode",
+                                "caption": "Calendar view",
+                                "value": "new",
+                                "options": [
+                                    {
+                                        "caption": "Create a new calendar view",
+                                        "value": "new"
+                                    },
+                                    {
+                                        "caption": "Use an existing calendar view",
+                                        "value": "existing"
+                                    }
+                                ]
+                            },
+                            {
+                                "type": "ValidationTextBox",
+                                "name": "ViewName",
+                                "caption": "Name for the new calendar view",
+                                "value": "OpenCalendar"
+                            },
+                            {
+                                "type": "Select",
+                                "name": "ExistingViewID",
+                                "caption": "Existing calendar view",
+                                "value": 0,
+                                "options": [
+                                    {
+                                        "caption": "Please select an existing calendar view.",
+                                        "value": 0
+                                    }
+                                ]
+                            },
+                            {
+                                "type": "Label",
+                                "caption": "For a new view, enter a name. For an existing view, select the view that should receive the selected calendars."
+                            },
+                            {
+                                "type": "Label",
+                                "caption": "Selected calendar instances are enabled in the view. Existing calendar assignments in a reused view are preserved."
+                            }
+                        ],
+                        "validate": "return IPSKALDISCOVERY_ValidateWizardCalendarViewSelection($id, $ViewMode, $ExistingViewID, $ViewName);",
+                        "onConfirm": "IPS_RequestAction($id, 'WizardSelectCalendarView', json_encode(['mode' => $ViewMode, 'existingViewID' => $ExistingViewID, 'viewName' => $ViewName], JSON_THROW_ON_ERROR));",
+                        "onUndo": "IPS_RequestAction($id, 'WizardCalendarViewSelectionUndo', '');",
+                        "nextPage": "summary",
+                        "closeCaption": "Set up later"
                     },
                     {
                         "name": "summary",
-                        "caption": "Calendar account ready",
+                        "caption": "OpenCalendar setup ready",
                         "items": [
                             {
                                 "type": "Label",
@@ -447,6 +504,10 @@
                             {
                                 "type": "Label",
                                 "caption": "If selected, OpenCalendar also creates a Calendar Configurator for this account. An existing matching configurator is reused."
+                            },
+                            {
+                                "type": "Label",
+                                "caption": "With OK, OpenCalendar creates a new Calendar View or uses the selected existing view and assigns the selected calendar instances to it. Existing assignments are preserved."
                             },
                             {
                                 "type": "Label",

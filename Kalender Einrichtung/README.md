@@ -22,8 +22,10 @@ Der Assistent führt aktuell durch folgende Schritte:
 4. anbieterabhängige Kontoeinrichtung
 5. Verbindung prüfen
 6. verfügbare Kalender ermitteln und auswählen
-7. ausgewählte Kalenderinstanzen anlegen beziehungsweise vorhandene übernehmen
-8. Kalender Konto abschließen und ein neu angelegtes Konto aktivieren
+7. Kalender Ansicht auswählen oder neu anlegen
+8. ausgewählte Kalenderinstanzen anlegen beziehungsweise vorhandene übernehmen
+9. ausgewählte Kalenderinstanzen der Kalender Ansicht zuordnen
+10. Kalender Konto abschließen und ein neu angelegtes Konto aktivieren
 
 Bei einem **vorhandenen Kalender Konto** baut OpenCalendar die Auswahl beim
 Öffnen der Discovery-Konfiguration aus allen vorhandenen **Calendar Account**-
@@ -121,20 +123,33 @@ Neu angelegte Kalenderinstanzen erhalten den Anbieter als Namenspräfix:
 - ICS / Webcal: `ICS - <Kalendername>`
 
 Die IDs der erzeugten beziehungsweise übernommenen Kalenderinstanzen werden in
-der Discovery-Instanz gespeichert und können im nächsten Ausbauschritt für die
-Kalender Ansicht weiterverwendet werden.
+der Discovery-Instanz gespeichert und anschließend für die Kalender Ansicht
+verwendet.
+
+### Kalender Ansicht
+
+Nach der Kalenderauswahl kann eine neue **Kalender Ansicht** angelegt oder eine
+bereits vorhandene Ansicht ausgewählt werden. Für eine neue Ansicht wird ein frei
+wählbarer Name verwendet; als Vorgabe trägt der Wizard `OpenCalendar` ein.
+
+Bei einer neuen Ansicht werden alle im Wizard ausgewählten Kalenderinstanzen
+aktiviert eingetragen. Bei einer vorhandenen Ansicht ergänzt OpenCalendar die
+ausgewählten Kalender, ohne bereits bestehende Zuordnungen zu entfernen. Ist ein
+ausgewählter Kalender dort bereits vorhanden, wird er aktiviert. Andere vorhandene
+Kalender und deren Aktivierungszustand bleiben unverändert.
+
+Die verwendete Kalender-Ansicht-ID wird in der Discovery-Instanz gespeichert.
 
 Ein im Wizard **neu angelegtes** Kalender Konto wird erst auf der Abschlussseite
 mit **OK** aktiviert. Ein bereits vorhandenes Konto behält seinen bisherigen
-Aktivierungszustand unverändert. Schlägt das Anlegen einer Kalenderinstanz fehl,
-werden in diesem Abschlussvorgang bereits neu erzeugte Kalenderinstanzen wieder
+Aktivierungszustand unverändert. Schlägt das Anlegen einer Kalenderinstanz oder
+das Einrichten der Kalender Ansicht fehl, werden in diesem Abschlussvorgang neu
+erzeugte Kalenderinstanzen wieder
 entfernt; ein zuvor inaktives neues Konto wird ebenfalls wieder deaktiviert.
 
 ## Geplanter Ausbau
 
-Der Assistent soll anschließend schrittweise um folgende Funktionen erweitert
-werden:
+Der Assistent soll anschließend noch um folgende Funktionen erweitert werden:
 
-- Kalender Ansicht anlegen oder eine vorhandene auswählen
-- gewählte Kalender der Ansicht zuordnen
-- abschließende Synchronisation und Ergebnisübersicht
+- abschließende Synchronisation und technische Prüfung
+- Ergebnisübersicht mit den tatsächlich angelegten beziehungsweise übernommenen Instanzen

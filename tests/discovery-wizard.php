@@ -84,9 +84,10 @@ assertDiscoveryWizard(
         'microsoft',
         'ics',
         'calendars',
+        'view',
         'summary'
     ],
-    'OpenCalendar Discovery must provide provider setup and calendar selection wizard pages.'
+    'OpenCalendar Discovery must provide provider, calendar selection and calendar view wizard pages.'
 );
 
 $accountPage = $pages[2];
@@ -189,8 +190,32 @@ assertDiscoveryWizard(
         && !str_contains((string) ($calendarPage['validate'] ?? ''), 'json_encode($WizardCalendars')
         && str_contains((string) ($calendarPage['onConfirm'] ?? ''), 'WizardSelectCalendars')
         && str_contains((string) ($calendarPage['onUndo'] ?? ''), 'WizardCalendarSelectionUndo')
-        && ($calendarPage['nextPage'] ?? '') === 'summary',
-    'Calendar selection page must validate the persisted selection and continue to the summary.'
+        && ($calendarPage['nextPage'] ?? '') === 'view',
+    'Calendar selection page must validate the persisted selection and continue to Calendar View selection.'
+);
+
+$viewPage = $providerPages['view'];
+$viewMode = null;
+$existingView = null;
+foreach ($viewPage['items'] ?? [] as $item) {
+    if (($item['name'] ?? '') === 'ViewMode') {
+        $viewMode = $item;
+    } elseif (($item['name'] ?? '') === 'ExistingViewID') {
+        $existingView = $item;
+    }
+}
+assertDiscoveryWizard(
+    is_array($viewMode)
+        && ($viewMode['type'] ?? '') === 'RadioButtonGroup'
+        && ($viewMode['value'] ?? '') === 'new'
+        && is_array($existingView)
+        && ($existingView['type'] ?? '') === 'Select'
+        && str_contains((string) ($viewPage['validate'] ?? ''), 'ValidateWizardCalendarViewSelection')
+        && str_contains((string) ($viewPage['onConfirm'] ?? ''), 'WizardSelectCalendarView')
+        && str_contains((string) ($viewPage['onUndo'] ?? ''), 'WizardCalendarViewSelectionUndo')
+        && ($viewPage['closeCaption'] ?? '') === 'Set up later'
+        && ($viewPage['nextPage'] ?? '') === 'summary',
+    'Calendar View page must support creating or selecting a view before the summary.'
 );
 
 $summaryPage = $providerPages['summary'];
@@ -218,16 +243,23 @@ assertDiscoveryWizard(
             'If selected, OpenCalendar also creates a Calendar Configurator for this account. An existing matching configurator is reused.',
             $summaryCaptions,
             true
+        )
+        && in_array(
+            'With OK, OpenCalendar creates a new Calendar View or uses the selected existing view and assigns the selected calendar instances to it. Existing assignments are preserved.',
+            $summaryCaptions,
+            true
         ),
-    'Final page must explain calendar instance creation, configurator handling and provider-prefixed names.'
+    'Final page must explain calendar, configurator and Calendar View handling.'
 );
 
 foreach ([
     "RegisterAttributeString('SelectedCalendarIDs', '[]')",
     "RegisterAttributeString('SelectedCalendarInstanceIDs', '[]')",
     "RegisterAttributeInteger('SelectedCalendarConfiguratorID', 0)",
+    "RegisterAttributeInteger('SelectedCalendarViewID', 0)",
     "private const CALENDAR_CONFIGURATOR_MODULE_ID = '{4A013D9D-3611-9900-5815-A8EC8A91287D}';",
     "private const CALENDAR_MODULE_ID = '{227B63E4-4223-316B-76E9-FD3849689562}';",
+    "private const CALENDAR_VIEW_MODULE_ID = '{1B19AB6B-9052-EA85-F158-86A13FE6F5BA}';",
     "'apple'     => 'Apple'",
     "'caldav'    => 'CalDAV'",
     "'google'    => 'Google'",
@@ -240,6 +272,7 @@ foreach ([
     'public function BeginWizardOAuth(): string',
     'public function ValidateWizardOAuthConnection(): string',
     'public function ValidateWizardCalendarSelection(): string',
+    'public function ValidateWizardCalendarViewSelection(',
     'private function defaultWizardSelectedCalendarIDs(array $calendars): array',
     'private function updateWizardCalendarSelection(mixed $value): void',
     'private function confirmWizardCalendarSelection(): void',
@@ -248,6 +281,14 @@ foreach ([
     'private function createCalendarConfigurator(int $accountID, string $provider): int',
     "GetBuffer('WizardCreateConfigurator') === '1'",
     "WriteAttributeInteger('SelectedCalendarConfiguratorID'",
+    "WriteAttributeInteger('SelectedCalendarViewID'",
+    'private function calendarViewSelectOptions(): array',
+    'private function storeWizardCalendarViewSelection(mixed $value): void',
+    'private function prepareCalendarView(int $accountID, array $selection, array $calendarInstanceIDs): array',
+    'private function createCalendarView(int $accountID, string $viewName, array $calendarInstanceIDs): int',
+    'private function mergeCalendarViewConfiguration(string $configuration, array $calendarInstanceIDs): string',
+    'IPS_CreateInstance(self::CALENDAR_VIEW_MODULE_ID)',
+    'IPS_SetProperty($viewID, \'Calendars\'',
     'private function prepareSelectedCalendarInstances(',
     'private function existingCalendarInstancesForAccount(int $accountID): array',
     'private function createCalendarInstance(int $accountID, string $provider, array $calendar): int',
@@ -300,6 +341,21 @@ foreach ([
     'If selected, OpenCalendar also creates a Calendar Configurator for this account. An existing matching configurator is reused.',
     'The calendar configurator could not be created.',
     'The calendar configurator could not be connected to the calendar account.',
+    '6. Choose or create a Calendar View. OpenCalendar assigns the selected calendar instances to it automatically.',
+    'OpenCalendar setup ready',
+    'Choose calendar view',
+    'Calendar view',
+    'Create a new calendar view',
+    'Use an existing calendar view',
+    'Name for the new calendar view',
+    'Existing calendar view',
+    'Please select an existing calendar view.',
+    'For a new view, enter a name. For an existing view, select the view that should receive the selected calendars.',
+    'Selected calendar instances are enabled in the view. Existing calendar assignments in a reused view are preserved.',
+    'Please enter a name for the calendar view.',
+    'The calendar view could not be configured.',
+    'The selected calendar view contains invalid calendar configuration.',
+    'With OK, OpenCalendar creates a new Calendar View or uses the selected existing view and assigns the selected calendar instances to it. Existing assignments are preserved.',
     'Choose calendars',
     'Available calendars',
     'Please select at least one calendar.',
@@ -317,4 +373,4 @@ foreach ([
     );
 }
 
-echo "OpenCalendar Discovery provider, calendar selection and instance creation tests passed.\n";
+echo "OpenCalendar Discovery provider, calendar selection, view assignment and instance creation tests passed.\n";

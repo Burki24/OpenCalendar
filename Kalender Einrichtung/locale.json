@@ -123,7 +123,25 @@
             "If selected, OpenCalendar also creates a Calendar Configurator for this account. An existing matching configurator is reused.": "Wenn ausgewählt, legt OpenCalendar zusätzlich einen Kalender Konfigurator für dieses Konto an. Ein bereits vorhandener passender Konfigurator wird übernommen.",
             "Configurator": "Konfigurator",
             "The calendar configurator could not be created.": "Der Kalender Konfigurator konnte nicht angelegt werden.",
-            "The calendar configurator could not be connected to the calendar account.": "Der Kalender Konfigurator konnte nicht mit dem Kalender Konto verbunden werden."
+            "The calendar configurator could not be connected to the calendar account.": "Der Kalender Konfigurator konnte nicht mit dem Kalender Konto verbunden werden.",
+            "6. Choose or create a Calendar View. OpenCalendar assigns the selected calendar instances to it automatically.": "6. Eine Kalender Ansicht auswählen oder neu anlegen. OpenCalendar ordnet ihr die ausgewählten Kalenderinstanzen automatisch zu.",
+            "Choose calendar view": "Kalender Ansicht auswählen",
+            "Calendar view": "Kalender Ansicht",
+            "Create a new calendar view": "Neue Kalender Ansicht anlegen",
+            "Use an existing calendar view": "Vorhandene Kalender Ansicht verwenden",
+            "Name for the new calendar view": "Name der neuen Kalender Ansicht",
+            "Existing calendar view": "Vorhandene Kalender Ansicht",
+            "Please select an existing calendar view.": "Bitte eine vorhandene Kalender Ansicht auswählen.",
+            "For a new view, enter a name. For an existing view, select the view that should receive the selected calendars.": "Für eine neue Ansicht einen Namen eingeben. Bei einer vorhandenen Ansicht die Ansicht auswählen, der die ausgewählten Kalender zugeordnet werden sollen.",
+            "Selected calendar instances are enabled in the view. Existing calendar assignments in a reused view are preserved.": "Die ausgewählten Kalenderinstanzen werden in der Ansicht aktiviert. Bereits vorhandene Kalenderzuordnungen einer übernommenen Ansicht bleiben erhalten.",
+            "Please enter a name for the calendar view.": "Bitte einen Namen für die Kalender Ansicht eingeben.",
+            "Please choose how the calendar view should be provided.": "Bitte auswählen, wie die Kalender Ansicht bereitgestellt werden soll.",
+            "The selected instance is not a calendar view.": "Die ausgewählte Instanz ist keine Kalender Ansicht.",
+            "The calendar view selection is invalid.": "Die Auswahl der Kalender Ansicht ist ungültig.",
+            "The calendar view could not be configured.": "Die Kalender Ansicht konnte nicht eingerichtet werden.",
+            "The selected calendar view contains invalid calendar configuration.": "Die ausgewählte Kalender Ansicht enthält eine ungültige Kalenderkonfiguration.",
+            "OpenCalendar setup ready": "OpenCalendar Einrichtung bereit",
+            "With OK, OpenCalendar creates a new Calendar View or uses the selected existing view and assigns the selected calendar instances to it. Existing assignments are preserved.": "Mit OK legt OpenCalendar eine neue Kalender Ansicht an oder verwendet die ausgewählte vorhandene Ansicht und ordnet ihr die ausgewählten Kalenderinstanzen zu. Bereits vorhandene Zuordnungen bleiben erhalten."
         }
     }
 }
