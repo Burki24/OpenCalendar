@@ -115,7 +115,15 @@
             "New calendar instances are named with the provider prefix, for example O365 - Family or Apple - Private.": "Neue Kalenderinstanzen erhalten den Anbieter als Namenspräfix, zum Beispiel O365 - Familie oder Apple - Privat.",
             "The selected calendar instances could not be created.": "Die ausgewählten Kalenderinstanzen konnten nicht angelegt werden.",
             "The calendar instance could not be connected to the calendar account.": "Die Kalenderinstanz konnte nicht mit dem Kalender Konto verbunden werden.",
-            "The calendar instance \"%s\" could not be created.": "Die Kalenderinstanz „%s“ konnte nicht angelegt werden."
+            "The calendar instance \"%s\" could not be created.": "Die Kalenderinstanz „%s“ konnte nicht angelegt werden.",
+            "Optional: You can also create a Calendar Configurator. It can later discover and add further calendars from the same account.": "Optional kann zusätzlich ein Kalender Konfigurator angelegt werden. Damit lassen sich später weitere Kalender desselben Kontos ermitteln und hinzufügen.",
+            "Create Calendar Configurator as well": "Kalender Konfigurator mit anlegen",
+            "The Calendar Configurator is optional. It can later rediscover the calendars of this account and lets you add further calendar instances without running the setup assistant again.": "Der Kalender Konfigurator ist optional. Mit ihm können später die Kalender dieses Kontos erneut ermittelt und weitere Kalenderinstanzen hinzugefügt werden, ohne den Einrichtungsassistenten erneut durchlaufen zu müssen.",
+            "If a Calendar Configurator is already connected to the selected calendar account, OpenCalendar reuses it and does not create a duplicate.": "Ist bereits ein Kalender Konfigurator mit dem ausgewählten Kalender Konto verbunden, übernimmt OpenCalendar diesen und legt keinen zweiten an.",
+            "If selected, OpenCalendar also creates a Calendar Configurator for this account. An existing matching configurator is reused.": "Wenn ausgewählt, legt OpenCalendar zusätzlich einen Kalender Konfigurator für dieses Konto an. Ein bereits vorhandener passender Konfigurator wird übernommen.",
+            "Configurator": "Konfigurator",
+            "The calendar configurator could not be created.": "Der Kalender Konfigurator konnte nicht angelegt werden.",
+            "The calendar configurator could not be connected to the calendar account.": "Der Kalender Konfigurator konnte nicht mit dem Kalender Konto verbunden werden."
         }
     }
 }

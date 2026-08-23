@@ -38,6 +38,10 @@
         },
         {
             "type": "Label",
+            "caption": "Optional: You can also create a Calendar Configurator. It can later discover and add further calendars from the same account."
+        },
+        {
+            "type": "Label",
             "caption": "The setup assistant can be started again later to add further calendar accounts or calendars."
         },
         {
@@ -105,10 +109,24 @@
                                         "value": "ics"
                                     }
                                 ]
+                            },
+                            {
+                                "type": "CheckBox",
+                                "name": "CreateConfigurator",
+                                "caption": "Create Calendar Configurator as well",
+                                "value": false
+                            },
+                            {
+                                "type": "Label",
+                                "caption": "The Calendar Configurator is optional. It can later rediscover the calendars of this account and lets you add further calendar instances without running the setup assistant again."
+                            },
+                            {
+                                "type": "Label",
+                                "caption": "If a Calendar Configurator is already connected to the selected calendar account, OpenCalendar reuses it and does not create a duplicate."
                             }
                         ],
                         "validate": "return $Provider === '' ? 'Please select a calendar provider.' : '';",
-                        "onConfirm": "IPS_RequestAction($id, 'WizardProvider', $Provider);",
+                        "onConfirm": "IPS_RequestAction($id, 'WizardProvider', json_encode(['provider' => $Provider, 'createConfigurator' => $CreateConfigurator], JSON_THROW_ON_ERROR));",
                         "onUndo": "IPS_RequestAction($id, 'WizardProviderUndo', '');",
                         "nextPage": "account"
                     },
@@ -425,6 +443,10 @@
                             {
                                 "type": "Label",
                                 "caption": "New calendar instances are named with the provider prefix, for example O365 - Family or Apple - Private."
+                            },
+                            {
+                                "type": "Label",
+                                "caption": "If selected, OpenCalendar also creates a Calendar Configurator for this account. An existing matching configurator is reused."
                             },
                             {
                                 "type": "Label",

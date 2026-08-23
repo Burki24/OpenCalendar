@@ -17,7 +17,7 @@ müssen.
 Der Assistent führt aktuell durch folgende Schritte:
 
 1. Willkommen
-2. Kalenderanbieter auswählen
+2. Kalenderanbieter auswählen und optional einen Kalender Konfigurator vormerken
 3. Kalender Konto auswählen oder ein neues Konto vorbereiten
 4. anbieterabhängige Kontoeinrichtung
 5. Verbindung prüfen
@@ -40,6 +40,20 @@ entfernt OpenCalendar ein in diesem Wizard-Lauf neu vorbereitetes Konto wieder.
 Wird der Wizard dagegen über **Später einrichten** geschlossen, bleibt die
 inaktive Instanz erhalten und kann beim nächsten Start als vorhandenes Konto
 weiterverwendet werden.
+
+### Optionaler Kalender Konfigurator
+
+Auf der Seite **Kalenderanbieter auswählen** kann optional **Kalender Konfigurator
+mit anlegen** aktiviert werden. Der Konfigurator wird mit demselben Kalender
+Konto verbunden und dient später dazu, die verfügbaren Kalender dieses Kontos
+erneut zu ermitteln sowie weitere Kalenderinstanzen komfortabel hinzuzufügen,
+ohne den vollständigen Einrichtungsassistenten erneut durchlaufen zu müssen.
+
+Ist für das gewählte Kalender Konto bereits ein Kalender Konfigurator vorhanden,
+wird dieser übernommen und kein zweiter angelegt. Neu angelegte Konfiguratoren
+erhalten einen Namen aus Provider, Kontoname und Funktionsbezeichnung, zum
+Beispiel `O365 - Privat - Konfigurator`. Wird die Option nicht aktiviert, legt
+der Assistent keinen Konfigurator an.
 
 ### Apple iCloud
 

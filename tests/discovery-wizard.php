@@ -98,6 +98,23 @@ assertDiscoveryWizard(
     'Calendar account page must prepare the account and route to the selected provider.'
 );
 
+$providerPage = $pages[1];
+$createConfigurator = null;
+foreach ($providerPage['items'] ?? [] as $item) {
+    if (($item['name'] ?? '') === 'CreateConfigurator') {
+        $createConfigurator = $item;
+        break;
+    }
+}
+assertDiscoveryWizard(
+    is_array($createConfigurator)
+        && ($createConfigurator['type'] ?? '') === 'CheckBox'
+        && ($createConfigurator['value'] ?? true) === false
+        && str_contains((string) ($providerPage['onConfirm'] ?? ''), 'createConfigurator')
+        && str_contains((string) ($providerPage['onConfirm'] ?? ''), '$CreateConfigurator'),
+    'Provider page must offer the optional Calendar Configurator selection.'
+);
+
 $providerPages = [];
 foreach ($pages as $page) {
     $providerPages[(string) ($page['name'] ?? '')] = $page;
@@ -196,13 +213,20 @@ assertDiscoveryWizard(
             'New calendar instances are named with the provider prefix, for example O365 - Family or Apple - Private.',
             $summaryCaptions,
             true
+        )
+        && in_array(
+            'If selected, OpenCalendar also creates a Calendar Configurator for this account. An existing matching configurator is reused.',
+            $summaryCaptions,
+            true
         ),
-    'Final page must explain calendar instance creation, reuse and provider-prefixed names.'
+    'Final page must explain calendar instance creation, configurator handling and provider-prefixed names.'
 );
 
 foreach ([
     "RegisterAttributeString('SelectedCalendarIDs', '[]')",
     "RegisterAttributeString('SelectedCalendarInstanceIDs', '[]')",
+    "RegisterAttributeInteger('SelectedCalendarConfiguratorID', 0)",
+    "private const CALENDAR_CONFIGURATOR_MODULE_ID = '{4A013D9D-3611-9900-5815-A8EC8A91287D}';",
     "private const CALENDAR_MODULE_ID = '{227B63E4-4223-316B-76E9-FD3849689562}';",
     "'apple'     => 'Apple'",
     "'caldav'    => 'CalDAV'",
@@ -219,6 +243,11 @@ foreach ([
     'private function defaultWizardSelectedCalendarIDs(array $calendars): array',
     'private function updateWizardCalendarSelection(mixed $value): void',
     'private function confirmWizardCalendarSelection(): void',
+    'private function decodeWizardProviderSelection(mixed $value): array',
+    'private function prepareCalendarConfigurator(int $accountID, string $provider): array',
+    'private function createCalendarConfigurator(int $accountID, string $provider): int',
+    "GetBuffer('WizardCreateConfigurator') === '1'",
+    "WriteAttributeInteger('SelectedCalendarConfiguratorID'",
     'private function prepareSelectedCalendarInstances(',
     'private function existingCalendarInstancesForAccount(int $accountID): array',
     'private function createCalendarInstance(int $accountID, string $provider, array $calendar): int',
@@ -265,6 +294,12 @@ foreach ([
     'Connect Microsoft 365',
     'Configure ICS / Webcal',
     'Set up later',
+    'Create Calendar Configurator as well',
+    'The Calendar Configurator is optional. It can later rediscover the calendars of this account and lets you add further calendar instances without running the setup assistant again.',
+    'If a Calendar Configurator is already connected to the selected calendar account, OpenCalendar reuses it and does not create a duplicate.',
+    'If selected, OpenCalendar also creates a Calendar Configurator for this account. An existing matching configurator is reused.',
+    'The calendar configurator could not be created.',
+    'The calendar configurator could not be connected to the calendar account.',
     'Choose calendars',
     'Available calendars',
     'Please select at least one calendar.',

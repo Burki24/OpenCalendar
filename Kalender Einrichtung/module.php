@@ -5,6 +5,7 @@ declare(strict_types=1);
 class OpenCalendarDiscovery extends IPSModuleStrict
 {
     private const CALENDAR_ACCOUNT_MODULE_ID = '{966D6119-7FF3-5CA5-06C3-536FBF8100C4}';
+    private const CALENDAR_CONFIGURATOR_MODULE_ID = '{4A013D9D-3611-9900-5815-A8EC8A91287D}';
     private const CALENDAR_MODULE_ID = '{227B63E4-4223-316B-76E9-FD3849689562}';
     private const APPLE_CALDAV_URL = 'https://caldav.icloud.com';
 
@@ -46,6 +47,7 @@ class OpenCalendarDiscovery extends IPSModuleStrict
         parent::Create();
 
         $this->RegisterAttributeInteger('SelectedCalendarAccountID', 0);
+        $this->RegisterAttributeInteger('SelectedCalendarConfiguratorID', 0);
         $this->RegisterAttributeString('SelectedCalendarIDs', '[]');
         $this->RegisterAttributeString('SelectedCalendarInstanceIDs', '[]');
     }
@@ -91,9 +93,13 @@ class OpenCalendarDiscovery extends IPSModuleStrict
     {
         switch ($Ident) {
             case 'WizardProvider':
-                $provider = trim((string) $Value);
-                $this->assertSupportedProvider($provider);
+                $providerSelection = $this->decodeWizardProviderSelection($Value);
+                $provider = $providerSelection['provider'];
                 $this->SetBuffer('WizardProvider', $provider);
+                $this->SetBuffer(
+                    'WizardCreateConfigurator',
+                    $providerSelection['createConfigurator'] ? '1' : '0'
+                );
                 $this->SetBuffer('WizardAccountSelection', '');
                 $this->SetBuffer('WizardConnectionVerified', '0');
                 $this->clearWizardCalendarSelection(true);
@@ -101,6 +107,7 @@ class OpenCalendarDiscovery extends IPSModuleStrict
 
             case 'WizardProviderUndo':
                 $this->SetBuffer('WizardProvider', '');
+                $this->SetBuffer('WizardCreateConfigurator', '0');
                 $this->SetBuffer('WizardAccountSelection', '');
                 $this->SetBuffer('WizardConnectionVerified', '0');
                 $this->clearWizardCalendarSelection(true);
@@ -439,18 +446,46 @@ class OpenCalendarDiscovery extends IPSModuleStrict
         $activateNewAccount = $createdAccountID === $accountID;
         $wasActive = (bool) IPS_GetProperty($accountID, 'Active');
 
+        $configuratorInstanceID = 0;
+        $createdConfiguratorInstanceID = 0;
+
         try {
             if ($activateNewAccount && !$wasActive) {
                 IPS_SetProperty($accountID, 'Active', true);
                 IPS_ApplyChanges($accountID);
             }
 
+            if ($this->GetBuffer('WizardCreateConfigurator') === '1') {
+                $configurator = $this->prepareCalendarConfigurator($accountID, $provider);
+                $configuratorInstanceID = $configurator['instanceID'];
+                if ($configurator['created']) {
+                    $createdConfiguratorInstanceID = $configuratorInstanceID;
+                }
+            }
+        } catch (Throwable $exception) {
+            if ($activateNewAccount && !$wasActive && IPS_InstanceExists($accountID)) {
+                IPS_SetProperty($accountID, 'Active', false);
+                IPS_ApplyChanges($accountID);
+            }
+
+            throw new RuntimeException(
+                $this->Translate('The calendar configurator could not be created.') . ' '
+                    . $exception->getMessage(),
+                0,
+                $exception
+            );
+        }
+
+        try {
             $calendarInstanceIDs = $this->prepareSelectedCalendarInstances(
                 $accountID,
                 $provider,
                 $selectedCalendarIDs
             );
         } catch (Throwable $exception) {
+            if ($createdConfiguratorInstanceID > 0 && IPS_InstanceExists($createdConfiguratorInstanceID)) {
+                IPS_DeleteInstance($createdConfiguratorInstanceID);
+            }
             if ($activateNewAccount && !$wasActive && IPS_InstanceExists($accountID)) {
                 IPS_SetProperty($accountID, 'Active', false);
                 IPS_ApplyChanges($accountID);
@@ -465,6 +500,7 @@ class OpenCalendarDiscovery extends IPSModuleStrict
         }
 
         $this->WriteAttributeInteger('SelectedCalendarAccountID', $accountID);
+        $this->WriteAttributeInteger('SelectedCalendarConfiguratorID', $configuratorInstanceID);
         $this->WriteAttributeString('SelectedCalendarIDs', $this->GetBuffer('WizardSelectedCalendarIDs'));
         $this->WriteAttributeString(
             'SelectedCalendarInstanceIDs',
@@ -474,11 +510,78 @@ class OpenCalendarDiscovery extends IPSModuleStrict
             )
         );
         $this->SetBuffer('WizardProvider', '');
+        $this->SetBuffer('WizardCreateConfigurator', '0');
         $this->SetBuffer('WizardAccountSelection', '');
         $this->SetBuffer('WizardAccountID', '');
         $this->SetBuffer('WizardCreatedAccountID', '');
         $this->SetBuffer('WizardConnectionVerified', '0');
         $this->clearWizardCalendarSelection(true);
+    }
+
+    /**
+     * Returns the existing Calendar Configurator for the account or creates one.
+     *
+     * @return array{instanceID: int, created: bool}
+     */
+    private function prepareCalendarConfigurator(int $accountID, string $provider): array
+    {
+        $this->assertSupportedProvider($provider);
+
+        $configuratorIDs = IPS_GetInstanceListByModuleID(self::CALENDAR_CONFIGURATOR_MODULE_ID);
+        sort($configuratorIDs, SORT_NUMERIC);
+        foreach ($configuratorIDs as $configuratorID) {
+            $instance = IPS_GetInstance($configuratorID);
+            if ((int) ($instance['ConnectionID'] ?? 0) === $accountID) {
+                return [
+                    'instanceID' => $configuratorID,
+                    'created'    => false
+                ];
+            }
+        }
+
+        return [
+            'instanceID' => $this->createCalendarConfigurator($accountID, $provider),
+            'created'    => true
+        ];
+    }
+
+    private function createCalendarConfigurator(int $accountID, string $provider): int
+    {
+        $configuratorID = 0;
+
+        try {
+            $configuratorID = IPS_CreateInstance(self::CALENDAR_CONFIGURATOR_MODULE_ID);
+            $accountName = trim(IPS_GetName($accountID));
+            if ($accountName === '') {
+                $accountName = $this->Translate('Calendar account');
+            }
+            IPS_SetName(
+                $configuratorID,
+                self::PROVIDER_INSTANCE_PREFIXES[$provider] . ' - ' . $accountName . ' - '
+                    . $this->Translate('Configurator')
+            );
+
+            $parentID = IPS_GetParent($accountID);
+            if ($parentID > 0) {
+                IPS_SetParent($configuratorID, $parentID);
+            }
+
+            if (!IPS_ConnectInstance($configuratorID, $accountID)) {
+                throw new RuntimeException(
+                    $this->Translate('The calendar configurator could not be connected to the calendar account.')
+                );
+            }
+
+            IPS_ApplyChanges($configuratorID);
+        } catch (Throwable $exception) {
+            if ($configuratorID > 0 && IPS_InstanceExists($configuratorID)) {
+                IPS_DeleteInstance($configuratorID);
+            }
+
+            throw $exception;
+        }
+
+        return $configuratorID;
     }
 
     /**
@@ -996,6 +1099,39 @@ class OpenCalendarDiscovery extends IPSModuleStrict
             $this->SetBuffer('WizardCalendars', '[]');
         }
         $this->SetBuffer('WizardSelectedCalendarIDs', '[]');
+    }
+
+    /**
+     * @return array{provider: string, createConfigurator: bool}
+     */
+    private function decodeWizardProviderSelection(mixed $value): array
+    {
+        if (!is_string($value) || trim($value) === '') {
+            throw new InvalidArgumentException($this->Translate('Please select a calendar provider.'));
+        }
+
+        $provider = trim($value);
+        $createConfigurator = false;
+        if (str_starts_with($provider, '{')) {
+            try {
+                $selection = json_decode($provider, true, 32, JSON_THROW_ON_ERROR);
+            } catch (JsonException) {
+                throw new InvalidArgumentException($this->Translate('Please select a calendar provider.'));
+            }
+            if (!is_array($selection)) {
+                throw new InvalidArgumentException($this->Translate('Please select a calendar provider.'));
+            }
+
+            $provider = trim((string) ($selection['provider'] ?? ''));
+            $createConfigurator = (bool) ($selection['createConfigurator'] ?? false);
+        }
+
+        $this->assertSupportedProvider($provider);
+
+        return [
+            'provider'           => $provider,
+            'createConfigurator' => $createConfigurator
+        ];
     }
 
     private function wizardAccountID(): int
