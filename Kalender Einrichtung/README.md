@@ -26,6 +26,8 @@ Der Assistent führt aktuell durch folgende Schritte:
 8. ausgewählte Kalenderinstanzen anlegen beziehungsweise vorhandene übernehmen
 9. ausgewählte Kalenderinstanzen der Kalender Ansicht zuordnen
 10. Kalender Konto abschließen und ein neu angelegtes Konto aktivieren
+11. Konto und ausgewählte Kalender abschließend synchronisieren und technisch prüfen
+12. Ergebnisübersicht mit angelegten beziehungsweise übernommenen Instanzen anzeigen
 
 Bei einem **vorhandenen Kalender Konto** baut OpenCalendar die Auswahl beim
 Öffnen der Discovery-Konfiguration aus allen vorhandenen **Calendar Account**-
@@ -104,7 +106,7 @@ Kalender-IDs werden in der Discovery-Instanz gespeichert.
 
 ### Kalenderinstanzen
 
-Mit **OK** auf der Abschlussseite legt OpenCalendar für die ausgewählten Kalender
+Mit **Weiter** auf der Prüfseite legt OpenCalendar für die ausgewählten Kalender
 die benötigten **Kalender**-Instanzen an und verbindet sie direkt mit dem
 gewählten Kalender Konto. Dabei wird dieselbe providerunabhängige
 Kalenderkonfiguration verwendet wie im Kalender Konfigurator: interne
@@ -140,16 +142,34 @@ Kalender und deren Aktivierungszustand bleiben unverändert.
 
 Die verwendete Kalender-Ansicht-ID wird in der Discovery-Instanz gespeichert.
 
-Ein im Wizard **neu angelegtes** Kalender Konto wird erst auf der Abschlussseite
-mit **OK** aktiviert. Ein bereits vorhandenes Konto behält seinen bisherigen
+Ein im Wizard **neu angelegtes** Kalender Konto wird beim abschließenden
+Einrichtungsschritt aktiviert. Ein bereits vorhandenes Konto behält seinen bisherigen
 Aktivierungszustand unverändert. Schlägt das Anlegen einer Kalenderinstanz oder
 das Einrichten der Kalender Ansicht fehl, werden in diesem Abschlussvorgang neu
 erzeugte Kalenderinstanzen wieder
 entfernt; ein zuvor inaktives neues Konto wird ebenfalls wieder deaktiviert.
 
-## Geplanter Ausbau
+### Abschlussprüfung und Ergebnisübersicht
 
-Der Assistent soll anschließend noch um folgende Funktionen erweitert werden:
+Nach dem Anlegen beziehungsweise Übernehmen der benötigten Instanzen führt der
+Assistent eine abschließende technische Prüfung durch. Das Kalender Konto wird
+aktualisiert und jeder im Wizard ausgewählte Kalender wird einmal synchronisiert.
+Eine vorhandene, deaktivierte Konto-Instanz wird dafür nur vorübergehend aktiviert
+und anschließend wieder in ihren ursprünglichen Zustand versetzt. Neu angelegte
+Konten bleiben nach erfolgreicher Einrichtung aktiviert.
 
-- abschließende Synchronisation und technische Prüfung
-- Ergebnisübersicht mit den tatsächlich angelegten beziehungsweise übernommenen Instanzen
+Anschließend initialisiert OpenCalendar die verwendete **Kalender Ansicht**. Fehler
+in dieser Abschlussprüfung führen nicht dazu, dass eine bereits erfolgreich
+angelegte Struktur wieder gelöscht wird. Stattdessen zeigt die letzte Wizard-Seite
+eine Warnung und nennt die Kalender, deren Synchronisation nicht erfolgreich war.
+
+Die Ergebnisübersicht zeigt:
+
+- das verwendete Kalender Konto und dessen Aktivierungszustand,
+- ob ein Kalender Konfigurator angelegt, übernommen oder nicht angefordert wurde,
+- wie viele Kalenderinstanzen neu angelegt beziehungsweise übernommen wurden,
+- das Ergebnis der abschließenden Synchronisation,
+- die verwendete Kalender Ansicht und das Ergebnis ihrer Initialisierung.
+
+Damit ist der technische Einrichtungsablauf vom Provider bis zur einsatzbereiten
+Kalender Ansicht vollständig im Assistenten abgebildet.

@@ -34,6 +34,10 @@
         },
         {
             "type": "Label",
+            "caption": "7. OpenCalendar performs a final synchronization and technical check and then shows a result overview."
+        },
+        {
+            "type": "Label",
             "caption": "For easier identification, newly created calendar instances receive the provider as a name prefix, for example O365 - Family, Apple - Private, Google - Work, CalDAV - Family or ICS - Holidays."
         },
         {
@@ -487,7 +491,7 @@
                     },
                     {
                         "name": "summary",
-                        "caption": "OpenCalendar setup ready",
+                        "caption": "Review OpenCalendar setup",
                         "items": [
                             {
                                 "type": "Label",
@@ -495,7 +499,7 @@
                             },
                             {
                                 "type": "Label",
-                                "caption": "With OK, OpenCalendar creates the selected calendars as calendar instances. Existing matching calendar instances are reused."
+                                "caption": "With Next, OpenCalendar creates the selected calendars as calendar instances. Existing matching calendar instances are reused."
                             },
                             {
                                 "type": "Label",
@@ -507,15 +511,62 @@
                             },
                             {
                                 "type": "Label",
-                                "caption": "With OK, OpenCalendar creates a new Calendar View or uses the selected existing view and assigns the selected calendar instances to it. Existing assignments are preserved."
+                                "caption": "With Next, OpenCalendar creates a new Calendar View or uses the selected existing view and assigns the selected calendar instances to it. Existing assignments are preserved."
                             },
                             {
                                 "type": "Label",
-                                "caption": "With OK, OpenCalendar activates a newly created calendar account and completes this setup step. Existing accounts keep their current activation state."
+                                "caption": "OpenCalendar then synchronizes the account and selected calendars, initializes the Calendar View and shows the result on the final page."
+                            },
+                            {
+                                "type": "Label",
+                                "caption": "A newly created calendar account is activated. Existing accounts keep their current activation state."
                             }
                         ],
                         "validate": "return IPSKALDISCOVERY_ValidateWizardConfirmation($id);",
-                        "onConfirm": "IPS_RequestAction($id, 'WizardFinishAccount', '');"
+                        "onConfirm": "IPS_RequestAction($id, 'WizardFinishAccount', '');",
+                        "nextPage": "result"
+                    },
+                    {
+                        "name": "result",
+                        "caption": "OpenCalendar setup completed",
+                        "closeCaption": "Finish",
+                        "items": [
+                            {
+                                "type": "Label",
+                                "name": "ResultStatus",
+                                "caption": "OpenCalendar setup result"
+                            },
+                            {
+                                "type": "Label",
+                                "name": "ResultAccount",
+                                "caption": "Calendar account result"
+                            },
+                            {
+                                "type": "Label",
+                                "name": "ResultConfigurator",
+                                "caption": "Calendar Configurator result"
+                            },
+                            {
+                                "type": "Label",
+                                "name": "ResultCalendars",
+                                "caption": "Calendar instance result"
+                            },
+                            {
+                                "type": "Label",
+                                "name": "ResultSynchronization",
+                                "caption": "Synchronization result"
+                            },
+                            {
+                                "type": "Label",
+                                "name": "ResultView",
+                                "caption": "Calendar View result"
+                            },
+                            {
+                                "type": "Label",
+                                "caption": "The setup assistant can be closed now. You can start it again later to add more calendar accounts or calendars."
+                            }
+                        ],
+                        "onConfirm": "IPS_RequestAction($id, 'WizardComplete', '');"
                     }
                 ]
             }

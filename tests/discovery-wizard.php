@@ -85,9 +85,10 @@ assertDiscoveryWizard(
         'ics',
         'calendars',
         'view',
-        'summary'
+        'summary',
+        'result'
     ],
-    'OpenCalendar Discovery must provide provider, calendar selection and calendar view wizard pages.'
+    'OpenCalendar Discovery must provide provider, calendar selection, Calendar View and result wizard pages.'
 );
 
 $accountPage = $pages[2];
@@ -221,8 +222,9 @@ assertDiscoveryWizard(
 $summaryPage = $providerPages['summary'];
 assertDiscoveryWizard(
     str_contains((string) ($summaryPage['validate'] ?? ''), 'ValidateWizardConfirmation')
-        && str_contains((string) ($summaryPage['onConfirm'] ?? ''), 'WizardFinishAccount'),
-    'Final page must create selected calendar instances and finalize the verified calendar account.'
+        && str_contains((string) ($summaryPage['onConfirm'] ?? ''), 'WizardFinishAccount')
+        && ($summaryPage['nextPage'] ?? '') === 'result',
+    'Review page must finalize the verified setup and continue to the result page.'
 );
 $summaryCaptions = array_map(
     static fn (array $item): string => (string) ($item['caption'] ?? ''),
@@ -230,7 +232,7 @@ $summaryCaptions = array_map(
 );
 assertDiscoveryWizard(
     in_array(
-        'With OK, OpenCalendar creates the selected calendars as calendar instances. Existing matching calendar instances are reused.',
+        'With Next, OpenCalendar creates the selected calendars as calendar instances. Existing matching calendar instances are reused.',
         $summaryCaptions,
         true
     )
@@ -245,11 +247,38 @@ assertDiscoveryWizard(
             true
         )
         && in_array(
-            'With OK, OpenCalendar creates a new Calendar View or uses the selected existing view and assigns the selected calendar instances to it. Existing assignments are preserved.',
+            'With Next, OpenCalendar creates a new Calendar View or uses the selected existing view and assigns the selected calendar instances to it. Existing assignments are preserved.',
+            $summaryCaptions,
+            true
+        )
+        && in_array(
+            'OpenCalendar then synchronizes the account and selected calendars, initializes the Calendar View and shows the result on the final page.',
             $summaryCaptions,
             true
         ),
-    'Final page must explain calendar, configurator and Calendar View handling.'
+    'Review page must explain instance creation, assignment and final verification.'
+);
+
+$resultPage = $providerPages['result'];
+$resultFields = [];
+foreach ($resultPage['items'] ?? [] as $item) {
+    $name = (string) ($item['name'] ?? '');
+    if ($name !== '') {
+        $resultFields[$name] = $item;
+    }
+}
+assertDiscoveryWizard(
+    ($resultPage['closeCaption'] ?? '') === 'Finish'
+        && str_contains((string) ($resultPage['onConfirm'] ?? ''), 'WizardComplete')
+        && isset(
+            $resultFields['ResultStatus'],
+            $resultFields['ResultAccount'],
+            $resultFields['ResultConfigurator'],
+            $resultFields['ResultCalendars'],
+            $resultFields['ResultSynchronization'],
+            $resultFields['ResultView']
+        ),
+    'Result page must expose the final setup and synchronization summary.'
 );
 
 foreach ([
@@ -257,6 +286,7 @@ foreach ([
     "RegisterAttributeString('SelectedCalendarInstanceIDs', '[]')",
     "RegisterAttributeInteger('SelectedCalendarConfiguratorID', 0)",
     "RegisterAttributeInteger('SelectedCalendarViewID', 0)",
+    "RegisterAttributeString('LastSetupResult', '{}')",
     "private const CALENDAR_CONFIGURATOR_MODULE_ID = '{4A013D9D-3611-9900-5815-A8EC8A91287D}';",
     "private const CALENDAR_MODULE_ID = '{227B63E4-4223-316B-76E9-FD3849689562}';",
     "private const CALENDAR_VIEW_MODULE_ID = '{1B19AB6B-9052-EA85-F158-86A13FE6F5BA}';",
@@ -287,6 +317,15 @@ foreach ([
     'private function prepareCalendarView(int $accountID, array $selection, array $calendarInstanceIDs): array',
     'private function createCalendarView(int $accountID, string $viewName, array $calendarInstanceIDs): int',
     'private function mergeCalendarViewConfiguration(string $configuration, array $calendarInstanceIDs): string',
+    'private function verifyWizardSetup(int $accountID, array $calendarInstanceIDs, int $viewID): array',
+    'private function updateWizardResultForm(array $result): void',
+    'private function wizardResultCaptions(array $result): array',
+    'private function readLastSetupResult(): array',
+    'private function completeWizardSession(): void',
+    'IPSKAL_Synchronize($calendarInstanceID)',
+    'IPSKALVIEW_Initialize($viewID)',
+    "WriteAttributeString(\n            'LastSetupResult'",
+    "SetBuffer('WizardSetupCompleted', '1')",
     'IPS_CreateInstance(self::CALENDAR_VIEW_MODULE_ID)',
     'IPS_SetProperty($viewID, \'Calendars\'',
     'private function prepareSelectedCalendarInstances(',
@@ -343,6 +382,10 @@ foreach ([
     'The calendar configurator could not be connected to the calendar account.',
     '6. Choose or create a Calendar View. OpenCalendar assigns the selected calendar instances to it automatically.',
     'OpenCalendar setup ready',
+    '7. OpenCalendar performs a final synchronization and technical check and then shows a result overview.',
+    'Review OpenCalendar setup',
+    'OpenCalendar setup completed',
+    'Finish',
     'Choose calendar view',
     'Calendar view',
     'Create a new calendar view',
@@ -355,15 +398,32 @@ foreach ([
     'Please enter a name for the calendar view.',
     'The calendar view could not be configured.',
     'The selected calendar view contains invalid calendar configuration.',
-    'With OK, OpenCalendar creates a new Calendar View or uses the selected existing view and assigns the selected calendar instances to it. Existing assignments are preserved.',
+    'With Next, OpenCalendar creates a new Calendar View or uses the selected existing view and assigns the selected calendar instances to it. Existing assignments are preserved.',
     'Choose calendars',
     'Available calendars',
     'Please select at least one calendar.',
-    'With OK, OpenCalendar creates the selected calendars as calendar instances. Existing matching calendar instances are reused.',
+    'With Next, OpenCalendar creates the selected calendars as calendar instances. Existing matching calendar instances are reused.',
     'New calendar instances are named with the provider prefix, for example O365 - Family or Apple - Private.',
     'The selected calendar instances could not be created.',
     'The calendar instance could not be connected to the calendar account.',
     'The calendar instance "%s" could not be created.',
+    'OpenCalendar then synchronizes the account and selected calendars, initializes the Calendar View and shows the result on the final page.',
+    'A newly created calendar account is activated. Existing accounts keep their current activation state.',
+    'OpenCalendar setup completed successfully.',
+    'OpenCalendar setup completed with warnings. The created configuration was kept; review the details below.',
+    'Calendar account: %s (#%d) - connection verified and active.',
+    'Calendar account: %s (#%d) - connection verified; the existing account remains disabled as before.',
+    'Calendar Configurator: not requested.',
+    'Calendar Configurator: %s (#%d) was created.',
+    'Calendar Configurator: %s (#%d) was reused.',
+    'Calendars: %d selected, %d newly created, %d reused.',
+    'Synchronization: account and all %d selected calendars synchronized successfully.',
+    'Account synchronization failed during the final check.',
+    'Synchronization: %d of %d selected calendars synchronized successfully. Failed: %s',
+    'Calendar View: %s (#%d) was created and the selected calendars were assigned.',
+    'Calendar View: %s (#%d) was reused and the selected calendars were assigned.',
+    'Calendar View initialization completed successfully.',
+    'Calendar View initialization could not be completed automatically.',
     'The calendar account connection was verified successfully.',
     'The calendar account connection has not been verified yet.'
 ] as $translationKey) {
@@ -373,4 +433,4 @@ foreach ([
     );
 }
 
-echo "OpenCalendar Discovery provider, calendar selection, view assignment and instance creation tests passed.\n";
+echo "OpenCalendar Discovery setup, synchronization and result-page tests passed.\n";
