@@ -5,6 +5,42 @@
             "caption": "OpenCalendar can be configured step by step with the setup assistant."
         },
         {
+            "type": "Label",
+            "caption": "The setup assistant handles the technical OpenCalendar structure for you and guides you through all required steps."
+        },
+        {
+            "type": "Label",
+            "caption": "1. Select the calendar provider (Google, Microsoft 365 / Outlook.com, Apple iCloud, CalDAV or ICS / Webcal)."
+        },
+        {
+            "type": "Label",
+            "caption": "2. Create a new calendar account or use an existing one. New accounts remain inactive until setup is completed successfully."
+        },
+        {
+            "type": "Label",
+            "caption": "3. Configure and verify the provider connection. Google and Microsoft use the native Symcon OAuth flow."
+        },
+        {
+            "type": "Label",
+            "caption": "4. OpenCalendar discovers the calendars available in the account and lets you choose which calendars should be used."
+        },
+        {
+            "type": "Label",
+            "caption": "5. The selected calendars are created as calendar instances and connected automatically to the calendar account. Existing matching calendar instances are reused."
+        },
+        {
+            "type": "Label",
+            "caption": "For easier identification, newly created calendar instances receive the provider as a name prefix, for example O365 - Family, Apple - Private, Google - Work, CalDAV - Family or ICS - Holidays."
+        },
+        {
+            "type": "Label",
+            "caption": "Existing calendar instances that are reused keep their current names."
+        },
+        {
+            "type": "Label",
+            "caption": "The setup assistant can be started again later to add further calendar accounts or calendars."
+        },
+        {
             "type": "PopupButton",
             "name": "SetupWizard",
             "caption": "Start OpenCalendar setup",
