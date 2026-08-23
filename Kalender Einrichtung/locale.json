@@ -12,7 +12,7 @@
             "For easier identification, newly created calendar instances receive the provider as a name prefix, for example O365 - Family, Apple - Private, Google - Work, CalDAV - Family or ICS - Holidays.": "Zur besseren Zuordnung erhalten neu angelegte Kalenderinstanzen den Anbieter als Namenspräfix, zum Beispiel O365 - Familie, Apple - Privat, Google - Arbeit, CalDAV - Familie oder ICS - Feiertage.",
             "Existing calendar instances that are reused keep their current names.": "Bereits vorhandene Kalenderinstanzen, die übernommen werden, behalten ihren bisherigen Namen.",
             "The setup assistant can be started again later to add further calendar accounts or calendars.": "Der Einrichtungsassistent kann später erneut gestartet werden, um weitere Kalender Konten oder Kalender einzurichten.",
-            "Start OpenCalendar setup": "OpenCalendar einrichten",
+            "Start OpenCalendar setup assistant": "OpenCalendar-Einrichtungsassistent starten",
             "OpenCalendar setup": "OpenCalendar Einrichtung",
             "Cancel": "Abbrechen",
             "This fallback content is not shown while wizard pages are available.": "Dieser Ersatzinhalt wird nicht angezeigt, solange Wizard-Seiten verfügbar sind.",

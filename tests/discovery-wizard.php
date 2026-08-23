@@ -62,6 +62,11 @@ foreach ($form['actions'] ?? [] as $action) {
     }
 }
 assertDiscoveryWizard(is_array($wizard), 'OpenCalendar Discovery must expose the setup PopupButton.');
+assertDiscoveryWizard(
+    ($wizard['caption'] ?? '') === 'Start OpenCalendar setup assistant'
+        && ($wizard['width'] ?? '') === '400px',
+    'OpenCalendar Discovery must expose one prominent setup-assistant start button.'
+);
 
 $pages = $wizard['popup']['pages'] ?? [];
 $pageNames = array_map(
@@ -252,6 +257,7 @@ foreach ([
 
 $germanTranslations = $locale['translations']['de'] ?? [];
 foreach ([
+    'Start OpenCalendar setup assistant',
     'Configure Apple iCloud',
     'App-specific password',
     'Configure CalDAV',

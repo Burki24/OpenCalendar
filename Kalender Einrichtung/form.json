@@ -43,8 +43,8 @@
         {
             "type": "PopupButton",
             "name": "SetupWizard",
-            "caption": "Start OpenCalendar setup",
-            "width": "300px",
+            "caption": "Start OpenCalendar setup assistant",
+            "width": "400px",
             "popup": {
                 "caption": "OpenCalendar setup",
                 "closeCaption": "Cancel",
