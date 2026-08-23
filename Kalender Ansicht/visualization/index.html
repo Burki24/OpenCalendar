@@ -218,6 +218,7 @@
                 <label for="event-description">Description</label>
                 <textarea id="event-description" maxlength="5000"></textarea>
             </div>
+            <div class="dialog-note hidden" id="event-description-html-note" role="note"></div>
             <div class="dialog-note hidden" id="dialog-note"></div>
         </div>
         <div class="dialog-actions">
@@ -403,8 +404,16 @@ window.SYMC_VISUALIZATION = {{BOOTSTRAP_JSON}};
 (() => {
     'use strict';
 
-    const target = document.getElementById('details-description');
-    if (!target || typeof MutationObserver !== 'function' || typeof DOMParser !== 'function') return;
+    const detailsTarget = document.getElementById('details-description');
+    const eventDescription = document.getElementById('event-description');
+    const eventDescriptionHtmlNote = document.getElementById('event-description-html-note');
+    const eventDialogElement = document.getElementById('event-dialog');
+    const eventFormElement = document.getElementById('event-form');
+    const calendarContent = document.getElementById('calendar-content');
+    if (typeof DOMParser !== 'function') return;
+
+    let htmlEditorPlainDescription = '';
+    let htmlEditorActive = false;
 
     function decodeHtmlEntities(value) {
         const decoder = document.createElement('textarea');
@@ -413,7 +422,7 @@ window.SYMC_VISUALIZATION = {{BOOTSTRAP_JSON}};
     }
 
     function looksLikeHtml(value) {
-        return /<\/?(?:html|head|body|table|thead|tbody|tfoot|tr|th|td|div|span|p|br|hr|h[1-6]|ul|ol|li|a|img|strong|b|em|i|u|blockquote|pre|font|center)\b[^>]*>/i
+        return /<\/?(?:html|head|body|style|table|thead|tbody|tfoot|tr|th|td|div|span|p|br|hr|h[1-6]|ul|ol|li|a|img|strong|b|em|i|u|blockquote|pre|font|center|section|article|header|footer|main|address|dl|dt|dd|code)\b[^>]*>/i
             .test(String(value || ''));
     }
 
@@ -422,6 +431,27 @@ window.SYMC_VISUALIZATION = {{BOOTSTRAP_JSON}};
         if (looksLikeHtml(source)) return source;
         const decoded = decodeHtmlEntities(source);
         return decoded !== source && looksLikeHtml(decoded) ? decoded : '';
+    }
+
+    function htmlDescriptionToPlainText(source) {
+        const parsed = new DOMParser().parseFromString(String(source || ''), 'text/html');
+        parsed.querySelectorAll('script, style, noscript, template').forEach(element => element.remove());
+        parsed.querySelectorAll('br').forEach(element => element.replaceWith('\n'));
+        parsed.querySelectorAll('td, th').forEach(element => element.append('\t'));
+        parsed.querySelectorAll('li').forEach(element => {
+            element.prepend('• ');
+            element.append('\n');
+        });
+        parsed.querySelectorAll('p, div, tr, h1, h2, h3, h4, h5, h6, blockquote, pre, section, article, header, footer, main, address, dl, dt, dd')
+            .forEach(element => element.append('\n'));
+
+        return String(parsed.body?.textContent || '')
+            .replace(/\u00a0/g, ' ')
+            .replace(/[ \t]+\n/g, '\n')
+            .replace(/\n[ \t]+/g, '\n')
+            .replace(/[ \t]{2,}/g, ' ')
+            .replace(/\n{3,}/g, '\n\n')
+            .trim();
     }
 
     function sanitizeLink(value) {
@@ -462,8 +492,8 @@ window.SYMC_VISUALIZATION = {{BOOTSTRAP_JSON}};
                 }
 
                 if (element.tagName === 'IMG' && name === 'src') {
-                    const source = sanitizeImageSource(attribute.value);
-                    if (source) element.setAttribute('src', source);
+                    const imageSource = sanitizeImageSource(attribute.value);
+                    if (imageSource) element.setAttribute('src', imageSource);
                     else element.removeAttribute('src');
                 }
             });
@@ -490,6 +520,7 @@ window.SYMC_VISUALIZATION = {{BOOTSTRAP_JSON}};
     }
 
     function renderHtmlDescription(source) {
+        if (!detailsTarget) return;
         const frame = document.createElement('iframe');
         frame.className = 'open-calendar-html-description';
         frame.title = document.getElementById('details-description-label')?.textContent || 'Description';
@@ -516,21 +547,122 @@ window.SYMC_VISUALIZATION = {{BOOTSTRAP_JSON}};
             }
         });
         frame.srcdoc = sanitizeHtmlDocument(source);
-        target.replaceChildren(frame);
+        detailsTarget.replaceChildren(frame);
     }
 
     function updateDescriptionRendering() {
-        if (target.querySelector('.open-calendar-html-description')) return;
-        const source = htmlDescriptionSource(target.textContent);
+        if (!detailsTarget || detailsTarget.querySelector('.open-calendar-html-description')) return;
+        const source = htmlDescriptionSource(detailsTarget.textContent);
         if (!source) return;
         renderHtmlDescription(source);
     }
 
-    new MutationObserver(updateDescriptionRendering).observe(target, {
-        childList: true,
-        characterData: true,
-        subtree: true
-    });
+    function editorNoteText() {
+        const language = String(document.documentElement.lang || '').toLowerCase();
+        if (language === 'de' || language.startsWith('de-')) {
+            return 'Die Beschreibung enthält HTML-Formatierung. Sie wird hier als Klartext angezeigt. Änderungen an der Beschreibung werden als Klartext gespeichert.';
+        }
+        return 'The description contains HTML formatting. It is shown here as plain text. Changes to the description will be saved as plain text.';
+    }
+
+    function resetHtmlDescriptionEditor() {
+        htmlEditorPlainDescription = '';
+        htmlEditorActive = false;
+        if (eventDescriptionHtmlNote) eventDescriptionHtmlNote.classList.add('hidden');
+    }
+
+    function prepareHtmlDescriptionEditor() {
+        if (!eventDescription || !eventDialogElement?.open) return;
+        if (htmlEditorActive && eventDescription.value === htmlEditorPlainDescription) return;
+
+        const originalDescription = eventDescription.value;
+        const source = htmlDescriptionSource(originalDescription);
+        if (!source) {
+            resetHtmlDescriptionEditor();
+            return;
+        }
+
+        htmlEditorPlainDescription = htmlDescriptionToPlainText(source);
+        if (eventDescription.maxLength > 0 && htmlEditorPlainDescription.length > eventDescription.maxLength) {
+            htmlEditorPlainDescription = htmlEditorPlainDescription.slice(0, eventDescription.maxLength);
+        }
+        htmlEditorActive = true;
+        eventDescription.value = htmlEditorPlainDescription;
+        if (eventDescriptionHtmlNote) {
+            eventDescriptionHtmlNote.textContent = editorNoteText();
+            eventDescriptionHtmlNote.classList.remove('hidden');
+        }
+    }
+
+    function updatePlainTextDescriptions(root = document) {
+        root.querySelectorAll?.('.event-description, .list-cell-description').forEach(element => {
+            const source = htmlDescriptionSource(element.textContent);
+            if (!source) return;
+            element.textContent = htmlDescriptionToPlainText(source);
+        });
+    }
+
+    if (detailsTarget && typeof MutationObserver === 'function') {
+        new MutationObserver(updateDescriptionRendering).observe(detailsTarget, {
+            childList: true,
+            characterData: true,
+            subtree: true
+        });
+    }
+
+    if (calendarContent && typeof MutationObserver === 'function') {
+        new MutationObserver(() => updatePlainTextDescriptions(calendarContent)).observe(calendarContent, {
+            childList: true,
+            subtree: true
+        });
+        updatePlainTextDescriptions(calendarContent);
+    }
+
+    if (eventDescription && eventDialogElement) {
+        if (typeof showEventDialog === 'function') {
+            const originalShowEventDialog = showEventDialog;
+            showEventDialog = function () {
+                const result = originalShowEventDialog();
+                queueMicrotask(prepareHtmlDescriptionEditor);
+                return result;
+            };
+        }
+
+        eventDescription.addEventListener('focus', prepareHtmlDescriptionEditor);
+        eventDescription.addEventListener('input', () => {
+            if (!htmlEditorActive) return;
+            if (eventDescriptionHtmlNote) eventDescriptionHtmlNote.classList.remove('hidden');
+        });
+        eventDialogElement.addEventListener('close', resetHtmlDescriptionEditor);
+
+        if (typeof MutationObserver === 'function') {
+            new MutationObserver(() => {
+                if (!eventDialogElement.open) {
+                    resetHtmlDescriptionEditor();
+                    return;
+                }
+                queueMicrotask(prepareHtmlDescriptionEditor);
+            }).observe(eventDialogElement, {
+                attributes: true,
+                attributeFilter: ['open', 'aria-busy']
+            });
+        }
+    }
+
+    if (eventFormElement && typeof sendAction === 'function') {
+        const originalSendAction = sendAction;
+        sendAction = async function (ident, value) {
+            if (htmlEditorActive && eventDescription && eventDialogElement?.open) {
+                const descriptionUnchanged = eventDescription.value === htmlEditorPlainDescription;
+                if (descriptionUnchanged && ident === 'UpdateEvent' && value?.event?.changes) {
+                    delete value.event.changes.description;
+                } else if (descriptionUnchanged && ident === 'MoveEvent' && value?.event) {
+                    value.event.description = htmlEditorPlainDescription;
+                }
+            }
+            return originalSendAction(ident, value);
+        };
+    }
 })();
 </script>
 </body>
