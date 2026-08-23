@@ -106,8 +106,12 @@ class OpenCalendarDiscovery extends IPSModuleStrict
                 $this->clearWizardCalendarSelection(true);
                 break;
 
+            case 'WizardCalendarSelectionChanged':
+                $this->updateWizardCalendarSelection($Value);
+                break;
+
             case 'WizardSelectCalendars':
-                $this->storeWizardCalendarSelection($Value);
+                $this->confirmWizardCalendarSelection();
                 break;
 
             case 'WizardCalendarSelectionUndo':
@@ -349,13 +353,10 @@ class OpenCalendarDiscovery extends IPSModuleStrict
         }
     }
 
-    public function ValidateWizardCalendarSelection(string $CalendarSelection): string
+    public function ValidateWizardCalendarSelection(): string
     {
         try {
-            $selectedCalendarIDs = $this->selectedCalendarIDsFromWizardValue($CalendarSelection);
-            if ($selectedCalendarIDs === []) {
-                throw new InvalidArgumentException($this->Translate('Please select at least one calendar.'));
-            }
+            $this->assertWizardCalendarSelectionValid();
         } catch (InvalidArgumentException | RuntimeException $exception) {
             return $exception->getMessage();
         }
@@ -510,7 +511,24 @@ class OpenCalendarDiscovery extends IPSModuleStrict
                 'WizardCalendars',
                 json_encode($calendars, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)
             );
-            $this->SetBuffer('WizardSelectedCalendarIDs', '[]');
+            $availableCalendarIDs = array_values(array_filter(array_map(
+                static fn (array $calendar): string => trim((string) ($calendar['id'] ?? '')),
+                $calendars
+            )));
+            $selectedCalendarIDs = array_values(array_intersect(
+                $this->readWizardSelectedCalendarIDs(),
+                $availableCalendarIDs
+            ));
+            if ($selectedCalendarIDs === []) {
+                $selectedCalendarIDs = $this->defaultWizardSelectedCalendarIDs($calendars);
+            }
+            $this->SetBuffer(
+                'WizardSelectedCalendarIDs',
+                json_encode(
+                    $selectedCalendarIDs,
+                    JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES
+                )
+            );
             $this->UpdateFormField(
                 'WizardCalendars',
                 'values',
@@ -678,57 +696,101 @@ class OpenCalendarDiscovery extends IPSModuleStrict
     }
 
     /**
+     * @param list<array<string, mixed>> $calendars
      * @return list<string>
      */
-    private function selectedCalendarIDsFromWizardValue(string $value): array
+    private function defaultWizardSelectedCalendarIDs(array $calendars): array
     {
-        try {
-            $rows = json_decode($value, true, 512, JSON_THROW_ON_ERROR);
-        } catch (JsonException) {
-            throw new InvalidArgumentException($this->Translate('The calendar selection is invalid.'));
-        }
-        if (!is_array($rows)) {
-            throw new InvalidArgumentException($this->Translate('The calendar selection is invalid.'));
+        $primaryCalendarIDs = array_values(array_filter(array_map(
+            static fn (array $calendar): string => (bool) ($calendar['primary'] ?? false)
+                ? trim((string) ($calendar['id'] ?? ''))
+                : '',
+            $calendars
+        )));
+        if ($primaryCalendarIDs !== []) {
+            return $primaryCalendarIDs;
         }
 
-        $availableCalendarIDs = array_values(array_filter(array_map(
+        if (count($calendars) !== 1) {
+            return [];
+        }
+
+        $calendarID = trim((string) ($calendars[0]['id'] ?? ''));
+        return $calendarID !== '' ? [$calendarID] : [];
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function availableWizardCalendarIDs(): array
+    {
+        return array_values(array_filter(array_map(
             static fn (array $calendar): string => trim((string) ($calendar['id'] ?? '')),
             $this->readWizardCalendars()
         )));
+    }
+
+    private function assertWizardCalendarSelectionValid(): void
+    {
+        $availableCalendarIDs = $this->availableWizardCalendarIDs();
         if ($availableCalendarIDs === []) {
             throw new RuntimeException($this->Translate('No discovered calendars are available.'));
         }
 
-        $selectedCalendarIDs = [];
-        foreach ($rows as $row) {
-            if (!is_array($row) || !($row['selected'] ?? false)) {
-                continue;
-            }
-            $calendarID = trim((string) ($row['calendarId'] ?? ''));
-            if ($calendarID === '' || !in_array($calendarID, $availableCalendarIDs, true)) {
-                throw new InvalidArgumentException($this->Translate('The calendar selection is invalid.'));
-            }
-            $selectedCalendarIDs[] = $calendarID;
-        }
-
-        return array_values(array_unique($selectedCalendarIDs));
-    }
-
-    private function storeWizardCalendarSelection(mixed $value): void
-    {
-        if (!is_string($value)) {
-            throw new InvalidArgumentException($this->Translate('The calendar selection is invalid.'));
-        }
-
-        $selectedCalendarIDs = $this->selectedCalendarIDsFromWizardValue($value);
+        $selectedCalendarIDs = $this->readWizardSelectedCalendarIDs();
         if ($selectedCalendarIDs === []) {
             throw new InvalidArgumentException($this->Translate('Please select at least one calendar.'));
         }
 
+        foreach ($selectedCalendarIDs as $calendarID) {
+            if (!in_array($calendarID, $availableCalendarIDs, true)) {
+                throw new InvalidArgumentException($this->Translate('The calendar selection is invalid.'));
+            }
+        }
+    }
+
+    private function updateWizardCalendarSelection(mixed $value): void
+    {
+        if (!is_string($value) || trim($value) === '') {
+            throw new InvalidArgumentException($this->Translate('The calendar selection is invalid.'));
+        }
+
+        try {
+            $change = json_decode($value, true, 32, JSON_THROW_ON_ERROR);
+        } catch (JsonException) {
+            throw new InvalidArgumentException($this->Translate('The calendar selection is invalid.'));
+        }
+        if (!is_array($change) || !array_key_exists('selected', $change)) {
+            throw new InvalidArgumentException($this->Translate('The calendar selection is invalid.'));
+        }
+
+        $calendarID = trim((string) ($change['calendarId'] ?? ''));
+        if ($calendarID === '' || !in_array($calendarID, $this->availableWizardCalendarIDs(), true)) {
+            throw new InvalidArgumentException($this->Translate('The calendar selection is invalid.'));
+        }
+
+        $selectedCalendarIDs = $this->readWizardSelectedCalendarIDs();
+        if ((bool) $change['selected']) {
+            $selectedCalendarIDs[] = $calendarID;
+        } else {
+            $selectedCalendarIDs = array_values(array_filter(
+                $selectedCalendarIDs,
+                static fn (string $selectedCalendarID): bool => $selectedCalendarID !== $calendarID
+            ));
+        }
+
         $this->SetBuffer(
             'WizardSelectedCalendarIDs',
-            json_encode($selectedCalendarIDs, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)
+            json_encode(
+                array_values(array_unique($selectedCalendarIDs)),
+                JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES
+            )
         );
+    }
+
+    private function confirmWizardCalendarSelection(): void
+    {
+        $this->assertWizardCalendarSelectionValid();
     }
 
     private function clearWizardCalendarSelection(bool $clearDiscovery): void

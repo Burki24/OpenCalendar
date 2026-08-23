@@ -357,7 +357,8 @@
                                         "save": true
                                     }
                                 ],
-                                "values": []
+                                "values": [],
+                                "onEdit": "IPS_RequestAction($id, 'WizardCalendarSelectionChanged', json_encode(['calendarId' => $WizardCalendars['calendarId'], 'selected' => $WizardCalendars['selected']], JSON_THROW_ON_ERROR));"
                             },
                             {
                                 "type": "Label",
@@ -368,8 +369,8 @@
                                 "caption": "If you choose Set up later, a newly created calendar account remains disabled until setup is completed."
                             }
                         ],
-                        "validate": "return IPSKALDISCOVERY_ValidateWizardCalendarSelection($id, json_encode($WizardCalendars, JSON_THROW_ON_ERROR));",
-                        "onConfirm": "IPS_RequestAction($id, 'WizardSelectCalendars', json_encode($WizardCalendars, JSON_THROW_ON_ERROR));",
+                        "validate": "return IPSKALDISCOVERY_ValidateWizardCalendarSelection($id);",
+                        "onConfirm": "IPS_RequestAction($id, 'WizardSelectCalendars', '');",
                         "onUndo": "IPS_RequestAction($id, 'WizardCalendarSelectionUndo', '');",
                         "nextPage": "summary"
                     },

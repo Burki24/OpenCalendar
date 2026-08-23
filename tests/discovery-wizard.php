@@ -157,11 +157,18 @@ assertDiscoveryWizard(
     'Calendar selection list must provide a checkbox and preserve the hidden calendar identity.'
 );
 assertDiscoveryWizard(
+    str_contains((string) ($calendarList['onEdit'] ?? ''), 'WizardCalendarSelectionChanged')
+        && str_contains((string) ($calendarList['onEdit'] ?? ''), '$WizardCalendars[\'calendarId\']')
+        && str_contains((string) ($calendarList['onEdit'] ?? ''), '$WizardCalendars[\'selected\']'),
+    'Calendar selection checkboxes must persist every edited row immediately.'
+);
+assertDiscoveryWizard(
     str_contains((string) ($calendarPage['validate'] ?? ''), 'ValidateWizardCalendarSelection')
+        && !str_contains((string) ($calendarPage['validate'] ?? ''), 'json_encode($WizardCalendars')
         && str_contains((string) ($calendarPage['onConfirm'] ?? ''), 'WizardSelectCalendars')
         && str_contains((string) ($calendarPage['onUndo'] ?? ''), 'WizardCalendarSelectionUndo')
         && ($calendarPage['nextPage'] ?? '') === 'summary',
-    'Calendar selection page must validate and store the selected calendar IDs.'
+    'Calendar selection page must validate the persisted selection and continue to the summary.'
 );
 
 $summaryPage = $providerPages['summary'];
@@ -179,7 +186,10 @@ foreach ([
     'public function ValidateWizardICalendarConfiguration(',
     'public function BeginWizardOAuth(): string',
     'public function ValidateWizardOAuthConnection(): string',
-    'public function ValidateWizardCalendarSelection(string $CalendarSelection): string',
+    'public function ValidateWizardCalendarSelection(): string',
+    'private function defaultWizardSelectedCalendarIDs(array $calendars): array',
+    'private function updateWizardCalendarSelection(mixed $value): void',
+    'private function confirmWizardCalendarSelection(): void',
     'private function testWizardConnection(int $accountID): string',
     'private function discoverWizardCalendars(int $accountID): array',
     'private function wizardCalendarListValues(array $calendars): array',
