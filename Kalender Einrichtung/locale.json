@@ -102,7 +102,11 @@
             "The calendar account returned invalid calendar data.": "Das Kalender Konto hat ungültige Kalenderdaten zurückgegeben.",
             "Calendar discovery failed.": "Die Kalenderermittlung ist fehlgeschlagen.",
             "No calendars were found for this account.": "Für dieses Kalender Konto wurden keine Kalender gefunden.",
-            "The selected calendars have been saved for the next setup step.": "Die ausgewählten Kalender wurden für den nächsten Einrichtungsschritt gespeichert."
+            "With OK, OpenCalendar creates the selected calendars as calendar instances. Existing matching calendar instances are reused.": "Mit OK legt OpenCalendar die ausgewählten Kalender als Kalenderinstanzen an. Bereits vorhandene passende Kalenderinstanzen werden übernommen.",
+            "New calendar instances are named with the provider prefix, for example O365 - Family or Apple - Private.": "Neue Kalenderinstanzen erhalten den Anbieter als Namenspräfix, zum Beispiel O365 - Familie oder Apple - Privat.",
+            "The selected calendar instances could not be created.": "Die ausgewählten Kalenderinstanzen konnten nicht angelegt werden.",
+            "The calendar instance could not be connected to the calendar account.": "Die Kalenderinstanz konnte nicht mit dem Kalender Konto verbunden werden.",
+            "The calendar instance \"%s\" could not be created.": "Die Kalenderinstanz „%s“ konnte nicht angelegt werden."
         }
     }
 }

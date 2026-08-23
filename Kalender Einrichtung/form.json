@@ -384,7 +384,11 @@
                             },
                             {
                                 "type": "Label",
-                                "caption": "The selected calendars have been saved for the next setup step."
+                                "caption": "With OK, OpenCalendar creates the selected calendars as calendar instances. Existing matching calendar instances are reused."
+                            },
+                            {
+                                "type": "Label",
+                                "caption": "New calendar instances are named with the provider prefix, for example O365 - Family or Apple - Private."
                             },
                             {
                                 "type": "Label",

@@ -175,11 +175,35 @@ $summaryPage = $providerPages['summary'];
 assertDiscoveryWizard(
     str_contains((string) ($summaryPage['validate'] ?? ''), 'ValidateWizardConfirmation')
         && str_contains((string) ($summaryPage['onConfirm'] ?? ''), 'WizardFinishAccount'),
-    'Final page must activate and finalize the verified calendar account.'
+    'Final page must create selected calendar instances and finalize the verified calendar account.'
+);
+$summaryCaptions = array_map(
+    static fn (array $item): string => (string) ($item['caption'] ?? ''),
+    $summaryPage['items'] ?? []
+);
+assertDiscoveryWizard(
+    in_array(
+        'With OK, OpenCalendar creates the selected calendars as calendar instances. Existing matching calendar instances are reused.',
+        $summaryCaptions,
+        true
+    )
+        && in_array(
+            'New calendar instances are named with the provider prefix, for example O365 - Family or Apple - Private.',
+            $summaryCaptions,
+            true
+        ),
+    'Final page must explain calendar instance creation, reuse and provider-prefixed names.'
 );
 
 foreach ([
     "RegisterAttributeString('SelectedCalendarIDs', '[]')",
+    "RegisterAttributeString('SelectedCalendarInstanceIDs', '[]')",
+    "private const CALENDAR_MODULE_ID = '{227B63E4-4223-316B-76E9-FD3849689562}';",
+    "'apple'     => 'Apple'",
+    "'caldav'    => 'CalDAV'",
+    "'google'    => 'Google'",
+    "'microsoft' => 'O365'",
+    "'ics'       => 'ICS'",
     'public function GetWizardProviderPage(): string',
     'public function ValidateWizardAppleConfiguration(',
     'public function ValidateWizardCalDAVConfiguration(',
@@ -190,6 +214,9 @@ foreach ([
     'private function defaultWizardSelectedCalendarIDs(array $calendars): array',
     'private function updateWizardCalendarSelection(mixed $value): void',
     'private function confirmWizardCalendarSelection(): void',
+    'private function prepareSelectedCalendarInstances(',
+    'private function existingCalendarInstancesForAccount(int $accountID): array',
+    'private function createCalendarInstance(int $accountID, string $provider, array $calendar): int',
     'private function testWizardConnection(int $accountID): string',
     'private function discoverWizardCalendars(int $accountID): array',
     'private function wizardCalendarListValues(array $calendars): array',
@@ -203,7 +230,18 @@ foreach ([
     'IPSKALACC_ConnectMicrosoft($accountID)',
     'IPSKALACC_GetAccountStatus($accountID)',
     'IPS_SetProperty($accountID, \'Active\', true)',
+    'IPS_CreateInstance(self::CALENDAR_MODULE_ID)',
+    'IPS_ConnectInstance($calendarInstanceID, $accountID)',
+    'IPS_SetProperty($calendarInstanceID, \'CalendarID\', $calendarID)',
+    "'ProviderCalendarID'",
+    "'CalendarURL'",
+    "'CalendarColor'",
+    "'CanWrite'",
+    "'UpdateSchedule'",
+    "'UpdateInterval'",
     "WriteAttributeString('SelectedCalendarIDs'",
+    "'SelectedCalendarInstanceIDs'",
+    'array_reverse($createdCalendarInstanceIDs)',
     'cleanupPreparedWizardAccount()'
 ] as $requiredSource) {
     assertDiscoveryWizard(
@@ -224,7 +262,11 @@ foreach ([
     'Choose calendars',
     'Available calendars',
     'Please select at least one calendar.',
-    'The selected calendars have been saved for the next setup step.',
+    'With OK, OpenCalendar creates the selected calendars as calendar instances. Existing matching calendar instances are reused.',
+    'New calendar instances are named with the provider prefix, for example O365 - Family or Apple - Private.',
+    'The selected calendar instances could not be created.',
+    'The calendar instance could not be connected to the calendar account.',
+    'The calendar instance "%s" could not be created.',
     'The calendar account connection was verified successfully.',
     'The calendar account connection has not been verified yet.'
 ] as $translationKey) {
@@ -234,4 +276,4 @@ foreach ([
     );
 }
 
-echo "OpenCalendar Discovery provider and calendar selection tests passed.\n";
+echo "OpenCalendar Discovery provider, calendar selection and instance creation tests passed.\n";

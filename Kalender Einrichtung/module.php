@@ -5,6 +5,7 @@ declare(strict_types=1);
 class OpenCalendarDiscovery extends IPSModuleStrict
 {
     private const CALENDAR_ACCOUNT_MODULE_ID = '{966D6119-7FF3-5CA5-06C3-536FBF8100C4}';
+    private const CALENDAR_MODULE_ID = '{227B63E4-4223-316B-76E9-FD3849689562}';
     private const APPLE_CALDAV_URL = 'https://caldav.icloud.com';
 
     /** @var array<string, int> */
@@ -25,6 +26,15 @@ class OpenCalendarDiscovery extends IPSModuleStrict
         4 => 'ICS / Webcal'
     ];
 
+    /** @var array<string, string> */
+    private const PROVIDER_INSTANCE_PREFIXES = [
+        'apple'     => 'Apple',
+        'caldav'    => 'CalDAV',
+        'google'    => 'Google',
+        'microsoft' => 'O365',
+        'ics'       => 'ICS'
+    ];
+
     private const ACCOUNT_MODE_NEW = 'new';
     private const ACCOUNT_MODE_EXISTING = 'existing';
 
@@ -37,6 +47,7 @@ class OpenCalendarDiscovery extends IPSModuleStrict
 
         $this->RegisterAttributeInteger('SelectedCalendarAccountID', 0);
         $this->RegisterAttributeString('SelectedCalendarIDs', '[]');
+        $this->RegisterAttributeString('SelectedCalendarInstanceIDs', '[]');
     }
 
     public function GetConfigurationForm(): string
@@ -422,20 +433,206 @@ class OpenCalendarDiscovery extends IPSModuleStrict
         }
 
         $accountID = $this->wizardAccountID();
+        $provider = $this->wizardProvider();
+        $selectedCalendarIDs = $this->readWizardSelectedCalendarIDs();
         $createdAccountID = (int) $this->GetBuffer('WizardCreatedAccountID');
-        if ($createdAccountID === $accountID) {
-            IPS_SetProperty($accountID, 'Active', true);
-            IPS_ApplyChanges($accountID);
+        $activateNewAccount = $createdAccountID === $accountID;
+        $wasActive = (bool) IPS_GetProperty($accountID, 'Active');
+
+        try {
+            if ($activateNewAccount && !$wasActive) {
+                IPS_SetProperty($accountID, 'Active', true);
+                IPS_ApplyChanges($accountID);
+            }
+
+            $calendarInstanceIDs = $this->prepareSelectedCalendarInstances(
+                $accountID,
+                $provider,
+                $selectedCalendarIDs
+            );
+        } catch (Throwable $exception) {
+            if ($activateNewAccount && !$wasActive && IPS_InstanceExists($accountID)) {
+                IPS_SetProperty($accountID, 'Active', false);
+                IPS_ApplyChanges($accountID);
+            }
+
+            throw new RuntimeException(
+                $this->Translate('The selected calendar instances could not be created.') . ' '
+                    . $exception->getMessage(),
+                0,
+                $exception
+            );
         }
 
         $this->WriteAttributeInteger('SelectedCalendarAccountID', $accountID);
         $this->WriteAttributeString('SelectedCalendarIDs', $this->GetBuffer('WizardSelectedCalendarIDs'));
+        $this->WriteAttributeString(
+            'SelectedCalendarInstanceIDs',
+            json_encode(
+                $calendarInstanceIDs,
+                JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES
+            )
+        );
         $this->SetBuffer('WizardProvider', '');
         $this->SetBuffer('WizardAccountSelection', '');
         $this->SetBuffer('WizardAccountID', '');
         $this->SetBuffer('WizardCreatedAccountID', '');
         $this->SetBuffer('WizardConnectionVerified', '0');
         $this->clearWizardCalendarSelection(true);
+    }
+
+    /**
+     * @param list<string> $selectedCalendarIDs
+     * @return list<int>
+     */
+    private function prepareSelectedCalendarInstances(
+        int $accountID,
+        string $provider,
+        array $selectedCalendarIDs
+    ): array {
+        $this->assertSupportedProvider($provider);
+
+        $calendars = [];
+        foreach ($this->readWizardCalendars() as $calendar) {
+            $calendarID = trim((string) ($calendar['id'] ?? ''));
+            if ($calendarID !== '') {
+                $calendars[$calendarID] = $calendar;
+            }
+        }
+
+        $existingInstances = $this->existingCalendarInstancesForAccount($accountID);
+        $calendarInstanceIDs = [];
+        $createdCalendarInstanceIDs = [];
+
+        try {
+            foreach ($selectedCalendarIDs as $calendarID) {
+                if (!isset($calendars[$calendarID])) {
+                    throw new InvalidArgumentException($this->Translate('The calendar selection is invalid.'));
+                }
+
+                if (isset($existingInstances[$calendarID])) {
+                    $calendarInstanceIDs[] = $existingInstances[$calendarID];
+                    continue;
+                }
+
+                $calendarInstanceID = $this->createCalendarInstance(
+                    $accountID,
+                    $provider,
+                    $calendars[$calendarID]
+                );
+                $createdCalendarInstanceIDs[] = $calendarInstanceID;
+                $calendarInstanceIDs[] = $calendarInstanceID;
+            }
+        } catch (Throwable $exception) {
+            foreach (array_reverse($createdCalendarInstanceIDs) as $calendarInstanceID) {
+                if (IPS_InstanceExists($calendarInstanceID)) {
+                    IPS_DeleteInstance($calendarInstanceID);
+                }
+            }
+
+            throw $exception;
+        }
+
+        return $calendarInstanceIDs;
+    }
+
+    /**
+     * @return array<string, int>
+     */
+    private function existingCalendarInstancesForAccount(int $accountID): array
+    {
+        $instances = [];
+
+        foreach (IPS_GetInstanceListByModuleID(self::CALENDAR_MODULE_ID) as $calendarInstanceID) {
+            $instance = IPS_GetInstance($calendarInstanceID);
+            if ((int) ($instance['ConnectionID'] ?? 0) !== $accountID) {
+                continue;
+            }
+
+            $calendarID = trim((string) IPS_GetProperty($calendarInstanceID, 'CalendarID'));
+            if ($calendarID !== '' && !isset($instances[$calendarID])) {
+                $instances[$calendarID] = $calendarInstanceID;
+            }
+        }
+
+        return $instances;
+    }
+
+    /**
+     * @param array<string, mixed> $calendar
+     */
+    private function createCalendarInstance(int $accountID, string $provider, array $calendar): int
+    {
+        $calendarID = trim((string) ($calendar['id'] ?? ''));
+        if ($calendarID === '') {
+            throw new InvalidArgumentException($this->Translate('The calendar selection is invalid.'));
+        }
+
+        $calendarName = trim((string) ($calendar['name'] ?? ''));
+        if ($calendarName === '') {
+            $calendarName = $calendarID;
+        }
+
+        $capabilities = is_array($calendar['capabilities'] ?? null)
+            ? $calendar['capabilities']
+            : [];
+        $canWrite = (bool) ($capabilities['create'] ?? false)
+            || (bool) ($capabilities['update'] ?? false)
+            || (bool) ($capabilities['delete'] ?? false);
+
+        $calendarInstanceID = 0;
+
+        try {
+            $calendarInstanceID = IPS_CreateInstance(self::CALENDAR_MODULE_ID);
+            IPS_SetName(
+                $calendarInstanceID,
+                self::PROVIDER_INSTANCE_PREFIXES[$provider] . ' - ' . $calendarName
+            );
+
+            $parentID = IPS_GetParent($accountID);
+            if ($parentID > 0) {
+                IPS_SetParent($calendarInstanceID, $parentID);
+            }
+
+            IPS_SetProperty($calendarInstanceID, 'CalendarID', $calendarID);
+            IPS_SetProperty(
+                $calendarInstanceID,
+                'ProviderCalendarID',
+                (string) ($calendar['providerId'] ?? $calendarID)
+            );
+            IPS_SetProperty($calendarInstanceID, 'CalendarURL', (string) ($calendar['url'] ?? ''));
+            IPS_SetProperty($calendarInstanceID, 'CalendarColor', (string) ($calendar['color'] ?? ''));
+            IPS_SetProperty($calendarInstanceID, 'CanWrite', $canWrite);
+            IPS_SetProperty($calendarInstanceID, 'UpdateSchedule', (int) ($calendar['updateSchedule'] ?? 0));
+            IPS_SetProperty(
+                $calendarInstanceID,
+                'UpdateInterval',
+                max(1, min(525600, (int) ($calendar['updateInterval'] ?? 15)))
+            );
+
+            if (!IPS_ConnectInstance($calendarInstanceID, $accountID)) {
+                throw new RuntimeException(
+                    $this->Translate('The calendar instance could not be connected to the calendar account.')
+                );
+            }
+
+            IPS_ApplyChanges($calendarInstanceID);
+        } catch (Throwable $exception) {
+            if ($calendarInstanceID > 0 && IPS_InstanceExists($calendarInstanceID)) {
+                IPS_DeleteInstance($calendarInstanceID);
+            }
+
+            throw new RuntimeException(
+                sprintf(
+                    $this->Translate('The calendar instance "%s" could not be created.'),
+                    $calendarName
+                ) . ' ' . $exception->getMessage(),
+                0,
+                $exception
+            );
+        }
+
+        return $calendarInstanceID;
     }
 
     private function createCalendarAccount(string $provider, string $accountName): int

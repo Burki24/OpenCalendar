@@ -22,7 +22,8 @@ Der Assistent führt aktuell durch folgende Schritte:
 4. anbieterabhängige Kontoeinrichtung
 5. Verbindung prüfen
 6. verfügbare Kalender ermitteln und auswählen
-7. Kalender Konto abschließen und ein neu angelegtes Konto aktivieren
+7. ausgewählte Kalenderinstanzen anlegen beziehungsweise vorhandene übernehmen
+8. Kalender Konto abschließen und ein neu angelegtes Konto aktivieren
 
 Bei einem **vorhandenen Kalender Konto** baut OpenCalendar die Auswahl beim
 Öffnen der Discovery-Konfiguration aus allen vorhandenen **Calendar Account**-
@@ -83,19 +84,43 @@ angezeigt und können über eine Checkbox ausgewählt werden.
 Ist genau ein Kalender vorhanden, wird er automatisch vorausgewählt. Meldet der
 Anbieter einen oder mehrere primäre Kalender, werden diese vorausgewählt. Vor dem
 Fortfahren muss mindestens ein Kalender gewählt sein. Die ausgewählten internen
-Kalender-IDs werden in der Discovery-Instanz gespeichert und bilden die Grundlage
-für den nächsten Ausbauschritt.
+Kalender-IDs werden in der Discovery-Instanz gespeichert.
+
+### Kalenderinstanzen
+
+Mit **OK** auf der Abschlussseite legt OpenCalendar für die ausgewählten Kalender
+die benötigten **Kalender**-Instanzen an und verbindet sie direkt mit dem
+gewählten Kalender Konto. Dabei wird dieselbe providerunabhängige
+Kalenderkonfiguration verwendet wie im Kalender Konfigurator: interne
+Kalender-ID, Provider-ID, URL, Farbe, Schreibrechte und Synchronisationswerte.
+
+Existiert unter demselben Kalender Konto bereits eine Kalenderinstanz mit
+derselben `CalendarID`, wird diese übernommen und nicht doppelt angelegt.
+Vorhandene Instanzen werden dabei nicht umbenannt.
+
+Neu angelegte Kalenderinstanzen erhalten den Anbieter als Namenspräfix:
+
+- Microsoft 365 / Outlook.com: `O365 - <Kalendername>`
+- Apple iCloud: `Apple - <Kalendername>`
+- Google Kalender: `Google - <Kalendername>`
+- CalDAV: `CalDAV - <Kalendername>`
+- ICS / Webcal: `ICS - <Kalendername>`
+
+Die IDs der erzeugten beziehungsweise übernommenen Kalenderinstanzen werden in
+der Discovery-Instanz gespeichert und können im nächsten Ausbauschritt für die
+Kalender Ansicht weiterverwendet werden.
 
 Ein im Wizard **neu angelegtes** Kalender Konto wird erst auf der Abschlussseite
 mit **OK** aktiviert. Ein bereits vorhandenes Konto behält seinen bisherigen
-Aktivierungszustand unverändert.
+Aktivierungszustand unverändert. Schlägt das Anlegen einer Kalenderinstanz fehl,
+werden in diesem Abschlussvorgang bereits neu erzeugte Kalenderinstanzen wieder
+entfernt; ein zuvor inaktives neues Konto wird ebenfalls wieder deaktiviert.
 
 ## Geplanter Ausbau
 
 Der Assistent soll anschließend schrittweise um folgende Funktionen erweitert
 werden:
 
-- ausgewählte Kalenderinstanzen erzeugen beziehungsweise vorhandene übernehmen
 - Kalender Ansicht anlegen oder eine vorhandene auswählen
 - gewählte Kalender der Ansicht zuordnen
 - abschließende Synchronisation und Ergebnisübersicht
