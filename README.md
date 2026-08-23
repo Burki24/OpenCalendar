@@ -1,8 +1,9 @@
+\
 # OpenCalendar
 
 [![Symcon](https://img.shields.io/badge/Symcon-PHPModul-555555.svg)](https://www.symcon.de)
-[![Modul Version](https://img.shields.io/badge/Modul%20Version-1.0-blue.svg)](library.json)
-[![Symcon Version](https://img.shields.io/badge/Symcon%20Version-9.0%2B-brightgreen.svg)](https://www.symcon.de)<br>
+[![Modul Version](https://img.shields.io/badge/Modul%20Version-3.0-blue.svg)](library.json)
+[![Symcon Version](https://img.shields.io/badge/Symcon%20Version-9.1%2B-brightgreen.svg)](https://www.symcon.de)<br>
 [![License](https://img.shields.io/badge/License-PolyForm--Noncommercial--1.0.0-brightgreen.svg)](LICENSE)
 [![Check Style](https://github.com/Burki24/OpenCalendar/actions/workflows/style.yml/badge.svg?branch=main)](https://github.com/Burki24/OpenCalendar/actions/workflows/style.yml?query=branch%3Amain)
 [![Run Tests](https://github.com/Burki24/OpenCalendar/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/Burki24/OpenCalendar/actions/workflows/tests.yml?query=branch%3Amain)
@@ -10,32 +11,74 @@
 OpenCalendar ist eine Anwendung für Symcon, mit der Nutzer ihre Online-Kalender verbinden, synchronisieren, anzeigen und bearbeiten können. Unterstützt werden Apple iCloud, Google Calendar, Microsoft 365/Outlook.com, generische CalDAV-Server sowie schreibgeschützte ICS-/Webcal-Abonnements.
 Die gefundenen Kalender können einzeln synchronisiert, in einer gemeinsamen Kachel angezeigt und optional als interaktive HTML-Seite in IPSView verwendet werden.
 
+Ab Version 3.0 steht zusätzlich die **Kalender Einrichtung** als zentraler
+Einrichtungsassistent zur Verfügung. Sie führt vom Kalenderanbieter über das
+Kalender Konto und die Kalenderauswahl bis zur fertigen Kalender Ansicht und
+übernimmt dabei die notwendigen technischen Verknüpfungen automatisch.
+
 Umfangreiche Terminlisten werden intern seitenweise zwischen Konto, Kalender und
 Kalenderansicht übertragen. Online-ICS-/Webcal-Feeds und lokal importierte
 ICS-Dateien dürfen jeweils höchstens 16 MiB groß sein. Innerhalb dieser Grenze
 müssen umfangreiche Kalenderdateien nicht manuell aufgeteilt werden.
 
-**Datenschutz:** [Datenschutzhinweise](PRIVACY.md)
+**Datenschutz:** [Datenschutzhinweise](PRIVACY.md)  
 **Nutzungsbedingungen:** [Nutzungsbedingungen](TERMS.md)
 
 ## Voraussetzungen
 
-- Symcon ab Version 9.0
+- Symcon ab Version 9.1
 - Netzwerkzugriff des Symcon-Servers auf den jeweiligen Kalenderdienst
 - für Google und Microsoft eine aktive Symcon-Connect-Verbindung; eine eigene
   OAuth-Client-ID oder ein eigener Clientschlüssel ist nicht erforderlich
 - für Apple iCloud ein anwendungsspezifisches Apple-Passwort
 
-## Schnellstart
+## Schnellstart mit dem Einrichtungsassistenten
 
-1. OpenCalendar über den Symcon Module Store installieren.
-2. Über **Instanz hinzufügen** eine Instanz **Kalender Konto** anlegen.
-3. Den gewünschten Anbieter auswählen und die angezeigten Zugangsdaten beziehungsweise den OAuth-Login einrichten.
-4. **Verbindung testen** ausführen. Erst bei erfolgreichem Test die Kontokonfiguration übernehmen.
-5. **Jetzt synchronisieren** ausführen, damit die verfügbaren Kalender gefunden werden.
-6. Über **Instanz hinzufügen** einen **Kalender Konfigurator** anlegen. Im Dialog das zuvor eingerichtete **Kalender Konto** als übergeordnete Instanz wählen. Ist bereits ein Konfigurator vorhanden, lässt sich die Verbindung über das Zahnrad und **Gateway ändern** kontrollieren oder anpassen.
-7. Den Konfigurator öffnen und **Kalender aktualisieren** verwenden. In der Liste die gewünschten Kalender über **Erstellen** beziehungsweise **Alle erstellen** anlegen.
-8. Optional eine Instanz **Kalender Ansicht** erstellen, die gewünschten Kalenderinstanzen auswählen und die Ansicht in der Kachelvisualisierung oder in IPSView platzieren.
+Für eine neue OpenCalendar-Konfiguration ist die **Kalender Einrichtung** der
+empfohlene Weg.
+
+1. OpenCalendar installieren und über **Instanz hinzufügen** eine Instanz
+   **Kalender Einrichtung** anlegen.
+2. **OpenCalendar-Einrichtungsassistent starten** wählen.
+3. Den gewünschten Kalenderanbieter auswählen. Optional kann der Assistent
+   gleichzeitig einen **Kalender Konfigurator** für die spätere Verwaltung
+   dieses Kontos anlegen.
+4. Ein vorhandenes **Kalender Konto** auswählen oder ein neues Konto einrichten.
+   Google und Microsoft verwenden dabei den vorhandenen OAuth-Ablauf; Apple,
+   CalDAV und ICS/Webcal werden direkt im Assistenten konfiguriert.
+5. Nach erfolgreicher Verbindungsprüfung die gewünschten Kalender auswählen.
+6. Eine vorhandene **Kalender Ansicht** auswählen oder eine neue anlegen.
+7. Die Zusammenfassung prüfen und die Einrichtung abschließen. Der Assistent legt
+   fehlende Kalender-Instanzen an, verbindet sie mit dem richtigen Konto, ordnet
+   sie der Kalender Ansicht zu und führt eine abschließende Synchronisations- und
+   Funktionsprüfung durch.
+
+Neu angelegte Kalender-Instanzen erhalten zur besseren Unterscheidung den
+Provider als Namenspräfix, beispielsweise `O365 - Familie`, `Apple - Privat`,
+`Google - Arbeit`, `CalDAV - Familie` oder `ICS - Feiertage`. Bereits vorhandene
+und wiederverwendete Instanzen werden nicht automatisch umbenannt.
+
+Auf der Ergebnisseite können fehlgeschlagene Synchronisationen erneut geprüft
+werden. Alternativ kann direkt ein weiteres Kalender-Konto eingerichtet werden,
+ohne den Assistenten schließen und neu öffnen zu müssen.
+
+Die vollständige Beschreibung des Ablaufs befindet sich in der Dokumentation der
+[Kalender Einrichtung](Kalender%20Einrichtung).
+
+## Manuelle Einrichtung
+
+Die bisherige manuelle Einrichtung bleibt weiterhin unterstützt und ist besonders
+für gezielte Änderungen an bestehenden Installationen sinnvoll.
+
+1. Eine Instanz **Kalender Konto** anlegen und den gewünschten Anbieter
+   konfigurieren.
+2. **Verbindung testen** und anschließend **Jetzt synchronisieren**, damit die
+   verfügbaren Kalender ermittelt werden.
+3. Einen **Kalender Konfigurator** anlegen und mit dem Kalender Konto verbinden.
+4. Im Konfigurator **Kalender aktualisieren** ausführen und die gewünschten
+   Kalender über **Erstellen** beziehungsweise **Alle erstellen** anlegen.
+5. Eine **Kalender Ansicht** anlegen und die gewünschten Kalenderinstanzen
+   auswählen.
 
 Die ausführlichen Einstellungen der Anbieter sind in der Dokumentation des
 [Kalender Kontos](Kalender%20Konto) beschrieben.
@@ -50,26 +93,38 @@ Microsoft 365/Outlook.com | Zentrale OpenCalendar-OAuth-Anwendung über Symcon |
 CalDAV | Server-URL, Benutzername und Passwort | Lesen und Schreiben entsprechend den Serverrechten
 ICS/Webcal | Eine oder mehrere Feed-URLs (öffentlich, Zugriffsschlüssel oder Benutzername/Passwort) oder lokale ICS-Dateien vom Arbeitsrechner | Schreibgeschützt
 
-## Kalender immer über den Konfigurator anlegen
+## Kalender korrekt anlegen
 
-**Kalender-Instanzen sollen ausschließlich aus der Liste des Kalender
-Konfigurators erstellt werden.**
+**Kalender-Instanzen sollen über den Einrichtungsassistenten oder den Kalender
+Konfigurator erzeugt werden.**
 
-Der Konfigurator übernimmt automatisch den Kalendernamen, die interne
-Kalender-ID, die Anbieter-ID, die Farbe, die Schreibrechte und die Verbindung
-zum aktuell gewählten Kalender Konto. Manuell angelegte oder kopierte
-Kalender-Instanzen besitzen diese vollständige Identität nicht. Sie dürfen daher
-nicht lediglich über **Gateway ändern** mit einem Konto verbunden werden.
+Beide Wege übernehmen die vollständige technische Identität des Kalenders:
+interne Kalender-ID, Anbieter-ID, URL, Farbe, Schreibrechte und die Verbindung
+zum richtigen Kalender Konto. Manuell angelegte oder kopierte Kalender-Instanzen
+besitzen diese vollständige Zuordnung nicht und sollten daher nicht lediglich
+über **Gateway ändern** mit einem Konto verbunden werden.
 
-Nach der Erstellung dürfen Kalender-Instanzen im Objektbaum beliebig verschoben
-oder umbenannt werden. Ihre technische Zuordnung bleibt dabei erhalten.
+Der **Einrichtungsassistent** ist für die Erst- und Erweiterungseinrichtung
+vorgesehen. Der **Kalender Konfigurator** eignet sich besonders für die spätere
+Verwaltung eines bereits eingerichteten Kontos, beispielsweise wenn weitere
+Kalender hinzukommen. Er kann bei der Einrichtung optional automatisch
+mitangelegt werden.
+
+Nach der korrekten Erstellung dürfen Kalender-Instanzen im Objektbaum beliebig
+verschoben oder umbenannt werden. Ihre technische Zuordnung bleibt dabei erhalten.
 
 ## Mehrere Kalenderkonten
 
-Für mehrere Konten gibt es zwei unterstützte Arbeitsweisen:
+Mehrere Kalenderkonten können direkt nacheinander über die **Kalender
+Einrichtung** hinzugefügt werden. Nach Abschluss eines Kontos bietet die
+Ergebnisseite an, unmittelbar zur Providerauswahl zurückzukehren und ein weiteres
+Konto einzurichten.
 
-- **Ein Konfigurator je Konto** ist die empfohlene und übersichtlichste Variante.
-  Jeder Konfigurator bleibt dauerhaft mit seinem Kalender Konto verbunden.
+Wer zusätzlich Kalender Konfiguratoren verwendet, hat weiterhin zwei
+Möglichkeiten:
+
+- **Ein Konfigurator je Konto** ist die übersichtlichste Variante. Jeder
+  Konfigurator bleibt dauerhaft mit seinem Kalender Konto verbunden.
 - **Ein gemeinsamer Konfigurator** kann nacheinander für mehrere Konten verwendet
   werden. Dazu im Konfigurator über das Zahnrad **Gateway ändern** wählen, das
   gewünschte Kalender Konto verbinden und anschließend zwingend
@@ -80,9 +135,7 @@ aktuell verbundenen Kontos. Bereits erzeugte Kalender-Instanzen bleiben beim
 Wechsel mit ihrem ursprünglichen Konto verbunden und erscheinen wieder, sobald
 der Konfigurator erneut mit diesem Konto verbunden wird.
 
-Diese Wiederverwendung entspricht dem von Symcon vorgesehenen Austausch einer
-übergeordneten Instanz. Die Kalender-Instanzen selbst werden weiterhin nur aus
-der aktuellen Konfiguratorliste erstellt. Weitere Hintergründe enthält die
+Weitere Hintergründe enthält die
 [Dokumentation des Kalender Konfigurators](Kalender%20Konfigurator).
 
 ## Google-Serientermine
@@ -208,6 +261,11 @@ Drittanbieter.
 
 ## Enthaltene Module
 
+- **Kalender Einrichtung** ([Dokumentation](Kalender%20Einrichtung))
+
+  Führt als zentraler Einrichtungsassistent durch Providerwahl, Konto,
+  Kalenderauswahl, optionale Konfigurator-Erstellung, Kalender Ansicht und
+  Abschlussprüfung.
 - **Kalender Konto** ([Dokumentation](Kalender%20Konto))
 
   Verbindet die unterstützten Anbieter und stellt deren Kalender bereit.
