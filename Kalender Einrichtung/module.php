@@ -85,10 +85,20 @@ class OpenCalendarDiscovery extends IPSModuleStrict
                     } elseif ($pageName === 'view' && ($item['name'] ?? '') === 'ExistingViewID') {
                         $item['options'] = $this->calendarViewSelectOptions();
                     } elseif ($pageName === 'result') {
-                        $captions = $this->wizardResultCaptions($this->readLastSetupResult());
+                        $result = $this->readLastSetupResult();
+                        $captions = $this->wizardResultCaptions($result);
                         $itemName = (string) ($item['name'] ?? '');
                         if (isset($captions[$itemName])) {
                             $item['caption'] = $captions[$itemName];
+                        }
+                        if (in_array($itemName, [
+                            'ResultSynchronizationDetails',
+                            'ResultRetryVerification',
+                            'ResultSynchronizationHintRetry',
+                            'ResultSynchronizationHintManual',
+                            'ResultSynchronizationHintDebug'
+                        ], true)) {
+                            $item['visible'] = $this->wizardResultNeedsVerificationHelp($result);
                         }
                     }
                 }
@@ -172,6 +182,14 @@ class OpenCalendarDiscovery extends IPSModuleStrict
 
             case 'WizardFinishAccount':
                 $this->finishWizardAccount();
+                break;
+
+            case 'WizardRetryVerification':
+                $this->retryWizardVerification();
+                break;
+
+            case 'WizardResultNext':
+                $this->continueWizardFromResult((string) $Value);
                 break;
 
             case 'WizardComplete':
@@ -604,24 +622,27 @@ class OpenCalendarDiscovery extends IPSModuleStrict
             $calendarView['instanceID']
         );
         $setupResult = [
-            'success'                    => $verification['accountSynchronized']
+            'success'                     => $verification['accountSynchronized']
                 && $verification['failedCalendarNames'] === []
                 && $verification['viewInitialized'],
-            'accountID'                  => $accountID,
-            'accountName'                => trim(IPS_GetName($accountID)),
-            'accountActive'              => (bool) IPS_GetProperty($accountID, 'Active'),
-            'accountSynchronized'        => $verification['accountSynchronized'],
-            'configuratorID'             => $configuratorInstanceID,
-            'configuratorCreated'        => $configuratorCreated,
-            'calendarCount'              => count($calendarInstanceIDs),
-            'calendarCreatedCount'       => count($createdCalendarInstanceIDs),
-            'calendarReusedCount'        => count($calendarInstanceIDs) - count($createdCalendarInstanceIDs),
-            'calendarSynchronizedCount'  => $verification['calendarSynchronizedCount'],
-            'failedCalendarNames'        => $verification['failedCalendarNames'],
-            'viewID'                     => $calendarView['instanceID'],
-            'viewName'                   => trim(IPS_GetName($calendarView['instanceID'])),
-            'viewCreated'                => $calendarView['created'],
-            'viewInitialized'            => $verification['viewInitialized']
+            'accountID'                   => $accountID,
+            'accountName'                 => trim(IPS_GetName($accountID)),
+            'accountActive'               => (bool) IPS_GetProperty($accountID, 'Active'),
+            'accountSynchronized'         => $verification['accountSynchronized'],
+            'accountSynchronizationError' => $verification['accountSynchronizationError'],
+            'configuratorID'              => $configuratorInstanceID,
+            'configuratorCreated'         => $configuratorCreated,
+            'calendarCount'               => count($calendarInstanceIDs),
+            'calendarCreatedCount'        => count($createdCalendarInstanceIDs),
+            'calendarReusedCount'         => count($calendarInstanceIDs) - count($createdCalendarInstanceIDs),
+            'calendarSynchronizedCount'   => $verification['calendarSynchronizedCount'],
+            'failedCalendarNames'         => $verification['failedCalendarNames'],
+            'failedCalendars'             => $verification['failedCalendars'],
+            'viewID'                      => $calendarView['instanceID'],
+            'viewName'                    => trim(IPS_GetName($calendarView['instanceID'])),
+            'viewCreated'                 => $calendarView['created'],
+            'viewInitialized'             => $verification['viewInitialized'],
+            'viewInitializationError'     => $verification['viewInitializationError']
         ];
 
         $this->WriteAttributeInteger('SelectedCalendarAccountID', $accountID);
@@ -662,9 +683,12 @@ class OpenCalendarDiscovery extends IPSModuleStrict
      * @param list<int> $calendarInstanceIDs
      * @return array{
      *     accountSynchronized: bool,
+     *     accountSynchronizationError: string,
      *     calendarSynchronizedCount: int,
      *     failedCalendarNames: list<string>,
-     *     viewInitialized: bool
+     *     failedCalendars: list<array{instanceID: int, name: string, error: string}>,
+     *     viewInitialized: bool,
+     *     viewInitializationError: string
      * }
      */
     private function verifyWizardSetup(int $accountID, array $calendarInstanceIDs, int $viewID): array
@@ -672,9 +696,11 @@ class OpenCalendarDiscovery extends IPSModuleStrict
         $accountWasActive = (bool) IPS_GetProperty($accountID, 'Active');
         $temporarilyActivated = false;
         $accountSynchronized = false;
+        $accountSynchronizationError = '';
         $calendarSynchronizedCount = 0;
-        $failedCalendarNames = [];
+        $failedCalendars = [];
         $viewInitialized = false;
+        $viewInitializationError = '';
 
         try {
             if (!$accountWasActive) {
@@ -685,17 +711,34 @@ class OpenCalendarDiscovery extends IPSModuleStrict
 
             try {
                 $accountSynchronized = IPSKALACC_Synchronize($accountID);
-            } catch (Throwable) {
-                $accountSynchronized = false;
+                if (!$accountSynchronized) {
+                    $accountSynchronizationError = $this->wizardAccountSynchronizationError($accountID);
+                }
+            } catch (Throwable $exception) {
+                $accountSynchronizationError = $this->normalizeWizardErrorMessage($exception->getMessage());
             }
 
             foreach ($calendarInstanceIDs as $calendarInstanceID) {
+                $name = IPS_InstanceExists($calendarInstanceID)
+                    ? trim(IPS_GetName($calendarInstanceID))
+                    : '';
+                if ($name === '') {
+                    $name = sprintf('#%d', $calendarInstanceID);
+                }
+
                 $synchronized = false;
+                $error = '';
                 try {
-                    $synchronized = IPS_InstanceExists($calendarInstanceID)
-                        && IPSKAL_Synchronize($calendarInstanceID);
-                } catch (Throwable) {
-                    $synchronized = false;
+                    if (!IPS_InstanceExists($calendarInstanceID)) {
+                        $error = $this->Translate('The calendar instance no longer exists.');
+                    } else {
+                        $synchronized = IPSKAL_Synchronize($calendarInstanceID);
+                        if (!$synchronized) {
+                            $error = $this->wizardCalendarSynchronizationError($calendarInstanceID);
+                        }
+                    }
+                } catch (Throwable $exception) {
+                    $error = $this->normalizeWizardErrorMessage($exception->getMessage());
                 }
 
                 if ($synchronized) {
@@ -703,27 +746,52 @@ class OpenCalendarDiscovery extends IPSModuleStrict
                     continue;
                 }
 
-                $name = IPS_InstanceExists($calendarInstanceID)
-                    ? trim(IPS_GetName($calendarInstanceID))
-                    : '';
-                $failedCalendarNames[] = $name !== ''
-                    ? $name
-                    : sprintf('#%d', $calendarInstanceID);
+                $failedCalendars[] = [
+                    'instanceID' => $calendarInstanceID,
+                    'name'       => $name,
+                    'error'      => $error !== ''
+                        ? $error
+                        : $this->Translate('The calendar reported a synchronization failure.')
+                ];
             }
 
             try {
                 $viewInitialized = IPS_InstanceExists($viewID) && IPSKALVIEW_Initialize($viewID);
-            } catch (Throwable) {
-                $viewInitialized = false;
+                if (!$viewInitialized) {
+                    $viewInitializationError = $this->wizardViewInitializationError($viewID);
+                }
+            } catch (Throwable $exception) {
+                $viewInitializationError = $this->normalizeWizardErrorMessage($exception->getMessage());
             }
-        } catch (Throwable) {
+        } catch (Throwable $exception) {
+            $fatalError = $this->normalizeWizardErrorMessage($exception->getMessage());
+            if ($accountSynchronizationError === '') {
+                $accountSynchronizationError = sprintf(
+                    $this->Translate('Final verification could not be completed: %s'),
+                    $fatalError
+                );
+            }
             foreach ($calendarInstanceIDs as $calendarInstanceID) {
                 $name = IPS_InstanceExists($calendarInstanceID)
                     ? trim(IPS_GetName($calendarInstanceID))
                     : '';
-                $failedCalendarNames[] = $name !== ''
-                    ? $name
-                    : sprintf('#%d', $calendarInstanceID);
+                if ($name === '') {
+                    $name = sprintf('#%d', $calendarInstanceID);
+                }
+                $failedCalendars[] = [
+                    'instanceID' => $calendarInstanceID,
+                    'name'       => $name,
+                    'error'      => sprintf(
+                        $this->Translate('Final verification could not be completed: %s'),
+                        $fatalError
+                    )
+                ];
+            }
+            if ($viewInitializationError === '') {
+                $viewInitializationError = sprintf(
+                    $this->Translate('Final verification could not be completed: %s'),
+                    $fatalError
+                );
             }
         } finally {
             if ($temporarilyActivated && IPS_InstanceExists($accountID)) {
@@ -732,12 +800,114 @@ class OpenCalendarDiscovery extends IPSModuleStrict
             }
         }
 
+        $failedCalendars = $this->uniqueFailedWizardCalendars($failedCalendars);
+
         return [
-            'accountSynchronized'       => $accountSynchronized,
-            'calendarSynchronizedCount' => $calendarSynchronizedCount,
-            'failedCalendarNames'       => array_values(array_unique($failedCalendarNames)),
-            'viewInitialized'           => $viewInitialized
+            'accountSynchronized'         => $accountSynchronized,
+            'accountSynchronizationError' => $accountSynchronizationError,
+            'calendarSynchronizedCount'   => $calendarSynchronizedCount,
+            'failedCalendarNames'         => array_values(array_map(
+                static fn (array $calendar): string => $calendar['name'],
+                $failedCalendars
+            )),
+            'failedCalendars'             => $failedCalendars,
+            'viewInitialized'             => $viewInitialized,
+            'viewInitializationError'     => $viewInitializationError
         ];
+    }
+
+    private function wizardAccountSynchronizationError(int $accountID): string
+    {
+        try {
+            $status = json_decode(
+                IPSKALACC_GetAccountStatus($accountID),
+                true,
+                512,
+                JSON_THROW_ON_ERROR
+            );
+            if (is_array($status)) {
+                $lastError = $this->normalizeWizardErrorMessage((string) ($status['lastError'] ?? ''));
+                if ($lastError !== '') {
+                    return $lastError;
+                }
+            }
+        } catch (Throwable $exception) {
+            $message = $this->normalizeWizardErrorMessage($exception->getMessage());
+            if ($message !== '') {
+                return $message;
+            }
+        }
+
+        return $this->Translate('Calendar account synchronization returned no success.');
+    }
+
+    private function wizardCalendarSynchronizationError(int $calendarInstanceID): string
+    {
+        if (!IPS_InstanceExists($calendarInstanceID)) {
+            return $this->Translate('The calendar instance no longer exists.');
+        }
+
+        $instance = IPS_GetInstance($calendarInstanceID);
+        $status = (int) ($instance['InstanceStatus'] ?? 0);
+
+        return match ($status) {
+            IS_INACTIVE => $this->Translate('The calendar instance is inactive.'),
+            201         => $this->Translate('The calendar configuration is incomplete.'),
+            202         => $this->Translate('The calendar reported a synchronization failure.'),
+            203         => $this->Translate('The provider returned an invalid calendar response.'),
+            204         => $this->Translate('An event write conflict was reported.'),
+            default     => sprintf(
+                $this->Translate('Calendar synchronization returned no success (instance status %d).'),
+                $status
+            )
+        };
+    }
+
+    private function wizardViewInitializationError(int $viewID): string
+    {
+        if (!IPS_InstanceExists($viewID)) {
+            return $this->Translate('The calendar view no longer exists.');
+        }
+
+        $instance = IPS_GetInstance($viewID);
+        $status = (int) ($instance['InstanceStatus'] ?? 0);
+
+        return sprintf(
+            $this->Translate('Calendar View initialization returned no success (instance status %d).'),
+            $status
+        );
+    }
+
+    private function normalizeWizardErrorMessage(string $message): string
+    {
+        $message = strip_tags($message);
+        $message = preg_replace('/\\s+/', ' ', $message) ?? $message;
+        $message = trim($message);
+
+        return strlen($message) > 600 ? substr($message, 0, 597) . '...' : $message;
+    }
+
+    /**
+     * @param list<array{instanceID: int, name: string, error: string}> $failedCalendars
+     * @return list<array{instanceID: int, name: string, error: string}>
+     */
+    private function uniqueFailedWizardCalendars(array $failedCalendars): array
+    {
+        $unique = [];
+        foreach ($failedCalendars as $calendar) {
+            $instanceID = (int) ($calendar['instanceID'] ?? 0);
+            $key = $instanceID > 0 ? (string) $instanceID : (string) ($calendar['name'] ?? '');
+            if ($key === '' || isset($unique[$key])) {
+                continue;
+            }
+            $unique[$key] = [
+                'instanceID' => $instanceID,
+                'name'       => trim((string) ($calendar['name'] ?? '')),
+                'error'      => trim((string) ($calendar['error'] ?? ''))
+            ];
+        }
+
+        return array_values($unique);
     }
 
     /**
@@ -747,6 +917,17 @@ class OpenCalendarDiscovery extends IPSModuleStrict
     {
         foreach ($this->wizardResultCaptions($result) as $field => $caption) {
             $this->UpdateFormField($field, 'caption', $caption);
+        }
+
+        $showVerificationHelp = $this->wizardResultNeedsVerificationHelp($result);
+        foreach ([
+            'ResultSynchronizationDetails',
+            'ResultRetryVerification',
+            'ResultSynchronizationHintRetry',
+            'ResultSynchronizationHintManual',
+            'ResultSynchronizationHintDebug'
+        ] as $field) {
+            $this->UpdateFormField($field, 'visible', $showVerificationHelp);
         }
     }
 
@@ -770,6 +951,9 @@ class OpenCalendarDiscovery extends IPSModuleStrict
         $calendarCreatedCount = max(0, (int) ($result['calendarCreatedCount'] ?? 0));
         $calendarReusedCount = max(0, (int) ($result['calendarReusedCount'] ?? 0));
         $calendarSynchronizedCount = max(0, (int) ($result['calendarSynchronizedCount'] ?? 0));
+        $failedCalendars = is_array($result['failedCalendars'] ?? null)
+            ? array_values(array_filter($result['failedCalendars'], 'is_array'))
+            : [];
         $failedCalendarNames = is_array($result['failedCalendarNames'] ?? null)
             ? array_values(array_filter(array_map('strval', $result['failedCalendarNames'])))
             : [];
@@ -777,6 +961,27 @@ class OpenCalendarDiscovery extends IPSModuleStrict
         $viewName = trim((string) ($result['viewName'] ?? ''));
         if ($viewName === '') {
             $viewName = $this->Translate('Calendar view');
+        }
+
+        $viewCaption = sprintf(
+            $this->Translate(
+                (bool) ($result['viewCreated'] ?? false)
+                    ? 'Calendar View: %s (#%d) was created and the selected calendars were assigned.'
+                    : 'Calendar View: %s (#%d) was reused and the selected calendars were assigned.'
+            ),
+            $viewName,
+            $viewID
+        ) . ' ' . $this->Translate(
+            (bool) ($result['viewInitialized'] ?? false)
+                ? 'Calendar View initialization completed successfully.'
+                : 'Calendar View initialization could not be completed automatically.'
+        );
+        $viewInitializationError = trim((string) ($result['viewInitializationError'] ?? ''));
+        if (!(bool) ($result['viewInitialized'] ?? false) && $viewInitializationError !== '') {
+            $viewCaption .= ' ' . sprintf(
+                $this->Translate('Reason: %s'),
+                $viewInitializationError
+            );
         }
 
         $captions = [
@@ -800,19 +1005,7 @@ class OpenCalendarDiscovery extends IPSModuleStrict
                 $calendarCreatedCount,
                 $calendarReusedCount
             ),
-            'ResultView' => sprintf(
-                $this->Translate(
-                    (bool) ($result['viewCreated'] ?? false)
-                        ? 'Calendar View: %s (#%d) was created and the selected calendars were assigned.'
-                        : 'Calendar View: %s (#%d) was reused and the selected calendars were assigned.'
-                ),
-                $viewName,
-                $viewID
-            ) . ' ' . $this->Translate(
-                (bool) ($result['viewInitialized'] ?? false)
-                    ? 'Calendar View initialization completed successfully.'
-                    : 'Calendar View initialization could not be completed automatically.'
-            )
+            'ResultView' => $viewCaption
         ];
 
         if ($configuratorID <= 0) {
@@ -858,7 +1051,131 @@ class OpenCalendarDiscovery extends IPSModuleStrict
             $captions['ResultSynchronization'] = implode(' ', $parts);
         }
 
+        $detailParts = [];
+        $accountError = trim((string) ($result['accountSynchronizationError'] ?? ''));
+        if (!(bool) ($result['accountSynchronized'] ?? false) && $accountError !== '') {
+            $detailParts[] = sprintf(
+                $this->Translate('Calendar account: %s'),
+                $accountError
+            );
+        }
+        foreach ($failedCalendars as $failedCalendar) {
+            $instanceID = (int) ($failedCalendar['instanceID'] ?? 0);
+            $name = trim((string) ($failedCalendar['name'] ?? ''));
+            if ($name === '') {
+                $name = $this->Translate('Calendar');
+            }
+            $error = trim((string) ($failedCalendar['error'] ?? ''));
+            if ($error === '') {
+                $error = $this->Translate('The calendar reported a synchronization failure.');
+            }
+            $detailParts[] = sprintf(
+                $this->Translate('Calendar %s (#%d): %s'),
+                $name,
+                $instanceID,
+                $error
+            );
+        }
+        if (!(bool) ($result['viewInitialized'] ?? false) && $viewInitializationError !== '') {
+            $detailParts[] = sprintf(
+                $this->Translate('Calendar View: %s'),
+                $viewInitializationError
+            );
+        }
+        if ($detailParts === [] && $this->wizardResultNeedsVerificationHelp($result)) {
+            $detailParts[] = $this->Translate('No more detailed error information was returned.');
+        }
+        $captions['ResultSynchronizationDetails'] = sprintf(
+            $this->Translate('Synchronization details: %s'),
+            implode(' | ', $detailParts)
+        );
+
         return $captions;
+    }
+
+    /**
+     * @param array<string, mixed> $result
+     */
+    private function wizardResultNeedsVerificationHelp(array $result): bool
+    {
+        if ($result === []) {
+            return false;
+        }
+
+        return !(bool) ($result['accountSynchronized'] ?? false)
+            || (is_array($result['failedCalendarNames'] ?? null) && $result['failedCalendarNames'] !== [])
+            || !(bool) ($result['viewInitialized'] ?? false);
+    }
+
+    private function retryWizardVerification(): void
+    {
+        $result = $this->readLastSetupResult();
+        if ($result === []) {
+            throw new RuntimeException($this->Translate('No completed OpenCalendar setup is available for verification.'));
+        }
+
+        $accountID = (int) ($result['accountID'] ?? 0);
+        $viewID = (int) ($result['viewID'] ?? 0);
+        $calendarInstanceIDs = $this->readSelectedCalendarInstanceIDs();
+        if ($accountID <= 0 || !IPS_InstanceExists($accountID) || $viewID <= 0 || $calendarInstanceIDs === []) {
+            throw new RuntimeException($this->Translate('The completed OpenCalendar setup is no longer available.'));
+        }
+
+        $verification = $this->verifyWizardSetup($accountID, $calendarInstanceIDs, $viewID);
+        $result['success'] = $verification['accountSynchronized']
+            && $verification['failedCalendarNames'] === []
+            && $verification['viewInitialized'];
+        $result['accountActive'] = (bool) IPS_GetProperty($accountID, 'Active');
+        $result['accountSynchronized'] = $verification['accountSynchronized'];
+        $result['accountSynchronizationError'] = $verification['accountSynchronizationError'];
+        $result['calendarSynchronizedCount'] = $verification['calendarSynchronizedCount'];
+        $result['failedCalendarNames'] = $verification['failedCalendarNames'];
+        $result['failedCalendars'] = $verification['failedCalendars'];
+        $result['viewInitialized'] = $verification['viewInitialized'];
+        $result['viewInitializationError'] = $verification['viewInitializationError'];
+
+        $this->WriteAttributeString(
+            'LastSetupResult',
+            json_encode(
+                $result,
+                JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES
+            )
+        );
+        $this->updateWizardResultForm($result);
+    }
+
+    /**
+     * @return list<int>
+     */
+    private function readSelectedCalendarInstanceIDs(): array
+    {
+        try {
+            $instanceIDs = json_decode(
+                $this->ReadAttributeString('SelectedCalendarInstanceIDs'),
+                true,
+                512,
+                JSON_THROW_ON_ERROR
+            );
+        } catch (JsonException) {
+            return [];
+        }
+        if (!is_array($instanceIDs)) {
+            return [];
+        }
+
+        return array_values(array_unique(array_filter(
+            array_map('intval', $instanceIDs),
+            static fn (int $instanceID): bool => $instanceID > 0
+        )));
+    }
+
+    private function continueWizardFromResult(string $nextPage): void
+    {
+        if (!in_array($nextPage, ['close', 'provider'], true)) {
+            throw new InvalidArgumentException($this->Translate('The selected setup continuation is invalid.'));
+        }
+
+        $this->completeWizardSession();
     }
 
     /**

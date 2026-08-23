@@ -269,16 +269,30 @@ foreach ($resultPage['items'] ?? [] as $item) {
 }
 assertDiscoveryWizard(
     ($resultPage['closeCaption'] ?? '') === 'Finish'
-        && str_contains((string) ($resultPage['onConfirm'] ?? ''), 'WizardComplete')
+        && str_contains((string) ($resultPage['onConfirm'] ?? ''), 'WizardResultNext')
+        && str_contains((string) ($resultPage['nextPage'] ?? ''), '$ResultNextAction')
         && isset(
             $resultFields['ResultStatus'],
             $resultFields['ResultAccount'],
             $resultFields['ResultConfigurator'],
             $resultFields['ResultCalendars'],
             $resultFields['ResultSynchronization'],
-            $resultFields['ResultView']
-        ),
-    'Result page must expose the final setup and synchronization summary.'
+            $resultFields['ResultSynchronizationDetails'],
+            $resultFields['ResultRetryVerification'],
+            $resultFields['ResultSynchronizationHintRetry'],
+            $resultFields['ResultSynchronizationHintManual'],
+            $resultFields['ResultSynchronizationHintDebug'],
+            $resultFields['ResultView'],
+            $resultFields['ResultNextAction']
+        )
+        && ($resultFields['ResultRetryVerification']['type'] ?? '') === 'Button'
+        && str_contains(
+            (string) ($resultFields['ResultRetryVerification']['onClick'] ?? ''),
+            'WizardRetryVerification'
+        )
+        && ($resultFields['ResultNextAction']['type'] ?? '') === 'RadioButtonGroup'
+        && ($resultFields['ResultNextAction']['value'] ?? '') === 'close',
+    'Result page must support retrying verification and directly starting another account setup.'
 );
 
 foreach ([
@@ -318,12 +332,23 @@ foreach ([
     'private function createCalendarView(int $accountID, string $viewName, array $calendarInstanceIDs): int',
     'private function mergeCalendarViewConfiguration(string $configuration, array $calendarInstanceIDs): string',
     'private function verifyWizardSetup(int $accountID, array $calendarInstanceIDs, int $viewID): array',
+    'private function wizardAccountSynchronizationError(int $accountID): string',
+    'private function wizardCalendarSynchronizationError(int $calendarInstanceID): string',
+    'private function wizardViewInitializationError(int $viewID): string',
+    'private function retryWizardVerification(): void',
+    'private function readSelectedCalendarInstanceIDs(): array',
+    'private function continueWizardFromResult(string $nextPage): void',
     'private function updateWizardResultForm(array $result): void',
     'private function wizardResultCaptions(array $result): array',
     'private function readLastSetupResult(): array',
     'private function completeWizardSession(): void',
     'IPSKAL_Synchronize($calendarInstanceID)',
     'IPSKALVIEW_Initialize($viewID)',
+    'IPSKALACC_GetAccountStatus($accountID)',
+    "'accountSynchronizationError'",
+    "'failedCalendars'",
+    "'viewInitializationError'",
+    'UpdateFormField($field, \'visible\', $showVerificationHelp)',
     "WriteAttributeString(\n            'LastSetupResult'",
     "SetBuffer('WizardSetupCompleted', '1')",
     'IPS_CreateInstance(self::CALENDAR_VIEW_MODULE_ID)',
@@ -424,6 +449,27 @@ foreach ([
     'Calendar View: %s (#%d) was reused and the selected calendars were assigned.',
     'Calendar View initialization completed successfully.',
     'Calendar View initialization could not be completed automatically.',
+    'Synchronization details',
+    'Retry synchronization and final check',
+    '• Retry: Use the button above to repeat account and calendar synchronization and the Calendar View check.',
+    '• Manual: Open the affected Calendar instance and click “Synchronize now”. If the account failed, synchronize or test the Calendar Account first.',
+    '• If it fails again: Check the instance status and Debug output of the affected Calendar or Calendar Account.',
+    'What would you like to do next?',
+    'Finish setup',
+    'Set up another calendar account',
+    'Choose “Set up another calendar account” and click Next to return directly to provider selection. The completed configuration remains unchanged.',
+    'Calendar account synchronization returned no success.',
+    'The calendar instance no longer exists.',
+    'The calendar instance is inactive.',
+    'The calendar configuration is incomplete.',
+    'The calendar reported a synchronization failure.',
+    'The provider returned an invalid calendar response.',
+    'Calendar synchronization returned no success (instance status %d).',
+    'Synchronization details: %s',
+    'Calendar %s (#%d): %s',
+    'Calendar View: %s',
+    'No completed OpenCalendar setup is available for verification.',
+    'The selected setup continuation is invalid.',
     'The calendar account connection was verified successfully.',
     'The calendar account connection has not been verified yet.'
 ] as $translationKey) {

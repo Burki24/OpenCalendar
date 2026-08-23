@@ -558,15 +558,63 @@
                             },
                             {
                                 "type": "Label",
+                                "name": "ResultSynchronizationDetails",
+                                "caption": "Synchronization details",
+                                "visible": false
+                            },
+                            {
+                                "type": "Button",
+                                "name": "ResultRetryVerification",
+                                "caption": "Retry synchronization and final check",
+                                "visible": false,
+                                "onClick": "IPS_RequestAction($id, 'WizardRetryVerification', '');"
+                            },
+                            {
+                                "type": "Label",
+                                "name": "ResultSynchronizationHintRetry",
+                                "caption": "• Retry: Use the button above to repeat account and calendar synchronization and the Calendar View check.",
+                                "visible": false
+                            },
+                            {
+                                "type": "Label",
+                                "name": "ResultSynchronizationHintManual",
+                                "caption": "• Manual: Open the affected Calendar instance and click “Synchronize now”. If the account failed, synchronize or test the Calendar Account first.",
+                                "visible": false
+                            },
+                            {
+                                "type": "Label",
+                                "name": "ResultSynchronizationHintDebug",
+                                "caption": "• If it fails again: Check the instance status and Debug output of the affected Calendar or Calendar Account.",
+                                "visible": false
+                            },
+                            {
+                                "type": "Label",
                                 "name": "ResultView",
                                 "caption": "Calendar View result"
                             },
                             {
+                                "type": "RadioButtonGroup",
+                                "name": "ResultNextAction",
+                                "caption": "What would you like to do next?",
+                                "value": "close",
+                                "options": [
+                                    {
+                                        "caption": "Finish setup",
+                                        "value": "close"
+                                    },
+                                    {
+                                        "caption": "Set up another calendar account",
+                                        "value": "provider"
+                                    }
+                                ]
+                            },
+                            {
                                 "type": "Label",
-                                "caption": "The setup assistant can be closed now. You can start it again later to add more calendar accounts or calendars."
+                                "caption": "Choose “Set up another calendar account” and click Next to return directly to provider selection. The completed configuration remains unchanged."
                             }
                         ],
-                        "onConfirm": "IPS_RequestAction($id, 'WizardComplete', '');"
+                        "onConfirm": "IPS_RequestAction($id, 'WizardResultNext', $ResultNextAction);",
+                        "nextPage": "return $ResultNextAction;"
                     }
                 ]
             }

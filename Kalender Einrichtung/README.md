@@ -173,3 +173,15 @@ Die Ergebnisübersicht zeigt:
 
 Damit ist der technische Einrichtungsablauf vom Provider bis zur einsatzbereiten
 Kalender Ansicht vollständig im Assistenten abgebildet.
+
+## Abschluss, Wiederholung und weitere Konten
+
+Bei Warnungen zeigt die Ergebnisseite die verfügbare Fehlerursache beziehungsweise
+den Instanzstatus an. Die Konto- und Kalendersynchronisation sowie die Initialisierung
+der Kalender Ansicht können direkt aus der Ergebnisseite erneut geprüft werden.
+Zusätzlich werden kurze Hinweise für eine manuelle Wiederholung über Kalender Konto
+und Kalenderinstanz angezeigt.
+
+Nach dem Ergebnis kann der Anwender die Einrichtung beenden oder direkt zur
+Providerauswahl zurückkehren, um ein weiteres Kalender-Konto einzurichten. Bereits
+abgeschlossene Konfigurationen bleiben unverändert.
