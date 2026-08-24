@@ -313,8 +313,7 @@ class CalendarView extends IPSModuleStrict
     {
         parent::ApplyChanges();
 
-        IPS_SetHiddenTitle($this->InstanceID, !$this->ReadPropertyBoolean('ShowTileTitle'));
-        IPS_SetHiddenMaximize($this->InstanceID, !$this->ReadPropertyBoolean('ShowTileMaximizeButton'));
+        $this->applyTileObjectVisibility();
 
         $preservedIPSViewHTML = $this->existingIPSViewHTML();
         $this->ensureIPSViewToken();
@@ -1234,6 +1233,28 @@ class CalendarView extends IPSModuleStrict
         } catch (Throwable $exception) {
             $this->SendDebug('IPSViewAction', $exception->getMessage(), 0);
             $this->outputIPSViewResponse(['Error' => 'Action failed.'], 500);
+        }
+    }
+
+    /**
+     * Applies the native Symcon tile chrome settings to the instance and all existing links targeting it.
+     */
+    private function applyTileObjectVisibility(): void
+    {
+        $hideTitle = !$this->ReadPropertyBoolean('ShowTileTitle');
+        $hideMaximize = !$this->ReadPropertyBoolean('ShowTileMaximizeButton');
+        $objectIDs = [$this->InstanceID];
+
+        foreach (IPS_GetLinkList() as $linkID) {
+            $link = IPS_GetLink($linkID);
+            if ((int) ($link['TargetID'] ?? 0) === $this->InstanceID) {
+                $objectIDs[] = $linkID;
+            }
+        }
+
+        foreach ($objectIDs as $objectID) {
+            IPS_SetHiddenTitle($objectID, $hideTitle);
+            IPS_SetHiddenMaximize($objectID, $hideMaximize);
         }
     }
 

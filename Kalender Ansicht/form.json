@@ -87,6 +87,10 @@
             ]
         },
         {
+            "type": "Label",
+            "caption": "Tile title and maximize settings also apply to existing links to this Calendar View."
+        },
+        {
             "type": "RowLayout",
             "items": [
                 {

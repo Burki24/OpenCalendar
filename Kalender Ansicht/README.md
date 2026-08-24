@@ -35,6 +35,19 @@ spätere Anpassung einer Kalender Ansicht.
 6. Die Konfiguration übernehmen und **Kalender synchronisieren** ausführen.
 7. Die Instanz in der Symcon-Kachelvisualisierung platzieren.
 
+### Kacheltitel und Maximieren-Button in Symcon 9.1
+
+Die Optionen **Kacheltitel anzeigen** und **Maximieren-Button anzeigen** verwenden
+die nativen Objekt-Einstellungen von Symcon 9.1. OpenCalendar wendet die
+gewählte Einstellung sowohl auf die Kalender-Ansicht-Instanz selbst als auch
+auf alle zum Zeitpunkt des Übernehmens vorhandenen Links an, die auf diese
+Instanz zeigen. Dadurch wirkt die Einstellung unabhängig davon, ob die Kalender
+Ansicht direkt oder über einen Link in der Kachelvisualisierung platziert ist.
+
+Wird später ein neuer Link auf die Kalender Ansicht angelegt, genügt ein erneutes
+**Übernehmen** der Instanzkonfiguration, damit die beiden Kacheloptionen auch auf
+diesen Link angewendet werden.
+
 Mit **Alle Kalenderinstanzen auswählen** werden alle im System vorhandenen
 Kalender-Instanzen im aktuell geöffneten Konfigurationsformular eingetragen und
 aktiviert. Die Aktion ist eine Komfortfunktion, wenn viele Kalender auf einmal

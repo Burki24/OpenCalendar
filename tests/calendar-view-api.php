@@ -98,16 +98,26 @@ assertCalendarViewApi(
 assertCalendarViewApi(
     str_contains($moduleSource, '$this->RegisterPropertyBoolean(\'ShowTileTitle\', true);')
         && str_contains($moduleSource, '$this->RegisterPropertyBoolean(\'ShowTileMaximizeButton\', true);')
-        && str_contains($moduleSource, 'IPS_SetHiddenTitle($this->InstanceID, !$this->ReadPropertyBoolean(\'ShowTileTitle\'));')
-        && str_contains($moduleSource, 'IPS_SetHiddenMaximize($this->InstanceID, !$this->ReadPropertyBoolean(\'ShowTileMaximizeButton\'));'),
-    'Calendar View must map its Symcon 9.1 tile options to the native object visibility flags.'
+        && str_contains($moduleSource, '$this->applyTileObjectVisibility();')
+        && str_contains($moduleSource, 'foreach (IPS_GetLinkList() as $linkID) {')
+        && str_contains($moduleSource, "(int) (\$link['TargetID'] ?? 0) === \$this->InstanceID")
+        && str_contains($moduleSource, 'IPS_SetHiddenTitle($objectID, $hideTitle);')
+        && str_contains($moduleSource, 'IPS_SetHiddenMaximize($objectID, $hideMaximize);'),
+    'Calendar View must apply its Symcon 9.1 tile options to the instance and existing links targeting it.'
 );
 assertCalendarViewApi(
     str_contains($formSource, '"name": "ShowTileTitle"')
         && str_contains($formSource, '"name": "ShowTileMaximizeButton"')
+        && str_contains($formSource, 'Tile title and maximize settings also apply to existing links to this Calendar View.')
         && str_contains($localeSource, '"Show tile title": "Kacheltitel anzeigen"')
-        && str_contains($localeSource, '"Show maximize button": "Maximieren-Button anzeigen"'),
-    'Calendar View must expose and localize both native Symcon 9.1 tile options.'
+        && str_contains($localeSource, '"Show maximize button": "Maximieren-Button anzeigen"')
+        && str_contains($localeSource, 'Kacheltitel und Maximieren-Button werden auch auf vorhandene Links zu dieser Kalender Ansicht angewendet.'),
+    'Calendar View must expose, explain, and localize both native Symcon 9.1 tile options.'
+);
+assertCalendarViewApi(
+    str_contains($readmeSource, 'sowohl auf die Kalender-Ansicht-Instanz selbst als auch')
+        && str_contains($readmeSource, 'auf alle zum Zeitpunkt des Übernehmens vorhandenen Links'),
+    'Calendar View documentation must explain how native tile settings are applied to links.'
 );
 
 $supportedScriptApiMethods = [
