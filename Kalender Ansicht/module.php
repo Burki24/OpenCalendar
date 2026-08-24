@@ -106,6 +106,8 @@ class CalendarView extends IPSModuleStrict
         $this->RegisterPropertyInteger('DefaultView', 0);
         $this->RegisterPropertyInteger('TileWeekOrientation', 0);
         $this->RegisterPropertyInteger('TileFontScale', 100);
+        $this->RegisterPropertyBoolean('ShowTileTitle', true);
+        $this->RegisterPropertyBoolean('ShowTileMaximizeButton', true);
         $this->RegisterPropertyInteger('PastDays', 0);
         $this->RegisterPropertyInteger('FutureDays', 31);
         $this->RegisterPropertyInteger('MaxEvents', 250);
@@ -310,6 +312,9 @@ class CalendarView extends IPSModuleStrict
     public function ApplyChanges(): void
     {
         parent::ApplyChanges();
+
+        IPS_SetHiddenTitle($this->InstanceID, !$this->ReadPropertyBoolean('ShowTileTitle'));
+        IPS_SetHiddenMaximize($this->InstanceID, !$this->ReadPropertyBoolean('ShowTileMaximizeButton'));
 
         $preservedIPSViewHTML = $this->existingIPSViewHTML();
         $this->ensureIPSViewToken();

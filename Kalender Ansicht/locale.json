@@ -14,6 +14,8 @@
             "Day": "Tag",
             "Month": "Monat",
             "Tile font size (%)": "Kachel-Schriftgröße (%)",
+            "Show tile title": "Kacheltitel anzeigen",
+            "Show maximize button": "Maximieren-Button anzeigen",
             "Past days": "Vergangene Tage",
             "Future days": "Zukünftige Tage",
             "Maximum events": "Maximale Termine",

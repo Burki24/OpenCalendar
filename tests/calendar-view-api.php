@@ -80,6 +80,8 @@ try {
 }
 
 $moduleSource = (string) file_get_contents(__DIR__ . '/../Kalender Ansicht/module.php');
+$formSource = (string) file_get_contents(__DIR__ . '/../Kalender Ansicht/form.json');
+$localeSource = (string) file_get_contents(__DIR__ . '/../Kalender Ansicht/locale.json');
 $calendarModuleSource = (string) file_get_contents(__DIR__ . '/../Kalender/module.php');
 $readmeSource = (string) file_get_contents(__DIR__ . '/../Kalender Ansicht/README.md');
 $moduleMetadata = json_decode(
@@ -91,6 +93,21 @@ $moduleMetadata = json_decode(
 assertCalendarViewApi(
     is_array($moduleMetadata) && ($moduleMetadata['prefix'] ?? '') === 'IPSKALVIEW',
     'Calendar View must keep the public Symcon wrapper prefix IPSKALVIEW.'
+);
+
+assertCalendarViewApi(
+    str_contains($moduleSource, '$this->RegisterPropertyBoolean(\'ShowTileTitle\', true);')
+        && str_contains($moduleSource, '$this->RegisterPropertyBoolean(\'ShowTileMaximizeButton\', true);')
+        && str_contains($moduleSource, 'IPS_SetHiddenTitle($this->InstanceID, !$this->ReadPropertyBoolean(\'ShowTileTitle\'));')
+        && str_contains($moduleSource, 'IPS_SetHiddenMaximize($this->InstanceID, !$this->ReadPropertyBoolean(\'ShowTileMaximizeButton\'));'),
+    'Calendar View must map its Symcon 9.1 tile options to the native object visibility flags.'
+);
+assertCalendarViewApi(
+    str_contains($formSource, '"name": "ShowTileTitle"')
+        && str_contains($formSource, '"name": "ShowTileMaximizeButton"')
+        && str_contains($localeSource, '"Show tile title": "Kacheltitel anzeigen"')
+        && str_contains($localeSource, '"Show maximize button": "Maximieren-Button anzeigen"'),
+    'Calendar View must expose and localize both native Symcon 9.1 tile options.'
 );
 
 $supportedScriptApiMethods = [
