@@ -389,6 +389,93 @@ foreach ([
     );
 }
 
+$regressionScenarios = [
+    'new account activation and rollback' => [
+        '$createdAccountID = (int) $this->GetBuffer(\'WizardCreatedAccountID\');',
+        '$activateNewAccount = $createdAccountID === $accountID;',
+        'if ($activateNewAccount && !$wasActive) {',
+        'IPS_SetProperty($accountID, \'Active\', true);',
+        'IPS_SetProperty($accountID, \'Active\', false);',
+        '$this->SetBuffer(\'WizardCreatedAccountID\', \'\');'
+    ],
+    'existing account activation state preservation' => [
+        '$accountWasActive = (bool) IPS_GetProperty($accountID, \'Active\');',
+        'if (!$accountWasActive) {',
+        '$temporarilyActivated = true;',
+        'if ($temporarilyActivated && IPS_InstanceExists($accountID)) {',
+        'IPS_SetProperty($accountID, \'Active\', false);'
+    ],
+    'optional configurator creation and reuse' => [
+        'if ($this->GetBuffer(\'WizardCreateConfigurator\') === \'1\') {',
+        'prepareCalendarConfigurator($accountID, $provider)',
+        'if ((int) ($instance[\'ConnectionID\'] ?? 0) === $accountID) {',
+        '\'created\'    => false',
+        'IPS_CreateInstance(self::CALENDAR_CONFIGURATOR_MODULE_ID)',
+        'IPS_ConnectInstance($configuratorID, $accountID)'
+    ],
+    'multiple calendar creation and duplicate protection' => [
+        'foreach ($selectedCalendarIDs as $calendarID) {',
+        '$existingInstances = $this->existingCalendarInstancesForAccount($accountID);',
+        'if (isset($existingInstances[$calendarID])) {',
+        '$calendarInstanceIDs[] = $existingInstances[$calendarID];',
+        'createCalendarInstance(',
+        'array_reverse($createdCalendarInstanceIDs)'
+    ],
+    'new Calendar View creation' => [
+        'if ($selection[\'mode\'] === self::VIEW_MODE_NEW) {',
+        'createCalendarView($accountID, $selection[\'viewName\'], $calendarInstanceIDs)',
+        'IPS_CreateInstance(self::CALENDAR_VIEW_MODULE_ID)',
+        "IPS_SetProperty(\n                \$viewID,\n                'Calendars',"
+    ],
+    'existing Calendar View merge without replacing assignments' => [
+        '$previousCalendars = (string) IPS_GetProperty($viewID, \'Calendars\');',
+        '$updatedCalendars = $this->mergeCalendarViewConfiguration($previousCalendars, $calendarInstanceIDs);',
+        'if ($updatedCalendars !== $previousCalendars) {',
+        '$row[\'Enabled\'] = true;',
+        "\$rows[] = [\n                'InstanceID' => \$instanceID,\n                'Enabled'    => true",
+        'IPS_SetProperty($viewID, \'Calendars\', $previousCalendars);'
+    ],
+    'final verification and retry' => [
+        '$verification = $this->verifyWizardSetup(',
+        'IPSKALACC_Synchronize($accountID)',
+        'IPSKAL_Synchronize($calendarInstanceID)',
+        'IPSKALVIEW_Initialize($viewID)',
+        '$verification = $this->verifyWizardSetup($accountID, $calendarInstanceIDs, $viewID);',
+        "\$this->WriteAttributeString(\n            'LastSetupResult'"
+    ],
+    'result restart for another account' => [
+        'if (!in_array($nextPage, [\'close\', \'provider\'], true)) {',
+        '$this->completeWizardSession();',
+        '$this->SetBuffer(\'WizardProvider\', \'\');',
+        '$this->SetBuffer(\'WizardAccountID\', \'\');',
+        '$this->SetBuffer(\'WizardCreatedAccountID\', \'\');',
+        '$this->clearWizardCalendarSelection(true);',
+        '$this->clearWizardCalendarViewSelection();'
+    ]
+];
+
+foreach ($regressionScenarios as $scenario => $requiredSources) {
+    foreach ($requiredSources as $requiredSource) {
+        assertDiscoveryWizard(
+            str_contains($moduleSource, $requiredSource),
+            sprintf('Discovery wizard regression scenario "%s" is missing behavior: %s', $scenario, $requiredSource)
+        );
+    }
+}
+
+$completionSourceOffset = strpos($moduleSource, 'private function completeWizardSession(): void');
+assertDiscoveryWizard(
+    $completionSourceOffset !== false,
+    'OpenCalendar Discovery must expose the transient wizard-session cleanup.'
+);
+assertDiscoveryWizard(
+    !str_contains(
+        substr($moduleSource, (int) $completionSourceOffset, 1500),
+        'WriteAttribute'
+    ),
+    'Starting another account setup must clear only transient wizard state and keep the completed setup result attributes.'
+);
+
 $germanTranslations = $locale['translations']['de'] ?? [];
 foreach ([
     'Start OpenCalendar setup assistant',
