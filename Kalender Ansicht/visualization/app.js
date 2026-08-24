@@ -250,6 +250,9 @@ function applyCalendarState(state) {
         applyStaticTranslations();
         initialized = true;
     }
+    if (clampCurrentCursorDate()) {
+        persistClientViewState();
+    }
     render();
     restoreAgendaScrollPosition(agendaScrollPosition);
     if (releasePreservedAgendaScrollPosition) {
@@ -3954,7 +3957,7 @@ document.getElementById('calendar-filter-none').addEventListener('click', () => 
 document.getElementById('calendar-filter-apply').addEventListener('click', applyCalendarFilter);
 document.getElementById('refresh-button').addEventListener('click', () => sendAction('Refresh', true));
 document.getElementById('today-button').addEventListener('click', () => {
-    cursorDate = startOfDay(new Date());
+    cursorDate = clampCursorDate(startOfDay(new Date()));
     persistClientViewState();
     render();
 });
@@ -3963,6 +3966,7 @@ document.getElementById('next-button').addEventListener('click', () => navigate(
 document.querySelectorAll('.view-selector-option').forEach(button => button.addEventListener('click', () => {
     if (!calendarViews.has(button.dataset.view)) return;
     activeView = button.dataset.view;
+    clampCurrentCursorDate();
     persistClientViewState();
     viewSelectorDialog.close();
     render();
@@ -4258,6 +4262,40 @@ function actionValueWithViewRange(value) {
     return { _value: value, _viewRange: range };
 }
 
+function configuredCursorDateBounds() {
+    const today = startOfDay(new Date());
+    const configuredPastDays = Number(calendarState.settings.pastDays);
+    const configuredFutureDays = Number(calendarState.settings.futureDays);
+    const pastDays = Number.isFinite(configuredPastDays)
+        ? Math.max(0, Math.min(1095, Math.round(configuredPastDays)))
+        : 0;
+    const futureDays = Number.isFinite(configuredFutureDays)
+        ? Math.max(1, Math.min(1095, Math.round(configuredFutureDays)))
+        : 31;
+
+    return {
+        minimum: addDays(today, -pastDays),
+        maximum: addDays(today, futureDays)
+    };
+}
+
+function clampCursorDate(date) {
+    const candidate = date instanceof Date && Number.isFinite(date.getTime())
+        ? startOfDay(date)
+        : startOfDay(new Date());
+    const bounds = configuredCursorDateBounds();
+    if (candidate < bounds.minimum) return bounds.minimum;
+    if (candidate > bounds.maximum) return bounds.maximum;
+    return candidate;
+}
+
+function clampCurrentCursorDate() {
+    const clampedDate = clampCursorDate(cursorDate);
+    if (clampedDate.getTime() === cursorDate.getTime()) return false;
+    cursorDate = clampedDate;
+    return true;
+}
+
 function navigate(direction) {
     if (activeView === 'month') {
         cursorDate = new Date(
@@ -4273,6 +4311,7 @@ function navigate(direction) {
     } else {
         cursorDate = addDays(cursorDate, direction * viewPeriod(activeView === 'list' ? 'list' : 'agenda'));
     }
+    clampCurrentCursorDate();
     persistClientViewState();
     render();
 }

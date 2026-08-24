@@ -732,6 +732,20 @@ assertVisualization(
 );
 
 assertVisualization(
+    str_contains($moduleSource, "'pastDays'                  => max(0, min(1095, \$this->ReadPropertyInteger('PastDays')))")
+        && str_contains($moduleSource, "'futureDays'                => max(1, min(1095, \$this->ReadPropertyInteger('FutureDays')))")
+        && str_contains($script, 'function configuredCursorDateBounds()')
+        && str_contains($script, 'function clampCursorDate(date)')
+        && str_contains($script, 'function clampCurrentCursorDate()')
+        && str_contains($script, 'minimum: addDays(today, -pastDays)')
+        && str_contains($script, 'maximum: addDays(today, futureDays)')
+        && str_contains($script, 'if (clampCurrentCursorDate()) {')
+        && str_contains($script, 'cursorDate = clampCursorDate(startOfDay(new Date()));')
+        && substr_count($script, 'clampCurrentCursorDate();') >= 2,
+    'Stored and manually navigated cursor dates must stay inside the configured past/future visualization window.'
+);
+
+assertVisualization(
     str_contains($indexSource, 'id="calendar-filter-dialog"')
         && str_contains($indexSource, 'id="calendar-filter-button"')
         && str_contains($script, 'function openCalendarFilter()')
