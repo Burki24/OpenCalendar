@@ -4,10 +4,11 @@ Das Modul repräsentiert einen einzelnen Online-Kalender.
 
 ## Einrichtung
 
-Eine Kalender-Instanz wird nicht über **Instanz hinzufügen** eingerichtet,
-sondern aus der gefundenen Liste des **Kalender Konfigurators** erstellt. Dabei
-werden Name, technische Kalender-ID, Anbieter-ID, Farbe, Schreibrechte und das
-richtige Kalender Konto automatisch übernommen.
+Eine Kalender-Instanz wird nicht über **Instanz hinzufügen** manuell eingerichtet.
+Sie wird entweder durch die **Kalender Einrichtung** oder aus der gefundenen
+Liste des **Kalender Konfigurators** erstellt. Beide Wege übernehmen Name,
+technische Kalender-ID, Anbieter-ID, Farbe, Schreibrechte und das richtige
+Kalender Konto automatisch.
 
 Nach der Erstellung:
 
@@ -18,13 +19,12 @@ Nach der Erstellung:
 4. Unter **Anzahl Termine** und **Letzte Synchronisation** das Ergebnis prüfen.
 
 > **Kalender-Instanzen nicht manuell anlegen oder lediglich über „Gateway
-> ändern“ mit einem Konto verbinden.** Sie sollen über den zum Konto gehörenden
-> **Kalender Konfigurator** erstellt werden. Nur der Konfigurator trägt den
-> tatsächlichen Kalendernamen, die interne Identität, die Farbe, die
-> Schreibrechte und die korrekte Kontoverbindung vollständig ein. Das ist
-> besonders bei Konten mit mehreren Kalendern erforderlich.
+> ändern“ mit einem Konto verbinden.** Unterstützt sind die Erstellung durch die
+> **Kalender Einrichtung** und aus der aktuellen Liste des **Kalender
+> Konfigurators**. Beide Wege tragen die vollständige Kalenderidentität, Farbe,
+> Schreibrechte und die korrekte Kontoverbindung ein.
 
-Nach der Erstellung durch den Konfigurator darf die Instanz im Objektbaum
+Nach der korrekten Erstellung darf die Instanz im Objektbaum
 beliebig verschoben oder vom Benutzer umbenannt werden.
 
 ## Funktionsumfang
@@ -45,9 +45,9 @@ Google-, Microsoft-, Apple-iCloud- und CalDAV-Serien können als einzelnes Vorko
 
 ## Voraussetzungen
 
-- Symcon ab Version 9.0
+- Symcon ab Version 9.1
 - eine verbundene Instanz **Kalender Konto**
-- eine über den Konfigurator zugewiesene Kalender-ID
+- eine über die Kalender Einrichtung oder den Konfigurator zugewiesene Kalender-ID
 
 ## Konfiguration
 
@@ -58,7 +58,7 @@ Aktualisierungsplan | Vorgegebener Rhythmus von fünf Minuten bis jährlich oder
 Benutzerdefiniertes Intervall | Eigener Abstand in Minuten; wird nur beim Zeitplan „Benutzerdefiniertes Intervall“ angezeigt
 Vergangene Termine laden | Anzahl der Tage vor dem aktuellen Datum
 Zukünftige Termine laden | Anzahl der Tage nach dem aktuellen Datum
-Kalenderidentität | Vom Konfigurator gesetzte, schreibgeschützte Anbieterinformationen
+Kalenderidentität | Von der Kalender Einrichtung oder dem Konfigurator gesetzte, schreibgeschützte Anbieterinformationen
 
 Bestehende Instanzen behalten ihren bisherigen Minutenwert als benutzerdefiniertes Intervall. Monatliche und jährliche Zeitpläne werden intern täglich auf Fälligkeit geprüft, damit keine für lange Zeiträume ungeeigneten Millisekunden-Timer verwendet werden. **Jetzt synchronisieren** bleibt unabhängig vom Zeitplan jederzeit verfügbar.
 
@@ -220,7 +220,7 @@ Nach jeder erfolgreichen Schreiboperation wird der lokale Termincache erneut vom
 
 Problem | Prüfung
 --- | ---
-Konfiguration unvollständig | Instanz im Kalender Konfigurator löschen und aus der aktuellen Kontoliste neu erstellen; die technischen Identitätsfelder nicht manuell setzen
+Konfiguration unvollständig | Instanz löschen und über Kalender Einrichtung oder Kalender Konfigurator aus der aktuellen Kontoliste neu erstellen; die technischen Identitätsfelder nicht manuell setzen
 Synchronisation fehlgeschlagen | Zuerst im verbundenen Kalender Konto **Verbindung testen**, anschließend Konto und Kalender erneut synchronisieren
 Keine Termine sichtbar | Zeitraum für vergangene und zukünftige Termine prüfen und kontrollieren, ob der Online-Kalender im gewählten Zeitraum Termine enthält
 Kalender ist schreibgeschützt | Schreibrechte beim Anbieter prüfen; ICS/Webcal-Abonnements sind immer schreibgeschützt

@@ -7,12 +7,17 @@ verwendet werden.
 
 ## Voraussetzungen
 
-- Symcon ab Version 9.0 mit Kachelvisualisierung und HTML-SDK
-- mindestens eine über den Kalender Konfigurator angelegte und synchronisierte
-  **Kalender**-Instanz
+- Symcon ab Version 9.1 mit Kachelvisualisierung und HTML-SDK
+- mindestens eine über die **Kalender Einrichtung** oder den **Kalender
+  Konfigurator** angelegte und synchronisierte **Kalender**-Instanz
 - für IPSView ein HTML-Box-Steuerelement mit Browser-Renderer
 
 ## Schnellstart für die Kachelvisualisierung
+
+Die **Kalender Einrichtung** kann eine neue Kalender Ansicht automatisch
+anlegen oder eine vorhandene Ansicht auswählen und die gewählten Kalender
+zuordnen. Die folgenden Schritte beschreiben die manuelle Erstellung oder
+spätere Anpassung einer Kalender Ansicht.
 
 1. Über **Instanz hinzufügen** eine Instanz **Kalender Ansicht** erstellen.
 2. In der Liste **Kalender** für jede gewünschte Zeile eine Kalender-Instanz

@@ -1,4 +1,3 @@
-\
 # OpenCalendar
 
 [![Symcon](https://img.shields.io/badge/Symcon-PHPModul-555555.svg)](https://www.symcon.de)

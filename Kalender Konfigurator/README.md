@@ -5,9 +5,14 @@ Der **Kalender Konfigurator** zeigt die Kalender des aktuell verbundenen
 **Kalender-Instanzen** mit korrekter Identität, Kontoverbindung, Farbe und
 Schreibberechtigung.
 
+Für die vollständige Ersteinrichtung ist die **Kalender Einrichtung** der
+empfohlene Weg. Dort kann der Kalender Konfigurator optional direkt mit
+angelegt werden. Der Konfigurator bleibt für die spätere Erweiterung eines
+Kontos und für eine manuelle Einrichtung verfügbar.
+
 ## Voraussetzungen
 
-- Symcon ab Version 9.0
+- Symcon ab Version 9.1
 - ein eingerichtetes und aktives **Kalender Konto**
 - eine erfolgreiche Kontosynchronisation
 
@@ -82,10 +87,11 @@ bestehende Instanzen immer gegen das aktuelle Kalender Konto abgleicht:
 Die Wiederverwendung bezieht sich ausschließlich auf das Gateway des
 **Kalender Konfigurators**.
 
-Kalender-Instanzen selbst sollen immer aus der aktuellen Konfiguratorliste
-erstellt werden. Manuell angelegte, kopierte oder lediglich über
-**Gateway ändern** mit einem Konto verbundene Kalender-Instanzen erhalten nicht
-automatisch den richtigen Kalendernamen und die vollständige Kalenderidentität.
+Kalender-Instanzen sollen entweder durch die **Kalender Einrichtung** oder aus
+der aktuellen Konfiguratorliste erstellt werden. Beide Wege übernehmen die
+vollständige technische Kalenderidentität. Manuell angelegte, kopierte oder
+lediglich über **Gateway ändern** mit einem Konto verbundene Kalender-Instanzen
+erhalten diese Angaben nicht automatisch.
 Bei Konten mit mehreren Kalendern wäre anschließend keine eindeutige Zuordnung
 möglich.
 

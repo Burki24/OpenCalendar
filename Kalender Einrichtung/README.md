@@ -12,9 +12,9 @@ Einrichtung. Anwender sollen dadurch die Abhängigkeiten zwischen Kalender Konto
 Kalender Konfigurator, Kalender und Kalender Ansicht nicht mehr vorab kennen
 müssen.
 
-## Aktueller Entwicklungsstand
+## Ablauf des Einrichtungsassistenten
 
-Der Assistent führt aktuell durch folgende Schritte:
+Der Assistent führt durch folgende Schritte:
 
 1. Willkommen
 2. Kalenderanbieter auswählen und optional einen Kalender Konfigurator vormerken

@@ -1,21 +1,25 @@
 # Kalender Konto
 
 Das Modul **Kalender Konto** verwaltet die Verbindung zu einem Kalenderanbieter.
-Es findet die verfügbaren Kalender und stellt sie dem Kalender Konfigurator und
-den erzeugten Kalender-Instanzen zur Verfügung.
+Es findet die verfügbaren Kalender und stellt sie der **Kalender Einrichtung**,
+dem **Kalender Konfigurator** und den erzeugten Kalender-Instanzen zur Verfügung.
 
 Unterstützt werden Apple iCloud, Google Calendar, Microsoft 365/Outlook.com,
 generische CalDAV-Server sowie mehrere schreibgeschützte ICS-/Webcal-Feeds.
 
 ## Voraussetzungen
 
-- Symcon ab Version 9.0
+- Symcon ab Version 9.1
 - Zugriff des Symcon-Servers auf den jeweiligen Kalenderdienst
 - für Google und Microsoft eine aktive Symcon-Connect-Verbindung; eine eigene
   OAuth-Client-ID oder ein eigener Clientschlüssel ist nicht erforderlich
 - für Apple iCloud ein anwendungsspezifisches Apple-Passwort
 
 ## Schnellstart
+
+Für eine vollständige neue OpenCalendar-Konfiguration ist die **Kalender
+Einrichtung** der empfohlene Einstieg. Der folgende Ablauf beschreibt die
+direkte manuelle Einrichtung eines Kalender Kontos.
 
 1. Über **Instanz hinzufügen** eine Instanz **Kalender Konto** erstellen.
 2. Das Konto sinnvoll benennen, besonders wenn mehrere Konten verwendet werden.
@@ -24,8 +28,9 @@ generische CalDAV-Server sowie mehrere schreibgeschützte ICS-/Webcal-Feeds.
 4. **Verbindung testen** verwenden. Der Test muss erfolgreich sein und die
    erwartete Anzahl gefundener Kalender melden.
 5. Die Konfiguration übernehmen und **Jetzt synchronisieren** ausführen.
-6. Anschließend einen **Kalender Konfigurator** öffnen oder erstellen, mit diesem
-   Konto verbinden und dort die gewünschten Kalender-Instanzen anlegen.
+6. Anschließend entweder die **Kalender Einrichtung** starten und dieses Konto
+   als vorhandenes Konto auswählen oder einen **Kalender Konfigurator** öffnen
+   beziehungsweise erstellen und dort die gewünschten Kalender-Instanzen anlegen.
 
 Mit **Kontostatus anzeigen** lassen sich der Verbindungszustand, die letzte
 Synchronisation und gegebenenfalls bereinigte Fehlermeldungen kontrollieren.
@@ -160,8 +165,8 @@ Minimaler Ablauf:
 5. Einen passenden Aktualisierungsplan wählen und optional eine Farbe im Format
    `#RRGGBB` eintragen.
 6. **Verbindung testen**, die Konfiguration übernehmen und synchronisieren.
-7. Jeden gefundenen Feed anschließend im Kalender Konfigurator als eigene
-   Kalender-Instanz erstellen.
+7. Jeden gefundenen Feed anschließend über die **Kalender Einrichtung** oder den
+   **Kalender Konfigurator** als eigene Kalender-Instanz erstellen.
 
 `webcal://` wird automatisch über HTTPS abgerufen. Bleibt die Farbe leer,
 verwendet OpenCalendar – sofern vorhanden – die Farbe aus dem Feed. Der
@@ -267,17 +272,21 @@ Termine für den eingestellten Zeitraum angefordert werden. Beide Abläufe könn
 eine Feed-Abfrage auslösen; unnötig kurze Intervalle sollten daher vermieden
 werden.
 
-## Mehrere Konten und der Kalender Konfigurator
+## Mehrere Konten und unterstützte Einrichtungswege
 
-Ein eigener Konfigurator je Konto ist die übersichtlichste Variante, aber keine
-technische Pflicht. Ein vorhandener Konfigurator darf über **Gateway ändern** mit
-einem anderen Kalender Konto verbunden werden. Danach muss
+Für weitere Kalenderkonten kann die **Kalender Einrichtung** nach einem
+erfolgreichen Abschluss direkt erneut gestartet werden. Für die spätere Pflege
+oder Erweiterung eines Kontos kann zusätzlich ein Kalender Konfigurator verwendet
+werden. Ein eigener Konfigurator je Konto ist die übersichtlichste Variante, aber
+keine technische Pflicht. Ein vorhandener Konfigurator darf über **Gateway ändern**
+mit einem anderen Kalender Konto verbunden werden. Danach muss
 **Kalender aktualisieren** ausgeführt werden. Der Konfigurator zeigt und verwaltet
 nur Kalender des aktuell verbundenen Kontos.
 
 Kalender-Instanzen selbst dürfen nicht manuell angelegt, kopiert oder lediglich
-über **Gateway ändern** einem Konto zugeordnet werden. Sie müssen aus der Liste
-des korrekt verbundenen Konfigurators erstellt werden.
+über **Gateway ändern** einem Konto zugeordnet werden. Sie müssen über die
+**Kalender Einrichtung** oder aus der Liste des korrekt verbundenen
+**Kalender Konfigurators** erstellt werden.
 
 ## Datenschutz und OAuth
 
