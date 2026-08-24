@@ -186,7 +186,7 @@ class CalendarView extends IPSModuleStrict
         }
         if (isset($form['elements']) && is_array($form['elements'])) {
             $this->InsertIPSViewHTMLPageFormItems($form['elements']);
-            $this->InsertIPSViewStyleFormItems($form['elements'], colorWidth: '220px');
+            $this->InsertIPSViewStyleFormItems($form['elements'], colorWidth: '32%');
         }
 
         return $this->EncodeConfigurationForm($form);

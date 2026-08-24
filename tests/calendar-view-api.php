@@ -120,6 +120,18 @@ assertCalendarViewApi(
     'Calendar View documentation must explain how native tile settings are applied to links.'
 );
 
+assertCalendarViewApi(
+    str_contains($moduleSource, '$this->InsertIPSViewStyleFormItems($form[\'elements\'], colorWidth: \'32%\');')
+        && preg_match('/"name": "ShowTileTitle"[\\s\\S]*?"width": "48%"/', $formSource) === 1
+        && preg_match('/"name": "PastDays"[\\s\\S]*?"width": "32%"/', $formSource) === 1
+        && preg_match('/"name": "ShowWeekends"[\\s\\S]*?"width": "24%"/', $formSource) === 1
+        && str_contains($formSource, '"width": "30%"')
+        && str_contains($formSource, '"width": "13%"')
+        && str_contains($formSource, '"width": "42%"')
+        && str_contains($formSource, '"width": "27%"'),
+    'Calendar View configuration rows must use responsive percentage widths supported by Symcon 9.1.'
+);
+
 $supportedScriptApiMethods = [
     'SynchronizeCalendars',
     'SelectAllCalendars',
