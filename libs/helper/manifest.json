@@ -58,10 +58,10 @@
             ]
         },
         "IPSViewStyleHelper": {
-            "version": "1.4.1",
-            "sha256": "1e5d2c47180e9ca686661307ebd8b37ffac177a91d8889c593f3663d88e011e1",
+            "version": "1.4.2",
+            "sha256": "c25ae20cfb04bb4c9909676b0f420cabe196d331a2aeb0b71d517ec4ec35e27b",
             "path": "libs/helper/IPSViewStyleHelper.php",
-            "source_sha": "21ed54cb661c35592f60fc78fa2f2a77a405fb35",
+            "source_sha": "f024c02b576bc40ff80060a5e0aa89d612458c56",
             "assets": [
                 {
                     "path": "libs/helper/translations/IPSViewStyleHelper.json",
@@ -74,7 +74,7 @@
                     "version": "1.0.0",
                     "sha256": "d3deee581eca9f8eb11e9adce060170227a2dc836ee898bd134f93d27604f639",
                     "path": "libs/helper/HelperTranslationHelper.php",
-                    "source_sha": "21ed54cb661c35592f60fc78fa2f2a77a405fb35"
+                    "source_sha": "f024c02b576bc40ff80060a5e0aa89d612458c56"
                 }
             ]
         },
