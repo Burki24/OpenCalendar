@@ -72,21 +72,14 @@
             "suffix": "%"
         },
         {
-            "type": "RowLayout",
-            "items": [
-                {
-                    "type": "CheckBox",
-                    "name": "ShowTileTitle",
-                    "caption": "Show tile title",
-                    "width": "48%"
-                },
-                {
-                    "type": "CheckBox",
-                    "name": "ShowTileMaximizeButton",
-                    "caption": "Show maximize button",
-                    "width": "48%"
-                }
-            ]
+            "type": "CheckBox",
+            "name": "ShowTileTitle",
+            "caption": "Show tile title"
+        },
+        {
+            "type": "CheckBox",
+            "name": "ShowTileMaximizeButton",
+            "caption": "Show maximize button"
         },
         {
             "type": "Label",

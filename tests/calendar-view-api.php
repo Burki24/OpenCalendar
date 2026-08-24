@@ -123,7 +123,9 @@ assertCalendarViewApi(
 assertCalendarViewApi(
     str_contains($moduleSource, '$this->InsertIPSViewStyleFormItems($form[\'elements\']);')
         && !str_contains($moduleSource, 'colorWidth:')
-        && preg_match('/"name": "ShowTileTitle"[\\s\\S]*?"width": "48%"/', $formSource) === 1
+        && preg_match('/"type": "CheckBox",\\s*"name": "ShowTileTitle",\\s*"caption": "Show tile title"/', $formSource) === 1
+        && preg_match('/"type": "CheckBox",\\s*"name": "ShowTileMaximizeButton",\\s*"caption": "Show maximize button"/', $formSource) === 1
+        && !preg_match('/"type": "RowLayout"[\\s\\S]{0,500}"name": "ShowTileTitle"[\\s\\S]{0,500}"name": "ShowTileMaximizeButton"/', $formSource)
         && preg_match('/"name": "PastDays"[\\s\\S]*?"width": "32%"/', $formSource) === 1
         && preg_match('/"name": "ShowWeekends"[\\s\\S]*?"width": "24%"/', $formSource) === 1
         && str_contains($formSource, '"width": "30%"')
