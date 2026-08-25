@@ -73,6 +73,8 @@ let visibleRangeRetryAttempts = 0;
 let visibleRangeRetryForce = false;
 let pendingCalendarInvalidation = false;
 let importedIcsTimezone = '';
+let eventStatusEdited = false;
+let eventAvailabilityEdited = false;
 let preservedAgendaScrollPosition = null;
 let agendaScrollWorkflow = '';
 let releaseAgendaScrollPositionAfterState = false;
@@ -99,6 +101,8 @@ const eventAnniversaryType = document.getElementById('event-anniversary-type');
 const eventAnniversaryDateRow = document.getElementById('event-anniversary-date-row');
 const eventAnniversaryDate = document.getElementById('event-anniversary-date');
 const eventAnniversaryDateLabel = document.getElementById('event-anniversary-date-label');
+const eventStatusInput = document.getElementById('event-status');
+const eventAvailabilityInput = document.getElementById('event-availability');
 const eventRecurrenceRow = document.getElementById('event-recurrence-row');
 const eventRecurrenceFrequency = document.getElementById('event-recurrence-frequency');
 const eventRecurrenceOptions = document.getElementById('event-recurrence-options');
@@ -2219,9 +2223,20 @@ function parseSingleIcsEvent(value) {
     if ((properties.RRULE?.length || 0) > 0 || (properties.RDATE?.length || 0) > 0) {
         throw new Error(icsImportText('Recurring ICS invitations cannot be imported as a single event.'));
     }
-    if (String(properties.STATUS?.[0]?.value || '').trim().toUpperCase() === 'CANCELLED') {
+    const rawStatus = String(properties.STATUS?.[0]?.value || '').trim().toUpperCase();
+    const status = normalizedEventStatus(rawStatus);
+    if (rawStatus !== '' && status === '') {
         throw new Error(icsImportText('The selected file is not a valid single-event ICS file.'));
     }
+    if (status === 'CANCELLED') {
+        throw new Error(icsImportText('The selected file is not a valid single-event ICS file.'));
+    }
+    const rawTransparency = String(properties.TRANSP?.[0]?.value || '').trim().toUpperCase();
+    const parsedTransparency = normalizedEventTransparency(rawTransparency, '');
+    if (rawTransparency !== '' && parsedTransparency === '') {
+        throw new Error(icsImportText('The selected file is not a valid single-event ICS file.'));
+    }
+    const transparency = parsedTransparency || 'OPAQUE';
 
     const start = parseIcsDateProperty(properties.DTSTART?.[0]);
     if (!start) {
@@ -2253,6 +2268,8 @@ function parseSingleIcsEvent(value) {
         start: start.date,
         end: end.date,
         timezone: start.timezone || end.timezone || '',
+        status,
+        transparency,
         reminder: parseIcsReminder(eventLines)
     };
 }
@@ -2264,6 +2281,10 @@ function applyImportedIcsEvent(importedEvent) {
     document.getElementById('event-location').value = importedEvent.location;
     document.getElementById('event-description').value = importedEvent.description;
     document.getElementById('event-all-day').checked = importedEvent.allDay;
+    eventStatusInput.value = normalizedEventStatus(importedEvent.status, 'CONFIRMED');
+    eventAvailabilityInput.value = normalizedEventTransparency(importedEvent.transparency);
+    eventStatusEdited = normalizedEventStatus(importedEvent.status) !== '';
+    eventAvailabilityEdited = true;
     resetAnniversaryEditor();
     setDateInputs(importedEvent.start, importedEvent.end, importedEvent.allDay, importedEvent.allDay);
     resetRecurrenceEditor(importedEvent.start);
@@ -2271,6 +2292,7 @@ function applyImportedIcsEvent(importedEvent) {
     updateRecurrenceAvailability();
     updateAnniversaryControls();
     updateReminderControls();
+    updateEventStateControls();
 }
 
 async function importIcsFile(file) {
@@ -2306,6 +2328,7 @@ function openNewEvent(preferredDay = null) {
     document.getElementById('event-location').value = '';
     document.getElementById('event-description').value = '';
     document.getElementById('event-all-day').checked = false;
+    resetEventStateEditor();
     resetAnniversaryEditor();
     let start;
     if (preferredDay instanceof Date && !Number.isNaN(preferredDay.getTime())) {
@@ -2404,6 +2427,7 @@ function openPendingEventEditor(event, writeScope = '') {
     document.getElementById('event-location').value = selectedEvent.location || '';
     document.getElementById('event-description').value = selectedEvent.description || '';
     document.getElementById('event-all-day').checked = Boolean(selectedEvent.allDay);
+    loadEventStateEditor(selectedEvent);
     loadAnniversaryEditor(selectedEvent);
     setDateInputs(
         eventStart(selectedEvent),
@@ -2737,8 +2761,18 @@ function setOptionalDetail(name, value) {
     row.classList.toggle('hidden', text === '');
 }
 
+function normalizedEventStatus(value, fallback = '') {
+    const status = String(value || '').trim().toUpperCase();
+    return ['CONFIRMED', 'TENTATIVE', 'CANCELLED'].includes(status) ? status : fallback;
+}
+
+function normalizedEventTransparency(value, fallback = 'OPAQUE') {
+    const transparency = String(value || '').trim().toUpperCase();
+    return ['OPAQUE', 'TRANSPARENT'].includes(transparency) ? transparency : fallback;
+}
+
 function eventStatusDetailText(event) {
-    const status = String(event?.status || '').trim().toUpperCase();
+    const status = normalizedEventStatus(event?.status);
     return {
         CONFIRMED: t('Confirmed'),
         TENTATIVE: t('Tentative'),
@@ -2747,10 +2781,88 @@ function eventStatusDetailText(event) {
 }
 
 function eventAvailabilityDetailText(event) {
-    const transparency = String(event?.transparency || '').trim().toUpperCase();
-    if (transparency === 'TRANSPARENT') return t('Free');
-    if (transparency === 'OPAQUE' || transparency === '') return t('Busy');
-    return '';
+    const transparency = normalizedEventTransparency(event?.transparency);
+    return transparency === 'TRANSPARENT' ? t('Free') : t('Busy');
+}
+
+function eventStateProvider(calendar) {
+    return String(calendar?.provider || '').trim().toLowerCase();
+}
+
+function calendarSupportsEventStatus(calendar) {
+    return Boolean(calendar?.canWrite)
+        && ['apple', 'caldav', 'google'].includes(eventStateProvider(calendar));
+}
+
+function calendarSupportsEventAvailability(calendar) {
+    return Boolean(calendar?.canWrite)
+        && ['apple', 'caldav', 'google', 'microsoft'].includes(eventStateProvider(calendar));
+}
+
+function defaultEventTransparency(calendar, allDay = false) {
+    return eventStateProvider(calendar) === 'microsoft' && allDay ? 'TRANSPARENT' : 'OPAQUE';
+}
+
+function loadEventStateEditor(event) {
+    eventStatusInput.value = normalizedEventStatus(event?.status, 'CONFIRMED');
+    eventAvailabilityInput.value = normalizedEventTransparency(event?.transparency);
+    eventStatusEdited = false;
+    eventAvailabilityEdited = false;
+    updateEventStateControls();
+}
+
+function resetEventStateEditor() {
+    eventStatusInput.value = 'CONFIRMED';
+    eventAvailabilityInput.value = defaultEventTransparency(
+        selectedCalendarEntry(),
+        document.getElementById('event-all-day').checked
+    );
+    eventStatusEdited = false;
+    eventAvailabilityEdited = false;
+    updateEventStateControls();
+}
+
+function updateEventStateDefaults() {
+    if (selectedEvent === null) {
+        if (!eventStatusEdited) {
+            eventStatusInput.value = 'CONFIRMED';
+        }
+        if (!eventAvailabilityEdited) {
+            eventAvailabilityInput.value = defaultEventTransparency(
+                selectedCalendarEntry(),
+                document.getElementById('event-all-day').checked
+            );
+        }
+    }
+    updateEventStateControls();
+}
+
+function updateEventStateControls() {
+    const calendar = selectedCalendarEntry();
+    eventStatusInput.disabled = !eventDialogEditable || !calendarSupportsEventStatus(calendar);
+    eventAvailabilityInput.disabled = !eventDialogEditable || !calendarSupportsEventAvailability(calendar);
+}
+
+function appendEventStateChanges(eventData, targetCalendar, moving, allDay) {
+    if (calendarSupportsEventStatus(targetCalendar)) {
+        const status = normalizedEventStatus(eventStatusInput.value, 'CONFIRMED');
+        const baselineStatus = selectedEvent && !moving
+            ? normalizedEventStatus(selectedEvent.status, 'CONFIRMED')
+            : 'CONFIRMED';
+        if (eventStatusEdited || status !== baselineStatus) {
+            eventData.status = status;
+        }
+    }
+
+    if (calendarSupportsEventAvailability(targetCalendar)) {
+        const transparency = normalizedEventTransparency(eventAvailabilityInput.value);
+        const baselineTransparency = selectedEvent && !moving
+            ? normalizedEventTransparency(selectedEvent.transparency)
+            : defaultEventTransparency(targetCalendar, allDay);
+        if (eventAvailabilityEdited || transparency !== baselineTransparency) {
+            eventData.transparency = transparency;
+        }
+    }
 }
 
 function formatDetailDate(date) {
@@ -2791,6 +2903,7 @@ function openExistingEvent(event, writeScope = '') {
     document.getElementById('event-location').value = selectedEvent.location || '';
     document.getElementById('event-description').value = selectedEvent.description || '';
     document.getElementById('event-all-day').checked = Boolean(selectedEvent.allDay);
+    loadEventStateEditor(selectedEvent);
     loadAnniversaryEditor(selectedEvent);
     setDateInputs(
         eventStart(selectedEvent),
@@ -3627,6 +3740,7 @@ function setDialogEditable(editable, descriptionEditable = editable) {
     document.getElementById('save-button').classList.toggle('hidden', !editable);
     updateReminderControls();
     updateAnniversaryControls();
+    updateEventStateControls();
 }
 
 function setDateInputs(start, end, allDay, allDayEndExclusive = false) {
@@ -3694,6 +3808,9 @@ eventForm.addEventListener('submit', async event => {
     event.preventDefault();
     const allDay = document.getElementById('event-all-day').checked;
     const calendarInstanceId = Number(eventCalendarInput.value);
+    const sourceCalendarInstanceId = Number(selectedEvent?.calendarInstanceId || 0);
+    const moving = Boolean(selectedEvent) && calendarInstanceId !== sourceCalendarInstanceId;
+    const targetCalendar = calendarEntryByInstanceId(calendarInstanceId);
     const eventData = {
         summary: document.getElementById('event-summary').value.trim(),
         description: document.getElementById('event-description').value.trim(),
@@ -3737,8 +3854,6 @@ eventForm.addEventListener('submit', async event => {
         eventData.timezone = timezone;
     }
     if (!calendarInstanceId || !eventData.summary || !eventData.start || !eventData.end) return;
-    const sourceCalendarInstanceId = Number(selectedEvent?.calendarInstanceId || 0);
-    const moving = Boolean(selectedEvent) && calendarInstanceId !== sourceCalendarInstanceId;
     const selectedAnniversaryType = annualEventType(selectedEvent);
     if (moving && selectedAnniversaryType && ['series', 'following'].includes(selectedEvent?.writeScope)) {
         eventData.anniversaryType = selectedAnniversaryType;
@@ -3746,6 +3861,7 @@ eventForm.addEventListener('submit', async event => {
         eventData.allDay = true;
         eventData.recurrence = anniversaryRecurrence();
     }
+    appendEventStateChanges(eventData, targetCalendar, moving, Boolean(eventData.allDay));
     if (selectedEvent?.onlineMeeting && !moving) delete eventData.description;
 
     const action = moving ? 'MoveEvent' : (selectedEvent ? 'UpdateEvent' : 'CreateEvent');
@@ -3818,6 +3934,7 @@ document.getElementById('event-all-day').addEventListener('change', event => {
         end = new Date(start.getTime() + 60 * 60 * 1000);
     }
     setDateInputs(start, end, event.target.checked);
+    updateEventStateDefaults();
 });
 eventCalendarInput.addEventListener('change', () => {
     updateDialogColor();
@@ -3826,6 +3943,13 @@ eventCalendarInput.addEventListener('change', () => {
     updateAnniversaryControls();
     resolveDefaultReminderForCalendarMove();
     updateReminderControls();
+    updateEventStateDefaults();
+});
+eventStatusInput.addEventListener('change', () => {
+    eventStatusEdited = true;
+});
+eventAvailabilityInput.addEventListener('change', () => {
+    eventAvailabilityEdited = true;
 });
 eventAnniversaryType.addEventListener('change', () => {
     updateRecurrenceAvailability();
@@ -3834,6 +3958,7 @@ eventAnniversaryType.addEventListener('change', () => {
         syncAnniversarySchedule();
     }
     updateAnniversaryControls();
+    updateEventStateDefaults();
 });
 eventAnniversaryDate.addEventListener('change', () => {
     syncAnniversarySchedule();

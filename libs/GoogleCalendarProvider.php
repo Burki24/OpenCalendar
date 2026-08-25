@@ -1000,6 +1000,13 @@ final class GoogleCalendarProvider implements CalendarEventLookupProviderInterfa
             }
             $payload['status'] = $status;
         }
+        if (array_key_exists('transparency', $data)) {
+            $transparency = strtolower(trim((string) $data['transparency']));
+            if (!in_array($transparency, ['opaque', 'transparent'], true)) {
+                throw new InvalidArgumentException('The event transparency is invalid.');
+            }
+            $payload['transparency'] = $transparency;
+        }
         if (array_key_exists('reminder', $data)) {
             $reminder = CalendarEventReminder::normalizeInput($data['reminder'], true);
             $payload['reminders'] = match ($reminder['mode']) {

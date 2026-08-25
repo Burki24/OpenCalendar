@@ -2435,7 +2435,7 @@ class CalendarView extends IPSModuleStrict
     }
 
     /**
-     * @return list<array{instanceId: int, name: string, color: string, canWrite: bool, timezone: string, canCreateRecurrence: bool, canUpdateRecurrence: bool, canUpdateOccurrence: bool, canDeleteOccurrence: bool, canUpdateFollowing: bool, canUpdateSeries: bool, canDeleteSeries: bool, canUseDefaultReminder: bool, canCreateWithDefaultReminder: bool, defaultReminder: array<string, mixed>, maxReminders: int, provider?: string, lastSynchronization?: int, status?: int, lastError?: string}>
+     * @return list<array{instanceId: int, name: string, color: string, canWrite: bool, timezone: string, canCreateRecurrence: bool, canUpdateRecurrence: bool, canUpdateOccurrence: bool, canDeleteOccurrence: bool, canUpdateFollowing: bool, canUpdateSeries: bool, canDeleteSeries: bool, canUseDefaultReminder: bool, canCreateWithDefaultReminder: bool, defaultReminder: array<string, mixed>, maxReminders: int, provider: string, lastSynchronization?: int, status?: int, lastError?: string}>
      */
     private function loadSelectedCalendars(bool $includeOperationalMetadata = false): array
     {
@@ -2477,6 +2477,7 @@ class CalendarView extends IPSModuleStrict
                 'instanceId'                   => $instanceId,
                 'name'                         => IPS_GetName($instanceId),
                 'color'                        => $color,
+                'provider'                     => $this->calendarProviderKey($instance),
                 'canWrite'                     => (bool) ($calendarStatus['canWrite']
                     ?? IPS_GetProperty($instanceId, 'CanWrite')),
                 'timezone'                     => trim((string) ($calendarStatus['timezone'] ?? '')),
@@ -2496,7 +2497,6 @@ class CalendarView extends IPSModuleStrict
                 'maxReminders'                 => max(1, min(CalendarEventReminder::MAX_REMINDERS, (int) ($calendarStatus['maxReminders'] ?? 1)))
             ];
             if ($includeOperationalMetadata) {
-                $calendar['provider'] = $this->calendarProviderKey($instance);
                 $calendar['lastSynchronization'] = max(0, (int) ($calendarStatus['lastSynchronization'] ?? 0));
                 $calendar['status'] = (int) ($instance['InstanceStatus'] ?? 0);
                 $calendar['lastError'] = trim((string) ($calendarStatus['lastError'] ?? ''));

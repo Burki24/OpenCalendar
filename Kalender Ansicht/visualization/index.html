@@ -150,6 +150,23 @@
                     <input id="event-end" type="datetime-local" required>
                 </div>
             </div>
+            <div class="form-row two" id="event-state-row">
+                <div class="form-row">
+                    <label for="event-status">Status</label>
+                    <select id="event-status">
+                        <option value="CONFIRMED" data-i18n="Confirmed">Confirmed</option>
+                        <option value="TENTATIVE" data-i18n="Tentative">Tentative</option>
+                        <option value="CANCELLED" data-i18n="Cancelled">Cancelled</option>
+                    </select>
+                </div>
+                <div class="form-row">
+                    <label for="event-availability">Availability</label>
+                    <select id="event-availability">
+                        <option value="OPAQUE" data-i18n="Busy">Busy</option>
+                        <option value="TRANSPARENT" data-i18n="Free">Free</option>
+                    </select>
+                </div>
+            </div>
             <div class="form-row recurrence-section" id="event-recurrence-row">
                 <label for="event-recurrence-frequency">Repeat</label>
                 <select id="event-recurrence-frequency">

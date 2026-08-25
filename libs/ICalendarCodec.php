@@ -221,6 +221,12 @@ final class ICalendarCodec
         if ($status !== '') {
             $lines[] = 'STATUS:' . $status;
         }
+        if (array_key_exists('transparency', $data)) {
+            $transparency = self::normalizeTransparency((string) $data['transparency']);
+            if ($transparency !== '') {
+                $lines[] = 'TRANSP:' . $transparency;
+            }
+        }
 
         if (array_key_exists('reminder', $data)) {
             $reminder = CalendarEventReminder::normalizeInput($data['reminder']);
@@ -1088,6 +1094,14 @@ final class ICalendarCodec
         if (array_key_exists('status', $data)) {
             $status = self::normalizeStatus((string) $data['status']);
             self::replaceProperty($block, 'STATUS', $status === '' ? null : 'STATUS:' . $status);
+        }
+        if (array_key_exists('transparency', $data)) {
+            $transparency = self::normalizeTransparency((string) $data['transparency']);
+            self::replaceProperty(
+                $block,
+                'TRANSP',
+                $transparency === '' ? null : 'TRANSP:' . $transparency
+            );
         }
 
         $properties = self::readTopLevelProperties($block);
@@ -2036,6 +2050,18 @@ final class ICalendarCodec
             throw new InvalidArgumentException('The event status is invalid.');
         }
         return $status;
+    }
+
+    private static function normalizeTransparency(string $transparency): string
+    {
+        $transparency = strtoupper(trim($transparency));
+        if ($transparency === '') {
+            return '';
+        }
+        if (!in_array($transparency, ['OPAQUE', 'TRANSPARENT'], true)) {
+            throw new InvalidArgumentException('The event transparency is invalid.');
+        }
+        return $transparency;
     }
 
     /**

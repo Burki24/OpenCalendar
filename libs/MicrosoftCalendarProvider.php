@@ -270,7 +270,7 @@ final class MicrosoftCalendarProvider implements CalendarProviderInterface, Recu
     {
         $calendarId = $this->calendarId($calendarReference);
         $payload = $this->buildEventPayload($event, true);
-        if ((bool) ($event['allDay'] ?? false)) {
+        if ((bool) ($event['allDay'] ?? false) && !array_key_exists('showAs', $payload)) {
             $payload['showAs'] = 'free';
         }
         $created = $this->requestJson(
@@ -921,6 +921,24 @@ final class MicrosoftCalendarProvider implements CalendarProviderInterface, Recu
         }
         if (array_key_exists('location', $data)) {
             $payload['location'] = ['displayName' => (string) $data['location']];
+        }
+        if (array_key_exists('status', $data)) {
+            $status = CalendarEventState::normalizeStatus($data['status'] ?? '');
+            if ($status !== CalendarEventState::STATUS_CONFIRMED) {
+                throw new InvalidArgumentException(
+                    'Microsoft Calendar does not support changing the provider-neutral event status.'
+                );
+            }
+        }
+        if (array_key_exists('transparency', $data)) {
+            $transparency = strtoupper(trim((string) $data['transparency']));
+            $payload['showAs'] = match ($transparency) {
+                CalendarEventState::TRANSP_OPAQUE      => 'busy',
+                CalendarEventState::TRANSP_TRANSPARENT => 'free',
+                default                                => throw new InvalidArgumentException(
+                    'The event transparency is invalid.'
+                )
+            };
         }
         if (array_key_exists('reminder', $data)) {
             $reminder = CalendarEventReminder::normalizeInput($data['reminder'], false, 1);

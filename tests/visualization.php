@@ -259,10 +259,8 @@ assertVisualization(
         && str_contains($script, "TENTATIVE: t('Tentative')")
         && str_contains($script, "CANCELLED: t('Cancelled')")
         && str_contains($script, 'function eventAvailabilityDetailText(event)')
-        && str_contains($script, "transparency === 'TRANSPARENT'")
-        && str_contains($script, "return t('Free');")
-        && str_contains($script, "transparency === 'OPAQUE' || transparency === ''")
-        && str_contains($script, "return t('Busy');")
+        && str_contains($script, 'const transparency = normalizedEventTransparency(event?.transparency);')
+        && str_contains($script, "return transparency === 'TRANSPARENT' ? t('Free') : t('Busy');")
         && str_contains($script, "setOptionalDetail('status', eventStatusDetailText(event));")
         && str_contains($script, "setOptionalDetail('availability', eventAvailabilityDetailText(event));")
         && str_contains($moduleSource, "'Status',")
@@ -280,6 +278,30 @@ assertVisualization(
         && str_contains($localeSource, '"Busy": "Belegt"')
         && str_contains($localeSource, '"Free": "Frei"'),
     'Event details must show provider-neutral RFC status and free/busy transparency with localized user-facing labels.'
+);
+
+assertVisualization(
+    str_contains($indexSource, 'id="event-status"')
+        && str_contains($indexSource, '<option value="CONFIRMED" data-i18n="Confirmed">')
+        && str_contains($indexSource, '<option value="TENTATIVE" data-i18n="Tentative">')
+        && str_contains($indexSource, '<option value="CANCELLED" data-i18n="Cancelled">')
+        && str_contains($indexSource, 'id="event-availability"')
+        && str_contains($indexSource, '<option value="OPAQUE" data-i18n="Busy">')
+        && str_contains($indexSource, '<option value="TRANSPARENT" data-i18n="Free">')
+        && str_contains($script, 'function calendarSupportsEventStatus(calendar)')
+        && str_contains($script, "['apple', 'caldav', 'google'].includes(eventStateProvider(calendar))")
+        && str_contains($script, 'function calendarSupportsEventAvailability(calendar)')
+        && str_contains($script, "['apple', 'caldav', 'google', 'microsoft'].includes(eventStateProvider(calendar))")
+        && str_contains($script, "eventStateProvider(calendar) === 'microsoft' && allDay ? 'TRANSPARENT' : 'OPAQUE'")
+        && str_contains($script, 'function appendEventStateChanges(eventData, targetCalendar, moving, allDay)')
+        && str_contains($script, 'eventData.status = status;')
+        && str_contains($script, 'eventData.transparency = transparency;')
+        && str_contains($script, 'appendEventStateChanges(eventData, targetCalendar, moving, Boolean(eventData.allDay));')
+        && str_contains($script, "const rawStatus = String(properties.STATUS?.[0]?.value || '').trim().toUpperCase();")
+        && str_contains($script, "const rawTransparency = String(properties.TRANSP?.[0]?.value || '').trim().toUpperCase();")
+        && str_contains($script, "const transparency = parsedTransparency || 'OPAQUE';")
+        && str_contains($moduleSource, "'provider'                     => $this->calendarProviderKey($instance),"),
+    'The event editor must write status and availability only for compatible providers, preserve provider defaults, and retain imported RFC state.'
 );
 
 assertVisualization(

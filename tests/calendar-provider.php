@@ -368,12 +368,14 @@ $writeClient = new FakeHttpClient([
 ]);
 $provider = new GoogleCalendarProvider($writeClient, 'access-token');
 $created = $provider->createEvent('owner@example.com', [
-    'summary'  => 'Test',
-    'allDay'   => false,
-    'start'    => '2026-07-20T10:00:00+02:00',
-    'end'      => '2026-07-20T11:00:00+02:00',
-    'location' => 'Berlin',
-    'reminder' => [
+    'summary'      => 'Test',
+    'allDay'       => false,
+    'start'        => '2026-07-20T10:00:00+02:00',
+    'end'          => '2026-07-20T11:00:00+02:00',
+    'location'     => 'Berlin',
+    'status'       => 'TENTATIVE',
+    'transparency' => 'TRANSPARENT',
+    'reminder'     => [
         'mode'               => 'custom',
         'minutesBeforeStart' => 30
     ]
@@ -382,6 +384,12 @@ assertSameValue('created-id', $created['eventReference'], 'The created Google ev
 assertSameValue('POST', $writeClient->requests[0]['method'], 'Events must be created via POST.');
 $createBody = json_decode($writeClient->requests[0]['body'], true, 512, JSON_THROW_ON_ERROR);
 assertSameValue('Test', $createBody['summary'], 'The event summary must be sent.');
+assertSameValue('tentative', $createBody['status'], 'Google event status must be written using provider values.');
+assertSameValue(
+    'transparent',
+    $createBody['transparency'],
+    'Google event availability must be written using the Calendar API transparency field.'
+);
 assertSameValue(false, $createBody['reminders']['useDefault'], 'Custom Google reminders must override calendar defaults.');
 assertSameValue(
     [['method' => 'popup', 'minutes' => 30]],
@@ -630,10 +638,17 @@ $provider->updateEvent(
     $created['resourceUrl'],
     '"new"',
     'created@example.com',
-    ['summary' => 'Updated']
+    [
+        'summary'      => 'Updated',
+        'status'       => 'CONFIRMED',
+        'transparency' => 'OPAQUE'
+    ]
 );
 assertSameValue('PATCH', $writeClient->requests[1]['method'], 'Events must be updated without replacing unrelated Google fields.');
 assertSameValue('"new"', $writeClient->requests[1]['headers']['If-Match'], 'Updates must use the ETag for conflict detection.');
+$updateBody = json_decode($writeClient->requests[1]['body'], true, 512, JSON_THROW_ON_ERROR);
+assertSameValue('confirmed', $updateBody['status'], 'Google status updates must preserve the provider-neutral selection.');
+assertSameValue('opaque', $updateBody['transparency'], 'Google availability updates must preserve the provider-neutral selection.');
 assertTrueValue(
     $provider->deleteEvent('owner@example.com', $created['resourceUrl'], '"updated"'),
     'Event deletion must return true after HTTP 204.'
@@ -1408,6 +1423,74 @@ assertSameValue(
     $msAllDayCreateBody['showAs'] ?? '',
     'New Microsoft all-day events must use Outlook\'s free availability default.'
 );
+
+$msAllDayBusyClient = new FakeHttpClient([
+    response(201, [
+        'id'          => 'all-day-busy-id',
+        'iCalUId'     => 'all-day-busy@example.com',
+        '@odata.etag' => 'W/"all-day-busy"'
+    ])
+]);
+(new MicrosoftCalendarProvider($msAllDayBusyClient, 'ms-access-token'))->createEvent('AQMk-primary', [
+    'summary'      => 'Busy all-day test',
+    'allDay'       => true,
+    'start'        => '2026-07-20',
+    'end'          => '2026-07-21',
+    'transparency' => 'OPAQUE'
+]);
+$msAllDayBusyBody = json_decode(
+    $msAllDayBusyClient->requests[0]['body'],
+    true,
+    512,
+    JSON_THROW_ON_ERROR
+);
+assertSameValue(
+    'busy',
+    $msAllDayBusyBody['showAs'] ?? '',
+    'Explicit busy availability must override Microsoft\'s free all-day creation default.'
+);
+
+$msTransparentClient = new FakeHttpClient([
+    response(201, [
+        'id'          => 'transparent-id',
+        'iCalUId'     => 'transparent@example.com',
+        '@odata.etag' => 'W/"transparent"'
+    ])
+]);
+(new MicrosoftCalendarProvider($msTransparentClient, 'ms-access-token'))->createEvent('AQMk-primary', [
+    'summary'      => 'Free timed test',
+    'allDay'       => false,
+    'start'        => '2026-07-20T10:00:00+02:00',
+    'end'          => '2026-07-20T11:00:00+02:00',
+    'transparency' => 'TRANSPARENT'
+]);
+$msTransparentBody = json_decode(
+    $msTransparentClient->requests[0]['body'],
+    true,
+    512,
+    JSON_THROW_ON_ERROR
+);
+assertSameValue(
+    'free',
+    $msTransparentBody['showAs'] ?? '',
+    'Provider-neutral transparent availability must map to Microsoft Graph free.'
+);
+
+try {
+    (new MicrosoftCalendarProvider(new FakeHttpClient([]), 'ms-access-token'))->createEvent('AQMk-primary', [
+        'summary' => 'Tentative status test',
+        'allDay'  => false,
+        'start'   => '2026-07-20T10:00:00+02:00',
+        'end'     => '2026-07-20T11:00:00+02:00',
+        'status'  => 'TENTATIVE'
+    ]);
+    throw new RuntimeException('Microsoft accepted a provider-neutral tentative event status.');
+} catch (InvalidArgumentException $exception) {
+    assertTrueValue(
+        str_contains($exception->getMessage(), 'does not support changing'),
+        'Microsoft writes must reject RFC event status values that have no Graph equivalent.'
+    );
+}
 
 $msAllDayUpdateClient = new FakeHttpClient([
     response(200, [
@@ -2555,6 +2638,42 @@ $opaqueState = ICalendarCodec::parseEvents(
 )[0];
 assertSameValue('CONFIRMED', $opaqueState['status'], 'RFC 5545 confirmed status must normalize canonically.');
 assertSameValue('OPAQUE', $opaqueState['transparency'], 'Missing RFC 5545 TRANSP must use the opaque default.');
+
+$eventStateCreated = ICalendarCodec::createEvent([
+    'summary'      => 'Writable state',
+    'allDay'       => false,
+    'start'        => '2026-08-17T10:00:00Z',
+    'end'          => '2026-08-17T11:00:00Z',
+    'status'       => 'TENTATIVE',
+    'transparency' => 'TRANSPARENT'
+]);
+assertTrueValue(
+    str_contains($eventStateCreated['ical'], 'STATUS:TENTATIVE')
+        && str_contains($eventStateCreated['ical'], 'TRANSP:TRANSPARENT'),
+    'iCalendar creation must serialize provider-neutral status and transparency.'
+);
+$eventStateUpdated = ICalendarCodec::updateEvent(
+    $eventStateCreated['ical'],
+    $eventStateCreated['uid'],
+    [
+        'status'       => 'CONFIRMED',
+        'transparency' => 'OPAQUE'
+    ]
+);
+assertTrueValue(
+    str_contains($eventStateUpdated, 'STATUS:CONFIRMED')
+        && str_contains($eventStateUpdated, 'TRANSP:OPAQUE')
+        && !str_contains($eventStateUpdated, 'STATUS:TENTATIVE')
+        && !str_contains($eventStateUpdated, 'TRANSP:TRANSPARENT'),
+    'iCalendar updates must replace status and transparency without leaving stale properties.'
+);
+$eventStateRoundTrip = ICalendarCodec::parseEvents(
+    $eventStateUpdated,
+    'https://calendar.example/work/writable-state.ics',
+    '"writable-state"'
+)[0];
+assertSameValue('CONFIRMED', $eventStateRoundTrip['status'], 'Updated iCalendar status must round-trip.');
+assertSameValue('OPAQUE', $eventStateRoundTrip['transparency'], 'Updated iCalendar transparency must round-trip.');
 
 $calDavRecurringCreated = ICalendarCodec::createEvent([
     'summary'    => 'CalDAV weekly meeting',
