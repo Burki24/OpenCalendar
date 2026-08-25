@@ -4326,10 +4326,6 @@ function restoreClientViewState(defaultView) {
     if (calendarViews.has(storedState.activeView)) {
         activeView = storedState.activeView;
     }
-    const storedDate = parseStoredViewDate(storedState.cursorDate);
-    if (storedDate) {
-        cursorDate = storedDate;
-    }
     if (Array.isArray(storedState.visibleCalendarIds)) {
         visibleCalendarIds = new Set(
             storedState.visibleCalendarIds
@@ -4345,7 +4341,6 @@ function persistClientViewState() {
 
     const value = JSON.stringify({
         activeView,
-        cursorDate: formatStoredViewDate(cursorDate),
         visibleCalendarIds: visibleCalendarIds instanceof Set
             ? Array.from(visibleCalendarIds).sort((left, right) => left - right)
             : null
@@ -4403,26 +4398,6 @@ function readWindowNameViewState() {
     } catch (error) {
         return null;
     }
-}
-
-function formatStoredViewDate(date) {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-}
-
-function parseStoredViewDate(value) {
-    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value || ''));
-    if (!match) return null;
-
-    const date = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
-    if (date.getFullYear() !== Number(match[1])
-        || date.getMonth() !== Number(match[2]) - 1
-        || date.getDate() !== Number(match[3])) {
-        return null;
-    }
-    return startOfDay(date);
 }
 
 function moveVisibleDays(start, amount) {

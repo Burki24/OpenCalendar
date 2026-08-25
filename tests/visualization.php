@@ -724,11 +724,13 @@ assertVisualization(
         && str_contains($script, 'window.localStorage.setItem(calendarViewStateStorageKey, value)')
         && str_contains($script, 'function readWindowNameViewState()')
         && str_contains($script, 'function writeWindowNameViewState(value)')
-        && str_contains($script, 'cursorDate: formatStoredViewDate(cursorDate)')
+        && !str_contains($script, 'cursorDate: formatStoredViewDate(cursorDate)')
+        && !str_contains($script, 'parseStoredViewDate(storedState.cursorDate)')
+        && str_contains($script, 'cursorDate = startOfDay(new Date());')
         && str_contains($script, 'visibleCalendarIds: visibleCalendarIds instanceof Set')
         && str_contains($script, 'Array.isArray(storedState.visibleCalendarIds)')
         && str_contains($script, 'persistClientViewState();'),
-    'The selected view, cursor date and temporary calendar filter must persist per visualization instance on the client across page reloads.'
+    'The selected view and temporary calendar filter must persist per visualization instance, while every page reload starts on today.'
 );
 
 assertVisualization(
@@ -742,7 +744,7 @@ assertVisualization(
         && str_contains($script, 'if (clampCurrentCursorDate()) {')
         && str_contains($script, 'cursorDate = clampCursorDate(startOfDay(new Date()));')
         && substr_count($script, 'clampCurrentCursorDate();') >= 2,
-    'Stored and manually navigated cursor dates must stay inside the configured past/future visualization window.'
+    'Current and manually navigated cursor dates must stay inside the configured past/future visualization window.'
 );
 
 assertVisualization(
