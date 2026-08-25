@@ -932,6 +932,10 @@ assertVisualization(
 assertVisualization(
     str_contains($style, '.list-table {')
         && str_contains($style, '.list-color-column {')
+        && str_contains($style, '.list-cell-date { min-width: 11em; max-width: 13em; }')
+        && str_contains($style, '.list-cell-start,')
+        && str_contains($style, '.list-cell-title { min-width: 12em; max-width: 24em; font-weight: 650; }')
+        && str_contains($style, '.list-cell-description { min-width: 14em; max-width: 32em; overflow: hidden; text-overflow: ellipsis; }')
         && str_contains($style, '.list-row:hover,')
         && str_contains($style, '.view-selector-options { display: grid;')
         && str_contains($style, '--cal-dialog-font-size: clamp(0.98rem, 0.94rem + 0.12vw, 1.04rem);')
@@ -1001,10 +1005,21 @@ assertVisualization(
         && str_contains($script, 'appendTimelineEvents(canvas, entry.dayStart, entry.timedEntries, range);')
         && str_contains($script, 'function timelineMinuteRange(entries)')
         && str_contains($style, '.multi-day-timeline-grid {')
-        && str_contains($style, 'grid-template-columns: 54px repeat(var(--multi-day-columns, 3), minmax(120px, 1fr));')
+        && str_contains($style, '--calendar-time-column-width: 5em;')
+        && str_contains($style, '--calendar-time-column-width: 5.25em;')
+        && str_contains($style, 'grid-template-columns: var(--calendar-time-column-width) repeat(var(--multi-day-columns, 3), minmax(120px, 1fr));')
         && str_contains($style, '.multi-day-timescale,')
         && str_contains($style, '.multi-day-timeline-canvas { position: relative; }'),
     'Multi-day day and week views must use one shared time scale so equal times align vertically and later starts are visibly offset in native and IPSView modes.'
+);
+
+assertVisualization(
+    str_contains($style, 'grid-template-columns: var(--agenda-color-bar-width) var(--calendar-time-column-width) minmax(0, 1fr);')
+        && str_contains($style, '.event-time { min-width: 0;')
+        && str_contains($style, 'grid-template-columns: var(--calendar-time-column-width) minmax(0, 1fr);')
+        && !str_contains($style, 'grid-template-columns: var(--agenda-color-bar-width) minmax(54px, 72px) 1fr;')
+        && !str_contains($style, 'grid-template-columns: var(--agenda-color-bar-width) 54px 1fr;'),
+    'Agenda and timeline time columns must scale with the configured font size so all-day labels and event content cannot overlap.'
 );
 
 assertVisualization(
