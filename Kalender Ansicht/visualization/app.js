@@ -2373,6 +2373,8 @@ function openEventDetails(event) {
     }
 
     setOptionalDetail('occasion', annualEventLabel(event));
+    setOptionalDetail('status', eventStatusDetailText(event));
+    setOptionalDetail('availability', eventAvailabilityDetailText(event));
     setOptionalDetail('reminder', reminderDetailText(event));
     setOptionalDetail('location', event.location);
     setOptionalDetail('description', event.description);
@@ -2733,6 +2735,22 @@ function setOptionalDetail(name, value) {
     const text = String(value || '').trim();
     target.textContent = text;
     row.classList.toggle('hidden', text === '');
+}
+
+function eventStatusDetailText(event) {
+    const status = String(event?.status || '').trim().toUpperCase();
+    return {
+        CONFIRMED: t('Confirmed'),
+        TENTATIVE: t('Tentative'),
+        CANCELLED: t('Cancelled')
+    }[status] || '';
+}
+
+function eventAvailabilityDetailText(event) {
+    const transparency = String(event?.transparency || '').trim().toUpperCase();
+    if (transparency === 'TRANSPARENT') return t('Free');
+    if (transparency === 'OPAQUE' || transparency === '') return t('Busy');
+    return '';
 }
 
 function formatDetailDate(date) {
@@ -4585,7 +4603,7 @@ function applyStaticTranslations() {
     updateViewSelectorOptions();
     document.getElementById('calendar-filter-dialog-title').textContent = t('Filter calendars');
     document.getElementById('calendar-filter-note').textContent = t('This filter only changes the current view on this browser or monitor.');
-    ['calendar', 'occasion', 'start', 'end', 'location', 'description'].forEach(name => {
+    ['calendar', 'occasion', 'start', 'end', 'status', 'availability', 'reminder', 'location', 'description'].forEach(name => {
         const label = document.getElementById(`details-${name}-label`);
         label.textContent = t(label.textContent.trim());
     });

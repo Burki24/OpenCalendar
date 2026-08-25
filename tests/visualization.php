@@ -252,6 +252,37 @@ assertVisualization(
 );
 
 assertVisualization(
+    str_contains($indexSource, 'id="details-status-row"')
+        && str_contains($indexSource, 'id="details-availability-row"')
+        && str_contains($script, 'function eventStatusDetailText(event)')
+        && str_contains($script, "CONFIRMED: t('Confirmed')")
+        && str_contains($script, "TENTATIVE: t('Tentative')")
+        && str_contains($script, "CANCELLED: t('Cancelled')")
+        && str_contains($script, 'function eventAvailabilityDetailText(event)')
+        && str_contains($script, "transparency === 'TRANSPARENT'")
+        && str_contains($script, "return t('Free');")
+        && str_contains($script, "transparency === 'OPAQUE' || transparency === ''")
+        && str_contains($script, "return t('Busy');")
+        && str_contains($script, "setOptionalDetail('status', eventStatusDetailText(event));")
+        && str_contains($script, "setOptionalDetail('availability', eventAvailabilityDetailText(event));")
+        && str_contains($moduleSource, "'Status',")
+        && str_contains($moduleSource, "'Availability',")
+        && str_contains($moduleSource, "'Confirmed',")
+        && str_contains($moduleSource, "'Tentative',")
+        && str_contains($moduleSource, "'Cancelled',")
+        && str_contains($moduleSource, "'Busy',")
+        && str_contains($moduleSource, "'Free',")
+        && str_contains($localeSource, '"Status": "Status"')
+        && str_contains($localeSource, '"Availability": "Verfügbarkeit"')
+        && str_contains($localeSource, '"Confirmed": "Bestätigt"')
+        && str_contains($localeSource, '"Tentative": "Vorläufig"')
+        && str_contains($localeSource, '"Cancelled": "Abgesagt"')
+        && str_contains($localeSource, '"Busy": "Belegt"')
+        && str_contains($localeSource, '"Free": "Frei"'),
+    'Event details must show provider-neutral RFC status and free/busy transparency with localized user-facing labels.'
+);
+
+assertVisualization(
     str_contains($script, "const action = moving ? 'MoveEvent' : (selectedEvent ? 'UpdateEvent' : 'CreateEvent');")
         && str_contains($script, 'targetCalendarInstanceId: calendarInstanceId')
         && str_contains($script, "document.getElementById('save-button').textContent = t(moving ? 'Move' : 'Save');")
