@@ -15,6 +15,7 @@ require_once __DIR__ . '/ICalendarRecurrence.php';
 require_once __DIR__ . '/ICalendarTimezoneResolver.php';
 require_once __DIR__ . '/CalendarEventRecurrence.php';
 require_once __DIR__ . '/CalendarEventReminder.php';
+require_once __DIR__ . '/CalendarEventState.php';
 require_once __DIR__ . '/CalendarRecurrenceRule.php';
 
 final class ICalendarCodec
@@ -84,7 +85,12 @@ final class ICalendarCodec
                 'timezoneResolved'            => $start['timezoneResolved'],
                 'localValue'                  => $start['localValue'],
                 'recurrenceTimezoneSupported' => $start['allDay'] || $start['timezoneResolved'],
-                'status'                      => strtoupper(self::propertyValue($properties, 'STATUS')),
+                'status'                      => CalendarEventState::normalizeStatus(
+                    self::propertyValue($properties, 'STATUS')
+                ),
+                'transparency'                => CalendarEventState::normalizeTransparency(
+                    self::propertyValue($properties, 'TRANSP')
+                ),
                 'recurrenceRule'              => $recurrenceRule,
                 'recurrenceIdTimestamp'       => $parsedRecurrenceId['timestamp'] ?? null,
                 'exceptionDates'              => self::parseDatePropertyList(

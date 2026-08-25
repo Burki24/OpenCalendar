@@ -16,6 +16,7 @@ require_once __DIR__ . '/RecurringCalendarProviderInterface.php';
 require_once __DIR__ . '/CalendarHttpClient.php';
 require_once __DIR__ . '/CalendarEventRecurrence.php';
 require_once __DIR__ . '/CalendarEventReminder.php';
+require_once __DIR__ . '/CalendarEventState.php';
 require_once __DIR__ . '/CalendarRecurrenceRule.php';
 
 final class MicrosoftCalendarProviderException extends RuntimeException
@@ -762,6 +763,13 @@ final class MicrosoftCalendarProvider implements CalendarProviderInterface, Recu
             default => CalendarEventRecurrence::single()
         };
         $resourceUrl = $this->eventUrl($calendarId, $eventId);
+        $status = (bool) ($item['isCancelled'] ?? false)
+            ? CalendarEventState::STATUS_CANCELLED
+            : CalendarEventState::STATUS_CONFIRMED;
+        $showAs = strtolower(trim((string) ($item['showAs'] ?? '')));
+        $transparency = $showAs === 'free'
+            ? CalendarEventState::TRANSP_TRANSPARENT
+            : CalendarEventState::TRANSP_OPAQUE;
 
         return array_merge([
             'id'             => hash('sha256', 'microsoft|' . $calendarId . '|' . $eventId),
@@ -778,7 +786,8 @@ final class MicrosoftCalendarProvider implements CalendarProviderInterface, Recu
             'endTimestamp'   => $end->getTimestamp(),
             'allDay'         => $allDay,
             'timezone'       => $timezone !== '' ? $timezone : 'UTC',
-            'status'         => (bool) ($item['isCancelled'] ?? false) ? 'CANCELLED' : 'CONFIRMED',
+            'status'         => $status,
+            'transparency'   => $transparency,
             'recurrenceRule' => '',
             'sequence'       => 0,
             'created'        => trim((string) ($item['createdDateTime'] ?? '')),

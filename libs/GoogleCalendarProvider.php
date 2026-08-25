@@ -17,6 +17,7 @@ require_once __DIR__ . '/RecurringCalendarProviderInterface.php';
 require_once __DIR__ . '/CalendarHttpClient.php';
 require_once __DIR__ . '/CalendarEventRecurrence.php';
 require_once __DIR__ . '/CalendarEventReminder.php';
+require_once __DIR__ . '/CalendarEventState.php';
 require_once __DIR__ . '/CalendarRecurrenceRule.php';
 
 final class GoogleCalendarProviderException extends RuntimeException
@@ -857,7 +858,8 @@ final class GoogleCalendarProvider implements CalendarEventLookupProviderInterfa
             'endTimestamp'   => $end->getTimestamp(),
             'allDay'         => $allDay,
             'timezone'       => $timezone,
-            'status'         => strtoupper(trim((string) ($item['status'] ?? ''))),
+            'status'         => CalendarEventState::normalizeStatus($item['status'] ?? ''),
+            'transparency'   => CalendarEventState::normalizeTransparency($item['transparency'] ?? ''),
             'recurrenceRule' => $recurrenceRule,
             'sequence'       => (int) ($item['sequence'] ?? 0),
             'created'        => trim((string) ($item['created'] ?? '')),

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Burki24\SymconModuleHelper\SymconOAuthClient;
 use IPSKalender\CalendarEventReminder;
+use IPSKalender\CalendarEventState;
 use IPSKalender\CalendarEventTranslation;
 use IPSKalender\CalendarHttpClientInterface;
 use IPSKalender\CalendarHttpResponse;
@@ -25,6 +26,7 @@ use IPSKalender\MicrosoftGraphOriginPolicy;
 use IPSKalender\SymconOAuthOriginPolicy;
 use IPSKalender\SynchronizationSchedule;
 
+require_once __DIR__ . '/../libs/CalendarEventState.php';
 require_once __DIR__ . '/../libs/GoogleCalendarProvider.php';
 require_once __DIR__ . '/../libs/GoogleCalendarOriginPolicy.php';
 require_once __DIR__ . '/../libs/GoogleOAuthOriginPolicy.php';
@@ -116,6 +118,27 @@ function assertTrueValue(bool $condition, string $message): void
         throw new RuntimeException($message);
     }
 }
+
+assertSameValue(
+    CalendarEventState::STATUS_TENTATIVE,
+    CalendarEventState::normalizeStatus(' tentative '),
+    'Provider event status values must normalize to RFC 5545 tokens.'
+);
+assertSameValue(
+    '',
+    CalendarEventState::normalizeStatus('unknown'),
+    'Unsupported provider event status values must not leak into the shared event model.'
+);
+assertSameValue(
+    CalendarEventState::TRANSP_TRANSPARENT,
+    CalendarEventState::normalizeTransparency(' transparent '),
+    'Provider transparency values must normalize to RFC 5545 tokens.'
+);
+assertSameValue(
+    CalendarEventState::TRANSP_OPAQUE,
+    CalendarEventState::normalizeTransparency(''),
+    'Missing provider transparency must use the RFC 5545 opaque default.'
+);
 
 $multipleReminder = CalendarEventReminder::fromMinutes([5, 30, 120]);
 assertSameValue('multiple', $multipleReminder['mode'], 'Multiple exact reminder offsets must use the shared multiple reminder mode.');
@@ -234,7 +257,8 @@ $eventClient = new FakeHttpClient([
                 'id'                => 'instance-id',
                 'iCalUID'           => 'series@example.com',
                 'summary'           => 'Meeting',
-                'status'            => 'confirmed',
+                'status'            => 'tentative',
+                'transparency'      => 'transparent',
                 'reminders'         => [
                     'useDefault' => false,
                     'overrides'  => [['method' => 'popup', 'minutes' => 15]]
@@ -261,6 +285,10 @@ $events = $provider->getEvents(
 assertSameValue(2, count($events), 'Cancelled events must be excluded.');
 assertSameValue(true, $events[0]['allDay'], 'Google date values must map to all-day events.');
 assertSameValue('2026-07-21', $events[0]['end'], 'The exclusive Google all-day end date must be retained.');
+assertSameValue('CONFIRMED', $events[0]['status'], 'Google confirmed status must use the provider-neutral RFC value.');
+assertSameValue('OPAQUE', $events[0]['transparency'], 'Google events without explicit transparency must default to opaque.');
+assertSameValue('TENTATIVE', $events[1]['status'], 'Google tentative status must remain distinguishable from confirmed events.');
+assertSameValue('TRANSPARENT', $events[1]['transparency'], 'Google transparent events must retain their free/busy behavior.');
 assertSameValue('default', $events[0]['reminder']['mode'], 'Google calendar-default reminders must remain distinguishable.');
 assertSameValue('custom', $events[1]['reminder']['mode'], 'One Google popup reminder must use the shared reminder model.');
 assertSameValue(15, $events[1]['reminder']['minutesBeforeStart'], 'Google popup reminder offsets must be retained.');
@@ -1180,6 +1208,7 @@ $msEventClient = new FakeHttpClient([
                 '@odata.etag' => 'W/"etag-1"',
                 'subject'     => 'Holiday',
                 'isAllDay'    => true,
+                'showAs'      => 'free',
                 'start'       => ['dateTime' => '2026-07-20T00:00:00.0000000', 'timeZone' => 'UTC'],
                 'end'         => ['dateTime' => '2026-07-21T00:00:00.0000000', 'timeZone' => 'UTC'],
                 'type'        => 'singleInstance'
@@ -1195,6 +1224,7 @@ $msEventClient = new FakeHttpClient([
                 'end'                        => ['dateTime' => '2026-07-20T11:00:00.1234567', 'timeZone' => 'UTC'],
                 'type'                       => 'occurrence',
                 'seriesMasterId'             => 'series-master',
+                'showAs'                     => 'tentative',
                 'isReminderOn'               => true,
                 'reminderMinutesBeforeStart' => 45,
                 'isOnlineMeeting'            => true,
@@ -1229,6 +1259,10 @@ $msEvents = $msProvider->getEvents(
 assertSameValue(3, count($msEvents), 'Cancelled Microsoft events must be excluded.');
 assertSameValue(true, $msEvents[0]['allDay'], 'Microsoft all-day events must retain their exclusive end date.');
 assertSameValue('2026-07-21', $msEvents[0]['end'], 'Microsoft all-day end dates must remain exclusive.');
+assertSameValue('CONFIRMED', $msEvents[0]['status'], 'Microsoft non-cancelled events must use the provider-neutral confirmed status.');
+assertSameValue('TRANSPARENT', $msEvents[0]['transparency'], 'Microsoft free availability must normalize to RFC transparent.');
+assertSameValue('CONFIRMED', $msEvents[1]['status'], 'Microsoft tentative availability must not be confused with RFC event status.');
+assertSameValue('OPAQUE', $msEvents[1]['transparency'], 'Microsoft tentative availability must continue to block time.');
 assertSameValue(true, $msEvents[1]['recurring'], 'Microsoft occurrences must remain marked as recurring.');
 assertSameValue('occurrence', $msEvents[1]['recurrenceType'], 'Microsoft occurrences must use the shared recurrence type.');
 assertSameValue('series-master', $msEvents[1]['seriesId'], 'Microsoft series master IDs must be retained separately.');
@@ -2486,6 +2520,41 @@ $explicitCredentials = ICalendarAuthentication::credentials(
 );
 assertSameValue('calendar-user', $explicitCredentials['username'], 'Explicit username/password mode must retain the username.');
 assertSameValue('calendar-password', $explicitCredentials['password'], 'Explicit username/password mode must retain the password.');
+
+$eventStateFixture = <<<'ICS'
+BEGIN:VCALENDAR
+VERSION:2.0
+BEGIN:VEVENT
+UID:event-state@example.com
+DTSTART:20260817T100000Z
+DTEND:20260817T110000Z
+SUMMARY:State test
+STATUS:TENTATIVE
+TRANSP:TRANSPARENT
+END:VEVENT
+END:VCALENDAR
+ICS;
+$eventStateFixture = str_replace("\n", "\r\n", $eventStateFixture) . "\r\n";
+$eventState = ICalendarCodec::parseEvents(
+    $eventStateFixture,
+    'https://calendar.example/work/state.ics',
+    '"state"'
+)[0];
+assertSameValue('TENTATIVE', $eventState['status'], 'RFC 5545 STATUS must survive iCalendar parsing.');
+assertSameValue('TRANSPARENT', $eventState['transparency'], 'RFC 5545 TRANSP must survive iCalendar parsing.');
+
+$opaqueStateFixture = str_replace(
+    "STATUS:TENTATIVE\r\nTRANSP:TRANSPARENT\r\n",
+    "STATUS:CONFIRMED\r\n",
+    $eventStateFixture
+);
+$opaqueState = ICalendarCodec::parseEvents(
+    $opaqueStateFixture,
+    'https://calendar.example/work/opaque-state.ics',
+    '"opaque-state"'
+)[0];
+assertSameValue('CONFIRMED', $opaqueState['status'], 'RFC 5545 confirmed status must normalize canonically.');
+assertSameValue('OPAQUE', $opaqueState['transparency'], 'Missing RFC 5545 TRANSP must use the opaque default.');
 
 $calDavRecurringCreated = ICalendarCodec::createEvent([
     'summary'    => 'CalDAV weekly meeting',
