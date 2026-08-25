@@ -16,7 +16,7 @@ require_once __DIR__ . '/HelperTranslationHelper.php';
  * their components, but do not define module-specific colors, gradients,
  * typography, borders or shadows.
  *
- * @version 1.4.2
+ * @version 1.4.3
  */
 trait IPSViewStyleHelper
 {
@@ -318,15 +318,12 @@ trait IPSViewStyleHelper
      *
      * @throws InvalidArgumentException If the requested color-control width is empty.
      */
-    protected function IPSViewStyleFormItems(string $colorWidth = '19%'): array
+    protected function IPSViewStyleFormItems(string $colorWidth = '240px'): array
     {
         $colorWidth = trim($colorWidth);
         if ($colorWidth === '') {
             throw new InvalidArgumentException('IPSView style color-control width must not be empty.');
         }
-
-        $responsiveColorLayout = $colorWidth === '19%';
-        $colorColumns = $responsiveColorLayout ? 5 : 3;
 
         $items = [
             [
@@ -346,19 +343,24 @@ trait IPSViewStyleHelper
                             ['caption' => $this->IPSViewStyleText('option.light_preset'), 'value' => self::IPSVIEW_STYLE_SOURCE_LIGHT],
                             ['caption' => $this->IPSViewStyleText('option.dark_preset'), 'value' => self::IPSVIEW_STYLE_SOURCE_DARK]
                         ],
-                        'width' => '24%'
+                        'width' => '220px'
                     ],
                     [
                         'type'    => 'SelectMedia',
                         'name'    => 'IPSViewStyleMediaID',
                         'caption' => $this->IPSViewStyleText('field.media_object'),
-                        'width'   => '34%'
-                    ],
+                        'width'   => '320px'
+                    ]
+                ]
+            ],
+            [
+                'type'  => 'RowLayout',
+                'items' => [
                     [
                         'type'    => 'CheckBox',
                         'name'    => 'IPSViewStyleTransparentBackground',
                         'caption' => $this->IPSViewStyleText('field.transparent_background'),
-                        'width'   => '20%'
+                        'width'   => '260px'
                     ],
                     [
                         'type'    => 'NumberSpinner',
@@ -367,7 +369,7 @@ trait IPSViewStyleHelper
                         'minimum' => 60,
                         'maximum' => 200,
                         'suffix'  => ' %',
-                        'width'   => '18%'
+                        'width'   => '180px'
                     ]
                 ]
             ],
@@ -381,7 +383,7 @@ trait IPSViewStyleHelper
             ]
         ];
 
-        foreach (array_chunk(array_keys(self::IPSVIEW_STYLE_COLOR_PROPERTIES), $colorColumns) as $keys) {
+        foreach (array_chunk(array_keys(self::IPSVIEW_STYLE_COLOR_PROPERTIES), 3) as $keys) {
             $row = [];
             foreach ($keys as $key) {
                 $row[] = [
@@ -403,7 +405,7 @@ trait IPSViewStyleHelper
             'type'    => 'Label',
             'caption' => $this->IPSViewStyleText('section.surface_transparency')
         ];
-        foreach (array_chunk(array_keys(self::IPSVIEW_STYLE_OPACITY_PROPERTIES), 4) as $keys) {
+        foreach (array_chunk(array_keys(self::IPSVIEW_STYLE_OPACITY_PROPERTIES), 3) as $keys) {
             $row = [];
             foreach ($keys as $key) {
                 $row[] = [
@@ -413,7 +415,7 @@ trait IPSViewStyleHelper
                     'minimum' => 0,
                     'maximum' => 100,
                     'suffix'  => ' %',
-                    'width'   => '24%'
+                    'width'   => '260px'
                 ];
             }
 
@@ -434,7 +436,7 @@ trait IPSViewStyleHelper
                     'type'    => 'ValidationTextBox',
                     'name'    => 'IPSViewStyleFontFamily',
                     'caption' => $this->IPSViewStyleText('field.font_family'),
-                    'width'   => '34%'
+                    'width'   => '300px'
                 ],
                 [
                     'type'    => 'NumberSpinner',
@@ -443,7 +445,7 @@ trait IPSViewStyleHelper
                     'minimum' => 8,
                     'maximum' => 32,
                     'suffix'  => ' px',
-                    'width'   => '20%'
+                    'width'   => '220px'
                 ],
                 [
                     'type'    => 'NumberSpinner',
@@ -453,17 +455,7 @@ trait IPSViewStyleHelper
                     'maximum' => 40,
                     'digits'  => 1,
                     'suffix'  => ' px',
-                    'width'   => '20%'
-                ],
-                [
-                    'type'    => 'NumberSpinner',
-                    'name'    => 'IPSViewStyleBorderWidth',
-                    'caption' => $this->IPSViewStyleText('field.border_width'),
-                    'minimum' => 0,
-                    'maximum' => 10,
-                    'digits'  => 1,
-                    'suffix'  => ' px',
-                    'width'   => '20%'
+                    'width'   => '220px'
                 ]
             ]
         ];
@@ -472,13 +464,23 @@ trait IPSViewStyleHelper
             'items' => [
                 [
                     'type'    => 'NumberSpinner',
+                    'name'    => 'IPSViewStyleBorderWidth',
+                    'caption' => $this->IPSViewStyleText('field.border_width'),
+                    'minimum' => 0,
+                    'maximum' => 10,
+                    'digits'  => 1,
+                    'suffix'  => ' px',
+                    'width'   => '220px'
+                ],
+                [
+                    'type'    => 'NumberSpinner',
                     'name'    => 'IPSViewStyleLineWidth',
                     'caption' => $this->IPSViewStyleText('field.line_width'),
                     'minimum' => 0,
                     'maximum' => 10,
                     'digits'  => 1,
                     'suffix'  => ' px',
-                    'width'   => '24%'
+                    'width'   => '220px'
                 ],
                 [
                     'type'    => 'NumberSpinner',
@@ -488,8 +490,13 @@ trait IPSViewStyleHelper
                     'maximum' => 80,
                     'digits'  => 1,
                     'suffix'  => ' px',
-                    'width'   => '24%'
-                ],
+                    'width'   => '220px'
+                ]
+            ]
+        ];
+        $items[] = [
+            'type'  => 'RowLayout',
+            'items' => [
                 [
                     'type'    => 'NumberSpinner',
                     'name'    => 'IPSViewStyleShadowSpread',
@@ -498,7 +505,7 @@ trait IPSViewStyleHelper
                     'maximum' => 40,
                     'digits'  => 1,
                     'suffix'  => ' px',
-                    'width'   => '24%'
+                    'width'   => '220px'
                 ],
                 [
                     'type'    => 'NumberSpinner',
@@ -508,13 +515,8 @@ trait IPSViewStyleHelper
                     'maximum' => 40,
                     'digits'  => 1,
                     'suffix'  => ' px',
-                    'width'   => '24%'
-                ]
-            ]
-        ];
-        $items[] = [
-            'type'  => 'RowLayout',
-            'items' => [
+                    'width'   => '220px'
+                ],
                 [
                     'type'    => 'NumberSpinner',
                     'name'    => 'IPSViewStyleShadowOffsetY',
@@ -523,8 +525,13 @@ trait IPSViewStyleHelper
                     'maximum' => 40,
                     'digits'  => 1,
                     'suffix'  => ' px',
-                    'width'   => '31%'
-                ],
+                    'width'   => '220px'
+                ]
+            ]
+        ];
+        $items[] = [
+            'type'  => 'RowLayout',
+            'items' => [
                 [
                     'type'    => 'NumberSpinner',
                     'name'    => 'IPSViewStyleDisabledOpacity',
@@ -532,7 +539,7 @@ trait IPSViewStyleHelper
                     'minimum' => 10,
                     'maximum' => 100,
                     'suffix'  => ' %',
-                    'width'   => '31%'
+                    'width'   => '220px'
                 ],
                 [
                     'type'    => 'NumberSpinner',
@@ -541,7 +548,7 @@ trait IPSViewStyleHelper
                     'minimum' => 0,
                     'maximum' => 80,
                     'suffix'  => ' %',
-                    'width'   => '31%'
+                    'width'   => '220px'
                 ]
             ]
         ];
@@ -563,7 +570,7 @@ trait IPSViewStyleHelper
     protected function InsertIPSViewStyleFormItems(
         array &$elements,
         string $markerCaption = self::IPSVIEW_STYLE_FORM_MARKER,
-        string $colorWidth = '19%'
+        string $colorWidth = '240px'
     ): bool {
         $markerCaption = trim($markerCaption);
         if ($markerCaption === '') {
