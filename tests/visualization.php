@@ -309,6 +309,21 @@ assertVisualization(
 );
 
 assertVisualization(
+    str_contains($script, 'function initializeIPSViewEventStatePickers()')
+        && str_contains($script, "calendarVisualization.mode !== 'ipsview'")
+        && str_contains($script, "picker.append(trigger, options);")
+        && str_contains($script, "select.classList.add('hidden');")
+        && str_contains($script, 'function synchronizeIPSViewEventStatePicker(select)')
+        && str_contains($script, 'picker.trigger.disabled = select.disabled;')
+        && str_contains($script, 'function openIPSViewEventStatePicker(select, focusSelected = false)')
+        && str_contains($script, 'function closeIPSViewEventStatePickers(exceptSelect = null)')
+        && str_contains($script, "option.setAttribute('aria-selected', String(selected));")
+        && str_contains($script, "select.dispatchEvent(new Event('change', { bubbles: true }));")
+        && str_contains($script, 'initializeIPSViewEventStatePickers();'),
+    'IPSView must use in-document event-state pickers instead of relying on native select popups inside the embedded WebView.'
+);
+
+assertVisualization(
     str_contains($script, 'const calendarClientContractVersion = 2;')
         && str_contains($script, "body.set('clientContractVersion', String(calendarClientContractVersion));")
         && str_contains($moduleSource, 'private const VISUALIZATION_CLIENT_CONTRACT_VERSION = 2;')
