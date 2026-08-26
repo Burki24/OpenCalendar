@@ -17,6 +17,7 @@ require_once __DIR__ . '/CalendarProviderInterface.php';
 require_once __DIR__ . '/RecurringCalendarProviderInterface.php';
 require_once __DIR__ . '/CalendarEventRecurrence.php';
 require_once __DIR__ . '/CalendarEventReminder.php';
+require_once __DIR__ . '/CalendarEventState.php';
 require_once __DIR__ . '/CalendarRecurrenceRule.php';
 require_once __DIR__ . '/CalendarHttpClient.php';
 require_once __DIR__ . '/CalDAVOriginPolicy.php';
@@ -1266,8 +1267,13 @@ final class CalDAVProvider implements CalendarProviderInterface, RecurringCalend
                     'updateFollowing'  => $canWrite,
                     'updateSeries'     => $canWrite,
                     'deleteSeries'     => $canWrite,
+                    'writeStatus'      => $canWrite,
+                    'writeTransparency' => $canWrite,
                     'maxReminders'     => CalendarEventReminder::MAX_REMINDERS
-                ]
+                ],
+                'defaultStatus'                 => CalendarEventState::STATUS_CONFIRMED,
+                'defaultTransparency'           => CalendarEventState::TRANSP_OPAQUE,
+                'defaultAllDayTransparency'     => CalendarEventState::TRANSP_OPAQUE
             ];
         }
 

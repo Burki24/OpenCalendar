@@ -213,6 +213,11 @@ assertSameValue(true, $calendars[0]['capabilities']['deleteSeries'], 'Writable G
 assertSameValue(true, $calendars[0]['capabilities']['useDefaultReminder'], 'Google calendars must advertise persistent calendar-default reminder support.');
 assertSameValue(true, $calendars[0]['capabilities']['createWithDefaultReminder'], 'Google calendars must allow new events to use the calendar default.');
 assertSameValue(5, $calendars[0]['capabilities']['maxReminders'], 'Google calendars must advertise support for up to five provider-neutral reminders.');
+assertSameValue(true, $calendars[0]['capabilities']['writeStatus'], 'Writable Google calendars must advertise provider-neutral status writes.');
+assertSameValue(true, $calendars[0]['capabilities']['writeTransparency'], 'Writable Google calendars must advertise provider-neutral transparency writes.');
+assertSameValue(CalendarEventState::STATUS_CONFIRMED, $calendars[0]['defaultStatus'], 'Google calendars must advertise their default event status.');
+assertSameValue(CalendarEventState::TRANSP_OPAQUE, $calendars[0]['defaultTransparency'], 'Google timed events must default to busy.');
+assertSameValue(CalendarEventState::TRANSP_OPAQUE, $calendars[0]['defaultAllDayTransparency'], 'Google all-day events must default to busy.');
 assertSameValue('custom', $calendars[0]['defaultReminder']['mode'], 'One Google popup calendar default must use the shared reminder model.');
 assertSameValue(30, $calendars[0]['defaultReminder']['minutesBeforeStart'], 'Google calendar-default reminder offsets must be retained.');
 assertSameValue('Europe/Berlin', $calendars[0]['timezone'], 'Google calendar timezones must be retained for recurring events.');
@@ -1159,6 +1164,11 @@ assertSameValue(true, $msCalendars[0]['capabilities']['updateSeries'], 'Editable
 assertSameValue(true, $msCalendars[0]['capabilities']['deleteSeries'], 'Editable Microsoft calendars must advertise recurring series delete support.');
 assertSameValue(true, $msCalendars[0]['capabilities']['createWithDefaultReminder'], 'Microsoft calendars must allow the server default when creating events.');
 assertSameValue(1, $msCalendars[0]['capabilities']['maxReminders'], 'Microsoft calendars must advertise the single reminder supported by the shared model.');
+assertSameValue(false, $msCalendars[0]['capabilities']['writeStatus'], 'Microsoft calendars must not advertise unsupported provider-neutral status writes.');
+assertSameValue(true, $msCalendars[0]['capabilities']['writeTransparency'], 'Writable Microsoft calendars must advertise provider-neutral transparency writes.');
+assertSameValue(CalendarEventState::STATUS_CONFIRMED, $msCalendars[0]['defaultStatus'], 'Microsoft calendars must advertise their provider-neutral default status.');
+assertSameValue(CalendarEventState::TRANSP_OPAQUE, $msCalendars[0]['defaultTransparency'], 'Microsoft timed events must default to busy.');
+assertSameValue(CalendarEventState::TRANSP_TRANSPARENT, $msCalendars[0]['defaultAllDayTransparency'], 'Microsoft all-day events must retain the provider free default.');
 assertTrueValue(!isset($msCalendars[0]['capabilities']['useDefaultReminder']), 'Microsoft events must not advertise a persistent calendar-default reminder mode.');
 assertSameValue(false, $msCalendars[2]['capabilities']['create'], 'Read-only Microsoft calendars must remain read-only.');
 assertSameValue(false, $msCalendars[2]['capabilities']['createRecurrence'], 'Read-only Microsoft calendars must not advertise recurrence creation support.');
@@ -3865,10 +3875,39 @@ assertTrueValue(
         && str_contains($calDavProviderSource, '<c:text-match collation="i;octet">')
         && str_contains($calDavProviderSource, "'updateSeries'     => \$canWrite")
         && str_contains($calDavProviderSource, "'deleteSeries'     => \$canWrite")
+        && str_contains($calDavProviderSource, "'writeStatus'      => \$canWrite")
+        && str_contains($calDavProviderSource, "'writeTransparency' => \$canWrite")
+        && str_contains($calDavProviderSource, "'defaultStatus'                 => CalendarEventState::STATUS_CONFIRMED")
+        && str_contains($calDavProviderSource, "'defaultTransparency'           => CalendarEventState::TRANSP_OPAQUE")
+        && str_contains($calDavProviderSource, "'defaultAllDayTransparency'     => CalendarEventState::TRANSP_OPAQUE")
         && str_contains($calDavProviderSource, 'ICalendarCodec::updateRecurringSeries(')
         && str_contains($calDavProviderSource, 'CalendarEventRecurrence::WRITE_SCOPE_SERIES'),
     'CalDAV must expose verified full-series lookup, editing and deletion while keeping following writes separate.'
 );
+assertTrueValue(
+    is_string($accountModuleSource)
+        && str_contains($accountModuleSource, "array_key_exists('writeStatus', \$capabilities)")
+        && str_contains($accountModuleSource, "array_key_exists('writeTransparency', \$capabilities)")
+        && str_contains($accountModuleSource, "'defaultStatus'] = CalendarEventState::STATUS_CONFIRMED")
+        && str_contains($accountModuleSource, "'defaultTransparency'] = CalendarEventState::TRANSP_OPAQUE")
+        && str_contains($accountModuleSource, "\$provider === self::PROVIDER_MICROSOFT")
+        && str_contains($accountModuleSource, 'CalendarEventState::TRANSP_TRANSPARENT'),
+    'Cached account calendars must gain provider event-state capabilities and defaults without manual rediscovery.'
+);
+
+assertTrueValue(
+    is_string($calendarModuleSource)
+        && str_contains($calendarModuleSource, "RegisterAttributeBoolean('DetectedCanWriteStatus', false)")
+        && str_contains($calendarModuleSource, "RegisterAttributeBoolean('DetectedCanWriteTransparency', false)")
+        && str_contains($calendarModuleSource, "RegisterAttributeString('DetectedDefaultStatus', CalendarEventState::STATUS_CONFIRMED)")
+        && str_contains($calendarModuleSource, "\$capabilities['writeStatus'] ?? false")
+        && str_contains($calendarModuleSource, "\$capabilities['writeTransparency'] ?? false")
+        && str_contains($calendarModuleSource, "'canWriteStatus'               => \$metadataAvailable")
+        && str_contains($calendarModuleSource, "'canWriteTransparency'         => \$metadataAvailable")
+        && str_contains($calendarModuleSource, "'defaultAllDayTransparency'     => \$metadataAvailable"),
+    'Calendar instances must persist and expose provider-neutral event-state capabilities and defaults.'
+);
+
 assertTrueValue(
     is_string($calendarModuleSource)
         && str_contains($calendarModuleSource, "RegisterAttributeString('ResolvedCalendarID', '')")

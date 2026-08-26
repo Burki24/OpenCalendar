@@ -133,8 +133,13 @@ final class GoogleCalendarProvider implements CalendarEventLookupProviderInterfa
                         'deleteSeries'              => $canWrite,
                         'useDefaultReminder'        => true,
                         'createWithDefaultReminder' => $canWrite,
+                        'writeStatus'               => $canWrite,
+                        'writeTransparency'         => $canWrite,
                         'maxReminders'              => CalendarEventReminder::MAX_REMINDERS
-                    ]
+                    ],
+                    'defaultStatus'                 => CalendarEventState::STATUS_CONFIRMED,
+                    'defaultTransparency'           => CalendarEventState::TRANSP_OPAQUE,
+                    'defaultAllDayTransparency'     => CalendarEventState::TRANSP_OPAQUE
                 ];
                 if (count($calendars) > self::MAX_CALENDARS) {
                     throw new GoogleCalendarProviderException('Google Calendar returned too many calendars.');

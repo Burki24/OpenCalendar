@@ -12,6 +12,7 @@ use IPSKalender\CalDAVOriginPolicy;
 use IPSKalender\CalDAVProvider;
 use IPSKalender\CalDAVProviderException;
 use IPSKalender\CalendarEventRecurrence;
+use IPSKalender\CalendarEventState;
 use IPSKalender\CalendarEventTranslation;
 use IPSKalender\CalendarHttpClient;
 use IPSKalender\CalendarHttpOriginPolicyInterface;
@@ -42,6 +43,7 @@ require_once __DIR__ . '/../libs/CalendarHttpClient.php';
 require_once __DIR__ . '/../libs/CalendarHttpOriginPolicyInterface.php';
 require_once __DIR__ . '/../libs/CalendarEventTranslation.php';
 require_once __DIR__ . '/../libs/CalendarEventRecurrence.php';
+require_once __DIR__ . '/../libs/CalendarEventState.php';
 require_once __DIR__ . '/../libs/CalDAVProvider.php';
 require_once __DIR__ . '/../libs/CalDAVOriginPolicy.php';
 require_once __DIR__ . '/../libs/GoogleCalendarProvider.php';
@@ -698,8 +700,9 @@ class CalendarAccount extends IPSModuleStrict
      *
      * Existing account caches survive module updates. Capabilities introduced later are
      * therefore derived from the provider and the already cached write permission so child
-     * calendar instances can use them without a manual account resynchronization. Google
-     * calendar-default reminder details remain protected until the next discovery refresh.
+     * calendar instances can use them without a manual account resynchronization. Event-state
+     * write support and provider defaults are restored here as well. Google calendar-default
+     * reminder details remain protected until the next discovery refresh.
      *
      * @param list<array<string, mixed>> $calendars Cached account calendars.
      * @return list<array<string, mixed>> Normalized calendars.
@@ -733,6 +736,24 @@ class CalendarAccount extends IPSModuleStrict
             }
             if (!array_key_exists('updateRecurrence', $capabilities)) {
                 $capabilities['updateRecurrence'] = $canWrite;
+            }
+            if (!array_key_exists('writeStatus', $capabilities)) {
+                $capabilities['writeStatus'] = $canWrite
+                    && $provider !== self::PROVIDER_MICROSOFT;
+            }
+            if (!array_key_exists('writeTransparency', $capabilities)) {
+                $capabilities['writeTransparency'] = $canWrite;
+            }
+            if (!array_key_exists('defaultStatus', $calendar)) {
+                $calendar['defaultStatus'] = CalendarEventState::STATUS_CONFIRMED;
+            }
+            if (!array_key_exists('defaultTransparency', $calendar)) {
+                $calendar['defaultTransparency'] = CalendarEventState::TRANSP_OPAQUE;
+            }
+            if (!array_key_exists('defaultAllDayTransparency', $calendar)) {
+                $calendar['defaultAllDayTransparency'] = $provider === self::PROVIDER_MICROSOFT
+                    ? CalendarEventState::TRANSP_TRANSPARENT
+                    : CalendarEventState::TRANSP_OPAQUE;
             }
             if (in_array($provider, [self::PROVIDER_APPLE, self::PROVIDER_CALDAV], true)) {
                 if (!array_key_exists('updateOccurrence', $capabilities)) {

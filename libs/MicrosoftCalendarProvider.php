@@ -116,8 +116,13 @@ final class MicrosoftCalendarProvider implements CalendarProviderInterface, Recu
                         'updateSeries'              => $canWrite,
                         'deleteSeries'              => $canWrite,
                         'createWithDefaultReminder' => $canWrite,
+                        'writeStatus'               => false,
+                        'writeTransparency'         => $canWrite,
                         'maxReminders'              => 1
-                    ]
+                    ],
+                    'defaultStatus'                 => CalendarEventState::STATUS_CONFIRMED,
+                    'defaultTransparency'           => CalendarEventState::TRANSP_OPAQUE,
+                    'defaultAllDayTransparency'     => CalendarEventState::TRANSP_TRANSPARENT
                 ];
                 if (count($calendars) > self::MAX_CALENDARS) {
                     throw new MicrosoftCalendarProviderException('Microsoft Calendar returned too many calendars.');

@@ -10,6 +10,7 @@ use Burki24\SymconModuleHelper\PersistentJsonCacheHelper;
 use Burki24\SymconModuleHelper\VariableHelper;
 use IPSKalender\CalendarEventCounter;
 use IPSKalender\CalendarEventRecurrence;
+use IPSKalender\CalendarEventState;
 use IPSKalender\SynchronizationSchedule;
 
 require_once __DIR__ . '/../libs/helper/ChunkedJsonTransferHelper.php';
@@ -20,6 +21,7 @@ require_once __DIR__ . '/../libs/helper/PersistentJsonCacheHelper.php';
 require_once __DIR__ . '/../libs/helper/VariableHelper.php';
 require_once __DIR__ . '/../libs/CalendarEventCounter.php';
 require_once __DIR__ . '/../libs/CalendarEventRecurrence.php';
+require_once __DIR__ . '/../libs/CalendarEventState.php';
 require_once __DIR__ . '/../libs/SynchronizationSchedule.php';
 
 class Calendar extends IPSModuleStrict
@@ -93,6 +95,11 @@ class Calendar extends IPSModuleStrict
         $this->RegisterAttributeBoolean('DetectedCanDeleteSeries', false);
         $this->RegisterAttributeBoolean('DetectedCanUseDefaultReminder', false);
         $this->RegisterAttributeBoolean('DetectedCanCreateWithDefaultReminder', false);
+        $this->RegisterAttributeBoolean('DetectedCanWriteStatus', false);
+        $this->RegisterAttributeBoolean('DetectedCanWriteTransparency', false);
+        $this->RegisterAttributeString('DetectedDefaultStatus', CalendarEventState::STATUS_CONFIRMED);
+        $this->RegisterAttributeString('DetectedDefaultTransparency', CalendarEventState::TRANSP_OPAQUE);
+        $this->RegisterAttributeString('DetectedDefaultAllDayTransparency', CalendarEventState::TRANSP_OPAQUE);
         $this->RegisterAttributeInteger('DetectedMaxReminders', 1);
         $this->RegisterAttributeString('DetectedDefaultReminder', '{}');
         $this->RegisterAttributeString('DetectedCalendarTimezone', '');
@@ -1018,6 +1025,28 @@ class Calendar extends IPSModuleStrict
                     && $this->ReadAttributeBoolean('DetectedCanUseDefaultReminder'),
                 'canCreateWithDefaultReminder' => $metadataAvailable
                     && $this->ReadAttributeBoolean('DetectedCanCreateWithDefaultReminder'),
+                'canWriteStatus'               => $metadataAvailable
+                    && $this->ReadAttributeBoolean('DetectedCanWriteStatus'),
+                'canWriteTransparency'         => $metadataAvailable
+                    && $this->ReadAttributeBoolean('DetectedCanWriteTransparency'),
+                'defaultStatus'                 => $metadataAvailable
+                    ? CalendarEventState::normalizeStatus(
+                        $this->ReadAttributeString('DetectedDefaultStatus'),
+                        CalendarEventState::STATUS_CONFIRMED
+                    )
+                    : CalendarEventState::STATUS_CONFIRMED,
+                'defaultTransparency'           => $metadataAvailable
+                    ? CalendarEventState::normalizeTransparency(
+                        $this->ReadAttributeString('DetectedDefaultTransparency'),
+                        CalendarEventState::TRANSP_OPAQUE
+                    )
+                    : CalendarEventState::TRANSP_OPAQUE,
+                'defaultAllDayTransparency'     => $metadataAvailable
+                    ? CalendarEventState::normalizeTransparency(
+                        $this->ReadAttributeString('DetectedDefaultAllDayTransparency'),
+                        CalendarEventState::TRANSP_OPAQUE
+                    )
+                    : CalendarEventState::TRANSP_OPAQUE,
                 'defaultReminder'              => $metadataAvailable ? $defaultReminder : [],
                 'maxReminders'                 => $metadataAvailable
                     ? max(1, min(5, $this->ReadAttributeInteger('DetectedMaxReminders')))
@@ -1104,6 +1133,11 @@ class Calendar extends IPSModuleStrict
             $this->WriteAttributeBoolean('DetectedCanDeleteSeries', false);
             $this->WriteAttributeBoolean('DetectedCanUseDefaultReminder', false);
             $this->WriteAttributeBoolean('DetectedCanCreateWithDefaultReminder', false);
+            $this->WriteAttributeBoolean('DetectedCanWriteStatus', false);
+            $this->WriteAttributeBoolean('DetectedCanWriteTransparency', false);
+            $this->WriteAttributeString('DetectedDefaultStatus', CalendarEventState::STATUS_CONFIRMED);
+            $this->WriteAttributeString('DetectedDefaultTransparency', CalendarEventState::TRANSP_OPAQUE);
+            $this->WriteAttributeString('DetectedDefaultAllDayTransparency', CalendarEventState::TRANSP_OPAQUE);
             $this->WriteAttributeInteger('DetectedMaxReminders', 1);
             $this->WriteAttributeString('DetectedDefaultReminder', '{}');
             $this->WriteAttributeString('DetectedCalendarTimezone', '');
@@ -1130,6 +1164,20 @@ class Calendar extends IPSModuleStrict
         $canDeleteSeries = (bool) ($capabilities['deleteSeries'] ?? false);
         $canUseDefaultReminder = (bool) ($capabilities['useDefaultReminder'] ?? false);
         $canCreateWithDefaultReminder = (bool) ($capabilities['createWithDefaultReminder'] ?? false);
+        $canWriteStatus = (bool) ($capabilities['writeStatus'] ?? false);
+        $canWriteTransparency = (bool) ($capabilities['writeTransparency'] ?? false);
+        $defaultStatus = CalendarEventState::normalizeStatus(
+            $calendar['defaultStatus'] ?? '',
+            CalendarEventState::STATUS_CONFIRMED
+        );
+        $defaultTransparency = CalendarEventState::normalizeTransparency(
+            $calendar['defaultTransparency'] ?? '',
+            CalendarEventState::TRANSP_OPAQUE
+        );
+        $defaultAllDayTransparency = CalendarEventState::normalizeTransparency(
+            $calendar['defaultAllDayTransparency'] ?? '',
+            $defaultTransparency
+        );
         $maxReminders = max(1, min(5, (int) ($capabilities['maxReminders'] ?? 1)));
         $defaultReminder = is_array($calendar['defaultReminder'] ?? null)
             && !array_is_list($calendar['defaultReminder'])
@@ -1157,6 +1205,11 @@ class Calendar extends IPSModuleStrict
             'DetectedCanCreateWithDefaultReminder',
             $canCreateWithDefaultReminder
         );
+        $this->WriteAttributeBoolean('DetectedCanWriteStatus', $canWriteStatus);
+        $this->WriteAttributeBoolean('DetectedCanWriteTransparency', $canWriteTransparency);
+        $this->WriteAttributeString('DetectedDefaultStatus', $defaultStatus);
+        $this->WriteAttributeString('DetectedDefaultTransparency', $defaultTransparency);
+        $this->WriteAttributeString('DetectedDefaultAllDayTransparency', $defaultAllDayTransparency);
         $this->WriteAttributeInteger('DetectedMaxReminders', $maxReminders);
         $this->WriteAttributeString(
             'DetectedDefaultReminder',
@@ -1180,7 +1233,12 @@ class Calendar extends IPSModuleStrict
             'canDeleteSeries'          => $canDeleteSeries,
             'maxReminders'             => $maxReminders,
             'canUseDefaultReminder'    => $canUseDefaultReminder,
-            'canCreateDefaultReminder' => $canCreateWithDefaultReminder
+            'canCreateDefaultReminder' => $canCreateWithDefaultReminder,
+            'canWriteStatus'           => $canWriteStatus,
+            'canWriteTransparency'     => $canWriteTransparency,
+            'defaultStatus'            => $defaultStatus,
+            'defaultTransparency'      => $defaultTransparency,
+            'defaultAllDayTransparency' => $defaultAllDayTransparency
         ]);
     }
 

@@ -2794,6 +2794,10 @@ function calendarSupportsEventAvailability(calendar) {
     return Boolean(calendar?.canWriteTransparency);
 }
 
+function defaultEventStatus(calendar) {
+    return normalizedEventStatus(calendar?.defaultStatus, 'CONFIRMED');
+}
+
 function defaultEventTransparency(calendar, allDay = false) {
     return normalizedEventTransparency(
         allDay ? calendar?.defaultAllDayTransparency : calendar?.defaultTransparency
@@ -2801,7 +2805,7 @@ function defaultEventTransparency(calendar, allDay = false) {
 }
 
 function loadEventStateEditor(event) {
-    eventStatusInput.value = normalizedEventStatus(event?.status, 'CONFIRMED');
+    eventStatusInput.value = normalizedEventStatus(event?.status, defaultEventStatus(selectedCalendarEntry()));
     eventAvailabilityInput.value = normalizedEventTransparency(event?.transparency);
     eventStatusEdited = false;
     eventAvailabilityEdited = false;
@@ -2809,7 +2813,7 @@ function loadEventStateEditor(event) {
 }
 
 function resetEventStateEditor() {
-    eventStatusInput.value = 'CONFIRMED';
+    eventStatusInput.value = defaultEventStatus(selectedCalendarEntry());
     eventAvailabilityInput.value = defaultEventTransparency(
         selectedCalendarEntry(),
         document.getElementById('event-all-day').checked
@@ -2822,7 +2826,7 @@ function resetEventStateEditor() {
 function updateEventStateDefaults() {
     if (selectedEvent === null) {
         if (!eventStatusEdited) {
-            eventStatusInput.value = 'CONFIRMED';
+            eventStatusInput.value = defaultEventStatus(selectedCalendarEntry());
         }
         if (!eventAvailabilityEdited) {
             eventAvailabilityInput.value = defaultEventTransparency(
@@ -2999,10 +3003,11 @@ function handleIPSViewEventStateOptionKeydown(event, select) {
 
 function appendEventStateChanges(eventData, targetCalendar, moving, allDay) {
     if (calendarSupportsEventStatus(targetCalendar)) {
-        const status = normalizedEventStatus(eventStatusInput.value, 'CONFIRMED');
+        const defaultStatus = defaultEventStatus(targetCalendar);
+        const status = normalizedEventStatus(eventStatusInput.value, defaultStatus);
         const baselineStatus = selectedEvent && !moving
-            ? normalizedEventStatus(selectedEvent.status, 'CONFIRMED')
-            : 'CONFIRMED';
+            ? normalizedEventStatus(selectedEvent.status, defaultStatus)
+            : defaultStatus;
         if (eventStatusEdited || status !== baselineStatus) {
             eventData.status = status;
         }

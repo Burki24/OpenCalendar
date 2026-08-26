@@ -10,9 +10,11 @@ use Burki24\SymconModuleHelper\VisualizationAssetHelper;
 use Burki24\SymconModuleHelper\VisualizationThemeHelper;
 use IPSKalender\CalendarAppointmentRange;
 use IPSKalender\CalendarEventReminder;
+use IPSKalender\CalendarEventState;
 
 require_once __DIR__ . '/../libs/CalendarAppointmentRange.php';
 require_once __DIR__ . '/../libs/CalendarEventReminder.php';
+require_once __DIR__ . '/../libs/CalendarEventState.php';
 require_once __DIR__ . '/../libs/helper/ConfigurationFormHelper.php';
 require_once __DIR__ . '/../libs/helper/IPSViewHTMLPageHelper.php';
 require_once __DIR__ . '/../libs/helper/IPSViewStyleHelper.php';
@@ -2491,7 +2493,7 @@ class CalendarView extends IPSModuleStrict
     }
 
     /**
-     * @return list<array{instanceId: int, name: string, color: string, canWrite: bool, timezone: string, canCreateRecurrence: bool, canUpdateRecurrence: bool, canUpdateOccurrence: bool, canDeleteOccurrence: bool, canUpdateFollowing: bool, canUpdateSeries: bool, canDeleteSeries: bool, canUseDefaultReminder: bool, canCreateWithDefaultReminder: bool, defaultReminder: array<string, mixed>, maxReminders: int, canWriteStatus: bool, canWriteTransparency: bool, defaultTransparency: string, defaultAllDayTransparency: string, provider?: string, lastSynchronization?: int, status?: int, lastError?: string}>
+     * @return list<array{instanceId: int, name: string, color: string, canWrite: bool, timezone: string, canCreateRecurrence: bool, canUpdateRecurrence: bool, canUpdateOccurrence: bool, canDeleteOccurrence: bool, canUpdateFollowing: bool, canUpdateSeries: bool, canDeleteSeries: bool, canUseDefaultReminder: bool, canCreateWithDefaultReminder: bool, defaultReminder: array<string, mixed>, maxReminders: int, canWriteStatus: bool, canWriteTransparency: bool, defaultStatus: string, defaultTransparency: string, defaultAllDayTransparency: string, provider?: string, lastSynchronization?: int, status?: int, lastError?: string}>
      */
     private function loadSelectedCalendars(bool $includeOperationalMetadata = false): array
     {
@@ -2529,7 +2531,6 @@ class CalendarView extends IPSModuleStrict
                 $color = $palette[abs(crc32((string) $instanceId)) % count($palette)];
             }
 
-            $provider = $this->calendarProviderKey($instance);
             $canWrite = (bool) ($calendarStatus['canWrite']
                 ?? IPS_GetProperty($instanceId, 'CanWrite'));
             $calendar = [
@@ -2552,12 +2553,20 @@ class CalendarView extends IPSModuleStrict
                     ? $calendarStatus['defaultReminder']
                     : [],
                 'maxReminders'                 => max(1, min(CalendarEventReminder::MAX_REMINDERS, (int) ($calendarStatus['maxReminders'] ?? 1))),
-                'canWriteStatus'               => $canWrite
-                    && in_array($provider, ['apple', 'caldav', 'google'], true),
-                'canWriteTransparency'         => $canWrite
-                    && in_array($provider, ['apple', 'caldav', 'google', 'microsoft'], true),
-                'defaultTransparency'          => 'OPAQUE',
-                'defaultAllDayTransparency'    => $provider === 'microsoft' ? 'TRANSPARENT' : 'OPAQUE'
+                'canWriteStatus'               => (bool) ($calendarStatus['canWriteStatus'] ?? false),
+                'canWriteTransparency'         => (bool) ($calendarStatus['canWriteTransparency'] ?? false),
+                'defaultStatus'                => CalendarEventState::normalizeStatus(
+                    $calendarStatus['defaultStatus'] ?? '',
+                    CalendarEventState::STATUS_CONFIRMED
+                ),
+                'defaultTransparency'          => CalendarEventState::normalizeTransparency(
+                    $calendarStatus['defaultTransparency'] ?? '',
+                    CalendarEventState::TRANSP_OPAQUE
+                ),
+                'defaultAllDayTransparency'    => CalendarEventState::normalizeTransparency(
+                    $calendarStatus['defaultAllDayTransparency'] ?? '',
+                    CalendarEventState::TRANSP_OPAQUE
+                )
             ];
             if ($includeOperationalMetadata) {
                 $calendar['provider'] = $this->calendarProviderKey($instance);

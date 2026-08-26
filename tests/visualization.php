@@ -292,6 +292,8 @@ assertVisualization(
         && str_contains($script, 'return Boolean(calendar?.canWriteStatus);')
         && str_contains($script, 'function calendarSupportsEventAvailability(calendar)')
         && str_contains($script, 'return Boolean(calendar?.canWriteTransparency);')
+        && str_contains($script, 'function defaultEventStatus(calendar)')
+        && str_contains($script, "normalizedEventStatus(calendar?.defaultStatus, 'CONFIRMED')")
         && str_contains($script, 'allDay ? calendar?.defaultAllDayTransparency : calendar?.defaultTransparency')
         && str_contains($script, 'function appendEventStateChanges(eventData, targetCalendar, moving, allDay)')
         && str_contains($script, 'eventData.status = status;')
@@ -300,10 +302,12 @@ assertVisualization(
         && str_contains($script, "const rawStatus = String(properties.STATUS?.[0]?.value || '').trim().toUpperCase();")
         && str_contains($script, "const rawTransparency = String(properties.TRANSP?.[0]?.value || '').trim().toUpperCase();")
         && str_contains($script, "const transparency = parsedTransparency || 'OPAQUE';")
-        && str_contains($moduleSource, "'canWriteStatus'               => \$canWrite")
-        && str_contains($moduleSource, "'canWriteTransparency'         => \$canWrite")
-        && str_contains($moduleSource, "'defaultTransparency'          => 'OPAQUE'")
-        && str_contains($moduleSource, "'defaultAllDayTransparency'    => \$provider === 'microsoft' ? 'TRANSPARENT' : 'OPAQUE'")
+        && str_contains($moduleSource, "'canWriteStatus'               => (bool) (\$calendarStatus['canWriteStatus'] ?? false)")
+        && str_contains($moduleSource, "'canWriteTransparency'         => (bool) (\$calendarStatus['canWriteTransparency'] ?? false)")
+        && str_contains($moduleSource, "\$calendarStatus['defaultStatus'] ?? ''")
+        && str_contains($moduleSource, "\$calendarStatus['defaultTransparency'] ?? ''")
+        && str_contains($moduleSource, "\$calendarStatus['defaultAllDayTransparency'] ?? ''")
+        && !str_contains($moduleSource, "in_array(\$provider, ['apple', 'caldav', 'google']")
         && str_contains($moduleSource, "\$calendar['provider'] = \$this->calendarProviderKey(\$instance);"),
     'The event editor must use provider-neutral write capabilities, preserve provider defaults, and retain imported RFC state without exposing provider metadata by default.'
 );
