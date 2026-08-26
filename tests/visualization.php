@@ -289,10 +289,10 @@ assertVisualization(
         && str_contains($indexSource, '<option value="OPAQUE" data-i18n="Busy">')
         && str_contains($indexSource, '<option value="TRANSPARENT" data-i18n="Free">')
         && str_contains($script, 'function calendarSupportsEventStatus(calendar)')
-        && str_contains($script, "['apple', 'caldav', 'google'].includes(eventStateProvider(calendar))")
+        && str_contains($script, 'return Boolean(calendar?.canWriteStatus);')
         && str_contains($script, 'function calendarSupportsEventAvailability(calendar)')
-        && str_contains($script, "['apple', 'caldav', 'google', 'microsoft'].includes(eventStateProvider(calendar))")
-        && str_contains($script, "eventStateProvider(calendar) === 'microsoft' && allDay ? 'TRANSPARENT' : 'OPAQUE'")
+        && str_contains($script, 'return Boolean(calendar?.canWriteTransparency);')
+        && str_contains($script, 'allDay ? calendar?.defaultAllDayTransparency : calendar?.defaultTransparency')
         && str_contains($script, 'function appendEventStateChanges(eventData, targetCalendar, moving, allDay)')
         && str_contains($script, 'eventData.status = status;')
         && str_contains($script, 'eventData.transparency = transparency;')
@@ -300,8 +300,12 @@ assertVisualization(
         && str_contains($script, "const rawStatus = String(properties.STATUS?.[0]?.value || '').trim().toUpperCase();")
         && str_contains($script, "const rawTransparency = String(properties.TRANSP?.[0]?.value || '').trim().toUpperCase();")
         && str_contains($script, "const transparency = parsedTransparency || 'OPAQUE';")
-        && str_contains($moduleSource, "'provider'                     => $this->calendarProviderKey($instance),"),
-    'The event editor must write status and availability only for compatible providers, preserve provider defaults, and retain imported RFC state.'
+        && str_contains($moduleSource, "'canWriteStatus'                => $canWrite")
+        && str_contains($moduleSource, "'canWriteTransparency'          => $canWrite")
+        && str_contains($moduleSource, "'defaultTransparency'           => 'OPAQUE'")
+        && str_contains($moduleSource, "'defaultAllDayTransparency'     => $provider === 'microsoft' ? 'TRANSPARENT' : 'OPAQUE'")
+        && str_contains($moduleSource, "\$calendar['provider'] = \$this->calendarProviderKey(\$instance);"),
+    'The event editor must use provider-neutral write capabilities, preserve provider defaults, and retain imported RFC state without exposing provider metadata by default.'
 );
 
 assertVisualization(

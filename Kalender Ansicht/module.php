@@ -2435,7 +2435,7 @@ class CalendarView extends IPSModuleStrict
     }
 
     /**
-     * @return list<array{instanceId: int, name: string, color: string, canWrite: bool, timezone: string, canCreateRecurrence: bool, canUpdateRecurrence: bool, canUpdateOccurrence: bool, canDeleteOccurrence: bool, canUpdateFollowing: bool, canUpdateSeries: bool, canDeleteSeries: bool, canUseDefaultReminder: bool, canCreateWithDefaultReminder: bool, defaultReminder: array<string, mixed>, maxReminders: int, provider: string, lastSynchronization?: int, status?: int, lastError?: string}>
+     * @return list<array{instanceId: int, name: string, color: string, canWrite: bool, timezone: string, canCreateRecurrence: bool, canUpdateRecurrence: bool, canUpdateOccurrence: bool, canDeleteOccurrence: bool, canUpdateFollowing: bool, canUpdateSeries: bool, canDeleteSeries: bool, canUseDefaultReminder: bool, canCreateWithDefaultReminder: bool, defaultReminder: array<string, mixed>, maxReminders: int, canWriteStatus: bool, canWriteTransparency: bool, defaultTransparency: string, defaultAllDayTransparency: string, provider?: string, lastSynchronization?: int, status?: int, lastError?: string}>
      */
     private function loadSelectedCalendars(bool $includeOperationalMetadata = false): array
     {
@@ -2473,13 +2473,14 @@ class CalendarView extends IPSModuleStrict
                 $color = $palette[abs(crc32((string) $instanceId)) % count($palette)];
             }
 
+            $provider = $this->calendarProviderKey($instance);
+            $canWrite = (bool) ($calendarStatus['canWrite']
+                ?? IPS_GetProperty($instanceId, 'CanWrite'));
             $calendar = [
                 'instanceId'                   => $instanceId,
                 'name'                         => IPS_GetName($instanceId),
                 'color'                        => $color,
-                'provider'                     => $this->calendarProviderKey($instance),
-                'canWrite'                     => (bool) ($calendarStatus['canWrite']
-                    ?? IPS_GetProperty($instanceId, 'CanWrite')),
+                'canWrite'                     => $canWrite,
                 'timezone'                     => trim((string) ($calendarStatus['timezone'] ?? '')),
                 'canCreateRecurrence'          => (bool) ($calendarStatus['canCreateRecurrence'] ?? false),
                 'canUpdateRecurrence'          => (bool) ($calendarStatus['canUpdateRecurrence'] ?? false),
@@ -2494,9 +2495,16 @@ class CalendarView extends IPSModuleStrict
                     && !array_is_list($calendarStatus['defaultReminder'])
                     ? $calendarStatus['defaultReminder']
                     : [],
-                'maxReminders'                 => max(1, min(CalendarEventReminder::MAX_REMINDERS, (int) ($calendarStatus['maxReminders'] ?? 1)))
+                'maxReminders'                 => max(1, min(CalendarEventReminder::MAX_REMINDERS, (int) ($calendarStatus['maxReminders'] ?? 1))),
+                'canWriteStatus'                => $canWrite
+                    && in_array($provider, ['apple', 'caldav', 'google'], true),
+                'canWriteTransparency'          => $canWrite
+                    && in_array($provider, ['apple', 'caldav', 'google', 'microsoft'], true),
+                'defaultTransparency'           => 'OPAQUE',
+                'defaultAllDayTransparency'     => $provider === 'microsoft' ? 'TRANSPARENT' : 'OPAQUE'
             ];
             if ($includeOperationalMetadata) {
+                $calendar['provider'] = $this->calendarProviderKey($instance);
                 $calendar['lastSynchronization'] = max(0, (int) ($calendarStatus['lastSynchronization'] ?? 0));
                 $calendar['status'] = (int) ($instance['InstanceStatus'] ?? 0);
                 $calendar['lastError'] = trim((string) ($calendarStatus['lastError'] ?? ''));

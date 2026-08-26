@@ -2785,22 +2785,18 @@ function eventAvailabilityDetailText(event) {
     return transparency === 'TRANSPARENT' ? t('Free') : t('Busy');
 }
 
-function eventStateProvider(calendar) {
-    return String(calendar?.provider || '').trim().toLowerCase();
-}
-
 function calendarSupportsEventStatus(calendar) {
-    return Boolean(calendar?.canWrite)
-        && ['apple', 'caldav', 'google'].includes(eventStateProvider(calendar));
+    return Boolean(calendar?.canWriteStatus);
 }
 
 function calendarSupportsEventAvailability(calendar) {
-    return Boolean(calendar?.canWrite)
-        && ['apple', 'caldav', 'google', 'microsoft'].includes(eventStateProvider(calendar));
+    return Boolean(calendar?.canWriteTransparency);
 }
 
 function defaultEventTransparency(calendar, allDay = false) {
-    return eventStateProvider(calendar) === 'microsoft' && allDay ? 'TRANSPARENT' : 'OPAQUE';
+    return normalizedEventTransparency(
+        allDay ? calendar?.defaultAllDayTransparency : calendar?.defaultTransparency
+    );
 }
 
 function loadEventStateEditor(event) {
