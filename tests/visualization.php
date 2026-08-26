@@ -926,8 +926,21 @@ assertVisualization(
         && str_contains($style, 'height: 100%;')
         && str_contains($style, '.month-section:only-child .calendar-grid {')
         && str_contains($style, 'grid-template-rows: auto repeat(6, minmax(0, 1fr));')
-        && str_contains($style, '.month-events { flex: 1 1 auto; min-height: 0; overflow: hidden; }'),
-    'A single-month view must distribute all six calendar week rows evenly across the available height while multi-month views retain a usable minimum row height.'
+        && str_contains($style, '.month-events { flex: 1 1 auto; min-height: 0; overflow: hidden; }')
+        && str_contains($script, 'function createMonthGrid(month, fillAvailableHeight)')
+        && str_contains($script, 'const last = new Date(month.getFullYear(), month.getMonth() + 1, 0);')
+        && str_contains($script, 'while (!showWeekends && isWeekend(firstVisible)) firstVisible = addDays(firstVisible, 1);')
+        && str_contains($script, 'while (!showWeekends && isWeekend(lastVisible)) lastVisible = addDays(lastVisible, -1);')
+        && str_contains($script, 'const gridEnd = addDays(startOfWeek(lastVisible), 7);')
+        && str_contains($script, 'const rowCount = Math.max(1, Math.ceil(visibleDays.length / columnCount));')
+        && str_contains($script, 'grid.style.gridTemplateRows = fillAvailableHeight')
+        && str_contains($script, "cell.classList.add('month-day-empty');")
+        && str_contains($script, "cell.setAttribute('aria-hidden', 'true');")
+        && str_contains($script, '&& (day.getDay() === 1 || day.getDate() === 1)')
+        && !str_contains($script, 'Array.from({ length: 42 }, (_, index) => addDays(gridStart, index))')
+        && !str_contains($script, 'showOutsideDetails')
+        && !str_contains($script, "cell.classList.add('outside');"),
+    'Month view must show only dates from the displayed month, preserve calendar-week labels, and size the grid to the occupied calendar weeks.'
 );
 assertVisualization(
     str_contains($style, '.list-table {')

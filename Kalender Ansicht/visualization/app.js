@@ -1368,55 +1368,79 @@ function renderMonth() {
     }
 }
 
-function createMonthGrid(month, showOutsideDetails) {
+function createMonthGrid(month, fillAvailableHeight) {
     const first = new Date(month.getFullYear(), month.getMonth(), 1);
-    const gridStart = startOfWeek(first);
-    const days = Array.from({ length: 42 }, (_, index) => addDays(gridStart, index));
-    const visibleDays = days.filter(day => calendarState.settings.showWeekends !== false || !isWeekend(day));
-    const grid = element('div', 'calendar-grid' + (calendarState.settings.showWeekends === false ? ' hide-weekends' : ''));
+    const last = new Date(month.getFullYear(), month.getMonth() + 1, 0);
+    const showWeekends = calendarState.settings.showWeekends !== false;
+    let firstVisible = first;
+    let lastVisible = last;
+    while (!showWeekends && isWeekend(firstVisible)) firstVisible = addDays(firstVisible, 1);
+    while (!showWeekends && isWeekend(lastVisible)) lastVisible = addDays(lastVisible, -1);
+
+    const gridStart = startOfWeek(firstVisible);
+    const gridEnd = addDays(startOfWeek(lastVisible), 7);
+    const days = [];
+    for (let day = gridStart; day < gridEnd; day = addDays(day, 1)) {
+        days.push(day);
+    }
+
+    const visibleDays = days.filter(day => showWeekends || !isWeekend(day));
+    const columnCount = showWeekends ? 7 : 5;
+    const rowCount = Math.max(1, Math.ceil(visibleDays.length / columnCount));
+    const grid = element('div', 'calendar-grid' + (showWeekends ? '' : ' hide-weekends'));
+    grid.style.gridTemplateRows = fillAvailableHeight
+        ? `auto repeat(${rowCount}, minmax(0, 1fr))`
+        : `auto repeat(${rowCount}, minmax(82px, 1fr))`;
+
     const weekdays = Array.from({ length: 7 }, (_, index) => addDays(startOfWeek(new Date()), index))
-        .filter(day => calendarState.settings.showWeekends !== false || !isWeekend(day));
+        .filter(day => showWeekends || !isWeekend(day));
     weekdays.forEach(day => {
         const header = element('div', 'weekday');
         header.textContent = new Intl.DateTimeFormat(undefined, { weekday: 'short' }).format(day);
         grid.appendChild(header);
     });
+
     visibleDays.forEach(day => {
-        const cell = element('div', 'month-day');
         const outside = day.getMonth() !== month.getMonth();
-        if (outside) cell.classList.add('outside');
-        if (isToday(day) && (!outside || showOutsideDetails)) cell.classList.add('today');
+        const cell = element('div', 'month-day');
+        if (outside) {
+            cell.classList.add('month-day-empty');
+            cell.setAttribute('aria-hidden', 'true');
+            grid.appendChild(cell);
+            return;
+        }
+
+        if (isToday(day)) cell.classList.add('today');
         const dayHeader = element('div', 'month-day-header');
-        if (calendarState.settings.showMonthCalendarWeek === true && day.getDay() === 1) {
+        if (calendarState.settings.showMonthCalendarWeek === true
+            && (day.getDay() === 1 || day.getDate() === 1)) {
             const calendarWeek = element('span', 'month-week-number');
             calendarWeek.textContent = formatCalendarWeekLabel([day]);
             dayHeader.appendChild(calendarWeek);
         }
-        if (!outside || showOutsideDetails) {
-            const dateMeta = element('div', 'month-day-date');
-            const number = element('div', 'day-number');
-            number.textContent = String(day.getDate());
-            if (isToday(day) && (!outside || showOutsideDetails)) emphasizeCurrentMonthDay(cell, number);
-            dateMeta.appendChild(number);
-            if (calendarState.settings.showMonthDayOfYear !== false) {
-                const dayOfYearMeta = element('span', 'month-day-of-year');
-                dayOfYearMeta.textContent = `${t('Day')} ${dayOfYear(day)}/${daysInYear(day)}`;
-                dateMeta.appendChild(dayOfYearMeta);
-            }
-            dayHeader.appendChild(dateMeta);
+
+        const dateMeta = element('div', 'month-day-date');
+        const number = element('div', 'day-number');
+        number.textContent = String(day.getDate());
+        if (isToday(day)) emphasizeCurrentMonthDay(cell, number);
+        dateMeta.appendChild(number);
+        if (calendarState.settings.showMonthDayOfYear !== false) {
+            const dayOfYearMeta = element('span', 'month-day-of-year');
+            dayOfYearMeta.textContent = `${t('Day')} ${dayOfYear(day)}/${daysInYear(day)}`;
+            dateMeta.appendChild(dayOfYearMeta);
         }
+        dayHeader.appendChild(dateMeta);
         cell.appendChild(dayHeader);
-        if (!outside || showOutsideDetails) {
-            const dayEnd = addDays(day, 1);
-            const events = visibleCalendarEvents()
-                .filter(event => eventOverlaps(event, day, dayEnd))
-                .sort(compareEventsForDisplay);
-            const eventList = element('div', 'month-events');
-            cell.appendChild(eventList);
-            monthEventData.set(eventList, { day, events });
-            renderMonthEventPreview(eventList, day, events);
-            bindMonthDayOverview(cell, day, events);
-        }
+
+        const dayEnd = addDays(day, 1);
+        const events = visibleCalendarEvents()
+            .filter(event => eventOverlaps(event, day, dayEnd))
+            .sort(compareEventsForDisplay);
+        const eventList = element('div', 'month-events');
+        cell.appendChild(eventList);
+        monthEventData.set(eventList, { day, events });
+        renderMonthEventPreview(eventList, day, events);
+        bindMonthDayOverview(cell, day, events);
         grid.appendChild(cell);
     });
     return grid;
