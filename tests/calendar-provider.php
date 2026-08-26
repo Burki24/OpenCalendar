@@ -3980,12 +3980,18 @@ assertTrueValue(
         && str_contains($calendarModuleSource, 'IPS_GetKernelRunlevel() !== KR_READY'),
     'The calendar module must defer parent communication until the kernel is ready.'
 );
+$calDavProviderDeclaration = '';
+if (
+    is_string($calDavProviderSource)
+    && preg_match('/final class CalDAVProvider implements[^{]+/', $calDavProviderSource, $calDavProviderDeclarationMatch) === 1
+) {
+    $calDavProviderDeclaration = $calDavProviderDeclarationMatch[0];
+}
 assertTrueValue(
     is_string($calDavProviderSource)
-        && str_contains(
-            $calDavProviderSource,
-            'final class CalDAVProvider implements CalendarProviderInterface, RecurringCalendarProviderInterface'
-        )
+        && str_contains($calDavProviderDeclaration, 'CalendarEventLookupProviderInterface')
+        && str_contains($calDavProviderDeclaration, 'CalendarProviderInterface')
+        && str_contains($calDavProviderDeclaration, 'RecurringCalendarProviderInterface')
         && str_contains($calDavProviderSource, 'public function getRecurringSeries(')
         && str_contains($calDavProviderSource, '<c:prop-filter name="UID">')
         && str_contains($calDavProviderSource, '<c:text-match collation="i;octet">')
