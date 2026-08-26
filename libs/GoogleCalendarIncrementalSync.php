@@ -126,7 +126,10 @@ final class GoogleCalendarIncrementalSync
                     $changes[] = $this->deletionMarker($item);
                 } else {
                     try {
-                        $changes[] = $this->provider->getEventForEdit($calendarReference, $eventId);
+                        $changes[] = $this->provider->getEventForEdit(
+                            $calendarReference,
+                            ['eventReference' => $eventId]
+                        );
                     } catch (GoogleCalendarProviderException $exception) {
                         if ($exception->httpStatus !== 404) {
                             throw $exception;

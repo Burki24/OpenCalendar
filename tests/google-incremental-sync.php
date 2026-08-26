@@ -136,6 +136,11 @@ googleSyncExpect(
 $incrementalUrl = $incrementalHttp->urls[0];
 googleSyncExpect(str_contains($incrementalUrl, 'syncToken=token-1'), 'The incremental Google request did not contain the previous sync token.');
 googleSyncExpect(str_contains($incrementalUrl, 'singleEvents=true'), 'The incremental Google request did not retain singleEvents.');
+googleSyncExpect(
+    isset($incrementalHttp->urls[1])
+        && str_contains($incrementalHttp->urls[1], '/calendars/primary/events/changed-1'),
+    'A changed Google event must be resolved through the provider-neutral direct event lookup.'
+);
 foreach (['timeMin=', 'timeMax=', 'orderBy=', 'showDeleted=false'] as $forbiddenQuery) {
     googleSyncExpect(
         !str_contains($incrementalUrl, $forbiddenQuery),
