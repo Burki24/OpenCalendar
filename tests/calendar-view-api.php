@@ -127,12 +127,13 @@ assertCalendarViewApi(
         && preg_match('/"type": "CheckBox",\\s*"name": "ShowTileMaximizeButton",\\s*"caption": "Show maximize button"/', $formSource) === 1
         && !preg_match('/"type": "RowLayout"[\\s\\S]{0,500}"name": "ShowTileTitle"[\\s\\S]{0,500}"name": "ShowTileMaximizeButton"/', $formSource)
         && preg_match('/"name": "PastDays"[\\s\\S]*?"width": "32%"/', $formSource) === 1
-        && preg_match('/"name": "ShowWeekends"[\\s\\S]*?"width": "24%"/', $formSource) === 1
-        && str_contains($formSource, '"width": "30%"')
-        && str_contains($formSource, '"width": "13%"')
+        && preg_match('/"name": "ShowWeekends"[\\s\\S]*?"width": "190px"/', $formSource) === 1
+        && str_contains($formSource, '"width": "220px"')
+        && str_contains($formSource, '"width": "110px"')
+        && str_contains($formSource, '"width": "160px"')
         && str_contains($formSource, '"width": "42%"')
         && str_contains($formSource, '"width": "27%"'),
-    'Calendar View configuration rows must use responsive percentage widths supported by Symcon 9.1.'
+    'Calendar View display option rows must use fixed pixel widths for stable alignment while other supported rows remain responsive.'
 );
 
 $supportedScriptApiMethods = [
