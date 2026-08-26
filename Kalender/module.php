@@ -1222,9 +1222,9 @@ class Calendar extends IPSModuleStrict
         $this->WriteAttributeBoolean('DetectedWriteAccessKnown', $writeAccessKnown);
         $this->WriteAttributeBoolean('CalendarMetadataAvailable', true);
         $this->SendSafeDebug('CalendarMetadata', [
-            'canWrite'                 => $canWrite,
-            'writeAccessKnown'         => $writeAccessKnown,
-            'timezone'                 => $timezone,
+            'canWrite'                  => $canWrite,
+            'writeAccessKnown'          => $writeAccessKnown,
+            'timezone'                  => $timezone,
             'canCreateRecurrence'       => $canCreateRecurrence,
             'canUpdateRecurrence'       => $canUpdateRecurrence,
             'canUpdateOccurrence'       => $canUpdateOccurrence,
