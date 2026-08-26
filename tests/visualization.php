@@ -300,10 +300,10 @@ assertVisualization(
         && str_contains($script, "const rawStatus = String(properties.STATUS?.[0]?.value || '').trim().toUpperCase();")
         && str_contains($script, "const rawTransparency = String(properties.TRANSP?.[0]?.value || '').trim().toUpperCase();")
         && str_contains($script, "const transparency = parsedTransparency || 'OPAQUE';")
-        && str_contains($moduleSource, "'canWriteStatus'                => $canWrite")
-        && str_contains($moduleSource, "'canWriteTransparency'          => $canWrite")
-        && str_contains($moduleSource, "'defaultTransparency'           => 'OPAQUE'")
-        && str_contains($moduleSource, "'defaultAllDayTransparency'     => $provider === 'microsoft' ? 'TRANSPARENT' : 'OPAQUE'")
+        && str_contains($moduleSource, "'canWriteStatus'               => \$canWrite")
+        && str_contains($moduleSource, "'canWriteTransparency'         => \$canWrite")
+        && str_contains($moduleSource, "'defaultTransparency'          => 'OPAQUE'")
+        && str_contains($moduleSource, "'defaultAllDayTransparency'    => \$provider === 'microsoft' ? 'TRANSPARENT' : 'OPAQUE'")
         && str_contains($moduleSource, "\$calendar['provider'] = \$this->calendarProviderKey(\$instance);"),
     'The event editor must use provider-neutral write capabilities, preserve provider defaults, and retain imported RFC state without exposing provider metadata by default.'
 );

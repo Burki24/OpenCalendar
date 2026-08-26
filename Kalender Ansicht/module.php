@@ -2496,12 +2496,12 @@ class CalendarView extends IPSModuleStrict
                     ? $calendarStatus['defaultReminder']
                     : [],
                 'maxReminders'                 => max(1, min(CalendarEventReminder::MAX_REMINDERS, (int) ($calendarStatus['maxReminders'] ?? 1))),
-                'canWriteStatus'                => $canWrite
+                'canWriteStatus'               => $canWrite
                     && in_array($provider, ['apple', 'caldav', 'google'], true),
-                'canWriteTransparency'          => $canWrite
+                'canWriteTransparency'         => $canWrite
                     && in_array($provider, ['apple', 'caldav', 'google', 'microsoft'], true),
-                'defaultTransparency'           => 'OPAQUE',
-                'defaultAllDayTransparency'     => $provider === 'microsoft' ? 'TRANSPARENT' : 'OPAQUE'
+                'defaultTransparency'          => 'OPAQUE',
+                'defaultAllDayTransparency'    => $provider === 'microsoft' ? 'TRANSPARENT' : 'OPAQUE'
             ];
             if ($includeOperationalMetadata) {
                 $calendar['provider'] = $this->calendarProviderKey($instance);
