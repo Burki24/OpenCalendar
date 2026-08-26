@@ -139,6 +139,28 @@ assertSameValue(
     CalendarEventState::normalizeTransparency(''),
     'Missing provider transparency must use the RFC 5545 opaque default.'
 );
+assertSameValue(
+    true,
+    CalendarEventState::isCancelled(' cancelled '),
+    'Cancelled provider events must be recognized independent of token casing.'
+);
+assertSameValue(
+    false,
+    CalendarEventState::isCancelled(CalendarEventState::STATUS_TENTATIVE),
+    'Tentative events must remain visible.'
+);
+$visibleStateEvents = CalendarEventState::filterVisibleEvents([
+    ['id' => 'google', 'status' => CalendarEventState::STATUS_CONFIRMED],
+    ['id' => 'microsoft', 'status' => CalendarEventState::STATUS_CONFIRMED],
+    ['id' => 'caldav', 'status' => CalendarEventState::STATUS_CANCELLED],
+    ['id' => 'ics', 'status' => 'cancelled'],
+    ['id' => 'tentative', 'status' => CalendarEventState::STATUS_TENTATIVE]
+]);
+assertSameValue(
+    ['google', 'microsoft', 'tentative'],
+    array_column($visibleStateEvents, 'id'),
+    'Provider-neutral event lists must exclude cancelled events while retaining active and tentative events.'
+);
 
 $multipleReminder = CalendarEventReminder::fromMinutes([5, 30, 120]);
 assertSameValue('multiple', $multipleReminder['mode'], 'Multiple exact reminder offsets must use the shared multiple reminder mode.');
@@ -2636,6 +2658,19 @@ $eventState = ICalendarCodec::parseEvents(
 assertSameValue('TENTATIVE', $eventState['status'], 'RFC 5545 STATUS must survive iCalendar parsing.');
 assertSameValue('TRANSPARENT', $eventState['transparency'], 'RFC 5545 TRANSP must survive iCalendar parsing.');
 
+$cancelledStateFixture = str_replace('STATUS:TENTATIVE', 'STATUS:CANCELLED', $eventStateFixture);
+$cancelledState = ICalendarCodec::parseEvents(
+    $cancelledStateFixture,
+    'https://calendar.example/work/cancelled-state.ics',
+    '"cancelled-state"'
+)[0];
+assertSameValue('CANCELLED', $cancelledState['status'], 'RFC 5545 cancelled status must normalize canonically.');
+assertSameValue(
+    [],
+    CalendarEventState::filterVisibleEvents([$cancelledState]),
+    'Cancelled CalDAV and ICS events must be removed by the provider-neutral visibility policy.'
+);
+
 $opaqueStateFixture = str_replace(
     "STATUS:TENTATIVE\r\nTRANSP:TRANSPARENT\r\n",
     "STATUS:CONFIRMED\r\n",
@@ -3906,6 +3941,16 @@ assertTrueValue(
         && str_contains($calendarModuleSource, "'canWriteTransparency'         => \$metadataAvailable")
         && str_contains($calendarModuleSource, "'defaultAllDayTransparency'     => \$metadataAvailable"),
     'Calendar instances must persist and expose provider-neutral event-state capabilities and defaults.'
+);
+
+assertTrueValue(
+    is_string($calendarModuleSource)
+        && substr_count($calendarModuleSource, 'CalendarEventState::filterVisibleEvents($events)') >= 3
+        && str_contains($calendarModuleSource, 'return CalendarEventState::filterVisibleEvents($events);')
+        && str_contains($calendarModuleSource, 'private function assertEventAvailable(array $event): void')
+        && str_contains($calendarModuleSource, 'CalendarEventState::isCancelled($event[\'status\'] ?? \'\')')
+        && substr_count($calendarModuleSource, '$this->assertEventAvailable(') >= 3,
+    'Calendar instances must hide cancelled events from synchronization, cached reads, writes, and direct edit preparation.'
 );
 
 assertTrueValue(

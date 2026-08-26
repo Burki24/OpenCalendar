@@ -36,6 +36,29 @@ final class CalendarEventState
     }
 
     /**
+     * Returns whether a provider-neutral event status represents a cancelled event.
+     */
+    public static function isCancelled(mixed $value): bool
+    {
+        return self::normalizeStatus($value) === self::STATUS_CANCELLED;
+    }
+
+    /**
+     * Removes cancelled events from a provider-neutral event list.
+     *
+     * @param array<mixed> $events
+     * @return list<array<string, mixed>>
+     */
+    public static function filterVisibleEvents(array $events): array
+    {
+        return array_values(array_filter(
+            $events,
+            static fn (mixed $event): bool => is_array($event)
+                && !self::isCancelled($event['status'] ?? '')
+        ));
+    }
+
+    /**
      * Normalizes provider free/busy transparency to the RFC 5545 VEVENT values.
      */
     public static function normalizeTransparency(

@@ -520,6 +520,7 @@ class Calendar extends IPSModuleStrict
                 'Start'          => $startTimestamp,
                 'End'            => $endTimestamp
             ]);
+            $this->assertEventAvailable($currentEvent);
             $currentEvent = $this->enrichAnniversaryEvent($currentEvent);
 
             return json_encode(
@@ -563,6 +564,7 @@ class Calendar extends IPSModuleStrict
                     'ResourceURL' => trim($ResourceURL)
                 ]
             );
+            $this->assertEventAvailable($series);
             $series = $this->enrichAnniversaryEvent($series);
             return json_encode(
                 $series,
@@ -615,6 +617,7 @@ class Calendar extends IPSModuleStrict
                     'ResourceURL'   => trim($ResourceURL)
                 ]
             );
+            $this->assertEventAvailable($following);
             $following = $this->enrichAnniversaryEvent($following);
             return json_encode(
                 $following,
@@ -1328,6 +1331,7 @@ class Calendar extends IPSModuleStrict
                 $transferredEvents,
                 static fn (array $event): bool => !($event['_syncDeleted'] ?? false)
             ));
+        $events = CalendarEventState::filterVisibleEvents($events);
         $this->reconcileAnniversaryMetadataAfterSynchronization($events, $cachedEvents);
         if ($nextSyncToken !== '') {
             $this->storeIncrementalSyncState($nextSyncToken, $startTimestamp, $endTimestamp);
@@ -1566,6 +1570,7 @@ class Calendar extends IPSModuleStrict
     private function storeEvents(array $events): void
     {
         $timestamp = time();
+        $events = CalendarEventState::filterVisibleEvents($events);
         $events = $this->enrichAnniversaryEvents($events);
         $this->WritePersistentJsonCache('CachedEvents', $events);
         $this->WriteAttributeInteger('LastSynchronization', $timestamp);
@@ -1604,7 +1609,7 @@ class Calendar extends IPSModuleStrict
     {
         try {
             $events = $this->ReadPersistentJsonCache('CachedEvents');
-            return array_values(array_filter($events, 'is_array'));
+            return CalendarEventState::filterVisibleEvents($events);
         } catch (UnexpectedValueException) {
             return [];
         }
@@ -2446,6 +2451,7 @@ class Calendar extends IPSModuleStrict
     /** @param list<array<string, mixed>> $events */
     private function storeEventsAfterWrite(array $events): void
     {
+        $events = CalendarEventState::filterVisibleEvents($events);
         $events = $this->enrichAnniversaryEvents($events);
         usort(
             $events,
@@ -2471,6 +2477,18 @@ class Calendar extends IPSModuleStrict
         $this->storeEvents($events);
         $this->WriteAttributeString('LastError', '');
         $this->SetStatus($this->ReadPropertyBoolean('Active') ? IS_ACTIVE : IS_INACTIVE);
+    }
+
+    /**
+     * Rejects events that were cancelled after they were cached or selected.
+     *
+     * @param array<string, mixed> $event
+     */
+    private function assertEventAvailable(array $event): void
+    {
+        if (CalendarEventState::isCancelled($event['status'] ?? '')) {
+            throw new RuntimeException('The selected event is no longer available.');
+        }
     }
 
     /**
