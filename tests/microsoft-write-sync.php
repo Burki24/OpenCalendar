@@ -5,6 +5,7 @@ declare(strict_types=1);
 use IPSKalender\CalendarHttpClientInterface;
 use IPSKalender\CalendarHttpResponse;
 use IPSKalender\MicrosoftCalendarIncrementalSync;
+use IPSKalender\MicrosoftCalendarProvider;
 
 require_once __DIR__ . '/../libs/MicrosoftCalendarIncrementalSync.php';
 
@@ -109,8 +110,11 @@ $end = new DateTimeImmutable('2027-08-01T00:00:00+00:00');
 $directHttp = new MicrosoftWriteSyncTestHttpClient([
     microsoftWriteSyncResponse(microsoftWriteSyncEvent('created-immutable-id', 'Created directly', '2026-08-20'))
 ]);
-$directSynchronizer = new MicrosoftCalendarIncrementalSync($directHttp, 'access-token');
-$directEvent = $directSynchronizer->getEventByReference('primary', 'created-immutable-id');
+$directProvider = new MicrosoftCalendarProvider($directHttp, 'access-token');
+$directEvent = $directProvider->getEventForEdit(
+    'primary',
+    ['eventReference' => 'created-immutable-id']
+);
 microsoftWriteSyncExpect(
     ($directEvent['eventReference'] ?? '') === 'created-immutable-id'
         && str_ends_with($directHttp->requests[0]['url'] ?? '', '/events/created-immutable-id'),
@@ -211,15 +215,18 @@ microsoftWriteSyncExpect(
 );
 microsoftWriteSyncExpect(
     str_contains($calendarSource, "'GetEventAfterWrite'")
-        && str_contains($calendarSource, "['EventReference' => \$eventReference]")
+        && str_contains($calendarSource, '$lookupIdentity = [')
+        && str_contains($calendarSource, "\$this->sendRequest('GetEventAfterWrite', \$lookupIdentity)")
         && str_contains($calendarSource, "'GetEventForEdit'"),
-    'Single writes must try the provider-returned event reference directly before the range-based fallback.'
+    'Single writes must use the provider-neutral identity for direct refresh before the edit fallback.'
 );
 $gatewaySource = (string) file_get_contents(__DIR__ . '/../Kalender Konto/traits/ChildGatewayTrait.php');
 microsoftWriteSyncExpect(
     str_contains($gatewaySource, "'GetEventAfterWrite'")
-        && str_contains($gatewaySource, 'getEventByReference('),
-    'The calendar account gateway must route Microsoft post-write lookups through immutable event references.'
+        && str_contains($gatewaySource, 'CalendarEventLookupProviderInterface')
+        && str_contains($gatewaySource, 'eventLookupIdentityForChild($request)')
+        && !str_contains($gatewaySource, 'getEventByReference('),
+    'The calendar account gateway must route post-write lookups through the provider-neutral lookup capability.'
 );
 
 fwrite(STDOUT, "Microsoft post-write synchronization tests passed.\n");

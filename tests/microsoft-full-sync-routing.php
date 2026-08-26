@@ -54,8 +54,10 @@ microsoftFullSyncRoutingExpect(
     'Incremental transfer diagnostics must report request mode, fallback, changes, and token progress.'
 );
 microsoftFullSyncRoutingExpect(
-    str_contains($gatewaySource, 'getEventByReference('),
-    'Microsoft direct post-write event lookup must remain available.'
+    str_contains($gatewaySource, 'CalendarEventLookupProviderInterface')
+        && str_contains($gatewaySource, 'eventLookupIdentityForChild($request)')
+        && !str_contains($gatewaySource, 'getEventByReference('),
+    'Microsoft direct event lookup must use the provider-neutral lookup capability.'
 );
 
 $incrementalSource = (string) file_get_contents(__DIR__ . '/../libs/MicrosoftCalendarIncrementalSync.php');
@@ -79,6 +81,15 @@ microsoftFullSyncRoutingExpect(
     str_contains($getEventsMethod, "'/calendarView?'")
         && !str_contains($getEventsMethod, "'/calendarView/delta?'"),
     'The authoritative Microsoft full snapshot must continue to use regular calendarView.'
+);
+$getEventForEditMethod = microsoftFullSyncRoutingMethod(
+    $providerSource,
+    'public function getEventForEdit(string $calendarReference, array $identity): array'
+);
+microsoftFullSyncRoutingExpect(
+    str_contains($getEventForEditMethod, "'/events/'")
+        && str_contains($getEventForEditMethod, '$this->eventMatchesLookupIdentity($event, $identity)'),
+    'Microsoft direct event lookup must remain available through the provider-neutral lookup contract.'
 );
 
 $calendarSource = (string) file_get_contents(__DIR__ . '/../Kalender/module.php');
