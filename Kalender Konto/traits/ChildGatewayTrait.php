@@ -372,7 +372,7 @@ trait KalenderKontoChildGatewayTrait
     }
 
     /**
-     * Returns one freshly written event by its provider reference when direct lookup is available.
+     * Returns one freshly written event through the provider-neutral direct lookup capability.
      *
      * @param array<string, mixed> $request
      * @return array<string, mixed>
@@ -380,40 +380,23 @@ trait KalenderKontoChildGatewayTrait
     private function getEventAfterWriteForChild(array $request): array
     {
         $calendar = $this->resolveCalendar((string) ($request['CalendarID'] ?? ''));
-        $eventReference = trim((string) ($request['EventReference'] ?? ''));
-        if ($eventReference === '') {
-            throw new InvalidArgumentException('The selected event reference is missing.');
-        }
-
-        if ($this->ReadPropertyInteger('Provider') === self::PROVIDER_MICROSOFT) {
-            $synchronizer = new MicrosoftCalendarIncrementalSync(
-                $this->createTrustedCloudHttpClient(new MicrosoftGraphOriginPolicy()),
-                $this->getMicrosoftAccessToken()
-            );
-
-            return $synchronizer->getEventByReference(
-                $this->calendarReference($calendar),
-                $eventReference
-            );
-        }
-
         $provider = $this->createProvider();
-        if ($provider instanceof CalendarEventLookupProviderInterface) {
-            return $provider->getEventForEdit(
-                $this->calendarReference($calendar),
-                $eventReference
-            );
+        if (!$provider instanceof CalendarEventLookupProviderInterface) {
+            throw new RuntimeException('Direct event lookup is not supported by this calendar provider.');
         }
 
-        throw new RuntimeException('Direct event lookup is not supported by this calendar provider.');
+        return $provider->getEventForEdit(
+            $this->calendarReference($calendar),
+            $this->eventLookupIdentityForChild($request)
+        );
     }
 
     /**
      * Returns the current provider version of one event before it is edited.
      *
-     * Providers with a direct lookup capability are queried by their stable event
-     * reference. Other providers are queried in a narrow time window and the
-     * normalized result is matched against the event identity supplied by the child.
+     * Providers with the direct lookup capability resolve their own provider-specific
+     * identity and fallback rules. Read-only ICS/Webcal providers keep the established
+     * bounded range lookup in the gateway.
      *
      * @param array<string, mixed> $request
      * @return array<string, mixed>
@@ -422,18 +405,11 @@ trait KalenderKontoChildGatewayTrait
     {
         $calendar = $this->resolveCalendar((string) ($request['CalendarID'] ?? ''));
         $provider = $this->createProvider();
-        $stableMicrosoftIdentity = $provider instanceof MicrosoftCalendarProvider;
-
-        try {
-            $directEvent = $this->directEventForEditForChild($calendar, $provider, $request);
-            if ($directEvent !== null
-                && $this->eventMatchesEditRequest($directEvent, $request, $stableMicrosoftIdentity)) {
-                return $directEvent;
-            }
-        } catch (Throwable) {
-            // A stale provider reference or a temporarily unavailable direct lookup
-            // must not make a previously editable event unusable. Fall back to the
-            // established bounded calendar lookup and identity matching below.
+        if ($provider instanceof CalendarEventLookupProviderInterface) {
+            return $provider->getEventForEdit(
+                $this->calendarReference($calendar),
+                $this->eventLookupIdentityForChild($request)
+            );
         }
 
         if (!$provider instanceof CalendarProviderInterface) {
@@ -448,11 +424,7 @@ trait KalenderKontoChildGatewayTrait
                 $rangeEnd
             ),
             fn (mixed $event): bool => is_array($event)
-                && $this->eventMatchesEditRequest(
-                    $event,
-                    $request,
-                    $stableMicrosoftIdentity
-                )
+                && $this->eventMatchesEditRequest($event, $request)
         ));
 
         if (count($matches) === 1) {
@@ -468,59 +440,28 @@ trait KalenderKontoChildGatewayTrait
     }
 
     /**
-     * Tries the fastest provider-specific event lookup before the bounded fallback query.
+     * Converts the child gateway request into the provider-neutral event identity contract.
      *
-     * @param array<string, mixed> $calendar
      * @param array<string, mixed> $request
-     * @return array<string, mixed>|null
+     * @return array<string, mixed>
      */
-    private function directEventForEditForChild(
-        array $calendar,
-        CalendarProviderInterface|CalendarEventLookupProviderInterface $provider,
-        array $request
-    ): ?array {
-        $calendarReference = $this->calendarReference($calendar);
-        $eventReference = trim((string) ($request['EventReference'] ?? ''));
-
-        if ($eventReference !== '' && $provider instanceof CalendarEventLookupProviderInterface) {
-            return $provider->getEventForEdit($calendarReference, $eventReference);
-        }
-
-        if ($eventReference !== '' && $provider instanceof MicrosoftCalendarProvider) {
-            $synchronizer = new MicrosoftCalendarIncrementalSync(
-                $this->createTrustedCloudHttpClient(new MicrosoftGraphOriginPolicy()),
-                $this->getMicrosoftAccessToken()
-            );
-
-            return $synchronizer->getEventByReference($calendarReference, $eventReference);
-        }
-
-        if ($provider instanceof CalDAVProvider) {
-            $resourceUrl = trim((string) ($request['ResourceURL'] ?? ''));
-            if ($resourceUrl === '') {
-                return null;
-            }
-
-            [$rangeStart, $rangeEnd] = $this->eventEditLookupRange($request);
-            $matches = array_values(array_filter(
-                $provider->getEventsForEditByResource(
-                    $calendarReference,
-                    $resourceUrl,
-                    $rangeStart,
-                    $rangeEnd
-                ),
-                fn (mixed $event): bool => is_array($event)
-                    && $this->eventMatchesEditRequest($event, $request)
-            ));
-
-            return count($matches) === 1 ? $matches[0] : null;
-        }
-
-        return null;
+    private function eventLookupIdentityForChild(array $request): array
+    {
+        return [
+            'eventReference' => trim((string) ($request['EventReference'] ?? '')),
+            'resourceUrl'    => trim((string) ($request['ResourceURL'] ?? '')),
+            'uid'            => trim((string) ($request['UID'] ?? '')),
+            'seriesId'       => trim((string) ($request['SeriesID'] ?? '')),
+            'occurrenceId'   => trim((string) ($request['OccurrenceID'] ?? '')),
+            'originalStart'  => trim((string) ($request['OriginalStart'] ?? '')),
+            'recurrenceId'   => trim((string) ($request['RecurrenceID'] ?? '')),
+            'startTimestamp' => (int) ($request['Start'] ?? 0),
+            'endTimestamp'   => (int) ($request['End'] ?? 0)
+        ];
     }
 
     /**
-     * Builds the narrow edit lookup range used by direct CalDAV and fallback queries.
+     * Builds the narrow edit lookup range used by the ICS/Webcal fallback query.
      *
      * @param array<string, mixed> $request
      * @return array{0: DateTimeImmutable, 1: DateTimeImmutable}
@@ -552,15 +493,8 @@ trait KalenderKontoChildGatewayTrait
      * @param array<string, mixed> $event
      * @param array<string, mixed> $request
      */
-    private function eventMatchesEditRequest(
-        array $event,
-        array $request,
-        bool $stableMicrosoftIdentity = false
-    ): bool {
-        if ($stableMicrosoftIdentity) {
-            return $this->microsoftEventMatchesEditRequest($event, $request);
-        }
-
+    private function eventMatchesEditRequest(array $event, array $request): bool
+    {
         $primaryIdentity = [
             'OccurrenceID'   => 'occurrenceId',
             'EventReference' => 'eventReference',
@@ -599,71 +533,6 @@ trait KalenderKontoChildGatewayTrait
         }
 
         return true;
-    }
-
-    /**
-     * Matches a Microsoft event without treating a stale Graph event ID as authoritative.
-     *
-     * Microsoft exposes immutable IDs when requested, but existing cached occurrences can
-     * still carry an older identity after a series change. The per-occurrence iCalUId is a
-     * stable secondary identity. Recurring events additionally fall back to their series ID
-     * and original occurrence start so a refreshed calendarView result can still be edited.
-     *
-     * @param array<string, mixed> $event
-     * @param array<string, mixed> $request
-     */
-    private function microsoftEventMatchesEditRequest(array $event, array $request): bool
-    {
-        foreach ([
-            'OccurrenceID'   => 'occurrenceId',
-            'EventReference' => 'eventReference',
-            'ResourceURL'    => 'resourceUrl',
-            'UID'            => 'uid'
-        ] as $requestKey => $eventKey) {
-            $expected = trim((string) ($request[$requestKey] ?? ''));
-            $actual = trim((string) ($event[$eventKey] ?? ''));
-            if ($expected !== '' && $actual !== '' && hash_equals($expected, $actual)) {
-                return true;
-            }
-        }
-
-        $expectedSeriesId = trim((string) ($request['SeriesID'] ?? ''));
-        $actualSeriesId = trim((string) ($event['seriesId'] ?? ''));
-        $expectedOriginalStart = trim((string) ($request['OriginalStart'] ?? ''));
-        $actualOriginalStart = trim((string) ($event['originalStart'] ?? ''));
-
-        return $expectedSeriesId !== ''
-            && $actualSeriesId !== ''
-            && hash_equals($expectedSeriesId, $actualSeriesId)
-            && $this->microsoftOriginalStartMatches(
-                $expectedOriginalStart,
-                $actualOriginalStart,
-                (bool) ($event['allDay'] ?? false)
-            );
-    }
-
-    private function microsoftOriginalStartMatches(string $left, string $right, bool $allDay): bool
-    {
-        $left = trim($left);
-        $right = trim($right);
-        if ($left === '' || $right === '') {
-            return false;
-        }
-        if (hash_equals($left, $right)) {
-            return true;
-        }
-        if ($allDay
-            || preg_match('/^\d{4}-\d{2}-\d{2}$/D', $left) === 1
-            || preg_match('/^\d{4}-\d{2}-\d{2}$/D', $right) === 1) {
-            return substr($left, 0, 10) === substr($right, 0, 10);
-        }
-
-        try {
-            return (new DateTimeImmutable($left))->getTimestamp()
-                === (new DateTimeImmutable($right))->getTimestamp();
-        } catch (Throwable) {
-            return false;
-        }
     }
 
     /**

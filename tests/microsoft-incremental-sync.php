@@ -96,22 +96,6 @@ function microsoftSyncOccurrence(string $id, string $seriesId, string $summary, 
 $start = new DateTimeImmutable('2026-08-01T00:00:00+00:00');
 $end = new DateTimeImmutable('2027-08-01T00:00:00+00:00');
 
-$directLookupHttp = new MicrosoftIncrementalSyncTestHttpClient([
-    microsoftSyncResponse(200, microsoftSyncEvent('direct-edit-1', 'Direct edit', '2026-08-19'))
-]);
-$directLookupSynchronizer = new MicrosoftCalendarIncrementalSync($directLookupHttp, 'access-token');
-$directLookupEvent = $directLookupSynchronizer->getEventByReference('primary', 'direct-edit-1');
-microsoftSyncExpect(
-    ($directLookupEvent['eventReference'] ?? '') === 'direct-edit-1'
-        && ($directLookupEvent['summary'] ?? '') === 'Direct edit',
-    'Microsoft edit preparation must support a direct event lookup by provider reference.'
-);
-microsoftSyncExpect(
-    count($directLookupHttp->urls) === 1
-        && str_contains($directLookupHttp->urls[0], '/me/calendars/primary/events/direct-edit-1'),
-    'Direct Microsoft edit lookup must request exactly the selected event instead of a calendar view.'
-);
-
 $initialNextLink = 'https://graph.microsoft.com/v1.0/me/calendars/primary/calendarView/delta?$skiptoken=page-2';
 $initialDeltaLink = 'https://graph.microsoft.com/v1.0/me/calendars/primary/calendarView/delta?$deltatoken=token-1';
 
@@ -264,52 +248,4 @@ microsoftSyncExpect(
     'The HTTP 410 fallback did not return the new full Microsoft event set.'
 );
 
-require_once __DIR__ . '/../Kalender Konto/traits/ChildGatewayTrait.php';
-
-final class MicrosoftEditIdentityTestHarness
-{
-    use KalenderKontoChildGatewayTrait;
-
-    /**
-     * Exposes the provider identity matcher for the Microsoft recurrence regression test.
-     *
-     * @param array<string, mixed> $event
-     * @param array<string, mixed> $request
-     */
-    public function matches(array $event, array $request, bool $stableMicrosoftIdentity): bool
-    {
-        return $this->eventMatchesEditRequest($event, $request, $stableMicrosoftIdentity);
-    }
-}
-
-$editIdentityHarness = new MicrosoftEditIdentityTestHarness();
-$editEvent = [
-    'occurrenceId'   => 'series-occurrence-1',
-    'eventReference' => 'series-occurrence-1',
-    'resourceUrl'    => 'https://graph.microsoft.com/v1.0/me/calendars/primary/events/series-occurrence-1',
-    'uid'            => 'series@example.test',
-    'originalStart'  => '2026-08-20T09:00:00+00:00',
-    'recurrenceId'   => ''
-];
-$staleEditRequest = [
-    'OccurrenceID'  => 'series-occurrence-1',
-    'OriginalStart' => '2026-08-20T08:00:00+00:00'
-];
-microsoftSyncExpect(
-    $editIdentityHarness->matches($editEvent, $staleEditRequest, true),
-    'A stable Microsoft occurrence ID must remain editable when cached original-start metadata is stale.'
-);
-microsoftSyncExpect(
-    !$editIdentityHarness->matches($editEvent, $staleEditRequest, false),
-    'Non-Microsoft edit matching must retain the stricter original-start identity check.'
-);
-microsoftSyncExpect(
-    !$editIdentityHarness->matches(
-        $editEvent,
-        ['OccurrenceID' => 'different-occurrence'],
-        true
-    ),
-    'Microsoft edit matching must still reject a different occurrence ID.'
-);
-
-echo "Microsoft incremental synchronization and recurring-edit tests passed.\n";
+echo "Microsoft incremental synchronization tests passed.\n";

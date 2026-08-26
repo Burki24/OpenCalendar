@@ -12,6 +12,7 @@ use RuntimeException;
 use Throwable;
 
 require_once __DIR__ . '/CalendarProviderInterface.php';
+require_once __DIR__ . '/CalendarEventLookupProviderInterface.php';
 require_once __DIR__ . '/RecurringCalendarProviderInterface.php';
 require_once __DIR__ . '/CalendarHttpClient.php';
 require_once __DIR__ . '/CalendarEventRecurrence.php';
@@ -33,7 +34,7 @@ final class MicrosoftCalendarProviderException extends RuntimeException
     }
 }
 
-final class MicrosoftCalendarProvider implements CalendarProviderInterface, RecurringCalendarProviderInterface
+final class MicrosoftCalendarProvider implements CalendarEventLookupProviderInterface, CalendarProviderInterface, RecurringCalendarProviderInterface
 {
     private const API_URL = 'https://graph.microsoft.com/v1.0';
     private const MAX_PAGES = 100;
@@ -194,6 +195,59 @@ final class MicrosoftCalendarProvider implements CalendarProviderInterface, Recu
         );
 
         return $events;
+    }
+
+    /** @inheritDoc */
+    public function getEventForEdit(string $calendarReference, array $identity): array
+    {
+        $calendarId = $this->calendarId($calendarReference);
+        $eventReference = trim((string) ($identity['eventReference'] ?? $identity['occurrenceId'] ?? ''));
+        $directException = null;
+
+        if ($eventReference !== '') {
+            try {
+                $eventId = $this->eventId($eventReference);
+                $item = $this->requestJson(
+                    'GET',
+                    '/me/calendars/' . rawurlencode($calendarId) . '/events/' . rawurlencode($eventId)
+                );
+                if ((bool) ($item['isCancelled'] ?? false)) {
+                    throw new MicrosoftCalendarProviderException('The selected event is no longer available.');
+                }
+
+                $event = $this->mapEvent($calendarId, $item);
+                if ($event !== null && $this->eventMatchesLookupIdentity($event, $identity)) {
+                    return $event;
+                }
+
+                throw new MicrosoftCalendarProviderException('Microsoft Calendar did not return the selected event.');
+            } catch (Throwable $exception) {
+                $directException = $exception;
+            }
+        }
+
+        $range = $this->eventLookupRange($identity);
+        if ($range !== null) {
+            [$rangeStart, $rangeEnd] = $range;
+            $matches = array_values(array_filter(
+                $this->getEvents($calendarReference, $rangeStart, $rangeEnd),
+                fn (mixed $event): bool => is_array($event) && $this->eventMatchesLookupIdentity($event, $identity)
+            ));
+            if (count($matches) === 1) {
+                return $matches[0];
+            }
+            if (count($matches) > 1) {
+                throw new MicrosoftCalendarProviderException('The selected event could not be identified uniquely.');
+            }
+
+            throw new MicrosoftCalendarProviderException('The selected event is no longer available.');
+        }
+
+        if ($directException instanceof Throwable) {
+            throw $directException;
+        }
+
+        throw new MicrosoftCalendarProviderException('The selected event is no longer available.');
     }
 
     /** @inheritDoc */
@@ -1252,6 +1306,93 @@ final class MicrosoftCalendarProvider implements CalendarProviderInterface, Recu
             'resourceUrl'    => $this->eventUrl($calendarId, $eventId),
             'etag'           => trim((string) ($event['@odata.etag'] ?? $event['changeKey'] ?? ''))
         ];
+    }
+
+    /**
+     * @param array<string, mixed> $identity
+     * @return array{0: DateTimeImmutable, 1: DateTimeImmutable}|null
+     */
+    private function eventLookupRange(array $identity): ?array
+    {
+        $startTimestamp = (int) ($identity['startTimestamp'] ?? 0);
+        if ($startTimestamp <= 0) {
+            return null;
+        }
+        $endTimestamp = (int) ($identity['endTimestamp'] ?? 0);
+        if ($endTimestamp <= $startTimestamp) {
+            $endTimestamp = $startTimestamp + 1;
+        }
+
+        $rangeStart = max(1, $startTimestamp - 86400);
+        $rangeEnd = $endTimestamp + 86400;
+        if (($rangeEnd - $rangeStart) > 6 * 366 * 86400) {
+            throw new MicrosoftCalendarProviderException('The selected event time range is too large.');
+        }
+
+        return [
+            new DateTimeImmutable('@' . $rangeStart),
+            new DateTimeImmutable('@' . $rangeEnd)
+        ];
+    }
+
+    /**
+     * Matches a Microsoft event without treating a stale Graph event ID as authoritative.
+     *
+     * @param array<string, mixed> $event
+     * @param array<string, mixed> $identity
+     */
+    private function eventMatchesLookupIdentity(array $event, array $identity): bool
+    {
+        foreach ([
+            'occurrenceId',
+            'eventReference',
+            'resourceUrl',
+            'uid'
+        ] as $key) {
+            $expected = trim((string) ($identity[$key] ?? ''));
+            $actual = trim((string) ($event[$key] ?? ''));
+            if ($expected !== '' && $actual !== '' && hash_equals($expected, $actual)) {
+                return true;
+            }
+        }
+
+        $expectedSeriesId = trim((string) ($identity['seriesId'] ?? ''));
+        $actualSeriesId = trim((string) ($event['seriesId'] ?? ''));
+        $expectedOriginalStart = trim((string) ($identity['originalStart'] ?? ''));
+        $actualOriginalStart = trim((string) ($event['originalStart'] ?? ''));
+
+        return $expectedSeriesId !== ''
+            && $actualSeriesId !== ''
+            && hash_equals($expectedSeriesId, $actualSeriesId)
+            && $this->lookupOriginalStartMatches(
+                $expectedOriginalStart,
+                $actualOriginalStart,
+                (bool) ($event['allDay'] ?? false)
+            );
+    }
+
+    private function lookupOriginalStartMatches(string $left, string $right, bool $allDay): bool
+    {
+        $left = trim($left);
+        $right = trim($right);
+        if ($left === '' || $right === '') {
+            return false;
+        }
+        if (hash_equals($left, $right)) {
+            return true;
+        }
+        if ($allDay
+            || preg_match('/^\d{4}-\d{2}-\d{2}$/D', $left) === 1
+            || preg_match('/^\d{4}-\d{2}-\d{2}$/D', $right) === 1) {
+            return substr($left, 0, 10) === substr($right, 0, 10);
+        }
+
+        try {
+            return (new DateTimeImmutable($left))->getTimestamp()
+                === (new DateTimeImmutable($right))->getTimestamp();
+        } catch (Throwable) {
+            return false;
+        }
     }
 
     private function calendarId(string $reference): string

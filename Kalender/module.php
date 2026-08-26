@@ -2307,13 +2307,22 @@ class Calendar extends IPSModuleStrict
         }
 
         $currentEvent = null;
-        $eventReference = trim((string) ($event['eventReference'] ?? ''));
-        if ($eventReference !== '') {
+        $lookupIdentity = [
+            'ResourceURL'    => trim((string) ($event['resourceUrl'] ?? '')),
+            'EventReference' => trim((string) ($event['eventReference'] ?? '')),
+            'UID'            => trim((string) ($event['uid'] ?? '')),
+            'SeriesID'       => trim((string) ($event['seriesId'] ?? '')),
+            'OccurrenceID'   => trim((string) ($event['occurrenceId'] ?? '')),
+            'OriginalStart'  => trim((string) ($event['originalStart'] ?? '')),
+            'RecurrenceID'   => trim((string) ($event['recurrenceId'] ?? '')),
+            'Start'          => $startTimestamp,
+            'End'            => $endTimestamp
+        ];
+        if ($lookupIdentity['EventReference'] !== ''
+            || $lookupIdentity['ResourceURL'] !== ''
+            || $lookupIdentity['UID'] !== '') {
             try {
-                $currentEvent = $this->sendRequest(
-                    'GetEventAfterWrite',
-                    ['EventReference' => $eventReference]
-                );
+                $currentEvent = $this->sendRequest('GetEventAfterWrite', $lookupIdentity);
             } catch (Throwable $exception) {
                 $this->SendSafeDebugException('EventDirectCacheRefreshFallback', $exception);
             }
@@ -2321,19 +2330,7 @@ class Calendar extends IPSModuleStrict
 
         if ($currentEvent === null) {
             try {
-                $currentEvent = $this->sendRequest(
-                    'GetEventForEdit',
-                    [
-                        'ResourceURL'    => trim((string) ($event['resourceUrl'] ?? '')),
-                        'EventReference' => $eventReference,
-                        'UID'            => trim((string) ($event['uid'] ?? '')),
-                        'OccurrenceID'   => '',
-                        'OriginalStart'  => '',
-                        'RecurrenceID'   => '',
-                        'Start'          => $startTimestamp,
-                        'End'            => $endTimestamp
-                    ]
-                );
+                $currentEvent = $this->sendRequest('GetEventForEdit', $lookupIdentity);
             } catch (Throwable $exception) {
                 $this->SendSafeDebugException('EventCacheRefreshFallback', $exception);
                 return false;

@@ -378,7 +378,12 @@ $freshEditClient = new FakeHttpClient([
 ]);
 $freshEditEvent = (new GoogleCalendarProvider($freshEditClient, 'access-token'))->getEventForEdit(
     'owner@example.com',
-    'event-id'
+    [
+        'eventReference' => 'event-id',
+        'uid'            => 'event@example.com',
+        'startTimestamp' => (new DateTimeImmutable('2026-07-20T10:00:00+02:00'))->getTimestamp(),
+        'endTimestamp'   => (new DateTimeImmutable('2026-07-20T11:00:00+02:00'))->getTimestamp()
+    ]
 );
 assertSameValue('"fresh-etag"', $freshEditEvent['etag'], 'Editing must use the current Google event ETag.');
 assertSameValue('event-id', $freshEditEvent['eventReference'], 'The directly loaded Google event identity must be retained.');
@@ -1340,6 +1345,82 @@ assertTrueValue(
         && str_contains($msEventClient->requests[0]['headers']['Prefer'] ?? '', 'outlook.timezone="UTC"')
         && str_contains($msEventClient->requests[0]['headers']['Prefer'] ?? '', 'IdType="ImmutableId"'),
     'Microsoft event reads must request text bodies, UTC event times and immutable IDs.'
+);
+
+$msDirectEditClient = new FakeHttpClient([
+    response(200, [
+        'id'                    => 'direct-edit-id',
+        'iCalUId'               => 'direct-edit@example.com',
+        '@odata.etag'           => 'W/"direct-edit-etag"',
+        'subject'               => 'Direct edit',
+        'start'                 => ['dateTime' => '2026-07-20T10:00:00', 'timeZone' => 'UTC'],
+        'end'                   => ['dateTime' => '2026-07-20T11:00:00', 'timeZone' => 'UTC'],
+        'type'                  => 'singleInstance',
+        'isAllDay'              => false,
+        'isCancelled'           => false,
+        'originalStartTimeZone' => 'UTC'
+    ])
+]);
+$msDirectEdit = (new MicrosoftCalendarProvider($msDirectEditClient, 'ms-access-token'))->getEventForEdit(
+    'AQMk-primary',
+    [
+        'eventReference' => 'direct-edit-id',
+        'uid'            => 'direct-edit@example.com',
+        'startTimestamp' => (new DateTimeImmutable('2026-07-20T10:00:00Z'))->getTimestamp(),
+        'endTimestamp'   => (new DateTimeImmutable('2026-07-20T11:00:00Z'))->getTimestamp()
+    ]
+);
+assertSameValue('direct-edit-id', $msDirectEdit['eventReference'], 'Microsoft direct edit lookup must retain the immutable provider event ID.');
+assertSameValue('W/"direct-edit-etag"', $msDirectEdit['etag'], 'Microsoft direct edit lookup must use the current Graph ETag.');
+assertSameValue(1, count($msDirectEditClient->requests), 'Microsoft direct edit lookup must request only the selected event when its immutable ID is current.');
+assertTrueValue(
+    str_contains($msDirectEditClient->requests[0]['url'], '/me/calendars/AQMk-primary/events/direct-edit-id'),
+    'Microsoft direct edit lookup must use the provider event endpoint.'
+);
+assertTrueValue(
+    str_contains($msDirectEditClient->requests[0]['headers']['Prefer'] ?? '', 'IdType="ImmutableId"'),
+    'Microsoft direct edit lookup must request immutable Graph IDs.'
+);
+
+$msFallbackEditClient = new FakeHttpClient([
+    response(404, [
+        'error' => [
+            'code'    => 'ErrorItemNotFound',
+            'message' => 'The specified object was not found.'
+        ]
+    ]),
+    response(200, [
+        'value' => [[
+            'id'                    => 'refreshed-occurrence-id',
+            'iCalUId'               => 'stable-occurrence@example.com',
+            '@odata.etag'           => 'W/"refreshed-etag"',
+            'subject'               => 'Refreshed occurrence',
+            'start'                 => ['dateTime' => '2026-07-20T10:00:00', 'timeZone' => 'UTC'],
+            'end'                   => ['dateTime' => '2026-07-20T11:00:00', 'timeZone' => 'UTC'],
+            'type'                  => 'occurrence',
+            'seriesMasterId'        => 'series-master-id',
+            'isAllDay'              => false,
+            'isCancelled'           => false,
+            'originalStartTimeZone' => 'UTC'
+        ]]
+    ])
+]);
+$msFallbackEdit = (new MicrosoftCalendarProvider($msFallbackEditClient, 'ms-access-token'))->getEventForEdit(
+    'AQMk-primary',
+    [
+        'eventReference' => 'stale-occurrence-id',
+        'uid'            => 'stable-occurrence@example.com',
+        'seriesId'       => 'series-master-id',
+        'originalStart'  => '2026-07-20T10:00:00+00:00',
+        'startTimestamp' => (new DateTimeImmutable('2026-07-20T10:00:00Z'))->getTimestamp(),
+        'endTimestamp'   => (new DateTimeImmutable('2026-07-20T11:00:00Z'))->getTimestamp()
+    ]
+);
+assertSameValue('refreshed-occurrence-id', $msFallbackEdit['eventReference'], 'Microsoft lookup must recover a stale occurrence ID through the bounded provider fallback.');
+assertSameValue(2, count($msFallbackEditClient->requests), 'Microsoft stale-ID recovery must perform one direct request followed by one bounded calendarView request.');
+assertTrueValue(
+    str_contains($msFallbackEditClient->requests[1]['url'], '/calendarView?'),
+    'Microsoft stale-ID recovery must keep its bounded fallback inside the provider.'
 );
 
 $previousTimezone = date_default_timezone_get();

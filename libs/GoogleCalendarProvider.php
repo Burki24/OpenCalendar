@@ -212,24 +212,56 @@ final class GoogleCalendarProvider implements CalendarEventLookupProviderInterfa
     }
 
     /** @inheritDoc */
-    public function getEventForEdit(string $calendarReference, string $eventReference): array
+    public function getEventForEdit(string $calendarReference, array $identity): array
     {
         $calendarId = $this->calendarId($calendarReference);
-        $eventId = $this->eventId($eventReference);
-        $item = $this->requestJson(
-            'GET',
-            '/calendars/' . rawurlencode($calendarId) . '/events/' . rawurlencode($eventId)
-        );
-        if (($item['status'] ?? '') === 'cancelled') {
+        $eventReference = trim((string) ($identity['eventReference'] ?? $identity['occurrenceId'] ?? ''));
+        $directException = null;
+
+        if ($eventReference !== '') {
+            try {
+                $eventId = $this->eventId($eventReference);
+                $item = $this->requestJson(
+                    'GET',
+                    '/calendars/' . rawurlencode($calendarId) . '/events/' . rawurlencode($eventId)
+                );
+                if (($item['status'] ?? '') === 'cancelled') {
+                    throw new GoogleCalendarProviderException('The selected event is no longer available.');
+                }
+
+                $event = $this->mapEvent($calendarId, $item, '');
+                if ($event !== null && hash_equals($eventId, (string) ($event['eventReference'] ?? ''))) {
+                    return $event;
+                }
+
+                throw new GoogleCalendarProviderException('Google Calendar did not return the selected event.');
+            } catch (Throwable $exception) {
+                $directException = $exception;
+            }
+        }
+
+        $range = $this->eventLookupRange($identity);
+        if ($range !== null) {
+            [$rangeStart, $rangeEnd] = $range;
+            $matches = array_values(array_filter(
+                $this->getEvents($calendarReference, $rangeStart, $rangeEnd),
+                fn (mixed $event): bool => is_array($event) && $this->eventMatchesLookupIdentity($event, $identity)
+            ));
+            if (count($matches) === 1) {
+                return $matches[0];
+            }
+            if (count($matches) > 1) {
+                throw new GoogleCalendarProviderException('The selected event could not be identified uniquely.');
+            }
+
             throw new GoogleCalendarProviderException('The selected event is no longer available.');
         }
 
-        $event = $this->mapEvent($calendarId, $item, '');
-        if ($event === null || !hash_equals($eventId, (string) ($event['eventReference'] ?? ''))) {
-            throw new GoogleCalendarProviderException('Google Calendar did not return the selected event.');
+        if ($directException instanceof Throwable) {
+            throw $directException;
         }
 
-        return $event;
+        throw new GoogleCalendarProviderException('The selected event is no longer available.');
     }
 
     /** @inheritDoc */
@@ -1272,6 +1304,73 @@ final class GoogleCalendarProvider implements CalendarEventLookupProviderInterfa
             'resourceUrl'    => $this->eventUrl($calendarId, $eventId),
             'etag'           => trim((string) ($event['etag'] ?? ''))
         ];
+    }
+
+    /**
+     * @param array<string, mixed> $identity
+     * @return array{0: DateTimeImmutable, 1: DateTimeImmutable}|null
+     */
+    private function eventLookupRange(array $identity): ?array
+    {
+        $startTimestamp = (int) ($identity['startTimestamp'] ?? 0);
+        if ($startTimestamp <= 0) {
+            return null;
+        }
+        $endTimestamp = (int) ($identity['endTimestamp'] ?? 0);
+        if ($endTimestamp <= $startTimestamp) {
+            $endTimestamp = $startTimestamp + 1;
+        }
+
+        $rangeStart = max(1, $startTimestamp - 86400);
+        $rangeEnd = $endTimestamp + 86400;
+        if (($rangeEnd - $rangeStart) > 6 * 366 * 86400) {
+            throw new GoogleCalendarProviderException('The selected event time range is too large.');
+        }
+
+        return [
+            new DateTimeImmutable('@' . $rangeStart),
+            new DateTimeImmutable('@' . $rangeEnd)
+        ];
+    }
+
+    /**
+     * @param array<string, mixed> $event
+     * @param array<string, mixed> $identity
+     */
+    private function eventMatchesLookupIdentity(array $event, array $identity): bool
+    {
+        $matchedPrimaryIdentity = false;
+        foreach ([
+            'occurrenceId',
+            'eventReference',
+            'uid',
+            'resourceUrl',
+            'seriesId'
+        ] as $key) {
+            $expected = trim((string) ($identity[$key] ?? ''));
+            $actual = trim((string) ($event[$key] ?? ''));
+            if ($expected === '' || $actual === '') {
+                continue;
+            }
+            if (!hash_equals($expected, $actual)) {
+                return false;
+            }
+            $matchedPrimaryIdentity = true;
+            break;
+        }
+        if (!$matchedPrimaryIdentity) {
+            return false;
+        }
+
+        foreach (['originalStart', 'recurrenceId'] as $key) {
+            $expected = trim((string) ($identity[$key] ?? ''));
+            $actual = trim((string) ($event[$key] ?? ''));
+            if ($expected !== '' && $actual !== '' && !hash_equals($expected, $actual)) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private function calendarId(string $reference): string

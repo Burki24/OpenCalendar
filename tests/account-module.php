@@ -49,8 +49,10 @@ final class CalendarAccountGatewayRecurrenceProbe
             }
 
             /** @return array<string, mixed> */
-            public function getEventForEdit(string $calendarReference, string $eventReference): array
+            public function getEventForEdit(string $calendarReference, array $identity): array
             {
+                $eventReference = trim((string) ($identity['eventReference'] ?? ''));
+
                 return [
                     'uid'            => 'event@example.com',
                     'eventReference' => $eventReference,
@@ -402,12 +404,11 @@ assertAccountStructure(
         && str_contains($gatewaySource, 'getEventForEditForChild($request)')
         && str_contains($gatewaySource, 'instanceof CalendarEventLookupProviderInterface')
         && str_contains($gatewaySource, '->getEventForEdit(')
-        && str_contains($gatewaySource, 'directEventForEditForChild(')
-        && str_contains($gatewaySource, 'new MicrosoftCalendarIncrementalSync(')
-        && str_contains($gatewaySource, '->getEventByReference(')
-        && str_contains($gatewaySource, '->getEventsForEditByResource(')
+        && str_contains($gatewaySource, 'eventLookupIdentityForChild(')
+        && !str_contains($gatewaySource, 'directEventForEditForChild(')
+        && !str_contains($gatewaySource, '->getEventByReference(')
+        && !str_contains($gatewaySource, '->getEventsForEditByResource(')
         && str_contains($gatewaySource, 'eventEditLookupRange(')
-        && str_contains($gatewaySource, 'catch (Throwable)')
         && str_contains($gatewaySource, "'GetRecurringSeries'")
         && str_contains($gatewaySource, 'getRecurringSeriesForChild($request)')
         && str_contains($gatewaySource, "'GetRecurringFollowing'")
@@ -415,7 +416,7 @@ assertAccountStructure(
         && str_contains($gatewaySource, 'instanceof RecurringCalendarProviderInterface')
         && str_contains($gatewaySource, '->getRecurringSeries(')
         && str_contains($gatewaySource, '->getRecurringFollowing('),
-    'The account child gateway must prefer direct provider event lookup with a bounded fallback and route recurrence reads only through recurrence-capable providers.'
+    'The account child gateway must route direct event lookup through the provider capability while retaining the bounded fallback only for providers without that capability.'
 );
 
 $accountSource = file_get_contents(__DIR__ . '/../Kalender Konto/module.php');

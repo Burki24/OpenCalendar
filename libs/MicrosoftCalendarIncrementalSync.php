@@ -37,32 +37,6 @@ final class MicrosoftCalendarIncrementalSync
     }
 
     /**
-     * Reads one Microsoft event by its provider reference using immutable Graph IDs.
-     *
-     * @return array<string, mixed>
-     */
-    public function getEventByReference(string $calendarReference, string $eventReference): array
-    {
-        $calendarId = $this->calendarId($calendarReference);
-        $eventReference = trim($eventReference);
-        if ($eventReference === '') {
-            throw new InvalidArgumentException('The Microsoft event reference is missing.');
-        }
-
-        $event = $this->mapEvent(
-            $calendarId,
-            $this->requestJsonUrl(
-                self::API_URL . '/me/calendars/' . rawurlencode($calendarId) . '/events/' . rawurlencode($eventReference)
-            )
-        );
-        if ($event === null) {
-            throw new MicrosoftCalendarProviderException('Microsoft Calendar did not return complete event data.');
-        }
-
-        return $event;
-    }
-
-    /**
      * Synchronizes one bounded Microsoft calendar view.
      *
      * @return array{items:list<array<string, mixed>>,syncToken:string,incremental:bool}
