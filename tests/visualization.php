@@ -311,7 +311,7 @@ assertVisualization(
 assertVisualization(
     str_contains($script, 'function initializeIPSViewEventStatePickers()')
         && str_contains($script, "calendarVisualization.mode !== 'ipsview'")
-        && str_contains($script, "picker.append(trigger, options);")
+        && str_contains($script, 'picker.append(trigger, options);')
         && str_contains($script, "select.classList.add('hidden');")
         && str_contains($script, 'function synchronizeIPSViewEventStatePicker(select)')
         && str_contains($script, 'picker.trigger.disabled = select.disabled;')
