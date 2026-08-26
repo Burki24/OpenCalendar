@@ -28,6 +28,7 @@ $commands = [
     ['Verify Microsoft post-write synchronization', [PHP_BINARY, 'tests/microsoft-write-sync.php']],
     ['Verify Microsoft event-edit identity', [PHP_BINARY, 'tests/microsoft-event-edit.php']],
     ['Verify CalDAV incremental synchronization', [PHP_BINARY, 'tests/caldav-incremental-sync.php']],
+    ['Verify provider parity matrix', [PHP_BINARY, 'tests/provider-parity.php']],
     ['Run OpenCalendar provider and integration tests', [PHP_BINARY, 'tests/calendar-provider.php']],
     ['Check shared visualization contract', [PHP_BINARY, 'tests/visualization.php']],
     ['Run account module structure tests', [PHP_BINARY, 'tests/account-module.php']],
