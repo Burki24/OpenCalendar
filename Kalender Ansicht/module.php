@@ -36,6 +36,7 @@ class CalendarView extends IPSModuleStrict
     private const VISUALIZATION_BOOTSTRAP_PAST_DAYS = 7;
     private const VISUALIZATION_BOOTSTRAP_FUTURE_DAYS = 42;
     private const VISUALIZATION_MAX_RANGE_DAYS = 370;
+    private const VISUALIZATION_CLIENT_CONTRACT_VERSION = 2;
     private const ATTRIBUTE_IPSVIEW_TOKEN_1 = 'IPSViewToken1';
     private const ATTRIBUTE_IPSVIEW_TOKEN_2 = 'IPSViewToken2';
     private const ATTRIBUTE_IPSVIEW_TOKEN_3 = 'IPSViewToken3';
@@ -1186,12 +1187,19 @@ class CalendarView extends IPSModuleStrict
             return;
         }
 
+        $rawClientContractVersion = $request['clientContractVersion'] ?? null;
+        $clientContractVersion = is_scalar($rawClientContractVersion)
+            ? max(0, (int) $rawClientContractVersion)
+            : 0;
         $action = is_string($request['action'] ?? null) ? $request['action'] : '';
         if ($action === 'GetState') {
             try {
                 $this->outputIPSViewResponse([
                     'type'    => 'state',
-                    'payload' => $this->buildState()
+                    'payload' => $this->prepareIPSViewStateForClient(
+                        $this->buildState(),
+                        $clientContractVersion
+                    )
                 ]);
             } catch (Throwable $exception) {
                 $this->SendDebug('IPSViewAction', $exception->getMessage(), 0);
@@ -1217,7 +1225,10 @@ class CalendarView extends IPSModuleStrict
             $result = $this->executeVisualizationAction($action, $value);
             $response = [
                 'type'    => 'state',
-                'payload' => $result['state']
+                'payload' => $this->prepareIPSViewStateForClient(
+                    $result['state'],
+                    $clientContractVersion
+                )
             ];
             if ($result['message'] !== '') {
                 $response['toast'] = [
@@ -1234,6 +1245,51 @@ class CalendarView extends IPSModuleStrict
             $this->SendDebug('IPSViewAction', $exception->getMessage(), 0);
             $this->outputIPSViewResponse(['Error' => 'Action failed.'], 500);
         }
+    }
+
+    /**
+     * Adds the legacy provider key only for persisted IPSView documents using an older client contract.
+     *
+     * IPSView stores the complete rendered HTML in a WebContent variable. A module update can therefore
+     * leave an already displayed page running an older JavaScript client until that HTML is regenerated.
+     * Event-state editing in the previous client derived its capabilities from the provider key, while
+     * current clients use provider-neutral capability flags. Keeping this compatibility metadata on the
+     * legacy IPSView transport prevents Status and Availability from becoming disabled after a refresh.
+     *
+     * @param array<string, mixed> $state Current visualization state.
+     *
+     * @return array<string, mixed> Client-compatible IPSView state.
+     */
+    private function prepareIPSViewStateForClient(array $state, int $clientContractVersion): array
+    {
+        if ($clientContractVersion >= self::VISUALIZATION_CLIENT_CONTRACT_VERSION
+            || !isset($state['calendars'])
+            || !is_array($state['calendars'])
+            || $state['calendars'] === []) {
+            return $state;
+        }
+
+        $providerByInstanceId = [];
+        foreach ($this->loadSelectedCalendars(true) as $calendar) {
+            $instanceId = (int) ($calendar['instanceId'] ?? 0);
+            $provider = trim((string) ($calendar['provider'] ?? ''));
+            if ($instanceId > 0 && $provider !== '') {
+                $providerByInstanceId[$instanceId] = $provider;
+            }
+        }
+
+        foreach ($state['calendars'] as &$calendar) {
+            if (!is_array($calendar)) {
+                continue;
+            }
+            $instanceId = (int) ($calendar['instanceId'] ?? 0);
+            if (isset($providerByInstanceId[$instanceId])) {
+                $calendar['provider'] = $providerByInstanceId[$instanceId];
+            }
+        }
+        unset($calendar);
+
+        return $state;
     }
 
     /**

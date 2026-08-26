@@ -309,6 +309,17 @@ assertVisualization(
 );
 
 assertVisualization(
+    str_contains($script, 'const calendarClientContractVersion = 2;')
+        && str_contains($script, "body.set('clientContractVersion', String(calendarClientContractVersion));")
+        && str_contains($moduleSource, 'private const VISUALIZATION_CLIENT_CONTRACT_VERSION = 2;')
+        && str_contains($moduleSource, 'private function prepareIPSViewStateForClient(array $state, int $clientContractVersion): array')
+        && str_contains($moduleSource, '$clientContractVersion >= self::VISUALIZATION_CLIENT_CONTRACT_VERSION')
+        && str_contains($moduleSource, "\$calendar['provider'] = \$providerByInstanceId[\$instanceId];")
+        && substr_count($moduleSource, '$this->prepareIPSViewStateForClient(') >= 2,
+    'IPSView must keep legacy persisted clients compatible while current clients use provider-neutral event-state capabilities.'
+);
+
+assertVisualization(
     str_contains($script, "const action = moving ? 'MoveEvent' : (selectedEvent ? 'UpdateEvent' : 'CreateEvent');")
         && str_contains($script, 'targetCalendarInstanceId: calendarInstanceId')
         && str_contains($script, "document.getElementById('save-button').textContent = t(moving ? 'Move' : 'Save');")

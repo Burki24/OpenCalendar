@@ -37,6 +37,7 @@ const swipeAxisRatio = 1.3;
 const ipsViewStateRefreshIntervalMilliseconds = 15_000;
 const visibleRangeRetryDelayMilliseconds = 300;
 const visibleRangeRetryMaxAttempts = 40;
+const calendarClientContractVersion = 2;
 document.documentElement.style.setProperty('--agenda-color-bar-width', `${calendarAgendaColorBarWidth}px`);
 document.documentElement.style.setProperty('--compact-color-bar-width', `${calendarCompactColorBarWidth}px`);
 
@@ -4605,6 +4606,7 @@ async function calendarIPSViewRequest(action, value) {
 
     const body = new URLSearchParams();
     body.set('token', String(calendarIPSViewConfig.token));
+    body.set('clientContractVersion', String(calendarClientContractVersion));
     body.set('action', action);
     body.set('value', JSON.stringify(value));
 
