@@ -3873,9 +3873,9 @@ assertTrueValue(
         && str_contains($calDavProviderSource, 'public function getRecurringSeries(')
         && str_contains($calDavProviderSource, '<c:prop-filter name="UID">')
         && str_contains($calDavProviderSource, '<c:text-match collation="i;octet">')
-        && str_contains($calDavProviderSource, "'updateSeries'     => \$canWrite")
-        && str_contains($calDavProviderSource, "'deleteSeries'     => \$canWrite")
-        && str_contains($calDavProviderSource, "'writeStatus'      => \$canWrite")
+        && str_contains($calDavProviderSource, "'updateSeries'      => \$canWrite")
+        && str_contains($calDavProviderSource, "'deleteSeries'      => \$canWrite")
+        && str_contains($calDavProviderSource, "'writeStatus'       => \$canWrite")
         && str_contains($calDavProviderSource, "'writeTransparency' => \$canWrite")
         && str_contains($calDavProviderSource, "'defaultStatus'                 => CalendarEventState::STATUS_CONFIRMED")
         && str_contains($calDavProviderSource, "'defaultTransparency'           => CalendarEventState::TRANSP_OPAQUE")
@@ -3890,7 +3890,7 @@ assertTrueValue(
         && str_contains($accountModuleSource, "array_key_exists('writeTransparency', \$capabilities)")
         && str_contains($accountModuleSource, "'defaultStatus'] = CalendarEventState::STATUS_CONFIRMED")
         && str_contains($accountModuleSource, "'defaultTransparency'] = CalendarEventState::TRANSP_OPAQUE")
-        && str_contains($accountModuleSource, "\$provider === self::PROVIDER_MICROSOFT")
+        && str_contains($accountModuleSource, '$provider === self::PROVIDER_MICROSOFT')
         && str_contains($accountModuleSource, 'CalendarEventState::TRANSP_TRANSPARENT'),
     'Cached account calendars must gain provider event-state capabilities and defaults without manual rediscovery.'
 );
