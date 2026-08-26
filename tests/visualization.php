@@ -309,6 +309,11 @@ assertVisualization(
 );
 
 assertVisualization(
+    str_contains($style, '#event-state-row { align-items: start; }'),
+    'The event-state row must keep the closed IPSView picker at its intrinsic height while the sibling picker is open.'
+);
+
+assertVisualization(
     str_contains($script, 'function initializeIPSViewEventStatePickers()')
         && str_contains($script, "calendarVisualization.mode !== 'ipsview'")
         && str_contains($script, 'picker.append(trigger, options);')
