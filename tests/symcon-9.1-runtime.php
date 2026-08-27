@@ -266,7 +266,7 @@ $accountImplemented = is_array($accountMetadata['implemented'] ?? null) ? $accou
 $accountChildren = is_array($accountMetadata['childRequirements'] ?? null) ? $accountMetadata['childRequirements'] : [];
 foreach (
     [
-        'Calendar'             => $calendarMetadata,
+        'Calendar'              => $calendarMetadata,
         'Calendar Configurator' => $configuratorMetadata
     ] as $name => $childMetadata
 ) {
