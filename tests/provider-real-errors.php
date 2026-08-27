@@ -84,7 +84,8 @@ function realProviderErrorExpect(
 }
 
 realProviderErrorExpect(
-    static function (): void {
+    static function (): void
+    {
         $http = new RealProviderErrorHttpClient([
             realProviderErrorResponse(
                 401,
@@ -99,7 +100,8 @@ realProviderErrorExpect(
 );
 
 realProviderErrorExpect(
-    static function (): void {
+    static function (): void
+    {
         $http = new RealProviderErrorHttpClient([
             realProviderErrorResponse(
                 403,
@@ -114,7 +116,8 @@ realProviderErrorExpect(
 );
 
 realProviderErrorExpect(
-    static function (): void {
+    static function (): void
+    {
         $http = new RealProviderErrorHttpClient([
             new CalendarHttpException('HTTP request failed (28): Operation timed out after 30000 milliseconds.')
         ]);
@@ -126,7 +129,8 @@ realProviderErrorExpect(
 );
 
 realProviderErrorExpect(
-    static function (): void {
+    static function (): void
+    {
         $http = new RealProviderErrorHttpClient([
             realProviderErrorResponse(200, '{"items":')
         ]);
@@ -138,7 +142,8 @@ realProviderErrorExpect(
 );
 
 realProviderErrorExpect(
-    static function (): void {
+    static function (): void
+    {
         $http = new RealProviderErrorHttpClient([
             realProviderErrorResponse(
                 403,
@@ -153,7 +158,8 @@ realProviderErrorExpect(
 );
 
 realProviderErrorExpect(
-    static function (): void {
+    static function (): void
+    {
         $http = new RealProviderErrorHttpClient([
             realProviderErrorResponse(
                 429,
@@ -168,7 +174,8 @@ realProviderErrorExpect(
 );
 
 realProviderErrorExpect(
-    static function (): void {
+    static function (): void
+    {
         $http = new RealProviderErrorHttpClient([
             realProviderErrorResponse(
                 503,
@@ -183,7 +190,8 @@ realProviderErrorExpect(
 );
 
 realProviderErrorExpect(
-    static function (): void {
+    static function (): void
+    {
         $http = new RealProviderErrorHttpClient([
             realProviderErrorResponse(200, '{"value":')
         ]);
@@ -199,7 +207,8 @@ $rangeStart = new DateTimeImmutable('2026-08-01T00:00:00Z');
 $rangeEnd = new DateTimeImmutable('2026-09-01T00:00:00Z');
 
 realProviderErrorExpect(
-    static function () use ($calendarUrl, $rangeStart, $rangeEnd): void {
+    static function () use ($calendarUrl, $rangeStart, $rangeEnd): void
+    {
         $http = new RealProviderErrorHttpClient([
             realProviderErrorResponse(503, '', $calendarUrl)
         ]);
@@ -215,7 +224,8 @@ realProviderErrorExpect(
 );
 
 realProviderErrorExpect(
-    static function () use ($calendarUrl, $rangeStart, $rangeEnd): void {
+    static function () use ($calendarUrl, $rangeStart, $rangeEnd): void
+    {
         $http = new RealProviderErrorHttpClient([
             realProviderErrorResponse(207, '<d:multistatus', $calendarUrl)
         ]);
