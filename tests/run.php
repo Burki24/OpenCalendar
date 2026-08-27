@@ -38,6 +38,7 @@ $commands = [
     ['Verify provider parity matrix', [PHP_BINARY, 'tests/provider-parity.php']],
     ['Run OpenCalendar provider and integration tests', [PHP_BINARY, 'tests/calendar-provider.php']],
     ['Check shared visualization contract', [PHP_BINARY, 'tests/visualization.php']],
+    ['Check visualization UI regression contract', [PHP_BINARY, 'tests/ui-regression.php']],
     ['Run account module structure tests', [PHP_BINARY, 'tests/account-module.php']],
     ['Check public PHPDoc coverage', [PHP_BINARY, 'tests/phpdocs.php']],
     ['Check Symcon Strict compliance', [PHP_BINARY, 'tests/symcon-strict.php']],
