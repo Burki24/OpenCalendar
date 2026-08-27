@@ -15,6 +15,7 @@ $commands = [
     ['Check RFC VTIMEZONE import', [PHP_BINARY, 'tests/vtimezone.php']],
     ['Check timezone and DST hardening', [PHP_BINARY, 'tests/timezone-dst.php']],
     ['Check provider timezone/DST parity', [PHP_BINARY, 'tests/provider-timezone-dst.php']],
+    ['Run data load and recurrence stress tests', [PHP_BINARY, 'tests/load-stress.php']],
     ['Check module localization contract', [PHP_BINARY, 'tests/localization.php']],
     ['Verify chunked event transfers', [PHP_BINARY, 'tests/chunked-event-transfer.php']],
     ['Verify current-day event counting', [PHP_BINARY, 'tests/calendar-event-counter.php']],
