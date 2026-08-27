@@ -277,7 +277,8 @@ function liveE2EReadback(
     );
 
     return liveE2EEventually(
-        static function () use ($provider, $calendarReference, $identity, $validator): ?array {
+        static function () use ($provider, $calendarReference, $identity, $validator): ?array
+        {
             $event = $provider->getEventForEdit($calendarReference, liveE2ELookupIdentity($identity));
             if ($validator !== null && !$validator($event)) {
                 return null;
@@ -300,7 +301,8 @@ function liveE2EWaitMissing(
     );
 
     liveE2EEventually(
-        static function () use ($provider, $calendarReference, $identity): ?bool {
+        static function () use ($provider, $calendarReference, $identity): ?bool
+        {
             try {
                 $provider->getEventForEdit($calendarReference, liveE2ELookupIdentity($identity));
             } catch (Throwable $exception) {
@@ -355,7 +357,8 @@ function liveE2EWaitUidEvents(
     callable $validator
 ): array {
     return liveE2EEventually(
-        static function () use ($provider, $calendarReference, $uid, $start, $end, $validator): ?array {
+        static function () use ($provider, $calendarReference, $uid, $start, $end, $validator): ?array
+        {
             $events = liveE2EVisibleEvents($provider->getEvents($calendarReference, $start, $end));
             $events = array_values(array_filter(
                 $events,
@@ -381,7 +384,8 @@ function liveE2EWaitTaggedEvents(
     callable $validator
 ): array {
     return liveE2EEventually(
-        static function () use ($provider, $calendarReference, $tag, $start, $end, $validator): ?array {
+        static function () use ($provider, $calendarReference, $tag, $start, $end, $validator): ?array
+        {
             $events = liveE2EVisibleEvents($provider->getEvents($calendarReference, $start, $end));
             $events = array_values(array_filter(
                 $events,
@@ -655,7 +659,8 @@ function liveE2EOccurrenceScenario(
         $uid,
         $rangeStart,
         $rangeEnd,
-        static function (array $items) use ($target, $updatedSummary): bool {
+        static function (array $items) use ($target, $updatedSummary): bool
+        {
             foreach ($items as $item) {
                 if (liveE2ESameOccurrence($item, $target) && ($item['summary'] ?? '') === $updatedSummary) {
                     return true;
@@ -857,7 +862,8 @@ function liveE2EFollowingScenario(
         $tag . ' following',
         $rangeStart,
         $rangeEnd,
-        static function (array $items) use ($summary, $tailSummary): bool {
+        static function (array $items) use ($summary, $tailSummary): bool
+        {
             if (count($items) !== 4) {
                 return false;
             }
