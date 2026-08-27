@@ -320,16 +320,28 @@ assertVisualization(
 assertVisualization(
     str_contains($script, 'function initializeIPSViewEventStatePickers()')
         && str_contains($script, "calendarVisualization.mode !== 'ipsview'")
+        && str_contains($script, "eventDialog.querySelectorAll('select').forEach(select => initializeIPSViewEventStatePicker(select));")
+        && str_contains($script, 'function initializeIPSViewEventStatePicker(select)')
         && str_contains($script, 'picker.append(trigger, options);')
         && str_contains($script, "select.classList.add('hidden');")
+        && str_contains($script, 'function rebuildIPSViewEventStatePickerOptions(select, picker)')
+        && str_contains($script, 'option.disabled = nativeOption.disabled;')
         && str_contains($script, 'function synchronizeIPSViewEventStatePicker(select)')
         && str_contains($script, 'picker.trigger.disabled = select.disabled;')
         && str_contains($script, 'function openIPSViewEventStatePicker(select, focusSelected = false)')
         && str_contains($script, 'function closeIPSViewEventStatePickers(exceptSelect = null)')
         && str_contains($script, "option.setAttribute('aria-selected', String(selected));")
         && str_contains($script, "select.dispatchEvent(new Event('change', { bubbles: true }));")
+        && str_contains($script, 'initializeIPSViewEventStatePicker(unitSelect);')
+        && str_contains($script, 'initializeIPSViewEventStatePicker(mode);')
+        && str_contains($script, 'initializeIPSViewEventStatePicker(index);')
+        && str_contains($indexSource, 'id="event-anniversary-type"')
+        && str_contains($indexSource, 'id="event-recurrence-frequency"')
+        && str_contains($indexSource, 'id="event-reminder-mode"')
+        && str_contains($indexSource, 'id="event-status"')
+        && str_contains($indexSource, 'id="event-availability"')
         && str_contains($script, 'initializeIPSViewEventStatePickers();'),
-    'IPSView must use in-document event-state pickers instead of relying on native select popups inside the embedded WebView.'
+    'IPSView must use in-document pickers for every event-editor select instead of relying on native select popups inside the embedded WebView.'
 );
 
 assertVisualization(

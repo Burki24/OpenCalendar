@@ -1595,9 +1595,19 @@ final class CalDAVProvider implements CalendarEventLookupProviderInterface, Cale
         $calendarPath = rtrim($this->normalizePath((string) ($calendar['path'] ?? '/')), '/') . '/';
         $resourcePath = $this->normalizePath((string) ($resource['path'] ?? '/'));
 
-        if (strcasecmp((string) ($calendar['scheme'] ?? ''), (string) ($resource['scheme'] ?? '')) !== 0
-            || strcasecmp((string) ($calendar['host'] ?? ''), (string) ($resource['host'] ?? '')) !== 0
-            || $calendarPort !== $resourcePort
+        $sameAuthority = strcasecmp(
+            (string) ($calendar['scheme'] ?? ''),
+            (string) ($resource['scheme'] ?? '')
+        ) === 0
+            && strcasecmp((string) ($calendar['host'] ?? ''), (string) ($resource['host'] ?? '')) === 0
+            && $calendarPort === $resourcePort;
+        $sameTrustedOriginFamily = !$sameAuthority
+            && $calendarPort === $resourcePort
+            && strcasecmp((string) ($calendar['scheme'] ?? ''), (string) ($resource['scheme'] ?? '')) === 0
+            && $this->originPolicy->isAllowedUrl($calendarUrl)
+            && $this->originPolicy->isAllowedUrl($resourceUrl);
+
+        if ((!$sameAuthority && !$sameTrustedOriginFamily)
             || !str_starts_with($resourcePath, $calendarPath)) {
             throw new CalDAVProviderException('The event resource does not belong to the configured calendar.');
         }

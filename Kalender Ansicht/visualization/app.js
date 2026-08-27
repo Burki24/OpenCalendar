@@ -1811,6 +1811,7 @@ function updateAnniversaryControls() {
     } else {
         allDayInput.disabled = !eventDialogEditable;
     }
+    synchronizeIPSViewEventStatePickers();
 }
 
 function suggestedAnniversaryDate() {
@@ -2870,78 +2871,97 @@ function updateEventStateControls() {
 }
 
 const ipsViewEventStatePickers = new Map();
+let ipsViewEventSelectSequence = 0;
 
 function initializeIPSViewEventStatePickers() {
     if (calendarVisualization.mode !== 'ipsview') return;
 
-    [eventStatusInput, eventAvailabilityInput].forEach(select => {
-        if (!(select instanceof HTMLSelectElement) || ipsViewEventStatePickers.has(select)) return;
-        const row = select.closest('.form-row');
-        const label = row?.querySelector(`label[for="${select.id}"]`);
-        if (!(row instanceof HTMLElement) || !(label instanceof HTMLLabelElement)) return;
+    eventDialog.querySelectorAll('select').forEach(select => initializeIPSViewEventStatePicker(select));
+}
 
-        const picker = element('div', 'calendar-picker event-state-picker');
-        const trigger = document.createElement('button');
-        const value = document.createElement('span');
-        const chevron = document.createElement('span');
-        const options = element('div', 'calendar-picker-options hidden');
+function initializeIPSViewEventStatePicker(select) {
+    if (calendarVisualization.mode !== 'ipsview'
+        || !(select instanceof HTMLSelectElement)
+        || ipsViewEventStatePickers.has(select)) return;
 
-        trigger.type = 'button';
-        trigger.className = 'calendar-picker-trigger';
-        trigger.id = `${select.id}-trigger`;
-        trigger.setAttribute('aria-haspopup', 'listbox');
-        trigger.setAttribute('aria-expanded', 'false');
-        trigger.setAttribute('aria-controls', `${select.id}-options`);
-        value.id = `${select.id}-value`;
-        chevron.className = 'calendar-picker-chevron';
-        chevron.setAttribute('aria-hidden', 'true');
-        chevron.textContent = '⌄';
-        trigger.append(value, chevron);
+    if (!select.id) {
+        ipsViewEventSelectSequence += 1;
+        select.id = `event-dialog-select-${ipsViewEventSelectSequence}`;
+    }
+    const row = select.closest('.form-row');
+    const label = row instanceof HTMLElement
+        ? Array.from(row.querySelectorAll('label')).find(candidate => candidate.htmlFor === select.id)
+            || row.querySelector('label')
+        : null;
+    if (!(row instanceof HTMLElement) || !(label instanceof HTMLLabelElement)) return;
 
-        options.id = `${select.id}-options`;
-        options.setAttribute('role', 'listbox');
-        label.id = label.id || `${select.id}-label`;
-        label.htmlFor = trigger.id;
-        options.setAttribute('aria-labelledby', label.id);
+    const picker = element('div', 'calendar-picker event-state-picker');
+    const trigger = document.createElement('button');
+    const value = document.createElement('span');
+    const chevron = document.createElement('span');
+    const options = element('div', 'calendar-picker-options hidden');
 
-        Array.from(select.options).forEach(nativeOption => {
-            const option = document.createElement('button');
-            option.type = 'button';
-            option.className = 'calendar-picker-option';
-            option.dataset.value = nativeOption.value;
-            option.setAttribute('role', 'option');
-            option.textContent = t(nativeOption.dataset.i18n || nativeOption.textContent.trim());
-            option.addEventListener('click', event => {
-                event.stopPropagation();
-                select.value = option.dataset.value || '';
-                select.dispatchEvent(new Event('change', { bubbles: true }));
-                synchronizeIPSViewEventStatePicker(select);
-                closeIPSViewEventStatePicker(select);
-                trigger.focus();
-            });
-            option.addEventListener('keydown', event => handleIPSViewEventStateOptionKeydown(event, select));
-            options.appendChild(option);
-        });
+    trigger.type = 'button';
+    trigger.className = 'calendar-picker-trigger';
+    trigger.id = `${select.id}-trigger`;
+    trigger.setAttribute('aria-haspopup', 'listbox');
+    trigger.setAttribute('aria-expanded', 'false');
+    trigger.setAttribute('aria-controls', `${select.id}-options`);
+    value.id = `${select.id}-value`;
+    chevron.className = 'calendar-picker-chevron';
+    chevron.setAttribute('aria-hidden', 'true');
+    chevron.textContent = '⌄';
+    trigger.append(value, chevron);
 
-        trigger.addEventListener('click', event => {
+    options.id = `${select.id}-options`;
+    options.setAttribute('role', 'listbox');
+    label.id = label.id || `${select.id}-label`;
+    label.htmlFor = trigger.id;
+    options.setAttribute('aria-labelledby', label.id);
+
+    trigger.addEventListener('click', event => {
+        event.stopPropagation();
+        toggleIPSViewEventStatePicker(select);
+    });
+    trigger.addEventListener('keydown', event => {
+        if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+            event.preventDefault();
+            openIPSViewEventStatePicker(select, true);
+        } else if (event.key === 'Escape') {
+            closeIPSViewEventStatePicker(select);
+        }
+    });
+
+    picker.append(trigger, options);
+    select.classList.add('hidden');
+    select.setAttribute('aria-hidden', 'true');
+    row.appendChild(picker);
+    ipsViewEventStatePickers.set(select, { picker, trigger, value, options });
+    synchronizeIPSViewEventStatePicker(select);
+}
+
+function rebuildIPSViewEventStatePickerOptions(select, picker) {
+    picker.options.replaceChildren();
+    Array.from(select.options).forEach(nativeOption => {
+        const option = document.createElement('button');
+        option.type = 'button';
+        option.className = 'calendar-picker-option';
+        option.dataset.value = nativeOption.value;
+        option.setAttribute('role', 'option');
+        option.textContent = t(nativeOption.dataset.i18n || nativeOption.textContent.trim());
+        option.disabled = nativeOption.disabled;
+        option.setAttribute('aria-disabled', String(nativeOption.disabled));
+        option.addEventListener('click', event => {
             event.stopPropagation();
-            toggleIPSViewEventStatePicker(select);
+            if (option.disabled) return;
+            select.value = option.dataset.value || '';
+            select.dispatchEvent(new Event('change', { bubbles: true }));
+            synchronizeIPSViewEventStatePicker(select);
+            closeIPSViewEventStatePicker(select);
+            picker.trigger.focus();
         });
-        trigger.addEventListener('keydown', event => {
-            if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
-                event.preventDefault();
-                openIPSViewEventStatePicker(select, true);
-            } else if (event.key === 'Escape') {
-                closeIPSViewEventStatePicker(select);
-            }
-        });
-
-        picker.append(trigger, options);
-        select.classList.add('hidden');
-        select.setAttribute('aria-hidden', 'true');
-        row.appendChild(picker);
-        ipsViewEventStatePickers.set(select, { picker, trigger, value, options });
-        synchronizeIPSViewEventStatePicker(select);
+        option.addEventListener('keydown', event => handleIPSViewEventStateOptionKeydown(event, select));
+        picker.options.appendChild(option);
     });
 }
 
@@ -2949,7 +2969,19 @@ function synchronizeIPSViewEventStatePicker(select) {
     const picker = ipsViewEventStatePickers.get(select);
     if (!picker) return;
 
-    const selectedOption = Array.from(select.options).find(option => option.value === select.value) || null;
+    const nativeOptions = Array.from(select.options);
+    const pickerOptions = Array.from(picker.options.querySelectorAll('.calendar-picker-option'));
+    const optionsChanged = nativeOptions.length !== pickerOptions.length
+        || nativeOptions.some((nativeOption, index) => pickerOptions[index]?.dataset.value !== nativeOption.value)
+        || nativeOptions.some((nativeOption, index) => {
+            const option = pickerOptions[index];
+            return option
+                && (option.textContent !== t(nativeOption.dataset.i18n || nativeOption.textContent.trim())
+                    || option.disabled !== nativeOption.disabled);
+        });
+    if (optionsChanged) rebuildIPSViewEventStatePickerOptions(select, picker);
+
+    const selectedOption = nativeOptions.find(option => option.value === select.value) || null;
     picker.value.textContent = selectedOption
         ? t(selectedOption.dataset.i18n || selectedOption.textContent.trim())
         : '';
@@ -2964,7 +2996,13 @@ function synchronizeIPSViewEventStatePicker(select) {
 }
 
 function synchronizeIPSViewEventStatePickers() {
-    ipsViewEventStatePickers.forEach((picker, select) => synchronizeIPSViewEventStatePicker(select));
+    ipsViewEventStatePickers.forEach((picker, select) => {
+        if (!select.isConnected || !picker.picker.isConnected) {
+            ipsViewEventStatePickers.delete(select);
+            return;
+        }
+        synchronizeIPSViewEventStatePicker(select);
+    });
 }
 
 function openIPSViewEventStatePicker(select, focusSelected = false) {
@@ -3006,7 +3044,7 @@ function toggleIPSViewEventStatePicker(select) {
 function handleIPSViewEventStateOptionKeydown(event, select) {
     const picker = ipsViewEventStatePickers.get(select);
     if (!picker) return;
-    const options = Array.from(picker.options.querySelectorAll('.calendar-picker-option'));
+    const options = Array.from(picker.options.querySelectorAll('.calendar-picker-option:not(:disabled)'));
     const currentIndex = options.indexOf(event.currentTarget);
     let nextIndex = currentIndex;
     if (event.key === 'ArrowDown') nextIndex = Math.min(options.length - 1, currentIndex + 1);
@@ -3384,7 +3422,9 @@ function appendReminderEditorEntry(minutesBeforeStart) {
 
     entry.append(fields, actions);
     eventReminderExtraList.append(entry);
+    initializeIPSViewEventStatePicker(unitSelect);
     setReminderFieldsFromMinutes(valueInput, unitSelect, minutesBeforeStart);
+    synchronizeIPSViewEventStatePicker(unitSelect);
 }
 
 function clearExtraReminderEntries() {
@@ -3546,6 +3586,7 @@ function updateReminderControls() {
     if (custom && validMinutes.length === minutes.length && new Set(validMinutes).size !== validMinutes.length) {
         eventReminderValue.setCustomValidity(t('Reminder times must be unique.'));
     }
+    synchronizeIPSViewEventStatePickers();
 }
 
 function reminderEditorValue() {
@@ -3736,6 +3777,8 @@ function recurrencePatternControls() {
     eventRecurrenceWeekdays.before(row);
     mode.addEventListener('change', updateRecurrenceControls);
     index.addEventListener('change', updateRecurrenceControls);
+    initializeIPSViewEventStatePicker(mode);
+    initializeIPSViewEventStatePicker(index);
 
     return { row, mode, index };
 }
@@ -3824,6 +3867,7 @@ function updateRecurrenceControls() {
     };
     eventRecurrenceIntervalUnit.textContent = enabled ? t(units[frequency] || 'Days') : '';
     updateRecurrenceEndDateMinimum();
+    synchronizeIPSViewEventStatePickers();
 }
 
 function updateRecurrenceEndDateMinimum() {

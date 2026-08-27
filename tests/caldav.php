@@ -515,6 +515,68 @@ assertCalDAVSame($directEditResourceUrl, $directEditEvent['resourceUrl'], 'Direc
 assertCalDAVSame(1, count($directEditClient->requests), 'Direct CalDAV edit lookup must use exactly one resource request.');
 assertCalDAVSame('GET', $directEditClient->requests[0]['method'], 'Direct CalDAV edit lookup must avoid a calendar REPORT.');
 
+// iCloud can redirect a calendar object between trusted CalDAV shard hosts. The
+// calendar path must remain authoritative without requiring the shard host itself
+// to stay identical for edit preparation and subsequent writes.
+$iCloudCalendarUrl = 'https://p12-caldav.icloud.com/123/calendars/work/';
+$iCloudResourceUrl = $iCloudCalendarUrl . 'event-1.ics';
+$iCloudRedirectedResourceUrl = 'https://p34-caldav.icloud.com/123/calendars/work/event-1.ics';
+$iCloudDirectEditClient = new FakeCalDAVHttpClient([
+    caldavResponseWithHeaders(
+        200,
+        ['etag' => '"icloud-direct-edit-etag"'],
+        singleEventIcal(),
+        $iCloudRedirectedResourceUrl
+    )
+]);
+$iCloudProvider = new CalDAVProvider($iCloudDirectEditClient, 'https://caldav.icloud.com/');
+$iCloudDirectEditEvent = $iCloudProvider->getEventForEdit(
+    $iCloudCalendarUrl,
+    [
+        'resourceUrl'    => $iCloudResourceUrl,
+        'uid'            => 'event-1@example.com',
+        'startTimestamp' => (new DateTimeImmutable('2026-07-24T10:00:00Z'))->getTimestamp(),
+        'endTimestamp'   => (new DateTimeImmutable('2026-07-24T11:00:00Z'))->getTimestamp()
+    ]
+);
+assertCalDAVSame(
+    $iCloudRedirectedResourceUrl,
+    $iCloudDirectEditEvent['resourceUrl'],
+    'A trusted iCloud shard redirect must retain the effective event resource URL during edit preparation.'
+);
+
+$iCloudUpdateClient = new FakeCalDAVHttpClient([
+    caldavResponseWithHeaders(
+        200,
+        ['etag' => '"icloud-current-etag"'],
+        singleEventIcal(),
+        $iCloudRedirectedResourceUrl
+    ),
+    caldavResponseWithHeaders(
+        204,
+        ['etag' => '"icloud-updated-etag"'],
+        '',
+        $iCloudRedirectedResourceUrl
+    )
+]);
+$iCloudUpdated = (new CalDAVProvider($iCloudUpdateClient, 'https://caldav.icloud.com/'))->updateEvent(
+    $iCloudCalendarUrl,
+    $iCloudResourceUrl,
+    '"stale-editor-etag"',
+    'event-1@example.com',
+    ['summary' => 'Updated across shard redirect']
+);
+assertCalDAVSame(
+    $iCloudRedirectedResourceUrl,
+    $iCloudUpdateClient->requests[1]['url'],
+    'A CalDAV update must follow a trusted iCloud shard redirect and write the effective resource URL.'
+);
+assertCalDAVSame(
+    $iCloudRedirectedResourceUrl,
+    $iCloudUpdated['resourceUrl'],
+    'A CalDAV update must return the trusted redirected iCloud resource URL.'
+);
+
 $directRecurringEditClient = new FakeCalDAVHttpClient([
     caldavResponseWithHeaders(
         200,
@@ -538,6 +600,32 @@ assertCalDAVSame('occurrence', $directRecurringEditEvent['recurrenceType'], 'A d
 assertCalDAVSame(true, $directRecurringEditEvent['canUpdateOccurrence'], 'Directly loaded CalDAV occurrences must remain individually editable.');
 assertCalDAVSame(true, $directRecurringEditEvent['canDeleteOccurrence'], 'Directly loaded CalDAV occurrences must remain individually deletable.');
 assertCalDAVSame('2026-08-24T10:00:00+00:00', $directRecurringEditEvent['originalStart'], 'Direct recurring edit lookup must retain the immutable occurrence start.');
+
+$iCloudSeriesResourceUrl = 'https://p12-caldav.icloud.com/123/calendars/work/series-1.ics';
+$iCloudRedirectedSeriesResourceUrl = 'https://p34-caldav.icloud.com/123/calendars/work/series-1.ics';
+$iCloudSeriesClient = new FakeCalDAVHttpClient([
+    caldavResponseWithHeaders(
+        200,
+        ['etag' => '"icloud-series-etag"'],
+        recurringSeriesIcal(),
+        $iCloudRedirectedSeriesResourceUrl
+    )
+]);
+$iCloudRecurringSeries = (new CalDAVProvider($iCloudSeriesClient, 'https://caldav.icloud.com/'))->getRecurringSeries(
+    $iCloudCalendarUrl,
+    'series-1@example.com',
+    $iCloudSeriesResourceUrl
+);
+assertCalDAVSame(
+    'master',
+    $iCloudRecurringSeries['recurrenceType'],
+    'A recurring iCloud series must remain editable when the object GET redirects to another trusted shard.'
+);
+assertCalDAVSame(
+    $iCloudRedirectedSeriesResourceUrl,
+    $iCloudRecurringSeries['resourceUrl'],
+    'Recurring iCloud series editing must retain the effective trusted shard resource URL.'
+);
 
 $uidLookupClient = new FakeCalDAVHttpClient([
     caldavResponse(
