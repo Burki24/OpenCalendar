@@ -38,6 +38,7 @@ $commands = [
     ['Run account module structure tests', [PHP_BINARY, 'tests/account-module.php']],
     ['Check public PHPDoc coverage', [PHP_BINARY, 'tests/phpdocs.php']],
     ['Check Symcon Strict compliance', [PHP_BINARY, 'tests/symcon-strict.php']],
+    ['Audit Symcon 9.1 Rust runtime boundaries', [PHP_BINARY, 'tests/symcon-9.1-runtime.php']],
     ['Run CalDAV provider tests', [PHP_BINARY, 'tests/caldav.php']],
     ['Run CalDAV HTTP integration tests', ['bash', 'tests/run-caldav-http.sh']]
 ];
