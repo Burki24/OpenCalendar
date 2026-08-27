@@ -27,14 +27,6 @@ jobs:
           private-key: ${{ secrets.HELPER_SYNC_APP_PRIVATE_KEY }}
           permission-contents: write
 
-      - name: Get GitHub App user ID
-        id: app-user
-        shell: bash
-        env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
-        run: |
-          echo "user-id=$(gh api \"/users/${{ steps.app-token.outputs.app-slug }}[bot]\" --jq .id)" >> "$GITHUB_OUTPUT"
-
       - name: Checkout
         uses: actions/checkout@v6
         with:
@@ -47,7 +39,7 @@ jobs:
         with:
           push: 'false'
           commit-user-name: ${{ steps.app-token.outputs.app-slug }}[bot]
-          commit-user-email: ${{ steps.app-user.outputs.user-id }}+${{ steps.app-token.outputs.app-slug }}[bot]@users.noreply.github.com
+          commit-user-email: ${{ steps.app-token.outputs.app-slug }}[bot]@users.noreply.github.com
 
       - name: Verify Symcon style after automatic fixes
         uses: Burki24/Symcon_ModuleCI/style@v1.0.0
@@ -83,7 +75,6 @@ jobs:
         shell: bash
         env:
           APP_SLUG: ${{ steps.app-token.outputs.app-slug }}
-          APP_USER_ID: ${{ steps.app-user.outputs.user-id }}
         run: |
           set -euo pipefail
 
@@ -93,7 +84,7 @@ jobs:
           fi
 
           git config user.name "${APP_SLUG}[bot]"
-          git config user.email "${APP_USER_ID}+${APP_SLUG}[bot]@users.noreply.github.com"
+          git config user.email "${APP_SLUG}[bot]@users.noreply.github.com"
 
           version=$(php -r '$library = json_decode(file_get_contents("library.json"), true); echo (string) $library["version"];')
           build=$(php -r '$library = json_decode(file_get_contents("library.json"), true); echo (int) $library["build"];')
