@@ -12,6 +12,8 @@ use IPSKalender\CalendarEventCounter;
 use IPSKalender\CalendarEventDeletion;
 use IPSKalender\CalendarEventRecurrence;
 use IPSKalender\CalendarEventState;
+use IPSKalender\CalendarProviderError;
+use IPSKalender\CalendarProviderErrorException;
 use IPSKalender\SynchronizationSchedule;
 
 require_once __DIR__ . '/../libs/helper/ChunkedJsonTransferHelper.php';
@@ -24,6 +26,7 @@ require_once __DIR__ . '/../libs/CalendarEventCounter.php';
 require_once __DIR__ . '/../libs/CalendarEventDeletion.php';
 require_once __DIR__ . '/../libs/CalendarEventRecurrence.php';
 require_once __DIR__ . '/../libs/CalendarEventState.php';
+require_once __DIR__ . '/../libs/CalendarProviderError.php';
 require_once __DIR__ . '/../libs/SynchronizationSchedule.php';
 
 class Calendar extends IPSModuleStrict
@@ -1529,7 +1532,16 @@ class Calendar extends IPSModuleStrict
         $response = json_decode($responseJson, true, 512, JSON_THROW_ON_ERROR);
         if (!is_array($response) || !($response['Success'] ?? false)) {
             $error = is_array($response) ? trim((string) ($response['Error'] ?? '')) : '';
-            throw new RuntimeException($error !== '' ? $error : 'The calendar account rejected the request.');
+            if ($error === '') {
+                $error = 'The calendar account rejected the request.';
+            }
+            $errorType = is_array($response)
+                ? CalendarProviderError::normalizeType((string) ($response['ErrorType'] ?? ''))
+                : '';
+            if ($errorType === '') {
+                $errorType = CalendarProviderError::classifyMessage($error);
+            }
+            throw new CalendarProviderErrorException($error, $errorType);
         }
         $payload = $response['Payload'] ?? null;
         if (!is_array($payload)) {
@@ -2504,24 +2516,31 @@ class Calendar extends IPSModuleStrict
             $rawMessage = 'Unknown calendar error.';
         }
 
-        if (str_contains(strtolower($rawMessage), 'changed by another client')) {
+        $errorType = $exception instanceof CalendarProviderErrorException
+            ? CalendarProviderError::normalizeType($exception->errorType)
+            : CalendarProviderError::fromThrowable($exception)['type'];
+        if ($errorType === '') {
+            $errorType = CalendarProviderError::TYPE_PROVIDER;
+        }
+
+        if ($errorType === CalendarProviderError::TYPE_CONFLICT) {
             $this->SetStatus(self::STATUS_WRITE_CONFLICT);
-        } elseif ($exception instanceof JsonException
-            || str_contains(strtolower($rawMessage), 'invalid data')
-            || str_contains(strtolower($rawMessage), 'event transfer')) {
+        } elseif ($errorType === CalendarProviderError::TYPE_INVALID_RESPONSE) {
             $this->SetStatus(self::STATUS_INVALID_RESPONSE);
         } else {
             $this->SetStatus(self::STATUS_SYNCHRONIZATION_FAILED);
         }
 
+        $normalizedMessage = CalendarProviderError::messageFor($errorType, $rawMessage);
         $message = $exception instanceof JsonException
             ? $this->Translate('Invalid JSON data.')
-            : $this->translateErrorMessage($rawMessage);
+            : $this->translateErrorMessage($normalizedMessage);
         $this->WriteAttributeString('LastError', $message);
         $this->SendSafeDebug('CalendarError', [
-            'type'    => $exception::class,
-            'message' => $rawMessage,
-            'code'    => $exception->getCode()
+            'type'      => $exception::class,
+            'errorType' => $errorType,
+            'message'   => $rawMessage,
+            'code'      => $exception->getCode()
         ]);
 
         return $message;

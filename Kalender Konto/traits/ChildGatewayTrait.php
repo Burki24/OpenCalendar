@@ -8,6 +8,7 @@ use IPSKalender\CalDAVProvider;
 use IPSKalender\CalendarEventLookupProviderInterface;
 use IPSKalender\CalendarEventRecurrence;
 use IPSKalender\CalendarHttpClient;
+use IPSKalender\CalendarProviderError;
 use IPSKalender\CalendarProviderInterface;
 use IPSKalender\GoogleCalendarIncrementalSync;
 use IPSKalender\GoogleCalendarOriginPolicy;
@@ -23,6 +24,7 @@ require_once __DIR__ . '/../../libs/CalDAVIncrementalSync.php';
 require_once __DIR__ . '/../../libs/GoogleCalendarIncrementalSync.php';
 require_once __DIR__ . '/../../libs/MicrosoftCalendarDebugHttpClient.php';
 require_once __DIR__ . '/../../libs/MicrosoftCalendarIncrementalSync.php';
+require_once __DIR__ . '/../../libs/CalendarProviderError.php';
 
 trait KalenderKontoChildGatewayTrait
 {
@@ -82,11 +84,14 @@ trait KalenderKontoChildGatewayTrait
 
             return $this->encodeResponse(true, $operation, $requestID, $payload);
         } catch (Throwable $exception) {
+            $providerError = CalendarProviderError::fromThrowable($exception);
             $this->SendSafeDebug('ChildRequestError', [
-                'operation' => isset($operation) ? $operation : '',
-                'type'      => $exception::class,
-                'message'   => $this->sanitizeError($exception->getMessage()),
-                'code'      => $exception->getCode()
+                'operation'  => isset($operation) ? $operation : '',
+                'type'       => $exception::class,
+                'errorType'  => $providerError['type'],
+                'httpStatus' => $providerError['httpStatus'],
+                'message'    => $this->sanitizeError($exception->getMessage()),
+                'code'       => $exception->getCode()
             ]);
 
             return $this->encodeResponse(
@@ -94,9 +99,8 @@ trait KalenderKontoChildGatewayTrait
                 isset($operation) ? $operation : '',
                 isset($requestID) ? $requestID : '',
                 null,
-                $exception instanceof JsonException
-                    ? $this->Translate('Invalid JSON data.')
-                    : $this->translateErrorMessage($exception->getMessage())
+                $this->translateErrorMessage($providerError['message']),
+                $providerError['type']
             );
         }
     }
@@ -758,16 +762,22 @@ trait KalenderKontoChildGatewayTrait
         string $operation,
         string $requestID,
         mixed $payload = null,
-        string $error = ''
+        string $error = '',
+        string $errorType = ''
     ): string {
+        $response = [
+            'Success'   => $success,
+            'Operation' => $operation,
+            'RequestID' => $requestID,
+            'Payload'   => $payload,
+            'Error'     => $error
+        ];
+        if ($errorType !== '') {
+            $response['ErrorType'] = $errorType;
+        }
+
         return json_encode(
-            [
-                'Success'   => $success,
-                'Operation' => $operation,
-                'RequestID' => $requestID,
-                'Payload'   => $payload,
-                'Error'     => $error
-            ],
+            $response,
             JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR
         );
     }
