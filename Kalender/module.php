@@ -9,6 +9,7 @@ use Burki24\SymconModuleHelper\DebugHelper;
 use Burki24\SymconModuleHelper\PersistentJsonCacheHelper;
 use Burki24\SymconModuleHelper\VariableHelper;
 use IPSKalender\CalendarEventCounter;
+use IPSKalender\CalendarEventDeletion;
 use IPSKalender\CalendarEventRecurrence;
 use IPSKalender\CalendarEventState;
 use IPSKalender\SynchronizationSchedule;
@@ -20,6 +21,7 @@ require_once __DIR__ . '/../libs/helper/DebugHelper.php';
 require_once __DIR__ . '/../libs/helper/PersistentJsonCacheHelper.php';
 require_once __DIR__ . '/../libs/helper/VariableHelper.php';
 require_once __DIR__ . '/../libs/CalendarEventCounter.php';
+require_once __DIR__ . '/../libs/CalendarEventDeletion.php';
 require_once __DIR__ . '/../libs/CalendarEventRecurrence.php';
 require_once __DIR__ . '/../libs/CalendarEventState.php';
 require_once __DIR__ . '/../libs/SynchronizationSchedule.php';
@@ -943,10 +945,13 @@ class Calendar extends IPSModuleStrict
                 )) {
                 $this->removeAnniversaryMetadata($event);
             }
-            if ($recurrenceType !== CalendarEventRecurrence::SINGLE
-                || !$this->removeSingleEventFromCache($event)) {
-                $this->refreshAfterWrite();
-            }
+            $events = $this->readEvents();
+            $filteredEvents = CalendarEventDeletion::filter($events, $event, $recurrence);
+            $this->storeEventsAfterWrite($filteredEvents);
+            $this->SendSafeDebug('EventDeleteCacheUpdated', [
+                'removedCount' => count($events) - count($filteredEvents),
+                'writeScope'   => $writeScope
+            ]);
             return true;
         } catch (Throwable $exception) {
             $this->handleError($exception);
@@ -2379,22 +2384,6 @@ class Calendar extends IPSModuleStrict
         }
 
         return false;
-    }
-
-    /** @param array<string, mixed> $event */
-    private function removeSingleEventFromCache(array $event): bool
-    {
-        $events = $this->readEvents();
-        $filtered = array_values(array_filter(
-            $events,
-            fn (array $cachedEvent): bool => !$this->eventIdentityMatches($cachedEvent, $event)
-        ));
-        if (count($filtered) === count($events)) {
-            return false;
-        }
-
-        $this->storeEventsAfterWrite($filtered);
-        return true;
     }
 
     /** @param array<string, mixed> $event */

@@ -27,6 +27,7 @@ $commands = [
     ['Verify Microsoft series-master synchronization', [PHP_BINARY, 'tests/microsoft-series-master-sync.php']],
     ['Verify Microsoft post-write synchronization', [PHP_BINARY, 'tests/microsoft-write-sync.php']],
     ['Verify provider-neutral post-write refresh', [PHP_BINARY, 'tests/post-write-refresh.php']],
+    ['Verify provider-neutral post-delete refresh', [PHP_BINARY, 'tests/post-delete-refresh.php']],
     ['Verify Microsoft event-edit identity', [PHP_BINARY, 'tests/microsoft-event-edit.php']],
     ['Verify CalDAV incremental synchronization', [PHP_BINARY, 'tests/caldav-incremental-sync.php']],
     ['Verify provider parity matrix', [PHP_BINARY, 'tests/provider-parity.php']],
