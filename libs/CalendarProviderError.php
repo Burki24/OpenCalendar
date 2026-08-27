@@ -27,6 +27,9 @@ final class CalendarProviderError
     public const TYPE_AUTHENTICATION = 'authentication';
     public const TYPE_ACCESS_DENIED = 'access_denied';
     public const TYPE_INVALID_RESPONSE = 'invalid_response';
+    public const TYPE_RATE_LIMITED = 'rate_limited';
+    public const TYPE_UNAVAILABLE = 'unavailable';
+    public const TYPE_TRANSPORT = 'transport';
 
     public const MESSAGE_CONFLICT = 'The event was changed by another client. Synchronize the calendar and try again.';
     public const MESSAGE_NOT_FOUND = 'The selected event is no longer available.';
@@ -37,7 +40,24 @@ final class CalendarProviderError
         self::TYPE_NOT_FOUND,
         self::TYPE_AUTHENTICATION,
         self::TYPE_ACCESS_DENIED,
-        self::TYPE_INVALID_RESPONSE
+        self::TYPE_INVALID_RESPONSE,
+        self::TYPE_RATE_LIMITED,
+        self::TYPE_UNAVAILABLE,
+        self::TYPE_TRANSPORT
+    ];
+
+    private const RATE_LIMIT_CODES = [
+        'ratelimitexceeded',
+        'userratelimitexceeded',
+        'quotaexceeded',
+        'toomanyrequests',
+        'activitylimitreached'
+    ];
+
+    private const UNAVAILABLE_CODES = [
+        'serviceunavailable',
+        'temporarilyunavailable',
+        'backenderror'
     ];
 
     /**
@@ -49,7 +69,13 @@ final class CalendarProviderError
     {
         $httpStatus = self::httpStatus($exception);
         $message = self::rawMessage($exception);
-        $type = self::classify($message, $httpStatus, $exception instanceof JsonException);
+        $type = self::classify(
+            $message,
+            $httpStatus,
+            $exception instanceof JsonException,
+            self::providerCode($exception),
+            self::isTransportException($exception)
+        );
 
         return [
             'type'       => $type,
@@ -72,7 +98,7 @@ final class CalendarProviderError
      */
     public static function classifyMessage(string $message): string
     {
-        return self::classify(self::normalizeMessage($message), 0, false);
+        return self::classify(self::normalizeMessage($message), 0, false, '', false);
     }
 
     /**
@@ -87,10 +113,25 @@ final class CalendarProviderError
         };
     }
 
-    private static function classify(string $message, int $httpStatus, bool $jsonError): string
-    {
+    private static function classify(
+        string $message,
+        int $httpStatus,
+        bool $jsonError,
+        string $providerCode,
+        bool $transportError
+    ): string {
         if ($jsonError) {
             return self::TYPE_INVALID_RESPONSE;
+        }
+        if (in_array($providerCode, self::RATE_LIMIT_CODES, true) || $httpStatus === 429) {
+            return self::TYPE_RATE_LIMITED;
+        }
+        if (in_array($providerCode, self::UNAVAILABLE_CODES, true)
+            || ($httpStatus >= 500 && $httpStatus <= 599)) {
+            return self::TYPE_UNAVAILABLE;
+        }
+        if ($httpStatus === 408) {
+            return self::TYPE_TRANSPORT;
         }
         if (in_array($httpStatus, [409, 412, 428], true)) {
             return self::TYPE_CONFLICT;
@@ -104,8 +145,28 @@ final class CalendarProviderError
         if ($httpStatus === 403) {
             return self::TYPE_ACCESS_DENIED;
         }
+        if ($transportError) {
+            return self::TYPE_TRANSPORT;
+        }
 
         $normalized = strtolower($message);
+        if (str_contains($normalized, 'rate limit')
+            || str_contains($normalized, 'too many requests')
+            || str_contains($normalized, 'quota exceeded')) {
+            return self::TYPE_RATE_LIMITED;
+        }
+        if (str_contains($normalized, 'service unavailable')
+            || str_contains($normalized, 'temporarily unavailable')
+            || str_contains($normalized, 'backend error')) {
+            return self::TYPE_UNAVAILABLE;
+        }
+        if (str_contains($normalized, 'http request failed')
+            || str_contains($normalized, 'operation timed out')
+            || str_contains($normalized, 'could not resolve host')
+            || str_contains($normalized, 'failed to connect')
+            || str_contains($normalized, 'connection refused')) {
+            return self::TYPE_TRANSPORT;
+        }
         if (str_contains($normalized, 'changed by another client')
             || str_contains($normalized, 'calendar object changed')
             || str_contains($normalized, 'precondition failed')
@@ -130,6 +191,10 @@ final class CalendarProviderError
         }
         if (str_contains($normalized, 'invalid json')
             || str_contains($normalized, 'invalid data')
+            || str_contains($normalized, 'invalid xml')
+            || str_contains($normalized, 'malformed xml')
+            || str_contains($normalized, 'invalid icalendar')
+            || str_contains($normalized, 'invalid calendar data')
             || str_contains($normalized, 'event transfer')) {
             return self::TYPE_INVALID_RESPONSE;
         }
@@ -147,6 +212,24 @@ final class CalendarProviderError
 
         $code = (int) $exception->getCode();
         return $code >= 100 && $code <= 599 ? $code : 0;
+    }
+
+    private static function providerCode(Throwable $exception): string
+    {
+        $properties = get_object_vars($exception);
+        foreach (['reason', 'errorCode'] as $property) {
+            $value = trim((string) ($properties[$property] ?? ''));
+            if ($value !== '') {
+                return strtolower((string) preg_replace('/[^a-z0-9]+/i', '', $value));
+            }
+        }
+
+        return '';
+    }
+
+    private static function isTransportException(Throwable $exception): bool
+    {
+        return str_ends_with($exception::class, '\\CalendarHttpException');
     }
 
     private static function rawMessage(Throwable $exception): string

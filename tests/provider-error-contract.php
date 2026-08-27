@@ -2,8 +2,10 @@
 
 declare(strict_types=1);
 
+use IPSKalender\CalendarHttpException;
 use IPSKalender\CalendarProviderError;
 
+require_once __DIR__ . '/../libs/CalendarHttpClient.php';
 require_once __DIR__ . '/../libs/CalendarProviderError.php';
 
 function providerErrorContractExpect(bool $condition, string $message): void
@@ -25,8 +27,12 @@ function providerErrorContractSource(string $path): string
 
 final class ProviderErrorContractException extends RuntimeException
 {
-    public function __construct(string $message, public readonly int $httpStatus = 0)
-    {
+    public function __construct(
+        string $message,
+        public readonly int $httpStatus = 0,
+        public readonly string $reason = '',
+        public readonly string $errorCode = ''
+    ) {
         parent::__construct($message);
     }
 }
@@ -75,6 +81,11 @@ providerErrorContractExpect(
     'JSON errors must map to the shared invalid-response contract.'
 );
 providerErrorContractExpect(
+    CalendarProviderError::classifyMessage('The CalDAV server returned invalid XML.')
+        === CalendarProviderError::TYPE_INVALID_RESPONSE,
+    'Invalid CalDAV XML must map to the shared invalid-response contract.'
+);
+providerErrorContractExpect(
     CalendarProviderError::fromThrowable(
         new ProviderErrorContractException('Provider authentication failed.', 401)
     )['type'] === CalendarProviderError::TYPE_AUTHENTICATION,
@@ -86,6 +97,61 @@ providerErrorContractExpect(
     )['type'] === CalendarProviderError::TYPE_ACCESS_DENIED,
     'HTTP 403 must be classified as an access-denied failure.'
 );
+providerErrorContractExpect(
+    CalendarProviderError::fromThrowable(
+        new ProviderErrorContractException('Provider throttled the request.', 429)
+    )['type'] === CalendarProviderError::TYPE_RATE_LIMITED,
+    'HTTP 429 must be classified as a rate-limit failure.'
+);
+providerErrorContractExpect(
+    CalendarProviderError::fromThrowable(
+        new ProviderErrorContractException(
+            'Rate Limit Exceeded',
+            403,
+            'rateLimitExceeded'
+        )
+    )['type'] === CalendarProviderError::TYPE_RATE_LIMITED,
+    'Provider-specific throttling metadata must take precedence over a generic HTTP 403 classification.'
+);
+providerErrorContractExpect(
+    CalendarProviderError::fromThrowable(
+        new ProviderErrorContractException('Provider service unavailable.', 503)
+    )['type'] === CalendarProviderError::TYPE_UNAVAILABLE,
+    'HTTP 5xx responses must be classified as temporary provider unavailability.'
+);
+providerErrorContractExpect(
+    CalendarProviderError::fromThrowable(
+        new ProviderErrorContractException(
+            'Provider backend problem.',
+            0,
+            '',
+            'ServiceUnavailable'
+        )
+    )['type'] === CalendarProviderError::TYPE_UNAVAILABLE,
+    'Provider-specific service-unavailable codes must remain classifiable without HTTP metadata.'
+);
+providerErrorContractExpect(
+    CalendarProviderError::fromThrowable(
+        new CalendarHttpException('HTTP request failed (28): Operation timed out.')
+    )['type'] === CalendarProviderError::TYPE_TRANSPORT,
+    'Calendar HTTP transport exceptions must map to the shared transport-error contract.'
+);
+providerErrorContractExpect(
+    CalendarProviderError::classifyMessage('Could not resolve host: calendar.example')
+        === CalendarProviderError::TYPE_TRANSPORT,
+    'Network failures must remain classifiable when exception type metadata is unavailable.'
+);
+
+foreach ([
+    CalendarProviderError::TYPE_RATE_LIMITED,
+    CalendarProviderError::TYPE_UNAVAILABLE,
+    CalendarProviderError::TYPE_TRANSPORT
+] as $type) {
+    providerErrorContractExpect(
+        CalendarProviderError::normalizeType($type) === $type,
+        'The provider-neutral error type must survive child-gateway normalization: ' . $type
+    );
+}
 
 $gatewaySource = providerErrorContractSource(__DIR__ . '/../Kalender Konto/traits/ChildGatewayTrait.php');
 providerErrorContractExpect(
