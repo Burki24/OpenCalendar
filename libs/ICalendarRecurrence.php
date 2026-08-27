@@ -9,9 +9,30 @@ use DateTimeImmutable;
 use DateTimeZone;
 use Throwable;
 
+require_once __DIR__ . '/CalendarEventRecurrence.php';
+
 final class ICalendarRecurrence
 {
     private const MAX_GENERATED_DAYS = 200_000;
+    private const MAX_GENERATED_HOURS = 500_000;
+    private const MAX_GENERATED_OCCURRENCES = 250_000;
+    private const SUPPORTED_FREQUENCIES = ['HOURLY', 'DAILY', 'WEEKLY', 'MONTHLY', 'YEARLY'];
+    private const SUPPORTED_RULE_PARTS = [
+        'FREQ',
+        'UNTIL',
+        'COUNT',
+        'INTERVAL',
+        'BYDAY',
+        'BYHOUR',
+        'BYMINUTE',
+        'BYMONTHDAY',
+        'BYYEARDAY',
+        'BYWEEKNO',
+        'BYMONTH',
+        'BYSETPOS',
+        'WKST'
+    ];
+    private const SINGLE_VALUE_RULE_PARTS = ['FREQ', 'UNTIL', 'COUNT', 'INTERVAL', 'WKST'];
 
     /**
      * Expands recurring event masters, exceptions, and overrides within a time range.
@@ -45,6 +66,164 @@ final class ICalendarRecurrence
         );
 
         return $result;
+    }
+
+    /**
+     * Builds privacy-conscious recurrence diagnostics from already expanded events.
+     *
+     * The summary intentionally omits event identity, titles, descriptions, locations,
+     * and resource URLs. Equivalent rules are grouped so account-level debug output
+     * stays compact even when several calendars contain the same recurrence pattern.
+     *
+     * @param list<array<string, mixed>> $events
+     * @return array{
+     *     seriesCount: int,
+     *     supportedSeriesCount: int,
+     *     unsupportedSeriesCount: int,
+     *     rules: list<array{
+     *         rule: string,
+     *         timezone: string,
+     *         supported: bool,
+     *         unsupportedParts: list<string>,
+     *         seriesCount: int,
+     *         occurrencesInRange: int,
+     *         overrideOccurrencesInRange: int,
+     *         rDateCount: int,
+     *         exDateCount: int
+     *     }>
+     * }
+     */
+    public static function diagnostics(array $events): array
+    {
+        $series = [];
+        foreach ($events as $event) {
+            $rule = strtoupper(trim((string) ($event['recurrenceRule'] ?? '')));
+            $recurrenceDates = is_array($event['recurrenceDates'] ?? null)
+                ? $event['recurrenceDates']
+                : [];
+            $exceptionDates = is_array($event['exceptionDates'] ?? null)
+                ? $event['exceptionDates']
+                : [];
+            $recurrenceType = strtolower(trim((string) ($event['recurrenceType'] ?? '')));
+            if ($rule === ''
+                && $recurrenceDates === []
+                && $exceptionDates === []
+                && !(bool) ($event['recurring'] ?? false)
+                && !in_array($recurrenceType, ['master', 'occurrence', 'exception'], true)) {
+                continue;
+            }
+
+            $seriesId = trim((string) ($event['seriesId'] ?? ''));
+            if ($seriesId === '') {
+                $seriesId = trim((string) ($event['uid'] ?? ''));
+            }
+            $timezone = trim((string) ($event['timezoneReference'] ?? $event['timezone'] ?? ''));
+            $seriesKey = $seriesId !== ''
+                ? 'series:' . $seriesId
+                : 'fallback:' . hash(
+                    'sha256',
+                    $rule . '|' . $timezone . '|' . (string) ($event['startTimestamp'] ?? '')
+                );
+
+            if (!isset($series[$seriesKey])) {
+                $series[$seriesKey] = [
+                    'rule'                       => $rule,
+                    'timezone'                   => $timezone,
+                    'supported'                  => (bool) ($event['recurrenceExpansionSupported'] ?? true),
+                    'unsupportedParts'           => [],
+                    'occurrencesInRange'         => 0,
+                    'overrideOccurrencesInRange' => 0,
+                    'rDateCount'                 => count($recurrenceDates),
+                    'exDateCount'                => count($exceptionDates)
+                ];
+            }
+
+            if ($series[$seriesKey]['rule'] === '' && $rule !== '') {
+                $series[$seriesKey]['rule'] = $rule;
+            }
+            if ($series[$seriesKey]['timezone'] === '' && $timezone !== '') {
+                $series[$seriesKey]['timezone'] = $timezone;
+            }
+            if (array_key_exists('recurrenceExpansionSupported', $event)
+                && !(bool) $event['recurrenceExpansionSupported']) {
+                $series[$seriesKey]['supported'] = false;
+            }
+
+            $unsupportedParts = is_array($event['recurrenceUnsupportedRuleParts'] ?? null)
+                ? array_values(array_filter(
+                    array_map(
+                        static fn (mixed $part): string => strtoupper(trim((string) $part)),
+                        $event['recurrenceUnsupportedRuleParts']
+                    ),
+                    static fn (string $part): bool => $part !== ''
+                ))
+                : [];
+            $series[$seriesKey]['unsupportedParts'] = array_values(array_unique(array_merge(
+                $series[$seriesKey]['unsupportedParts'],
+                $unsupportedParts
+            )));
+            sort($series[$seriesKey]['unsupportedParts'], SORT_STRING);
+            $series[$seriesKey]['rDateCount'] = max(
+                $series[$seriesKey]['rDateCount'],
+                count($recurrenceDates)
+            );
+            $series[$seriesKey]['exDateCount'] = max(
+                $series[$seriesKey]['exDateCount'],
+                count($exceptionDates)
+            );
+            ++$series[$seriesKey]['occurrencesInRange'];
+            if ($recurrenceType === CalendarEventRecurrence::EXCEPTION) {
+                ++$series[$seriesKey]['overrideOccurrencesInRange'];
+            }
+        }
+
+        $rules = [];
+        $supportedSeriesCount = 0;
+        foreach ($series as $entry) {
+            if ($entry['supported']) {
+                ++$supportedSeriesCount;
+            }
+            $signature = hash(
+                'sha256',
+                $entry['rule'] . "\0"
+                    . $entry['timezone'] . "\0"
+                    . ($entry['supported'] ? '1' : '0') . "\0"
+                    . implode(',', $entry['unsupportedParts'])
+            );
+            if (!isset($rules[$signature])) {
+                $rules[$signature] = [
+                    'rule'                       => $entry['rule'] !== '' ? $entry['rule'] : 'RDATE',
+                    'timezone'                   => $entry['timezone'],
+                    'supported'                  => $entry['supported'],
+                    'unsupportedParts'           => $entry['unsupportedParts'],
+                    'seriesCount'                => 0,
+                    'occurrencesInRange'         => 0,
+                    'overrideOccurrencesInRange' => 0,
+                    'rDateCount'                 => 0,
+                    'exDateCount'                => 0
+                ];
+            }
+            ++$rules[$signature]['seriesCount'];
+            $rules[$signature]['occurrencesInRange'] += $entry['occurrencesInRange'];
+            $rules[$signature]['overrideOccurrencesInRange'] += $entry['overrideOccurrencesInRange'];
+            $rules[$signature]['rDateCount'] += $entry['rDateCount'];
+            $rules[$signature]['exDateCount'] += $entry['exDateCount'];
+        }
+
+        $rules = array_values($rules);
+        usort(
+            $rules,
+            static fn (array $left, array $right): int => strcmp($left['rule'], $right['rule'])
+                ?: strcmp($left['timezone'], $right['timezone'])
+                ?: ((int) $right['supported'] <=> (int) $left['supported'])
+        );
+
+        return [
+            'seriesCount'            => count($series),
+            'supportedSeriesCount'   => $supportedSeriesCount,
+            'unsupportedSeriesCount' => count($series) - $supportedSeriesCount,
+            'rules'                  => $rules
+        ];
     }
 
     /**
@@ -87,9 +266,16 @@ final class ICalendarRecurrence
         if (self::isCancelled($master)) {
             return [];
         }
+        $rule = trim((string) ($master['recurrenceRule'] ?? ''));
+        $recurrenceDates = is_array($master['recurrenceDates'] ?? null) ? $master['recurrenceDates'] : [];
+        if (!(bool) ($master['recurrenceTimezoneSupported'] ?? true)
+            && ($rule !== '' || $recurrenceDates !== [])) {
+            return self::unexpandedTimezoneGroup($master, $overrides, $rangeStart, $rangeEnd);
+        }
 
         $result = [];
         $usedOverrides = [];
+        $recurrenceExpansionState = ['recurrenceExpansionSupported' => true];
         foreach ([$master] as $master) {
             $rule = trim((string) ($master['recurrenceRule'] ?? ''));
             $recurrenceDates = is_array($master['recurrenceDates'] ?? null) ? $master['recurrenceDates'] : [];
@@ -100,7 +286,13 @@ final class ICalendarRecurrence
                 continue;
             }
 
-            $starts = self::generateRuleStarts($master, $rule, $rangeEnd);
+            $expansion = self::generateRuleStarts($master, $rule, $rangeStart, $rangeEnd);
+            $starts = $expansion['starts'];
+            $recurrenceExpansionState = ['recurrenceExpansionSupported' => $expansion['supported']];
+            if ($expansion['unsupportedParts'] !== []) {
+                $recurrenceExpansionState['recurrenceUnsupportedRuleParts'] = $expansion['unsupportedParts'];
+            }
+            $master = array_merge($master, $recurrenceExpansionState);
             foreach ($recurrenceDates as $recurrenceDate) {
                 if (is_array($recurrenceDate) && isset($recurrenceDate['timestamp'])) {
                     $starts[(int) $recurrenceDate['timestamp']] = self::dateAtTimestamp(
@@ -124,7 +316,18 @@ final class ICalendarRecurrence
                     $override = $overrides[$originalTimestamp];
                     if (!self::isCancelled($override)
                         && self::overlapsRange($override, $rangeStart, $rangeEnd)) {
-                        $override['recurring'] = true;
+                        $override = array_merge(
+                            $override,
+                            $recurrenceExpansionState,
+                            CalendarEventRecurrence::occurrence(
+                                (string) ($override['uid'] ?? ''),
+                                (string) ($override['uid'] ?? '') . '|' . (string) ($override['recurrenceId'] ?? ''),
+                                (string) ($override['originalStart'] ?? ''),
+                                (string) ($override['recurrenceId'] ?? ''),
+                                false,
+                                true
+                            )
+                        );
                         $result[] = $override;
                     }
                     continue;
@@ -144,7 +347,18 @@ final class ICalendarRecurrence
             if (!isset($usedOverrides[$recurrenceTimestamp])
                 && !self::isCancelled($override)
                 && self::overlapsRange($override, $rangeStart, $rangeEnd)) {
-                $override['recurring'] = true;
+                $override = array_merge(
+                    $override,
+                    $recurrenceExpansionState,
+                    CalendarEventRecurrence::occurrence(
+                        (string) ($override['uid'] ?? ''),
+                        (string) ($override['uid'] ?? '') . '|' . (string) ($override['recurrenceId'] ?? ''),
+                        (string) ($override['originalStart'] ?? ''),
+                        (string) ($override['recurrenceId'] ?? ''),
+                        false,
+                        true
+                    )
+                );
                 $result[] = $override;
             }
         }
@@ -153,58 +367,456 @@ final class ICalendarRecurrence
     }
 
     /**
+     * Keeps the explicit master occurrence and detached overrides when an
+     * embedded custom TZID cannot be mapped losslessly to the host tzdb.
+     *
+     * @param array<string,mixed> $master
+     * @param array<int,array<string,mixed>> $overrides
+     * @return list<array<string,mixed>>
+     */
+    private static function unexpandedTimezoneGroup(
+        array $master,
+        array $overrides,
+        DateTimeImmutable $rangeStart,
+        DateTimeImmutable $rangeEnd
+    ): array {
+        $state = [
+            'recurrenceExpansionSupported'   => false,
+            'recurrenceUnsupportedRuleParts' => ['TZID']
+        ];
+        $result = [];
+        if (self::overlapsRange($master, $rangeStart, $rangeEnd)) {
+            $recurrenceId = trim((string) ($master['localValue'] ?? ''));
+            if ($recurrenceId === '') {
+                $recurrenceId = (string) ($master['start'] ?? '');
+            }
+            $masterOccurrence = array_merge(
+                $master,
+                $state,
+                CalendarEventRecurrence::occurrence(
+                    (string) ($master['uid'] ?? ''),
+                    (string) ($master['uid'] ?? '') . '|' . $recurrenceId,
+                    (string) ($master['start'] ?? ''),
+                    $recurrenceId
+                )
+            );
+            $masterOccurrence['recurrenceIdTimestamp'] = (int) ($master['startTimestamp'] ?? 0);
+            $result[] = $masterOccurrence;
+        }
+
+        foreach ($overrides as $override) {
+            if (self::isCancelled($override) || !self::overlapsRange($override, $rangeStart, $rangeEnd)) {
+                continue;
+            }
+            $result[] = array_merge($override, $state);
+        }
+
+        return $result;
+    }
+
+    /**
      * @param array<string, mixed> $master
-     * @return array<int, DateTimeImmutable>
+     * @return array{
+     *     starts: array<int, DateTimeImmutable>,
+     *     supported: bool,
+     *     unsupportedParts: list<string>
+     * }
      */
     private static function generateRuleStarts(
         array $master,
         string $ruleText,
+        DateTimeImmutable $rangeStart,
         DateTimeImmutable $rangeEnd
     ): array {
         $timezone = self::timezone((string) ($master['timezone'] ?? 'UTC'));
         $seriesStart = (new DateTimeImmutable('@' . (int) $master['startTimestamp']))->setTimezone($timezone);
         $starts = [$seriesStart->getTimestamp() => $seriesStart];
         if ($ruleText === '') {
-            return $starts;
+            return [
+                'starts'           => $starts,
+                'supported'        => true,
+                'unsupportedParts' => []
+            ];
         }
 
-        $rule = self::parseRule($ruleText);
-        $frequency = $rule['FREQ'][0] ?? '';
-        if (!in_array($frequency, ['DAILY', 'WEEKLY', 'MONTHLY', 'YEARLY'], true)) {
-            return $starts;
+        $allDay = (bool) ($master['allDay'] ?? false);
+        $analysis = self::analyzeRule($ruleText, $timezone, $allDay);
+        if (!$analysis['supported']) {
+            return [
+                'starts'           => $starts,
+                'supported'        => false,
+                'unsupportedParts' => $analysis['unsupportedParts']
+            ];
         }
 
-        $countLimit = isset($rule['COUNT'][0]) ? max(1, (int) $rule['COUNT'][0]) : null;
+        $rule = $analysis['rule'];
+        $frequency = $rule['FREQ'][0];
+        $countLimit = isset($rule['COUNT'][0]) ? (int) $rule['COUNT'][0] : null;
         $until = self::parseUntil($rule['UNTIL'][0] ?? '', $timezone);
-        $day = $seriesStart->setTime(0, 0);
-        $lastDay = $rangeEnd->setTimezone($timezone)->setTime(0, 0)->add(new DateInterval('P1D'));
-        if ($until !== null && $until < $lastDay) {
-            $lastDay = $until->setTimezone($timezone)->setTime(0, 0)->add(new DateInterval('P1D'));
+        $scanStart = self::recurrenceScanStart($master, $seriesStart, $rangeStart, $countLimit);
+        if ($frequency === 'HOURLY') {
+            return self::generateHourlyRuleStarts(
+                $seriesStart,
+                $scanStart,
+                $rule,
+                $rangeEnd,
+                $until,
+                $countLimit
+            );
         }
 
+        return self::generateDayBasedRuleStarts(
+            $seriesStart,
+            $scanStart,
+            $rule,
+            $rangeEnd,
+            $until,
+            $countLimit,
+            $allDay
+        );
+    }
+
+    /**
+     * @param array<string, mixed> $master
+     */
+    private static function recurrenceScanStart(
+        array $master,
+        DateTimeImmutable $seriesStart,
+        DateTimeImmutable $rangeStart,
+        ?int $countLimit
+    ): DateTimeImmutable {
+        if ($countLimit !== null) {
+            return $seriesStart;
+        }
+
+        $durationSeconds = max(
+            0,
+            (int) ($master['endTimestamp'] ?? 0) - (int) ($master['startTimestamp'] ?? 0)
+        );
+        $scanTimestamp = max(
+            $seriesStart->getTimestamp(),
+            $rangeStart->getTimestamp() - $durationSeconds
+        );
+
+        return (new DateTimeImmutable('@' . $scanTimestamp))->setTimezone($seriesStart->getTimezone());
+    }
+
+    /**
+     * @param array<string, list<string>> $rule
+     * @return array{starts:array<int,DateTimeImmutable>,supported:bool,unsupportedParts:list<string>}
+     */
+    private static function generateDayBasedRuleStarts(
+        DateTimeImmutable $seriesStart,
+        DateTimeImmutable $scanStart,
+        array $rule,
+        DateTimeImmutable $rangeEnd,
+        ?DateTimeImmutable $until,
+        ?int $countLimit,
+        bool $allDay
+    ): array {
+        $timeAwareSetPosition = !$allDay
+            && isset($rule['BYSETPOS'])
+            && (isset($rule['BYHOUR']) || isset($rule['BYMINUTE']));
+        if ($timeAwareSetPosition) {
+            return self::generateTimedSetPositionRuleStarts(
+                $seriesStart,
+                $scanStart,
+                $rule,
+                $rangeEnd,
+                $until,
+                $countLimit
+            );
+        }
+
+        $starts = [$seriesStart->getTimestamp() => $seriesStart];
+        $day = $scanStart->setTime(0, 0);
+        $lastDay = $rangeEnd->setTimezone($seriesStart->getTimezone())->setTime(0, 0)->add(new DateInterval('P1D'));
+        if ($until !== null && $until < $lastDay) {
+            $lastDay = $until->setTimezone($seriesStart->getTimezone())->setTime(0, 0)->add(new DateInterval('P1D'));
+        }
+
+        $frequency = $rule['FREQ'][0];
         $occurrenceCount = 0;
         $iterations = 0;
-        while ($day <= $lastDay && $iterations++ < self::MAX_GENERATED_DAYS) {
+        while ($day <= $lastDay) {
+            if (++$iterations > self::MAX_GENERATED_DAYS) {
+                return self::expansionLimitResult($seriesStart);
+            }
             if (self::matchesRuleDate($day, $seriesStart, $rule, $frequency)) {
-                $candidate = $day->setTime(
-                    (int) $seriesStart->format('H'),
-                    (int) $seriesStart->format('i'),
-                    (int) $seriesStart->format('s')
-                );
-                if ($candidate >= $seriesStart && ($until === null || $candidate <= $until)) {
-                    $occurrenceCount++;
-                    if ($countLimit === null || $occurrenceCount <= $countLimit) {
-                        $starts[$candidate->getTimestamp()] = $candidate;
+                foreach (self::timeCandidatesForDay($day, $seriesStart, $rule, $allDay) as $candidate) {
+                    if ($candidate < $seriesStart || ($until !== null && $candidate > $until)) {
+                        continue;
                     }
+
+                    ++$occurrenceCount;
+                    if ($occurrenceCount > self::MAX_GENERATED_OCCURRENCES) {
+                        return self::expansionLimitResult($seriesStart);
+                    }
+                    $starts[$candidate->getTimestamp()] = $candidate;
                     if ($countLimit !== null && $occurrenceCount >= $countLimit) {
-                        break;
+                        return [
+                            'starts'           => $starts,
+                            'supported'        => true,
+                            'unsupportedParts' => []
+                        ];
                     }
                 }
             }
             $day = $day->add(new DateInterval('P1D'));
         }
 
-        return $starts;
+        return [
+            'starts'           => $starts,
+            'supported'        => true,
+            'unsupportedParts' => []
+        ];
+    }
+
+    /**
+     * Applies BYSETPOS after BYHOUR/BYMINUTE have expanded the candidate set
+     * for one DAILY, WEEKLY, MONTHLY, or YEARLY frequency interval.
+     *
+     * @param array<string, list<string>> $rule
+     * @return array{starts:array<int,DateTimeImmutable>,supported:bool,unsupportedParts:list<string>}
+     */
+    private static function generateTimedSetPositionRuleStarts(
+        DateTimeImmutable $seriesStart,
+        DateTimeImmutable $scanStart,
+        array $rule,
+        DateTimeImmutable $rangeEnd,
+        ?DateTimeImmutable $until,
+        ?int $countLimit
+    ): array {
+        $starts = [$seriesStart->getTimestamp() => $seriesStart];
+        $frequency = $rule['FREQ'][0];
+        $setPositions = self::integerValues($rule['BYSETPOS'] ?? []);
+        [$periodStart, $periodEnd] = self::setPositionPeriod($scanStart, $rule, $frequency);
+        $scanBoundary = $rangeEnd->setTimezone($seriesStart->getTimezone());
+        if ($until !== null && $until < $scanBoundary) {
+            $scanBoundary = $until->setTimezone($seriesStart->getTimezone());
+        }
+
+        $occurrenceCount = 0;
+        $generatedCandidateCount = 0;
+        $iterations = 0;
+        while ($periodStart <= $scanBoundary) {
+            $periodCandidates = [];
+            $day = $periodStart->setTime(0, 0);
+            while ($day < $periodEnd) {
+                if (++$iterations > self::MAX_GENERATED_DAYS) {
+                    return self::expansionLimitResult($seriesStart);
+                }
+                if (self::matchesRuleDate($day, $seriesStart, $rule, $frequency, false)) {
+                    foreach (self::timeCandidatesForDay($day, $seriesStart, $rule, false) as $candidate) {
+                        if (++$generatedCandidateCount > self::MAX_GENERATED_OCCURRENCES) {
+                            return self::expansionLimitResult($seriesStart);
+                        }
+                        $periodCandidates[$candidate->getTimestamp()] = $candidate;
+                    }
+                }
+                $day = $day->add(new DateInterval('P1D'));
+            }
+            ksort($periodCandidates);
+
+            foreach (self::selectSetPositionCandidates(array_values($periodCandidates), $setPositions) as $candidate) {
+                if ($candidate < $seriesStart || ($until !== null && $candidate > $until)) {
+                    continue;
+                }
+
+                ++$occurrenceCount;
+                if ($occurrenceCount > self::MAX_GENERATED_OCCURRENCES) {
+                    return self::expansionLimitResult($seriesStart);
+                }
+                $starts[$candidate->getTimestamp()] = $candidate;
+                if ($countLimit !== null && $occurrenceCount >= $countLimit) {
+                    return [
+                        'starts'           => $starts,
+                        'supported'        => true,
+                        'unsupportedParts' => []
+                    ];
+                }
+            }
+
+            [$periodStart, $periodEnd] = self::setPositionPeriod($periodEnd, $rule, $frequency);
+        }
+
+        return [
+            'starts'           => $starts,
+            'supported'        => true,
+            'unsupportedParts' => []
+        ];
+    }
+
+    /**
+     * @param array<string, list<string>> $rule
+     * @return array{starts:array<int,DateTimeImmutable>,supported:bool,unsupportedParts:list<string>}
+     */
+    private static function generateHourlyRuleStarts(
+        DateTimeImmutable $seriesStart,
+        DateTimeImmutable $scanStart,
+        array $rule,
+        DateTimeImmutable $rangeEnd,
+        ?DateTimeImmutable $until,
+        ?int $countLimit
+    ): array {
+        $starts = [$seriesStart->getTimestamp() => $seriesStart];
+        $interval = isset($rule['INTERVAL'][0]) ? max(1, (int) $rule['INTERVAL'][0]) : 1;
+        $hours = self::uniqueIntegerValues($rule['BYHOUR'] ?? []);
+        $minutes = self::uniqueIntegerValues($rule['BYMINUTE'] ?? []);
+        if ($minutes === []) {
+            $minutes = [(int) $seriesStart->format('i')];
+        }
+        $setPositions = self::integerValues($rule['BYSETPOS'] ?? []);
+
+        $periodSeconds = $interval * 3600;
+        $elapsedSeconds = max(0, $scanStart->getTimestamp() - $seriesStart->getTimestamp());
+        $periodOffset = intdiv($elapsedSeconds, $periodSeconds) * $periodSeconds;
+        $period = (new DateTimeImmutable('@' . ($seriesStart->getTimestamp() + $periodOffset)))
+            ->setTimezone($seriesStart->getTimezone());
+        $scanBoundary = $rangeEnd->setTimezone($seriesStart->getTimezone());
+        if ($until !== null && $until < $scanBoundary) {
+            $scanBoundary = $until->setTimezone($seriesStart->getTimezone());
+        }
+
+        $occurrenceCount = 0;
+        $generatedCandidateCount = 0;
+        $iterations = 0;
+        while ($period <= $scanBoundary) {
+            if (++$iterations > self::MAX_GENERATED_HOURS) {
+                return self::expansionLimitResult($seriesStart);
+            }
+            $periodHour = (int) $period->format('G');
+            if (self::matchesRuleDate($period, $seriesStart, $rule, 'HOURLY', false)
+                && ($hours === [] || in_array($periodHour, $hours, true))) {
+                $periodCandidates = [];
+                foreach ($minutes as $minute) {
+                    $candidate = self::localTimeCandidate(
+                        $period,
+                        $periodHour,
+                        $minute,
+                        (int) $seriesStart->format('s')
+                    );
+                    if ($candidate === null) {
+                        continue;
+                    }
+                    if (++$generatedCandidateCount > self::MAX_GENERATED_OCCURRENCES) {
+                        return self::expansionLimitResult($seriesStart);
+                    }
+                    $periodCandidates[$candidate->getTimestamp()] = $candidate;
+                }
+                ksort($periodCandidates);
+
+                $selectedCandidates = $setPositions === []
+                    ? array_values($periodCandidates)
+                    : self::selectSetPositionCandidates(array_values($periodCandidates), $setPositions);
+                foreach ($selectedCandidates as $candidate) {
+                    if ($candidate < $seriesStart || ($until !== null && $candidate > $until)) {
+                        continue;
+                    }
+
+                    ++$occurrenceCount;
+                    if ($occurrenceCount > self::MAX_GENERATED_OCCURRENCES) {
+                        return self::expansionLimitResult($seriesStart);
+                    }
+                    $starts[$candidate->getTimestamp()] = $candidate;
+                    if ($countLimit !== null && $occurrenceCount >= $countLimit) {
+                        return [
+                            'starts'           => $starts,
+                            'supported'        => true,
+                            'unsupportedParts' => []
+                        ];
+                    }
+                }
+            }
+            $period = $period->add(new DateInterval('PT' . $interval . 'H'));
+        }
+
+        return [
+            'starts'           => $starts,
+            'supported'        => true,
+            'unsupportedParts' => []
+        ];
+    }
+
+    /**
+     * @param array<string, list<string>> $rule
+     * @return list<DateTimeImmutable>
+     */
+    private static function timeCandidatesForDay(
+        DateTimeImmutable $day,
+        DateTimeImmutable $seriesStart,
+        array $rule,
+        bool $allDay
+    ): array {
+        if ($allDay) {
+            return [$day->setTime(0, 0)];
+        }
+
+        $hours = self::uniqueIntegerValues($rule['BYHOUR'] ?? []);
+        if ($hours === []) {
+            $hours = [(int) $seriesStart->format('G')];
+        }
+        $minutes = self::uniqueIntegerValues($rule['BYMINUTE'] ?? []);
+        if ($minutes === []) {
+            $minutes = [(int) $seriesStart->format('i')];
+        }
+
+        $candidates = [];
+        foreach ($hours as $hour) {
+            foreach ($minutes as $minute) {
+                $candidate = self::localTimeCandidate(
+                    $day,
+                    $hour,
+                    $minute,
+                    (int) $seriesStart->format('s')
+                );
+                if ($candidate !== null) {
+                    $candidates[$candidate->getTimestamp()] = $candidate;
+                }
+            }
+        }
+        ksort($candidates);
+
+        return array_values($candidates);
+    }
+
+    private static function localTimeCandidate(
+        DateTimeImmutable $date,
+        int $hour,
+        int $minute,
+        int $second
+    ): ?DateTimeImmutable {
+        $candidate = $date->setTime($hour, $minute, $second);
+        $expected = sprintf('%s %02d:%02d:%02d', $date->format('Y-m-d'), $hour, $minute, $second);
+        if ($candidate->format('Y-m-d H:i:s') !== $expected) {
+            return null;
+        }
+
+        return $candidate;
+    }
+
+    /**
+     * @param list<string> $values
+     * @return list<int>
+     */
+    private static function uniqueIntegerValues(array $values): array
+    {
+        $integers = array_values(array_unique(self::integerValues($values)));
+        sort($integers, SORT_NUMERIC);
+
+        return $integers;
+    }
+
+    /**
+     * @return array{starts:array<int,DateTimeImmutable>,supported:bool,unsupportedParts:list<string>}
+     */
+    private static function expansionLimitResult(DateTimeImmutable $seriesStart): array
+    {
+        return [
+            'starts'           => [$seriesStart->getTimestamp() => $seriesStart],
+            'supported'        => false,
+            'unsupportedParts' => ['EXPANSION_LIMIT']
+        ];
     }
 
     /**
@@ -224,13 +836,28 @@ final class ICalendarRecurrence
         }
 
         $matchesFrequency = match ($frequency) {
+            'HOURLY'  => true,
             'DAILY'   => self::calendarDayDifference($seriesStart, $date) % $interval === 0,
             'WEEKLY'  => self::matchesWeeklyInterval($date, $seriesStart, $rule, $interval),
             'MONTHLY' => self::calendarMonthDifference($seriesStart, $date) % $interval === 0,
-            'YEARLY'  => ((int) $date->format('Y') - (int) $seriesStart->format('Y')) % $interval === 0,
+            'YEARLY'  => self::matchesYearlyInterval($date, $seriesStart, $rule, $interval),
             default   => false
         };
         if (!$matchesFrequency) {
+            return false;
+        }
+
+        $yearDays = self::integerValues($rule['BYYEARDAY'] ?? []);
+        if ($yearDays !== [] && !self::matchesYearDay($date, $yearDays)) {
+            return false;
+        }
+
+        $weekNumbers = self::integerValues($rule['BYWEEKNO'] ?? []);
+        if ($weekNumbers !== [] && !self::matchesWeekNumber(
+            $date,
+            $weekNumbers,
+            self::weekdayNumber($rule['WKST'][0] ?? 'MO')
+        )) {
             return false;
         }
 
@@ -253,11 +880,15 @@ final class ICalendarRecurrence
             return false;
         }
         if ($frequency === 'YEARLY') {
-            if ($months === [] && !($byDays !== [] && self::containsOrdinalByDay($byDays))
+            $hasExpandedDaySelector = $weekNumbers !== []
+                || $yearDays !== []
+                || $monthDays !== []
+                || $byDays !== [];
+            if ($months === [] && !$hasExpandedDaySelector
                 && (int) $date->format('n') !== (int) $seriesStart->format('n')) {
                 return false;
             }
-            if ($monthDays === [] && $byDays === []
+            if (!$hasExpandedDaySelector
                 && (int) $date->format('j') !== (int) $seriesStart->format('j')) {
                 return false;
             }
@@ -267,6 +898,27 @@ final class ICalendarRecurrence
         return !$applySetPosition
             || $setPositions === []
             || self::matchesSetPosition($date, $seriesStart, $rule, $frequency, $setPositions);
+    }
+
+    /**
+     * @param array<string, list<string>> $rule
+     */
+    private static function matchesYearlyInterval(
+        DateTimeImmutable $date,
+        DateTimeImmutable $seriesStart,
+        array $rule,
+        int $interval
+    ): bool {
+        $year = (int) $date->format('Y');
+        $seriesYear = (int) $seriesStart->format('Y');
+        if (isset($rule['BYWEEKNO'])) {
+            $weekStart = self::weekdayNumber($rule['WKST'][0] ?? 'MO');
+            [$year] = self::weekYearAndNumber($date, $weekStart);
+            [$seriesYear] = self::weekYearAndNumber($seriesStart, $weekStart);
+        }
+        $years = $year - $seriesYear;
+
+        return $years >= 0 && $years % $interval === 0;
     }
 
     /**
@@ -339,6 +991,153 @@ final class ICalendarRecurrence
     }
 
     /**
+     * @param list<int> $yearDays
+     */
+    private static function matchesYearDay(DateTimeImmutable $date, array $yearDays): bool
+    {
+        $day = (int) $date->format('z') + 1;
+        $daysInYear = $date->format('L') === '1' ? 366 : 365;
+        foreach ($yearDays as $yearDay) {
+            $normalized = $yearDay < 0 ? $daysInYear + $yearDay + 1 : $yearDay;
+            if ($normalized === $day) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @param list<int> $weekNumbers
+     */
+    private static function matchesWeekNumber(
+        DateTimeImmutable $date,
+        array $weekNumbers,
+        int $weekStart
+    ): bool {
+        [$weekYear, $weekNumber] = self::weekYearAndNumber($date, $weekStart);
+        $weeksInYear = self::weeksInWeekYear($date, $weekYear, $weekStart);
+        foreach ($weekNumbers as $requestedWeek) {
+            $normalized = $requestedWeek < 0
+                ? $weeksInYear + $requestedWeek + 1
+                : $requestedWeek;
+            if ($normalized === $weekNumber) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @return array{0:int,1:int}
+     */
+    private static function weekYearAndNumber(DateTimeImmutable $date, int $weekStart): array
+    {
+        $calendarYear = (int) $date->format('Y');
+        $weekYear = $calendarYear;
+        $firstWeek = self::firstWeekStart($date, $calendarYear, $weekStart);
+        if ($date->setTime(0, 0) < $firstWeek) {
+            --$weekYear;
+            $firstWeek = self::firstWeekStart($date, $weekYear, $weekStart);
+        } else {
+            $nextFirstWeek = self::firstWeekStart($date, $calendarYear + 1, $weekStart);
+            if ($date->setTime(0, 0) >= $nextFirstWeek) {
+                ++$weekYear;
+                $firstWeek = $nextFirstWeek;
+            }
+        }
+
+        $week = intdiv(
+            self::calendarDayDifference($firstWeek, self::startOfWeek($date, $weekStart)),
+            7
+        ) + 1;
+
+        return [$weekYear, $week];
+    }
+
+    private static function weeksInWeekYear(
+        DateTimeImmutable $date,
+        int $year,
+        int $weekStart
+    ): int {
+        return intdiv(
+            self::calendarDayDifference(
+                self::firstWeekStart($date, $year, $weekStart),
+                self::firstWeekStart($date, $year + 1, $weekStart)
+            ),
+            7
+        );
+    }
+
+    private static function firstWeekStart(
+        DateTimeImmutable $date,
+        int $year,
+        int $weekStart
+    ): DateTimeImmutable {
+        return self::startOfWeek($date->setDate($year, 1, 4)->setTime(0, 0), $weekStart);
+    }
+
+    /**
+     * @param list<DateTimeImmutable> $candidates
+     * @param list<int> $setPositions
+     * @return list<DateTimeImmutable>
+     */
+    private static function selectSetPositionCandidates(array $candidates, array $setPositions): array
+    {
+        if ($candidates === [] || $setPositions === []) {
+            return $candidates;
+        }
+
+        usort(
+            $candidates,
+            static fn (DateTimeImmutable $left, DateTimeImmutable $right): int => $left <=> $right
+        );
+        $selected = [];
+        $candidateCount = count($candidates);
+        foreach ($setPositions as $setPosition) {
+            $index = $setPosition > 0
+                ? $setPosition - 1
+                : $candidateCount + $setPosition;
+            if (!isset($candidates[$index])) {
+                continue;
+            }
+            $candidate = $candidates[$index];
+            $selected[$candidate->getTimestamp()] = $candidate;
+        }
+        ksort($selected);
+
+        return array_values($selected);
+    }
+
+    /**
+     * @param array<string, list<string>> $rule
+     * @return array{0:DateTimeImmutable,1:DateTimeImmutable}
+     */
+    private static function setPositionPeriod(
+        DateTimeImmutable $date,
+        array $rule,
+        string $frequency
+    ): array {
+        return match ($frequency) {
+            'WEEKLY'  => [
+                self::startOfWeek($date, self::weekdayNumber($rule['WKST'][0] ?? 'MO')),
+                self::startOfWeek($date, self::weekdayNumber($rule['WKST'][0] ?? 'MO'))
+                    ->add(new DateInterval('P7D'))
+            ],
+            'MONTHLY' => [
+                $date->modify('first day of this month')->setTime(0, 0),
+                $date->modify('first day of next month')->setTime(0, 0)
+            ],
+            'YEARLY'  => self::yearlySetPositionPeriod($date, $rule),
+            default   => [
+                $date->setTime(0, 0),
+                $date->setTime(0, 0)->add(new DateInterval('P1D'))
+            ]
+        };
+    }
+
+    /**
      * @param array<string, list<string>> $rule
      * @param list<int> $setPositions
      */
@@ -349,21 +1148,7 @@ final class ICalendarRecurrence
         string $frequency,
         array $setPositions
     ): bool {
-        [$periodStart, $periodEnd] = match ($frequency) {
-            'WEEKLY'  => [
-                self::startOfWeek($date, self::weekdayNumber($rule['WKST'][0] ?? 'MO')),
-                self::startOfWeek($date, self::weekdayNumber($rule['WKST'][0] ?? 'MO'))->add(new DateInterval('P7D'))
-            ],
-            'MONTHLY' => [
-                $date->modify('first day of this month')->setTime(0, 0),
-                $date->modify('first day of next month')->setTime(0, 0)
-            ],
-            'YEARLY'  => [
-                $date->setDate((int) $date->format('Y'), 1, 1)->setTime(0, 0),
-                $date->setDate((int) $date->format('Y') + 1, 1, 1)->setTime(0, 0)
-            ],
-            default   => [$date->setTime(0, 0), $date->setTime(0, 0)->add(new DateInterval('P1D'))]
-        };
+        [$periodStart, $periodEnd] = self::setPositionPeriod($date, $rule, $frequency);
 
         $matches = [];
         $candidate = $periodStart;
@@ -383,6 +1168,30 @@ final class ICalendarRecurrence
         $negativePosition = $position - count($matches);
         return in_array($positivePosition, $setPositions, true)
             || in_array($negativePosition, $setPositions, true);
+    }
+
+    /**
+     * @param array<string, list<string>> $rule
+     * @return array{0:DateTimeImmutable,1:DateTimeImmutable}
+     */
+    private static function yearlySetPositionPeriod(DateTimeImmutable $date, array $rule): array
+    {
+        if (isset($rule['BYWEEKNO'])) {
+            $weekStart = self::weekdayNumber($rule['WKST'][0] ?? 'MO');
+            [$weekYear] = self::weekYearAndNumber($date, $weekStart);
+
+            return [
+                self::firstWeekStart($date, $weekYear, $weekStart),
+                self::firstWeekStart($date, $weekYear + 1, $weekStart)
+            ];
+        }
+
+        $year = (int) $date->format('Y');
+
+        return [
+            $date->setDate($year, 1, 1)->setTime(0, 0),
+            $date->setDate($year + 1, 1, 1)->setTime(0, 0)
+        ];
     }
 
     /**
@@ -414,9 +1223,16 @@ final class ICalendarRecurrence
 
         $occurrence['startTimestamp'] = $occurrenceStart->getTimestamp();
         $occurrence['endTimestamp'] = $occurrenceEnd->getTimestamp();
-        $occurrence['recurrenceId'] = $recurrenceId;
         $occurrence['recurrenceIdTimestamp'] = $occurrenceStart->getTimestamp();
-        $occurrence['recurring'] = true;
+        $occurrence = array_merge(
+            $occurrence,
+            CalendarEventRecurrence::occurrence(
+                (string) ($master['uid'] ?? ''),
+                (string) ($master['uid'] ?? '') . '|' . $recurrenceId,
+                $allDay ? $occurrenceStart->format('Y-m-d') : $occurrenceStart->format(DATE_ATOM),
+                $recurrenceId
+            )
+        );
         $occurrence['id'] = hash(
             'sha256',
             (string) ($master['resourceUrl'] ?? '') . '|'
@@ -428,27 +1244,212 @@ final class ICalendarRecurrence
     }
 
     /**
-     * @return array<string, list<string>>
+     * Parses an RFC 5545 recurrence rule and verifies that every rule part can be
+     * expanded losslessly by the local recurrence engine.
+     *
+     * Unsupported or malformed rules deliberately keep only DTSTART and explicit
+     * RDATE values. This prevents a partially understood rule from generating
+     * incorrect occurrences.
+     *
+     * @return array{
+     *     rule: array<string, list<string>>,
+     *     supported: bool,
+     *     unsupportedParts: list<string>
+     * }
      */
-    private static function parseRule(string $rule): array
+    private static function analyzeRule(string $ruleText, DateTimeZone $timezone, bool $allDay): array
     {
-        $result = [];
-        foreach (explode(';', strtoupper(trim($rule))) as $part) {
+        $rule = [];
+        $unsupportedParts = [];
+        $seen = [];
+
+        foreach (explode(';', strtoupper(trim($ruleText))) as $part) {
+            $part = trim($part);
             $separator = strpos($part, '=');
-            if ($separator === false) {
+            if ($part === '' || $separator === false || $separator === 0) {
+                $unsupportedParts[] = $part !== '' ? $part : 'INVALID';
                 continue;
             }
+
             $name = trim(substr($part, 0, $separator));
             $values = array_values(array_filter(
                 array_map('trim', explode(',', substr($part, $separator + 1))),
                 static fn (string $value): bool => $value !== ''
             ));
-            if ($name !== '' && $values !== []) {
-                $result[$name] = $values;
+            if ($name === '' || $values === []) {
+                $unsupportedParts[] = $name !== '' ? $name : 'INVALID';
+                continue;
+            }
+            if (isset($seen[$name])) {
+                $unsupportedParts[] = $name;
+                continue;
+            }
+            $seen[$name] = true;
+            $rule[$name] = $values;
+
+            if (!in_array($name, self::SUPPORTED_RULE_PARTS, true)) {
+                $unsupportedParts[] = $name;
             }
         }
 
-        return $result;
+        foreach (self::SINGLE_VALUE_RULE_PARTS as $name) {
+            if (isset($rule[$name]) && count($rule[$name]) !== 1) {
+                $unsupportedParts[] = $name;
+            }
+        }
+
+        if ($allDay) {
+            unset($rule['BYHOUR'], $rule['BYMINUTE']);
+        }
+
+        $frequency = $rule['FREQ'][0] ?? '';
+        if ($frequency === '' || !in_array($frequency, self::SUPPORTED_FREQUENCIES, true)) {
+            $unsupportedParts[] = $frequency !== '' ? 'FREQ=' . $frequency : 'FREQ';
+        }
+        if ($allDay && $frequency === 'HOURLY') {
+            $unsupportedParts[] = 'FREQ=HOURLY';
+        }
+        if (isset($rule['COUNT'], $rule['UNTIL'])) {
+            $unsupportedParts[] = 'COUNT+UNTIL';
+        }
+        if (isset($rule['COUNT']) && !self::singlePositiveInteger($rule['COUNT'])) {
+            $unsupportedParts[] = 'COUNT';
+        }
+        if (isset($rule['INTERVAL']) && !self::singlePositiveInteger($rule['INTERVAL'])) {
+            $unsupportedParts[] = 'INTERVAL';
+        }
+        if (isset($rule['UNTIL'])
+            && (count($rule['UNTIL']) !== 1 || self::parseUntil($rule['UNTIL'][0], $timezone) === null)) {
+            $unsupportedParts[] = 'UNTIL';
+        }
+        if (isset($rule['WKST'])
+            && (count($rule['WKST']) !== 1
+                || preg_match('/^(MO|TU|WE|TH|FR|SA|SU)$/D', $rule['WKST'][0]) !== 1)) {
+            $unsupportedParts[] = 'WKST';
+        }
+        if (isset($rule['BYHOUR']) && !self::integerListIncludingZero($rule['BYHOUR'], 23)) {
+            $unsupportedParts[] = 'BYHOUR';
+        }
+        if (isset($rule['BYMINUTE']) && !self::integerListIncludingZero($rule['BYMINUTE'], 59)) {
+            $unsupportedParts[] = 'BYMINUTE';
+        }
+        if (isset($rule['BYMONTH']) && !self::integerListInRange($rule['BYMONTH'], 1, 12, false)) {
+            $unsupportedParts[] = 'BYMONTH';
+        }
+        if (isset($rule['BYMONTHDAY']) && !self::integerListInRange($rule['BYMONTHDAY'], 1, 31, true)) {
+            $unsupportedParts[] = 'BYMONTHDAY';
+        }
+        if (isset($rule['BYYEARDAY']) && !self::integerListInRange($rule['BYYEARDAY'], 1, 366, true)) {
+            $unsupportedParts[] = 'BYYEARDAY';
+        }
+        if (isset($rule['BYWEEKNO']) && !self::integerListInRange($rule['BYWEEKNO'], 1, 53, true)) {
+            $unsupportedParts[] = 'BYWEEKNO';
+        }
+        if (isset($rule['BYSETPOS']) && !self::integerListInRange($rule['BYSETPOS'], 1, 366, true)) {
+            $unsupportedParts[] = 'BYSETPOS';
+        }
+        if (isset($rule['BYSETPOS'])
+            && !array_intersect(
+                ['BYMONTH', 'BYWEEKNO', 'BYYEARDAY', 'BYMONTHDAY', 'BYDAY', 'BYHOUR', 'BYMINUTE'],
+                array_keys($rule)
+            )) {
+            $unsupportedParts[] = 'BYSETPOS';
+        }
+        if (isset($rule['BYDAY']) && !self::supportedByDayValues($rule['BYDAY'], $frequency)) {
+            $unsupportedParts[] = 'BYDAY';
+        }
+        if ($frequency === 'WEEKLY' && isset($rule['BYMONTHDAY'])) {
+            $unsupportedParts[] = 'BYMONTHDAY';
+        }
+        if (isset($rule['BYYEARDAY']) && !in_array($frequency, ['HOURLY', 'YEARLY'], true)) {
+            $unsupportedParts[] = 'BYYEARDAY';
+        }
+        if (isset($rule['BYWEEKNO']) && $frequency !== 'YEARLY') {
+            $unsupportedParts[] = 'BYWEEKNO';
+        }
+        if ($frequency === 'YEARLY' && isset($rule['BYWEEKNO'])) {
+            foreach ($rule['BYDAY'] ?? [] as $byDay) {
+                if (preg_match('/^[+-]?\d+(?:MO|TU|WE|TH|FR|SA|SU)$/D', $byDay) === 1) {
+                    $unsupportedParts[] = 'BYDAY';
+                    break;
+                }
+            }
+        }
+
+        $unsupportedParts = array_values(array_unique($unsupportedParts));
+
+        return [
+            'rule'             => $rule,
+            'supported'        => $unsupportedParts === [],
+            'unsupportedParts' => $unsupportedParts
+        ];
+    }
+
+    /** @param list<string> $values */
+    private static function integerListIncludingZero(array $values, int $maximum): bool
+    {
+        foreach ($values as $value) {
+            if (preg_match('/^\d+$/D', $value) !== 1) {
+                return false;
+            }
+            $number = (int) $value;
+            if ($number < 0 || $number > $maximum) {
+                return false;
+            }
+        }
+
+        return $values !== [];
+    }
+
+    /** @param list<string> $values */
+    private static function singlePositiveInteger(array $values): bool
+    {
+        return count($values) === 1
+            && preg_match('/^[1-9]\d*$/D', $values[0]) === 1;
+    }
+
+    /**
+     * @param list<string> $values
+     */
+    private static function integerListInRange(array $values, int $minimum, int $maximum, bool $allowNegative): bool
+    {
+        foreach ($values as $value) {
+            if (preg_match($allowNegative ? '/^[+-]?\d+$/D' : '/^\d+$/D', $value) !== 1) {
+                return false;
+            }
+            $number = (int) $value;
+            $absolute = abs($number);
+            if ($number === 0 || $absolute < $minimum || $absolute > $maximum) {
+                return false;
+            }
+            if (!$allowNegative && $number < 0) {
+                return false;
+            }
+        }
+
+        return $values !== [];
+    }
+
+    /**
+     * @param list<string> $values
+     */
+    private static function supportedByDayValues(array $values, string $frequency): bool
+    {
+        foreach ($values as $value) {
+            if (preg_match('/^([+-]?\d+)?(MO|TU|WE|TH|FR|SA|SU)$/D', $value, $matches) !== 1) {
+                return false;
+            }
+            if (($matches[1] ?? '') === '') {
+                continue;
+            }
+
+            $ordinal = (int) $matches[1];
+            if ($ordinal === 0 || abs($ordinal) > 53 || !in_array($frequency, ['MONTHLY', 'YEARLY'], true)) {
+                return false;
+            }
+        }
+
+        return $values !== [];
     }
 
     private static function parseUntil(string $value, DateTimeZone $timezone): ?DateTimeImmutable
@@ -502,20 +1503,6 @@ final class ICalendarRecurrence
         }
 
         return $result;
-    }
-
-    /**
-     * @param list<string> $byDays
-     */
-    private static function containsOrdinalByDay(array $byDays): bool
-    {
-        foreach ($byDays as $value) {
-            if (preg_match('/^[+-]?\d+(?:MO|TU|WE|TH|FR|SA|SU)$/', strtoupper($value)) === 1) {
-                return true;
-            }
-        }
-
-        return false;
     }
 
     private static function matchesWeekdayOrdinalInMonth(DateTimeImmutable $date, int $ordinal): bool

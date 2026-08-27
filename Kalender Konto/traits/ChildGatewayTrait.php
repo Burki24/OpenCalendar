@@ -2,6 +2,28 @@
 
 declare(strict_types=1);
 
+use IPSKalender\CalDAVIncrementalSync;
+use IPSKalender\CalDAVOriginPolicy;
+use IPSKalender\CalDAVProvider;
+use IPSKalender\CalendarEventLookupProviderInterface;
+use IPSKalender\CalendarEventRecurrence;
+use IPSKalender\CalendarHttpClient;
+use IPSKalender\CalendarProviderInterface;
+use IPSKalender\GoogleCalendarIncrementalSync;
+use IPSKalender\GoogleCalendarOriginPolicy;
+use IPSKalender\GoogleCalendarProvider;
+use IPSKalender\ICalendarRecurrence;
+use IPSKalender\MicrosoftCalendarDebugHttpClient;
+use IPSKalender\MicrosoftCalendarIncrementalSync;
+use IPSKalender\MicrosoftCalendarProvider;
+use IPSKalender\MicrosoftGraphOriginPolicy;
+use IPSKalender\RecurringCalendarProviderInterface;
+
+require_once __DIR__ . '/../../libs/CalDAVIncrementalSync.php';
+require_once __DIR__ . '/../../libs/GoogleCalendarIncrementalSync.php';
+require_once __DIR__ . '/../../libs/MicrosoftCalendarDebugHttpClient.php';
+require_once __DIR__ . '/../../libs/MicrosoftCalendarIncrementalSync.php';
+
 trait KalenderKontoChildGatewayTrait
 {
     /**
@@ -12,11 +34,22 @@ trait KalenderKontoChildGatewayTrait
      */
     public function ForwardData(string $JSONString): string
     {
+        $startedAt = microtime(true);
+
         try {
             $request = $this->DecodeDataFlowMessage($JSONString, self::DATA_ID_FROM_CHILD);
 
             $operation = (string) ($request['Operation'] ?? '');
             $requestID = (string) ($request['RequestID'] ?? '');
+            $debugRequest = $operation !== 'ReadEventsTransferPage';
+            if ($debugRequest) {
+                $this->SendSafeDebug('ChildRequest', [
+                    'operation'         => $operation,
+                    'provider'          => $this->getProviderName($this->ReadPropertyInteger('Provider')),
+                    'calendarSpecified' => trim((string) ($request['CalendarID'] ?? '')) !== '',
+                    'requestFields'     => array_values(array_keys($request))
+                ]);
+            }
 
             $payload = match ($operation) {
                 'GetCalendars'           => json_decode($this->GetCalendars(), true, 512, JSON_THROW_ON_ERROR),
@@ -27,17 +60,34 @@ trait KalenderKontoChildGatewayTrait
                 'FinishEventsTransfer'   => [
                     'success' => $this->finishEventsTransferForChild($request)
                 ],
-                'CreateEvent'       => $this->createEventForChild($request),
-                'UpdateEvent'       => $this->updateEventForChild($request),
-                'DeleteEvent'       => ['success' => $this->deleteEventForChild($request)],
-                'Synchronize'       => ['success' => $this->Synchronize()],
-                'TestConnection'    => json_decode($this->TestConnection(), true, 512, JSON_THROW_ON_ERROR),
-                default             => throw new InvalidArgumentException('Unsupported operation: ' . $operation)
+                'GetEventForEdit'        => $this->getEventForEditForChild($request),
+                'GetEventAfterWrite'     => $this->getEventAfterWriteForChild($request),
+                'CheckRecurringSeries'   => $this->checkRecurringSeriesForChild($request),
+                'GetRecurringSeries'     => $this->getRecurringSeriesForChild($request),
+                'GetRecurringFollowing'  => $this->getRecurringFollowingForChild($request),
+                'CreateEvent'            => $this->createEventForChild($request),
+                'UpdateEvent'            => $this->updateEventForChild($request),
+                'DeleteEvent'            => ['success' => $this->deleteEventForChild($request)],
+                'Synchronize'            => ['success' => $this->Synchronize()],
+                'TestConnection'         => json_decode($this->TestConnection(), true, 512, JSON_THROW_ON_ERROR),
+                default                  => throw new InvalidArgumentException('Unsupported operation: ' . $operation)
             };
+
+            if ($debugRequest) {
+                $this->SendSafeDebug('ChildRequestCompleted', [
+                    'operation'  => $operation,
+                    'durationMs' => (int) round((microtime(true) - $startedAt) * 1000)
+                ]);
+            }
 
             return $this->encodeResponse(true, $operation, $requestID, $payload);
         } catch (Throwable $exception) {
-            $this->SendDebug('ForwardData', $this->sanitizeError($exception->getMessage()), 0);
+            $this->SendSafeDebug('ChildRequestError', [
+                'operation' => isset($operation) ? $operation : '',
+                'type'      => $exception::class,
+                'message'   => $this->sanitizeError($exception->getMessage()),
+                'code'      => $exception->getCode()
+            ]);
 
             return $this->encodeResponse(
                 false,
@@ -67,25 +117,230 @@ trait KalenderKontoChildGatewayTrait
             throw new InvalidArgumentException('The requested event time range is too large.');
         }
 
-        return $this->createProvider()->getEvents(
+        $startedAt = microtime(true);
+        $providerType = $this->ReadPropertyInteger('Provider');
+        $microsoftDebugClient = null;
+        if ($providerType === self::PROVIDER_MICROSOFT) {
+            $microsoftDebugClient = new MicrosoftCalendarDebugHttpClient(
+                $this->createTrustedCloudHttpClient(new MicrosoftGraphOriginPolicy())
+            );
+            $provider = new MicrosoftCalendarProvider(
+                $microsoftDebugClient,
+                $this->getMicrosoftAccessToken()
+            );
+        } else {
+            $provider = $this->createProvider();
+        }
+        $events = $provider->getEvents(
             $this->calendarReference($calendar),
             new DateTimeImmutable('@' . $startTimestamp),
             new DateTimeImmutable('@' . $endTimestamp)
         );
+        $this->SendSafeDebug('ProviderEvents', [
+            'provider'   => $this->getProviderName($this->ReadPropertyInteger('Provider')),
+            'start'      => (new DateTimeImmutable('@' . $startTimestamp))->format(DATE_ATOM),
+            'end'        => (new DateTimeImmutable('@' . $endTimestamp))->format(DATE_ATOM),
+            'eventCount' => count($events),
+            'durationMs' => (int) round((microtime(true) - $startedAt) * 1000)
+        ]);
+        if ($providerType === self::PROVIDER_MICROSOFT && $microsoftDebugClient !== null) {
+            $this->SendSafeDebug('MicrosoftGraphCalendarView', $microsoftDebugClient->diagnostics());
+            $this->SendSafeDebug('MicrosoftMappedEvents', $this->microsoftMappedEventDiagnostics($events));
+        } elseif ($providerType === self::PROVIDER_ICS) {
+            $recurrenceDiagnostics = ICalendarRecurrence::diagnostics($events);
+            if ($recurrenceDiagnostics['seriesCount'] > 0) {
+                $this->SendSafeDebug('RecurrenceExpansion', $recurrenceDiagnostics);
+            }
+        }
+
+        return $events;
+    }
+
+    /**
+     * Summarizes the normalized Microsoft events after provider mapping.
+     *
+     * @param list<array<string, mixed>> $events
+     * @return array<string, mixed>
+     */
+    private function microsoftMappedEventDiagnostics(array $events): array
+    {
+        $typeCounts = [];
+        $recurringSamples = [];
+        $firstStart = '';
+        $lastStart = '';
+
+        foreach ($events as $event) {
+            $type = strtolower(trim((string) ($event['recurrenceType'] ?? '')));
+            if ($type === '') {
+                $type = (bool) ($event['recurring'] ?? false) ? 'recurring-unknown' : 'single';
+            }
+            $typeCounts[$type] = ($typeCounts[$type] ?? 0) + 1;
+
+            $start = trim((string) ($event['start'] ?? ''));
+            if ($start !== '') {
+                if ($firstStart === '' || strcmp($start, $firstStart) < 0) {
+                    $firstStart = $start;
+                }
+                if ($lastStart === '' || strcmp($start, $lastStart) > 0) {
+                    $lastStart = $start;
+                }
+            }
+
+            if (!(bool) ($event['recurring'] ?? false) || count($recurringSamples) >= 50) {
+                continue;
+            }
+
+            $recurringSamples[] = [
+                'summary'        => $this->microsoftDebugSummary((string) ($event['summary'] ?? '')),
+                'type'           => $type,
+                'start'          => $start,
+                'eventHash'      => $this->microsoftDebugReferenceHash((string) ($event['eventReference'] ?? '')),
+                'seriesHash'     => $this->microsoftDebugReferenceHash((string) ($event['seriesId'] ?? '')),
+                'occurrenceHash' => $this->microsoftDebugReferenceHash((string) ($event['occurrenceId'] ?? ''))
+            ];
+        }
+
+        ksort($typeCounts, SORT_NATURAL);
+
+        return [
+            'eventCount'       => count($events),
+            'typeCounts'       => $typeCounts,
+            'firstStart'       => $firstStart,
+            'lastStart'        => $lastStart,
+            'recurringSamples' => $recurringSamples
+        ];
+    }
+
+    private function microsoftDebugReferenceHash(string $value): string
+    {
+        $value = trim($value);
+        return $value === '' ? '' : substr(hash('sha256', $value), 0, 12);
+    }
+
+    private function microsoftDebugSummary(string $summary): string
+    {
+        $summary = trim((string) preg_replace('/\s+/u', ' ', $summary));
+        if ($summary === '') {
+            return '';
+        }
+
+        return function_exists('mb_substr')
+            ? mb_substr($summary, 0, 80, 'UTF-8')
+            : substr($summary, 0, 80);
     }
 
     /**
      * Creates a temporary, paged transfer for the requested calendar events.
      *
      * @param array<string, mixed> $request
-     * @return array{Token:string,PageCount:int,ItemCount:int,ExpiresAt:int}
+     * @return array{Token:string,PageCount:int,ItemCount:int,ExpiresAt:int,SyncToken?:string,Incremental?:bool}
      */
     private function beginEventsTransferForChild(array $request): array
     {
-        return $this->CreateChunkedJsonTransfer(
-            self::EVENT_TRANSFER_SCOPE,
-            $this->getEventsForChild($request)
-        );
+        $providerType = $this->ReadPropertyInteger('Provider');
+        if (!in_array(
+            $providerType,
+            [self::PROVIDER_APPLE, self::PROVIDER_CALDAV, self::PROVIDER_GOOGLE, self::PROVIDER_MICROSOFT],
+            true
+        )) {
+            return $this->CreateChunkedJsonTransfer(
+                self::EVENT_TRANSFER_SCOPE,
+                $this->getEventsForChild($request)
+            );
+        }
+
+        $calendar = $this->resolveCalendar((string) ($request['CalendarID'] ?? ''));
+        $startTimestamp = (int) ($request['Start'] ?? 0);
+        $endTimestamp = (int) ($request['End'] ?? 0);
+        if ($startTimestamp <= 0 || $endTimestamp <= $startTimestamp) {
+            throw new InvalidArgumentException('The requested event time range is invalid.');
+        }
+        if (($endTimestamp - $startTimestamp) > 6 * 366 * 86400) {
+            throw new InvalidArgumentException('The requested event time range is too large.');
+        }
+
+        $startedAt = microtime(true);
+        $calendarReference = $this->calendarReference($calendar);
+        $start = new DateTimeImmutable('@' . $startTimestamp);
+        $end = new DateTimeImmutable('@' . $endTimestamp);
+        $syncToken = trim((string) ($request['SyncToken'] ?? ''));
+        $microsoftDebugClient = null;
+        if ($providerType === self::PROVIDER_MICROSOFT) {
+            $microsoftDebugClient = new MicrosoftCalendarDebugHttpClient(
+                $this->createTrustedCloudHttpClient(new MicrosoftGraphOriginPolicy())
+            );
+            $synchronizer = new MicrosoftCalendarIncrementalSync(
+                $microsoftDebugClient,
+                $this->getMicrosoftAccessToken()
+            );
+            $debugName = 'MicrosoftEventSynchronization';
+        } elseif ($providerType === self::PROVIDER_GOOGLE) {
+            $accessToken = $this->getGoogleAccessToken();
+            $httpClient = $this->createTrustedCloudHttpClient(new GoogleCalendarOriginPolicy());
+            $provider = new GoogleCalendarProvider($httpClient, $accessToken);
+            $synchronizer = new GoogleCalendarIncrementalSync($provider, $httpClient, $accessToken);
+            $debugName = 'GoogleEventSynchronization';
+        } else {
+            $serverUrl = $providerType === self::PROVIDER_APPLE
+                ? self::APPLE_CALDAV_URL
+                : trim($this->ReadPropertyString('ServerURL'));
+            $originPolicy = new CalDAVOriginPolicy($serverUrl);
+            $httpClient = new CalendarHttpClient(
+                max(5, min(120, $this->ReadPropertyInteger('RequestTimeout'))),
+                $providerType === self::PROVIDER_APPLE ? true : $this->ReadPropertyBoolean('VerifyTLS'),
+                trim($this->ReadPropertyString('Username')),
+                $this->ReadPropertyString('Password'),
+                $originPolicy
+            );
+            $provider = new CalDAVProvider($httpClient, $serverUrl, $originPolicy);
+            $synchronizer = new CalDAVIncrementalSync($provider, $httpClient, $originPolicy);
+            $debugName = 'CalDAVEventSynchronization';
+        }
+        $result = $synchronizer->synchronize($calendarReference, $start, $end, $syncToken);
+        $nextSyncToken = trim((string) ($result['syncToken'] ?? ''));
+        $items = $result['items'];
+        $deletedCount = count(array_filter(
+            $items,
+            static fn (mixed $item): bool => is_array($item)
+                && (bool) ($item['_syncDeleted'] ?? false)
+        ));
+        $recurringCount = count(array_filter(
+            $items,
+            static fn (mixed $item): bool => is_array($item)
+                && ((bool) ($item['recurring'] ?? false)
+                    || trim((string) ($item['seriesId'] ?? '')) !== '')
+        ));
+        $syncTokenAdvanced = $nextSyncToken !== ''
+            && ($syncToken === '' || !hash_equals($syncToken, $nextSyncToken));
+
+        $transfer = $this->CreateChunkedJsonTransfer(self::EVENT_TRANSFER_SCOPE, $items);
+        $transfer['SyncToken'] = $nextSyncToken;
+        $transfer['Incremental'] = $result['incremental'];
+        $this->SendSafeDebug($debugName, [
+            'requestedIncremental' => $syncToken !== '',
+            'incremental'          => $result['incremental'],
+            'fallbackToFull'       => $syncToken !== '' && !$result['incremental'],
+            'itemCount'            => count($items),
+            'deletedCount'         => $deletedCount,
+            'recurringCount'       => $recurringCount,
+            'syncTokenAvailable'   => $nextSyncToken !== '',
+            'syncTokenAdvanced'    => $syncTokenAdvanced,
+            'durationMs'           => (int) round((microtime(true) - $startedAt) * 1000)
+        ]);
+        if ($providerType === self::PROVIDER_MICROSOFT && $microsoftDebugClient !== null) {
+            $graphDiagnostics = $microsoftDebugClient->diagnostics();
+            if ((int) ($graphDiagnostics['requestCount'] ?? 0) > 0) {
+                $this->SendSafeDebug('MicrosoftGraphCalendarView', $graphDiagnostics);
+            }
+            $mappedItems = array_values(array_filter(
+                $items,
+                static fn (mixed $item): bool => is_array($item)
+                    && !(bool) ($item['_syncDeleted'] ?? false)
+            ));
+            $this->SendSafeDebug('MicrosoftMappedEvents', $this->microsoftMappedEventDiagnostics($mappedItems));
+        }
+
+        return $transfer;
     }
 
     /**
@@ -113,6 +368,381 @@ trait KalenderKontoChildGatewayTrait
         return $this->ClearChunkedJsonTransfer(
             self::EVENT_TRANSFER_SCOPE,
             (string) ($request['Token'] ?? '')
+        );
+    }
+
+    /**
+     * Returns one freshly written event by its provider reference when direct lookup is available.
+     *
+     * @param array<string, mixed> $request
+     * @return array<string, mixed>
+     */
+    private function getEventAfterWriteForChild(array $request): array
+    {
+        $calendar = $this->resolveCalendar((string) ($request['CalendarID'] ?? ''));
+        $eventReference = trim((string) ($request['EventReference'] ?? ''));
+        if ($eventReference === '') {
+            throw new InvalidArgumentException('The selected event reference is missing.');
+        }
+
+        if ($this->ReadPropertyInteger('Provider') === self::PROVIDER_MICROSOFT) {
+            $synchronizer = new MicrosoftCalendarIncrementalSync(
+                $this->createTrustedCloudHttpClient(new MicrosoftGraphOriginPolicy()),
+                $this->getMicrosoftAccessToken()
+            );
+
+            return $synchronizer->getEventByReference(
+                $this->calendarReference($calendar),
+                $eventReference
+            );
+        }
+
+        $provider = $this->createProvider();
+        if ($provider instanceof CalendarEventLookupProviderInterface) {
+            return $provider->getEventForEdit(
+                $this->calendarReference($calendar),
+                $eventReference
+            );
+        }
+
+        throw new RuntimeException('Direct event lookup is not supported by this calendar provider.');
+    }
+
+    /**
+     * Returns the current provider version of one event before it is edited.
+     *
+     * Providers with a direct lookup capability are queried by their stable event
+     * reference. Other providers are queried in a narrow time window and the
+     * normalized result is matched against the event identity supplied by the child.
+     *
+     * @param array<string, mixed> $request
+     * @return array<string, mixed>
+     */
+    private function getEventForEditForChild(array $request): array
+    {
+        $calendar = $this->resolveCalendar((string) ($request['CalendarID'] ?? ''));
+        $provider = $this->createProvider();
+        $stableMicrosoftIdentity = $provider instanceof MicrosoftCalendarProvider;
+
+        try {
+            $directEvent = $this->directEventForEditForChild($calendar, $provider, $request);
+            if ($directEvent !== null
+                && $this->eventMatchesEditRequest($directEvent, $request, $stableMicrosoftIdentity)) {
+                return $directEvent;
+            }
+        } catch (Throwable) {
+            // A stale provider reference or a temporarily unavailable direct lookup
+            // must not make a previously editable event unusable. Fall back to the
+            // established bounded calendar lookup and identity matching below.
+        }
+
+        if (!$provider instanceof CalendarProviderInterface) {
+            throw new RuntimeException('The selected event could not be verified by this calendar provider.');
+        }
+
+        [$rangeStart, $rangeEnd] = $this->eventEditLookupRange($request);
+        $matches = array_values(array_filter(
+            $provider->getEvents(
+                $this->calendarReference($calendar),
+                $rangeStart,
+                $rangeEnd
+            ),
+            fn (mixed $event): bool => is_array($event)
+                && $this->eventMatchesEditRequest(
+                    $event,
+                    $request,
+                    $stableMicrosoftIdentity
+                )
+        ));
+
+        if (count($matches) === 1) {
+            return $matches[0];
+        }
+        if ($matches === []) {
+            throw new RuntimeException(
+                'The selected event is no longer available. Synchronize the calendar and try again.'
+            );
+        }
+
+        throw new RuntimeException('The selected event could not be identified uniquely.');
+    }
+
+    /**
+     * Tries the fastest provider-specific event lookup before the bounded fallback query.
+     *
+     * @param array<string, mixed> $calendar
+     * @param array<string, mixed> $request
+     * @return array<string, mixed>|null
+     */
+    private function directEventForEditForChild(
+        array $calendar,
+        CalendarProviderInterface|CalendarEventLookupProviderInterface $provider,
+        array $request
+    ): ?array {
+        $calendarReference = $this->calendarReference($calendar);
+        $eventReference = trim((string) ($request['EventReference'] ?? ''));
+
+        if ($eventReference !== '' && $provider instanceof CalendarEventLookupProviderInterface) {
+            return $provider->getEventForEdit($calendarReference, $eventReference);
+        }
+
+        if ($eventReference !== '' && $provider instanceof MicrosoftCalendarProvider) {
+            $synchronizer = new MicrosoftCalendarIncrementalSync(
+                $this->createTrustedCloudHttpClient(new MicrosoftGraphOriginPolicy()),
+                $this->getMicrosoftAccessToken()
+            );
+
+            return $synchronizer->getEventByReference($calendarReference, $eventReference);
+        }
+
+        if ($provider instanceof CalDAVProvider) {
+            $resourceUrl = trim((string) ($request['ResourceURL'] ?? ''));
+            if ($resourceUrl === '') {
+                return null;
+            }
+
+            [$rangeStart, $rangeEnd] = $this->eventEditLookupRange($request);
+            $matches = array_values(array_filter(
+                $provider->getEventsForEditByResource(
+                    $calendarReference,
+                    $resourceUrl,
+                    $rangeStart,
+                    $rangeEnd
+                ),
+                fn (mixed $event): bool => is_array($event)
+                    && $this->eventMatchesEditRequest($event, $request)
+            ));
+
+            return count($matches) === 1 ? $matches[0] : null;
+        }
+
+        return null;
+    }
+
+    /**
+     * Builds the narrow edit lookup range used by direct CalDAV and fallback queries.
+     *
+     * @param array<string, mixed> $request
+     * @return array{0: DateTimeImmutable, 1: DateTimeImmutable}
+     */
+    private function eventEditLookupRange(array $request): array
+    {
+        $startTimestamp = (int) ($request['Start'] ?? 0);
+        $endTimestamp = (int) ($request['End'] ?? 0);
+        if ($startTimestamp <= 0) {
+            throw new InvalidArgumentException('The selected event start is invalid.');
+        }
+        if ($endTimestamp <= $startTimestamp) {
+            $endTimestamp = $startTimestamp + 1;
+        }
+
+        $rangeStart = max(1, $startTimestamp - 86400);
+        $rangeEnd = $endTimestamp + 86400;
+        if (($rangeEnd - $rangeStart) > 6 * 366 * 86400) {
+            throw new InvalidArgumentException('The selected event time range is too large.');
+        }
+
+        return [
+            new DateTimeImmutable('@' . $rangeStart),
+            new DateTimeImmutable('@' . $rangeEnd)
+        ];
+    }
+
+    /**
+     * @param array<string, mixed> $event
+     * @param array<string, mixed> $request
+     */
+    private function eventMatchesEditRequest(
+        array $event,
+        array $request,
+        bool $stableMicrosoftIdentity = false
+    ): bool {
+        if ($stableMicrosoftIdentity) {
+            return $this->microsoftEventMatchesEditRequest($event, $request);
+        }
+
+        $primaryIdentity = [
+            'OccurrenceID'   => 'occurrenceId',
+            'EventReference' => 'eventReference',
+            'ResourceURL'    => 'resourceUrl',
+            'UID'            => 'uid'
+        ];
+        $matchedPrimaryKey = '';
+        foreach ($primaryIdentity as $requestKey => $eventKey) {
+            $expected = trim((string) ($request[$requestKey] ?? ''));
+            if ($expected === '') {
+                continue;
+            }
+            $actual = trim((string) ($event[$eventKey] ?? ''));
+            if ($actual === '') {
+                continue;
+            }
+            if (!hash_equals($expected, $actual)) {
+                return false;
+            }
+            $matchedPrimaryKey = $eventKey;
+            break;
+        }
+        if ($matchedPrimaryKey === '') {
+            return false;
+        }
+
+        foreach ([
+            'OriginalStart' => 'originalStart',
+            'RecurrenceID'  => 'recurrenceId'
+        ] as $requestKey => $eventKey) {
+            $expected = trim((string) ($request[$requestKey] ?? ''));
+            $actual = trim((string) ($event[$eventKey] ?? ''));
+            if ($expected !== '' && $actual !== '' && !hash_equals($expected, $actual)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Matches a Microsoft event without treating a stale Graph event ID as authoritative.
+     *
+     * Microsoft exposes immutable IDs when requested, but existing cached occurrences can
+     * still carry an older identity after a series change. The per-occurrence iCalUId is a
+     * stable secondary identity. Recurring events additionally fall back to their series ID
+     * and original occurrence start so a refreshed calendarView result can still be edited.
+     *
+     * @param array<string, mixed> $event
+     * @param array<string, mixed> $request
+     */
+    private function microsoftEventMatchesEditRequest(array $event, array $request): bool
+    {
+        foreach ([
+            'OccurrenceID'   => 'occurrenceId',
+            'EventReference' => 'eventReference',
+            'ResourceURL'    => 'resourceUrl',
+            'UID'            => 'uid'
+        ] as $requestKey => $eventKey) {
+            $expected = trim((string) ($request[$requestKey] ?? ''));
+            $actual = trim((string) ($event[$eventKey] ?? ''));
+            if ($expected !== '' && $actual !== '' && hash_equals($expected, $actual)) {
+                return true;
+            }
+        }
+
+        $expectedSeriesId = trim((string) ($request['SeriesID'] ?? ''));
+        $actualSeriesId = trim((string) ($event['seriesId'] ?? ''));
+        $expectedOriginalStart = trim((string) ($request['OriginalStart'] ?? ''));
+        $actualOriginalStart = trim((string) ($event['originalStart'] ?? ''));
+
+        return $expectedSeriesId !== ''
+            && $actualSeriesId !== ''
+            && hash_equals($expectedSeriesId, $actualSeriesId)
+            && $this->microsoftOriginalStartMatches(
+                $expectedOriginalStart,
+                $actualOriginalStart,
+                (bool) ($event['allDay'] ?? false)
+            );
+    }
+
+    private function microsoftOriginalStartMatches(string $left, string $right, bool $allDay): bool
+    {
+        $left = trim($left);
+        $right = trim($right);
+        if ($left === '' || $right === '') {
+            return false;
+        }
+        if (hash_equals($left, $right)) {
+            return true;
+        }
+        if ($allDay
+            || preg_match('/^\d{4}-\d{2}-\d{2}$/D', $left) === 1
+            || preg_match('/^\d{4}-\d{2}-\d{2}$/D', $right) === 1) {
+            return substr($left, 0, 10) === substr($right, 0, 10);
+        }
+
+        try {
+            return (new DateTimeImmutable($left))->getTimestamp()
+                === (new DateTimeImmutable($right))->getTimestamp();
+        } catch (Throwable) {
+            return false;
+        }
+    }
+
+    /**
+     * Verifies whether a recurring parent event still exists without turning a
+     * provider-side deletion into an error response for the child calendar.
+     *
+     * @param array<string, mixed> $request
+     * @return array{supported: bool, exists: bool}
+     */
+    private function checkRecurringSeriesForChild(array $request): array
+    {
+        $calendar = $this->resolveCalendar((string) ($request['CalendarID'] ?? ''));
+        $provider = $this->createProvider();
+        if (!$provider instanceof RecurringCalendarProviderInterface) {
+            return ['supported' => false, 'exists' => false];
+        }
+
+        $seriesId = trim((string) ($request['SeriesID'] ?? ''));
+        if ($seriesId === '') {
+            throw new InvalidArgumentException('The recurring series ID is missing.');
+        }
+
+        try {
+            $provider->getRecurringSeries(
+                $this->calendarReference($calendar),
+                $seriesId,
+                trim((string) ($request['ResourceURL'] ?? ''))
+            );
+        } catch (Throwable $exception) {
+            $httpStatus = property_exists($exception, 'httpStatus')
+                ? (int) $exception->httpStatus
+                : 0;
+            if (in_array($httpStatus, [404, 410], true)) {
+                return ['supported' => true, 'exists' => false];
+            }
+
+            throw $exception;
+        }
+
+        return ['supported' => true, 'exists' => true];
+    }
+
+    /**
+     * @param array<string, mixed> $request
+     * @return array<string, mixed>
+     */
+    private function getRecurringSeriesForChild(array $request): array
+    {
+        $calendar = $this->resolveCalendar((string) ($request['CalendarID'] ?? ''));
+        $provider = $this->createProvider();
+        if (!$provider instanceof RecurringCalendarProviderInterface) {
+            throw new InvalidArgumentException('Recurring series are not supported by this calendar provider.');
+        }
+
+        return $provider->getRecurringSeries(
+            $this->calendarReference($calendar),
+            trim((string) ($request['SeriesID'] ?? '')),
+            trim((string) ($request['ResourceURL'] ?? ''))
+        );
+    }
+
+    /**
+     * @param array<string, mixed> $request
+     * @return array<string, mixed>
+     */
+    private function getRecurringFollowingForChild(array $request): array
+    {
+        $calendar = $this->resolveCalendar((string) ($request['CalendarID'] ?? ''));
+        $provider = $this->createProvider();
+        if (!$provider instanceof RecurringCalendarProviderInterface) {
+            throw new InvalidArgumentException('Recurring series are not supported by this calendar provider.');
+        }
+
+        return $provider->getRecurringFollowing(
+            $this->calendarReference($calendar),
+            trim((string) ($request['SeriesID'] ?? '')),
+            trim((string) ($request['OccurrenceID'] ?? '')),
+            trim((string) ($request['OriginalStart'] ?? '')),
+            trim((string) ($request['ResourceURL'] ?? ''))
         );
     }
 
@@ -148,7 +778,10 @@ trait KalenderKontoChildGatewayTrait
             trim((string) ($request['ResourceURL'] ?? '')),
             trim((string) ($request['ETag'] ?? '')),
             trim((string) ($request['UID'] ?? '')),
-            $event
+            $event,
+            CalendarEventRecurrence::fromEvent(
+                is_array($request['Recurrence'] ?? null) ? $request['Recurrence'] : []
+            )
         );
     }
 
@@ -163,7 +796,10 @@ trait KalenderKontoChildGatewayTrait
             $this->calendarReference($calendar),
             trim((string) ($request['ResourceURL'] ?? '')),
             trim((string) ($request['ETag'] ?? '')),
-            trim((string) ($request['RecurrenceID'] ?? ''))
+            trim((string) ($request['RecurrenceID'] ?? '')),
+            CalendarEventRecurrence::fromEvent(
+                is_array($request['Recurrence'] ?? null) ? $request['Recurrence'] : []
+            )
         );
     }
 
@@ -232,10 +868,9 @@ trait KalenderKontoChildGatewayTrait
             return null;
         }
 
-        $this->SendDebug(
+        $this->SendSafeDebug(
             'CalendarResolution',
-            'Using the only calendar exposed by the ICS/Webcal account because the stored calendar ID is missing or no longer matches.',
-            0
+            'Using the only calendar exposed by the ICS/Webcal account because the stored calendar ID is missing or no longer matches.'
         );
 
         return $available[0];

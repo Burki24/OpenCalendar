@@ -1,9 +1,7 @@
 {
     "translations": {
-        "en": {
-            "Kalender Konfigurator": "Calendar Configurator"
-        },
         "de": {
+            "Calendar Configurator": "Kalender Konfigurator",
             "Available calendars": "Verfügbare Kalender",
             "Calendar": "Kalender",
             "Color": "Farbe",

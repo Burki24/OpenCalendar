@@ -85,11 +85,103 @@ Diese Wiederverwendung entspricht dem von Symcon vorgesehenen Austausch einer
 der aktuellen Konfiguratorliste erstellt. Weitere Hintergründe enthält die
 [Dokumentation des Kalender Konfigurators](Kalender%20Konfigurator).
 
+## Google-Serientermine
+
+In beschreibbaren Google-Kalendern unterstützt OpenCalendar Serientermine
+vollständig im gemeinsamen Dialog-Workflow der Kachelvisualisierung und IPSView.
+
+- Neue Serien können **täglich, wöchentlich, monatlich oder jährlich** angelegt
+  werden. Unterstützt werden ein frei wählbares Intervall, bei Wochenserien
+  mehrere Wochentage sowie die Endarten **Nie**, **Nach Anzahl** und
+  **Am Datum**.
+- Bei zeitgebundenen Serien wird die Zeitzone des Google-Kalenders verwendet,
+  damit die lokale Uhrzeit auch über Sommer-/Winterzeitwechsel erhalten bleibt.
+- Einzelne Serienvorkommnisse können bearbeitet und gelöscht werden.
+- **Diesen und alle folgenden Termine** können gemeinsam bearbeitet oder
+  gelöscht werden. Beim Bearbeiten wird die Serie am gewählten Vorkommnis
+  geteilt; der zurückliegende Teil bleibt unverändert. Beim Löschen endet die
+  Serie unmittelbar vor dem gewählten Vorkommnis.
+- Die **gesamte Serie** kann bearbeitet oder gelöscht werden.
+- Komplexe Wiederholungsregeln, die OpenCalendar nicht verlustfrei in seinem
+  Serieneditor abbilden kann, werden nicht automatisch geteilt oder vereinfacht.
+
+## Microsoft-Serientermine
+
+In beschreibbaren Microsoft-365-/Outlook.com-Kalendern können neue Terminserien
+mit demselben gemeinsamen Serieneditor wie bei Google angelegt werden. Unterstützt
+werden tägliche, wöchentliche, monatliche und jährliche Wiederholungen, Intervalle,
+mehrere Wochentage sowie die Endarten **Nie**, **Nach Anzahl** und **Am Datum**.
+Für zeitgebundene Serien wird die vom Client beziehungsweise über die PHP-API
+übergebene Zeitzone verwendet, damit Microsoft Graph die lokale Uhrzeit der Serie
+erhält. Einzelne Vorkommnisse bestehender Microsoft-Serien können gezielt
+bearbeitet oder gelöscht werden, ohne die übrigen Vorkommnisse der Serie zu ändern.
+Auch die **gesamte Microsoft-Serie** kann bearbeitet oder gelöscht werden. Beim
+Bearbeiten wird der Serien-Master geladen; Wiederholungsmuster, die dem gemeinsamen
+OpenCalendar-Serieneditor entsprechen, können dabei ebenfalls geändert werden.
+**Diesen und alle folgenden Termine** wird wie bei Google durch ein sicheres Teilen
+der Serie umgesetzt: Der bisherige Serienteil endet unmittelbar vor dem gewählten
+Vorkommnis und beim Bearbeiten wird ab dort eine neue Serie angelegt. Bei nummerierten
+Serien wird die verbleibende Anzahl übernommen. Beim Löschen wird nur der vordere
+Serienteil behalten. Bereits vorhandene Ausnahmen ab dem Trennpunkt werden beim
+Bearbeiten nicht in den neuen Serienteil übernommen. Komplexere Microsoft-Muster
+bleiben erhalten, werden aber nicht verlustbehaftet im Serieneditor vereinfacht.
+
+## Apple/iCloud- und CalDAV-Serientermine
+
+Beschreibbare Apple-iCloud- und generische CalDAV-Kalender können neue Terminserien
+mit demselben gemeinsamen Serieneditor wie Google und Microsoft anlegen. Unterstützt
+werden tägliche, wöchentliche, monatliche und jährliche Wiederholungen, Intervalle,
+mehrere Wochentage sowie die Endarten **Nie**, **Nach Anzahl** und **Am Datum**.
+
+OpenCalendar speichert die Serie als RFC-5545-`RRULE` im CalDAV-Kalenderobjekt.
+Zeitgebundene Serien werden mit der lokalen Zeitzone und einem passenden
+`VTIMEZONE`-Block geschrieben, damit die lokale Uhrzeit auch über
+Sommer-/Winterzeitwechsel erhalten bleibt. Apple iCloud verwendet denselben
+CalDAV-Pfad wie andere Server.
+
+Zusätzlich können einzelne Vorkommnisse bestehender Apple-iCloud- und
+CalDAV-Serien bearbeitet und gelöscht werden. Beim Bearbeiten schreibt
+OpenCalendar eine `RECURRENCE-ID`-Ausnahme in das bestehende Kalenderobjekt; beim
+Löschen wird das ausgewählte Vorkommnis über `EXDATE` ausgeschlossen. Auch die
+**vollständige Serie** kann bearbeitet oder gelöscht werden. OpenCalendar lädt den
+Serien-Master dabei direkt über die bereits bekannte CalDAV-Ressource. Einfache
+RRULEs können im gemeinsamen Serieneditor geändert werden; komplexere Regeln bleiben
+erhalten und werden nicht verlustbehaftet vereinfacht.
+
+Auch **Diesen und alle folgenden Termine** wird für unterstützte RRULEs verarbeitet.
+Beim Bearbeiten legt OpenCalendar ab dem gewählten Vorkommnis zuerst eine neue
+CalDAV-Serie an und kürzt anschließend die ursprüngliche Serie unmittelbar davor.
+Bei nummerierten Serien übernimmt der neue Teil nur die verbleibende Anzahl;
+vorhandene Ausnahmen ab dem Trennpunkt werden bewusst zurückgesetzt. Beim Löschen
+wird nur die ursprüngliche Serie vor dem gewählten Vorkommnis beendet. Beginnt die
+Auswahl mit dem ersten Vorkommnis, wird die bestehende Serie direkt geändert bzw.
+gelöscht, ohne einen zweiten Serienteil anzulegen.
+
+## Jahresereignisse
+
+OpenCalendar kann jährlich wiederkehrende persönliche Ereignisse als
+**Geburtstag**, **Jahrestag**, **Hochzeitstag** oder **Todestag** verwalten. Der
+Typ und das ursprüngliche Ausgangsdatum werden als lokale OpenCalendar-Metadaten
+gespeichert; der Terminname beim Kalenderanbieter bleibt unverändert. In der
+Kachelvisualisierung und in IPSView wird die Zahl der vergangenen Jahre
+dynamisch ergänzt, beispielsweise `Max Mustermann (33J)`.
+
+Für Skripte stehen providerneutrale PHP-Funktionen zur Verfügung. Auf Ebene einer
+einzelnen Kalenderinstanz können Jahresereignisse mit
+`IPSKAL_GetAnniversaryList()` gelesen und mit `IPSKAL_SetAnniversary()` markiert
+oder geändert werden. `IPSKAL_GetBirthdayList()` bleibt als kompatibler
+Geburtstags-Spezialfall erhalten. Über die **Kalender Ansicht** liefert
+`IPSKALVIEW_GetAnniversaryList()` wahlweise alle ausgewählten Kalender oder eine
+bestimmte Kalenderinstanz und unterstützt sowohl einen frei wählbaren Zeitraum in
+Tagen als auch einen Filter nach Ereignistyp. Die vollständige Befehlsreferenz
+befindet sich in der Dokumentation der Module **Kalender** und
+**Kalender Ansicht**.
+
 ## Bekannte Einschränkungen
 
-- Einzelne Vorkommen wiederkehrender Termine werden derzeit nur lesend
-  dargestellt. Dadurch kann nicht versehentlich die vollständige Terminserie
-  überschrieben oder gelöscht werden.
+- **Diesen und alle folgenden Termine** wird bei Microsoft-Onlinebesprechungen und
+  Serien mit Anhängen nicht automatisch geteilt, weil diese Daten beim Erzeugen des
+  neuen Serienteils nicht verlustfrei übernommen werden können.
 - ICS-/Webcal-Abonnements und lokal importierte ICS-Dateien sind grundsätzlich schreibgeschützt.
 - Die IPSView-Ausgabe benötigt im HTML-Box-Steuerelement den Renderer
   **Browser des Clients** oder **Automatisch**, da die Bedienung JavaScript
@@ -131,5 +223,6 @@ Drittanbieter.
 
   Führt mehrere Kalender in einer responsiven Kachel- oder IPSView-Ansicht
   zusammen und stellt die ausgewählten Kalender zusätzlich providerübergreifend
-  über PHP-Funktionen für Tages- und Datumsbereichsabfragen bereit. Neben der
-  vollständigen Ausgabe stehen kompakte Varianten für einfache Skripte zur Verfügung.
+  über PHP-Funktionen für Tages- und Datumsbereichsabfragen sowie für
+  Jahresereignisse bereit. Neben der vollständigen Ausgabe stehen kompakte
+  Varianten für einfache Skripte zur Verfügung.

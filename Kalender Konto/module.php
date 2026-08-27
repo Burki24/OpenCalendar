@@ -5,11 +5,13 @@ declare(strict_types=1);
 use Burki24\SymconModuleHelper\ChunkedJsonTransferHelper;
 use Burki24\SymconModuleHelper\ConfigurationFormHelper;
 use Burki24\SymconModuleHelper\DataFlowHelper;
+use Burki24\SymconModuleHelper\DebugHelper;
 use Burki24\SymconModuleHelper\HttpResponseHelper;
 use Burki24\SymconModuleHelper\SymconOAuthException;
 use IPSKalender\CalDAVOriginPolicy;
 use IPSKalender\CalDAVProvider;
 use IPSKalender\CalDAVProviderException;
+use IPSKalender\CalendarEventRecurrence;
 use IPSKalender\CalendarEventTranslation;
 use IPSKalender\CalendarHttpClient;
 use IPSKalender\CalendarHttpOriginPolicyInterface;
@@ -31,12 +33,15 @@ use IPSKalender\SynchronizationSchedule;
 require_once __DIR__ . '/../libs/helper/ChunkedJsonTransferHelper.php';
 require_once __DIR__ . '/../libs/helper/ConfigurationFormHelper.php';
 require_once __DIR__ . '/../libs/helper/DataFlowHelper.php';
+require_once __DIR__ . '/../libs/helper/DebugHelper.php';
 require_once __DIR__ . '/../libs/helper/HttpResponseHelper.php';
 require_once __DIR__ . '/../libs/helper/SymconOAuthHelper.php';
 require_once __DIR__ . '/../libs/CalendarProviderInterface.php';
+require_once __DIR__ . '/../libs/RecurringCalendarProviderInterface.php';
 require_once __DIR__ . '/../libs/CalendarHttpClient.php';
 require_once __DIR__ . '/../libs/CalendarHttpOriginPolicyInterface.php';
 require_once __DIR__ . '/../libs/CalendarEventTranslation.php';
+require_once __DIR__ . '/../libs/CalendarEventRecurrence.php';
 require_once __DIR__ . '/../libs/CalDAVProvider.php';
 require_once __DIR__ . '/../libs/CalDAVOriginPolicy.php';
 require_once __DIR__ . '/../libs/GoogleCalendarProvider.php';
@@ -56,11 +61,12 @@ require_once __DIR__ . '/traits/MicrosoftOAuthTrait.php';
 require_once __DIR__ . '/traits/ICalendarAccountTrait.php';
 require_once __DIR__ . '/traits/ChildGatewayTrait.php';
 
-class KalenderKonto extends IPSModuleStrict
+class CalendarAccount extends IPSModuleStrict
 {
     use ChunkedJsonTransferHelper;
     use ConfigurationFormHelper;
     use DataFlowHelper;
+    use DebugHelper;
     use HttpResponseHelper;
     use KalenderKontoSymconOAuthTrait;
     use KalenderKontoGoogleOAuthTrait;
@@ -490,6 +496,13 @@ class KalenderKonto extends IPSModuleStrict
             );
         }
 
+        $providerName = $this->getProviderName($this->ReadPropertyInteger('Provider'));
+        $startedAt = microtime(true);
+        $this->SendSafeDebug('ConnectionTestStart', [
+            'provider'       => $providerName,
+            'timeoutSeconds' => max(5, min(120, $this->ReadPropertyInteger('RequestTimeout')))
+        ]);
+
         try {
             $provider = $this->createProvider();
             $result = $provider->testConnection();
@@ -498,6 +511,11 @@ class KalenderKonto extends IPSModuleStrict
             }
             $this->WriteAttributeString('LastError', '');
             $this->SetStatus($this->ReadPropertyBoolean('Active') ? IS_ACTIVE : IS_INACTIVE);
+            $this->SendSafeDebug('ConnectionTestCompleted', [
+                'provider'   => $providerName,
+                'success'    => (bool) ($result['success'] ?? true),
+                'durationMs' => (int) round((microtime(true) - $startedAt) * 1000)
+            ]);
 
             return json_encode($result, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
         } catch (Throwable $exception) {
@@ -528,6 +546,10 @@ class KalenderKonto extends IPSModuleStrict
             return false;
         }
 
+        $providerName = $this->getProviderName($this->ReadPropertyInteger('Provider'));
+        $startedAt = microtime(true);
+        $this->SendSafeDebug('AccountSynchronizationStart', ['provider' => $providerName]);
+
         try {
             $calendars = $this->discoverCalendars();
             $this->SetStatus(IS_ACTIVE);
@@ -540,7 +562,11 @@ class KalenderKonto extends IPSModuleStrict
                 ]
             ));
 
-            $this->SendDebug('Synchronize', sprintf('%d calendars synchronized.', count($calendars)), 0);
+            $this->SendSafeDebug('AccountSynchronizationCompleted', [
+                'provider'      => $providerName,
+                'calendarCount' => count($calendars),
+                'durationMs'    => (int) round((microtime(true) - $startedAt) * 1000)
+            ]);
 
             return true;
         } catch (Throwable $exception) {
@@ -556,7 +582,29 @@ class KalenderKonto extends IPSModuleStrict
      */
     public function GetCalendars(): string
     {
-        return $this->ReadAttributeString('CachedCalendars');
+        $cachedCalendars = $this->ReadAttributeString('CachedCalendars');
+        $provider = $this->ReadPropertyInteger('Provider');
+        if (!in_array(
+            $provider,
+            [self::PROVIDER_APPLE, self::PROVIDER_CALDAV, self::PROVIDER_GOOGLE, self::PROVIDER_MICROSOFT],
+            true
+        )) {
+            return $cachedCalendars;
+        }
+
+        try {
+            $calendars = json_decode($cachedCalendars, true, 512, JSON_THROW_ON_ERROR);
+            if (!is_array($calendars) || !array_is_list($calendars)) {
+                return $cachedCalendars;
+            }
+
+            return json_encode(
+                self::normalizeCachedCalendarCapabilities($calendars, $provider),
+                JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR
+            );
+        } catch (JsonException) {
+            return $cachedCalendars;
+        }
     }
 
     /**
@@ -645,6 +693,115 @@ class KalenderKonto extends IPSModuleStrict
     /**
      * Defers OAuth registration until the current module reload sequence has settled.
      */
+    /**
+     * Adds capabilities introduced after calendar discovery to compatible cached entries.
+     *
+     * Existing account caches survive module updates. Capabilities introduced later are
+     * therefore derived from the provider and the already cached write permission so child
+     * calendar instances can use them without a manual account resynchronization. Google
+     * calendar-default reminder details remain protected until the next discovery refresh.
+     *
+     * @param list<array<string, mixed>> $calendars Cached account calendars.
+     * @return list<array<string, mixed>> Normalized calendars.
+     */
+    private static function normalizeCachedCalendarCapabilities(array $calendars, int $provider): array
+    {
+        if (!in_array(
+            $provider,
+            [self::PROVIDER_APPLE, self::PROVIDER_CALDAV, self::PROVIDER_GOOGLE, self::PROVIDER_MICROSOFT],
+            true
+        )) {
+            return $calendars;
+        }
+
+        foreach ($calendars as &$calendar) {
+            $capabilities = is_array($calendar['capabilities'] ?? null)
+                ? $calendar['capabilities']
+                : [];
+            $accessRole = strtolower(trim((string) ($calendar['accessRole'] ?? '')));
+            $canWrite = (bool) ($capabilities['create'] ?? false)
+                || in_array($accessRole, ['writer', 'owner'], true);
+            if (!array_key_exists('maxReminders', $capabilities)) {
+                $capabilities['maxReminders'] = in_array(
+                    $provider,
+                    [self::PROVIDER_APPLE, self::PROVIDER_CALDAV, self::PROVIDER_GOOGLE],
+                    true
+                ) ? 5 : 1;
+            }
+            if (!array_key_exists('createRecurrence', $capabilities)) {
+                $capabilities['createRecurrence'] = $canWrite;
+            }
+            if (!array_key_exists('updateRecurrence', $capabilities)) {
+                $capabilities['updateRecurrence'] = $canWrite;
+            }
+            if (in_array($provider, [self::PROVIDER_APPLE, self::PROVIDER_CALDAV], true)) {
+                if (!array_key_exists('updateOccurrence', $capabilities)) {
+                    $capabilities['updateOccurrence'] = $canWrite;
+                }
+                if (!array_key_exists('deleteOccurrence', $capabilities)) {
+                    $capabilities['deleteOccurrence'] = $canWrite;
+                }
+                if (!array_key_exists('updateFollowing', $capabilities)) {
+                    $capabilities['updateFollowing'] = $canWrite;
+                }
+                if (!array_key_exists('updateSeries', $capabilities)) {
+                    $capabilities['updateSeries'] = $canWrite;
+                }
+                if (!array_key_exists('deleteSeries', $capabilities)) {
+                    $capabilities['deleteSeries'] = $canWrite;
+                }
+            }
+            if ($provider === self::PROVIDER_MICROSOFT) {
+                if (!array_key_exists('createWithDefaultReminder', $capabilities)) {
+                    $capabilities['createWithDefaultReminder'] = $canWrite;
+                }
+                if (!array_key_exists('updateOccurrence', $capabilities)) {
+                    $capabilities['updateOccurrence'] = $canWrite;
+                }
+                if (!array_key_exists('deleteOccurrence', $capabilities)) {
+                    $capabilities['deleteOccurrence'] = $canWrite;
+                }
+                if (!array_key_exists('updateFollowing', $capabilities)) {
+                    $capabilities['updateFollowing'] = $canWrite;
+                }
+                if (!array_key_exists('updateSeries', $capabilities)) {
+                    $capabilities['updateSeries'] = $canWrite;
+                }
+                if (!array_key_exists('deleteSeries', $capabilities)) {
+                    $capabilities['deleteSeries'] = $canWrite;
+                }
+            }
+            if ($provider === self::PROVIDER_GOOGLE) {
+                if (!array_key_exists('useDefaultReminder', $capabilities)) {
+                    $capabilities['useDefaultReminder'] = true;
+                }
+                if (!array_key_exists('createWithDefaultReminder', $capabilities)) {
+                    $capabilities['createWithDefaultReminder'] = $canWrite;
+                }
+                if (!array_key_exists('defaultReminder', $calendar)) {
+                    $calendar['defaultReminder'] = [
+                        'mode'               => 'complex',
+                        'minutesBeforeStart' => null,
+                        'editable'           => false
+                    ];
+                }
+                if (!array_key_exists('updateFollowing', $capabilities)) {
+                    $capabilities['updateFollowing'] = $canWrite;
+                }
+                if (!array_key_exists('updateSeries', $capabilities)) {
+                    $capabilities['updateSeries'] = $canWrite;
+                }
+                if (!array_key_exists('deleteSeries', $capabilities)) {
+                    $capabilities['deleteSeries'] = $canWrite;
+                }
+            }
+            $calendar['capabilities'] = $capabilities;
+        }
+        unset($calendar);
+
+        return $calendars;
+    }
+
     private function scheduleOAuthRegistration(): void
     {
         $this->SetTimerInterval('OAuthRegistrationTimer', 0);
@@ -665,18 +822,17 @@ class KalenderKonto extends IPSModuleStrict
         foreach ([self::GOOGLE_OAUTH_IDENTIFIER, self::MICROSOFT_OAUTH_IDENTIFIER] as $identifier) {
             try {
                 if (!$this->RegisterOAuth($identifier)) {
-                    $this->SendDebug(
+                    $this->SendSafeDebug(
                         'OAuthRegistration',
-                        sprintf('OAuth handler "%s" could not be registered.', $identifier),
-                        0
+                        sprintf('OAuth handler "%s" could not be registered.', $identifier)
                     );
                 }
             } catch (Throwable $exception) {
-                $this->SendDebug(
-                    'OAuthRegistration',
-                    $this->sanitizeError($exception->getMessage()),
-                    0
-                );
+                $this->SendSafeDebug('OAuthRegistrationError', [
+                    'type'    => $exception::class,
+                    'message' => $this->sanitizeError($exception->getMessage()),
+                    'code'    => $exception->getCode()
+                ]);
             }
         }
     }
@@ -842,6 +998,9 @@ class KalenderKonto extends IPSModuleStrict
             throw new InvalidArgumentException($validationError);
         }
 
+        $providerName = $this->getProviderName($this->ReadPropertyInteger('Provider'));
+        $startedAt = microtime(true);
+        $this->SendSafeDebug('CalendarDiscoveryStart', ['provider' => $providerName]);
         $calendars = $this->createProvider()->getCalendars();
         if ($this->ReadPropertyInteger('Provider') === self::PROVIDER_ICS) {
             $this->pruneICalendarFeedCache(array_map(
@@ -891,6 +1050,11 @@ class KalenderKonto extends IPSModuleStrict
                 ? $this->iCalendarCacheWarning()
                 : ''
         );
+        $this->SendSafeDebug('CalendarDiscoveryCompleted', [
+            'provider'      => $providerName,
+            'calendarCount' => count($calendars),
+            'durationMs'    => (int) round((microtime(true) - $startedAt) * 1000)
+        ]);
 
         return $calendars;
     }
@@ -898,6 +1062,15 @@ class KalenderKonto extends IPSModuleStrict
     private function createProvider(): CalendarProviderInterface
     {
         $provider = $this->ReadPropertyInteger('Provider');
+        $verifyTls = match ($provider) {
+            self::PROVIDER_APPLE, self::PROVIDER_GOOGLE, self::PROVIDER_MICROSOFT => true,
+            default                                                               => $this->ReadPropertyBoolean('VerifyTLS')
+        };
+        $this->SendSafeDebug('ProviderCreate', [
+            'provider'       => $this->getProviderName($provider),
+            'timeoutSeconds' => max(5, min(120, $this->ReadPropertyInteger('RequestTimeout'))),
+            'verifyTLS'      => $verifyTls
+        ]);
 
         if ($provider === self::PROVIDER_GOOGLE) {
             return new GoogleCalendarProvider(
@@ -1186,7 +1359,20 @@ class KalenderKonto extends IPSModuleStrict
             ? $this->Translate('Invalid JSON data.')
             : $this->translateErrorMessage($rawMessage);
         $this->WriteAttributeString('LastError', $message);
-        $this->SendDebug('ProviderError', $rawMessage, 0);
+        $httpStatus = match (true) {
+            $exception instanceof CalDAVProviderException,
+            $exception instanceof GoogleCalendarProviderException,
+            $exception instanceof MicrosoftCalendarProviderException,
+            $exception instanceof ICalendarFeedProviderException,
+            $exception instanceof ICalendarFileProviderException => $exception->httpStatus,
+            default                                              => 0
+        };
+        $this->SendSafeDebug('ProviderError', [
+            'provider'   => $this->getProviderName($this->ReadPropertyInteger('Provider')),
+            'type'       => $exception::class,
+            'httpStatus' => $httpStatus,
+            'message'    => $rawMessage
+        ]);
 
         return $message;
     }

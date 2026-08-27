@@ -12,7 +12,11 @@ use RuntimeException;
 use Throwable;
 
 require_once __DIR__ . '/CalendarProviderInterface.php';
+require_once __DIR__ . '/RecurringCalendarProviderInterface.php';
 require_once __DIR__ . '/CalendarHttpClient.php';
+require_once __DIR__ . '/CalendarEventRecurrence.php';
+require_once __DIR__ . '/CalendarEventReminder.php';
+require_once __DIR__ . '/CalendarRecurrenceRule.php';
 
 final class MicrosoftCalendarProviderException extends RuntimeException
 {
@@ -28,7 +32,7 @@ final class MicrosoftCalendarProviderException extends RuntimeException
     }
 }
 
-final class MicrosoftCalendarProvider implements CalendarProviderInterface
+final class MicrosoftCalendarProvider implements CalendarProviderInterface, RecurringCalendarProviderInterface
 {
     private const API_URL = 'https://graph.microsoft.com/v1.0';
     private const MAX_PAGES = 100;
@@ -99,10 +103,19 @@ final class MicrosoftCalendarProvider implements CalendarProviderInterface
                     'components'       => ['VEVENT'],
                     'writeAccessKnown' => true,
                     'capabilities'     => [
-                        'read'   => true,
-                        'create' => $canWrite,
-                        'update' => $canWrite,
-                        'delete' => $canWrite
+                        'read'                      => true,
+                        'create'                    => $canWrite,
+                        'update'                    => $canWrite,
+                        'delete'                    => $canWrite,
+                        'createRecurrence'          => $canWrite,
+                        'updateRecurrence'          => $canWrite,
+                        'updateOccurrence'          => $canWrite,
+                        'deleteOccurrence'          => $canWrite,
+                        'updateFollowing'           => $canWrite,
+                        'updateSeries'              => $canWrite,
+                        'deleteSeries'              => $canWrite,
+                        'createWithDefaultReminder' => $canWrite,
+                        'maxReminders'              => 1
                     ]
                 ];
                 if (count($calendars) > self::MAX_CALENDARS) {
@@ -178,13 +191,91 @@ final class MicrosoftCalendarProvider implements CalendarProviderInterface
     }
 
     /** @inheritDoc */
+    public function getRecurringSeries(
+        string $calendarReference,
+        string $seriesId,
+        string $resourceReference = ''
+    ): array {
+        $seriesData = $this->recurringSeriesData($calendarReference, $seriesId);
+        $mapped = array_merge(
+            $seriesData['event'],
+            CalendarEventRecurrence::master(trim($seriesId), true, true)
+        );
+        $mapped['recurrenceEditable'] = $seriesData['settings'] !== null;
+        $mapped['recurrenceSettings'] = $seriesData['settings'] ?? [];
+
+        return $mapped;
+    }
+
+    /** @inheritDoc */
+    public function getRecurringFollowing(
+        string $calendarReference,
+        string $seriesId,
+        string $occurrenceId,
+        string $originalStart,
+        string $resourceReference = ''
+    ): array {
+        $seriesId = trim($seriesId);
+        $seriesData = $this->recurringSeriesData($calendarReference, $seriesId);
+        if ($seriesData['settings'] === null) {
+            throw new MicrosoftCalendarProviderException('The recurrence pattern cannot be split safely.');
+        }
+
+        $target = $this->verifiedRecurringOccurrence(
+            $seriesData['calendarId'],
+            $seriesId,
+            trim($occurrenceId),
+            trim($originalStart)
+        );
+        $targetDate = $this->recurrenceTargetDate($target, $seriesData['item']);
+        $settings = $seriesData['settings'];
+        if (($settings['endMode'] ?? '') === 'count') {
+            $settings['count'] = CalendarRecurrenceRule::remainingMicrosoftOccurrenceCount(
+                $seriesData['recurrence'],
+                $targetDate
+            );
+        }
+
+        $series = $seriesData['event'];
+        foreach (['start', 'end', 'startTimestamp', 'endTimestamp', 'allDay', 'timezone'] as $key) {
+            $series[$key] = $target[$key];
+        }
+        $series['eventReference'] = $target['eventReference'];
+        $series['resourceUrl'] = $target['resourceUrl'];
+        $series['etag'] = $target['etag'];
+        $series['recurrenceSettings'] = $settings;
+        $series = array_merge(
+            $series,
+            CalendarEventRecurrence::occurrence(
+                $seriesId,
+                (string) $target['occurrenceId'],
+                (string) $target['originalStart'],
+                '',
+                true,
+                ($target['recurrenceType'] ?? '') === CalendarEventRecurrence::EXCEPTION,
+                true,
+                true,
+                true
+            )
+        );
+        $series['recurrenceEditable'] = true;
+        $series['writeScope'] = CalendarEventRecurrence::WRITE_SCOPE_FOLLOWING;
+
+        return $series;
+    }
+
+    /** @inheritDoc */
     public function createEvent(string $calendarReference, array $event): array
     {
         $calendarId = $this->calendarId($calendarReference);
+        $payload = $this->buildEventPayload($event, true);
+        if ((bool) ($event['allDay'] ?? false)) {
+            $payload['showAs'] = 'free';
+        }
         $created = $this->requestJson(
             'POST',
             '/me/calendars/' . rawurlencode($calendarId) . '/events',
-            $this->buildEventPayload($event, true),
+            $payload,
             [],
             [201]
         );
@@ -198,18 +289,35 @@ final class MicrosoftCalendarProvider implements CalendarProviderInterface
         string $eventReference,
         string $etag,
         string $uid,
-        array $event
+        array $event,
+        array $recurrence = []
     ): array {
         $calendarId = $this->calendarId($calendarReference);
         $eventId = $this->eventId($eventReference);
+        $identity = $this->assertWritableEventTarget($recurrence, $eventId, true);
+        $recurrenceType = (string) ($identity['recurrenceType'] ?? CalendarEventRecurrence::SINGLE);
+        if (($identity['writeScope'] ?? '') === CalendarEventRecurrence::WRITE_SCOPE_FOLLOWING) {
+            return $this->updateFollowingInstances($calendarId, $eventId, $event, $identity);
+        }
+
+        $seriesUpdate = ($identity['writeScope'] ?? '') === CalendarEventRecurrence::WRITE_SCOPE_SERIES;
+        $singleRecurrenceUpdate = $recurrenceType === CalendarEventRecurrence::SINGLE
+            && is_array($event['recurrence'] ?? null)
+            && $event['recurrence'] !== [];
+        $targetEventId = $seriesUpdate
+            ? trim((string) ($identity['seriesId'] ?? ''))
+            : $eventId;
+        if ($targetEventId === '') {
+            throw new MicrosoftCalendarProviderException('The recurring series ID is missing.');
+        }
         if (array_key_exists('description', $event)) {
-            $this->assertDescriptionEditable($calendarId, $eventId);
+            $this->assertDescriptionEditable($calendarId, $targetEventId);
         }
         $headers = $etag !== '' ? ['If-Match' => $etag] : [];
         $updated = $this->requestJson(
             'PATCH',
-            '/me/calendars/' . rawurlencode($calendarId) . '/events/' . rawurlencode($eventId),
-            $this->buildEventPayload($event, false),
+            '/me/calendars/' . rawurlencode($calendarId) . '/events/' . rawurlencode($targetEventId),
+            $this->buildEventPayload($event, false, $seriesUpdate || $singleRecurrenceUpdate),
             $headers,
             [200]
         );
@@ -222,20 +330,378 @@ final class MicrosoftCalendarProvider implements CalendarProviderInterface
         string $calendarReference,
         string $eventReference,
         string $etag,
-        string $recurrenceId = ''
+        string $recurrenceId = '',
+        array $recurrence = []
     ): bool {
         $calendarId = $this->calendarId($calendarReference);
         $eventId = $this->eventId($eventReference);
-        $headers = $etag !== '' ? ['If-Match' => $etag] : [];
+        $identity = $this->assertWritableEventTarget($recurrence, $eventId, false);
+        if (($identity['writeScope'] ?? '') === CalendarEventRecurrence::WRITE_SCOPE_FOLLOWING) {
+            return $this->deleteFollowingInstances($calendarId, $eventId, $identity);
+        }
+
+        $seriesDelete = ($identity['writeScope'] ?? '') === CalendarEventRecurrence::WRITE_SCOPE_SERIES;
+        $targetEventId = $seriesDelete
+            ? trim((string) ($identity['seriesId'] ?? ''))
+            : $eventId;
+        if ($targetEventId === '') {
+            throw new MicrosoftCalendarProviderException('The recurring series ID is missing.');
+        }
+        $headers = !$seriesDelete && $etag !== '' ? ['If-Match' => $etag] : [];
         $this->requestJson(
             'DELETE',
-            '/me/calendars/' . rawurlencode($calendarId) . '/events/' . rawurlencode($eventId),
+            '/me/calendars/' . rawurlencode($calendarId) . '/events/' . rawurlencode($targetEventId),
             null,
             $headers,
             [204]
         );
 
         return true;
+    }
+
+    /**
+     * Applies a "this and following" update by splitting a Microsoft recurring series.
+     *
+     * @param array<string, mixed> $event
+     * @param array<string, mixed> $identity
+     * @return array<string, mixed>
+     */
+    private function updateFollowingInstances(
+        string $calendarId,
+        string $eventId,
+        array $event,
+        array $identity
+    ): array {
+        $seriesId = trim((string) ($identity['seriesId'] ?? ''));
+        $originalStart = trim((string) ($identity['originalStart'] ?? ''));
+        $seriesData = $this->recurringSeriesData($calendarId, $seriesId);
+        if ($seriesData['settings'] === null) {
+            throw new MicrosoftCalendarProviderException('The recurrence pattern cannot be split safely.');
+        }
+        if (!is_array($event['recurrence'] ?? null) || $event['recurrence'] === []) {
+            throw new MicrosoftCalendarProviderException(
+                'The recurrence settings are required when splitting a recurring event.'
+            );
+        }
+
+        $target = $this->verifiedRecurringOccurrence($calendarId, $seriesId, $eventId, $originalStart);
+        $targetDate = $this->recurrenceTargetDate($target, $seriesData['item']);
+        $position = CalendarRecurrenceRule::microsoftOccurrencePosition(
+            $seriesData['recurrence'],
+            $targetDate
+        );
+        $parentItem = $seriesData['item'];
+        $parentEtag = trim((string) ($parentItem['@odata.etag'] ?? $parentItem['changeKey'] ?? ''));
+        $parentHeaders = $parentEtag !== '' ? ['If-Match' => $parentEtag] : [];
+
+        if ($position === 1) {
+            if (array_key_exists('description', $event)) {
+                $this->assertDescriptionEditable($calendarId, $seriesId);
+            }
+            $updated = $this->requestJson(
+                'PATCH',
+                '/me/calendars/' . rawurlencode($calendarId) . '/events/' . rawurlencode($seriesId),
+                $this->buildEventPayload($event, false, true),
+                $parentHeaders,
+                [200]
+            );
+
+            return $this->writeResult($calendarId, $updated);
+        }
+
+        $newEventPayload = array_replace(
+            $this->splitEventBasePayload($parentItem),
+            $this->buildEventPayload($event, true)
+        );
+        $trimmedRecurrence = CalendarRecurrenceRule::trimMicrosoftRecurrenceBefore(
+            $seriesData['recurrence'],
+            $targetDate
+        );
+        $trimmedParent = $this->requestJson(
+            'PATCH',
+            '/me/calendars/' . rawurlencode($calendarId) . '/events/' . rawurlencode($seriesId),
+            ['recurrence' => $trimmedRecurrence],
+            $parentHeaders,
+            [200]
+        );
+
+        try {
+            $created = $this->requestJson(
+                'POST',
+                '/me/calendars/' . rawurlencode($calendarId) . '/events',
+                $newEventPayload,
+                [],
+                [201]
+            );
+        } catch (Throwable $exception) {
+            $rollbackEtag = trim((string) ($trimmedParent['@odata.etag'] ?? $trimmedParent['changeKey'] ?? ''));
+            $rollbackHeaders = $rollbackEtag !== '' ? ['If-Match' => $rollbackEtag] : [];
+            try {
+                $this->requestJson(
+                    'PATCH',
+                    '/me/calendars/' . rawurlencode($calendarId) . '/events/' . rawurlencode($seriesId),
+                    ['recurrence' => $seriesData['recurrence']],
+                    $rollbackHeaders,
+                    [200]
+                );
+            } catch (Throwable) {
+                throw new MicrosoftCalendarProviderException(
+                    'The new recurring series could not be created and the original series could not be restored automatically.'
+                );
+            }
+
+            throw $exception;
+        }
+
+        return $this->writeResult($calendarId, $created);
+    }
+
+    /**
+     * Deletes a Microsoft recurring event from the selected occurrence onward.
+     *
+     * @param array<string, mixed> $identity
+     */
+    private function deleteFollowingInstances(string $calendarId, string $eventId, array $identity): bool
+    {
+        $seriesId = trim((string) ($identity['seriesId'] ?? ''));
+        $originalStart = trim((string) ($identity['originalStart'] ?? ''));
+        $seriesData = $this->recurringSeriesData($calendarId, $seriesId);
+        if ($seriesData['settings'] === null) {
+            throw new MicrosoftCalendarProviderException('The recurrence pattern cannot be split safely.');
+        }
+
+        $target = $this->verifiedRecurringOccurrence($calendarId, $seriesId, $eventId, $originalStart);
+        $targetDate = $this->recurrenceTargetDate($target, $seriesData['item']);
+        $position = CalendarRecurrenceRule::microsoftOccurrencePosition(
+            $seriesData['recurrence'],
+            $targetDate
+        );
+        $parentItem = $seriesData['item'];
+        $parentEtag = trim((string) ($parentItem['@odata.etag'] ?? $parentItem['changeKey'] ?? ''));
+        $parentHeaders = $parentEtag !== '' ? ['If-Match' => $parentEtag] : [];
+
+        if ($position === 1) {
+            $this->requestJson(
+                'DELETE',
+                '/me/calendars/' . rawurlencode($calendarId) . '/events/' . rawurlencode($seriesId),
+                null,
+                $parentHeaders,
+                [204]
+            );
+
+            return true;
+        }
+
+        $this->requestJson(
+            'PATCH',
+            '/me/calendars/' . rawurlencode($calendarId) . '/events/' . rawurlencode($seriesId),
+            [
+                'recurrence' => CalendarRecurrenceRule::trimMicrosoftRecurrenceBefore(
+                    $seriesData['recurrence'],
+                    $targetDate
+                )
+            ],
+            $parentHeaders,
+            [200]
+        );
+
+        return true;
+    }
+
+    /**
+     * Loads and validates the Microsoft series master and its supported recurrence settings.
+     *
+     * @return array{calendarId: string, item: array<string, mixed>, event: array<string, mixed>, recurrence: array<string, mixed>, settings: array<string, mixed>|null}
+     */
+    private function recurringSeriesData(string $calendarReference, string $seriesId): array
+    {
+        $calendarId = $this->calendarId($calendarReference);
+        $seriesId = trim($seriesId);
+        if ($seriesId === '') {
+            throw new MicrosoftCalendarProviderException('The recurring series ID is missing.');
+        }
+
+        $item = $this->requestJson(
+            'GET',
+            '/me/calendars/' . rawurlencode($calendarId) . '/events/' . rawurlencode($seriesId),
+            null,
+            ['Prefer' => 'outlook.body-content-type="text", outlook.timezone="UTC"']
+        );
+        $mapped = $this->mapEvent($calendarId, $item);
+        if ($mapped === null
+            || ($mapped['recurrenceType'] ?? '') !== CalendarEventRecurrence::MASTER
+            || !hash_equals($seriesId, (string) ($mapped['seriesId'] ?? ''))) {
+            throw new MicrosoftCalendarProviderException('Microsoft Calendar did not return the recurring parent event.');
+        }
+
+        $recurrence = is_array($item['recurrence'] ?? null) ? $item['recurrence'] : [];
+        $range = is_array($recurrence['range'] ?? null) ? $recurrence['range'] : [];
+        $rangeStart = trim((string) ($range['startDate'] ?? ''));
+        $recurrenceStart = preg_match('/^\d{4}-\d{2}-\d{2}$/D', $rangeStart) === 1
+            ? new DateTimeImmutable($rangeStart . 'T00:00:00Z')
+            : new DateTimeImmutable((string) ($mapped['start'] ?? 'now'));
+
+        return [
+            'calendarId' => $calendarId,
+            'item'       => $item,
+            'event'      => $mapped,
+            'recurrence' => $recurrence,
+            'settings'   => CalendarRecurrenceRule::fromMicrosoftRecurrence($recurrence, $recurrenceStart)
+        ];
+    }
+
+    /**
+     * Returns one verified occurrence or exception of the selected Microsoft series.
+     *
+     * @return array<string, mixed>
+     */
+    private function verifiedRecurringOccurrence(
+        string $calendarId,
+        string $seriesId,
+        string $occurrenceId,
+        string $originalStart
+    ): array {
+        if ($seriesId === '' || $occurrenceId === '' || $originalStart === '') {
+            throw new MicrosoftCalendarProviderException('The recurring occurrence identity is incomplete.');
+        }
+
+        $item = $this->requestJson(
+            'GET',
+            '/me/calendars/' . rawurlencode($calendarId) . '/events/' . rawurlencode($occurrenceId),
+            null,
+            ['Prefer' => 'outlook.body-content-type="text", outlook.timezone="UTC"']
+        );
+        $mapped = $this->mapEvent($calendarId, $item);
+        if ($mapped === null
+            || !CalendarEventRecurrence::isOccurrence($mapped)
+            || !hash_equals($seriesId, (string) ($mapped['seriesId'] ?? ''))
+            || !hash_equals($occurrenceId, (string) ($mapped['occurrenceId'] ?? ''))
+            || !$this->sameOriginalStart($originalStart, (string) ($mapped['originalStart'] ?? ''), $mapped)) {
+            throw new MicrosoftCalendarProviderException('The recurring target occurrence could not be verified.');
+        }
+
+        return $mapped;
+    }
+
+    /**
+     * Returns the local recurrence date of the selected original occurrence start.
+     *
+     * @param array<string, mixed> $target
+     * @param array<string, mixed> $parentItem
+     */
+    private function recurrenceTargetDate(array $target, array $parentItem): string
+    {
+        $originalStart = trim((string) ($target['originalStart'] ?? ''));
+        if ($originalStart === '') {
+            throw new MicrosoftCalendarProviderException('The recurring target start is missing.');
+        }
+        if (preg_match('/^\d{4}-\d{2}-\d{2}$/D', $originalStart) === 1) {
+            return $originalStart;
+        }
+
+        $recurrence = is_array($parentItem['recurrence'] ?? null) ? $parentItem['recurrence'] : [];
+        $range = is_array($recurrence['range'] ?? null) ? $recurrence['range'] : [];
+        $timezoneName = trim((string) ($range['recurrenceTimeZone']
+            ?? $parentItem['originalStartTimeZone']
+            ?? $target['timezone']
+            ?? 'UTC'));
+        try {
+            return (new DateTimeImmutable($originalStart))
+                ->setTimezone($this->timezone($timezoneName))
+                ->format('Y-m-d');
+        } catch (Throwable) {
+            throw new MicrosoftCalendarProviderException('The recurring target start is invalid.');
+        }
+    }
+
+    /**
+     * Compares two provider occurrence starts without relying on their textual offset format.
+     *
+     * @param array<string, mixed> $event
+     */
+    private function sameOriginalStart(string $left, string $right, array $event): bool
+    {
+        $left = trim($left);
+        $right = trim($right);
+        if ($left === '' || $right === '') {
+            return false;
+        }
+        $allDay = (bool) ($event['allDay'] ?? false);
+        if ($allDay) {
+            return substr($left, 0, 10) === substr($right, 0, 10);
+        }
+
+        try {
+            return (new DateTimeImmutable($left))->getTimestamp() === (new DateTimeImmutable($right))->getTimestamp();
+        } catch (Throwable) {
+            return false;
+        }
+    }
+
+    /**
+     * Builds the writable fields that are preserved when the future part becomes a new series.
+     *
+     * @param array<string, mixed> $parentItem
+     * @return array<string, mixed>
+     */
+    private function splitEventBasePayload(array $parentItem): array
+    {
+        if ((bool) ($parentItem['isOnlineMeeting'] ?? false)) {
+            throw new MicrosoftCalendarProviderException(
+                'This and following updates are not supported for Microsoft online meetings.'
+            );
+        }
+        if ((bool) ($parentItem['hasAttachments'] ?? false)) {
+            throw new MicrosoftCalendarProviderException(
+                'This and following updates are not supported for recurring events with attachments.'
+            );
+        }
+
+        $payload = [];
+        foreach ([
+            'body',
+            'location',
+            'categories',
+            'showAs',
+            'sensitivity',
+            'importance',
+            'isReminderOn',
+            'reminderMinutesBeforeStart',
+            'responseRequested',
+            'allowNewTimeProposals',
+            'hideAttendees'
+        ] as $key) {
+            if (array_key_exists($key, $parentItem)) {
+                $payload[$key] = $parentItem[$key];
+            }
+        }
+
+        $attendees = [];
+        foreach (is_array($parentItem['attendees'] ?? null) ? $parentItem['attendees'] : [] as $attendee) {
+            if (!is_array($attendee) || !is_array($attendee['emailAddress'] ?? null)) {
+                continue;
+            }
+            $address = trim((string) ($attendee['emailAddress']['address'] ?? ''));
+            if ($address === '') {
+                continue;
+            }
+            $emailAddress = ['address' => $address];
+            $name = trim((string) ($attendee['emailAddress']['name'] ?? ''));
+            if ($name !== '') {
+                $emailAddress['name'] = $name;
+            }
+            $entry = ['emailAddress' => $emailAddress];
+            $type = strtolower(trim((string) ($attendee['type'] ?? 'required')));
+            if (in_array($type, ['required', 'optional', 'resource'], true)) {
+                $entry['type'] = $type;
+            }
+            $attendees[] = $entry;
+        }
+        if ($attendees !== []) {
+            $payload['attendees'] = $attendees;
+        }
+
+        return $payload;
     }
 
     /** @param array<string, true> $seenPageUrls */
@@ -275,10 +741,29 @@ final class MicrosoftCalendarProvider implements CalendarProviderInterface
         $body = is_array($item['body'] ?? null) ? $item['body'] : [];
         $location = is_array($item['location'] ?? null) ? $item['location'] : [];
         $seriesMasterId = trim((string) ($item['seriesMasterId'] ?? ''));
+        $originalStart = trim((string) ($item['originalStart'] ?? ''));
         $type = strtolower(trim((string) ($item['type'] ?? 'singleInstance')));
+        if ($originalStart === '' && $type === 'occurrence') {
+            $originalStart = $allDay ? $start->format('Y-m-d') : $start->format(DATE_ATOM);
+        }
+        $recurrenceIdentity = match ($type) {
+            'seriesmaster'            => CalendarEventRecurrence::master($eventId, true, true),
+            'occurrence', 'exception' => CalendarEventRecurrence::occurrence(
+                $seriesMasterId,
+                $eventId,
+                $originalStart,
+                '',
+                $seriesMasterId !== '',
+                $type === 'exception',
+                true,
+                true,
+                $seriesMasterId !== '' && $originalStart !== ''
+            ),
+            default => CalendarEventRecurrence::single()
+        };
         $resourceUrl = $this->eventUrl($calendarId, $eventId);
 
-        return [
+        return array_merge([
             'id'             => hash('sha256', 'microsoft|' . $calendarId . '|' . $eventId),
             'uid'            => trim((string) ($item['iCalUId'] ?? $eventId)),
             'eventReference' => $eventId,
@@ -295,15 +780,100 @@ final class MicrosoftCalendarProvider implements CalendarProviderInterface
             'timezone'       => $timezone !== '' ? $timezone : 'UTC',
             'status'         => (bool) ($item['isCancelled'] ?? false) ? 'CANCELLED' : 'CONFIRMED',
             'recurrenceRule' => '',
-            'recurrenceId'   => $seriesMasterId,
-            'recurring'      => in_array($type, ['occurrence', 'exception', 'seriesmaster'], true)
-                || $seriesMasterId !== '',
             'sequence'       => 0,
             'created'        => trim((string) ($item['createdDateTime'] ?? '')),
             'lastModified'   => trim((string) ($item['lastModifiedDateTime'] ?? '')),
             'url'            => trim((string) ($item['webLink'] ?? '')),
-            'onlineMeeting'  => (bool) ($item['isOnlineMeeting'] ?? false)
-        ];
+            'onlineMeeting'  => (bool) ($item['isOnlineMeeting'] ?? false),
+            'reminder'       => $this->mapReminder($item)
+        ], $recurrenceIdentity);
+    }
+
+    /**
+     * @param array<string, mixed> $item
+     * @return array{mode: string, minutesBeforeStart: int|null, editable: bool}
+     */
+    private function mapReminder(array $item): array
+    {
+        if (!(bool) ($item['isReminderOn'] ?? false)) {
+            return CalendarEventReminder::none();
+        }
+
+        $minutes = filter_var(
+            $item['reminderMinutesBeforeStart'] ?? null,
+            FILTER_VALIDATE_INT,
+            ['options' => ['min_range' => 0, 'max_range' => CalendarEventReminder::MAX_MINUTES_BEFORE_START]]
+        );
+        if ($minutes === false) {
+            return CalendarEventReminder::complex();
+        }
+
+        return CalendarEventReminder::custom((int) $minutes);
+    }
+
+    /**
+     * @param array<string, mixed> $recurrence
+     * @return array<string, mixed> Normalized recurrence identity.
+     */
+    private function assertWritableEventTarget(array $recurrence, string $eventId, bool $updating): array
+    {
+        if ($recurrence === []) {
+            return CalendarEventRecurrence::single();
+        }
+
+        $identity = CalendarEventRecurrence::fromEvent($recurrence);
+        $type = (string) ($identity['recurrenceType'] ?? CalendarEventRecurrence::SINGLE);
+        if ($type === CalendarEventRecurrence::SINGLE) {
+            return $identity;
+        }
+
+        $writeScope = (string) ($identity['writeScope'] ?? CalendarEventRecurrence::WRITE_SCOPE_OCCURRENCE);
+        if ($writeScope === CalendarEventRecurrence::WRITE_SCOPE_SERIES) {
+            $capability = $updating ? 'canUpdateSeries' : 'canDeleteSeries';
+            $seriesId = trim((string) ($identity['seriesId'] ?? ''));
+            if ($type !== CalendarEventRecurrence::SINGLE
+                && $seriesId !== ''
+                && (bool) ($identity[$capability] ?? false)
+                && (!$updating || hash_equals($seriesId, $eventId))) {
+                return $identity;
+            }
+
+            throw new MicrosoftCalendarProviderException(
+                'The complete Microsoft recurring series cannot be modified.'
+            );
+        }
+        if ($writeScope === CalendarEventRecurrence::WRITE_SCOPE_FOLLOWING) {
+            $seriesId = trim((string) ($identity['seriesId'] ?? ''));
+            $occurrenceId = trim((string) ($identity['occurrenceId'] ?? ''));
+            $originalStart = trim((string) ($identity['originalStart'] ?? ''));
+            if (in_array($type, [CalendarEventRecurrence::OCCURRENCE, CalendarEventRecurrence::EXCEPTION], true)
+                && $seriesId !== ''
+                && $occurrenceId !== ''
+                && hash_equals($eventId, $occurrenceId)
+                && $originalStart !== ''
+                && (bool) ($identity['canUpdateFollowing'] ?? false)
+                && ($updating || (bool) ($identity['canDeleteSeries'] ?? false))) {
+                return $identity;
+            }
+
+            throw new MicrosoftCalendarProviderException(
+                'This and following Microsoft recurring occurrences cannot be modified.'
+            );
+        }
+
+        $capability = $updating ? 'canUpdateOccurrence' : 'canDeleteOccurrence';
+        $occurrenceId = trim((string) ($identity['occurrenceId'] ?? ''));
+        if (in_array($type, [CalendarEventRecurrence::OCCURRENCE, CalendarEventRecurrence::EXCEPTION], true)
+            && trim((string) ($identity['seriesId'] ?? '')) !== ''
+            && $occurrenceId !== ''
+            && hash_equals($eventId, $occurrenceId)
+            && (bool) ($identity[$capability] ?? false)) {
+            return $identity;
+        }
+
+        throw new MicrosoftCalendarProviderException(
+            'The Microsoft recurring occurrence cannot be modified.'
+        );
     }
 
     private function assertDescriptionEditable(string $calendarId, string $eventId): void
@@ -324,7 +894,7 @@ final class MicrosoftCalendarProvider implements CalendarProviderInterface
      * @param array<string, mixed> $data
      * @return array<string, mixed>
      */
-    private function buildEventPayload(array $data, bool $creating): array
+    private function buildEventPayload(array $data, bool $creating, bool $allowRecurrenceUpdate = false): array
     {
         $payload = [];
         if ($creating || array_key_exists('summary', $data)) {
@@ -342,6 +912,27 @@ final class MicrosoftCalendarProvider implements CalendarProviderInterface
         }
         if (array_key_exists('location', $data)) {
             $payload['location'] = ['displayName' => (string) $data['location']];
+        }
+        if (array_key_exists('reminder', $data)) {
+            $reminder = CalendarEventReminder::normalizeInput($data['reminder'], false, 1);
+            if ($reminder['mode'] === CalendarEventReminder::MODE_NONE) {
+                $payload['isReminderOn'] = false;
+            } else {
+                $payload['isReminderOn'] = true;
+                $payload['reminderMinutesBeforeStart'] = $reminder['minutesBeforeStart'];
+            }
+        }
+
+        $recurrenceProvided = array_key_exists('recurrence', $data);
+        $recurrence = $data['recurrence'] ?? null;
+        $recurring = $recurrence !== null && $recurrence !== [];
+        $clearRecurrence = $recurrenceProvided && $recurrence === null;
+        if ($clearRecurrence && ($creating || !$allowRecurrenceUpdate)) {
+            throw new InvalidArgumentException('The recurrence settings are invalid.');
+        }
+        if ($recurring
+            && ((!$creating && !$allowRecurrenceUpdate) || !is_array($recurrence) || array_is_list($recurrence))) {
+            throw new InvalidArgumentException('The recurrence settings are invalid.');
         }
 
         $hasStart = array_key_exists('start', $data);
@@ -361,7 +952,12 @@ final class MicrosoftCalendarProvider implements CalendarProviderInterface
             }
 
             $payload['isAllDay'] = $allDay;
+            $eventTimezone = trim((string) ($data['timezone'] ?? ''));
+            if ($recurring && $eventTimezone === '') {
+                $eventTimezone = date_default_timezone_get();
+            }
             if ($allDay) {
+                $recurrenceStart = $start;
                 $payload['start'] = [
                     'dateTime' => $start->format('Y-m-d') . 'T00:00:00',
                     'timeZone' => 'UTC'
@@ -370,7 +966,20 @@ final class MicrosoftCalendarProvider implements CalendarProviderInterface
                     'dateTime' => $end->format('Y-m-d') . 'T00:00:00',
                     'timeZone' => 'UTC'
                 ];
+            } elseif ($eventTimezone !== '') {
+                $eventZone = $this->recurrenceTimezone($eventTimezone);
+                $recurrenceStart = $start->setTimezone($eventZone);
+                $eventEnd = $end->setTimezone($eventZone);
+                $payload['start'] = [
+                    'dateTime' => $recurrenceStart->format('Y-m-d\TH:i:s'),
+                    'timeZone' => $eventTimezone
+                ];
+                $payload['end'] = [
+                    'dateTime' => $eventEnd->format('Y-m-d\TH:i:s'),
+                    'timeZone' => $eventTimezone
+                ];
             } else {
+                $recurrenceStart = $start;
                 $payload['start'] = [
                     'dateTime' => $start->setTimezone(new DateTimeZone('UTC'))->format('Y-m-d\TH:i:s'),
                     'timeZone' => 'UTC'
@@ -380,8 +989,21 @@ final class MicrosoftCalendarProvider implements CalendarProviderInterface
                     'timeZone' => 'UTC'
                 ];
             }
+
+            if ($recurring) {
+                $payload['recurrence'] = CalendarRecurrenceRule::toMicrosoftRecurrence(
+                    $recurrence,
+                    $recurrenceStart
+                );
+            }
         } elseif (array_key_exists('allDay', $data)) {
             throw new InvalidArgumentException('Changing all-day mode requires a start and end.');
+        } elseif ($recurring) {
+            throw new InvalidArgumentException('Recurring event changes require a start and end.');
+        }
+
+        if ($clearRecurrence) {
+            $payload['recurrence'] = null;
         }
 
         if ($payload === []) {
@@ -516,6 +1138,24 @@ final class MicrosoftCalendarProvider implements CalendarProviderInterface
             return new DateTimeImmutable($rawValue);
         } catch (Throwable) {
             throw new InvalidArgumentException('The event contains an invalid date.');
+        }
+    }
+
+    private function recurrenceTimezone(string $name): DateTimeZone
+    {
+        $name = trim($name);
+        if ($name === '') {
+            throw new InvalidArgumentException('The recurring event timezone is missing.');
+        }
+
+        try {
+            return new DateTimeZone($name);
+        } catch (Throwable) {
+            $ianaName = $this->windowsTimezoneToIana($name);
+            if ($ianaName !== '') {
+                return new DateTimeZone($ianaName);
+            }
+            throw new InvalidArgumentException('The recurring event timezone is invalid.');
         }
     }
 

@@ -47,9 +47,11 @@ final class CalendarVisualizationRenderer
                     'showListEnd'               => false,
                     'showListTitle'             => true,
                     'showListCalendarName'      => true,
+                    'showListAnniversaryType'   => true,
                     'showListLocation'          => false,
                     'showListDescription'       => true,
-                    'showListControls'          => false
+                    'showListControls'          => false,
+                    'showAnniversaryType'       => true
                 ]
             ],
             'runtime'            => $ipsView
@@ -90,6 +92,33 @@ function assertVisualization(bool $condition, string $message): void
 
 $script = (string) file_get_contents(__DIR__ . '/../Kalender Ansicht/visualization/app.js');
 $indexSource = (string) file_get_contents(__DIR__ . '/../Kalender Ansicht/visualization/index.html');
+$style = (string) file_get_contents(__DIR__ . '/../Kalender Ansicht/visualization/style.css');
+$moduleSource = (string) file_get_contents(__DIR__ . '/../Kalender Ansicht/module.php');
+$formSource = (string) file_get_contents(__DIR__ . '/../Kalender Ansicht/form.json');
+$localeSource = (string) file_get_contents(__DIR__ . '/../Kalender Ansicht/locale.json');
+$localeData = json_decode($localeSource, true, 512, JSON_THROW_ON_ERROR);
+$germanTranslations = is_array($localeData['translations']['de'] ?? null)
+    ? $localeData['translations']['de']
+    : [];
+preg_match_all('/Translate\\(\'([^\']+)\'\\)/', $moduleSource, $moduleTranslationMatches);
+foreach (array_unique($moduleTranslationMatches[1] ?? []) as $translationKey) {
+    assertVisualization(
+        array_key_exists($translationKey, $germanTranslations),
+        'Every literal Calendar View Translate() key must have a German locale entry: ' . $translationKey
+    );
+}
+foreach ([
+    'Tile week orientation',
+    'IPSView week orientation',
+    'Horizontal',
+    'Vertical',
+    'Recurring events cannot be moved yet.'
+] as $obsoleteTranslationKey) {
+    assertVisualization(
+        !array_key_exists($obsoleteTranslationKey, $germanTranslations),
+        'Obsolete Calendar View locale entries must be removed: ' . $obsoleteTranslationKey
+    );
+}
 assertVisualization(
     str_contains($script, 'return event.allDay ? allDayDate(event.start, event.startTimestamp)')
         && str_contains($script, 'allDayDate(event.end, event.endTimestamp || event.startTimestamp)')
@@ -97,7 +126,8 @@ assertVisualization(
     'All-day events must use their date-only boundaries so exclusive end dates cannot spill into the next local day.'
 );
 assertVisualization(
-    str_contains($script, 'setDateInputs(eventStart(event), eventEnd(event), Boolean(event.allDay), Boolean(event.allDay));')
+    str_contains($script, 'eventStart(selectedEvent),')
+        && str_contains($script, 'Boolean(selectedEvent.allDay)')
         && str_contains($script, 'const displayEnd = allDay && allDayEndExclusive && end > start ? addDays(end, -1) : end;')
         && str_contains($script, "end: inputDateValue(document.getElementById('event-end').value, allDay, allDay)")
         && str_contains($script, 'return localDate(exclusiveEnd ? addDays(date, 1) : date);'),
@@ -110,16 +140,126 @@ assertVisualization(
         && str_contains($script, 'if (dateChanged && !timeChanged && currentEnd) {')
         && str_contains($script, 'currentEnd.getHours(),')
         && str_contains($script, 'new Date(start.getTime() + 60 * 60 * 1000)')
-        && str_contains($script, 'document.getElementById(\'event-start\').addEventListener(\'change\', updateEndFromStart);'),
+        && str_contains($script, "document.getElementById('event-start').addEventListener('change', () => {")
+        && str_contains($script, 'updateRecurrenceEndDateMinimum();'),
     'Changing only the start date must move the end to that date while preserving its time; changing the start time must use a one-hour duration.'
+);
+
+assertVisualization(
+    str_contains($indexSource, 'id="event-recurrence-frequency"')
+        && str_contains($indexSource, 'id="event-recurrence-weekdays"')
+        && str_contains($indexSource, 'id="event-recurrence-end-mode"')
+        && str_contains($script, 'Boolean(calendar?.canCreateRecurrence)')
+        && str_contains($script, 'Boolean(movingSingle ? calendar?.canCreateRecurrence : calendar?.canUpdateRecurrence)')
+        && str_contains($script, 'const editingSingle = selectedEvent !== null && !Boolean(selectedEvent?.recurring);')
+        && str_contains($script, 'const canClearSeriesRecurrence = editingSeries')
+        && str_contains($script, 'Boolean(calendar?.canUpdateRecurrence);')
+        && str_contains($script, 'resetRecurrenceEditor(eventStart(selectedEvent));')
+        && str_contains($script, 'function recurrencePatternControls()')
+        && str_contains($script, "mode.id = 'event-recurrence-pattern-mode';")
+        && str_contains($script, "index.id = 'event-recurrence-relative-index';")
+        && str_contains($script, 'Boolean(selectedCalendarEntry()?.canUpdateRecurrence);')
+        && str_contains($script, 'recurrencePatternContext.patternMode')
+        && str_contains($script, "recurrence.patternMode = 'relative';")
+        && str_contains($script, 'recurrence.relativeIndex = patternControls.index.value;')
+        && str_contains($script, 'recurrence.weekStart = recurrencePatternContext.weekStart;')
+        && str_contains($script, 'recurrence.recurrenceTimeZone = recurrencePatternContext.recurrenceTimeZone;')
+        && str_contains($script, 'function recurrenceEditorValue()')
+        && str_contains($script, 'eventData.recurrence = recurrence;')
+        && str_contains($script, "eventRecurrenceFrequency.value === 'none'")
+        && str_contains($script, 'eventData.recurrence = null;')
+        && str_contains($script, 'Intl.DateTimeFormat().resolvedOptions().timeZone')
+        && str_contains($script, 'if (timezone && (!allDay || recurrence || editingSeries || editingFollowing)) {')
+        && str_contains($script, 'eventData.timezone = timezone;'),
+    'The event dialog must support Microsoft recurrence conversion and preserve Outlook-specific weekly and relative recurrence metadata while submitting the correct timezone.'
+);
+
+assertVisualization(
+    str_contains($moduleSource, 'RegisterPropertyBoolean(\'ShowAnniversaryType\', true)')
+        && str_contains($moduleSource, 'RegisterPropertyBoolean(\'ShowListAnniversaryType\', true)')
+        && str_contains($moduleSource, '\'showAnniversaryType\'       => ')
+        && str_contains($moduleSource, '\'showListAnniversaryType\'   => ')
+        && str_contains($moduleSource, '\'Occasion\',')
+        && str_contains($moduleSource, '\'Birthday\',')
+        && str_contains($moduleSource, '\'Anniversary\',')
+        && str_contains($moduleSource, '\'Wedding anniversary\',')
+        && str_contains($moduleSource, '\'Death anniversary\',')
+        && str_contains($formSource, '"name": "ShowAnniversaryType"')
+        && str_contains($formSource, '"caption": "Show annual event occasion"')
+        && str_contains($formSource, '"name": "ShowListAnniversaryType"')
+        && str_contains($formSource, '"caption": "Occasion"')
+        && str_contains($localeSource, '"Show annual event occasion": "Anlass bei Jahresereignissen anzeigen"')
+        && str_contains($localeSource, '"Occasion": "Anlass"'),
+    'Calendar View must expose central and list-specific annual-event occasion display settings.'
+);
+
+assertVisualization(
+    str_contains($script, 'function annualEventLabel(event)')
+        && str_contains($script, 'birthday: t(\'Birthday\')')
+        && str_contains($script, 'anniversary: t(\'Anniversary\')')
+        && str_contains($script, 'wedding: t(\'Wedding anniversary\')')
+        && str_contains($script, 'death: t(\'Death anniversary\')')
+        && str_contains($script, 'calendarState.settings.showAnniversaryType !== false')
+        && str_contains($script, 'metaParts.push(annualEventLabel(event));')
+        && str_contains($script, 'key: \'occasion\'')
+        && str_contains($script, 'label: \'Occasion\'')
+        && str_contains($script, 'calendarState.settings.showListAnniversaryType !== false')
+        && str_contains($script, '+ (occasion ? \' · \' + occasion : \'\');'),
+    'Annual-event occasions must be visible across normal views and available as an independent list column.'
+);
+
+assertVisualization(
+    str_contains($indexSource, 'id="event-anniversary-type"')
+        && str_contains($indexSource, '<option value="birthday"')
+        && str_contains($indexSource, '<option value="anniversary"')
+        && str_contains($indexSource, '<option value="wedding"')
+        && str_contains($indexSource, '<option value="death"')
+        && str_contains($indexSource, 'id="event-anniversary-date"')
+        && str_contains($script, 'function anniversaryEditorEditable()')
+        && str_contains($script, 'function anniversaryRecurrence()')
+        && str_contains($script, 'function suggestedAnniversaryDate()')
+        && str_contains($script, 'function anniversaryEditorChange()')
+        && str_contains($script, 'eventData.anniversaryType = anniversaryChange.enabled ? anniversaryChange.type : \'\';')
+        && str_contains($script, 'eventData.anniversaryDate = anniversaryChange.enabled ? anniversaryChange.date : \'\';')
+        && str_contains($script, 'eventData.recurrence = anniversaryRecurrence();')
+        && str_contains($script, 'function eventDisplaySummary(event)')
+        && str_contains($script, 'eventDisplaySummary(event) || t(\'Untitled event\')'),
+    'The shared event dialog must support provider-neutral birthdays, anniversaries, wedding anniversaries, and death anniversaries with a suggested source date.'
+);
+
+assertVisualization(
+    str_contains($indexSource, 'id="event-reminder-mode"')
+        && str_contains($indexSource, 'id="event-reminder-value"')
+        && str_contains($indexSource, 'id="event-reminder-unit"')
+        && str_contains($indexSource, 'id="event-reminder-extra-list"')
+        && str_contains($indexSource, 'id="event-reminder-add-button"')
+        && str_contains($indexSource, 'id="details-reminder-row"')
+        && str_contains($script, 'function eventReminderState(event)')
+        && str_contains($script, 'function calendarDefaultReminderState(calendar)')
+        && str_contains($script, 'function maxReminderCount(calendar = selectedCalendarEntry())')
+        && str_contains($script, 'function appendReminderEditorEntry(')
+        && str_contains($script, "mode: 'multiple'")
+        && str_contains($script, 'reminders: minutes.map(')
+        && str_contains($script, "t('Remove reminder')")
+        && str_contains($script, 'function resolveDefaultReminderForCalendarMove()')
+        && str_contains($script, 'calendar?.canUseDefaultReminder || calendar?.canCreateWithDefaultReminder')
+        && str_contains($script, "? { mode: 'default' }")
+        && str_contains($script, 'eventData.reminder = reminder;')
+        && str_contains($script, 'reminder: selectedEvent.reminder || null')
+        && str_contains($script, "calendarDefaultReminderState(sourceCalendar).mode === 'complex'")
+        && str_contains($script, "setOptionalDetail('reminder', reminderDetailText(event));"),
+    'The shared event dialog must edit one or multiple provider-neutral reminders, respect calendar limits, resolve defaults during moves, and protect complex reminder settings.'
 );
 
 assertVisualization(
     str_contains($script, "const action = moving ? 'MoveEvent' : (selectedEvent ? 'UpdateEvent' : 'CreateEvent');")
         && str_contains($script, 'targetCalendarInstanceId: calendarInstanceId')
         && str_contains($script, "document.getElementById('save-button').textContent = t(moving ? 'Move' : 'Save');")
-        && str_contains($script, 'calendarState.calendars.filter(calendar => calendar.canWrite || calendar.instanceId === event.calendarInstanceId)'),
-    'Editable events must allow selecting another writable calendar and submit a dedicated move action.'
+        && str_contains($script, 'function eventCanMove(event, writeScope = \'\')')
+        && str_contains($script, 'const recurringTargetRequired = editingSeries || editingFollowing;')
+        && str_contains($script, '(!recurringTargetRequired || calendar.canCreateRecurrence)')
+        && str_contains($script, '...recurrencePayload(selectedEvent)'),
+    'Editable single events and supported recurring scopes must allow selecting a compatible writable target calendar and submit complete move identity data.'
 );
 
 assertVisualization(
@@ -135,15 +275,80 @@ assertVisualization(
 );
 
 assertVisualization(
-    str_contains($indexSource, 'id="event-details-dialog" class="oc-dialog oc-dialog-medium event-details-dialog"')
+    str_contains($script, 'function bindDayOverview(target, day, events)')
+        && str_contains($script, 'target.classList.add(\'day-overview-enabled\');')
+        && str_contains($script, 'clickEvent.target.closest?.(\'button, a, input, select, textarea, label, .week-event\')')
+        && substr_count($script, 'bindDayOverview(column, day, events);') >= 2
+        && str_contains($script, 'bindDayOverview(heading, entry.day, entry.events);')
+        && str_contains($script, 'bindDayOverview(allDayCell, entry.day, entry.events);')
+        && str_contains($script, 'bindDayOverview(canvas, entry.day, entry.events);')
+        && str_contains($style, '.week-column.day-overview-enabled,')
+        && str_contains($style, '.multi-day-timeline-canvas.day-overview-enabled { cursor: pointer; }'),
+    'Days, full-week and work-week views must open the existing day-events modal from a selected day without intercepting event controls.'
+);
+
+assertVisualization(
+    str_contains($script, "heading.classList.add('agenda-date-overview-enabled');")
+        && str_contains($script, 'heading.tabIndex = 0;')
+        && str_contains($script, "heading.setAttribute('role', 'button');")
+        && str_contains($script, 'heading.setAttribute(\'aria-label\', `${formatDayEventsTitle(group.date)} · ${t(\'Day events\')}`);')
+        && str_contains($script, 'const dayEvents = events.filter(event => eventOverlaps(event, group.date, dayEnd));')
+        && str_contains($script, "heading.addEventListener('click', () => openDayEvents(group.date, dayEvents));")
+        && str_contains($script, "if (!['Enter', ' '].includes(key.key)) return;")
+        && str_contains($script, 'openDayEvents(group.date, dayEvents);'),
+    'Agenda day headings must open the shared day-events modal by pointer and keyboard with all events overlapping that day.'
+);
+
+assertVisualization(
+    str_contains($script, 'const swipeNavigationViews = new Set([\'threeDays\', \'week\', \'workWeek\', \'month\']);')
+        && str_contains($script, 'const swipeMinimumDistance = 60;')
+        && str_contains($script, 'const swipeAxisRatio = 1.3;')
+        && str_contains($script, 'function calendarViewRequiresHorizontalPan()')
+        && str_contains($script, 'content.scrollWidth > content.clientWidth + 1')
+        && str_contains($script, 'function updateSwipeNavigationMode()')
+        && str_contains($script, "content.style.touchAction = 'auto';")
+        && str_contains($script, "? 'pan-x pan-y'")
+        && str_contains($script, ": 'pan-y';")
+        && str_contains($script, 'updateSwipeNavigationMode();')
+        && str_contains($script, 'content.addEventListener(\'pointerdown\', beginSwipeNavigation);')
+        && str_contains($script, 'content.addEventListener(\'pointerup\', finishSwipeNavigation);')
+        && str_contains($script, 'content.addEventListener(\'pointercancel\', cancelSwipeNavigation);')
+        && str_contains($script, 'calendarViewRequiresHorizontalPan()')
+        && str_contains($script, '![\'touch\', \'pen\'].includes(event.pointerType)')
+        && str_contains($script, 'calendarDialogIsOpen()')
+        && str_contains($script, 'swipeNavigationTargetIsInteractive(event.target)')
+        && str_contains($script, 'Math.abs(deltaX) < swipeMinimumDistance')
+        && str_contains($script, 'Math.abs(deltaX) < Math.abs(deltaY) * swipeAxisRatio')
+        && str_contains($script, 'suppressSwipeClickUntil = Date.now() + 500;')
+        && str_contains($script, 'navigate(deltaX < 0 ? 1 : -1);')
+        && str_contains($script, 'target.closest(\'button, a, input, select, textarea, label, .week-event, [role="button"], [contenteditable="true"]\')'),
+    'Days, week and month views must preserve native horizontal panning on narrow displays and use guarded touch/pen swipe navigation only when the visible layout fits.'
+);
+
+assertVisualization(
+    str_contains($indexSource, 'id="event-details-dialog" class="oc-dialog oc-dialog-extra-large event-details-dialog"')
         && str_contains($script, 'function openEventDetails(event)')
         && str_contains($script, 'card.addEventListener(\'click\', () => openEventDetails(event));')
         && str_contains($script, 'document.getElementById(\'details-edit-button\').addEventListener(\'click\'')
-        && str_contains($script, 'eventDetailsDialog.close();')
-        && str_contains($script, 'openExistingEvent(event);')
-        && str_contains($script, 'document.getElementById(\'dialog-title\').textContent = t(\'Edit event\');')
+        && str_contains($script, 'requestEdit(eventDetailsDialog)')
+        && str_contains($script, 'void prepareEventEdit(event);')
+        && str_contains($script, "t(editingSeries ? 'Edit recurring event' : 'Edit event')")
         && str_contains($script, 'const displayEnd = end > start ? addDays(end, -1) : start;')
-        && str_contains($script, 'if (event.recurring || event.recurrenceId) return \'Recurring occurrences are currently read-only.\';'),
+        && str_contains($script, 'function eventCanUpdate(event)')
+        && str_contains($script, 'Boolean(event.canUpdateOccurrence)')
+        && str_contains($script, 'function eventCanUpdateFollowing(event)')
+        && str_contains($script, 'function eventIsRecurring(event)')
+        && str_contains($script, "['master', 'occurrence', 'exception', 'unknown'].includes(recurrenceType)")
+        && str_contains($script, 'function eventWriteCapability(event, capability)')
+        && str_contains($script, "eventWriteCapability(event, 'canUpdateFollowing')")
+        && str_contains($script, "eventWriteCapability(event, 'canUpdateSeries')")
+        && str_contains($script, 'function eventCanDeleteFollowing(event)')
+        && str_contains($script, 'function eventCanDelete(event)')
+        && str_contains($script, 'Boolean(event.canDeleteOccurrence)')
+        && str_contains($script, 'eventCanDeleteFollowing(event)')
+        && str_contains($script, '...recurrencePayload(selectedEvent)')
+        && str_contains($script, "t('Only this occurrence of the recurring event will be changed.')")
+        && str_contains($script, "'Open in provider': 'Extern öffnen'"),
     'Event clicks must open a read-first details modal and route editable events to the existing editor only on request.'
 );
 
@@ -204,12 +409,171 @@ assertVisualization(
 $formSource = (string) file_get_contents(__DIR__ . '/../Kalender Ansicht/form.json');
 $moduleSource = (string) file_get_contents(__DIR__ . '/../Kalender Ansicht/module.php');
 assertVisualization(
+    str_contains($moduleSource, '\'Events with complex reminder settings cannot be moved safely.\'')
+        && str_contains($moduleSource, '($sourceReminder[\'mode\'] ?? \'\') === \'complex\'')
+        && str_contains($moduleSource, '($sourceReminder[\'editable\'] ?? true) === false')
+        && str_contains($moduleSource, 'CalendarEventReminder::MODE_DEFAULT')
+        && str_contains($moduleSource, '$event[\'reminder\'] = $this->defaultReminderForMove($sourceInstanceId);')
+        && str_contains($moduleSource, '$this->assertReminderSupportedByCalendar($targetInstanceId, $event[\'reminder\']);')
+        && str_contains($moduleSource, 'private function assertReminderSupportedByCalendar(')
+        && str_contains($moduleSource, 'private function defaultReminderForMove(int $instanceId): array'),
+    'The visualization backend must preserve supported multiple reminders during moves, resolve Google calendar defaults, and reject reminder settings the target cannot represent.'
+);
+$calendarModuleSource = (string) file_get_contents(__DIR__ . '/../Kalender/module.php');
+
+assertVisualization(
+    str_contains($calendarModuleSource, 'DetectedCanUseDefaultReminder')
+        && str_contains($calendarModuleSource, 'DetectedCanCreateWithDefaultReminder')
+        && str_contains($calendarModuleSource, 'DetectedDefaultReminder')
+        && str_contains($calendarModuleSource, 'DetectedMaxReminders')
+        && str_contains($calendarModuleSource, '\'maxReminders\'')
+        && str_contains($calendarModuleSource, '\'canUseDefaultReminder\'')
+        && str_contains($calendarModuleSource, '\'canCreateWithDefaultReminder\'')
+        && str_contains($calendarModuleSource, '\'defaultReminder\''),
+    'Calendar instances must expose provider reminder-default capabilities, reminder-count limits and the resolved calendar default to visualizations.'
+);
+
+assertVisualization(
+    substr_count($moduleSource, "if ((\$event['recurrenceType'] ?? '') === 'occurrence'") === 2
+        && substr_count($moduleSource, "\$event['originalStart'] = trim((string) (\$event['start'] ?? ''));") === 2
+        && substr_count($moduleSource, "\$recurringOccurrence = (bool) (\$event['recurring'] ?? false)") === 2
+        && substr_count($moduleSource, "trim((string) (\$event['occurrenceId'] ?? '')) !== ''") >= 2
+        && substr_count($moduleSource, "trim((string) (\$event['seriesId'] ?? '')) !== ''") >= 2,
+    'Cached Microsoft occurrences must recover their original start and recurrence capabilities without manual cache deletion.'
+);
+
+assertVisualization(
+    str_contains($script, 'let pendingEventEdit = null;')
+        && str_contains($script, 'async function prepareEventEdit(event)')
+        && str_contains($script, "sendAction('PrepareEventEdit', request)")
+        && str_contains($script, "openExistingEvent(eventEdit, 'occurrence')")
+        && !str_contains($script, "openExistingEvent(event, 'occurrence')")
+        && str_contains($moduleSource, "case 'PrepareEventEdit':")
+        && str_contains($moduleSource, 'IPSKAL_GetEventForEdit(')
+        && str_contains($moduleSource, '$state[\'eventEdit\'] = $eventEdit;')
+        && str_contains($calendarModuleSource, 'public function GetEventForEdit(string $EventJSON): string')
+        && str_contains($calendarModuleSource, '$this->sendRequest(\'GetEventForEdit\', ['),
+    'Opening a normal or single-occurrence editor must refresh the event identity and ETag from the provider before editing is enabled.'
+);
+
+assertVisualization(
+    str_contains($script, "let eventDialogLoadingMode = '';")
+        && str_contains($script, "function openPendingEventEditor(event, writeScope = '')")
+        && str_contains($script, "setEventDialogLoading('provider');")
+        && str_contains($script, "openPendingEventEditor(event, 'occurrence');")
+        && str_contains($script, 'openPendingEventEditor(event, scope);')
+        && str_contains($script, 'const containsPendingEditPayload = containsPendingEventEditPayload || containsPendingSeriesEditPayload;')
+        && str_contains($script, 'pendingEventEditMatches(message.payload.eventEdit)')
+        && str_contains($script, "String(message.payload.seriesEdit.seriesId || '') === pendingSeriesEdit.seriesId")
+        && str_contains($script, 'shouldDeferCalendarState() && !containsPendingEditPayload')
+        && str_contains($script, "setEventDialogLoading('create');")
+        && str_contains($script, 'deferEventDialogSetup(() => {')
+        && str_contains($script, 'if (!eventDialog.open) eventDialog.showModal();')
+        && str_contains($script, "eventDialog.toggleAttribute('aria-busy', loading);"),
+    'Create and edit dialogs must become visible immediately while advanced or provider-backed editor setup completes safely.'
+);
+
+assertVisualization(
+    str_contains($script, 'if (preferredDay instanceof Date && !Number.isNaN(preferredDay.getTime()))')
+        && str_contains($script, 'if (dayKey(start) === dayKey(today))')
+        && str_contains($script, 'start.setHours(start.getHours() + 1);')
+        && str_contains($script, 'start.setHours(9, 0, 0, 0);')
+        && str_contains($script, 'const end = new Date(start.getTime() + 60 * 60 * 1000);')
+        && str_contains($script, 'start.setSeconds(0, 0);')
+        && !str_contains($script, 'start.setHours(23, 0, 0, 0);'),
+    'Creating from a day overview must keep the selected day, use a practical default time and never force an already-past 23:00 start.'
+);
+
+assertVisualization(
+    str_contains($indexSource, 'id="edit-scope-dialog"')
+        && str_contains($indexSource, 'name="edit-scope" value="occurrence"')
+        && str_contains($indexSource, 'name="edit-scope" value="following"')
+        && str_contains($indexSource, 'name="edit-scope" value="series"')
+        && str_contains($script, 'function requestEdit(sourceDialog)')
+        && str_contains($script, 'function confirmEditScope()')
+        && str_contains($script, 'function eventCanUpdateFollowing(event)')
+        && str_contains($script, "resourceUrl: String(event.resourceUrl || '')")
+        && str_contains($script, "sendAction('PrepareSeriesEdit', pendingSeriesEdit)")
+        && str_contains($script, 'if (!eventIsRecurring(event) || (!followingAllowed && !seriesAllowed))')
+        && str_contains($script, "eventWriteCapability(event, 'canUpdateOccurrence')")
+        && str_contains($script, "eventWriteCapability(event, 'canUpdateFollowing')")
+        && str_contains($script, "eventWriteCapability(event, 'canUpdateSeries')")
+        && str_contains($script, "const writeScope = pendingSeriesEdit.writeScope === 'following' ? 'following' : 'series';")
+        && str_contains($script, 'openExistingEvent(seriesEdit, writeScope)')
+        && str_contains($script, 'function loadRecurrenceEditor(event)')
+        && str_contains($script, "selectedEvent?.writeScope === 'following'")
+        && str_contains($script, "selectedEvent?.writeScope === 'series'")
+        && str_contains($script, 'Boolean(event.canUpdateFollowing)')
+        && str_contains($script, 'Boolean(event.canUpdateSeries)')
+        && str_contains($script, 'writeScope: scope')
+        && str_contains($moduleSource, "case 'PrepareSeriesEdit':")
+        && str_contains($moduleSource, 'IPSKAL_GetRecurringFollowing($instanceId, $seriesId, $occurrenceId, $originalStart, $resourceUrl)')
+        && str_contains($moduleSource, 'IPSKAL_GetRecurringSeries($instanceId, $seriesId, $resourceUrl)')
+        && str_contains($calendarModuleSource, "public function GetRecurringSeries(string \$SeriesID, string \$ResourceURL = ''): string")
+        && str_contains($calendarModuleSource, 'public function GetRecurringFollowing(')
+        && str_contains($calendarModuleSource, "string \$ResourceURL = ''")
+        && str_contains($calendarModuleSource, "'ResourceURL' => trim(\$ResourceURL)")
+        && str_contains($calendarModuleSource, "'ResourceURL'   => trim(\$ResourceURL)")
+        && str_contains($moduleSource, '$seriesEdit[\'canWrite\'] = true;')
+        && str_contains($moduleSource, '$seriesEdit[\'writeScope\'] = $writeScope;')
+        && str_contains($moduleSource, "'Changes will apply to this and all following occurrences.'")
+        && str_contains($moduleSource, "'Changes will apply to the entire recurring series.'"),
+    'Recurring Google, Microsoft and CalDAV events must offer supported write scopes with verified provider data.'
+);
+$seriesWriteScopePosition = strpos(
+    $calendarModuleSource,
+    'if ($writeScope === CalendarEventRecurrence::WRITE_SCOPE_SERIES) {'
+);
+$cachedWriteLookupPosition = strpos(
+    $calendarModuleSource,
+    'foreach ($this->readEvents() as $cachedEvent) {'
+);
+assertVisualization(
+    $seriesWriteScopePosition !== false
+        && $cachedWriteLookupPosition !== false
+        && $seriesWriteScopePosition < $cachedWriteLookupPosition
+        && str_contains($calendarModuleSource, "'ResourceURL' => \$resourceUrl")
+        && str_contains(
+            $calendarModuleSource,
+            'return CalendarEventRecurrence::fromEvent($verifiedIdentity);'
+        )
+        && !str_contains(
+            $calendarModuleSource,
+            "\$verifiedSeries = \$this->sendRequest('GetRecurringSeries', ['SeriesID' => \$seriesId]);"
+        ),
+    'Whole-series writes must verify the recurring master before cached occurrences and reuse the known provider resource.'
+);
+
+assertVisualization(
+    str_contains($indexSource, 'id="delete-scope-following-option"')
+        && str_contains($indexSource, 'name="delete-scope" value="following"')
+        && str_contains($script, 'function eventCanDeleteFollowing(event)')
+        && str_contains($script, 'Boolean(event.canUpdateFollowing)')
+        && str_contains($script, 'Boolean(event.canDeleteSeries)')
+        && str_contains($script, 'const followingAllowed = eventCanDeleteFollowing(event);')
+        && str_contains($script, "return ['following', 'series'].includes(selected?.value) ? selected.value : 'occurrence';"),
+    'Recurring Google, Microsoft and CalDAV events must offer deleting the selected occurrence and all following occurrences when splitting is supported.'
+);
+assertVisualization(
     str_contains($moduleSource, 'private function getFullUpdateMessage(?array $state = null, ?array $toast = null): string')
         && str_contains($moduleSource, '$message[\'toast\'] = $toast;')
         && str_contains($moduleSource, '$this->UpdateVisualizationValue($this->getFullUpdateMessage(')
         && str_contains($moduleSource, "'level'   => \$result['level']")
         && str_contains($moduleSource, "'message' => \$result['message']"),
     'Native visualization actions must send refreshed state and toast together so the tile cannot remain stale after an action.'
+);
+assertVisualization(
+    !str_contains($script, 'function daysBetween('),
+    'Visualization code must not retain the unused daysBetween helper.'
+);
+assertVisualization(
+    !str_contains($formSource, '"name": "TileWeekOrientation"')
+        && !str_contains($formSource, '"name": "IPSViewWeekOrientation"')
+        && str_contains($moduleSource, "RegisterPropertyInteger('TileWeekOrientation', 0)")
+        && str_contains($moduleSource, "RegisterPropertyInteger('IPSViewWeekOrientation', 0)")
+        && !str_contains($moduleSource, "'tileWeekOrientation'")
+        && !str_contains($moduleSource, "'ipsViewWeekOrientation'"),
+    'Obsolete week-orientation controls must stay hidden and out of runtime state while their legacy properties remain registered for configuration compatibility.'
 );
 assertVisualization(
     str_contains($formSource, '"name": "TileFontScale"')
@@ -323,7 +687,8 @@ assertVisualization(
         && str_contains($script, "activeView !== 'list' || calendarState.settings.showListControls !== false")
         && str_contains($script, "document.getElementById('previous-button').parentElement.classList.toggle('hidden', !showControls)")
         && str_contains($script, "document.getElementById('refresh-button').classList.toggle('hidden', !showControls)")
-        && str_contains($script, 'actionBridgeAvailable && listControlsVisible()'),
+        && str_contains($script, 'const showAddButton = actionBridgeAvailable')
+        && str_contains($script, '&& listControlsVisible()'),
     'The list-view controls setting must hide navigation, event creation and refresh while preserving the period and view selector.'
 );
 foreach ([
@@ -346,7 +711,7 @@ assertVisualization(
         && str_contains($script, "viewPeriod('agenda')")
         && str_contains($script, "viewPeriod('list')")
         && str_contains($script, "viewPeriod('threeDays')")
-        && str_contains($script, "viewPeriod('week')")
+        && str_contains($script, "viewPeriod(workWeek ? 'workWeek' : 'week')")
         && str_contains($script, "viewPeriod('month')")
         && str_contains($script, 'function viewPeriod(view)'),
     'View periods must use a collapsible section and every visualization view must use its independently configured display period.'
@@ -359,11 +724,27 @@ assertVisualization(
         && str_contains($script, 'window.localStorage.setItem(calendarViewStateStorageKey, value)')
         && str_contains($script, 'function readWindowNameViewState()')
         && str_contains($script, 'function writeWindowNameViewState(value)')
-        && str_contains($script, 'cursorDate: formatStoredViewDate(cursorDate)')
+        && !str_contains($script, 'cursorDate: formatStoredViewDate(cursorDate)')
+        && !str_contains($script, 'parseStoredViewDate(storedState.cursorDate)')
+        && str_contains($script, 'cursorDate = startOfDay(new Date());')
         && str_contains($script, 'visibleCalendarIds: visibleCalendarIds instanceof Set')
         && str_contains($script, 'Array.isArray(storedState.visibleCalendarIds)')
         && str_contains($script, 'persistClientViewState();'),
-    'The selected view, cursor date and temporary calendar filter must persist per visualization instance on the client across page reloads.'
+    'The selected view and temporary calendar filter must persist per visualization instance, while every page reload starts on today.'
+);
+
+assertVisualization(
+    str_contains($moduleSource, "'pastDays'                  => max(0, min(1095, \$this->ReadPropertyInteger('PastDays')))")
+        && str_contains($moduleSource, "'futureDays'                => max(1, min(1095, \$this->ReadPropertyInteger('FutureDays')))")
+        && str_contains($script, 'function configuredCursorDateBounds()')
+        && str_contains($script, 'function clampCursorDate(date)')
+        && str_contains($script, 'function clampCurrentCursorDate()')
+        && str_contains($script, 'minimum: addDays(today, -pastDays)')
+        && str_contains($script, 'maximum: addDays(today, futureDays)')
+        && str_contains($script, 'if (clampCurrentCursorDate()) {')
+        && str_contains($script, 'cursorDate = clampCursorDate(startOfDay(new Date()));')
+        && substr_count($script, 'clampCurrentCursorDate();') >= 2,
+    'Current and manually navigated cursor dates must stay inside the configured past/future visualization window.'
 );
 
 assertVisualization(
@@ -381,38 +762,50 @@ assertVisualization(
 assertVisualization(
     str_contains($indexSource, 'id="event-dialog" class="oc-dialog oc-dialog-large"')
         && str_contains($indexSource, 'id="event-form" class="dialog-layout"')
-        && str_contains($indexSource, 'id="event-details-dialog" class="oc-dialog oc-dialog-medium event-details-dialog"')
+        && str_contains($indexSource, 'id="event-details-dialog" class="oc-dialog oc-dialog-extra-large event-details-dialog"')
+        && str_contains($indexSource, 'id="edit-scope-dialog" class="oc-dialog oc-dialog-small edit-scope-dialog"')
         && str_contains($indexSource, 'id="delete-confirm-dialog" class="oc-dialog oc-dialog-small delete-confirm-dialog"')
         && str_contains($indexSource, 'id="day-events-dialog" class="oc-dialog oc-dialog-large day-events-dialog"')
         && str_contains($indexSource, 'id="view-selector-dialog" class="oc-dialog oc-dialog-small view-selector-dialog"')
         && str_contains($indexSource, 'id="calendar-filter-dialog" class="oc-dialog oc-dialog-medium calendar-filter-dialog"')
-        && substr_count($indexSource, 'class="icon-button dialog-close-button"') === 6
-        && substr_count($indexSource, 'class="dialog-actions-end"') === 6,
+        && substr_count($indexSource, 'class="icon-button dialog-close-button"') === 7
+        && substr_count($indexSource, 'class="dialog-actions-end"') === 7,
     'All calendar dialogs must use the shared OpenCalendar modal structure and action layout.'
 );
 
 assertVisualization(
     str_contains($indexSource, 'id="view-selector-button"')
         && str_contains($indexSource, 'id="view-selector-options"')
-        && substr_count($indexSource, 'class="view-selector-option"') === 5
-        && substr_count($indexSource, 'class="view-selector-option-period"') === 5
+        && substr_count($indexSource, 'class="view-selector-option"') === 6
+        && substr_count($indexSource, 'class="view-selector-option-period"') === 6
         && str_contains($indexSource, 'data-view="threeDays"')
         && str_contains($indexSource, '<span class="view-selector-option-label">Days</span>')
+        && str_contains($indexSource, '<span class="view-selector-option-label">Full week</span>')
+        && str_contains($indexSource, 'data-view="workWeek"')
+        && str_contains($indexSource, '<span class="view-selector-option-label">Work week</span>')
         && str_contains($script, "threeDays: 'Days'")
+        && str_contains($script, "week: 'Full week'")
+        && str_contains($script, "workWeek: 'Work week'")
         && str_contains($script, 'function formatViewPeriod(view)')
         && str_contains($script, "agenda: ['Day', 'Days']")
         && str_contains($script, "week: ['Week', 'Weeks']")
+        && str_contains($script, "workWeek: ['Week', 'Weeks']")
         && str_contains($script, "month: ['Month', 'Months']")
         && str_contains($script, "button.querySelector('.view-selector-option-period')")
         && !str_contains($formSource, '"caption": "3 Days"')
         && substr_count($formSource, '"caption": "Days"') >= 3
         && str_contains($moduleSource, "'Weeks'")
+        && str_contains($moduleSource, "'Full week'")
+        && str_contains($moduleSource, "'Work week'")
+        && str_contains($moduleSource, "5       => 'workWeek'")
+        && str_contains($formSource, '"caption": "Full week"')
+        && str_contains($formSource, '"caption": "Work week"')
         && str_contains($moduleSource, "'Months'")
         && str_contains($script, 'function openViewSelector()')
         && str_contains($script, 'document.querySelectorAll(\'.view-selector-option\')')
         && str_contains($script, 'viewSelectorDialog.showModal()')
         && str_contains($script, 'viewSelectorDialog.close()'),
-    'The calendar view switcher must show all five views with their configured periods and use a generic days label for the configurable multi-day view.'
+    'The calendar view switcher must show all six views, including full-week and work-week variants, with their configured periods.'
 );
 
 assertVisualization(
@@ -424,6 +817,14 @@ assertVisualization(
         && str_contains($script, 'requestDelete(eventDialog)')
         && str_contains($script, 'requestDelete(eventDetailsDialog)')
         && str_contains($script, 'deleteConfirmButton.addEventListener(\'click\', confirmDeleteEvent)')
+        && str_contains($indexSource, 'id="delete-scope"')
+        && str_contains($indexSource, 'value="occurrence" checked')
+        && str_contains($indexSource, 'value="series"')
+        && str_contains($script, 'function updateDeleteScope(event)')
+        && str_contains($script, 'function selectedDeleteScope(event)')
+        && str_contains($script, 'Boolean(event.canDeleteSeries)')
+        && str_contains($indexSource, 'id="delete-scope-series-option"')
+        && str_contains($script, 'recurrencePayload(event, selectedDeleteScope(event))')
         && !str_contains($script, 'confirm(')
         && str_contains($moduleSource, '\'Delete event\'')
         && str_contains($moduleSource, '\'Do you really want to delete this event?\'')
@@ -457,6 +858,20 @@ assertVisualization(
 
 $style = (string) file_get_contents(__DIR__ . '/../Kalender Ansicht/visualization/style.css');
 assertVisualization(
+    !str_contains($style, '.delete-confirm-dialog { font-size:')
+        && !str_contains($style, 'html.ipsview-mode .delete-confirm-dialog { font-size:'),
+    'The delete confirmation dialog must use the shared OpenCalendar dialog typography instead of a dialog-specific font size.'
+);
+
+assertVisualization(
+    str_contains($style, '.form-row select option,')
+        && str_contains($style, 'background: var(--cal-dialog);')
+        && str_contains($style, '.form-row select option:checked')
+        && str_contains($style, 'background: #f2f2f2;')
+        && str_contains($style, 'color: #111111;'),
+    'Native select options in event dialogs must keep a high-contrast selected row even when the browser paints the popup selection itself.'
+);
+assertVisualization(
     str_contains($style, '--cal-view-background: var(--ipsview-role-view-background);')
         && str_contains($style, '--cal-page-background: var(--ipsview-role-page-background);')
         && str_contains($style, '--cal-text: var(--ipsview-role-text-primary);')
@@ -472,15 +887,28 @@ assertVisualization(
     str_contains($style, '--cal-dialog-small-width: 360px;')
         && str_contains($style, '--cal-dialog-medium-width: 440px;')
         && str_contains($style, '--cal-dialog-large-width: 560px;')
+        && str_contains($style, '--cal-dialog-extra-large-width: 640px;')
         && str_contains($style, '--cal-dialog-small-width: 420px;')
         && str_contains($style, '--cal-dialog-medium-width: 540px;')
         && str_contains($style, '--cal-dialog-large-width: 680px;')
+        && str_contains($style, '--cal-dialog-extra-large-width: 760px;')
+        && str_contains($style, '.oc-dialog-extra-large { --dialog-width: var(--cal-dialog-extra-large-width); }')
         && str_contains($style, '.oc-dialog[open] { display: flex; flex-direction: column; }')
         && str_contains($style, '.oc-dialog > .dialog-layout {')
         && str_contains($style, 'flex: 1 1 auto;')
         && str_contains($style, 'scrollbar-gutter: stable;')
         && str_contains($style, '.dialog-actions-start, .dialog-actions-end {')
+        && str_contains($style, '.event-details-dialog { --dialog-width: 720px; }')
+        && str_contains($style, 'html.ipsview-mode .event-details-dialog { --dialog-width: 840px; }')
+        && str_contains($style, '.event-details-dialog .dialog-actions { flex-wrap: wrap; }')
+        && str_contains($style, '.event-details-dialog .dialog-actions-start,')
+        && str_contains($style, '.event-details-dialog .dialog-actions-end { flex-wrap: wrap; }')
+        && str_contains($style, '.event-details-dialog .dialog-actions button { flex: 0 0 auto; white-space: nowrap; }')
         && str_contains($style, '.dialog-close-button {')
+        && str_contains($style, '.delete-scope,')
+        && str_contains($style, '.edit-scope { display: grid;')
+        && str_contains($style, '.delete-scope-option:hover,')
+        && str_contains($style, '.edit-scope-option:hover { background: var(--cal-surface-hover); }')
         && str_contains($style, '@media (max-width: 420px) {'),
     'All OpenCalendar modals must share responsive size classes, fixed header/footer layout and a scrollable content area.'
 );
@@ -498,12 +926,29 @@ assertVisualization(
         && str_contains($style, 'height: 100%;')
         && str_contains($style, '.month-section:only-child .calendar-grid {')
         && str_contains($style, 'grid-template-rows: auto repeat(6, minmax(0, 1fr));')
-        && str_contains($style, '.month-events { flex: 1 1 auto; min-height: 0; overflow: hidden; }'),
-    'A single-month view must distribute all six calendar week rows evenly across the available height while multi-month views retain a usable minimum row height.'
+        && str_contains($style, '.month-events { flex: 1 1 auto; min-height: 0; overflow: hidden; }')
+        && str_contains($script, 'function createMonthGrid(month, fillAvailableHeight)')
+        && str_contains($script, 'const last = new Date(month.getFullYear(), month.getMonth() + 1, 0);')
+        && str_contains($script, 'while (!showWeekends && isWeekend(firstVisible)) firstVisible = addDays(firstVisible, 1);')
+        && str_contains($script, 'while (!showWeekends && isWeekend(lastVisible)) lastVisible = addDays(lastVisible, -1);')
+        && str_contains($script, 'const gridEnd = addDays(startOfWeek(lastVisible), 7);')
+        && str_contains($script, 'const rowCount = Math.max(1, Math.ceil(visibleDays.length / columnCount));')
+        && str_contains($script, 'grid.style.gridTemplateRows = fillAvailableHeight')
+        && str_contains($script, "cell.classList.add('month-day-empty');")
+        && str_contains($script, "cell.setAttribute('aria-hidden', 'true');")
+        && str_contains($script, '&& (day.getDay() === 1 || day.getDate() === 1)')
+        && !str_contains($script, 'Array.from({ length: 42 }, (_, index) => addDays(gridStart, index))')
+        && !str_contains($script, 'showOutsideDetails')
+        && !str_contains($script, "cell.classList.add('outside');"),
+    'Month view must show only dates from the displayed month, preserve calendar-week labels, and size the grid to the occupied calendar weeks.'
 );
 assertVisualization(
     str_contains($style, '.list-table {')
         && str_contains($style, '.list-color-column {')
+        && str_contains($style, '.list-cell-date { min-width: 11em; max-width: 13em; }')
+        && str_contains($style, '.list-cell-start,')
+        && str_contains($style, '.list-cell-title { min-width: 12em; max-width: 24em; font-weight: 650; }')
+        && str_contains($style, '.list-cell-description { min-width: 14em; max-width: 32em; overflow: hidden; text-overflow: ellipsis; }')
         && str_contains($style, '.list-row:hover,')
         && str_contains($style, '.view-selector-options { display: grid;')
         && str_contains($style, '--cal-dialog-font-size: clamp(0.98rem, 0.94rem + 0.12vw, 1.04rem);')
@@ -534,9 +979,80 @@ assertVisualization(
 );
 
 assertVisualization(
-    str_contains($script, 'const showAddButton = actionBridgeAvailable && listControlsVisible() && activeView !== \'month\';')
+    str_contains($script, 'const showAddButton = actionBridgeAvailable')
+        && str_contains($script, '&& [\'agenda\', \'list\'].includes(activeView);')
         && str_contains($script, 'addButton.classList.toggle(\'visible\', showAddButton);'),
-    'The floating event creation button must stay available in non-month views and remain hidden in the month view.'
+    'The floating event creation button must remain limited to agenda and list views after direct day selection is available elsewhere.'
+);
+
+assertVisualization(
+    str_contains($script, 'renderWeekEventLayout(eventList, events, day, dayEnd);')
+        && str_contains($script, 'function renderWeekEventLayout(eventList, events, dayStart, dayEnd)')
+        && str_contains($script, 'function buildWeekEventOverlapGroups(entries)')
+        && str_contains($script, 'laneEnd <= entry.startTimestamp')
+        && str_contains($script, 'entry.startTimestamp >= groupEnd')
+        && str_contains($script, "element('div', 'week-event-overlap-group')")
+        && str_contains($style, '.week-event-overlap-group {')
+        && str_contains($style, 'grid-template-columns: repeat(var(--week-event-columns, 2), minmax(0, 1fr));')
+        && str_contains($style, '.week-grid.vertical-week-grid .week-event-overlap-group { grid-column: 1 / -1; margin: 0; }'),
+    'Timed collisions in the shared three-day/week renderer must use provider-independent side-by-side lanes in native and IPSView modes.'
+);
+
+assertVisualization(
+    str_contains($script, 'if (days.length === 1) {')
+        && str_contains($script, 'renderSingleDayTimeline(days[0]);')
+        && str_contains($script, 'function createSingleDayTimeline(dayStart, dayEnd, events)')
+        && str_contains($script, 'buildWeekEventOverlapGroups(entries).forEach(group => {')
+        && str_contains($script, 'item.style.top = `${Math.round(top)}px`;')
+        && str_contains($script, "item.style.setProperty('--single-day-lane', String(entry.lane || 0));")
+        && str_contains($style, '.single-day-timeline {')
+        && str_contains($style, '.single-day-timeline-event {')
+        && str_contains($style, 'left: calc((100% / var(--single-day-lanes, 1)) * var(--single-day-lane, 0) + 3px);'),
+    'A one-day Days view must place timed events proportionally by start time and offset overlaps like Outlook in native and IPSView modes.'
+);
+
+assertVisualization(
+    str_contains($script, 'function renderMultiDayTimeline(days, showDayOfYear, showEventCount)')
+        && str_contains($script, 'const allTimedEntries = dayData.flatMap')
+        && str_contains($script, 'const range = timelineMinuteRange(allTimedEntries);')
+        && str_contains($script, 'appendTimelineEvents(canvas, entry.dayStart, entry.timedEntries, range);')
+        && str_contains($script, 'function timelineMinuteRange(entries)')
+        && str_contains($style, '.multi-day-timeline-grid {')
+        && str_contains($style, '--calendar-time-column-width: 5em;')
+        && str_contains($style, '--calendar-time-column-width: 5.25em;')
+        && str_contains($style, 'grid-template-columns: var(--calendar-time-column-width) repeat(var(--multi-day-columns, 3), minmax(120px, 1fr));')
+        && str_contains($style, '.multi-day-timescale,')
+        && str_contains($style, '.multi-day-timeline-canvas { position: relative; }'),
+    'Multi-day day and week views must use one shared time scale so equal times align vertically and later starts are visibly offset in native and IPSView modes.'
+);
+
+assertVisualization(
+    str_contains($style, 'grid-template-columns: var(--agenda-color-bar-width) var(--calendar-time-column-width) minmax(0, 1fr);')
+        && str_contains($style, '.event-time { min-width: 0;')
+        && str_contains($style, 'grid-template-columns: var(--calendar-time-column-width) minmax(0, 1fr);')
+        && !str_contains($style, 'grid-template-columns: var(--agenda-color-bar-width) minmax(54px, 72px) 1fr;')
+        && !str_contains($style, 'grid-template-columns: var(--agenda-color-bar-width) 54px 1fr;'),
+    'Agenda and timeline time columns must scale with the configured font size so all-day labels and event content cannot overlap.'
+);
+
+assertVisualization(
+    str_contains($script, "const calendarViews = new Set(['agenda', 'list', 'threeDays', 'week', 'workWeek', 'month']);")
+        && str_contains($script, 'function weekViewDays(workWeek = false)')
+        && str_contains($script, 'return workWeek ? days.filter(day => !isWeekend(day)) : days;')
+        && str_contains($script, "renderWeek(activeView === 'workWeek');")
+        && str_contains($script, 'const columnsPerWeek = workWeek ? 5 : 7;')
+        && str_contains($script, "'week-grid' + (workWeek ? ' hide-weekends work-week-grid' : ''),")
+        && str_contains($script, 'grid.style.gridTemplateColumns = `repeat(${columnsPerWeek}, minmax(120px, 1fr))`;')
+        && str_contains($script, 'grid.style.minWidth = `${columnsPerWeek * 120}px`;')
+        && str_contains($script, "grid.style.rowGap = '12px';")
+        && !str_contains($script, 'function weekTimelineMinimumWidth(dayCount, ipsView)')
+        && !str_contains($script, 'configuredVertical')
+        && !str_contains($script, 'responsiveVertical')
+        && str_contains($script, 'calendarState.settings.showWeekDayOfYear !== false,')
+        && str_contains($script, 'calendarState.settings.showWeekEventCount !== false')
+        && str_contains($script, "else if (activeView === 'week' || activeView === 'workWeek') {")
+        && str_contains($script, 'render();'),
+    'Full-week and work-week views must keep each week on one fixed five- or seven-day grid row and stack additional weeks below it.'
 );
 
 assertVisualization(
@@ -548,6 +1064,62 @@ assertVisualization(
         && str_contains($style, 'width: 48px;')
         && str_contains($style, 'html.ipsview-mode .floating-add-label { display: inline; }'),
     'IPSView must expose a compact labelled creation button with a touch-sized control and a round narrow-screen fallback.'
+);
+
+assertVisualization(
+    str_contains($moduleSource, 'private const VISUALIZATION_BOOTSTRAP_FUTURE_DAYS = 42;')
+        && str_contains($moduleSource, 'private const VISUALIZATION_MAX_RANGE_DAYS = 370;')
+        && str_contains($moduleSource, 'private function buildState(?int $requestedRangeStart = null, ?int $requestedRangeEnd = null, int $eventOffset = 0): array')
+        && str_contains($moduleSource, "'eventRange'  => [")
+        && str_contains($moduleSource, "case 'LoadRange':")
+        && str_contains($moduleSource, "if (\$ident !== 'LoadRange') {")
+        && str_contains($moduleSource, '$state = $this->buildStateForActionValue($value);')
+        && str_contains($moduleSource, 'private function visualizationRangeFromActionValue(mixed $value): ?array')
+        && str_contains($moduleSource, 'private function visualizationEventOffsetFromActionValue(mixed $value): int'),
+    'Calendar View must build bounded visualization states and expose a dedicated visible-range action.'
+);
+assertVisualization(
+    str_contains($script, 'function visibleViewRange()')
+        && str_contains($script, 'function ensureVisibleRangeLoaded(force = false)')
+        && str_contains($script, 'async function requestVisibleRangePage(range, offset, force = false)')
+        && str_contains($script, "const success = await sendAction('LoadRange', {")
+        && str_contains($script, '_eventOffset: Math.max(0, Math.floor(Number(offset) || 0))')
+        && str_contains($script, "Object.prototype.hasOwnProperty.call(value, '_viewRange')")
+        && str_contains($script, 'eventRange: state.eventRange && typeof state.eventRange ===')
+        && str_contains($script, 'void ensureVisibleRangeLoaded();')
+        && str_contains($script, "message.type === 'invalidate'")
+        && str_contains($moduleSource, "['type' => 'invalidate']"),
+    'The visualization must request the exact visible range and refresh it without replacing the page with a full-horizon state.'
+);
+assertVisualization(
+    str_contains($moduleSource, '$totalEventCount = count($events);')
+        && str_contains($moduleSource, '$events = array_slice($events, $eventOffset, $maximumEvents);')
+        && str_contains($moduleSource, '$hasMore = $nextOffset < $totalEventCount;')
+        && str_contains($moduleSource, "'offset'     => \$eventOffset")
+        && str_contains($moduleSource, "'nextOffset' => \$hasMore ? \$nextOffset : null")
+        && str_contains($script, 'loadedRange?.hasMore === true')
+        && str_contains($script, 'mergeRangePageEvents(previousEvents, incomingEvents)'),
+    'The maximum-event setting must page large visible ranges instead of permanently truncating later events.'
+);
+assertVisualization(
+    str_contains($script, 'const visibleRangeRetryDelayMilliseconds = 300;')
+        && str_contains($script, 'function scheduleVisibleRangeRetry(force = false)')
+        && str_contains($script, "isNativeVisualization() && typeof requestAction !== 'function'")
+        && str_contains($script, 'scheduleVisibleRangeRetry(force);')
+        && str_contains($script, "document.addEventListener('visibilitychange', () => {")
+        && str_contains($script, 'void ensureVisibleRangeLoaded();'),
+    'The native tile must retry its initial visible-range request until the Symcon action bridge becomes available.'
+);
+
+assertVisualization(
+    str_contains($script, 'function calendarStateBelongsToThisClient(state, containsPendingEditPayload = false)')
+        && str_contains($script, 'if (!calendarStateBelongsToThisClient(message.payload, containsPendingEditPayload)) return;')
+        && str_contains($script, 'if (containsEditPayload) return false;')
+        && str_contains($script, "pendingRangeRequestSignature !== '' && incomingPageSignature === pendingRangeRequestSignature")
+        && str_contains($script, 'return calendarRangeCovers(incomingRange, visibleViewRange());')
+        && str_contains($script, 'function calendarRangeCovers(loadedRange, requestedRange)')
+        && str_contains($script, 'return loadedRange?.hasMore !== true && calendarRangeCovers(loadedRange, range);'),
+    'Native visualization clients must ignore state ranges and edit payloads that belong to another open browser or device.'
 );
 
 $renderer = new CalendarVisualizationRenderer();
@@ -584,8 +1156,8 @@ foreach ([$native, $ipsView] as $html) {
     assertVisualization(str_contains($html, '"showListControls":false'), 'The list controls setting must be serialized.');
     assertVisualization(str_contains($html, 'calendarVisualization.state'), 'The calendar script must consume the shared state contract.');
     assertVisualization(
-        str_contains($html, "calendarIPSViewRequest('GetState', null)"),
-        'IPSView must refresh the embedded calendar state from its authenticated action bridge on page load.'
+        str_contains($html, "calendarIPSViewRequest('LoadRange', actionValueWithViewRange({}))"),
+        'IPSView must refresh only the currently visible calendar range through its authenticated action bridge.'
     );
     assertVisualization(str_contains($html, 'id="add-button-label"'), 'The event creation control must expose a visible text label for touch users.');
 

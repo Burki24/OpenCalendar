@@ -47,6 +47,20 @@ werden.
    normale Apple-Account-Passwort.
 5. **Verbindung testen**, die Konfiguration übernehmen und synchronisieren.
 
+Beschreibbare iCloud-Kalender können neue tägliche, wöchentliche, monatliche und
+jährliche Terminserien mit Intervall, Wochentagen sowie den Endarten Nie, Anzahl
+oder Enddatum anlegen. Die Serie wird als RFC-5545-`RRULE` über CalDAV gespeichert.
+Zeitgebundene Serien enthalten einen passenden `VTIMEZONE`-Block. Einzelne
+Vorkommnisse bestehender Serien können außerdem bearbeitet oder gelöscht werden.
+Änderungen werden als `RECURRENCE-ID`-Ausnahme gespeichert; Löschungen ergänzen
+ein `EXDATE`, ohne das übrige Serienobjekt zu entfernen. Die vollständige Serie
+kann ebenfalls bearbeitet oder gelöscht werden. Für unterstützte RRULEs kann die
+Serie außerdem **ab einem ausgewählten Vorkommnis für alle folgenden Termine**
+bearbeitet oder gekürzt werden. Beim Bearbeiten wird zuerst ein neuer zukünftiger
+Serienteil angelegt und danach die ursprüngliche Ressource unmittelbar vor dem
+Trennpunkt beendet. Einfache RRULEs lassen sich dabei im gemeinsamen Serieneditor
+ändern; komplexere Regeln werden unverändert erhalten und nicht automatisch geteilt.
+
 ### Generisches CalDAV
 
 1. Als Anbieter **CalDAV** wählen.
@@ -61,6 +75,12 @@ werden.
 Falls die automatische Ermittlung mit einer allgemeinen Serveradresse nicht
 funktioniert, sollte die vom Anbieter ausdrücklich genannte CalDAV-Basisadresse
 verwendet werden.
+
+Beschreibbare CalDAV-Kalender unterstützen dieselbe Neuanlage und Bearbeitung von
+Terminserien wie iCloud. Zusätzlich können einzelne Vorkommnisse, vollständige
+Serien sowie bei unterstützten RRULEs **dieses und alle folgenden Vorkommnisse**
+bearbeitet oder gelöscht werden. Beim Teilen wird die vorhandene Ressource mit
+ETag geschützt; der neue zukünftige Serienteil erhält eine eigene UID und Ressource.
 
 ### Google Calendar
 
@@ -102,7 +122,14 @@ Konten wie Outlook.com.
 OpenCalendar verwendet delegierten Kalenderzugriff. Mail, Kontakte, OneDrive,
 Teams und andere Microsoft-Graph-Bereiche werden nicht angefordert. Microsofts
 `canEdit`-Angabe bestimmt, ob ein Kalender beschreibbar oder schreibgeschützt
-angelegt wird.
+angelegt wird. In beschreibbaren Microsoft-Kalendern können außerdem neue tägliche,
+wöchentliche, monatliche und jährliche Terminserien mit Intervall sowie den
+Endarten Nie, Anzahl oder Enddatum angelegt werden. Einzelne Vorkommnisse,
+**dieses und alle folgenden Vorkommnisse** sowie die vollständige Serie können
+außerdem bearbeitet und gelöscht werden. Für „dieses und folgende“ wird die
+bestehende Serie vor dem ausgewählten Vorkommnis beendet und beim Bearbeiten ab
+dort als neuer Serienteil fortgeführt. Nummerierte Serien übernehmen dabei die
+verbleibende Anzahl.
 
 Bei bestehenden Microsoft-Onlinebesprechungen wird die Beschreibung in der
 Kalenderansicht nicht zur Bearbeitung angeboten. Microsoft speichert darin

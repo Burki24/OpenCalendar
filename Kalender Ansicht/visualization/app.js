@@ -13,13 +13,30 @@ const calendarRuntime = calendarVisualization.runtime && typeof calendarVisualiz
     ? calendarVisualization.runtime
     : null;
 const calendarIPSViewConfig = calendarVisualization.mode === 'ipsview' ? calendarRuntime : null;
+const calendarIsAndroid = typeof navigator !== 'undefined'
+    && (/Android/i.test(navigator.userAgent || '')
+        || String(navigator.userAgentData?.platform || '').toLowerCase() === 'android');
+const calendarCanImportIcsFile = calendarVisualization.mode !== 'ipsview' || !calendarIsAndroid;
 const calendarAgendaColorBarWidth = Math.max(2, Math.min(16, Number(calendarOptions.agendaColorBarWidth) || 5));
 const calendarCompactColorBarWidth = Math.max(2, Math.min(16, Number(calendarOptions.compactColorBarWidth) || 3));
 const calendarViewStateStorageKey = Number(calendarOptions.instanceId) > 0
     ? `OpenCalendar.ViewState.${Number(calendarOptions.instanceId)}`
     : '';
-const calendarViews = new Set(['agenda', 'list', 'threeDays', 'week', 'month']);
-const calendarViewLabels = { agenda: 'Agenda', list: 'List', threeDays: 'Days', week: 'Week', month: 'Month' };
+const calendarViews = new Set(['agenda', 'list', 'threeDays', 'week', 'workWeek', 'month']);
+const calendarViewLabels = {
+    agenda: 'Agenda',
+    list: 'List',
+    threeDays: 'Days',
+    week: 'Full week',
+    workWeek: 'Work week',
+    month: 'Month'
+};
+const swipeNavigationViews = new Set(['threeDays', 'week', 'workWeek', 'month']);
+const swipeMinimumDistance = 60;
+const swipeAxisRatio = 1.3;
+const ipsViewStateRefreshIntervalMilliseconds = 15_000;
+const visibleRangeRetryDelayMilliseconds = 300;
+const visibleRangeRetryMaxAttempts = 40;
 document.documentElement.style.setProperty('--agenda-color-bar-width', `${calendarAgendaColorBarWidth}px`);
 document.documentElement.style.setProperty('--compact-color-bar-width', `${calendarCompactColorBarWidth}px`);
 
@@ -28,26 +45,79 @@ let activeView = 'agenda';
 let cursorDate = startOfDay(new Date());
 let initialized = false;
 let selectedEvent = null;
+let editScopeSourceDialog = null;
+let pendingEventEdit = null;
+let pendingSeriesEdit = null;
+let recurrencePatternContext = null;
+let eventDialogEditable = false;
+let reminderDefaultResolvedForMove = false;
 let deleteSourceDialog = null;
 let visibleCalendarIds = null;
 let pendingCalendarFilterIds = new Set();
 let toastTimer = null;
 let monthLayoutFrame = null;
 let selectedDayEventsDate = null;
+let swipeGesture = null;
+let suppressSwipeClickUntil = 0;
+let deferredCalendarState = null;
+let calendarStateSignature = '';
+let eventEditingActive = false;
+let eventEditingRevision = 0;
+let eventDialogLoadingMode = '';
+let ipsViewStateRequestPending = false;
+let ipsViewStateRefreshRequested = false;
+let ipsViewStateRefreshTimer = null;
+let pendingRangeRequestSignature = '';
+let visibleRangeRetryTimer = null;
+let visibleRangeRetryAttempts = 0;
+let visibleRangeRetryForce = false;
+let pendingCalendarInvalidation = false;
+let importedIcsTimezone = '';
+let preservedAgendaScrollPosition = null;
+let agendaScrollWorkflow = '';
+let releaseAgendaScrollPositionAfterState = false;
 const monthEventData = new WeakMap();
 
 const content = document.getElementById('calendar-content');
 const periodTitle = document.getElementById('period-title');
 const eventDialog = document.getElementById('event-dialog');
 const eventDetailsDialog = document.getElementById('event-details-dialog');
+const editScopeDialog = document.getElementById('edit-scope-dialog');
+const editScopeConfirmButton = document.getElementById('edit-scope-confirm');
 const deleteConfirmDialog = document.getElementById('delete-confirm-dialog');
 const deleteConfirmButton = document.getElementById('delete-confirm-button');
 const eventForm = document.getElementById('event-form');
+const icsImportButton = document.getElementById('ics-import-button');
+const icsImportButtonLabel = document.getElementById('ics-import-button-label');
+const icsImportFile = document.getElementById('ics-import-file');
 const eventCalendarInput = document.getElementById('event-calendar');
 const eventCalendarPicker = document.getElementById('event-calendar-picker');
 const eventCalendarTrigger = document.getElementById('event-calendar-trigger');
 const eventCalendarValue = document.getElementById('event-calendar-value');
 const eventCalendarOptions = document.getElementById('event-calendar-options');
+const eventAnniversaryType = document.getElementById('event-anniversary-type');
+const eventAnniversaryDateRow = document.getElementById('event-anniversary-date-row');
+const eventAnniversaryDate = document.getElementById('event-anniversary-date');
+const eventAnniversaryDateLabel = document.getElementById('event-anniversary-date-label');
+const eventRecurrenceRow = document.getElementById('event-recurrence-row');
+const eventRecurrenceFrequency = document.getElementById('event-recurrence-frequency');
+const eventRecurrenceOptions = document.getElementById('event-recurrence-options');
+const eventRecurrenceInterval = document.getElementById('event-recurrence-interval');
+const eventRecurrenceIntervalUnit = document.getElementById('event-recurrence-interval-unit');
+const eventRecurrenceWeekdays = document.getElementById('event-recurrence-weekdays');
+const eventRecurrenceEndMode = document.getElementById('event-recurrence-end-mode');
+const eventRecurrenceCountRow = document.getElementById('event-recurrence-count-row');
+const eventRecurrenceCount = document.getElementById('event-recurrence-count');
+const eventRecurrenceUntilRow = document.getElementById('event-recurrence-until-row');
+const eventRecurrenceUntil = document.getElementById('event-recurrence-until');
+const eventReminderRow = document.getElementById('event-reminder-row');
+const eventReminderMode = document.getElementById('event-reminder-mode');
+const eventReminderCustomRow = document.getElementById('event-reminder-custom-row');
+const eventReminderValue = document.getElementById('event-reminder-value');
+const eventReminderUnit = document.getElementById('event-reminder-unit');
+const eventReminderExtraList = document.getElementById('event-reminder-extra-list');
+const eventReminderAddRow = document.getElementById('event-reminder-add-row');
+const eventReminderAddButton = document.getElementById('event-reminder-add-button');
 const dayEventsDialog = document.getElementById('day-events-dialog');
 const viewSelectorDialog = document.getElementById('view-selector-dialog');
 const viewSelectorButton = document.getElementById('view-selector-button');
@@ -63,24 +133,116 @@ monthResizeObserver?.observe(content);
 
 applySymconColorScheme();
 
+function calendarStateContentSignature(state) {
+    if (!state || typeof state !== 'object') return '';
+    try {
+        return JSON.stringify({
+            events: Array.isArray(state.events) ? state.events : [],
+            calendars: Array.isArray(state.calendars) ? state.calendars : [],
+            eventRange: state.eventRange && typeof state.eventRange === 'object' ? state.eventRange : null,
+            settings: state.settings && typeof state.settings === 'object' ? state.settings : {}
+        });
+    } catch (error) {
+        return '';
+    }
+}
+
 function handleMessage(data) {
     let message = data;
     if (typeof message === 'string') {
         try { message = JSON.parse(message); } catch (error) { return; }
     }
     if (!message || typeof message !== 'object') return;
+    if (message.type === 'invalidate') {
+        pendingCalendarInvalidation = true;
+        if (!shouldDeferCalendarState()) {
+            pendingCalendarInvalidation = false;
+            void ensureVisibleRangeLoaded(true);
+        }
+        return;
+    }
     if (message.toast && typeof message.toast === 'object') {
+        if (message.toast.level === 'error') {
+            cancelPendingProviderEditor();
+            if (agendaScrollWorkflow) {
+                failAgendaScrollWorkflow();
+            }
+        }
         showToast(t(message.toast.message || ''), message.toast.level || 'success');
     }
     if (message.type === 'toast') {
+        if (message.level === 'error') {
+            cancelPendingProviderEditor();
+            if (agendaScrollWorkflow) {
+                failAgendaScrollWorkflow();
+            }
+        }
         showToast(t(message.message || ''), message.level || 'success');
         return;
     }
     if (message.type !== 'state' || !message.payload) return;
-    calendarState = message.payload;
-    calendarState.events = Array.isArray(calendarState.events) ? calendarState.events : [];
+    const containsEditPayload = Boolean(message.payload.eventEdit && typeof message.payload.eventEdit === 'object')
+        || Boolean(message.payload.seriesEdit && typeof message.payload.seriesEdit === 'object');
+    const containsPendingEventEditPayload = Boolean(
+        message.payload.eventEdit
+        && pendingEventEdit
+        && pendingEventEditMatches(message.payload.eventEdit)
+    );
+    const containsPendingSeriesEditPayload = Boolean(
+        message.payload.seriesEdit
+        && pendingSeriesEdit
+        && Number(message.payload.seriesEdit.calendarInstanceId) === pendingSeriesEdit.calendarInstanceId
+        && String(message.payload.seriesEdit.seriesId || '') === pendingSeriesEdit.seriesId
+    );
+    const containsPendingEditPayload = containsPendingEventEditPayload || containsPendingSeriesEditPayload;
+    if (!calendarStateBelongsToThisClient(message.payload, containsPendingEditPayload)) return;
+    const nextStateSignature = calendarStateContentSignature(message.payload);
+    if (!containsEditPayload && nextStateSignature !== '' && nextStateSignature === calendarStateSignature) return;
+    if (shouldDeferCalendarState() && !containsPendingEditPayload) {
+        deferredCalendarState = message.payload;
+        return;
+    }
+    applyCalendarState(message.payload);
+}
+
+function applyCalendarState(state) {
+    const agendaScrollPosition = agendaScrollWorkflow
+        ? preservedAgendaScrollPosition
+        : (initialized ? captureAgendaScrollPosition() : null);
+    const releasePreservedAgendaScrollPosition = Boolean(agendaScrollWorkflow)
+        && releaseAgendaScrollPositionAfterState;
+    const previousEvents = Array.isArray(calendarState.events) ? calendarState.events : [];
+    const previousRangeSignature = visualizationRangeSignature(calendarState.eventRange);
+    const incomingRange = state?.eventRange && typeof state.eventRange === 'object'
+        ? state.eventRange
+        : null;
+    const incomingRangeSignature = visualizationRangeSignature(incomingRange);
+    const incomingOffset = Math.max(0, Math.floor(Number(incomingRange?.offset) || 0));
+    const appendRangePage = incomingOffset > 0
+        && incomingRangeSignature !== ''
+        && incomingRangeSignature === previousRangeSignature;
+
+    calendarState = state;
+    const eventEdit = calendarState.eventEdit && typeof calendarState.eventEdit === 'object'
+        ? calendarState.eventEdit
+        : null;
+    const seriesEdit = calendarState.seriesEdit && typeof calendarState.seriesEdit === 'object'
+        ? calendarState.seriesEdit
+        : null;
+    delete calendarState.eventEdit;
+    delete calendarState.seriesEdit;
+    const incomingEvents = Array.isArray(calendarState.events) ? calendarState.events : [];
+    calendarState.events = appendRangePage
+        ? mergeRangePageEvents(previousEvents, incomingEvents)
+        : incomingEvents;
     calendarState.calendars = Array.isArray(calendarState.calendars) ? calendarState.calendars : [];
+    calendarState.eventRange = incomingRange;
     calendarState.settings = calendarState.settings || {};
+    const appliedRequestSignature = visualizationRangePageSignature(incomingRange, incomingOffset);
+    if (appliedRequestSignature !== '' && appliedRequestSignature === pendingRangeRequestSignature) {
+        pendingRangeRequestSignature = '';
+    }
+    calendarStateSignature = calendarStateContentSignature(calendarState);
     normalizeVisibleCalendarIds();
     applyTileFontScale();
     if (!initialized) {
@@ -88,9 +250,287 @@ function handleMessage(data) {
         applyStaticTranslations();
         initialized = true;
     }
+    if (clampCurrentCursorDate()) {
+        persistClientViewState();
+    }
     render();
+    restoreAgendaScrollPosition(agendaScrollPosition);
+    if (releasePreservedAgendaScrollPosition) {
+        clearAgendaScrollWorkflow();
+    }
+    if (eventEdit && pendingEventEdit && pendingEventEditMatches(eventEdit)) {
+        pendingEventEdit = null;
+        openExistingEvent(eventEdit, 'occurrence');
+    }
+    if (seriesEdit && pendingSeriesEdit
+        && Number(seriesEdit.calendarInstanceId) === pendingSeriesEdit.calendarInstanceId
+        && String(seriesEdit.seriesId || '') === pendingSeriesEdit.seriesId) {
+        const writeScope = pendingSeriesEdit.writeScope === 'following' ? 'following' : 'series';
+        pendingSeriesEdit = null;
+        openExistingEvent(seriesEdit, writeScope);
+    }
 }
 
+function mergeRangePageEvents(previousEvents, incomingEvents) {
+    const merged = [];
+    const seen = new Set();
+    [...previousEvents, ...incomingEvents].forEach(event => {
+        const key = calendarEventRangeIdentity(event);
+        if (key !== '' && seen.has(key)) return;
+        if (key !== '') seen.add(key);
+        merged.push(event);
+    });
+    return merged;
+}
+
+function calendarEventRangeIdentity(event) {
+    if (!event || typeof event !== 'object') return '';
+    return [
+        Number(event.calendarInstanceId || 0),
+        String(event.occurrenceId || event.eventReference || event.uid || ''),
+        String(event.seriesId || ''),
+        String(event.originalStart || ''),
+        Number(event.startTimestamp || 0),
+        Number(event.endTimestamp || 0),
+        String(event.summary || '')
+    ].join('|');
+}
+
+function pendingEventEditMatches(eventEdit) {
+    if (!pendingEventEdit
+        || Number(eventEdit?.calendarInstanceId || 0) !== pendingEventEdit.calendarInstanceId) {
+        return false;
+    }
+
+    const returnedOccurrenceId = String(eventEdit?.occurrenceId || '');
+    if (pendingEventEdit.occurrenceId !== ''
+        && returnedOccurrenceId !== ''
+        && returnedOccurrenceId === pendingEventEdit.occurrenceId) {
+        return true;
+    }
+
+    const returnedEventReference = String(eventEdit?.eventReference || '');
+    if (pendingEventEdit.eventReference !== ''
+        && returnedEventReference !== ''
+        && returnedEventReference === pendingEventEdit.eventReference) {
+        return true;
+    }
+
+    const returnedUid = String(eventEdit?.uid || '');
+    if (pendingEventEdit.uid !== ''
+        && returnedUid !== ''
+        && returnedUid === pendingEventEdit.uid
+        && (pendingEventEdit.seriesId === ''
+            || String(eventEdit?.seriesId || '') === pendingEventEdit.seriesId)) {
+        return true;
+    }
+
+    return pendingEventEdit.seriesId !== ''
+        && String(eventEdit?.seriesId || '') === pendingEventEdit.seriesId
+        && recurringOriginalStartMatches(
+            pendingEventEdit.originalStart,
+            String(eventEdit?.originalStart || ''),
+            Boolean(eventEdit?.allDay)
+        );
+}
+
+function recurringOriginalStartMatches(left, right, allDay = false) {
+    const expected = String(left || '').trim();
+    const actual = String(right || '').trim();
+    if (!expected || !actual) return false;
+    if (expected === actual) return true;
+    if (allDay || /^\d{4}-\d{2}-\d{2}$/.test(expected) || /^\d{4}-\d{2}-\d{2}$/.test(actual)) {
+        return expected.slice(0, 10) === actual.slice(0, 10);
+    }
+
+    const expectedTimestamp = Date.parse(expected);
+    const actualTimestamp = Date.parse(actual);
+    return Number.isFinite(expectedTimestamp)
+        && Number.isFinite(actualTimestamp)
+        && expectedTimestamp === actualTimestamp;
+}
+
+function shouldDeferCalendarState() {
+    return eventEditingActive
+        || eventDialog.open
+        || (releaseAgendaScrollPositionAfterState
+            && (eventDetailsDialog.open || editScopeDialog.open || deleteConfirmDialog.open));
+}
+
+function applyDeferredCalendarState() {
+    if (shouldDeferCalendarState()) return;
+    if (deferredCalendarState) {
+        const state = deferredCalendarState;
+        deferredCalendarState = null;
+        applyCalendarState(state);
+    }
+    if (pendingCalendarInvalidation) {
+        pendingCalendarInvalidation = false;
+        void ensureVisibleRangeLoaded(true);
+    }
+}
+
+function beginEventEditing() {
+    eventEditingActive = true;
+    eventEditingRevision += 1;
+}
+
+function endEventEditing() {
+    if (!eventEditingActive) return;
+    eventEditingActive = false;
+    eventEditingRevision += 1;
+}
+
+function setEventDialogLoading(mode = '') {
+    eventDialogLoadingMode = mode;
+    const loading = mode !== '';
+    eventDialog.toggleAttribute('aria-busy', loading);
+    if (loading) {
+        eventRecurrenceRow.classList.add('hidden');
+        eventRecurrenceOptions.classList.add('hidden');
+        eventReminderRow.classList.add('hidden');
+        eventReminderCustomRow.classList.add('hidden');
+        eventReminderExtraList.classList.add('hidden');
+        eventReminderAddRow.classList.add('hidden');
+        document.getElementById('save-button').classList.add('hidden');
+        document.getElementById('delete-button').classList.add('hidden');
+        return;
+    }
+
+    eventReminderRow.classList.remove('hidden');
+}
+
+function showEventDialog() {
+    if (!eventEditingActive) beginEventEditing();
+    if (!eventDialog.open) eventDialog.showModal();
+}
+
+function deferEventDialogSetup(callback) {
+    const editingRevision = eventEditingRevision;
+    const run = () => window.setTimeout(() => {
+        if (!eventDialog.open || !eventEditingActive || editingRevision !== eventEditingRevision) return;
+        callback();
+    }, 0);
+    if (typeof requestAnimationFrame === 'function') {
+        requestAnimationFrame(run);
+    } else {
+        run();
+    }
+}
+
+function cancelPendingProviderEditor() {
+    pendingEventEdit = null;
+    pendingSeriesEdit = null;
+    if (eventDialogLoadingMode !== 'provider') return;
+    setEventDialogLoading();
+    if (eventDialog.open) eventDialog.close();
+}
+
+function beginAgendaScrollWorkflow(workflow) {
+    if (!agendaScrollWorkflow) {
+        preservedAgendaScrollPosition = captureAgendaScrollPosition();
+    }
+    agendaScrollWorkflow = workflow;
+    releaseAgendaScrollPositionAfterState = false;
+}
+
+function releaseAgendaScrollWorkflowAfterState() {
+    if (!agendaScrollWorkflow) return;
+    releaseAgendaScrollPositionAfterState = true;
+}
+
+function cancelAgendaScrollWorkflowRelease() {
+    releaseAgendaScrollPositionAfterState = false;
+}
+
+function failAgendaScrollWorkflow() {
+    cancelAgendaScrollWorkflowRelease();
+    if (!eventDialog.open && !eventDetailsDialog.open && !editScopeDialog.open && !deleteConfirmDialog.open) {
+        clearAgendaScrollWorkflow(true);
+    }
+}
+
+function clearAgendaScrollWorkflow(restore = false) {
+    const position = preservedAgendaScrollPosition;
+    preservedAgendaScrollPosition = null;
+    agendaScrollWorkflow = '';
+    releaseAgendaScrollPositionAfterState = false;
+    if (restore) restoreAgendaScrollPosition(position);
+}
+
+function captureAgendaScrollPosition() {
+    if (activeView !== 'agenda' || content.scrollTop <= 0) return null;
+
+    const viewport = content.getBoundingClientRect();
+    const eventAnchor = firstVisibleAgendaElement('.event-card[data-agenda-anchor]', viewport);
+    const dayAnchor = firstVisibleAgendaElement('.agenda-day[data-agenda-date]', viewport);
+
+    return {
+        cursorDate: dayKey(cursorDate),
+        scrollTop: content.scrollTop,
+        eventKey: eventAnchor?.dataset.agendaAnchor || '',
+        eventOffset: eventAnchor ? eventAnchor.getBoundingClientRect().top - viewport.top : 0,
+        dayKey: dayAnchor?.dataset.agendaDate || '',
+        dayOffset: dayAnchor ? dayAnchor.getBoundingClientRect().top - viewport.top : 0
+    };
+}
+
+function firstVisibleAgendaElement(selector, viewport) {
+    const elements = Array.from(content.querySelectorAll(selector));
+    return elements.find(entry => {
+        const rect = entry.getBoundingClientRect();
+        return rect.bottom > viewport.top && rect.top < viewport.bottom;
+    }) || elements.find(entry => entry.getBoundingClientRect().top >= viewport.top) || null;
+}
+
+function restoreAgendaScrollPosition(position) {
+    if (!position || activeView !== 'agenda' || position.cursorDate !== dayKey(cursorDate)) return;
+
+    const restore = () => {
+        if (activeView !== 'agenda' || position.cursorDate !== dayKey(cursorDate)) return;
+
+        let anchor = null;
+        let expectedOffset = 0;
+        if (position.eventKey) {
+            anchor = Array.from(content.querySelectorAll('.event-card[data-agenda-anchor]'))
+                .find(entry => entry.dataset.agendaAnchor === position.eventKey) || null;
+            expectedOffset = position.eventOffset;
+        }
+        if (!anchor && position.dayKey) {
+            anchor = Array.from(content.querySelectorAll('.agenda-day[data-agenda-date]'))
+                .find(entry => entry.dataset.agendaDate === position.dayKey) || null;
+            expectedOffset = position.dayOffset;
+        }
+
+        if (anchor) {
+            const currentOffset = anchor.getBoundingClientRect().top - content.getBoundingClientRect().top;
+            content.scrollTop += currentOffset - expectedOffset;
+            return;
+        }
+
+        content.scrollTop = Math.min(
+            position.scrollTop,
+            Math.max(0, content.scrollHeight - content.clientHeight)
+        );
+    };
+
+    restore();
+    if (typeof requestAnimationFrame === 'function') {
+        requestAnimationFrame(() => {
+            restore();
+            requestAnimationFrame(restore);
+        });
+    }
+    if (typeof setTimeout === 'function') {
+        setTimeout(restore, 80);
+        setTimeout(restore, 180);
+    }
+}
+
+function restorePreservedAgendaScrollPosition() {
+    if (!agendaScrollWorkflow || !preservedAgendaScrollPosition) return;
+    restoreAgendaScrollPosition(preservedAgendaScrollPosition);
+}
 
 function applyTileFontScale() {
     if (calendarVisualization.mode === 'ipsview') return;
@@ -107,8 +547,8 @@ function render() {
         renderEmpty('No calendars visible', 'Select one or more calendars in the calendar filter.');
     } else if (activeView === 'month') {
         renderMonth();
-    } else if (activeView === 'week') {
-        renderWeek();
+    } else if (activeView === 'week' || activeView === 'workWeek') {
+        renderWeek(activeView === 'workWeek');
     } else if (activeView === 'threeDays') {
         renderThreeDays();
     } else if (activeView === 'list') {
@@ -120,7 +560,9 @@ function render() {
     const hasWritableCalendar = actionBridgeAvailable
         && calendarState.calendars.some(calendar => calendar.canWrite);
     const addButton = document.getElementById('add-button');
-    const showAddButton = actionBridgeAvailable && listControlsVisible() && activeView !== 'month';
+    const showAddButton = actionBridgeAvailable
+        && listControlsVisible()
+        && ['agenda', 'list'].includes(activeView);
     addButton.classList.toggle('visible', showAddButton);
     addButton.disabled = !hasWritableCalendar;
     addButton.setAttribute('aria-disabled', String(!hasWritableCalendar));
@@ -129,6 +571,8 @@ function render() {
     addButton.setAttribute('aria-label', t(addButtonText));
     updateCalendarFilterButton();
     if (activeView === 'month') scheduleMonthEventLayout();
+    updateSwipeNavigationMode();
+    void ensureVisibleRangeLoaded();
 }
 
 function listControlsVisible() {
@@ -187,11 +631,12 @@ function updateToolbar() {
         periodTitle.textContent = monthCount === 1
             ? formatMonth(start)
             : `${formatMonth(start)} – ${formatMonth(end)}`;
-    } else if (activeView === 'week') {
-        const start = startOfWeek(cursorDate);
-        const end = addDays(start, (viewPeriod('week') * 7) - 1);
+    } else if (activeView === 'week' || activeView === 'workWeek') {
+        const days = weekViewDays(activeView === 'workWeek');
+        const start = days[0] || startOfWeek(cursorDate);
+        const end = days[days.length - 1] || start;
         const calendarWeek = calendarState.settings.showWeekCalendarWeek !== false
-            ? `${formatCalendarWeekLabel(daysBetween(start, end))} · `
+            ? `${formatCalendarWeekLabel(days)} · `
             : '';
         periodTitle.textContent = calendarWeek + formatRange(start, end);
     } else if (activeView === 'threeDays') {
@@ -233,6 +678,7 @@ function renderAgenda() {
             }
         }
         const section = element('section', 'agenda-day');
+        section.dataset.agendaDate = dayKey(group.date);
         const heading = element('div', 'agenda-date');
         const strong = document.createElement('strong');
         strong.textContent = new Intl.DateTimeFormat(undefined, { weekday: 'long' }).format(group.date);
@@ -245,15 +691,48 @@ function renderAgenda() {
             calendarState.settings.showAgendaEventCount !== false
         );
         heading.append(strong, fullDate);
+        const dayEnd = addDays(group.date, 1);
+        const dayEvents = events.filter(event => eventOverlaps(event, group.date, dayEnd));
+        heading.classList.add('agenda-date-overview-enabled');
+        heading.tabIndex = 0;
+        heading.setAttribute('role', 'button');
+        heading.setAttribute('aria-label', `${formatDayEventsTitle(group.date)} · ${t('Day events')}`);
+        heading.style.cursor = 'pointer';
+        heading.addEventListener('click', () => openDayEvents(group.date, dayEvents));
+        heading.addEventListener('keydown', key => {
+            if (!['Enter', ' '].includes(key.key)) return;
+            key.preventDefault();
+            openDayEvents(group.date, dayEvents);
+        });
         section.appendChild(heading);
         group.events.forEach(event => section.appendChild(createAgendaEvent(event)));
         content.appendChild(section);
     });
 }
 
+function agendaEventAnchorKey(event) {
+    const calendarInstanceId = String(Number(event?.calendarInstanceId || 0));
+    const occurrenceId = String(event?.occurrenceId || '').trim();
+    const eventReference = String(event?.eventReference || '').trim();
+    if (occurrenceId) return `${calendarInstanceId}|occurrence:${occurrenceId}`;
+    if (eventReference) return `${calendarInstanceId}|reference:${eventReference}`;
+
+    const resourceUrl = String(event?.resourceUrl || '').trim();
+    const uid = String(event?.uid || '').trim();
+    const originalStart = String(event?.originalStart || '').trim();
+    const start = originalStart || String(event?.startTimestamp || event?.start || '').trim();
+    const summary = String(event?.summary || '').trim();
+    const identity = resourceUrl
+        ? `resource:${resourceUrl}`
+        : (uid ? `uid:${uid}` : `fallback:${summary}`);
+
+    return `${calendarInstanceId}|${identity}|${start}`;
+}
+
 function createAgendaEvent(event) {
     const card = element('button', 'event-card');
     card.type = 'button';
+    card.dataset.agendaAnchor = agendaEventAnchorKey(event);
     card.addEventListener('click', () => openEventDetails(event));
     const color = element('span', 'event-color');
     color.style.background = safeColor(event.calendarColor);
@@ -262,10 +741,11 @@ function createAgendaEvent(event) {
     time.style.whiteSpace = 'pre-line';
     const main = element('span', 'event-main');
     const title = element('span', 'event-title');
-    title.textContent = event.summary || t('Untitled event');
+    title.textContent = eventDisplaySummary(event) || t('Untitled event');
     main.appendChild(title);
     const metaParts = [];
     if (calendarState.settings.showCalendarName) metaParts.push(event.calendarName || '');
+    if (calendarState.settings.showAnniversaryType !== false) metaParts.push(annualEventLabel(event));
     if (calendarState.settings.showLocation && event.location) metaParts.push('⌖ ' + event.location);
     if (metaParts.length) {
         const meta = element('span', 'event-meta');
@@ -385,7 +865,14 @@ function listColumns() {
         columns.push({
             key: 'title',
             label: 'Title',
-            value: event => event.summary || t('Untitled event')
+            value: event => eventDisplaySummary(event) || t('Untitled event')
+        });
+    }
+    if (calendarState.settings.showListAnniversaryType !== false) {
+        columns.push({
+            key: 'occasion',
+            label: 'Occasion',
+            value: event => annualEventLabel(event)
         });
     }
     if (calendarState.settings.showListCalendarName !== false) {
@@ -412,45 +899,334 @@ function listColumns() {
     return columns;
 }
 
-function renderWeek() {
+function weekViewDays(workWeek = false) {
     const weekStart = startOfWeek(cursorDate);
-    const periodDays = viewPeriod('week') * 7;
-    const days = Array.from({ length: periodDays }, (_, index) => addDays(weekStart, index))
-        .filter(day => calendarState.settings.showWeekends !== false || !isWeekend(day));
-    const ipsView = document.documentElement.classList.contains('ipsview-mode');
-    const vertical = (
-        ipsView
-            ? calendarState.settings.ipsViewWeekOrientation
-            : calendarState.settings.tileWeekOrientation
-    ) === 'vertical';
-    renderDayColumns(
+    const periodDays = viewPeriod(workWeek ? 'workWeek' : 'week') * 7;
+    const days = Array.from({ length: periodDays }, (_, index) => addDays(weekStart, index));
+    return workWeek ? days.filter(day => !isWeekend(day)) : days;
+}
+
+function emphasizeCurrentDaySurface(target, baseSurface = 'var(--cal-surface)', outlined = false) {
+    target.style.background = `color-mix(in srgb, var(--cal-accent) 14%, ${baseSurface})`;
+    if (outlined) {
+        target.style.borderColor = 'var(--cal-accent)';
+        target.style.boxShadow = 'inset 0 0 0 2px var(--cal-accent)';
+    }
+}
+
+function emphasizeCurrentDayHeading(heading) {
+    heading.style.color = 'var(--cal-accent)';
+    heading.style.borderBottomColor = 'var(--cal-accent)';
+    heading.style.fontWeight = '750';
+}
+
+function emphasizeCurrentDayTimelineSection(target, heading = false) {
+    emphasizeCurrentDaySurface(target);
+    target.style.boxShadow = heading
+        ? 'inset 0 3px 0 var(--cal-accent), inset 2px 0 0 color-mix(in srgb, var(--cal-accent) 70%, transparent), inset -2px 0 0 color-mix(in srgb, var(--cal-accent) 70%, transparent)'
+        : 'inset 2px 0 0 color-mix(in srgb, var(--cal-accent) 70%, transparent), inset -2px 0 0 color-mix(in srgb, var(--cal-accent) 70%, transparent)';
+    if (heading) emphasizeCurrentDayHeading(target);
+}
+
+function emphasizeCurrentMonthDay(cell, number) {
+    emphasizeCurrentDaySurface(cell, 'var(--cal-card)', true);
+    cell.style.boxShadow = 'inset 0 0 0 3px var(--cal-accent)';
+    number.style.display = 'inline-grid';
+    number.style.minWidth = '1.85em';
+    number.style.height = '1.85em';
+    number.style.marginLeft = 'auto';
+    number.style.placeItems = 'center';
+    number.style.borderRadius = '999px';
+    number.style.background = 'var(--cal-accent)';
+    number.style.color = 'var(--cal-accent-contrast)';
+    number.style.fontWeight = '750';
+}
+
+function renderWeek(workWeek = false) {
+    const days = weekViewDays(workWeek);
+    const columnsPerWeek = workWeek ? 5 : 7;
+    const grid = renderDayColumns(
         days,
-        'week-grid'
-            + (calendarState.settings.showWeekends === false ? ' hide-weekends' : '')
-            + (vertical ? ' vertical-week-grid' : ''),
+        'week-grid' + (workWeek ? ' hide-weekends work-week-grid' : ''),
         calendarState.settings.showWeekDayOfYear !== false,
         calendarState.settings.showWeekEventCount !== false
     );
+    grid.style.gridTemplateColumns = `repeat(${columnsPerWeek}, minmax(120px, 1fr))`;
+    grid.style.minWidth = `${columnsPerWeek * 120}px`;
+    grid.style.rowGap = '12px';
 }
 
 function renderThreeDays() {
     const days = getVisibleDays(cursorDate, viewPeriod('threeDays'));
-    const grid = renderDayColumns(
+    if (days.length === 1) {
+        renderSingleDayTimeline(days[0]);
+        return;
+    }
+
+    renderMultiDayTimeline(
         days,
-        'week-grid three-day-grid',
         calendarState.settings.showThreeDaysDayOfYear !== false,
         calendarState.settings.showThreeDaysEventCount !== false
     );
-    grid.style.setProperty('--day-grid-columns', String(Math.min(days.length, 7)));
+}
+
+function renderMultiDayTimeline(days, showDayOfYear, showEventCount) {
+    const dayData = days.map(day => {
+        const dayStart = startOfDay(day);
+        const dayEnd = addDays(dayStart, 1);
+        const events = visibleCalendarEvents().filter(event => eventOverlaps(event, dayStart, dayEnd));
+        const timedEvents = events.filter(event => !event.allDay);
+        return {
+            day,
+            dayStart,
+            dayEnd,
+            events,
+            allDayEvents: events.filter(event => event.allDay),
+            timedEntries: createTimelineEntries(dayStart, dayEnd, timedEvents)
+        };
+    });
+    const allTimedEntries = dayData.flatMap(entry => entry.timedEntries.map(timedEntry => ({
+        ...timedEntry,
+        dayStartTimestamp: entry.dayStart.getTime()
+    })));
+    const grid = element('div', 'multi-day-timeline-grid');
+    grid.style.setProperty('--multi-day-columns', String(days.length));
+
+    const corner = element('div', 'multi-day-timeline-corner');
+    corner.style.gridColumn = '1';
+    corner.style.gridRow = '1';
+    grid.appendChild(corner);
+
+    dayData.forEach((entry, index) => {
+        const currentDay = isToday(entry.day);
+        const heading = element('div', 'week-heading multi-day-heading' + (currentDay ? ' today' : ''));
+        heading.style.gridColumn = String(index + 2);
+        heading.style.gridRow = '1';
+        if (currentDay) emphasizeCurrentDayTimelineSection(heading, true);
+        heading.textContent = formatDayHeading(
+            entry.day,
+            { weekday: 'short', day: '2-digit', month: '2-digit' },
+            showDayOfYear,
+            entry.events.length,
+            showEventCount
+        );
+        bindDayOverview(heading, entry.day, entry.events);
+        grid.appendChild(heading);
+    });
+
+    const hasAllDayEvents = dayData.some(entry => entry.allDayEvents.length > 0);
+    let timelineRow = 2;
+    if (hasAllDayEvents) {
+        const allDayLabel = element('div', 'multi-day-all-day-label');
+        allDayLabel.style.gridColumn = '1';
+        allDayLabel.style.gridRow = '2';
+        allDayLabel.textContent = t('All day');
+        grid.appendChild(allDayLabel);
+
+        dayData.forEach((entry, index) => {
+            const currentDay = isToday(entry.day);
+            const allDayCell = element('div', 'multi-day-all-day-cell' + (currentDay ? ' today' : ''));
+            allDayCell.style.gridColumn = String(index + 2);
+            allDayCell.style.gridRow = '2';
+            if (currentDay) emphasizeCurrentDayTimelineSection(allDayCell);
+            entry.allDayEvents.forEach(event => allDayCell.appendChild(createWeekEventElement(event)));
+            bindDayOverview(allDayCell, entry.day, entry.events);
+            grid.appendChild(allDayCell);
+        });
+        timelineRow = 3;
+    }
+
+    if (allTimedEntries.length > 0) {
+        const range = timelineMinuteRange(allTimedEntries);
+        const timescale = element('div', 'multi-day-timescale');
+        timescale.style.gridColumn = '1';
+        timescale.style.gridRow = String(timelineRow);
+        timescale.style.height = `${range.height}px`;
+        appendTimelineHourLabels(timescale, dayData[0].dayStart, range);
+        grid.appendChild(timescale);
+
+        dayData.forEach((entry, index) => {
+            const currentDay = isToday(entry.day);
+            const canvas = element('div', 'multi-day-timeline-canvas' + (currentDay ? ' today' : ''));
+            canvas.style.gridColumn = String(index + 2);
+            canvas.style.gridRow = String(timelineRow);
+            if (currentDay) emphasizeCurrentDayTimelineSection(canvas);
+            canvas.style.height = `${range.height}px`;
+            appendTimelineHourLines(canvas, range);
+            appendTimelineEvents(canvas, entry.dayStart, entry.timedEntries, range);
+            bindDayOverview(canvas, entry.day, entry.events);
+            grid.appendChild(canvas);
+        });
+    }
+
+    content.appendChild(grid);
+}
+
+function renderSingleDayTimeline(day) {
+    const dayStart = startOfDay(day);
+    const dayEnd = addDays(dayStart, 1);
+    const events = visibleCalendarEvents().filter(event => eventOverlaps(event, dayStart, dayEnd));
+    const currentDay = isToday(day);
+    const column = element('section', 'week-column single-day-column' + (currentDay ? ' today' : ''));
+    const heading = element('div', 'week-heading');
+    if (currentDay) {
+        emphasizeCurrentDaySurface(column, 'var(--cal-surface)', true);
+        emphasizeCurrentDayHeading(heading);
+    }
+    heading.textContent = formatDayHeading(
+        day,
+        { weekday: 'short', day: '2-digit', month: '2-digit' },
+        calendarState.settings.showThreeDaysDayOfYear !== false,
+        events.length,
+        calendarState.settings.showThreeDaysEventCount !== false
+    );
+    bindDayOverview(column, day, events);
+    column.appendChild(heading);
+
+    const allDayEvents = events.filter(event => event.allDay);
+    if (allDayEvents.length > 0) {
+        const allDayList = element('div', 'single-day-all-day');
+        allDayEvents.forEach(event => allDayList.appendChild(createWeekEventElement(event)));
+        column.appendChild(allDayList);
+    }
+
+    const timedEvents = events.filter(event => !event.allDay);
+    if (timedEvents.length > 0) {
+        column.appendChild(createSingleDayTimeline(dayStart, dayEnd, timedEvents));
+    }
+
+    content.appendChild(column);
+}
+
+function createSingleDayTimeline(dayStart, dayEnd, events) {
+    const entries = createTimelineEntries(dayStart, dayEnd, events);
+    const range = timelineMinuteRange(entries.map(entry => ({
+        ...entry,
+        dayStartTimestamp: dayStart.getTime()
+    })));
+    const timeline = element('div', 'single-day-timeline');
+    const scale = element('div', 'single-day-timescale');
+    const canvas = element('div', 'single-day-timeline-canvas');
+    scale.style.height = `${range.height}px`;
+    canvas.style.height = `${range.height}px`;
+    appendTimelineHourLabels(scale, dayStart, range);
+    appendTimelineHourLines(canvas, range);
+    appendTimelineEvents(canvas, dayStart, entries, range);
+    timeline.append(scale, canvas);
+    return timeline;
+}
+
+function createTimelineEntries(dayStart, dayEnd, events) {
+    const dayStartTimestamp = dayStart.getTime();
+    const dayEndTimestamp = dayEnd.getTime();
+    const minimumDisplayDuration = 30 * 60_000;
+    const entries = events.map((event, index) => {
+        const startTimestamp = Math.max(dayStartTimestamp, eventStart(event).getTime());
+        const rawEndTimestamp = Math.min(dayEndTimestamp, eventEnd(event).getTime());
+        const endTimestamp = Math.min(
+            dayEndTimestamp,
+            Math.max(startTimestamp + minimumDisplayDuration, rawEndTimestamp)
+        );
+        return { event, index, startTimestamp, endTimestamp };
+    });
+
+    buildWeekEventOverlapGroups(entries).forEach(group => {
+        const laneCount = group.reduce((maximum, entry) => Math.max(maximum, entry.lane + 1), 1);
+        group.forEach(entry => { entry.laneCount = laneCount; });
+    });
+    return entries;
+}
+
+function timelineMinuteRange(entries) {
+    const minute = 60_000;
+    const earliestMinute = Math.max(0, Math.floor(Math.min(...entries.map(entry =>
+        (entry.startTimestamp - entry.dayStartTimestamp) / minute
+    ))));
+    const latestMinute = Math.min(24 * 60, Math.ceil(Math.max(...entries.map(entry =>
+        (entry.endTimestamp - entry.dayStartTimestamp) / minute
+    ))));
+    const startMinute = Math.floor(earliestMinute / 60) * 60;
+    const endMinute = Math.min(24 * 60, Math.max(
+        startMinute + 120,
+        Math.ceil(latestMinute / 60) * 60
+    ));
+    const pixelsPerMinute = 1;
+    return {
+        startMinute,
+        endMinute,
+        pixelsPerMinute,
+        height: Math.max(120, Math.round((endMinute - startMinute) * pixelsPerMinute))
+    };
+}
+
+function appendTimelineHourLabels(container, dayStart, range) {
+    const minute = 60_000;
+    for (let tick = range.startMinute; tick <= range.endMinute; tick += 60) {
+        const top = Math.min(range.height, Math.round((tick - range.startMinute) * range.pixelsPerMinute));
+        const tickDate = new Date(dayStart.getTime() + (tick * minute));
+        const label = element('span', 'single-day-hour-label');
+        label.style.top = `${top}px`;
+        label.textContent = formatTime(tickDate);
+        container.appendChild(label);
+    }
+}
+
+function appendTimelineHourLines(container, range) {
+    for (let tick = range.startMinute; tick <= range.endMinute; tick += 60) {
+        const top = Math.min(range.height, Math.round((tick - range.startMinute) * range.pixelsPerMinute));
+        const line = element('span', 'single-day-hour-line');
+        line.style.top = `${top}px`;
+        container.appendChild(line);
+    }
+}
+
+function appendTimelineEvents(container, dayStart, entries, range) {
+    const minute = 60_000;
+    const dayStartTimestamp = dayStart.getTime();
+    entries.forEach(entry => {
+        const item = createSingleDayTimelineEvent(entry.event);
+        const startMinute = (entry.startTimestamp - dayStartTimestamp) / minute;
+        const endMinute = (entry.endTimestamp - dayStartTimestamp) / minute;
+        const top = Math.max(0, (startMinute - range.startMinute) * range.pixelsPerMinute);
+        const naturalHeight = Math.max(1, (endMinute - startMinute) * range.pixelsPerMinute);
+        item.style.top = `${Math.round(top)}px`;
+        item.style.height = `${Math.max(30, Math.round(naturalHeight - 2))}px`;
+        item.style.setProperty('--single-day-lane', String(entry.lane || 0));
+        item.style.setProperty('--single-day-lanes', String(entry.laneCount || 1));
+        container.appendChild(item);
+    });
+}
+
+function createSingleDayTimelineEvent(event) {
+    const item = element('button', 'single-day-timeline-event');
+    item.type = 'button';
+    item.style.setProperty('--event-color', safeColor(event.calendarColor));
+    item.setAttribute(
+        'aria-label',
+        `${eventDisplaySummary(event) || t('Untitled event')}, ${formatTime(eventStart(event))} – ${formatTime(eventEnd(event))}`
+    );
+
+    const title = document.createElement('strong');
+    title.textContent = eventDisplaySummary(event) || t('Untitled event');
+    const time = element('span', 'single-day-timeline-time');
+    time.textContent = formatTime(eventStart(event));
+    item.append(title, time);
+    item.addEventListener('click', () => openEventDetails(event));
+    return item;
 }
 
 function renderDayColumns(days, className, showDayOfYear, showEventCount) {
     const grid = element('div', className);
     days.forEach(day => {
-        const column = element('section', 'week-column' + (isToday(day) ? ' today' : ''));
+        const currentDay = isToday(day);
+        const column = element('section', 'week-column' + (currentDay ? ' today' : ''));
         const dayEnd = addDays(day, 1);
         const events = visibleCalendarEvents().filter(event => eventOverlaps(event, day, dayEnd));
         const heading = element('div', 'week-heading');
+        if (currentDay) {
+            emphasizeCurrentDaySurface(column, 'var(--cal-surface)', true);
+            emphasizeCurrentDayHeading(heading);
+        }
         heading.textContent = formatDayHeading(
             day,
             { weekday: 'short', day: '2-digit', month: '2-digit' },
@@ -458,26 +1234,111 @@ function renderDayColumns(days, className, showDayOfYear, showEventCount) {
             events.length,
             showEventCount
         );
+        bindDayOverview(column, day, events);
         column.appendChild(heading);
         const eventList = element('div', 'week-events');
-        events.forEach(event => {
-            const item = element('div', 'week-event');
-            item.style.setProperty('--event-color', safeColor(event.calendarColor));
-            item.tabIndex = 0;
-            item.addEventListener('click', () => openEventDetails(event));
-            item.addEventListener('keydown', key => { if (key.key === 'Enter') openEventDetails(event); });
-            const title = document.createElement('strong');
-            title.textContent = event.summary || t('Untitled event');
-            const time = document.createElement('span');
-            time.textContent = event.allDay ? t('All day') : formatTime(eventStart(event));
-            item.append(title, time);
-            eventList.appendChild(item);
-        });
+        renderWeekEventLayout(eventList, events, day, dayEnd);
         column.appendChild(eventList);
         grid.appendChild(column);
     });
     content.appendChild(grid);
     return grid;
+}
+
+function renderWeekEventLayout(eventList, events, dayStart, dayEnd) {
+    const timedEvents = [];
+    const fallbackEvents = [];
+
+    events.forEach((event, index) => {
+        if (event.allDay) {
+            eventList.appendChild(createWeekEventElement(event));
+            return;
+        }
+
+        const startTimestamp = Math.max(eventStart(event).getTime(), dayStart.getTime());
+        const endTimestamp = Math.min(eventEnd(event).getTime(), dayEnd.getTime());
+        if (!Number.isFinite(startTimestamp) || !Number.isFinite(endTimestamp)) {
+            fallbackEvents.push(event);
+            return;
+        }
+
+        timedEvents.push({
+            event,
+            index,
+            startTimestamp,
+            endTimestamp: Math.max(startTimestamp + 1, endTimestamp)
+        });
+    });
+
+    fallbackEvents.forEach(event => eventList.appendChild(createWeekEventElement(event)));
+    buildWeekEventOverlapGroups(timedEvents).forEach(group => {
+        const laneCount = group.reduce((maximum, entry) => Math.max(maximum, entry.lane + 1), 1);
+        if (laneCount <= 1) {
+            group.forEach(entry => eventList.appendChild(createWeekEventElement(entry.event)));
+            return;
+        }
+
+        const overlapGroup = element('div', 'week-event-overlap-group');
+        overlapGroup.style.setProperty('--week-event-columns', String(laneCount));
+        const lanes = Array.from({ length: laneCount }, () => element('div', 'week-event-overlap-lane'));
+        group.forEach(entry => lanes[entry.lane].appendChild(createWeekEventElement(entry.event)));
+        lanes.forEach(lane => overlapGroup.appendChild(lane));
+        eventList.appendChild(overlapGroup);
+    });
+}
+
+function buildWeekEventOverlapGroups(entries) {
+    const sortedEntries = [...entries].sort((left, right) =>
+        (left.startTimestamp - right.startTimestamp)
+        || (left.endTimestamp - right.endTimestamp)
+        || (left.index - right.index)
+    );
+    const groups = [];
+    let group = [];
+    let groupEnd = Number.NEGATIVE_INFINITY;
+
+    const finishGroup = () => {
+        if (group.length === 0) return;
+        const laneEnds = [];
+        group.forEach(entry => {
+            let lane = laneEnds.findIndex(laneEnd => laneEnd <= entry.startTimestamp);
+            if (lane < 0) {
+                lane = laneEnds.length;
+                laneEnds.push(entry.endTimestamp);
+            } else {
+                laneEnds[lane] = entry.endTimestamp;
+            }
+            entry.lane = lane;
+        });
+        groups.push(group);
+        group = [];
+        groupEnd = Number.NEGATIVE_INFINITY;
+    };
+
+    sortedEntries.forEach(entry => {
+        if (group.length > 0 && entry.startTimestamp >= groupEnd) finishGroup();
+        group.push(entry);
+        groupEnd = Math.max(groupEnd, entry.endTimestamp);
+    });
+    finishGroup();
+
+    return groups;
+}
+
+function createWeekEventElement(event) {
+    const item = element('div', 'week-event');
+    item.style.setProperty('--event-color', safeColor(event.calendarColor));
+    item.tabIndex = 0;
+    item.addEventListener('click', () => openEventDetails(event));
+    item.addEventListener('keydown', key => { if (key.key === 'Enter') openEventDetails(event); });
+    const title = document.createElement('strong');
+    title.textContent = eventDisplaySummary(event) || t('Untitled event');
+    const time = document.createElement('span');
+    const timeParts = [event.allDay ? t('All day') : formatTime(eventStart(event))];
+    if (calendarState.settings.showAnniversaryType !== false) timeParts.push(annualEventLabel(event));
+    time.textContent = timeParts.filter(Boolean).join(' · ');
+    item.append(title, time);
+    return item;
 }
 
 function getVisibleDays(start, count) {
@@ -507,54 +1368,79 @@ function renderMonth() {
     }
 }
 
-function createMonthGrid(month, showOutsideDetails) {
+function createMonthGrid(month, fillAvailableHeight) {
     const first = new Date(month.getFullYear(), month.getMonth(), 1);
-    const gridStart = startOfWeek(first);
-    const days = Array.from({ length: 42 }, (_, index) => addDays(gridStart, index));
-    const visibleDays = days.filter(day => calendarState.settings.showWeekends !== false || !isWeekend(day));
-    const grid = element('div', 'calendar-grid' + (calendarState.settings.showWeekends === false ? ' hide-weekends' : ''));
+    const last = new Date(month.getFullYear(), month.getMonth() + 1, 0);
+    const showWeekends = calendarState.settings.showWeekends !== false;
+    let firstVisible = first;
+    let lastVisible = last;
+    while (!showWeekends && isWeekend(firstVisible)) firstVisible = addDays(firstVisible, 1);
+    while (!showWeekends && isWeekend(lastVisible)) lastVisible = addDays(lastVisible, -1);
+
+    const gridStart = startOfWeek(firstVisible);
+    const gridEnd = addDays(startOfWeek(lastVisible), 7);
+    const days = [];
+    for (let day = gridStart; day < gridEnd; day = addDays(day, 1)) {
+        days.push(day);
+    }
+
+    const visibleDays = days.filter(day => showWeekends || !isWeekend(day));
+    const columnCount = showWeekends ? 7 : 5;
+    const rowCount = Math.max(1, Math.ceil(visibleDays.length / columnCount));
+    const grid = element('div', 'calendar-grid' + (showWeekends ? '' : ' hide-weekends'));
+    grid.style.gridTemplateRows = fillAvailableHeight
+        ? `auto repeat(${rowCount}, minmax(0, 1fr))`
+        : `auto repeat(${rowCount}, minmax(82px, 1fr))`;
+
     const weekdays = Array.from({ length: 7 }, (_, index) => addDays(startOfWeek(new Date()), index))
-        .filter(day => calendarState.settings.showWeekends !== false || !isWeekend(day));
+        .filter(day => showWeekends || !isWeekend(day));
     weekdays.forEach(day => {
         const header = element('div', 'weekday');
         header.textContent = new Intl.DateTimeFormat(undefined, { weekday: 'short' }).format(day);
         grid.appendChild(header);
     });
+
     visibleDays.forEach(day => {
-        const cell = element('div', 'month-day');
         const outside = day.getMonth() !== month.getMonth();
-        if (outside) cell.classList.add('outside');
-        if (isToday(day) && (!outside || showOutsideDetails)) cell.classList.add('today');
+        const cell = element('div', 'month-day');
+        if (outside) {
+            cell.classList.add('month-day-empty');
+            cell.setAttribute('aria-hidden', 'true');
+            grid.appendChild(cell);
+            return;
+        }
+
+        if (isToday(day)) cell.classList.add('today');
         const dayHeader = element('div', 'month-day-header');
-        if (calendarState.settings.showMonthCalendarWeek === true && day.getDay() === 1) {
+        if (calendarState.settings.showMonthCalendarWeek === true
+            && (day.getDay() === 1 || day.getDate() === 1)) {
             const calendarWeek = element('span', 'month-week-number');
             calendarWeek.textContent = formatCalendarWeekLabel([day]);
             dayHeader.appendChild(calendarWeek);
         }
-        if (!outside || showOutsideDetails) {
-            const dateMeta = element('div', 'month-day-date');
-            const number = element('div', 'day-number');
-            number.textContent = String(day.getDate());
-            dateMeta.appendChild(number);
-            if (calendarState.settings.showMonthDayOfYear !== false) {
-                const dayOfYearMeta = element('span', 'month-day-of-year');
-                dayOfYearMeta.textContent = `${t('Day')} ${dayOfYear(day)}/${daysInYear(day)}`;
-                dateMeta.appendChild(dayOfYearMeta);
-            }
-            dayHeader.appendChild(dateMeta);
+
+        const dateMeta = element('div', 'month-day-date');
+        const number = element('div', 'day-number');
+        number.textContent = String(day.getDate());
+        if (isToday(day)) emphasizeCurrentMonthDay(cell, number);
+        dateMeta.appendChild(number);
+        if (calendarState.settings.showMonthDayOfYear !== false) {
+            const dayOfYearMeta = element('span', 'month-day-of-year');
+            dayOfYearMeta.textContent = `${t('Day')} ${dayOfYear(day)}/${daysInYear(day)}`;
+            dateMeta.appendChild(dayOfYearMeta);
         }
+        dayHeader.appendChild(dateMeta);
         cell.appendChild(dayHeader);
-        if (!outside || showOutsideDetails) {
-            const dayEnd = addDays(day, 1);
-            const events = visibleCalendarEvents()
-                .filter(event => eventOverlaps(event, day, dayEnd))
-                .sort(compareEventsForDisplay);
-            const eventList = element('div', 'month-events');
-            cell.appendChild(eventList);
-            monthEventData.set(eventList, { day, events });
-            renderMonthEventPreview(eventList, day, events);
-            bindMonthDayOverview(cell, day, events);
-        }
+
+        const dayEnd = addDays(day, 1);
+        const events = visibleCalendarEvents()
+            .filter(event => eventOverlaps(event, day, dayEnd))
+            .sort(compareEventsForDisplay);
+        const eventList = element('div', 'month-events');
+        cell.appendChild(eventList);
+        monthEventData.set(eventList, { day, events });
+        renderMonthEventPreview(eventList, day, events);
+        bindMonthDayOverview(cell, day, events);
         grid.appendChild(cell);
     });
     return grid;
@@ -564,6 +1450,14 @@ function bindMonthDayOverview(cell, day, events) {
     cell.classList.add('month-day-overview-enabled');
     cell.addEventListener('click', clickEvent => {
         if (clickEvent.target.closest?.('button, a, input, select, textarea, label')) return;
+        openDayEvents(day, events);
+    });
+}
+
+function bindDayOverview(target, day, events) {
+    target.classList.add('day-overview-enabled');
+    target.addEventListener('click', clickEvent => {
+        if (clickEvent.target.closest?.('button, a, input, select, textarea, label, .week-event')) return;
         openDayEvents(day, events);
     });
 }
@@ -618,8 +1512,10 @@ function createMonthEventChip(event) {
     const chip = element('button', 'event-chip');
     chip.type = 'button';
     chip.style.setProperty('--event-color', safeColor(event.calendarColor));
+    const occasion = calendarState.settings.showAnniversaryType !== false ? annualEventLabel(event) : '';
     chip.textContent = (event.allDay ? '' : formatTime(eventStart(event)) + ' ')
-        + (event.summary || t('Untitled event'));
+        + (eventDisplaySummary(event) || t('Untitled event'))
+        + (occasion ? ' · ' + occasion : '');
     chip.addEventListener('click', () => openEventDetails(event));
     return chip;
 }
@@ -653,11 +1549,14 @@ function openDayEvents(day, events) {
         const time = element('span', 'day-event-time');
         time.textContent = event.allDay ? t('All day') : `${formatTime(eventStart(event))} – ${formatTime(eventEnd(event))}`;
         const summary = element('span', 'day-event-summary');
-        summary.textContent = event.summary || t('Untitled event');
+        summary.textContent = eventDisplaySummary(event) || t('Untitled event');
         item.append(time, summary);
-        if (calendarState.settings.showCalendarName !== false && event.calendarName) {
+        const metaParts = [];
+        if (calendarState.settings.showCalendarName !== false && event.calendarName) metaParts.push(event.calendarName);
+        if (calendarState.settings.showAnniversaryType !== false) metaParts.push(annualEventLabel(event));
+        if (metaParts.filter(Boolean).length > 0) {
             const calendar = element('span', 'day-event-calendar');
-            calendar.textContent = event.calendarName;
+            calendar.textContent = metaParts.filter(Boolean).join(' · ');
             item.appendChild(calendar);
         }
         item.addEventListener('click', () => {
@@ -810,16 +1709,628 @@ function applyCalendarFilter() {
     render();
 }
 
+function eventDisplaySummary(event) {
+    const displaySummary = String(event?.displaySummary || '').trim();
+    return displaySummary || String(event?.summary || '').trim();
+}
+
+function resetAnniversaryEditor() {
+    eventAnniversaryType.value = '';
+    eventAnniversaryDate.max = localDate(new Date());
+    eventAnniversaryDate.value = '';
+    eventAnniversaryDateRow.classList.add('hidden');
+    eventAnniversaryDate.required = false;
+    updateAnniversaryDateLabel();
+}
+
+function annualEventType(event) {
+    const type = String(event?.anniversaryType || '').trim().toLowerCase();
+    if (['birthday', 'anniversary', 'wedding', 'death'].includes(type)) return type;
+    return event?.birthday ? 'birthday' : '';
+}
+
+function annualEventLabel(event) {
+    return {
+        birthday: t('Birthday'),
+        anniversary: t('Anniversary'),
+        wedding: t('Wedding anniversary'),
+        death: t('Death anniversary')
+    }[annualEventType(event)] || '';
+}
+
+function annualEventDate(event) {
+    const date = String(event?.anniversaryDate || '').trim();
+    if (date) return date;
+    return event?.birthday ? String(event.birthDate || '') : '';
+}
+
+function loadAnniversaryEditor(event) {
+    eventAnniversaryType.value = annualEventType(event);
+    eventAnniversaryDate.max = localDate(new Date());
+    eventAnniversaryDate.value = eventAnniversaryType.value ? annualEventDate(event) : '';
+    eventAnniversaryDateRow.classList.toggle('hidden', !eventAnniversaryType.value);
+    updateAnniversaryDateLabel();
+}
+
+function anniversaryEditorEditable() {
+    const calendar = selectedCalendarEntry();
+    if (!eventDialogEditable || !calendar?.canWrite) return false;
+    if (selectedEvent === null) return Boolean(calendar.canCreateRecurrence);
+    if (!selectedEvent.recurring) {
+        const moving = Number(calendar.instanceId || 0) !== Number(selectedEvent.calendarInstanceId || 0);
+        return Boolean(moving ? calendar.canCreateRecurrence : calendar.canUpdateRecurrence);
+    }
+    return selectedEvent.writeScope === 'series'
+        && Boolean(selectedEvent.canUpdateSeries)
+        && Boolean(calendar.canUpdateRecurrence);
+}
+
+function anniversaryRecurrence() {
+    return { frequency: 'YEARLY', interval: 1, endMode: 'never' };
+}
+
+function updateAnniversaryDateLabel() {
+    const labels = {
+        birthday: 'Birth date',
+        anniversary: 'Anniversary date',
+        wedding: 'Wedding date',
+        death: 'Date of death'
+    };
+    eventAnniversaryDateLabel.textContent = t(labels[eventAnniversaryType.value] || 'Anniversary date');
+}
+
+function updateAnniversaryControls() {
+    let type = String(eventAnniversaryType.value || '');
+    const editable = anniversaryEditorEditable();
+    if (type && eventDialogEditable && !editable && !annualEventType(selectedEvent)) {
+        eventAnniversaryType.value = '';
+        eventAnniversaryDate.value = '';
+        type = '';
+    }
+    eventAnniversaryType.disabled = !editable;
+    eventAnniversaryDateRow.classList.toggle('hidden', !type);
+    eventAnniversaryDate.disabled = !editable || !type;
+    eventAnniversaryDate.required = editable && Boolean(type);
+    updateAnniversaryDateLabel();
+
+    const allDayInput = document.getElementById('event-all-day');
+    if (type && editable) {
+        allDayInput.checked = true;
+        allDayInput.disabled = true;
+        eventRecurrenceRow.classList.remove('hidden');
+        eventRecurrenceFrequency.value = 'yearly';
+        eventRecurrenceInterval.value = '1';
+        eventRecurrenceEndMode.value = 'never';
+        eventRecurrenceFrequency.disabled = true;
+        eventRecurrenceOptions.classList.add('hidden');
+    } else {
+        allDayInput.disabled = !eventDialogEditable;
+    }
+}
+
+function suggestedAnniversaryDate() {
+    const eventStart = readInputDate(document.getElementById('event-start').value);
+    if (!eventStart) return '';
+
+    const today = startOfDay(new Date());
+    const month = eventStart.getMonth();
+    const day = eventStart.getDate();
+    let year = Math.min(eventStart.getFullYear(), today.getFullYear());
+
+    while (year >= 1) {
+        const candidate = new Date(year, month, day);
+        if (candidate.getFullYear() === year
+            && candidate.getMonth() === month
+            && candidate.getDate() === day
+            && candidate <= today) {
+            return localDate(candidate);
+        }
+        --year;
+    }
+
+    return '';
+}
+
+function syncAnniversarySchedule() {
+    if (!eventAnniversaryType.value || !anniversaryEditorEditable()) return;
+    const anniversaryDate = readInputDate(eventAnniversaryDate.value);
+    if (!anniversaryDate) return;
+    const end = addDays(anniversaryDate, 1);
+    document.getElementById('event-all-day').checked = true;
+    setDateInputs(anniversaryDate, end, true, true);
+    eventRecurrenceFrequency.value = 'yearly';
+    eventRecurrenceInterval.value = '1';
+    eventRecurrenceEndMode.value = 'never';
+}
+
+function anniversaryEditorChange() {
+    if (!anniversaryEditorEditable()) return null;
+    const type = String(eventAnniversaryType.value || '');
+    const date = type ? String(eventAnniversaryDate.value || '') : '';
+    if (type && !date) return null;
+    if (selectedEvent === null) {
+        return type ? { enabled: true, type, date } : null;
+    }
+    const oldType = annualEventType(selectedEvent);
+    const oldDate = oldType ? annualEventDate(selectedEvent) : '';
+    if (type === oldType && (!type || date === oldDate)) return null;
+    return { enabled: Boolean(type), type, date };
+}
+
+const icsImportMaximumBytes = 1024 * 1024;
+const icsImportMessages = {
+    de: {
+        'Import ICS': 'ICS importieren',
+        'ICS event imported.': 'ICS-Termin importiert.',
+        'The ICS file is too large.': 'Die ICS-Datei ist zu groß.',
+        'The selected file is not a valid single-event ICS file.': 'Die ausgewählte Datei ist keine gültige ICS-Datei mit einem einzelnen Termin.',
+        'This ICS file contains multiple events.': 'Diese ICS-Datei enthält mehrere Termine.',
+        'Recurring ICS invitations cannot be imported as a single event.': 'Wiederkehrende ICS-Einladungen können hier nicht als Einzeltermin importiert werden.'
+    }
+};
+
+function icsImportText(value) {
+    const translated = t(value);
+    if (translated !== value) return translated;
+    const language = String(document.documentElement.lang || '').toLowerCase().split('-')[0];
+    return icsImportMessages[language]?.[value] || value;
+}
+
+const providerLinkMessages = {
+    de: {
+        'Open in provider': 'Extern öffnen'
+    }
+};
+
+function providerLinkText(value) {
+    const translated = t(value);
+    if (translated !== value) return translated;
+    const language = String(document.documentElement.lang || '').toLowerCase().split('-')[0];
+    return providerLinkMessages[language]?.[value] || value;
+}
+
+function providerEventUrl(event) {
+    const value = String(event?.url || '').trim();
+    if (!value) return '';
+
+    let url;
+    try {
+        url = new URL(value);
+    } catch (error) {
+        return '';
+    }
+    if (url.protocol !== 'https:') return '';
+
+    const host = url.hostname.toLowerCase();
+    const path = url.pathname.toLowerCase();
+    const googleCalendar = (host === 'calendar.google.com' || host === 'www.google.com')
+        && path.startsWith('/calendar/');
+    const microsoftCalendar = ['outlook.office.com', 'outlook.office365.com', 'outlook.live.com'].includes(host);
+
+    return googleCalendar || microsoftCalendar ? url.href : '';
+}
+
+function openProviderEvent() {
+    if (!selectedEvent) return;
+    const url = providerEventUrl(selectedEvent);
+    if (!url) return;
+    window.open(url, '_blank', 'noopener,noreferrer');
+}
+
+function unfoldIcsLines(value) {
+    const lines = [];
+    String(value || '').replace(/\r\n?/g, '\n').split('\n').forEach(line => {
+        if ((line.startsWith(' ') || line.startsWith('\t')) && lines.length > 0) {
+            lines[lines.length - 1] += line.slice(1);
+        } else {
+            lines.push(line);
+        }
+    });
+    return lines;
+}
+
+function parseIcsProperty(line) {
+    const separator = line.indexOf(':');
+    if (separator <= 0) return null;
+    const definition = line.slice(0, separator).split(';');
+    const propertyName = String(definition.shift() || '').split('.').pop().toUpperCase();
+    if (!propertyName) return null;
+    const parameters = {};
+    definition.forEach(parameter => {
+        const equals = parameter.indexOf('=');
+        if (equals <= 0) return;
+        const name = parameter.slice(0, equals).trim().toUpperCase();
+        let value = parameter.slice(equals + 1).trim();
+        if (value.startsWith('"') && value.endsWith('"') && value.length >= 2) {
+            value = value.slice(1, -1);
+        }
+        parameters[name] = value;
+    });
+    return {
+        name: propertyName,
+        parameters,
+        value: line.slice(separator + 1)
+    };
+}
+
+function unescapeIcsText(value) {
+    return String(value || '')
+        .replace(/\\[nN]/g, '\n')
+        .replace(/\\,/g, ',')
+        .replace(/\\;/g, ';')
+        .replace(/\\\\/g, '\\');
+}
+
+function collectIcsEventProperties(eventLines) {
+    const properties = {};
+    let nestedDepth = 0;
+    for (let index = 1; index < eventLines.length - 1; index++) {
+        const line = eventLines[index];
+        const upperLine = line.trim().toUpperCase();
+        if (upperLine.startsWith('BEGIN:')) {
+            nestedDepth++;
+            continue;
+        }
+        if (upperLine.startsWith('END:')) {
+            nestedDepth = Math.max(0, nestedDepth - 1);
+            continue;
+        }
+        if (nestedDepth > 0) continue;
+        const property = parseIcsProperty(line);
+        if (!property) continue;
+        if (!properties[property.name]) properties[property.name] = [];
+        properties[property.name].push(property);
+    }
+    return properties;
+}
+
+function normalizeIcsTimezone(value) {
+    let timezone = String(value || '').trim();
+    if (!timezone) return '';
+    const mappings = {
+        'GMT Standard Time': 'Europe/London',
+        'W. Europe Standard Time': 'Europe/Berlin',
+        'Central Europe Standard Time': 'Europe/Budapest',
+        'Romance Standard Time': 'Europe/Paris',
+        'Central European Standard Time': 'Europe/Warsaw',
+        'GTB Standard Time': 'Europe/Bucharest',
+        'FLE Standard Time': 'Europe/Kyiv',
+        'Turkey Standard Time': 'Europe/Istanbul',
+        'Russian Standard Time': 'Europe/Moscow',
+        'Eastern Standard Time': 'America/New_York',
+        'Central Standard Time': 'America/Chicago',
+        'Mountain Standard Time': 'America/Denver',
+        'Pacific Standard Time': 'America/Los_Angeles',
+        'Tokyo Standard Time': 'Asia/Tokyo',
+        'China Standard Time': 'Asia/Shanghai',
+        'India Standard Time': 'Asia/Kolkata',
+        'AUS Eastern Standard Time': 'Australia/Sydney',
+        'New Zealand Standard Time': 'Pacific/Auckland'
+    };
+    timezone = mappings[timezone] || timezone;
+    try {
+        new Intl.DateTimeFormat('en-US', { timeZone: timezone }).format(new Date());
+        return timezone;
+    } catch (error) {
+        const ianaMatch = timezone.match(/([A-Za-z_+-]+\/[A-Za-z0-9_+./-]+)$/);
+        if (!ianaMatch) return '';
+        try {
+            new Intl.DateTimeFormat('en-US', { timeZone: ianaMatch[1] }).format(new Date());
+            return ianaMatch[1];
+        } catch (nestedError) {
+            return '';
+        }
+    }
+}
+
+function datePartsInTimeZone(date, timezone) {
+    const values = {};
+    new Intl.DateTimeFormat('en-CA', {
+        timeZone: timezone,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hourCycle: 'h23'
+    }).formatToParts(date).forEach(part => {
+        if (part.type !== 'literal') values[part.type] = Number(part.value);
+    });
+    return values;
+}
+
+function dateFromIcsTimezone(parts, timezone) {
+    const target = Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute, parts.second);
+    let timestamp = target;
+    for (let attempt = 0; attempt < 3; attempt++) {
+        const observed = datePartsInTimeZone(new Date(timestamp), timezone);
+        const observedTimestamp = Date.UTC(
+            observed.year,
+            observed.month - 1,
+            observed.day,
+            observed.hour,
+            observed.minute,
+            observed.second
+        );
+        const adjustment = target - observedTimestamp;
+        timestamp += adjustment;
+        if (adjustment === 0) break;
+    }
+    return new Date(timestamp);
+}
+
+function validIcsDateParts(parts) {
+    const value = new Date(Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute, parts.second));
+    return value.getUTCFullYear() === parts.year
+        && value.getUTCMonth() === parts.month - 1
+        && value.getUTCDate() === parts.day
+        && value.getUTCHours() === parts.hour
+        && value.getUTCMinutes() === parts.minute
+        && value.getUTCSeconds() === parts.second;
+}
+
+function parseIcsDateProperty(property) {
+    if (!property) return null;
+    const value = String(property.value || '').trim();
+    const dateOnly = property.parameters.VALUE?.toUpperCase() === 'DATE' || /^\d{8}$/.test(value);
+    if (dateOnly) {
+        const match = /^(\d{4})(\d{2})(\d{2})$/.exec(value);
+        if (!match) return null;
+        const parts = {
+            year: Number(match[1]),
+            month: Number(match[2]),
+            day: Number(match[3]),
+            hour: 0,
+            minute: 0,
+            second: 0
+        };
+        if (!validIcsDateParts(parts)) return null;
+        return {
+            date: new Date(parts.year, parts.month - 1, parts.day),
+            allDay: true,
+            timezone: ''
+        };
+    }
+
+    const match = /^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})?(Z)?$/i.exec(value);
+    if (!match) return null;
+    const parts = {
+        year: Number(match[1]),
+        month: Number(match[2]),
+        day: Number(match[3]),
+        hour: Number(match[4]),
+        minute: Number(match[5]),
+        second: Number(match[6] || 0)
+    };
+    if (!validIcsDateParts(parts)) return null;
+
+    if (match[7]) {
+        return {
+            date: new Date(Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute, parts.second)),
+            allDay: false,
+            timezone: 'UTC'
+        };
+    }
+
+    const timezone = normalizeIcsTimezone(property.parameters.TZID || '');
+    return {
+        date: timezone
+            ? dateFromIcsTimezone(parts, timezone)
+            : new Date(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute, parts.second),
+        allDay: false,
+        timezone
+    };
+}
+
+function parseIcsDuration(value) {
+    const match = /^P(?:(\d+)W)?(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?)?$/i.exec(String(value || '').trim());
+    if (!match) return 0;
+    const seconds = (Number(match[1] || 0) * 7 * 86400)
+        + (Number(match[2] || 0) * 86400)
+        + (Number(match[3] || 0) * 3600)
+        + (Number(match[4] || 0) * 60)
+        + Number(match[5] || 0);
+    return seconds * 1000;
+}
+
+function parseIcsTriggerMinutes(property) {
+    if (!property || String(property.parameters.RELATED || 'START').toUpperCase() !== 'START') return null;
+    const value = String(property.value || '').trim().toUpperCase();
+    if (!value.startsWith('-')) return null;
+    const duration = parseIcsDuration(value.slice(1));
+    if (duration < 0 || duration > 40320 * 60 * 1000 || duration % 60000 !== 0) return null;
+    return duration / 60000;
+}
+
+function parseIcsReminder(eventLines) {
+    const reminders = [];
+    let inAlarm = false;
+    for (const line of eventLines) {
+        const upperLine = line.trim().toUpperCase();
+        if (upperLine === 'BEGIN:VALARM') {
+            inAlarm = true;
+            continue;
+        }
+        if (upperLine === 'END:VALARM') {
+            inAlarm = false;
+            continue;
+        }
+        if (!inAlarm) continue;
+        const property = parseIcsProperty(line);
+        if (property?.name !== 'TRIGGER') continue;
+        const minutes = parseIcsTriggerMinutes(property);
+        if (minutes !== null && !reminders.includes(minutes)) reminders.push(minutes);
+    }
+    reminders.sort((left, right) => right - left);
+    if (reminders.length === 0) {
+        return { mode: 'none', minutesBeforeStart: null, reminders: [], editable: true };
+    }
+    if (reminders.length === 1) {
+        return {
+            mode: 'custom',
+            minutesBeforeStart: reminders[0],
+            reminders: [{ minutesBeforeStart: reminders[0] }],
+            editable: true
+        };
+    }
+    return {
+        mode: 'multiple',
+        minutesBeforeStart: null,
+        reminders: reminders.slice(0, 5).map(minutesBeforeStart => ({ minutesBeforeStart })),
+        editable: true
+    };
+}
+
+function extractHttpUrl(value) {
+    const match = String(value || '').match(/https?:\/\/[^\s<>"']+/i);
+    return match ? match[0].replace(/[),.;]+$/, '') : '';
+}
+
+function conferenceUrlFromIcs(properties, description, location) {
+    const propertyNames = Object.keys(properties);
+    const preferredNames = propertyNames.filter(name => /(?:CONFERENCE|MEETING|JOIN)/i.test(name));
+    const genericNames = propertyNames.filter(name => name === 'URL');
+    for (const name of [...preferredNames, ...genericNames]) {
+        for (const property of properties[name]) {
+            const url = extractHttpUrl(unescapeIcsText(property.value));
+            if (url) return url;
+        }
+    }
+    return extractHttpUrl(description) || extractHttpUrl(location);
+}
+
+function appendConferenceUrl(description, conferenceUrl) {
+    const value = String(description || '').trim();
+    if (!conferenceUrl || value.includes(conferenceUrl)) return value.slice(0, 5000);
+    const separator = value ? '\n\n' : '';
+    const available = Math.max(0, 5000 - separator.length - conferenceUrl.length);
+    return value.slice(0, available).trimEnd() + separator + conferenceUrl;
+}
+
+function parseSingleIcsEvent(value) {
+    const lines = unfoldIcsLines(value);
+    if (!lines.some(line => line.trim().toUpperCase() === 'BEGIN:VCALENDAR')) {
+        throw new Error(icsImportText('The selected file is not a valid single-event ICS file.'));
+    }
+    if (lines.some(line => line.trim().toUpperCase() === 'METHOD:CANCEL')) {
+        throw new Error(icsImportText('The selected file is not a valid single-event ICS file.'));
+    }
+
+    const eventBlocks = [];
+    let eventStartIndex = -1;
+    lines.forEach((line, index) => {
+        const upperLine = line.trim().toUpperCase();
+        if (upperLine === 'BEGIN:VEVENT') {
+            if (eventStartIndex !== -1) {
+                throw new Error(icsImportText('The selected file is not a valid single-event ICS file.'));
+            }
+            eventStartIndex = index;
+        } else if (upperLine === 'END:VEVENT' && eventStartIndex !== -1) {
+            eventBlocks.push(lines.slice(eventStartIndex, index + 1));
+            eventStartIndex = -1;
+        }
+    });
+    if (eventStartIndex !== -1 || eventBlocks.length === 0) {
+        throw new Error(icsImportText('The selected file is not a valid single-event ICS file.'));
+    }
+    if (eventBlocks.length > 1) {
+        throw new Error(icsImportText('This ICS file contains multiple events.'));
+    }
+
+    const eventLines = eventBlocks[0];
+    const properties = collectIcsEventProperties(eventLines);
+    if ((properties.RRULE?.length || 0) > 0 || (properties.RDATE?.length || 0) > 0) {
+        throw new Error(icsImportText('Recurring ICS invitations cannot be imported as a single event.'));
+    }
+    if (String(properties.STATUS?.[0]?.value || '').trim().toUpperCase() === 'CANCELLED') {
+        throw new Error(icsImportText('The selected file is not a valid single-event ICS file.'));
+    }
+
+    const start = parseIcsDateProperty(properties.DTSTART?.[0]);
+    if (!start) {
+        throw new Error(icsImportText('The selected file is not a valid single-event ICS file.'));
+    }
+    let end = parseIcsDateProperty(properties.DTEND?.[0]);
+    if (end && end.allDay !== start.allDay) end = null;
+    if (!end) {
+        const duration = parseIcsDuration(properties.DURATION?.[0]?.value || '');
+        end = {
+            date: new Date(start.date.getTime() + (duration || (start.allDay ? 86400000 : 3600000))),
+            allDay: start.allDay,
+            timezone: start.timezone
+        };
+    }
+    if (end.date <= start.date) {
+        end.date = new Date(start.date.getTime() + (start.allDay ? 86400000 : 3600000));
+    }
+
+    const summary = unescapeIcsText(properties.SUMMARY?.[0]?.value || '').trim();
+    const location = unescapeIcsText(properties.LOCATION?.[0]?.value || '').trim();
+    const description = unescapeIcsText(properties.DESCRIPTION?.[0]?.value || '').trim();
+    const conferenceUrl = conferenceUrlFromIcs(properties, description, location);
+    return {
+        summary: (summary || icsImportText('Untitled event')).slice(0, 250),
+        location: location.slice(0, 500),
+        description: appendConferenceUrl(description, conferenceUrl),
+        allDay: start.allDay,
+        start: start.date,
+        end: end.date,
+        timezone: start.timezone || end.timezone || '',
+        reminder: parseIcsReminder(eventLines)
+    };
+}
+
+function applyImportedIcsEvent(importedEvent) {
+    if (selectedEvent !== null) return;
+    importedIcsTimezone = importedEvent.timezone || '';
+    document.getElementById('event-summary').value = importedEvent.summary;
+    document.getElementById('event-location').value = importedEvent.location;
+    document.getElementById('event-description').value = importedEvent.description;
+    document.getElementById('event-all-day').checked = importedEvent.allDay;
+    resetAnniversaryEditor();
+    setDateInputs(importedEvent.start, importedEvent.end, importedEvent.allDay, importedEvent.allDay);
+    resetRecurrenceEditor(importedEvent.start);
+    loadReminderEditor({ reminder: importedEvent.reminder });
+    updateRecurrenceAvailability();
+    updateAnniversaryControls();
+    updateReminderControls();
+}
+
+async function importIcsFile(file) {
+    if (!file || selectedEvent !== null) return;
+    if (file.size <= 0 || file.size > icsImportMaximumBytes) {
+        throw new Error(icsImportText(file.size > icsImportMaximumBytes
+            ? 'The ICS file is too large.'
+            : 'The selected file is not a valid single-event ICS file.'));
+    }
+    const content = typeof file.text === 'function'
+        ? await file.text()
+        : await new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(String(reader.result || ''));
+            reader.onerror = () => reject(new Error(icsImportText('The selected file is not a valid single-event ICS file.')));
+            reader.readAsText(file);
+        });
+    applyImportedIcsEvent(parseSingleIcsEvent(content));
+}
+
 function openNewEvent(preferredDay = null) {
     const writable = calendarState.calendars.filter(calendar => calendar.canWrite);
     if (!writable.length) return;
+    beginAgendaScrollWorkflow('create');
     selectedEvent = null;
+    importedIcsTimezone = '';
+    icsImportFile.value = '';
+    icsImportFile.disabled = !calendarCanImportIcsFile;
+    icsImportButton.classList.toggle('hidden', !calendarCanImportIcsFile);
     populateCalendarSelect(writable, writable[0].instanceId);
     document.getElementById('dialog-title').textContent = t('Create event');
     document.getElementById('event-summary').value = '';
     document.getElementById('event-location').value = '';
     document.getElementById('event-description').value = '';
     document.getElementById('event-all-day').checked = false;
+    resetAnniversaryEditor();
     let start;
     if (preferredDay instanceof Date && !Number.isNaN(preferredDay.getTime())) {
         start = startOfDay(preferredDay);
@@ -829,8 +2340,8 @@ function openNewEvent(preferredDay = null) {
             start.setMinutes(0, 0, 0);
             start.setHours(start.getHours() + 1);
             if (dayKey(start) !== dayKey(today)) {
-                start = startOfDay(preferredDay);
-                start.setHours(23, 0, 0, 0);
+                start = new Date();
+                start.setSeconds(0, 0);
             }
         } else {
             start.setHours(9, 0, 0, 0);
@@ -842,19 +2353,35 @@ function openNewEvent(preferredDay = null) {
     }
     const end = new Date(start.getTime() + 60 * 60 * 1000);
     setDateInputs(start, end, false);
-    setDialogEditable(true);
-    document.getElementById('delete-button').classList.add('hidden');
+
+    eventRecurrenceFrequency.value = 'none';
+    eventRecurrenceOptions.classList.add('hidden');
+    eventReminderMode.value = 'none';
+    clearExtraReminderEntries();
+    setDialogEditable(false);
     document.getElementById('dialog-note').classList.add('hidden');
     updateDialogColor();
     updateSaveButtonLabel();
-    eventDialog.showModal();
+    setEventDialogLoading('create');
+    showEventDialog();
+
+    deferEventDialogSetup(() => {
+        resetRecurrenceEditor(start);
+        resetReminderEditor();
+        setEventDialogLoading();
+        setDialogEditable(true);
+        updateDialogColor();
+        updateSaveButtonLabel();
+    });
 }
 
 function openEventDetails(event) {
+    beginAgendaScrollWorkflow('details');
     selectedEvent = event;
-    const editable = eventIsEditable(event);
+    const editable = eventCanUpdate(event);
+    const deletable = eventCanDelete(event);
     document.getElementById('details-dialog-title').textContent = t('Event details');
-    document.getElementById('details-summary').textContent = event.summary || t('Untitled event');
+    document.getElementById('details-summary').textContent = eventDisplaySummary(event) || t('Untitled event');
     document.getElementById('details-calendar').textContent = event.calendarName || '';
     document.getElementById('details-color').style.setProperty('--dialog-accent-color', safeColor(event.calendarColor));
 
@@ -869,10 +2396,13 @@ function openEventDetails(event) {
         document.getElementById('details-end').textContent = formatDetailDateTime(end);
     }
 
+    setOptionalDetail('occasion', annualEventLabel(event));
+    setOptionalDetail('reminder', reminderDetailText(event));
     setOptionalDetail('location', event.location);
     setOptionalDetail('description', event.description);
+    document.getElementById('details-provider-button').classList.toggle('hidden', providerEventUrl(event) === '');
     document.getElementById('details-edit-button').classList.toggle('hidden', !editable);
-    document.getElementById('details-delete-button').classList.toggle('hidden', !editable);
+    document.getElementById('details-delete-button').classList.toggle('hidden', !deletable);
 
     const note = document.getElementById('details-note');
     const reason = eventReadOnlyReason(event);
@@ -881,12 +2411,188 @@ function openEventDetails(event) {
     eventDetailsDialog.showModal();
 }
 
+function openPendingEventEditor(event, writeScope = '') {
+    const scope = event.recurring ? (writeScope || event.writeScope || 'occurrence') : '';
+    selectedEvent = { ...event, writeScope: scope };
+    importedIcsTimezone = '';
+    icsImportFile.value = '';
+    icsImportButton.classList.add('hidden');
+
+    const calendar = calendarEntryByInstanceId(selectedEvent.calendarInstanceId);
+    populateCalendarSelect(calendar ? [calendar] : [], selectedEvent.calendarInstanceId);
+    setCalendarSelectDisabled(true);
+    document.getElementById('dialog-title').textContent = t(scope === 'series' ? 'Edit recurring event' : 'Edit event');
+    document.getElementById('event-summary').value = selectedEvent.summary || '';
+    document.getElementById('event-location').value = selectedEvent.location || '';
+    document.getElementById('event-description').value = selectedEvent.description || '';
+    document.getElementById('event-all-day').checked = Boolean(selectedEvent.allDay);
+    loadAnniversaryEditor(selectedEvent);
+    setDateInputs(
+        eventStart(selectedEvent),
+        eventEnd(selectedEvent),
+        Boolean(selectedEvent.allDay),
+        Boolean(selectedEvent.allDay)
+    );
+    setDialogEditable(false);
+    document.getElementById('dialog-note').classList.add('hidden');
+    updateDialogColor();
+    updateSaveButtonLabel();
+    setEventDialogLoading('provider');
+    showEventDialog();
+}
+
+function requestEdit(sourceDialog) {
+    if (!selectedEvent || !eventCanUpdate(selectedEvent)) return;
+    const event = selectedEvent;
+    const occurrenceAllowed = eventCanUpdateOccurrence(event);
+    const followingAllowed = eventCanUpdateFollowing(event);
+    const seriesAllowed = eventCanUpdateSeries(event);
+    if (!eventIsRecurring(event) || (!followingAllowed && !seriesAllowed)) {
+        beginAgendaScrollWorkflow('edit');
+        sourceDialog?.close();
+        void prepareEventEdit(event);
+        return;
+    }
+
+    editScopeSourceDialog = sourceDialog;
+    document.getElementById('edit-scope-occurrence-option').classList.toggle('hidden', !occurrenceAllowed);
+    document.getElementById('edit-scope-following-option').classList.toggle('hidden', !followingAllowed);
+    document.getElementById('edit-scope-series-option').classList.toggle('hidden', !seriesAllowed);
+    const defaultValue = occurrenceAllowed ? 'occurrence' : (followingAllowed ? 'following' : 'series');
+    editScopeDialog.querySelectorAll('input[name="edit-scope"]').forEach(input => {
+        input.checked = input.value === defaultValue;
+    });
+    editScopeDialog.showModal();
+}
+
+async function confirmEditScope() {
+    if (!selectedEvent || !eventCanUpdate(selectedEvent)) {
+        editScopeDialog.close();
+        return;
+    }
+
+    const event = selectedEvent;
+    const sourceDialog = editScopeSourceDialog;
+    const selected = editScopeDialog.querySelector('input[name="edit-scope"]:checked');
+    const scope = ['following', 'series'].includes(selected?.value) ? selected.value : 'occurrence';
+    editScopeConfirmButton.disabled = true;
+    try {
+        beginAgendaScrollWorkflow('edit');
+        editScopeDialog.close();
+        sourceDialog?.close();
+        if (scope === 'occurrence') {
+            await prepareEventEdit(event);
+            return;
+        }
+
+        pendingSeriesEdit = {
+            calendarInstanceId: Number(event.calendarInstanceId),
+            seriesId: String(event.seriesId || ''),
+            resourceUrl: String(event.resourceUrl || ''),
+            occurrenceId: String(event.occurrenceId || ''),
+            originalStart: String(event.originalStart || ''),
+            writeScope: scope
+        };
+        if (!pendingSeriesEdit.calendarInstanceId || !pendingSeriesEdit.seriesId
+            || (scope === 'following' && (!pendingSeriesEdit.occurrenceId || !pendingSeriesEdit.originalStart))) {
+            pendingSeriesEdit = null;
+            clearAgendaScrollWorkflow(true);
+            return;
+        }
+
+        openPendingEventEditor(event, scope);
+        if (!await sendAction('PrepareSeriesEdit', pendingSeriesEdit)) {
+            cancelPendingProviderEditor();
+            clearAgendaScrollWorkflow(true);
+        }
+    } finally {
+        editScopeConfirmButton.disabled = false;
+    }
+}
+
+async function prepareEventEdit(event) {
+    const calendarInstanceId = Number(event?.calendarInstanceId || 0);
+    const eventReference = String(event?.eventReference || '');
+    const occurrenceId = String(event?.occurrenceId || '');
+    const uid = String(event?.uid || '');
+    const seriesId = String(event?.seriesId || '');
+    const originalStart = String(event?.originalStart || '');
+    const startTimestamp = Number(event?.startTimestamp)
+        || Math.floor(eventStart(event).getTime() / 1000);
+    const endTimestamp = Number(event?.endTimestamp)
+        || Math.floor(eventEnd(event).getTime() / 1000);
+
+    pendingEventEdit = {
+        calendarInstanceId,
+        eventReference,
+        occurrenceId,
+        uid,
+        seriesId,
+        originalStart
+    };
+    const request = {
+        calendarInstanceId,
+        event: {
+            uid,
+            resourceUrl: String(event?.resourceUrl || ''),
+            eventReference,
+            seriesId,
+            occurrenceId,
+            originalStart,
+            recurrenceId: String(event?.recurrenceId || ''),
+            startTimestamp,
+            endTimestamp
+        }
+    };
+
+    if (!calendarInstanceId || startTimestamp <= 0) {
+        pendingEventEdit = null;
+        clearAgendaScrollWorkflow(true);
+        return;
+    }
+
+    openPendingEventEditor(event, 'occurrence');
+    if (!(await sendAction('PrepareEventEdit', request))) {
+        cancelPendingProviderEditor();
+        clearAgendaScrollWorkflow(true);
+    }
+}
+
 function requestDelete(sourceDialog) {
-    if (!selectedEvent || !eventIsEditable(selectedEvent)) return;
+    if (!selectedEvent || !eventCanDelete(selectedEvent)) return;
     deleteSourceDialog = sourceDialog;
-    document.getElementById('delete-confirm-summary').textContent = selectedEvent.summary || t('Untitled event');
+    document.getElementById('delete-confirm-summary').textContent = eventDisplaySummary(selectedEvent) || t('Untitled event');
     document.getElementById('delete-confirm-period').textContent = formatDeleteEventPeriod(selectedEvent);
+    updateDeleteScope(selectedEvent);
     deleteConfirmDialog.showModal();
+}
+
+function updateDeleteScope(event) {
+    const scope = document.getElementById('delete-scope');
+    const occurrenceOption = document.getElementById('delete-scope-occurrence-option');
+    const followingOption = document.getElementById('delete-scope-following-option');
+    const seriesOption = document.getElementById('delete-scope-series-option');
+    const occurrenceAllowed = Boolean(event.recurring) && Boolean(event.canDeleteOccurrence);
+    const followingAllowed = eventCanDeleteFollowing(event);
+    const seriesAllowed = Boolean(event.recurring) && Boolean(event.canDeleteSeries);
+    occurrenceOption.classList.toggle('hidden', !occurrenceAllowed);
+    followingOption.classList.toggle('hidden', !followingAllowed);
+    seriesOption.classList.toggle('hidden', !seriesAllowed);
+    scope.classList.toggle(
+        'hidden',
+        !event.recurring || (!occurrenceAllowed && !followingAllowed && !seriesAllowed)
+    );
+
+    const defaultValue = occurrenceAllowed ? 'occurrence' : (followingAllowed ? 'following' : 'series');
+    scope.querySelectorAll('input[name="delete-scope"]').forEach(input => {
+        input.checked = input.value === defaultValue;
+    });
+}
+
+function selectedDeleteScope(event) {
+    if (!event?.recurring) return '';
+    const selected = document.querySelector('input[name="delete-scope"]:checked');
+    return ['following', 'series'].includes(selected?.value) ? selected.value : 'occurrence';
 }
 
 function formatDeleteEventPeriod(event) {
@@ -903,13 +2609,15 @@ function formatDeleteEventPeriod(event) {
 }
 
 async function confirmDeleteEvent() {
-    if (!selectedEvent || !eventIsEditable(selectedEvent)) {
+    if (!selectedEvent || !eventCanDelete(selectedEvent)) {
         deleteConfirmDialog.close();
         return;
     }
 
     const event = selectedEvent;
     const sourceDialog = deleteSourceDialog;
+    beginAgendaScrollWorkflow('delete');
+    releaseAgendaScrollWorkflowAfterState();
     deleteConfirmButton.disabled = true;
     try {
         const success = await sendAction('DeleteEvent', {
@@ -917,24 +2625,127 @@ async function confirmDeleteEvent() {
             event: {
                 resourceUrl: event.resourceUrl,
                 etag: event.etag,
-                recurrenceId: event.recurrenceId || ''
+                ...recurrencePayload(event, selectedDeleteScope(event))
             }
         });
         if (success) {
             deleteConfirmDialog.close();
             sourceDialog?.close();
+        } else {
+            cancelAgendaScrollWorkflowRelease();
         }
     } finally {
         deleteConfirmButton.disabled = false;
     }
 }
 
-function eventIsEditable(event) {
-    return hasActionBridge() && Boolean(event.canWrite) && !event.recurring && !event.recurrenceId;
+function eventIsRecurring(event) {
+    const recurrenceType = String(event?.recurrenceType || '').trim().toLowerCase();
+    return Boolean(event?.recurring)
+        || Boolean(event?.seriesId)
+        || ['master', 'occurrence', 'exception', 'unknown'].includes(recurrenceType);
+}
+
+function eventWriteCapability(event, capability) {
+    const calendar = calendarEntryByInstanceId(event?.calendarInstanceId);
+    return Boolean(event?.[capability]) || Boolean(calendar?.[capability]);
+}
+
+function eventCanUpdateOccurrence(event) {
+    return hasActionBridge()
+        && Boolean(event.canWrite)
+        && (!eventIsRecurring(event) || eventWriteCapability(event, 'canUpdateOccurrence'));
+}
+
+function eventCanUpdateFollowing(event) {
+    return hasActionBridge()
+        && Boolean(event.canWrite)
+        && eventIsRecurring(event)
+        && eventWriteCapability(event, 'canUpdateFollowing')
+        && Boolean(event.seriesId)
+        && Boolean(event.occurrenceId)
+        && Boolean(event.originalStart);
+}
+
+function eventCanUpdateSeries(event) {
+    return hasActionBridge()
+        && Boolean(event.canWrite)
+        && eventIsRecurring(event)
+        && eventWriteCapability(event, 'canUpdateSeries')
+        && Boolean(event.seriesId);
+}
+
+function eventCanUpdate(event) {
+    return eventCanUpdateOccurrence(event) || eventCanUpdateFollowing(event) || eventCanUpdateSeries(event);
+}
+
+function eventCanMove(event, writeScope = '') {
+    if (!hasActionBridge() || !Boolean(event?.canWrite)) return false;
+    const reminder = eventReminderState(event);
+    if (reminder.mode === 'complex') return false;
+    if (reminder.mode === 'default') {
+        const sourceCalendar = calendarEntryByInstanceId(event?.calendarInstanceId);
+        if (calendarDefaultReminderState(sourceCalendar).mode === 'complex') return false;
+    }
+    if (!Boolean(event?.recurring)) {
+        return eventCanUpdateOccurrence(event) && eventCanDelete(event);
+    }
+
+    const scope = writeScope || event.writeScope || 'occurrence';
+    if (scope === 'series') {
+        return eventCanUpdateSeries(event)
+            && Boolean(event.canDeleteSeries)
+            && event.recurrenceEditable !== false;
+    }
+    if (scope === 'following') {
+        return eventCanUpdateFollowing(event)
+            && eventCanDeleteFollowing(event)
+            && event.recurrenceEditable !== false;
+    }
+
+    return eventCanUpdateOccurrence(event) && Boolean(event.canDeleteOccurrence);
+}
+
+function eventCanDeleteFollowing(event) {
+    return hasActionBridge()
+        && Boolean(event.canWrite)
+        && Boolean(event.recurring)
+        && Boolean(event.canUpdateFollowing)
+        && Boolean(event.canDeleteSeries)
+        && Boolean(event.seriesId)
+        && Boolean(event.occurrenceId)
+        && Boolean(event.originalStart);
+}
+
+function eventCanDelete(event) {
+    return hasActionBridge()
+        && Boolean(event.canWrite)
+        && (!event.recurring
+            || Boolean(event.canDeleteOccurrence)
+            || eventCanDeleteFollowing(event)
+            || Boolean(event.canDeleteSeries));
+}
+
+function recurrencePayload(event, writeScope = '') {
+    const scope = writeScope || event.writeScope || '';
+    return {
+        recurrenceType: event.recurrenceType || (event.recurring ? 'unknown' : 'single'),
+        seriesId: event.seriesId || '',
+        occurrenceId: event.occurrenceId || '',
+        originalStart: event.originalStart || '',
+        recurrenceId: event.recurrenceId || '',
+        recurring: Boolean(event.recurring),
+        canUpdateOccurrence: Boolean(event.canUpdateOccurrence),
+        canDeleteOccurrence: Boolean(event.canDeleteOccurrence),
+        canUpdateFollowing: Boolean(event.canUpdateFollowing),
+        canUpdateSeries: Boolean(event.canUpdateSeries),
+        canDeleteSeries: Boolean(event.canDeleteSeries),
+        writeScope: scope
+    };
 }
 
 function eventReadOnlyReason(event) {
-    if (eventIsEditable(event)) return '';
+    if (eventCanUpdate(event) || eventCanDelete(event)) return '';
     if (!hasActionBridge()) return 'Editing events is unavailable because no action bridge is configured.';
     if (event.recurring || event.recurrenceId) return 'Recurring occurrences are currently read-only.';
     return 'This calendar is read-only.';
@@ -956,26 +2767,68 @@ function formatDetailDateTime(date) {
     return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(date);
 }
 
-function openExistingEvent(event) {
-    selectedEvent = event;
-    const editable = eventIsEditable(event);
+function openExistingEvent(event, writeScope = '') {
+    setEventDialogLoading();
+    const scope = event.recurring ? (writeScope || event.writeScope || 'occurrence') : '';
+    selectedEvent = { ...event, writeScope: scope };
+    importedIcsTimezone = '';
+    icsImportFile.value = '';
+    icsImportButton.classList.add('hidden');
+    const editingSeries = Boolean(selectedEvent.recurring) && scope === 'series';
+    const editingFollowing = Boolean(selectedEvent.recurring) && scope === 'following';
+    const recurringOccurrence = Boolean(selectedEvent.recurring) && !editingSeries && !editingFollowing;
+    const editable = editingSeries
+        ? eventCanUpdateSeries(selectedEvent)
+        : editingFollowing
+            ? eventCanUpdateFollowing(selectedEvent)
+            : eventCanUpdateOccurrence(selectedEvent);
+    const canMove = editable && eventCanMove(selectedEvent, scope);
+    const recurringTargetRequired = editingSeries || editingFollowing;
     const availableCalendars = editable
-        ? calendarState.calendars.filter(calendar => calendar.canWrite || calendar.instanceId === event.calendarInstanceId)
+        ? calendarState.calendars.filter(calendar => calendar.instanceId === selectedEvent.calendarInstanceId
+            || (canMove
+                && calendar.canWrite
+                && (!recurringTargetRequired || calendar.canCreateRecurrence)))
         : calendarState.calendars;
-    populateCalendarSelect(availableCalendars, event.calendarInstanceId);
-    setCalendarSelectDisabled(!editable);
-    document.getElementById('dialog-title').textContent = t('Edit event');
-    document.getElementById('event-summary').value = event.summary || '';
-    document.getElementById('event-location').value = event.location || '';
-    document.getElementById('event-description').value = event.description || '';
-    document.getElementById('event-all-day').checked = Boolean(event.allDay);
-    setDateInputs(eventStart(event), eventEnd(event), Boolean(event.allDay), Boolean(event.allDay));
-    const descriptionEditable = editable && !Boolean(event.onlineMeeting);
+    populateCalendarSelect(availableCalendars, selectedEvent.calendarInstanceId);
+    setCalendarSelectDisabled(!canMove);
+    document.getElementById('dialog-title').textContent = t(editingSeries ? 'Edit recurring event' : 'Edit event');
+    document.getElementById('event-summary').value = selectedEvent.summary || '';
+    document.getElementById('event-location').value = selectedEvent.location || '';
+    document.getElementById('event-description').value = selectedEvent.description || '';
+    document.getElementById('event-all-day').checked = Boolean(selectedEvent.allDay);
+    loadAnniversaryEditor(selectedEvent);
+    setDateInputs(
+        eventStart(selectedEvent),
+        eventEnd(selectedEvent),
+        Boolean(selectedEvent.allDay),
+        Boolean(selectedEvent.allDay)
+    );
+    if (editingSeries || editingFollowing) {
+        loadRecurrenceEditor(selectedEvent);
+    } else if (!selectedEvent.recurring) {
+        resetRecurrenceEditor(eventStart(selectedEvent));
+    } else {
+        updateRecurrenceAvailability();
+    }
+    loadReminderEditor(selectedEvent);
+    const descriptionEditable = editable && !Boolean(selectedEvent.onlineMeeting);
     setDialogEditable(editable, descriptionEditable);
-    document.getElementById('delete-button').classList.toggle('hidden', !editable);
+    document.getElementById('delete-button').classList.toggle('hidden', !eventCanDelete(selectedEvent));
     const note = document.getElementById('dialog-note');
     if (!editable) {
-        note.textContent = t(eventReadOnlyReason(event));
+        note.textContent = t(eventReadOnlyReason(selectedEvent));
+        note.classList.remove('hidden');
+    } else if (editingSeries) {
+        note.textContent = selectedEvent.recurrenceEditable === false
+            ? `${t('Changes will apply to the entire recurring series.')} ${t('The recurrence pattern of this series cannot be edited here.')}`
+            : t('Changes will apply to the entire recurring series.');
+        note.classList.remove('hidden');
+    } else if (editingFollowing) {
+        note.textContent = `${t('Changes will apply to this and all following occurrences.')} ${t('Existing exceptions from this occurrence onward will be reset.')}`;
+        note.classList.remove('hidden');
+    } else if (recurringOccurrence) {
+        note.textContent = t('Only this occurrence of the recurring event will be changed.');
         note.classList.remove('hidden');
     } else if (!descriptionEditable) {
         note.textContent = t('The description of Microsoft online meetings is protected and cannot be edited here.');
@@ -985,7 +2838,7 @@ function openExistingEvent(event) {
     }
     updateDialogColor();
     updateSaveButtonLabel();
-    eventDialog.showModal();
+    showEventDialog();
 }
 
 function populateCalendarSelect(calendars, selectedId) {
@@ -1079,12 +2932,707 @@ function handleCalendarOptionKeydown(event) {
     options[nextIndex]?.focus();
 }
 
+function calendarEntryByInstanceId(instanceId) {
+    const normalizedId = Number(instanceId);
+    return calendarState.calendars.find(calendar => Number(calendar.instanceId) === normalizedId) || null;
+}
+
+function selectedCalendarEntry() {
+    return calendarEntryByInstanceId(eventCalendarInput.value);
+}
+
+function eventReminderState(event) {
+    const reminder = event?.reminder;
+    if (!reminder || typeof reminder !== 'object' || Array.isArray(reminder)) {
+        return { mode: 'none', minutesBeforeStart: null, reminders: [], editable: true };
+    }
+
+    const mode = ['default', 'none', 'custom', 'multiple', 'complex'].includes(reminder.mode)
+        ? reminder.mode
+        : 'complex';
+    const editable = reminder.editable !== false && mode !== 'complex';
+    if (mode === 'custom') {
+        const minutes = Number(reminder.minutesBeforeStart);
+        if (!Number.isInteger(minutes) || minutes < 0 || minutes > 40320) {
+            return { mode: 'complex', minutesBeforeStart: null, reminders: [], editable: false };
+        }
+        return { mode, minutesBeforeStart: minutes, reminders: [minutes], editable };
+    }
+    if (mode === 'multiple') {
+        const items = Array.isArray(reminder.reminders) ? reminder.reminders : [];
+        const minutes = items.map(item => Number(item?.minutesBeforeStart));
+        if (minutes.length < 2
+            || minutes.length > 5
+            || minutes.some(value => !Number.isInteger(value) || value < 0 || value > 40320)
+            || new Set(minutes).size !== minutes.length) {
+            return { mode: 'complex', minutesBeforeStart: null, reminders: [], editable: false };
+        }
+        return { mode, minutesBeforeStart: null, reminders: minutes, editable };
+    }
+
+    return { mode, minutesBeforeStart: null, reminders: [], editable };
+}
+
+function calendarDefaultReminderState(calendar) {
+    if (!calendar || !Boolean(calendar.canUseDefaultReminder)) {
+        return { mode: 'complex', minutesBeforeStart: null, reminders: [], editable: false };
+    }
+
+    const reminder = calendar.defaultReminder;
+    if (!reminder || typeof reminder !== 'object' || Array.isArray(reminder)) {
+        return { mode: 'complex', minutesBeforeStart: null, reminders: [], editable: false };
+    }
+
+    const mode = ['none', 'custom', 'multiple', 'complex'].includes(reminder.mode)
+        ? reminder.mode
+        : 'complex';
+    if (mode === 'custom') {
+        const minutes = Number(reminder.minutesBeforeStart);
+        if (!Number.isInteger(minutes) || minutes < 0 || minutes > 40320) {
+            return { mode: 'complex', minutesBeforeStart: null, reminders: [], editable: false };
+        }
+        return {
+            mode,
+            minutesBeforeStart: minutes,
+            reminders: [minutes],
+            editable: reminder.editable !== false
+        };
+    }
+    if (mode === 'multiple') {
+        const items = Array.isArray(reminder.reminders) ? reminder.reminders : [];
+        const minutes = items.map(item => Number(item?.minutesBeforeStart));
+        if (minutes.length < 2
+            || minutes.length > 5
+            || minutes.some(value => !Number.isInteger(value) || value < 0 || value > 40320)
+            || new Set(minutes).size !== minutes.length) {
+            return { mode: 'complex', minutesBeforeStart: null, reminders: [], editable: false };
+        }
+        return {
+            mode,
+            minutesBeforeStart: null,
+            reminders: minutes,
+            editable: reminder.editable !== false
+        };
+    }
+
+    return {
+        mode,
+        minutesBeforeStart: null,
+        reminders: [],
+        editable: reminder.editable !== false && mode !== 'complex'
+    };
+}
+
+function maxReminderCount(calendar = selectedCalendarEntry()) {
+    const value = Number(calendar?.maxReminders);
+    return Math.max(1, Math.min(5, Number.isInteger(value) ? value : 1));
+}
+
+function reminderEditorEntries() {
+    return [
+        { valueInput: eventReminderValue, unitSelect: eventReminderUnit, removeButton: null },
+        ...Array.from(eventReminderExtraList.querySelectorAll('.reminder-extra-entry')).map(entry => ({
+            valueInput: entry.querySelector('.event-reminder-extra-value'),
+            unitSelect: entry.querySelector('.event-reminder-extra-unit'),
+            removeButton: entry.querySelector('[data-reminder-remove]')
+        }))
+    ].filter(entry => entry.valueInput && entry.unitSelect);
+}
+
+function createReminderUnitSelect() {
+    const select = document.createElement('select');
+    select.className = 'event-reminder-extra-unit';
+    [
+        ['minutes', 'Minutes'],
+        ['hours', 'Hours'],
+        ['days', 'Days'],
+        ['weeks', 'Weeks']
+    ].forEach(([value, label]) => {
+        const option = document.createElement('option');
+        option.value = value;
+        option.textContent = t(label);
+        select.append(option);
+    });
+    return select;
+}
+
+function appendReminderEditorEntry(minutesBeforeStart) {
+    const entry = document.createElement('div');
+    entry.className = 'reminder-extra-entry';
+
+    const fields = document.createElement('div');
+    fields.className = 'form-row two';
+
+    const valueRow = document.createElement('div');
+    valueRow.className = 'form-row';
+    const valueLabel = document.createElement('label');
+    valueLabel.textContent = t('Before start');
+    const valueInput = document.createElement('input');
+    valueInput.type = 'number';
+    valueInput.min = '0';
+    valueInput.max = '40320';
+    valueInput.className = 'event-reminder-extra-value';
+    valueRow.append(valueLabel, valueInput);
+
+    const unitRow = document.createElement('div');
+    unitRow.className = 'form-row';
+    const unitLabel = document.createElement('label');
+    unitLabel.textContent = t('Unit');
+    const unitSelect = createReminderUnitSelect();
+    unitRow.append(unitLabel, unitSelect);
+
+    fields.append(valueRow, unitRow);
+
+    const actions = document.createElement('div');
+    actions.className = 'form-row';
+    const removeButton = document.createElement('button');
+    removeButton.type = 'button';
+    removeButton.className = 'secondary-button';
+    removeButton.dataset.reminderRemove = 'true';
+    removeButton.textContent = t('Remove reminder');
+    actions.append(removeButton);
+
+    entry.append(fields, actions);
+    eventReminderExtraList.append(entry);
+    setReminderFieldsFromMinutes(valueInput, unitSelect, minutesBeforeStart);
+}
+
+function clearExtraReminderEntries() {
+    eventReminderExtraList.replaceChildren();
+}
+
+function resetReminderEditor() {
+    reminderDefaultResolvedForMove = false;
+    const calendar = selectedCalendarEntry();
+    const allowDefault = Boolean(calendar?.canUseDefaultReminder || calendar?.canCreateWithDefaultReminder);
+    const defaultOption = eventReminderMode.querySelector('option[value="default"]');
+    if (defaultOption) defaultOption.disabled = !allowDefault;
+    eventReminderMode.value = allowDefault ? 'default' : 'none';
+    clearExtraReminderEntries();
+    setReminderFieldsFromMinutes(eventReminderValue, eventReminderUnit, 15);
+    updateReminderControls();
+}
+
+function loadReminderEditor(event) {
+    reminderDefaultResolvedForMove = false;
+    const reminder = eventReminderState(event);
+    eventReminderMode.value = ['custom', 'multiple'].includes(reminder.mode) ? 'custom' : reminder.mode;
+    if (reminder.reminders.length > 0) {
+        setReminderEditorValues(reminder.reminders);
+    } else {
+        clearExtraReminderEntries();
+        setReminderFieldsFromMinutes(eventReminderValue, eventReminderUnit, 15);
+    }
+    updateReminderControls();
+}
+
+function setReminderEditorValues(minutesBeforeStart) {
+    const values = Array.isArray(minutesBeforeStart) && minutesBeforeStart.length > 0
+        ? minutesBeforeStart.slice(0, 5)
+        : [15];
+    clearExtraReminderEntries();
+    setReminderFieldsFromMinutes(eventReminderValue, eventReminderUnit, values[0]);
+    values.slice(1).forEach(value => appendReminderEditorEntry(value));
+}
+
+function setReminderFieldsFromMinutes(valueInput, unitSelect, minutes) {
+    const value = Math.max(0, Math.min(40320, Number(minutes) || 0));
+    const units = [
+        ['weeks', 10080],
+        ['days', 1440],
+        ['hours', 60],
+        ['minutes', 1]
+    ];
+    const selected = units.find(([, multiplier]) => value > 0 && value % multiplier === 0)
+        || ['minutes', 1];
+    unitSelect.value = selected[0];
+    valueInput.value = String(value / selected[1]);
+}
+
+function reminderUnitMultiplier(unit = eventReminderUnit.value) {
+    return {
+        minutes: 1,
+        hours: 60,
+        days: 1440,
+        weeks: 10080
+    }[unit] || 1;
+}
+
+function reminderMinutesFromEntry(entry) {
+    const value = Number(entry.valueInput.value);
+    const minutes = value * reminderUnitMultiplier(entry.unitSelect.value);
+    return Number.isInteger(value) && value >= 0 && Number.isInteger(minutes) && minutes <= 40320
+        ? minutes
+        : null;
+}
+
+function nextReminderDefaultMinutes() {
+    const used = new Set(reminderEditorEntries().map(reminderMinutesFromEntry).filter(value => value !== null));
+    return [60, 1440, 10080, 30, 10, 5, 0].find(value => !used.has(value)) ?? 15;
+}
+
+function resolveDefaultReminderForCalendarMove() {
+    if (!selectedEvent || eventReminderState(selectedEvent).mode !== 'default') return;
+
+    const sourceInstanceId = Number(selectedEvent.calendarInstanceId);
+    const targetInstanceId = Number(eventCalendarInput.value);
+    if (sourceInstanceId === targetInstanceId) {
+        if (reminderDefaultResolvedForMove) {
+            eventReminderMode.value = 'default';
+            clearExtraReminderEntries();
+            setReminderFieldsFromMinutes(eventReminderValue, eventReminderUnit, 15);
+            reminderDefaultResolvedForMove = false;
+        }
+        return;
+    }
+    if (eventReminderMode.value !== 'default') return;
+
+    const sourceDefault = calendarDefaultReminderState(calendarEntryByInstanceId(sourceInstanceId));
+    if (sourceDefault.mode === 'none') {
+        eventReminderMode.value = 'none';
+        reminderDefaultResolvedForMove = true;
+    } else if (['custom', 'multiple'].includes(sourceDefault.mode) && sourceDefault.reminders.length > 0) {
+        eventReminderMode.value = 'custom';
+        setReminderEditorValues(sourceDefault.reminders);
+        reminderDefaultResolvedForMove = true;
+    }
+}
+
+function reminderLimitMessage(maxReminders) {
+    return t('This calendar supports up to %d reminders.').replace('%d', String(maxReminders));
+}
+
+function updateReminderControls() {
+    const selectedReminder = selectedEvent ? eventReminderState(selectedEvent) : null;
+    const reminderEditable = eventDialogEditable
+        && (!selectedReminder || selectedReminder.editable);
+    const selectedCalendar = selectedCalendarEntry();
+    const defaultAllowed = selectedEvent
+        ? Boolean(selectedCalendar?.canUseDefaultReminder)
+        : Boolean(selectedCalendar?.canUseDefaultReminder || selectedCalendar?.canCreateWithDefaultReminder);
+    const defaultOption = eventReminderMode.querySelector('option[value="default"]');
+    if (defaultOption) {
+        defaultOption.disabled = !defaultAllowed;
+    }
+    if (!selectedEvent && !defaultAllowed && eventReminderMode.value === 'default') {
+        eventReminderMode.value = 'none';
+    }
+
+    eventReminderMode.disabled = !reminderEditable;
+    const custom = reminderEditable && eventReminderMode.value === 'custom';
+    eventReminderCustomRow.classList.toggle('hidden', !custom);
+    eventReminderExtraList.classList.toggle('hidden', !custom);
+
+    const entries = reminderEditorEntries();
+    const limits = {
+        minutes: 40320,
+        hours: 672,
+        days: 28,
+        weeks: 4
+    };
+    entries.forEach(entry => {
+        entry.valueInput.disabled = !custom;
+        entry.unitSelect.disabled = !custom;
+        entry.valueInput.required = custom;
+        entry.removeButton && (entry.removeButton.disabled = !custom);
+        entry.valueInput.max = String(limits[entry.unitSelect.value] || 40320);
+        if (Number(entry.valueInput.value) > Number(entry.valueInput.max)) {
+            entry.valueInput.value = entry.valueInput.max;
+        }
+    });
+
+    const maxReminders = maxReminderCount(selectedCalendar);
+    eventReminderAddRow.classList.toggle('hidden', !custom || entries.length >= maxReminders);
+    eventReminderAddButton.disabled = !custom || entries.length >= maxReminders;
+
+    eventReminderValue.setCustomValidity('');
+    if (custom && entries.length > maxReminders) {
+        eventReminderValue.setCustomValidity(reminderLimitMessage(maxReminders));
+        return;
+    }
+
+    const minutes = entries.map(reminderMinutesFromEntry);
+    const validMinutes = minutes.filter(value => value !== null);
+    if (custom && validMinutes.length === minutes.length && new Set(validMinutes).size !== validMinutes.length) {
+        eventReminderValue.setCustomValidity(t('Reminder times must be unique.'));
+    }
+}
+
+function reminderEditorValue() {
+    if (eventReminderMode.disabled || eventReminderMode.value === 'complex') {
+        return null;
+    }
+    if (eventReminderMode.value === 'default') {
+        return Boolean(selectedCalendarEntry()?.canUseDefaultReminder)
+            ? { mode: 'default' }
+            : null;
+    }
+    if (eventReminderMode.value === 'none') {
+        return { mode: 'none' };
+    }
+    if (eventReminderMode.value !== 'custom') {
+        return null;
+    }
+
+    const minutes = reminderEditorEntries().map(reminderMinutesFromEntry);
+    if (minutes.some(value => value === null)
+        || minutes.length < 1
+        || minutes.length > maxReminderCount()
+        || new Set(minutes).size !== minutes.length) {
+        return null;
+    }
+    if (minutes.length === 1) {
+        return {
+            mode: 'custom',
+            minutesBeforeStart: minutes[0]
+        };
+    }
+
+    return {
+        mode: 'multiple',
+        reminders: minutes.map(minutesBeforeStart => ({ minutesBeforeStart }))
+    };
+}
+
+function reminderOffsetText(minutes) {
+    const normalizedMinutes = Math.max(0, Number(minutes) || 0);
+    const units = [
+        ['Week', 'Weeks', 10080],
+        ['Day', 'Days', 1440],
+        ['Hour', 'Hours', 60],
+        ['Minute', 'Minutes', 1]
+    ];
+    const selected = units.find(([, , multiplier]) => normalizedMinutes > 0 && normalizedMinutes % multiplier === 0)
+        || ['Minute', 'Minutes', 1];
+    const value = normalizedMinutes / selected[2];
+    const unit = t(value === 1 ? selected[0] : selected[1]);
+    return `${value} ${unit} · ${t('Before start')}`;
+}
+
+function reminderOffsetsText(reminder) {
+    return reminder.reminders.map(reminderOffsetText).join(', ');
+}
+
+function reminderDetailText(event) {
+    const reminder = eventReminderState(event);
+    if (reminder.mode === 'none') return '';
+    if (reminder.mode === 'complex') return t('Existing reminder settings');
+    if (reminder.mode === 'default') {
+        const sourceDefault = calendarDefaultReminderState(calendarEntryByInstanceId(event?.calendarInstanceId));
+        if (sourceDefault.mode === 'none') {
+            return `${t('Calendar default')} · ${t('No reminder')}`;
+        }
+        if (['custom', 'multiple'].includes(sourceDefault.mode) && sourceDefault.reminders.length > 0) {
+            return `${t('Calendar default')} · ${reminderOffsetsText(sourceDefault)}`;
+        }
+        return t('Calendar default');
+    }
+
+    return reminderOffsetsText(reminder);
+}
+
+function resetRecurrenceEditor(start) {
+    recurrencePatternContext = null;
+    setRecurrenceNoneOptionDisabled(false);
+    eventRecurrenceFrequency.value = 'none';
+    eventRecurrenceInterval.value = '1';
+    eventRecurrenceEndMode.value = 'never';
+    eventRecurrenceCount.value = '10';
+    eventRecurrenceUntil.value = '';
+    eventRecurrenceWeekdays.querySelectorAll('input[type="checkbox"]').forEach(input => {
+        input.checked = false;
+    });
+    const patternControls = recurrencePatternControls();
+    patternControls.mode.value = 'absolute';
+    patternControls.index.value = 'first';
+    selectDefaultRecurrenceWeekday(start);
+    updateRecurrenceAvailability();
+}
+
+function setRecurrenceNoneOptionDisabled(disabled) {
+    const option = eventRecurrenceFrequency.querySelector('option[value="none"]');
+    if (option) option.disabled = disabled;
+}
+
+function loadRecurrenceEditor(event) {
+    const recurrence = event.recurrenceSettings && typeof event.recurrenceSettings === 'object'
+        ? event.recurrenceSettings
+        : {};
+    recurrencePatternContext = {
+        frequency: String(recurrence.frequency || '').toUpperCase(),
+        patternMode: recurrence.patternMode === 'relative' ? 'relative' : 'absolute',
+        relativeIndex: ['first', 'second', 'third', 'fourth', 'last'].includes(recurrence.relativeIndex)
+            ? recurrence.relativeIndex
+            : 'first',
+        weekStart: String(recurrence.weekStart || ''),
+        dayOfMonth: Number(recurrence.dayOfMonth) || 0,
+        month: Number(recurrence.month) || 0,
+        recurrenceTimeZone: String(recurrence.recurrenceTimeZone || ''),
+        startDate: localDate(eventStart(event))
+    };
+    const editable = event.recurrenceEditable !== false && Boolean(recurrence.frequency);
+    setRecurrenceNoneOptionDisabled(editable);
+    eventRecurrenceFrequency.value = editable ? String(recurrence.frequency).toLowerCase() : 'none';
+    eventRecurrenceInterval.value = String(Math.max(1, Number(recurrence.interval) || 1));
+    eventRecurrenceEndMode.value = ['count', 'until'].includes(recurrence.endMode)
+        ? recurrence.endMode
+        : 'never';
+    eventRecurrenceCount.value = String(Math.max(1, Number(recurrence.count) || 10));
+    eventRecurrenceUntil.value = String(recurrence.until || '');
+    const selectedWeekdays = new Set(Array.isArray(recurrence.byDay) ? recurrence.byDay : []);
+    eventRecurrenceWeekdays.querySelectorAll('input[type="checkbox"]').forEach(input => {
+        input.checked = selectedWeekdays.has(input.value);
+    });
+    const patternControls = recurrencePatternControls();
+    patternControls.mode.value = recurrencePatternContext.patternMode;
+    patternControls.index.value = recurrencePatternContext.relativeIndex;
+    if (editable
+        && (eventRecurrenceFrequency.value === 'weekly' || recurrencePatternContext.patternMode === 'relative')
+        && selectedWeekdays.size === 0) {
+        selectDefaultRecurrenceWeekday(eventStart(event));
+    }
+    updateRecurrenceAvailability();
+}
+
+function recurrencePatternControls() {
+    let row = document.getElementById('event-recurrence-pattern-row');
+    if (row) {
+        return {
+            row,
+            mode: document.getElementById('event-recurrence-pattern-mode'),
+            index: document.getElementById('event-recurrence-relative-index')
+        };
+    }
+
+    const german = document.documentElement.lang.toLowerCase().startsWith('de');
+    row = document.createElement('div');
+    row.id = 'event-recurrence-pattern-row';
+    row.className = 'form-row two hidden';
+
+    const modeRow = document.createElement('div');
+    modeRow.className = 'form-row';
+    const modeLabel = document.createElement('label');
+    modeLabel.htmlFor = 'event-recurrence-pattern-mode';
+    modeLabel.textContent = german ? 'Muster' : 'Pattern';
+    const mode = document.createElement('select');
+    mode.id = 'event-recurrence-pattern-mode';
+    const absolute = document.createElement('option');
+    absolute.value = 'absolute';
+    const relative = document.createElement('option');
+    relative.value = 'relative';
+    relative.textContent = german ? 'Wochentagsposition' : 'Weekday position';
+    mode.append(absolute, relative);
+    modeRow.append(modeLabel, mode);
+
+    const indexRow = document.createElement('div');
+    indexRow.className = 'form-row';
+    indexRow.id = 'event-recurrence-relative-index-row';
+    const indexLabel = document.createElement('label');
+    indexLabel.htmlFor = 'event-recurrence-relative-index';
+    indexLabel.textContent = german ? 'Position' : 'Position';
+    const index = document.createElement('select');
+    index.id = 'event-recurrence-relative-index';
+    const labels = german
+        ? { first: 'Erste', second: 'Zweite', third: 'Dritte', fourth: 'Vierte', last: 'Letzte' }
+        : { first: 'First', second: 'Second', third: 'Third', fourth: 'Fourth', last: 'Last' };
+    Object.entries(labels).forEach(([value, label]) => {
+        const option = document.createElement('option');
+        option.value = value;
+        option.textContent = label;
+        index.appendChild(option);
+    });
+    indexRow.append(indexLabel, index);
+    row.append(modeRow, indexRow);
+    eventRecurrenceWeekdays.before(row);
+    mode.addEventListener('change', updateRecurrenceControls);
+    index.addEventListener('change', updateRecurrenceControls);
+
+    return { row, mode, index };
+}
+
+function updateRecurrencePatternLabels(frequency, mode) {
+    const controls = recurrencePatternControls();
+    const absolute = controls.mode.querySelector('option[value="absolute"]');
+    const german = document.documentElement.lang.toLowerCase().startsWith('de');
+    if (absolute) {
+        absolute.textContent = frequency === 'yearly'
+            ? (german ? 'Festes Datum' : 'Fixed date')
+            : (german ? 'Fester Monatstag' : 'Fixed day of month');
+    }
+    controls.index.parentElement.classList.toggle('hidden', mode !== 'relative');
+}
+
+function selectDefaultRecurrenceWeekday(start) {
+    if (!(start instanceof Date) || Number.isNaN(start.getTime())) return;
+    const weekday = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'][start.getDay()];
+    const input = eventRecurrenceWeekdays.querySelector(`input[value="${weekday}"]`);
+    if (input) input.checked = true;
+}
+
+function updateRecurrenceAvailability() {
+    const calendar = selectedCalendarEntry();
+    const editingSeries = Boolean(selectedEvent?.recurring) && selectedEvent?.writeScope === 'series';
+    const editingFollowing = Boolean(selectedEvent?.recurring) && selectedEvent?.writeScope === 'following';
+    const editingRecurringRange = editingSeries || editingFollowing;
+    const editingSingle = selectedEvent !== null && !Boolean(selectedEvent?.recurring);
+    const movingSingle = editingSingle
+        && Number(calendar?.instanceId || 0) !== Number(selectedEvent?.calendarInstanceId || 0);
+    const available = editingRecurringRange
+        ? Boolean(editingSeries ? selectedEvent?.canUpdateSeries : selectedEvent?.canUpdateFollowing)
+            && selectedEvent?.recurrenceEditable !== false
+        : selectedEvent === null
+            ? Boolean(calendar?.canWrite) && Boolean(calendar?.canCreateRecurrence)
+            : editingSingle
+                && eventCanUpdateOccurrence(selectedEvent)
+                && Boolean(calendar?.canWrite)
+                && Boolean(movingSingle ? calendar?.canCreateRecurrence : calendar?.canUpdateRecurrence);
+    const canClearSeriesRecurrence = editingSeries
+        && Boolean(calendar?.canUpdateRecurrence);
+    setRecurrenceNoneOptionDisabled(
+        editingRecurringRange && available && (!editingSeries || !canClearSeriesRecurrence)
+    );
+    eventRecurrenceRow.classList.toggle('hidden', !available);
+    eventRecurrenceFrequency.disabled = !available;
+    if (!available) eventRecurrenceFrequency.value = 'none';
+    updateRecurrenceControls();
+}
+
+function updateRecurrenceControls() {
+    const frequency = eventRecurrenceFrequency.value;
+    const enabled = !eventRecurrenceFrequency.disabled && frequency !== 'none';
+    eventRecurrenceOptions.classList.toggle('hidden', !enabled);
+
+    const patternControls = recurrencePatternControls();
+    const patternSupported = enabled
+        && ['monthly', 'yearly'].includes(frequency)
+        && Boolean(selectedCalendarEntry()?.canUpdateRecurrence);
+    patternControls.row.classList.toggle('hidden', !patternSupported);
+    if (!patternSupported) {
+        patternControls.mode.value = 'absolute';
+    }
+    const patternMode = patternSupported ? patternControls.mode.value : 'absolute';
+    updateRecurrencePatternLabels(frequency, patternMode);
+    const relativePattern = patternSupported && patternMode === 'relative';
+    eventRecurrenceWeekdays.classList.toggle('hidden', !enabled || (frequency !== 'weekly' && !relativePattern));
+
+    const endMode = eventRecurrenceEndMode.value;
+    const countVisible = enabled && endMode === 'count';
+    const untilVisible = enabled && endMode === 'until';
+    eventRecurrenceCountRow.classList.toggle('hidden', !countVisible);
+    eventRecurrenceUntilRow.classList.toggle('hidden', !untilVisible);
+    eventRecurrenceCount.disabled = !countVisible;
+    eventRecurrenceUntil.disabled = !untilVisible;
+    eventRecurrenceCount.required = countVisible;
+    eventRecurrenceUntil.required = untilVisible;
+
+    const interval = Math.max(1, Number(eventRecurrenceInterval.value) || 1);
+    const units = {
+        daily: interval === 1 ? 'Day' : 'Days',
+        weekly: interval === 1 ? 'Week' : 'Weeks',
+        monthly: interval === 1 ? 'Month' : 'Months',
+        yearly: interval === 1 ? 'Year' : 'Years'
+    };
+    eventRecurrenceIntervalUnit.textContent = enabled ? t(units[frequency] || 'Days') : '';
+    updateRecurrenceEndDateMinimum();
+}
+
+function updateRecurrenceEndDateMinimum() {
+    const start = readInputDate(document.getElementById('event-start').value);
+    if (!start) return;
+    eventRecurrenceUntil.min = localDate(start);
+    if (eventRecurrenceUntil.value && eventRecurrenceUntil.value < eventRecurrenceUntil.min) {
+        eventRecurrenceUntil.value = eventRecurrenceUntil.min;
+    }
+}
+
+function recurrenceEditorValue() {
+    const editingSeries = Boolean(selectedEvent?.recurring) && selectedEvent?.writeScope === 'series';
+    const editingFollowing = Boolean(selectedEvent?.recurring) && selectedEvent?.writeScope === 'following';
+    const editingSingle = selectedEvent !== null && !Boolean(selectedEvent?.recurring);
+    if ((selectedEvent !== null && !editingSeries && !editingFollowing && !editingSingle)
+        || eventRecurrenceFrequency.disabled) return null;
+    const frequency = eventRecurrenceFrequency.value;
+    if (frequency === 'none') return null;
+
+    const recurrence = {
+        frequency: frequency.toUpperCase(),
+        interval: Math.max(1, Math.min(999, Number(eventRecurrenceInterval.value) || 1)),
+        endMode: eventRecurrenceEndMode.value
+    };
+    const patternControls = recurrencePatternControls();
+    const relativePattern = ['monthly', 'yearly'].includes(frequency)
+        && patternControls.mode.value === 'relative';
+    if (relativePattern) {
+        recurrence.patternMode = 'relative';
+        recurrence.relativeIndex = patternControls.index.value;
+    }
+    if (frequency === 'weekly' || relativePattern) {
+        let byDay = Array.from(eventRecurrenceWeekdays.querySelectorAll('input[type="checkbox"]:checked'))
+            .map(input => input.value);
+        if (!byDay.length) {
+            const start = readInputDate(document.getElementById('event-start').value);
+            if (start) byDay = [['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'][start.getDay()]];
+        }
+        recurrence.byDay = byDay;
+    }
+
+    const currentStartDate = String(document.getElementById('event-start').value || '').slice(0, 10);
+    if (frequency === 'weekly'
+        && recurrencePatternContext?.frequency === 'WEEKLY'
+        && recurrencePatternContext.weekStart) {
+        recurrence.weekStart = recurrencePatternContext.weekStart;
+    }
+    if (!relativePattern
+        && recurrencePatternContext?.frequency === recurrence.frequency
+        && recurrencePatternContext.startDate === currentStartDate) {
+        if (frequency === 'monthly' && recurrencePatternContext.dayOfMonth > 0) {
+            recurrence.dayOfMonth = recurrencePatternContext.dayOfMonth;
+        } else if (frequency === 'yearly') {
+            if (recurrencePatternContext.dayOfMonth > 0) {
+                recurrence.dayOfMonth = recurrencePatternContext.dayOfMonth;
+            }
+            if (recurrencePatternContext.month > 0) {
+                recurrence.month = recurrencePatternContext.month;
+            }
+        }
+    } else if (relativePattern
+        && frequency === 'yearly'
+        && recurrencePatternContext?.frequency === 'YEARLY'
+        && recurrencePatternContext.startDate === currentStartDate
+        && recurrencePatternContext.month > 0) {
+        recurrence.month = recurrencePatternContext.month;
+    }
+    if (recurrencePatternContext?.recurrenceTimeZone) {
+        recurrence.recurrenceTimeZone = recurrencePatternContext.recurrenceTimeZone;
+    }
+
+    if (recurrence.endMode === 'count') {
+        recurrence.count = Math.max(1, Math.min(9999, Number(eventRecurrenceCount.value) || 1));
+    } else if (recurrence.endMode === 'until') {
+        recurrence.until = eventRecurrenceUntil.value;
+    }
+
+    return recurrence;
+}
+
+function updateRecurrenceWeekdayLabels() {
+    const monday = new Date(2026, 7, 17);
+    eventRecurrenceWeekdays.querySelectorAll('[data-weekday]').forEach(label => {
+        const offset = Math.max(0, Math.min(6, Number(label.dataset.weekday) - 1));
+        label.textContent = new Intl.DateTimeFormat(undefined, { weekday: 'short' })
+            .format(addDays(monday, offset));
+    });
+}
+
 function setDialogEditable(editable, descriptionEditable = editable) {
+    eventDialogEditable = editable;
     ['event-summary', 'event-all-day', 'event-start', 'event-end', 'event-location'].forEach(id => {
         document.getElementById(id).disabled = !editable;
     });
     document.getElementById('event-description').disabled = !descriptionEditable;
     document.getElementById('save-button').classList.toggle('hidden', !editable);
+    updateReminderControls();
+    updateAnniversaryControls();
 }
 
 function setDateInputs(start, end, allDay, allDayEndExclusive = false) {
@@ -1160,9 +3708,50 @@ eventForm.addEventListener('submit', async event => {
         start: inputDateValue(document.getElementById('event-start').value, allDay),
         end: inputDateValue(document.getElementById('event-end').value, allDay, allDay)
     };
+    const anniversaryChange = anniversaryEditorChange();
+    if (anniversaryChange) {
+        eventData.anniversaryType = anniversaryChange.enabled ? anniversaryChange.type : '';
+        eventData.anniversaryDate = anniversaryChange.enabled ? anniversaryChange.date : '';
+        if (anniversaryChange.enabled) {
+            eventData.allDay = true;
+            eventData.start = anniversaryChange.date;
+            const anniversaryStart = readInputDate(anniversaryChange.date);
+            eventData.end = anniversaryStart ? localDate(addDays(anniversaryStart, 1)) : '';
+            eventData.recurrence = anniversaryRecurrence();
+        }
+    }
+    const reminder = reminderEditorValue();
+    if (reminder) {
+        eventData.reminder = reminder;
+    }
+    const editingSeries = Boolean(selectedEvent?.recurring) && selectedEvent?.writeScope === 'series';
+    const editingFollowing = Boolean(selectedEvent?.recurring) && selectedEvent?.writeScope === 'following';
+    const recurrence = recurrenceEditorValue();
+    if (recurrence && !(anniversaryChange?.enabled)) {
+        eventData.recurrence = recurrence;
+    } else if (!anniversaryChange?.enabled && editingSeries
+        && !eventRecurrenceFrequency.disabled
+        && eventRecurrenceFrequency.value === 'none'
+        && Boolean(selectedCalendarEntry()?.canUpdateRecurrence)) {
+        eventData.recurrence = null;
+    }
+    const browserTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone || '';
+    const timezone = String(
+        selectedEvent?.timezone || importedIcsTimezone || selectedCalendarEntry()?.timezone || browserTimezone
+    ).trim();
+    if (timezone && (!allDay || recurrence || editingSeries || editingFollowing)) {
+        eventData.timezone = timezone;
+    }
     if (!calendarInstanceId || !eventData.summary || !eventData.start || !eventData.end) return;
     const sourceCalendarInstanceId = Number(selectedEvent?.calendarInstanceId || 0);
     const moving = Boolean(selectedEvent) && calendarInstanceId !== sourceCalendarInstanceId;
+    const selectedAnniversaryType = annualEventType(selectedEvent);
+    if (moving && selectedAnniversaryType && ['series', 'following'].includes(selectedEvent?.writeScope)) {
+        eventData.anniversaryType = selectedAnniversaryType;
+        eventData.anniversaryDate = annualEventDate(selectedEvent);
+        eventData.allDay = true;
+        eventData.recurrence = anniversaryRecurrence();
+    }
     if (selectedEvent?.onlineMeeting && !moving) delete eventData.description;
 
     const action = moving ? 'MoveEvent' : (selectedEvent ? 'UpdateEvent' : 'CreateEvent');
@@ -1174,8 +3763,10 @@ eventForm.addEventListener('submit', async event => {
                 uid: selectedEvent.uid,
                 resourceUrl: selectedEvent.resourceUrl,
                 etag: selectedEvent.etag,
-                recurrenceId: selectedEvent.recurrenceId || '',
-                recurring: Boolean(selectedEvent.recurring)
+                reminder: selectedEvent.reminder || null,
+                anniversaryType: annualEventType(selectedEvent),
+                anniversaryDate: annualEventDate(selectedEvent),
+                ...recurrencePayload(selectedEvent)
             },
             event: eventData
         }
@@ -1186,20 +3777,43 @@ eventForm.addEventListener('submit', async event => {
                     uid: selectedEvent.uid,
                     resourceUrl: selectedEvent.resourceUrl,
                     etag: selectedEvent.etag,
-                    recurrenceId: selectedEvent.recurrenceId || '',
+                    ...recurrencePayload(selectedEvent),
                     changes: eventData
                 }
             }
             : { calendarInstanceId, event: eventData });
 
+    releaseAgendaScrollWorkflowAfterState();
     if (await sendAction(action, value)) {
         eventDialog.close();
+    } else {
+        cancelAgendaScrollWorkflowRelease();
+    }
+});
+
+icsImportFile.addEventListener('change', async () => {
+    const file = icsImportFile.files?.[0] || null;
+    if (!file) return;
+    icsImportFile.disabled = true;
+    icsImportButton.setAttribute('aria-disabled', 'true');
+    try {
+        await importIcsFile(file);
+        showToast(icsImportText('ICS event imported.'), 'success');
+    } catch (error) {
+        showToast(error instanceof Error ? error.message : icsImportText('The selected file is not a valid single-event ICS file.'), 'error');
+    } finally {
+        icsImportFile.disabled = false;
+        icsImportButton.setAttribute('aria-disabled', 'false');
+        icsImportFile.value = '';
     }
 });
 
 document.getElementById('delete-button').addEventListener('click', () => requestDelete(eventDialog));
 
-document.getElementById('event-start').addEventListener('change', updateEndFromStart);
+document.getElementById('event-start').addEventListener('change', () => {
+    updateEndFromStart();
+    updateRecurrenceEndDateMinimum();
+});
 
 document.getElementById('event-all-day').addEventListener('change', event => {
     const start = readInputDate(document.getElementById('event-start').value) || new Date();
@@ -1214,7 +3828,70 @@ document.getElementById('event-all-day').addEventListener('change', event => {
 eventCalendarInput.addEventListener('change', () => {
     updateDialogColor();
     updateSaveButtonLabel();
+    updateRecurrenceAvailability();
+    updateAnniversaryControls();
+    resolveDefaultReminderForCalendarMove();
+    updateReminderControls();
 });
+eventAnniversaryType.addEventListener('change', () => {
+    updateRecurrenceAvailability();
+    if (eventAnniversaryType.value) {
+        if (!eventAnniversaryDate.value) eventAnniversaryDate.value = suggestedAnniversaryDate();
+        syncAnniversarySchedule();
+    }
+    updateAnniversaryControls();
+});
+eventAnniversaryDate.addEventListener('change', () => {
+    syncAnniversarySchedule();
+    updateAnniversaryControls();
+});
+eventReminderMode.addEventListener('change', () => {
+    reminderDefaultResolvedForMove = false;
+    updateReminderControls();
+});
+eventReminderValue.addEventListener('input', () => {
+    reminderDefaultResolvedForMove = false;
+    updateReminderControls();
+});
+eventReminderUnit.addEventListener('change', () => {
+    reminderDefaultResolvedForMove = false;
+    updateReminderControls();
+});
+eventReminderAddButton.addEventListener('click', () => {
+    if (reminderEditorEntries().length >= maxReminderCount()) return;
+    appendReminderEditorEntry(nextReminderDefaultMinutes());
+    reminderDefaultResolvedForMove = false;
+    updateReminderControls();
+});
+eventReminderExtraList.addEventListener('click', event => {
+    const button = event.target.closest('[data-reminder-remove]');
+    if (!button) return;
+    button.closest('.reminder-extra-entry')?.remove();
+    reminderDefaultResolvedForMove = false;
+    updateReminderControls();
+});
+eventReminderExtraList.addEventListener('input', () => {
+    reminderDefaultResolvedForMove = false;
+    updateReminderControls();
+});
+eventReminderExtraList.addEventListener('change', () => {
+    reminderDefaultResolvedForMove = false;
+    updateReminderControls();
+});
+eventRecurrenceFrequency.addEventListener('change', () => {
+    const controls = recurrencePatternControls();
+    const frequency = eventRecurrenceFrequency.value.toUpperCase();
+    if (!recurrencePatternContext || recurrencePatternContext.frequency !== frequency) {
+        controls.mode.value = 'absolute';
+        controls.index.value = 'first';
+    } else {
+        controls.mode.value = recurrencePatternContext.patternMode;
+        controls.index.value = recurrencePatternContext.relativeIndex;
+    }
+    updateRecurrenceControls();
+});
+eventRecurrenceInterval.addEventListener('input', updateRecurrenceControls);
+eventRecurrenceEndMode.addEventListener('change', updateRecurrenceControls);
 eventCalendarTrigger.addEventListener('click', event => {
     event.stopPropagation();
     toggleCalendarPicker();
@@ -1237,14 +3914,41 @@ eventDialog.addEventListener('cancel', event => {
         eventCalendarTrigger.focus();
     }
 });
-eventDialog.addEventListener('close', closeCalendarPicker);
+eventDialog.addEventListener('close', () => {
+    closeCalendarPicker();
+    if (eventDialogLoadingMode === 'provider') {
+        pendingEventEdit = null;
+        pendingSeriesEdit = null;
+    }
+    setEventDialogLoading();
+    endEventEditing();
+    restorePreservedAgendaScrollPosition();
+    applyDeferredCalendarState();
+    if (!releaseAgendaScrollPositionAfterState
+        && ['create', 'edit', 'delete'].includes(agendaScrollWorkflow)) {
+        clearAgendaScrollWorkflow(true);
+    }
+    requestIPSViewStateRefresh();
+});
+eventDetailsDialog.addEventListener('close', () => {
+    restorePreservedAgendaScrollPosition();
+    applyDeferredCalendarState();
+    if (!releaseAgendaScrollPositionAfterState
+        && ['details', 'delete'].includes(agendaScrollWorkflow)) {
+        clearAgendaScrollWorkflow(true);
+    }
+});
 document.getElementById('details-close').addEventListener('click', () => eventDetailsDialog.close());
 document.getElementById('details-close-button').addEventListener('click', () => eventDetailsDialog.close());
-document.getElementById('details-edit-button').addEventListener('click', () => {
-    if (!selectedEvent || !eventIsEditable(selectedEvent)) return;
-    const event = selectedEvent;
-    eventDetailsDialog.close();
-    openExistingEvent(event);
+document.getElementById('details-provider-button').addEventListener('click', openProviderEvent);
+document.getElementById('details-edit-button').addEventListener('click', () => requestEdit(eventDetailsDialog));
+document.getElementById('edit-scope-close').addEventListener('click', () => editScopeDialog.close());
+document.getElementById('edit-scope-cancel').addEventListener('click', () => editScopeDialog.close());
+editScopeConfirmButton.addEventListener('click', confirmEditScope);
+editScopeDialog.addEventListener('close', () => {
+    editScopeSourceDialog = null;
+    restorePreservedAgendaScrollPosition();
+    applyDeferredCalendarState();
 });
 document.getElementById('details-delete-button').addEventListener('click', () => requestDelete(eventDetailsDialog));
 document.getElementById('delete-confirm-close').addEventListener('click', () => deleteConfirmDialog.close());
@@ -1252,6 +3956,8 @@ document.getElementById('delete-confirm-cancel').addEventListener('click', () =>
 deleteConfirmButton.addEventListener('click', confirmDeleteEvent);
 deleteConfirmDialog.addEventListener('close', () => {
     deleteSourceDialog = null;
+    restorePreservedAgendaScrollPosition();
+    applyDeferredCalendarState();
 });
 document.getElementById('day-events-close').addEventListener('click', () => dayEventsDialog.close());
 document.getElementById('day-events-close-button').addEventListener('click', () => dayEventsDialog.close());
@@ -1275,7 +3981,7 @@ document.getElementById('calendar-filter-none').addEventListener('click', () => 
 document.getElementById('calendar-filter-apply').addEventListener('click', applyCalendarFilter);
 document.getElementById('refresh-button').addEventListener('click', () => sendAction('Refresh', true));
 document.getElementById('today-button').addEventListener('click', () => {
-    cursorDate = startOfDay(new Date());
+    cursorDate = clampCursorDate(startOfDay(new Date()));
     persistClientViewState();
     render();
 });
@@ -1284,14 +3990,114 @@ document.getElementById('next-button').addEventListener('click', () => navigate(
 document.querySelectorAll('.view-selector-option').forEach(button => button.addEventListener('click', () => {
     if (!calendarViews.has(button.dataset.view)) return;
     activeView = button.dataset.view;
+    clampCurrentCursorDate();
     persistClientViewState();
     viewSelectorDialog.close();
     render();
 }));
 window.addEventListener('resize', () => {
-    if (activeView === 'month') scheduleMonthEventLayout();
+    if (activeView === 'month') {
+        scheduleMonthEventLayout();
+    } else if (activeView === 'week' || activeView === 'workWeek') {
+        render();
+        return;
+    }
+    updateSwipeNavigationMode();
+});
+document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') return;
+    void ensureVisibleRangeLoaded();
+    requestIPSViewStateRefresh();
 });
 document.addEventListener('wheel', containWheelInsideTile, { capture: true, passive: false });
+content.addEventListener('pointerdown', beginSwipeNavigation);
+content.addEventListener('pointerup', finishSwipeNavigation);
+content.addEventListener('pointercancel', cancelSwipeNavigation);
+content.addEventListener('click', suppressClickAfterSwipe, true);
+
+function calendarViewRequiresHorizontalPan() {
+    return swipeNavigationViews.has(activeView)
+        && content.scrollWidth > content.clientWidth + 1;
+}
+
+function updateSwipeNavigationMode() {
+    if (!swipeNavigationViews.has(activeView)) {
+        content.style.touchAction = 'auto';
+        return;
+    }
+
+    content.style.touchAction = calendarViewRequiresHorizontalPan()
+        ? 'pan-x pan-y'
+        : 'pan-y';
+}
+
+function beginSwipeNavigation(event) {
+    if (!swipeNavigationViews.has(activeView)
+        || calendarViewRequiresHorizontalPan()
+        || !event.isPrimary
+        || !['touch', 'pen'].includes(event.pointerType)
+        || calendarDialogIsOpen()
+        || swipeNavigationTargetIsInteractive(event.target)) {
+        return;
+    }
+
+    swipeGesture = {
+        pointerId: event.pointerId,
+        startX: event.clientX,
+        startY: event.clientY
+    };
+    content.setPointerCapture?.(event.pointerId);
+}
+
+function finishSwipeNavigation(event) {
+    if (!swipeGesture || event.pointerId !== swipeGesture.pointerId) return;
+
+    const deltaX = event.clientX - swipeGesture.startX;
+    const deltaY = event.clientY - swipeGesture.startY;
+    cancelSwipeNavigation(event);
+
+    if (Math.abs(deltaX) < swipeMinimumDistance
+        || Math.abs(deltaX) < Math.abs(deltaY) * swipeAxisRatio) {
+        return;
+    }
+
+    suppressSwipeClickUntil = Date.now() + 500;
+    event.preventDefault();
+    navigate(deltaX < 0 ? 1 : -1);
+}
+
+function cancelSwipeNavigation(event = null) {
+    if (!swipeGesture) return;
+    const pointerId = swipeGesture.pointerId;
+    swipeGesture = null;
+    if (event && content.hasPointerCapture?.(pointerId)) {
+        content.releasePointerCapture?.(pointerId);
+    }
+}
+
+function suppressClickAfterSwipe(event) {
+    if (Date.now() > suppressSwipeClickUntil) return;
+    suppressSwipeClickUntil = 0;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+}
+
+function swipeNavigationTargetIsInteractive(target) {
+    return target instanceof Element
+        && Boolean(target.closest('button, a, input, select, textarea, label, .week-event, [role="button"], [contenteditable="true"]'));
+}
+
+function calendarDialogIsOpen() {
+    return [
+        eventDialog,
+        eventDetailsDialog,
+        editScopeDialog,
+        deleteConfirmDialog,
+        dayEventsDialog,
+        viewSelectorDialog,
+        calendarFilterDialog
+    ].some(dialog => dialog.open);
+}
 
 function containWheelInsideTile(event) {
     if (event.ctrlKey) return;
@@ -1299,7 +4105,7 @@ function containWheelInsideTile(event) {
     const calendarOptionList = event.target instanceof Element
         ? event.target.closest('.calendar-picker-options')
         : null;
-    const openDialog = [eventDialog, eventDetailsDialog, dayEventsDialog, viewSelectorDialog, calendarFilterDialog]
+    const openDialog = [eventDialog, eventDetailsDialog, editScopeDialog, deleteConfirmDialog, dayEventsDialog, viewSelectorDialog, calendarFilterDialog]
         .find(dialog => dialog.open);
     const scrollTarget = calendarOptionList || openDialog?.querySelector('.dialog-body') || content;
     const factor = event.deltaMode === WheelEvent.DOM_DELTA_LINE
@@ -1319,6 +4125,201 @@ function containWheelInsideTile(event) {
     event.stopImmediatePropagation();
 }
 
+function visibleViewRange() {
+    let start;
+    let end;
+
+    if (activeView === 'month') {
+        start = new Date(cursorDate.getFullYear(), cursorDate.getMonth(), 1);
+        end = new Date(start.getFullYear(), start.getMonth() + viewPeriod('month'), 1);
+    } else if (activeView === 'week' || activeView === 'workWeek') {
+        const days = weekViewDays(activeView === 'workWeek');
+        start = startOfDay(days[0] || startOfWeek(cursorDate));
+        end = addDays(startOfDay(days[days.length - 1] || start), 1);
+    } else if (activeView === 'threeDays') {
+        const days = getVisibleDays(cursorDate, viewPeriod('threeDays'));
+        start = startOfDay(days[0] || cursorDate);
+        end = addDays(startOfDay(days[days.length - 1] || cursorDate), 1);
+    } else {
+        start = startOfDay(cursorDate);
+        end = addDays(start, viewPeriod(activeView === 'list' ? 'list' : 'agenda'));
+    }
+
+    return {
+        start: Math.floor(start.getTime() / 1000),
+        end: Math.floor(end.getTime() / 1000)
+    };
+}
+
+function visualizationRangeSignature(range) {
+    if (!range || typeof range !== 'object') return '';
+    const start = Number(range.start || 0);
+    const end = Number(range.end || 0);
+    return start > 0 && end > start ? `${start}:${end}` : '';
+}
+
+function visualizationRangePageSignature(range, offset = 0) {
+    const signature = visualizationRangeSignature(range);
+    if (signature === '') return '';
+    return `${signature}@${Math.max(0, Math.floor(Number(offset) || 0))}`;
+}
+
+function calendarRangeCovers(loadedRange, requestedRange) {
+    if (!loadedRange || typeof loadedRange !== 'object'
+        || !requestedRange || typeof requestedRange !== 'object') {
+        return false;
+    }
+
+    const loadedStart = Number(loadedRange.start || 0);
+    const loadedEnd = Number(loadedRange.end || 0);
+    const requestedStart = Number(requestedRange.start || 0);
+    const requestedEnd = Number(requestedRange.end || 0);
+    return loadedStart > 0
+        && loadedEnd > loadedStart
+        && requestedStart > 0
+        && requestedEnd > requestedStart
+        && loadedStart <= requestedStart
+        && loadedEnd >= requestedEnd;
+}
+
+function calendarStateBelongsToThisClient(state, containsPendingEditPayload = false) {
+    if (!initialized || containsPendingEditPayload) return true;
+
+    const containsEditPayload = Boolean(state?.eventEdit && typeof state.eventEdit === 'object')
+        || Boolean(state?.seriesEdit && typeof state.seriesEdit === 'object');
+    if (containsEditPayload) return false;
+
+    const incomingRange = state?.eventRange && typeof state.eventRange === 'object'
+        ? state.eventRange
+        : null;
+    const incomingRangeSignature = visualizationRangeSignature(incomingRange);
+    if (incomingRangeSignature === '') {
+        return visualizationRangeSignature(calendarState.eventRange) === '';
+    }
+
+    const incomingOffset = Math.max(0, Math.floor(Number(incomingRange?.offset) || 0));
+    const incomingPageSignature = visualizationRangePageSignature(incomingRange, incomingOffset);
+    if (pendingRangeRequestSignature !== '' && incomingPageSignature === pendingRangeRequestSignature) {
+        return true;
+    }
+
+    return calendarRangeCovers(incomingRange, visibleViewRange());
+}
+
+function loadedRangeCovers(range) {
+    const loadedRange = calendarState.eventRange;
+    return loadedRange?.hasMore !== true && calendarRangeCovers(loadedRange, range);
+}
+
+async function ensureVisibleRangeLoaded(force = false) {
+    if (!initialized || eventEditingActive || document.visibilityState === 'hidden' || !hasActionBridge()) return;
+
+    const range = visibleViewRange();
+    const signature = visualizationRangeSignature(range);
+    if (signature === '') return;
+
+    if (isNativeVisualization() && typeof requestAction !== 'function') {
+        scheduleVisibleRangeRetry(force);
+        return;
+    }
+
+    cancelVisibleRangeRetry();
+    const loadedRange = calendarState.eventRange;
+    const loadedSignature = visualizationRangeSignature(loadedRange);
+    if (!force && loadedSignature === signature && loadedRange?.hasMore === true) {
+        const nextOffset = Math.max(0, Math.floor(Number(loadedRange.nextOffset) || 0));
+        if (nextOffset > 0) {
+            await requestVisibleRangePage(range, nextOffset);
+            return;
+        }
+    }
+    if (!force && loadedRangeCovers(range)) return;
+
+    await requestVisibleRangePage(range, 0, force);
+}
+
+async function requestVisibleRangePage(range, offset, force = false) {
+    const requestSignature = visualizationRangePageSignature(range, offset);
+    if (requestSignature === '' || pendingRangeRequestSignature === requestSignature) return;
+
+    pendingRangeRequestSignature = requestSignature;
+    const success = await sendAction('LoadRange', {
+        _viewRange: range,
+        _eventOffset: Math.max(0, Math.floor(Number(offset) || 0))
+    });
+    if (!success && pendingRangeRequestSignature === requestSignature) {
+        pendingRangeRequestSignature = '';
+        scheduleVisibleRangeRetry(force);
+    }
+}
+
+function scheduleVisibleRangeRetry(force = false) {
+    visibleRangeRetryForce = visibleRangeRetryForce || force;
+    if (visibleRangeRetryTimer !== null || visibleRangeRetryAttempts >= visibleRangeRetryMaxAttempts) return;
+
+    visibleRangeRetryTimer = window.setTimeout(() => {
+        visibleRangeRetryTimer = null;
+        visibleRangeRetryAttempts += 1;
+        const retryForce = visibleRangeRetryForce;
+        visibleRangeRetryForce = false;
+        void ensureVisibleRangeLoaded(retryForce);
+    }, visibleRangeRetryDelayMilliseconds);
+}
+
+function cancelVisibleRangeRetry() {
+    if (visibleRangeRetryTimer !== null) {
+        window.clearTimeout(visibleRangeRetryTimer);
+        visibleRangeRetryTimer = null;
+    }
+    visibleRangeRetryAttempts = 0;
+    visibleRangeRetryForce = false;
+}
+
+function actionValueWithViewRange(value) {
+    const range = visibleViewRange();
+    if (value && typeof value === 'object' && !Array.isArray(value)) {
+        return Object.prototype.hasOwnProperty.call(value, '_viewRange')
+            ? { ...value }
+            : { ...value, _viewRange: range };
+    }
+
+    return { _value: value, _viewRange: range };
+}
+
+function configuredCursorDateBounds() {
+    const today = startOfDay(new Date());
+    const configuredPastDays = Number(calendarState.settings.pastDays);
+    const configuredFutureDays = Number(calendarState.settings.futureDays);
+    const pastDays = Number.isFinite(configuredPastDays)
+        ? Math.max(0, Math.min(1095, Math.round(configuredPastDays)))
+        : 0;
+    const futureDays = Number.isFinite(configuredFutureDays)
+        ? Math.max(1, Math.min(1095, Math.round(configuredFutureDays)))
+        : 31;
+
+    return {
+        minimum: addDays(today, -pastDays),
+        maximum: addDays(today, futureDays)
+    };
+}
+
+function clampCursorDate(date) {
+    const candidate = date instanceof Date && Number.isFinite(date.getTime())
+        ? startOfDay(date)
+        : startOfDay(new Date());
+    const bounds = configuredCursorDateBounds();
+    if (candidate < bounds.minimum) return bounds.minimum;
+    if (candidate > bounds.maximum) return bounds.maximum;
+    return candidate;
+}
+
+function clampCurrentCursorDate() {
+    const clampedDate = clampCursorDate(cursorDate);
+    if (clampedDate.getTime() === cursorDate.getTime()) return false;
+    cursorDate = clampedDate;
+    return true;
+}
+
 function navigate(direction) {
     if (activeView === 'month') {
         cursorDate = new Date(
@@ -1329,11 +4330,12 @@ function navigate(direction) {
     } else if (activeView === 'threeDays') {
         const firstVisibleDay = getVisibleDays(cursorDate, 1)[0];
         cursorDate = moveVisibleDays(firstVisibleDay, direction * viewPeriod('threeDays'));
-    } else if (activeView === 'week') {
-        cursorDate = addDays(startOfWeek(cursorDate), direction * viewPeriod('week') * 7);
+    } else if (activeView === 'week' || activeView === 'workWeek') {
+        cursorDate = addDays(startOfWeek(cursorDate), direction * viewPeriod(activeView) * 7);
     } else {
         cursorDate = addDays(cursorDate, direction * viewPeriod(activeView === 'list' ? 'list' : 'agenda'));
     }
+    clampCurrentCursorDate();
     persistClientViewState();
     render();
 }
@@ -1347,10 +4349,6 @@ function restoreClientViewState(defaultView) {
 
     if (calendarViews.has(storedState.activeView)) {
         activeView = storedState.activeView;
-    }
-    const storedDate = parseStoredViewDate(storedState.cursorDate);
-    if (storedDate) {
-        cursorDate = storedDate;
     }
     if (Array.isArray(storedState.visibleCalendarIds)) {
         visibleCalendarIds = new Set(
@@ -1367,7 +4365,6 @@ function persistClientViewState() {
 
     const value = JSON.stringify({
         activeView,
-        cursorDate: formatStoredViewDate(cursorDate),
         visibleCalendarIds: visibleCalendarIds instanceof Set
             ? Array.from(visibleCalendarIds).sort((left, right) => left - right)
             : null
@@ -1427,26 +4424,6 @@ function readWindowNameViewState() {
     }
 }
 
-function formatStoredViewDate(date) {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-}
-
-function parseStoredViewDate(value) {
-    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value || ''));
-    if (!match) return null;
-
-    const date = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
-    if (date.getFullYear() !== Number(match[1])
-        || date.getMonth() !== Number(match[2]) - 1
-        || date.getDate() !== Number(match[3])) {
-        return null;
-    }
-    return startOfDay(date);
-}
-
 function moveVisibleDays(start, amount) {
     let result = startOfDay(start);
     const direction = amount < 0 ? -1 : 1;
@@ -1461,9 +4438,10 @@ function moveVisibleDays(start, amount) {
 }
 
 async function sendAction(ident, value) {
+    const actionValue = actionValueWithViewRange(value);
     if (typeof requestAction === 'function'
         || (isNativeVisualization() && await waitForNativeActionBridge())) {
-        requestAction(ident, typeof value === 'string' ? value : JSON.stringify(value));
+        requestAction(ident, JSON.stringify(actionValue));
         return true;
     }
     if (!hasIPSViewActionBridge()) {
@@ -1472,7 +4450,7 @@ async function sendAction(ident, value) {
     }
 
     try {
-        const payload = await calendarIPSViewRequest(ident, value);
+        const payload = await calendarIPSViewRequest(ident, actionValue);
         handleMessage(payload);
         return true;
     } catch (error) {
@@ -1532,20 +4510,66 @@ async function calendarIPSViewRequest(action, value) {
     return payload;
 }
 
+function requestIPSViewStateRefresh() {
+    if (calendarVisualization.mode !== 'ipsview' || !hasIPSViewActionBridge()) return;
+    if (eventEditingActive || document.visibilityState === 'hidden' || ipsViewStateRequestPending) {
+        ipsViewStateRefreshRequested = true;
+        return;
+    }
+    void refreshIPSViewState();
+}
+
 async function refreshIPSViewState() {
     if (!hasIPSViewActionBridge()) return;
-
-    try {
-        handleMessage(await calendarIPSViewRequest('GetState', null));
-    } catch (error) {
-        console.warn('OpenCalendar IPSView state refresh failed; using embedded state.', error);
+    if (eventEditingActive || document.visibilityState === 'hidden') {
+        ipsViewStateRefreshRequested = true;
+        return;
     }
+    if (ipsViewStateRequestPending) {
+        ipsViewStateRefreshRequested = true;
+        return;
+    }
+
+    ipsViewStateRequestPending = true;
+    ipsViewStateRefreshRequested = false;
+    const editingRevision = eventEditingRevision;
+    try {
+        const message = await calendarIPSViewRequest('LoadRange', actionValueWithViewRange({}));
+        if (eventEditingActive || editingRevision !== eventEditingRevision) {
+            ipsViewStateRefreshRequested = true;
+            return;
+        }
+        handleMessage(message);
+    } catch (error) {
+        console.warn('OpenCalendar IPSView state refresh failed; using the last known state.', error);
+    } finally {
+        ipsViewStateRequestPending = false;
+        if (ipsViewStateRefreshRequested && !eventEditingActive && document.visibilityState !== 'hidden') {
+            ipsViewStateRefreshRequested = false;
+            window.setTimeout(() => {
+                void refreshIPSViewState();
+            }, 0);
+        }
+    }
+}
+
+function startIPSViewStateRefresh() {
+    if (!hasIPSViewActionBridge() || ipsViewStateRefreshTimer !== null) return;
+    requestIPSViewStateRefresh();
+    ipsViewStateRefreshTimer = window.setInterval(
+        requestIPSViewStateRefresh,
+        ipsViewStateRefreshIntervalMilliseconds
+    );
 }
 
 function applyStaticTranslations() {
     document.querySelectorAll('label[for]').forEach(label => {
         label.textContent = t(label.textContent.trim());
     });
+    document.querySelectorAll('[data-i18n]').forEach(element => {
+        element.textContent = t(element.dataset.i18n || element.textContent.trim());
+    });
+    updateRecurrenceWeekdayLabels();
     [
         ['delete-button', 'Delete'],
         ['cancel-button', 'Cancel'],
@@ -1553,6 +4577,8 @@ function applyStaticTranslations() {
         ['details-delete-button', 'Delete'],
         ['details-close-button', 'Close'],
         ['details-edit-button', 'Edit'],
+        ['edit-scope-cancel', 'Cancel'],
+        ['edit-scope-confirm', 'Continue'],
         ['delete-confirm-cancel', 'Cancel'],
         ['delete-confirm-button', 'Delete'],
         ['day-events-create-button', 'Create event on this day'],
@@ -1563,9 +4589,19 @@ function applyStaticTranslations() {
         ['calendar-filter-cancel', 'Cancel'],
         ['calendar-filter-apply', 'Apply']
     ].forEach(([id, text]) => { document.getElementById(id).textContent = t(text); });
+    const providerButtonText = providerLinkText('Open in provider');
+    const providerButton = document.getElementById('details-provider-button');
+    providerButton.textContent = providerButtonText;
+    providerButton.title = providerButtonText;
+    providerButton.setAttribute('aria-label', providerButtonText);
+    icsImportButtonLabel.textContent = icsImportText('Import ICS');
+    icsImportButton.title = icsImportText('Import ICS');
+    icsImportFile.setAttribute('aria-label', icsImportText('Import ICS'));
     document.getElementById('all-day-label').textContent = t('All day');
     document.getElementById('dialog-title').textContent = t('Event');
     document.getElementById('details-dialog-title').textContent = t('Event details');
+    document.getElementById('edit-scope-dialog-title').textContent = t('Edit recurring event');
+    document.getElementById('edit-scope-question').textContent = t('Which events do you want to edit?');
     document.getElementById('delete-confirm-dialog-title').textContent = t('Delete event');
     document.getElementById('delete-confirm-question').textContent = t('Do you really want to delete this event?');
     document.getElementById('day-events-dialog-title').textContent = t('Day events');
@@ -1573,7 +4609,7 @@ function applyStaticTranslations() {
     updateViewSelectorOptions();
     document.getElementById('calendar-filter-dialog-title').textContent = t('Filter calendars');
     document.getElementById('calendar-filter-note').textContent = t('This filter only changes the current view on this browser or monitor.');
-    ['calendar', 'start', 'end', 'location', 'description'].forEach(name => {
+    ['calendar', 'occasion', 'start', 'end', 'location', 'description'].forEach(name => {
         const label = document.getElementById(`details-${name}-label`);
         label.textContent = t(label.textContent.trim());
     });
@@ -1581,6 +4617,7 @@ function applyStaticTranslations() {
     [
         ['dialog-close', 'Close'],
         ['details-close', 'Close'],
+        ['edit-scope-close', 'Close'],
         ['delete-confirm-close', 'Close'],
         ['day-events-close', 'Close'],
         ['view-selector-close', 'Close'],
@@ -1717,6 +4754,7 @@ function viewPeriod(view) {
         list: ['listPeriodDays', 14, 1, 366],
         threeDays: ['threeDaysPeriodDays', 3, 1, 31],
         week: ['weekPeriodWeeks', 1, 1, 12],
+        workWeek: ['weekPeriodWeeks', 1, 1, 12],
         month: ['monthPeriodMonths', 1, 1, 12]
     };
     const [setting, fallback, minimum, maximum] = periods[view] || periods.agenda;
@@ -1730,20 +4768,11 @@ function formatViewPeriod(view) {
         list: ['Day', 'Days'],
         threeDays: ['Day', 'Days'],
         week: ['Week', 'Weeks'],
+        workWeek: ['Week', 'Weeks'],
         month: ['Month', 'Months']
     };
     const [singular, plural] = units[view] || units.agenda;
     return `${count} ${t(count === 1 ? singular : plural)}`;
-}
-function daysBetween(start, end) {
-    const days = [];
-    let current = startOfDay(start);
-    const last = startOfDay(end);
-    while (current <= last) {
-        days.push(current);
-        current = addDays(current, 1);
-    }
-    return days;
 }
 function formatMonth(date) {
     return new Intl.DateTimeFormat(undefined, { month: 'long', year: 'numeric' }).format(date);
@@ -1759,5 +4788,5 @@ if (calendarVisualization.state && typeof calendarVisualization.state === 'objec
 }
 
 if (calendarVisualization.mode === 'ipsview') {
-    void refreshIPSViewState();
+    startIPSViewStateRefresh();
 }

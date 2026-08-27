@@ -12,6 +12,10 @@ use RuntimeException;
 use Throwable;
 
 require_once __DIR__ . '/ICalendarRecurrence.php';
+require_once __DIR__ . '/ICalendarTimezoneResolver.php';
+require_once __DIR__ . '/CalendarEventRecurrence.php';
+require_once __DIR__ . '/CalendarEventReminder.php';
+require_once __DIR__ . '/CalendarRecurrenceRule.php';
 
 final class ICalendarCodec
 {
@@ -23,6 +27,7 @@ final class ICalendarCodec
     public static function parseEvents(string $ical, string $resourceUrl, string $etag): array
     {
         $events = [];
+        $timezoneResolver = ICalendarTimezoneResolver::fromCalendar($ical);
         foreach (self::extractEventBlocks(self::unfoldLines($ical)) as $block) {
             $properties = self::readTopLevelProperties($block);
             $uid = self::propertyValue($properties, 'UID');
@@ -31,43 +36,74 @@ final class ICalendarCodec
                 continue;
             }
 
-            $start = self::parseDateProperty($startProperty);
+            $start = self::parseDateProperty($startProperty, $timezoneResolver);
             $endProperty = self::firstProperty($properties, 'DTEND');
             $end = $endProperty !== null
-                ? self::parseDateProperty($endProperty)
-                : self::endFromDuration($start, self::propertyValue($properties, 'DURATION'));
+                ? self::parseDateProperty($endProperty, $timezoneResolver)
+                : self::endFromDuration(
+                    $start,
+                    self::propertyValue($properties, 'DURATION'),
+                    $timezoneResolver
+                );
             $recurrenceIdProperty = self::firstProperty($properties, 'RECURRENCE-ID');
             $recurrenceId = $recurrenceIdProperty['value'] ?? '';
             $parsedRecurrenceId = $recurrenceIdProperty !== null
-                ? self::parseDateProperty($recurrenceIdProperty)
+                ? self::parseDateProperty($recurrenceIdProperty, $timezoneResolver)
                 : null;
 
-            $events[] = [
-                'id'                    => hash('sha256', $resourceUrl . '|' . $uid . '|' . $recurrenceId . '|' . $start['value']),
-                'uid'                   => $uid,
-                'resourceUrl'           => $resourceUrl,
-                'etag'                  => $etag,
-                'summary'               => self::unescapeText(self::propertyValue($properties, 'SUMMARY')),
-                'description'           => self::unescapeText(self::propertyValue($properties, 'DESCRIPTION')),
-                'location'              => self::unescapeText(self::propertyValue($properties, 'LOCATION')),
-                'start'                 => $start['value'],
-                'end'                   => $end['value'],
-                'startTimestamp'        => $start['timestamp'],
-                'endTimestamp'          => $end['timestamp'],
-                'allDay'                => $start['allDay'],
-                'timezone'              => $start['timezone'],
-                'status'                => strtoupper(self::propertyValue($properties, 'STATUS')),
-                'recurrenceRule'        => self::propertyValue($properties, 'RRULE'),
-                'recurrenceId'          => $recurrenceId,
-                'recurrenceIdTimestamp' => $parsedRecurrenceId['timestamp'] ?? null,
-                'exceptionDates'        => self::parseDatePropertyList($properties['EXDATE'] ?? []),
-                'recurrenceDates'       => self::parseDatePropertyList($properties['RDATE'] ?? []),
-                'recurring'             => self::propertyValue($properties, 'RRULE') !== '' || $recurrenceId !== '',
-                'sequence'              => (int) self::propertyValue($properties, 'SEQUENCE'),
-                'created'               => self::parseOptionalDate(self::firstProperty($properties, 'CREATED')),
-                'lastModified'          => self::parseOptionalDate(self::firstProperty($properties, 'LAST-MODIFIED')),
-                'url'                   => self::propertyValue($properties, 'URL')
-            ];
+            $recurrenceRule = self::propertyValue($properties, 'RRULE');
+            $recurrenceDates = self::parseDatePropertyList($properties['RDATE'] ?? [], $timezoneResolver);
+            $recurrenceIdentity = $recurrenceId !== ''
+                ? CalendarEventRecurrence::occurrence(
+                    $uid,
+                    $uid . '|' . $recurrenceId,
+                    (string) ($parsedRecurrenceId['value'] ?? ''),
+                    $recurrenceId,
+                    false,
+                    true
+                )
+                : ($recurrenceRule !== '' || $recurrenceDates !== []
+                    ? CalendarEventRecurrence::master($uid)
+                    : CalendarEventRecurrence::single());
+
+            $events[] = array_merge([
+                'id'                          => hash('sha256', $resourceUrl . '|' . $uid . '|' . $recurrenceId . '|' . $start['value']),
+                'uid'                         => $uid,
+                'resourceUrl'                 => $resourceUrl,
+                'etag'                        => $etag,
+                'summary'                     => self::unescapeText(self::propertyValue($properties, 'SUMMARY')),
+                'description'                 => self::unescapeText(self::propertyValue($properties, 'DESCRIPTION')),
+                'location'                    => self::unescapeText(self::propertyValue($properties, 'LOCATION')),
+                'start'                       => $start['value'],
+                'end'                         => $end['value'],
+                'startTimestamp'              => $start['timestamp'],
+                'endTimestamp'                => $end['timestamp'],
+                'allDay'                      => $start['allDay'],
+                'timezone'                    => $start['timezone'],
+                'timezoneReference'           => $start['timezoneReference'],
+                'timezoneResolved'            => $start['timezoneResolved'],
+                'localValue'                  => $start['localValue'],
+                'recurrenceTimezoneSupported' => $start['allDay'] || $start['timezoneResolved'],
+                'status'                      => strtoupper(self::propertyValue($properties, 'STATUS')),
+                'recurrenceRule'              => $recurrenceRule,
+                'recurrenceIdTimestamp'       => $parsedRecurrenceId['timestamp'] ?? null,
+                'exceptionDates'              => self::parseDatePropertyList(
+                    $properties['EXDATE'] ?? [],
+                    $timezoneResolver
+                ),
+                'recurrenceDates'             => $recurrenceDates,
+                'sequence'                    => (int) self::propertyValue($properties, 'SEQUENCE'),
+                'created'                     => self::parseOptionalDate(
+                    self::firstProperty($properties, 'CREATED'),
+                    $timezoneResolver
+                ),
+                'lastModified'                => self::parseOptionalDate(
+                    self::firstProperty($properties, 'LAST-MODIFIED'),
+                    $timezoneResolver
+                ),
+                'url'                         => self::propertyValue($properties, 'URL'),
+                'reminder'                    => self::reminderState($block)
+            ], $recurrenceIdentity);
         }
 
         return $events;
@@ -95,6 +131,9 @@ final class ICalendarCodec
     /**
      * Creates a standalone VCALENDAR document containing one VEVENT.
      *
+     * Recurring timed events retain their local wall-clock time through an
+     * RFC 5545 TZID reference plus a matching VTIMEZONE component.
+     *
      * @param array<string, mixed> $data
      * @return array{uid: string, ical: string}
      */
@@ -117,23 +156,53 @@ final class ICalendarCodec
             throw new InvalidArgumentException('The event end must be later than the start.');
         }
 
+        $recurrence = $data['recurrence'] ?? null;
+        $recurring = $recurrence !== null && $recurrence !== [];
+        if ($recurring && (!is_array($recurrence) || array_is_list($recurrence))) {
+            throw new InvalidArgumentException('The recurrence settings are invalid.');
+        }
+
+        $timezoneName = trim((string) ($data['timezone'] ?? ''));
+        $timezoneLines = [];
+        $useTimezoneReference = false;
+        if ($recurring && !$allDay) {
+            if ($timezoneName === '') {
+                $timezoneName = date_default_timezone_get();
+            }
+            $timezone = self::strictTimezone($timezoneName);
+            $start = $start->setTimezone($timezone);
+            $end = $end->setTimezone($timezone);
+            $timezoneLines = self::timezoneComponent($timezone, $start, $recurrence);
+            $useTimezoneReference = $timezoneLines !== [];
+        }
+
         $uid = bin2hex(random_bytes(16)) . '@ips-kalender';
         $now = gmdate('Ymd\THis\Z');
         $lines = [
             'BEGIN:VCALENDAR',
             'VERSION:2.0',
             'PRODID:-//OpenCalendar//Calendar Module//EN',
-            'CALSCALE:GREGORIAN',
-            'BEGIN:VEVENT',
-            'UID:' . $uid,
-            'DTSTAMP:' . $now,
-            'CREATED:' . $now,
-            'LAST-MODIFIED:' . $now,
-            'SEQUENCE:0',
-            self::formatDateLine('DTSTART', $start, $allDay),
-            self::formatDateLine('DTEND', $end, $allDay),
-            'SUMMARY:' . self::escapeText($summary)
+            'CALSCALE:GREGORIAN'
         ];
+        array_push($lines, ...$timezoneLines);
+        $lines[] = 'BEGIN:VEVENT';
+        $lines[] = 'UID:' . $uid;
+        $lines[] = 'DTSTAMP:' . $now;
+        $lines[] = 'CREATED:' . $now;
+        $lines[] = 'LAST-MODIFIED:' . $now;
+        $lines[] = 'SEQUENCE:0';
+        $lines[] = self::formatEventDateLine('DTSTART', $start, $allDay, $useTimezoneReference ? $timezoneName : '');
+        $lines[] = self::formatEventDateLine('DTEND', $end, $allDay, $useTimezoneReference ? $timezoneName : '');
+        $lines[] = 'SUMMARY:' . self::escapeText($summary);
+
+        if ($recurring) {
+            $lines[] = CalendarRecurrenceRule::toICalendarRule(
+                $recurrence,
+                $start,
+                $allDay,
+                $timezoneName !== '' ? $timezoneName : 'UTC'
+            );
+        }
 
         foreach (['description' => 'DESCRIPTION', 'location' => 'LOCATION'] as $key => $property) {
             $value = trim((string) ($data[$key] ?? ''));
@@ -145,6 +214,11 @@ final class ICalendarCodec
         $status = self::normalizeStatus((string) ($data['status'] ?? 'CONFIRMED'));
         if ($status !== '') {
             $lines[] = 'STATUS:' . $status;
+        }
+
+        if (array_key_exists('reminder', $data)) {
+            $reminder = CalendarEventReminder::normalizeInput($data['reminder']);
+            array_push($lines, ...self::reminderAlarmBlocks($reminder, $summary));
         }
 
         $lines[] = 'END:VEVENT';
@@ -170,8 +244,9 @@ final class ICalendarCodec
                 continue;
             }
             if (self::propertyValue($properties, 'RRULE') !== ''
+                || self::propertyValue($properties, 'RDATE') !== ''
                 || self::propertyValue($properties, 'RECURRENCE-ID') !== '') {
-                throw new RuntimeException('Recurring events cannot be modified yet.');
+                throw new RuntimeException('Recurring events cannot be modified as single events.');
             }
             $target = $block;
             break;
@@ -182,6 +257,811 @@ final class ICalendarCodec
         }
 
         $block = $target['lines'];
+        self::applyEventChangesToBlock($block, $data);
+        array_splice($lines, $target['start'], $target['end'] - $target['start'] + 1, $block);
+
+        return self::foldLines($lines);
+    }
+
+    /**
+     * Converts one non-recurring VEVENT into a recurring series in place.
+     *
+     * Existing nested components such as VALARM and unrelated VCALENDAR
+     * components are retained. Timed recurrences use the requested timezone
+     * and add a matching VTIMEZONE component when one can be generated.
+     *
+     * @param array<string, mixed> $data
+     */
+    public static function convertEventToRecurringSeries(string $ical, string $uid, array $data): string
+    {
+        $uid = trim($uid);
+        if ($uid === '') {
+            throw new InvalidArgumentException('The event UID is missing.');
+        }
+
+        $recurrence = $data['recurrence'] ?? null;
+        if (!is_array($recurrence) || $recurrence === [] || array_is_list($recurrence)) {
+            throw new InvalidArgumentException('The recurrence settings are invalid.');
+        }
+
+        $lines = self::unfoldLines($ical);
+        $blocks = self::extractEventBlocksWithOffsets($lines);
+        $matches = [];
+        foreach ($blocks as $block) {
+            $properties = self::readTopLevelProperties($block['lines']);
+            if (!hash_equals($uid, self::propertyValue($properties, 'UID'))) {
+                continue;
+            }
+            if (self::propertyValue($properties, 'RRULE') !== ''
+                || self::propertyValue($properties, 'RDATE') !== ''
+                || self::propertyValue($properties, 'EXDATE') !== ''
+                || self::propertyValue($properties, 'EXRULE') !== ''
+                || self::propertyValue($properties, 'RECURRENCE-ID') !== '') {
+                throw new RuntimeException('Recurring events cannot be converted from a single event.');
+            }
+            $matches[] = $block;
+        }
+
+        if (count($matches) !== 1) {
+            throw new RuntimeException(
+                $matches === []
+                    ? 'The event was not found in the calendar resource.'
+                    : 'The calendar resource contains multiple matching events.'
+            );
+        }
+
+        $target = $matches[0];
+        $block = $target['lines'];
+        self::applyEventChangesToBlock($block, $data);
+
+        $properties = self::readTopLevelProperties($block);
+        $startProperty = self::firstProperty($properties, 'DTSTART');
+        if ($startProperty === null) {
+            throw new RuntimeException('The event has no start.');
+        }
+        $startData = self::parseDateProperty($startProperty);
+        $allDay = $startData['allDay'];
+        $timezoneName = trim((string) ($data['timezone'] ?? $startData['timezone']));
+        $timezoneLines = [];
+        $useTimezoneReference = false;
+        if (!$allDay) {
+            if ($timezoneName === '') {
+                $timezoneName = date_default_timezone_get();
+            }
+            $timezone = self::strictTimezone($timezoneName);
+            $start = (new DateTimeImmutable('@' . $startData['timestamp']))->setTimezone($timezone);
+            $timezoneLines = self::timezoneComponent($timezone, $start, $recurrence);
+            $useTimezoneReference = $timezoneLines !== [];
+            self::replaceProperty(
+                $block,
+                'DTSTART',
+                self::formatEventDateLine(
+                    'DTSTART',
+                    $start,
+                    false,
+                    $useTimezoneReference ? $timezoneName : ''
+                )
+            );
+
+            $properties = self::readTopLevelProperties($block);
+            $endProperty = self::firstProperty($properties, 'DTEND');
+            if ($endProperty !== null) {
+                $endData = self::parseDateProperty($endProperty);
+                $end = (new DateTimeImmutable('@' . $endData['timestamp']))->setTimezone($timezone);
+                self::replaceProperty(
+                    $block,
+                    'DTEND',
+                    self::formatEventDateLine(
+                        'DTEND',
+                        $end,
+                        false,
+                        $useTimezoneReference ? $timezoneName : ''
+                    )
+                );
+            }
+        }
+
+        $updatedProperties = self::readTopLevelProperties($block);
+        $updatedStartProperty = self::firstProperty($updatedProperties, 'DTSTART');
+        if ($updatedStartProperty === null) {
+            throw new RuntimeException('The event has no start.');
+        }
+        $updatedStart = self::parseDateProperty($updatedStartProperty);
+        $ruleTimezone = $allDay
+            ? self::timezone($updatedStart['timezone'])
+            : self::strictTimezone($timezoneName !== '' ? $timezoneName : $updatedStart['timezone']);
+        $start = (new DateTimeImmutable('@' . $updatedStart['timestamp']))->setTimezone($ruleTimezone);
+        self::replaceProperty(
+            $block,
+            'RRULE',
+            CalendarRecurrenceRule::toICalendarRule(
+                $recurrence,
+                $start,
+                $allDay,
+                $timezoneName !== '' ? $timezoneName : $updatedStart['timezone']
+            )
+        );
+
+        array_splice($lines, $target['start'], $target['end'] - $target['start'] + 1, $block);
+        self::ensureTimezoneComponent($lines, $timezoneLines);
+
+        return self::foldLines($lines);
+    }
+
+    /**
+     * Updates the master VEVENT of a recurring iCalendar resource.
+     *
+     * Detached RECURRENCE-ID overrides and other calendar components are retained
+     * while the series remains recurring. Converting the series to a single event
+     * removes detached overrides and recurrence-only properties. A replacement RRULE
+     * is accepted only when the existing recurrence can be
+     * represented losslessly by the common OpenCalendar recurrence editor.
+     *
+     * @param array<string, mixed> $data
+     */
+    public static function updateRecurringSeries(string $ical, string $uid, array $data): string
+    {
+        $uid = trim($uid);
+        if ($uid === '') {
+            throw new InvalidArgumentException('The recurring event UID is missing.');
+        }
+
+        $lines = self::unfoldLines($ical);
+        $blocks = self::extractEventBlocksWithOffsets($lines);
+        $master = self::recurringMaster($blocks, $uid);
+        $block = $master['lines'];
+        $properties = $master['properties'];
+        $recurrenceProvided = array_key_exists('recurrence', $data);
+        $recurrence = $data['recurrence'] ?? null;
+        $removeRecurrence = $recurrenceProvided
+            && ($recurrence === null || (is_array($recurrence) && $recurrence === []));
+
+        if ($recurrenceProvided && !$removeRecurrence) {
+            if (!is_array($recurrence) || array_is_list($recurrence)) {
+                throw new InvalidArgumentException('The recurrence settings are invalid.');
+            }
+            $startProperty = self::firstProperty($properties, 'DTSTART');
+            $currentRule = self::propertyValue($properties, 'RRULE');
+            if ($startProperty === null
+                || count($properties['RRULE'] ?? []) !== 1
+                || self::propertyValue($properties, 'RDATE') !== ''
+                || self::propertyValue($properties, 'EXRULE') !== '') {
+                throw new RuntimeException('The recurrence pattern cannot be edited safely.');
+            }
+            $currentStart = self::parseDateProperty($startProperty);
+            if (CalendarRecurrenceRule::fromGoogleRule(
+                $currentRule,
+                $currentStart['allDay'],
+                $currentStart['timezone']
+            ) === null) {
+                throw new RuntimeException('The recurrence pattern cannot be edited safely.');
+            }
+        }
+
+        self::applyEventChangesToBlock($block, $data);
+
+        if ($removeRecurrence) {
+            foreach (['RRULE', 'RDATE', 'EXDATE', 'EXRULE'] as $property) {
+                self::replaceProperty($block, $property, null);
+            }
+
+            $operations = [[
+                'start'       => $master['start'],
+                'length'      => $master['end'] - $master['start'] + 1,
+                'replacement' => $block
+            ]];
+            foreach ($blocks as $eventBlock) {
+                $eventProperties = self::readTopLevelProperties($eventBlock['lines']);
+                if (!hash_equals($uid, self::propertyValue($eventProperties, 'UID'))
+                    || self::propertyValue($eventProperties, 'RECURRENCE-ID') === '') {
+                    continue;
+                }
+                $operations[] = [
+                    'start'       => $eventBlock['start'],
+                    'length'      => $eventBlock['end'] - $eventBlock['start'] + 1,
+                    'replacement' => []
+                ];
+            }
+
+            usort(
+                $operations,
+                static fn (array $left, array $right): int => $right['start'] <=> $left['start']
+            );
+            foreach ($operations as $operation) {
+                array_splice(
+                    $lines,
+                    $operation['start'],
+                    $operation['length'],
+                    $operation['replacement']
+                );
+            }
+
+            return self::foldLines($lines);
+        }
+
+        if ($recurrenceProvided && is_array($recurrence)) {
+            $updatedProperties = self::readTopLevelProperties($block);
+            $updatedStartProperty = self::firstProperty($updatedProperties, 'DTSTART');
+            if ($updatedStartProperty === null) {
+                throw new RuntimeException('The recurring event master has no start.');
+            }
+            $updatedStart = self::parseDateProperty($updatedStartProperty);
+            $timezone = self::timezone($updatedStart['timezone']);
+            $start = (new DateTimeImmutable('@' . $updatedStart['timestamp']))->setTimezone($timezone);
+            self::replaceProperty(
+                $block,
+                'RRULE',
+                CalendarRecurrenceRule::toICalendarRule(
+                    $recurrence,
+                    $start,
+                    $updatedStart['allDay'],
+                    $updatedStart['timezone']
+                )
+            );
+        }
+
+        array_splice($lines, $master['start'], $master['end'] - $master['start'] + 1, $block);
+
+        return self::foldLines($lines);
+    }
+
+    /**
+     * Shortens one supported recurring series so it ends before the selected occurrence.
+     *
+     * Detached overrides at or after the split boundary are removed because they belong
+     * to the future part of the series. Overrides before the boundary are retained.
+     */
+    public static function trimRecurringSeriesBefore(
+        string $ical,
+        string $uid,
+        string $originalStart
+    ): string {
+        $context = self::recurringSplitContext($ical, $uid, $originalStart);
+        $targetStart = $context['targetStart'];
+        $masterStart = $context['masterStart'];
+        if ($targetStart->getTimestamp() === $masterStart->getTimestamp()) {
+            throw new RuntimeException('The recurring series cannot be shortened before its first occurrence.');
+        }
+
+        $lines = $context['lines'];
+        $master = $context['master'];
+        $masterBlock = $master['lines'];
+        self::replaceProperty(
+            $masterBlock,
+            'RRULE',
+            CalendarRecurrenceRule::trimGoogleRuleBefore(
+                'RRULE:' . $context['rule'],
+                $context['allDay'] ? $targetStart->format('Y-m-d') : $targetStart->format(DATE_ATOM),
+                $context['allDay'],
+                $context['timezone']
+            )
+        );
+        self::touchEventBlock($masterBlock);
+
+        $operations = [[
+            'start'       => $master['start'],
+            'length'      => $master['end'] - $master['start'] + 1,
+            'replacement' => $masterBlock
+        ]];
+        foreach ($context['blocks'] as $block) {
+            $properties = self::readTopLevelProperties($block['lines']);
+            if (!hash_equals($context['uid'], self::propertyValue($properties, 'UID'))) {
+                continue;
+            }
+            $recurrenceId = self::firstProperty($properties, 'RECURRENCE-ID');
+            if ($recurrenceId === null) {
+                continue;
+            }
+            try {
+                $timestamp = self::parseDateProperty($recurrenceId)['timestamp'];
+            } catch (Throwable) {
+                continue;
+            }
+            if ($timestamp < $targetStart->getTimestamp()) {
+                continue;
+            }
+            $operations[] = [
+                'start'       => $block['start'],
+                'length'      => $block['end'] - $block['start'] + 1,
+                'replacement' => []
+            ];
+        }
+
+        usort(
+            $operations,
+            static fn (array $left, array $right): int => $right['start'] <=> $left['start']
+        );
+        foreach ($operations as $operation) {
+            array_splice(
+                $lines,
+                $operation['start'],
+                $operation['length'],
+                $operation['replacement']
+            );
+        }
+
+        return self::foldLines($lines);
+    }
+
+    /**
+     * Splits one supported recurring series at the selected occurrence.
+     *
+     * The original resource is shortened before the selected occurrence and all
+     * following detached exceptions are removed. The future portion is returned as
+     * a new self-contained VCALENDAR resource with a new UID so a CalDAV provider can
+     * create it atomically before shortening the original resource.
+     *
+     * @param array<string, mixed> $data Changes and recurrence settings for the new future series.
+     * @return array{originalIcal: string, newIcal: string, newUid: string}
+     */
+    public static function splitRecurringSeries(
+        string $ical,
+        string $uid,
+        string $originalStart,
+        array $data
+    ): array {
+        $recurrence = $data['recurrence'] ?? null;
+        if (!is_array($recurrence) || $recurrence === [] || array_is_list($recurrence)) {
+            throw new InvalidArgumentException('The recurrence settings are required when splitting a recurring event.');
+        }
+
+        $context = self::recurringSplitContext($ical, $uid, $originalStart);
+        $targetStart = $context['targetStart'];
+        if ($targetStart->getTimestamp() === $context['masterStart']->getTimestamp()) {
+            throw new RuntimeException('The first occurrence must update the existing recurring series.');
+        }
+
+        $originalIcal = self::trimRecurringSeriesBefore($ical, $uid, $originalStart);
+
+        $newBlock = self::createOccurrenceOverrideBlock($context['master']['lines'], $targetStart);
+        self::replaceProperty($newBlock, 'RECURRENCE-ID', null);
+        $newUid = bin2hex(random_bytes(16)) . '@ips-kalender';
+        self::replaceProperty($newBlock, 'UID', 'UID:' . $newUid);
+        self::applyEventChangesToBlock($newBlock, $data);
+
+        $updatedProperties = self::readTopLevelProperties($newBlock);
+        $updatedStartProperty = self::firstProperty($updatedProperties, 'DTSTART');
+        if ($updatedStartProperty === null) {
+            throw new RuntimeException('The split recurring event has no start.');
+        }
+        $updatedStart = self::parseDateProperty($updatedStartProperty);
+        $updatedTimezone = self::timezone($updatedStart['timezone']);
+        $updatedStartDate = (new DateTimeImmutable('@' . $updatedStart['timestamp']))->setTimezone($updatedTimezone);
+        self::replaceProperty(
+            $newBlock,
+            'RRULE',
+            CalendarRecurrenceRule::toICalendarRule(
+                $recurrence,
+                $updatedStartDate,
+                $updatedStart['allDay'],
+                $updatedStart['timezone']
+            )
+        );
+
+        $now = gmdate('Ymd\\THis\\Z');
+        self::replaceProperty($newBlock, 'SEQUENCE', 'SEQUENCE:0');
+        self::replaceProperty($newBlock, 'CREATED', 'CREATED:' . $now);
+        self::replaceProperty($newBlock, 'DTSTAMP', 'DTSTAMP:' . $now);
+        self::replaceProperty($newBlock, 'LAST-MODIFIED', 'LAST-MODIFIED:' . $now);
+
+        $newLines = $context['lines'];
+        foreach (array_reverse($context['blocks']) as $block) {
+            array_splice($newLines, $block['start'], $block['end'] - $block['start'] + 1);
+        }
+        self::insertEventBlock($newLines, $newBlock);
+
+        return [
+            'originalIcal' => $originalIcal,
+            'newIcal'      => self::foldLines($newLines),
+            'newUid'       => $newUid
+        ];
+    }
+
+    /**
+     * Checks whether an iCalendar resource contains a recurring VEVENT master.
+     */
+    public static function hasRecurringEvent(string $ical, string $uid = ''): bool
+    {
+        $uid = trim($uid);
+        foreach (self::extractEventBlocks(self::unfoldLines($ical)) as $block) {
+            $properties = self::readTopLevelProperties($block);
+            if ($uid !== '' && self::propertyValue($properties, 'UID') !== $uid) {
+                continue;
+            }
+            if (self::propertyValue($properties, 'RECURRENCE-ID') === ''
+                && (self::propertyValue($properties, 'RRULE') !== ''
+                    || self::propertyValue($properties, 'RDATE') !== '')) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Creates or updates a detached VEVENT override for one recurrence instance.
+     *
+     * The RECURRENCE-ID always retains the original scheduled start while DTSTART
+     * and DTEND may be changed independently for the selected occurrence.
+     *
+     * @param array<string, mixed> $data
+     */
+    public static function updateRecurringOccurrence(
+        string $ical,
+        string $uid,
+        string $originalStart,
+        array $data
+    ): string {
+        $uid = trim($uid);
+        if ($uid === '') {
+            throw new InvalidArgumentException('The recurring event UID is missing.');
+        }
+
+        $lines = self::unfoldLines($ical);
+        $blocks = self::extractEventBlocksWithOffsets($lines);
+        $master = self::recurringMaster($blocks, $uid);
+        $masterStartProperty = self::firstProperty($master['properties'], 'DTSTART');
+        if ($masterStartProperty === null) {
+            throw new RuntimeException('The recurring event master has no start.');
+        }
+        $targetStart = self::occurrenceOriginalStart($originalStart, $masterStartProperty);
+        $override = self::recurrenceOverride($blocks, $uid, $targetStart);
+
+        if ($override !== null) {
+            $block = $override['lines'];
+            self::applyEventChangesToBlock($block, $data);
+            array_splice($lines, $override['start'], $override['end'] - $override['start'] + 1, $block);
+
+            return self::foldLines($lines);
+        }
+
+        $block = self::createOccurrenceOverrideBlock($master['lines'], $targetStart);
+        self::applyEventChangesToBlock($block, $data);
+        self::insertEventBlock($lines, $block);
+
+        return self::foldLines($lines);
+    }
+
+    /**
+     * Excludes one recurrence instance from a recurring VEVENT resource.
+     *
+     * Existing detached overrides for the same RECURRENCE-ID are removed and an
+     * EXDATE is added to the master. The master DTSTART remains intact, including
+     * when the first recurrence instance is excluded.
+     */
+    public static function deleteRecurringOccurrence(
+        string $ical,
+        string $uid,
+        string $originalStart
+    ): string {
+        $lines = self::unfoldLines($ical);
+        $blocks = self::extractEventBlocksWithOffsets($lines);
+        $master = self::recurringMaster($blocks, trim($uid));
+        $masterUid = self::propertyValue($master['properties'], 'UID');
+        $masterStartProperty = self::firstProperty($master['properties'], 'DTSTART');
+        if ($masterUid === '' || $masterStartProperty === null) {
+            throw new RuntimeException('The recurring event master is incomplete.');
+        }
+        $targetStart = self::occurrenceOriginalStart($originalStart, $masterStartProperty);
+
+        $masterBlock = $master['lines'];
+        if (!self::hasExceptionDate($master['properties'], $targetStart)) {
+            self::appendTopLevelProperty(
+                $masterBlock,
+                self::formatDateLineLike(
+                    'EXDATE',
+                    $targetStart,
+                    self::parseDateProperty($masterStartProperty)['allDay'],
+                    $masterStartProperty
+                )
+            );
+        }
+        self::touchEventBlock($masterBlock);
+
+        $operations = [[
+            'start'       => $master['start'],
+            'length'      => $master['end'] - $master['start'] + 1,
+            'replacement' => $masterBlock
+        ]];
+        foreach (self::recurrenceOverrides($blocks, $masterUid, $targetStart) as $override) {
+            $operations[] = [
+                'start'       => $override['start'],
+                'length'      => $override['end'] - $override['start'] + 1,
+                'replacement' => []
+            ];
+        }
+        usort(
+            $operations,
+            static fn (array $left, array $right): int => $right['start'] <=> $left['start']
+        );
+        foreach ($operations as $operation) {
+            array_splice(
+                $lines,
+                $operation['start'],
+                $operation['length'],
+                $operation['replacement']
+            );
+        }
+
+        return self::foldLines($lines);
+    }
+
+    /**
+     * Validates and resolves one supported recurring split boundary.
+     *
+     * @return array{
+     *     uid: string,
+     *     lines: list<string>,
+     *     blocks: list<array{start: int, end: int, lines: list<string>}>,
+     *     master: array{start: int, end: int, lines: list<string>, properties: array<string, list<array{value: string, params: array<string, string>}>>},
+     *     masterStart: DateTimeImmutable,
+     *     targetStart: DateTimeImmutable,
+     *     rule: string,
+     *     settings: array<string, mixed>,
+     *     allDay: bool,
+     *     timezone: string,
+     *     position: int
+     * }
+     */
+    private static function recurringSplitContext(string $ical, string $uid, string $originalStart): array
+    {
+        $uid = trim($uid);
+        if ($uid === '') {
+            throw new InvalidArgumentException('The recurring event UID is missing.');
+        }
+
+        $lines = self::unfoldLines($ical);
+        $blocks = self::extractEventBlocksWithOffsets($lines);
+        $master = self::recurringMaster($blocks, $uid);
+        $startProperty = self::firstProperty($master['properties'], 'DTSTART');
+        $rule = self::propertyValue($master['properties'], 'RRULE');
+        if ($startProperty === null
+            || count($master['properties']['RRULE'] ?? []) !== 1
+            || $rule === ''
+            || self::propertyValue($master['properties'], 'RDATE') !== ''
+            || self::propertyValue($master['properties'], 'EXRULE') !== '') {
+            throw new RuntimeException('The recurrence pattern cannot be split safely.');
+        }
+
+        $parsedStart = self::parseDateProperty($startProperty);
+        $settings = CalendarRecurrenceRule::fromGoogleRule(
+            $rule,
+            $parsedStart['allDay'],
+            $parsedStart['timezone']
+        );
+        if ($settings === null) {
+            throw new RuntimeException('The recurrence pattern cannot be split safely.');
+        }
+
+        $timezone = self::timezone($parsedStart['timezone']);
+        $masterStart = (new DateTimeImmutable('@' . $parsedStart['timestamp']))->setTimezone($timezone);
+        $targetStart = self::occurrenceOriginalStart($originalStart, $startProperty)->setTimezone($timezone);
+        if ($targetStart < $masterStart
+            || (!$parsedStart['allDay'] && $targetStart->format('H:i:s') !== $masterStart->format('H:i:s'))) {
+            throw new RuntimeException('The recurring target occurrence is not part of the series pattern.');
+        }
+
+        try {
+            $microsoftRecurrence = CalendarRecurrenceRule::toMicrosoftRecurrence($settings, $masterStart);
+            $position = CalendarRecurrenceRule::microsoftOccurrencePosition(
+                $microsoftRecurrence,
+                $targetStart->format('Y-m-d')
+            );
+        } catch (Throwable $exception) {
+            throw new RuntimeException('The recurring target occurrence is not part of the series pattern.', 0, $exception);
+        }
+        if ($position < 1) {
+            throw new RuntimeException('The recurring target occurrence is not part of the series pattern.');
+        }
+
+        return [
+            'uid'         => $uid,
+            'lines'       => $lines,
+            'blocks'      => $blocks,
+            'master'      => $master,
+            'masterStart' => $masterStart,
+            'targetStart' => $targetStart,
+            'rule'        => $rule,
+            'settings'    => $settings,
+            'allDay'      => $parsedStart['allDay'],
+            'timezone'    => $parsedStart['timezone'],
+            'position'    => $position
+        ];
+    }
+
+    /**
+     * @param list<array{start: int, end: int, lines: list<string>}> $blocks
+     * @return array{start: int, end: int, lines: list<string>, properties: array<string, list<array{value: string, params: array<string, string>}>>}
+     */
+    private static function recurringMaster(array $blocks, string $uid): array
+    {
+        $matches = [];
+        foreach ($blocks as $block) {
+            $properties = self::readTopLevelProperties($block['lines']);
+            $blockUid = self::propertyValue($properties, 'UID');
+            if ($blockUid === '' || ($uid !== '' && !hash_equals($uid, $blockUid))) {
+                continue;
+            }
+            if (self::propertyValue($properties, 'RECURRENCE-ID') !== '') {
+                continue;
+            }
+            if (self::propertyValue($properties, 'RRULE') === ''
+                && self::propertyValue($properties, 'RDATE') === '') {
+                continue;
+            }
+            $matches[] = array_merge($block, ['properties' => $properties]);
+        }
+
+        if (count($matches) !== 1) {
+            throw new RuntimeException(
+                $matches === []
+                    ? 'The recurring event master was not found in the calendar resource.'
+                    : 'The calendar resource contains multiple recurring event masters.'
+            );
+        }
+
+        return $matches[0];
+    }
+
+    /**
+     * @param list<array{start: int, end: int, lines: list<string>}> $blocks
+     * @return array{start: int, end: int, lines: list<string>}|null
+     */
+    private static function recurrenceOverride(
+        array $blocks,
+        string $uid,
+        DateTimeImmutable $targetStart
+    ): ?array {
+        $matches = self::recurrenceOverrides($blocks, $uid, $targetStart);
+        if (count($matches) > 1) {
+            throw new RuntimeException('The calendar resource contains duplicate recurrence overrides.');
+        }
+
+        return $matches[0] ?? null;
+    }
+
+    /**
+     * @param list<array{start: int, end: int, lines: list<string>}> $blocks
+     * @return list<array{start: int, end: int, lines: list<string>}>
+     */
+    private static function recurrenceOverrides(
+        array $blocks,
+        string $uid,
+        DateTimeImmutable $targetStart
+    ): array {
+        $matches = [];
+        foreach ($blocks as $block) {
+            $properties = self::readTopLevelProperties($block['lines']);
+            if (!hash_equals($uid, self::propertyValue($properties, 'UID'))) {
+                continue;
+            }
+            $recurrenceId = self::firstProperty($properties, 'RECURRENCE-ID');
+            if ($recurrenceId === null) {
+                continue;
+            }
+            try {
+                if (self::parseDateProperty($recurrenceId)['timestamp'] === $targetStart->getTimestamp()) {
+                    $matches[] = $block;
+                }
+            } catch (Throwable) {
+                continue;
+            }
+        }
+
+        return $matches;
+    }
+
+    /** @param array{value: string, params: array<string, string>} $masterStartProperty */
+    private static function occurrenceOriginalStart(
+        string $originalStart,
+        array $masterStartProperty
+    ): DateTimeImmutable {
+        $masterStart = self::parseDateProperty($masterStartProperty);
+        $timezone = self::timezone($masterStart['timezone']);
+        $originalStart = trim($originalStart);
+        if ($originalStart === '') {
+            return (new DateTimeImmutable('@' . $masterStart['timestamp']))->setTimezone($timezone);
+        }
+
+        try {
+            if ($masterStart['allDay'] && preg_match('/^\d{4}-\d{2}-\d{2}$/D', $originalStart) === 1) {
+                $date = DateTimeImmutable::createFromFormat('!Y-m-d', $originalStart, $timezone);
+                if ($date !== false && $date->format('Y-m-d') === $originalStart) {
+                    return $date;
+                }
+            }
+            if (preg_match('/^\d{8}(?:T\d{4}(?:\d{2})?Z?)?$/D', strtoupper($originalStart)) === 1) {
+                return (new DateTimeImmutable(
+                    '@' . self::parseDateProperty([
+                        'value'  => $originalStart,
+                        'params' => $masterStartProperty['params']
+                    ])['timestamp']
+                ))->setTimezone($timezone);
+            }
+
+            return (new DateTimeImmutable($originalStart, $timezone))->setTimezone($timezone);
+        } catch (Throwable $exception) {
+            throw new InvalidArgumentException('The recurring occurrence start is invalid.', 0, $exception);
+        }
+    }
+
+    /**
+     * @param list<string> $masterBlock
+     * @return list<string>
+     */
+    private static function createOccurrenceOverrideBlock(
+        array $masterBlock,
+        DateTimeImmutable $targetStart
+    ): array {
+        $properties = self::readTopLevelProperties($masterBlock);
+        $masterStartProperty = self::firstProperty($properties, 'DTSTART');
+        if ($masterStartProperty === null) {
+            throw new RuntimeException('The recurring event master has no start.');
+        }
+        $masterStart = self::parseDateProperty($masterStartProperty);
+        $targetStart = $targetStart->setTimezone(self::timezone($masterStart['timezone']));
+        $masterEndProperty = self::firstProperty($properties, 'DTEND');
+        $masterEnd = $masterEndProperty !== null
+            ? self::parseDateProperty($masterEndProperty)
+            : self::endFromDuration($masterStart, self::propertyValue($properties, 'DURATION'));
+
+        if ($masterStart['allDay']) {
+            $masterStartDate = (new DateTimeImmutable('@' . $masterStart['timestamp']))
+                ->setTimezone(self::timezone($masterStart['timezone']));
+            $masterEndDate = (new DateTimeImmutable('@' . $masterEnd['timestamp']))
+                ->setTimezone(self::timezone($masterStart['timezone']));
+            $durationDays = max(1, (int) $masterStartDate->diff($masterEndDate)->format('%a'));
+            $targetEnd = $targetStart->add(new DateInterval('P' . $durationDays . 'D'));
+        } else {
+            $durationSeconds = max(0, $masterEnd['timestamp'] - $masterStart['timestamp']);
+            $targetEnd = (new DateTimeImmutable('@' . ($targetStart->getTimestamp() + $durationSeconds)))
+                ->setTimezone(self::timezone($masterStart['timezone']));
+        }
+
+        $block = $masterBlock;
+        foreach (['RRULE', 'RDATE', 'EXDATE', 'EXRULE', 'RECURRENCE-ID'] as $property) {
+            self::replaceProperty($block, $property, null);
+        }
+        self::replaceProperty(
+            $block,
+            'RECURRENCE-ID',
+            self::formatDateLineLike(
+                'RECURRENCE-ID',
+                $targetStart,
+                $masterStart['allDay'],
+                $masterStartProperty
+            )
+        );
+        self::replaceProperty(
+            $block,
+            'DTSTART',
+            self::formatDateLineLike('DTSTART', $targetStart, $masterStart['allDay'], $masterStartProperty)
+        );
+        if ($masterEndProperty !== null || self::propertyValue($properties, 'DURATION') !== '') {
+            self::replaceProperty($block, 'DURATION', null);
+            self::replaceProperty(
+                $block,
+                'DTEND',
+                self::formatDateLineLike(
+                    'DTEND',
+                    $targetEnd,
+                    $masterStart['allDay'],
+                    $masterEndProperty ?? $masterStartProperty
+                )
+            );
+        } else {
+            self::replaceProperty($block, 'DTEND', null);
+        }
+
+        return $block;
+    }
+
+    /**
+     * @param list<string> $block
+     * @param array<string, mixed> $data
+     */
+    private static function applyEventChangesToBlock(array &$block, array $data): void
+    {
         if (array_key_exists('summary', $data)) {
             $summary = trim((string) $data['summary']);
             if ($summary === '') {
@@ -192,7 +1072,11 @@ final class ICalendarCodec
         foreach (['description' => 'DESCRIPTION', 'location' => 'LOCATION'] as $key => $property) {
             if (array_key_exists($key, $data)) {
                 $value = trim((string) $data[$key]);
-                self::replaceProperty($block, $property, $value === '' ? null : $property . ':' . self::escapeText($value));
+                self::replaceProperty(
+                    $block,
+                    $property,
+                    $value === '' ? null : $property . ':' . self::escapeText($value)
+                );
             }
         }
         if (array_key_exists('status', $data)) {
@@ -202,17 +1086,37 @@ final class ICalendarCodec
 
         $properties = self::readTopLevelProperties($block);
         $currentStart = self::firstProperty($properties, 'DTSTART');
+        $currentEnd = self::firstProperty($properties, 'DTEND');
         $allDay = array_key_exists('allDay', $data)
             ? (bool) $data['allDay']
             : ($currentStart !== null && self::parseDateProperty($currentStart)['allDay']);
 
         if (array_key_exists('start', $data)) {
             $start = self::inputDate($data['start'], $allDay);
-            self::replaceProperty($block, 'DTSTART', self::formatDateLine('DTSTART', $start, $allDay));
+            self::replaceProperty(
+                $block,
+                'DTSTART',
+                self::formatDateLineLike(
+                    'DTSTART',
+                    $start,
+                    $allDay,
+                    $currentStart ?? ['value' => '', 'params' => []]
+                )
+            );
         }
         if (array_key_exists('end', $data)) {
             $end = self::inputDate($data['end'], $allDay);
-            self::replaceProperty($block, 'DTEND', self::formatDateLine('DTEND', $end, $allDay));
+            self::replaceProperty($block, 'DURATION', null);
+            self::replaceProperty(
+                $block,
+                'DTEND',
+                self::formatDateLineLike(
+                    'DTEND',
+                    $end,
+                    $allDay,
+                    $currentEnd ?? $currentStart ?? ['value' => '', 'params' => []]
+                )
+            );
         }
 
         $updatedProperties = self::readTopLevelProperties($block);
@@ -223,13 +1127,502 @@ final class ICalendarCodec
             throw new InvalidArgumentException('The event end must be later than the start.');
         }
 
-        $sequence = (int) self::propertyValue($updatedProperties, 'SEQUENCE');
+        if (array_key_exists('reminder', $data)) {
+            self::applyReminderChangesToBlock($block, $data['reminder']);
+        }
+
+        self::touchEventBlock($block);
+    }
+
+    /**
+     * Returns the provider-neutral state of VALARM components nested in one VEVENT.
+     *
+     * Multiple independent non-repeating DISPLAY alarms relative to DTSTART can be
+     * represented losslessly up to the common OpenCalendar reminder limit.
+     *
+     * @param list<string> $block
+     * @return array<string, mixed>
+     */
+    private static function reminderState(array $block): array
+    {
+        $alarms = self::extractNestedComponentBlocksWithOffsets($block, 'VALARM');
+        if ($alarms === []) {
+            return CalendarEventReminder::none();
+        }
+
+        $minutesBeforeStart = [];
+        foreach ($alarms as $alarm) {
+            $properties = self::readTopLevelProperties($alarm['lines']);
+            if (strtoupper(self::propertyValue($properties, 'ACTION')) !== 'DISPLAY'
+                || self::propertyValue($properties, 'DESCRIPTION') === ''
+                || self::propertyValue($properties, 'REPEAT') !== ''
+                || self::propertyValue($properties, 'DURATION') !== '') {
+                return CalendarEventReminder::complex();
+            }
+
+            $trigger = self::firstProperty($properties, 'TRIGGER');
+            if ($trigger === null) {
+                return CalendarEventReminder::complex();
+            }
+            $related = strtoupper(trim((string) ($trigger['params']['RELATED'] ?? 'START')));
+            $valueType = strtoupper(trim((string) ($trigger['params']['VALUE'] ?? 'DURATION')));
+            if ($related !== 'START' || $valueType !== 'DURATION') {
+                return CalendarEventReminder::complex();
+            }
+
+            $minutes = self::relativeReminderMinutes((string) $trigger['value']);
+            if ($minutes === null) {
+                return CalendarEventReminder::complex();
+            }
+            $minutesBeforeStart[] = $minutes;
+        }
+
+        try {
+            return CalendarEventReminder::fromMinutes($minutesBeforeStart);
+        } catch (InvalidArgumentException) {
+            return CalendarEventReminder::complex();
+        }
+    }
+
+    /**
+     * Replaces supported VALARM components without touching other VEVENT data.
+     *
+     * @param list<string> $block
+     */
+    private static function applyReminderChangesToBlock(array &$block, mixed $value): void
+    {
+        $reminder = CalendarEventReminder::normalizeInput($value);
+        $current = self::reminderState($block);
+        if ($current['mode'] === CalendarEventReminder::MODE_COMPLEX) {
+            throw new RuntimeException('The reminder settings cannot be edited safely.');
+        }
+
+        $alarms = self::extractNestedComponentBlocksWithOffsets($block, 'VALARM');
+        foreach (array_reverse($alarms) as $alarm) {
+            array_splice(
+                $block,
+                $alarm['start'],
+                $alarm['end'] - $alarm['start'] + 1
+            );
+        }
+        if ($reminder['mode'] === CalendarEventReminder::MODE_NONE) {
+            return;
+        }
+
+        $properties = self::readTopLevelProperties($block);
+        $summary = self::unescapeText(self::propertyValue($properties, 'SUMMARY'));
+        $alarmLines = self::reminderAlarmBlocks($reminder, $summary);
+        $insertAt = array_search('END:VEVENT', array_map('strtoupper', $block), true);
+        if ($insertAt === false) {
+            throw new RuntimeException('The calendar event is missing END:VEVENT.');
+        }
+        array_splice($block, $insertAt, 0, $alarmLines);
+    }
+
+    /**
+     * @param array<string, mixed> $reminder Normalized reminder state.
+     * @return list<string>
+     */
+    private static function reminderAlarmBlocks(array $reminder, string $summary): array
+    {
+        $lines = [];
+        foreach (CalendarEventReminder::minutesBeforeStartValues($reminder) as $minutesBeforeStart) {
+            array_push($lines, ...self::reminderAlarmLines($minutesBeforeStart, $summary));
+        }
+
+        return $lines;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private static function reminderAlarmLines(int $minutesBeforeStart, string $summary): array
+    {
+        CalendarEventReminder::custom($minutesBeforeStart);
+        $trigger = $minutesBeforeStart === 0 ? 'PT0M' : '-PT' . $minutesBeforeStart . 'M';
+        $description = trim($summary) !== '' ? $summary : 'Reminder';
+
+        return [
+            'BEGIN:VALARM',
+            'TRIGGER:' . $trigger,
+            'ACTION:DISPLAY',
+            'DESCRIPTION:' . self::escapeText($description),
+            'END:VALARM'
+        ];
+    }
+
+    private static function relativeReminderMinutes(string $value): ?int
+    {
+        $value = strtoupper(trim($value));
+        $negative = str_starts_with($value, '-');
+        if ($negative) {
+            $value = substr($value, 1);
+        } elseif (str_starts_with($value, '+')) {
+            return null;
+        }
+
+        $weeks = 0;
+        $days = 0;
+        $hours = 0;
+        $minutes = 0;
+        $seconds = 0;
+        if (preg_match('/^P(\d+)W$/D', $value, $matches) === 1) {
+            $weeks = (int) $matches[1];
+        } elseif (preg_match(
+            '/^P(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?)?$/D',
+            $value,
+            $matches
+        ) === 1) {
+            if (!isset($matches[1]) && !isset($matches[2]) && !isset($matches[3]) && !isset($matches[4])) {
+                return null;
+            }
+            $days = (int) ($matches[1] ?? 0);
+            $hours = (int) ($matches[2] ?? 0);
+            $minutes = (int) ($matches[3] ?? 0);
+            $seconds = (int) ($matches[4] ?? 0);
+        } else {
+            return null;
+        }
+
+        $totalSeconds = (($weeks * 7 + $days) * 24 * 60 * 60)
+            + ($hours * 60 * 60)
+            + ($minutes * 60)
+            + $seconds;
+        if ($totalSeconds % 60 !== 0) {
+            return null;
+        }
+
+        $totalMinutes = intdiv($totalSeconds, 60);
+        if (!$negative && $totalMinutes > 0) {
+            return null;
+        }
+        if ($totalMinutes > CalendarEventReminder::MAX_MINUTES_BEFORE_START) {
+            return null;
+        }
+
+        return $totalMinutes;
+    }
+
+    /**
+     * @param list<string> $block
+     * @return list<array{start: int, end: int, lines: list<string>}>
+     */
+    private static function extractNestedComponentBlocksWithOffsets(array $block, string $component): array
+    {
+        $component = strtoupper(trim($component));
+        $blocks = [];
+        $depth = 0;
+        $start = null;
+
+        foreach ($block as $index => $line) {
+            $upper = strtoupper($line);
+            if (str_starts_with($upper, 'BEGIN:')) {
+                if ($depth === 1 && $upper === 'BEGIN:' . $component) {
+                    $start = $index;
+                }
+                ++$depth;
+                continue;
+            }
+            if (!str_starts_with($upper, 'END:')) {
+                continue;
+            }
+
+            --$depth;
+            if ($start !== null && $depth === 1 && $upper === 'END:' . $component) {
+                $blocks[] = [
+                    'start' => $start,
+                    'end'   => $index,
+                    'lines' => array_slice($block, $start, $index - $start + 1)
+                ];
+                $start = null;
+            }
+        }
+
+        return $blocks;
+    }
+
+    /** @param list<string> $block */
+    private static function touchEventBlock(array &$block): void
+    {
+        $properties = self::readTopLevelProperties($block);
+        $sequence = (int) self::propertyValue($properties, 'SEQUENCE');
         self::replaceProperty($block, 'SEQUENCE', 'SEQUENCE:' . ($sequence + 1));
         self::replaceProperty($block, 'DTSTAMP', 'DTSTAMP:' . gmdate('Ymd\THis\Z'));
         self::replaceProperty($block, 'LAST-MODIFIED', 'LAST-MODIFIED:' . gmdate('Ymd\THis\Z'));
+    }
 
-        array_splice($lines, $target['start'], $target['end'] - $target['start'] + 1, $block);
-        return self::foldLines($lines);
+    /**
+     * @param array<string, list<array{value: string, params: array<string, string>}>> $properties
+     */
+    private static function hasExceptionDate(array $properties, DateTimeImmutable $targetStart): bool
+    {
+        foreach (self::parseDatePropertyList($properties['EXDATE'] ?? []) as $exception) {
+            if ($exception['timestamp'] === $targetStart->getTimestamp()) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @param array{value: string, params: array<string, string>} $template
+     */
+    private static function formatDateLineLike(
+        string $property,
+        DateTimeImmutable $date,
+        bool $allDay,
+        array $template
+    ): string {
+        if ($allDay) {
+            return $property . ';VALUE=DATE:' . $date->format('Ymd');
+        }
+
+        $timezoneName = trim((string) ($template['params']['TZID'] ?? ''));
+        if ($timezoneName !== '' && preg_match('/^[A-Za-z0-9._+\/-]+$/D', $timezoneName) === 1) {
+            return $property . ';TZID=' . $timezoneName . ':'
+                . $date->setTimezone(self::timezone($timezoneName))->format('Ymd\THis');
+        }
+
+        if (str_ends_with(strtoupper(trim((string) ($template['value'] ?? ''))), 'Z')) {
+            return $property . ':' . $date->setTimezone(new DateTimeZone('UTC'))->format('Ymd\THis\Z');
+        }
+
+        $timezone = 'UTC';
+        try {
+            $timezone = self::parseDateProperty($template)['timezone'];
+        } catch (Throwable) {
+            $timezone = date_default_timezone_get();
+        }
+
+        return $property . ':' . $date->setTimezone(self::timezone($timezone))->format('Ymd\THis');
+    }
+
+    /** @param list<string> $block */
+    private static function appendTopLevelProperty(array &$block, string $line): void
+    {
+        $depth = 0;
+        $insertAt = count($block) - 1;
+        foreach ($block as $index => $currentLine) {
+            $upper = strtoupper($currentLine);
+            if (str_starts_with($upper, 'BEGIN:')) {
+                if ($depth === 1) {
+                    $insertAt = $index;
+                    break;
+                }
+                ++$depth;
+                continue;
+            }
+            if (str_starts_with($upper, 'END:')) {
+                if ($depth === 1) {
+                    $insertAt = $index;
+                    break;
+                }
+                --$depth;
+            }
+        }
+
+        array_splice($block, $insertAt, 0, [$line]);
+    }
+
+    /**
+     * @param list<string> $lines
+     * @param list<string> $block
+     */
+    private static function insertEventBlock(array &$lines, array $block): void
+    {
+        $insertAt = array_search('END:VCALENDAR', array_map('strtoupper', $lines), true);
+        if ($insertAt === false) {
+            throw new RuntimeException('The calendar resource is missing END:VCALENDAR.');
+        }
+
+        array_splice($lines, $insertAt, 0, $block);
+    }
+
+    private static function formatEventDateLine(
+        string $property,
+        DateTimeImmutable $date,
+        bool $allDay,
+        string $timezoneName
+    ): string {
+        if ($allDay || $timezoneName === '') {
+            return self::formatDateLine($property, $date, $allDay);
+        }
+
+        return $property . ';TZID=' . $timezoneName . ':' . $date->format('Ymd\THis');
+    }
+
+    private static function strictTimezone(string $name): DateTimeZone
+    {
+        $name = trim($name);
+        if ($name === '' || preg_match('/^[A-Za-z0-9._+\/-]+$/D', $name) !== 1) {
+            throw new InvalidArgumentException('The recurring event timezone is invalid.');
+        }
+
+        try {
+            return new DateTimeZone($name);
+        } catch (Throwable $exception) {
+            throw new InvalidArgumentException('The recurring event timezone is invalid.', 0, $exception);
+        }
+    }
+
+    /**
+     * @param list<string> $lines
+     * @param list<string> $timezoneLines
+     */
+    private static function ensureTimezoneComponent(array &$lines, array $timezoneLines): void
+    {
+        if ($timezoneLines === []) {
+            return;
+        }
+
+        $timezoneId = '';
+        foreach ($timezoneLines as $line) {
+            if (str_starts_with(strtoupper($line), 'TZID:')) {
+                $timezoneId = trim(substr($line, 5));
+                break;
+            }
+        }
+        if ($timezoneId === '') {
+            return;
+        }
+
+        foreach ($lines as $line) {
+            if (strcasecmp(trim($line), 'TZID:' . $timezoneId) === 0) {
+                return;
+            }
+        }
+
+        $insertAt = array_search('BEGIN:VEVENT', array_map('strtoupper', $lines), true);
+        if ($insertAt === false) {
+            $insertAt = array_search('END:VCALENDAR', array_map('strtoupper', $lines), true);
+        }
+        if ($insertAt === false) {
+            throw new RuntimeException('The calendar resource is missing END:VCALENDAR.');
+        }
+
+        array_splice($lines, $insertAt, 0, $timezoneLines);
+    }
+
+    /**
+     * Builds a compact VTIMEZONE component from PHP timezone transitions.
+     *
+     * Transition dates are emitted explicitly so the calendar object remains
+     * self-contained as required for TZID references in CalDAV resources.
+     *
+     * @param array<string, mixed> $recurrence
+     * @return list<string>
+     */
+    private static function timezoneComponent(
+        DateTimeZone $timezone,
+        DateTimeImmutable $start,
+        array $recurrence
+    ): array {
+        $timezoneName = $timezone->getName();
+        if (in_array(strtoupper($timezoneName), ['UTC', 'GMT', 'ETC/UTC', 'ETC/GMT'], true)) {
+            return [];
+        }
+
+        $windowStart = $start->modify('-2 years')->getTimestamp();
+        $windowEnd = self::timezoneTransitionEnd($start, $recurrence)->getTimestamp();
+        $transitions = $timezone->getTransitions($windowStart, $windowEnd);
+        if ($transitions === false || count($transitions) < 2) {
+            return [];
+        }
+
+        $groups = [];
+        $previous = $transitions[0];
+        foreach (array_slice($transitions, 1) as $transition) {
+            $fromOffset = (int) ($previous['offset'] ?? 0);
+            $toOffset = (int) ($transition['offset'] ?? 0);
+            if ($fromOffset === $toOffset) {
+                $previous = $transition;
+                continue;
+            }
+
+            $type = (bool) ($transition['isdst'] ?? false) ? 'DAYLIGHT' : 'STANDARD';
+            $name = trim((string) ($transition['abbr'] ?? ''));
+            $key = implode('|', [$type, $fromOffset, $toOffset, $name]);
+            $localTransition = gmdate(
+                'Ymd\THis',
+                (int) ($transition['ts'] ?? 0) + $fromOffset
+            );
+            if (!isset($groups[$key])) {
+                $groups[$key] = [
+                    'type'       => $type,
+                    'fromOffset' => $fromOffset,
+                    'toOffset'   => $toOffset,
+                    'name'       => $name,
+                    'dates'      => []
+                ];
+            }
+            $groups[$key]['dates'][] = $localTransition;
+            $previous = $transition;
+        }
+
+        if ($groups === []) {
+            return [];
+        }
+
+        $lines = [
+            'BEGIN:VTIMEZONE',
+            'TZID:' . $timezoneName
+        ];
+        foreach ($groups as $group) {
+            $dates = $group['dates'];
+            if ($dates === []) {
+                continue;
+            }
+            $lines[] = 'BEGIN:' . $group['type'];
+            $lines[] = 'DTSTART:' . array_shift($dates);
+            $lines[] = 'TZOFFSETFROM:' . self::timezoneOffset((int) $group['fromOffset']);
+            $lines[] = 'TZOFFSETTO:' . self::timezoneOffset((int) $group['toOffset']);
+            if ($group['name'] !== '') {
+                $lines[] = 'TZNAME:' . self::escapeText((string) $group['name']);
+            }
+            if ($dates !== []) {
+                $lines[] = 'RDATE:' . implode(',', $dates);
+            }
+            $lines[] = 'END:' . $group['type'];
+        }
+        $lines[] = 'END:VTIMEZONE';
+
+        return $lines;
+    }
+
+    /** @param array<string, mixed> $recurrence */
+    private static function timezoneTransitionEnd(DateTimeImmutable $start, array $recurrence): DateTimeImmutable
+    {
+        $maximum = $start->modify('+100 years');
+        if (strtolower(trim((string) ($recurrence['endMode'] ?? 'never'))) !== 'until') {
+            return $maximum;
+        }
+
+        $until = trim((string) ($recurrence['until'] ?? ''));
+        if (preg_match('/^\d{4}-\d{2}-\d{2}$/D', $until) !== 1) {
+            return $maximum;
+        }
+        $untilDate = DateTimeImmutable::createFromFormat('!Y-m-d', $until, $start->getTimezone());
+        if ($untilDate === false || $untilDate->format('Y-m-d') !== $until) {
+            return $maximum;
+        }
+
+        $end = $untilDate->modify('+2 years');
+        return $end < $maximum ? $end : $maximum;
+    }
+
+    private static function timezoneOffset(int $seconds): string
+    {
+        $sign = $seconds < 0 ? '-' : '+';
+        $seconds = abs($seconds);
+        $hours = intdiv($seconds, 3600);
+        $minutes = intdiv($seconds % 3600, 60);
+        $remainingSeconds = $seconds % 60;
+
+        $value = sprintf('%s%02d%02d', $sign, $hours, $minutes);
+        return $remainingSeconds === 0
+            ? $value
+            : $value . sprintf('%02d', $remainingSeconds);
     }
 
     /**
@@ -370,14 +1763,26 @@ final class ICalendarCodec
 
     /**
      * @param array{value: string, params: array<string, string>} $property
-     * @return array{value: string, timestamp: int, allDay: bool, timezone: string}
+     * @return array{
+     *     value: string,
+     *     timestamp: int,
+     *     allDay: bool,
+     *     timezone: string,
+     *     timezoneReference: string,
+     *     timezoneResolved: bool,
+     *     localValue: string
+     * }
      */
-    private static function parseDateProperty(array $property): array
-    {
+    private static function parseDateProperty(
+        array $property,
+        ?ICalendarTimezoneResolver $timezoneResolver = null
+    ): array {
         $raw = trim($property['value']);
         $allDay = strtoupper($property['params']['VALUE'] ?? '') === 'DATE'
             || preg_match('/^\d{8}$/', $raw) === 1;
-        $timezoneName = $property['params']['TZID'] ?? '';
+        $timezoneName = trim((string) ($property['params']['TZID'] ?? ''));
+        $timezoneReference = $allDay ? '' : $timezoneName;
+        $timezoneResolved = true;
 
         try {
             if ($allDay) {
@@ -387,6 +1792,20 @@ final class ICalendarCodec
                 $timezone = new DateTimeZone('UTC');
                 $format = strlen($raw) === 14 ? '!Ymd\THi\Z' : '!Ymd\THis\Z';
                 $date = DateTimeImmutable::createFromFormat($format, strtoupper($raw), $timezone);
+            } elseif ($timezoneResolver !== null && $timezoneName !== '') {
+                $resolvedDate = $timezoneResolver->resolveDateTime($timezoneName, $raw);
+                if ($resolvedDate === null && $timezoneResolver->hasDefinition($timezoneName)) {
+                    throw new RuntimeException('The embedded VTIMEZONE definition cannot be resolved safely.');
+                }
+                if ($resolvedDate !== null) {
+                    $date = $resolvedDate['date'];
+                    $timezoneReference = $resolvedDate['reference'];
+                    $timezoneResolved = $resolvedDate['resolved'];
+                } else {
+                    $timezone = self::timezone($timezoneName);
+                    $format = strlen($raw) === 13 ? '!Ymd\THi' : '!Ymd\THis';
+                    $date = DateTimeImmutable::createFromFormat($format, $raw, $timezone);
+                }
             } else {
                 $timezone = self::timezone($timezoneName);
                 $format = strlen($raw) === 13 ? '!Ymd\THi' : '!Ymd\THis';
@@ -401,19 +1820,32 @@ final class ICalendarCodec
         }
 
         return [
-            'value'     => $allDay ? $date->format('Y-m-d') : $date->format(DATE_ATOM),
-            'timestamp' => $date->getTimestamp(),
-            'allDay'    => $allDay,
-            'timezone'  => $date->getTimezone()->getName()
+            'value'             => $allDay ? $date->format('Y-m-d') : $date->format(DATE_ATOM),
+            'timestamp'         => $date->getTimestamp(),
+            'allDay'            => $allDay,
+            'timezone'          => $date->getTimezone()->getName(),
+            'timezoneReference' => $timezoneReference,
+            'timezoneResolved'  => $timezoneResolved,
+            'localValue'        => $raw
         ];
     }
 
     /**
      * @param list<array{value: string, params: array<string, string>}> $properties
-     * @return list<array{value: string, timestamp: int, allDay: bool, timezone: string}>
+     * @return list<array{
+     *     value: string,
+     *     timestamp: int,
+     *     allDay: bool,
+     *     timezone: string,
+     *     timezoneReference: string,
+     *     timezoneResolved: bool,
+     *     localValue: string
+     * }>
      */
-    private static function parseDatePropertyList(array $properties): array
-    {
+    private static function parseDatePropertyList(
+        array $properties,
+        ?ICalendarTimezoneResolver $timezoneResolver = null
+    ): array {
         $result = [];
         foreach ($properties as $property) {
             foreach (explode(',', $property['value']) as $value) {
@@ -425,7 +1857,7 @@ final class ICalendarCodec
                     $result[] = self::parseDateProperty([
                         'value'  => $value,
                         'params' => $property['params']
-                    ]);
+                    ], $timezoneResolver);
                 } catch (Throwable) {
                     continue;
                 }
@@ -436,8 +1868,8 @@ final class ICalendarCodec
     }
 
     /**
-     * @param array{value: string, timestamp: int, allDay: bool, timezone: string} $start
-     * @return array{value: string, timestamp: int, allDay: bool, timezone: string}
+     * @param array<string,mixed> $start
+     * @return array<string,mixed>
      */
     private static function defaultEnd(array $start): array
     {
@@ -445,25 +1877,29 @@ final class ICalendarCodec
             return $start;
         }
 
-        $timezone = self::timezone($start['timezone']);
-        $end = (new DateTimeImmutable('@' . $start['timestamp']))
+        $timezone = self::timezone((string) $start['timezone']);
+        $end = (new DateTimeImmutable('@' . (int) $start['timestamp']))
             ->setTimezone($timezone)
             ->add(new DateInterval('P1D'));
 
-        return [
-            'value'     => $end->format('Y-m-d'),
-            'timestamp' => $end->getTimestamp(),
-            'allDay'    => true,
-            'timezone'  => $start['timezone']
-        ];
+        return array_merge($start, [
+            'value'      => $end->format('Y-m-d'),
+            'timestamp'  => $end->getTimestamp(),
+            'allDay'     => true,
+            'timezone'   => (string) $start['timezone'],
+            'localValue' => $end->format('Ymd')
+        ]);
     }
 
     /**
-     * @param array{value: string, timestamp: int, allDay: bool, timezone: string} $start
-     * @return array{value: string, timestamp: int, allDay: bool, timezone: string}
+     * @param array<string,mixed> $start
+     * @return array<string,mixed>
      */
-    private static function endFromDuration(array $start, string $duration): array
-    {
+    private static function endFromDuration(
+        array $start,
+        string $duration,
+        ?ICalendarTimezoneResolver $timezoneResolver = null
+    ): array {
         $duration = strtoupper(trim($duration));
         if ($duration === '') {
             return self::defaultEnd($start);
@@ -473,17 +1909,49 @@ final class ICalendarCodec
             if (str_starts_with($duration, '-')) {
                 throw new RuntimeException('Negative event duration.');
             }
-            $timezone = self::timezone($start['timezone']);
-            $date = (new DateTimeImmutable('@' . $start['timestamp']))
+            $timezoneReference = trim((string) ($start['timezoneReference'] ?? ''));
+            if (!$start['allDay']
+                && !(bool) ($start['timezoneResolved'] ?? true)
+                && $timezoneResolver !== null
+                && $timezoneReference !== '') {
+                $localValue = strtoupper(trim((string) ($start['localValue'] ?? '')));
+                $format = strlen($localValue) === 13 ? '!Ymd\THi' : '!Ymd\THis';
+                $localDate = DateTimeImmutable::createFromFormat($format, $localValue, new DateTimeZone('UTC'));
+                if ($localDate === false) {
+                    throw new RuntimeException('Invalid local VTIMEZONE date.');
+                }
+                $localEnd = $localDate->add(new DateInterval($duration));
+                $resolvedEnd = $timezoneResolver->resolveDateTime(
+                    $timezoneReference,
+                    $localEnd->format('Ymd\THis')
+                );
+                if ($resolvedEnd === null) {
+                    throw new RuntimeException('The VTIMEZONE duration cannot be resolved safely.');
+                }
+
+                return [
+                    'value'             => $resolvedEnd['date']->format(DATE_ATOM),
+                    'timestamp'         => $resolvedEnd['date']->getTimestamp(),
+                    'allDay'            => false,
+                    'timezone'          => $resolvedEnd['timezone'],
+                    'timezoneReference' => $resolvedEnd['reference'],
+                    'timezoneResolved'  => $resolvedEnd['resolved'],
+                    'localValue'        => $localEnd->format('Ymd\THis')
+                ];
+            }
+
+            $timezone = self::timezone((string) $start['timezone']);
+            $date = (new DateTimeImmutable('@' . (int) $start['timestamp']))
                 ->setTimezone($timezone)
                 ->add(new DateInterval($duration));
 
-            return [
-                'value'     => $start['allDay'] ? $date->format('Y-m-d') : $date->format(DATE_ATOM),
-                'timestamp' => $date->getTimestamp(),
-                'allDay'    => $start['allDay'],
-                'timezone'  => $date->getTimezone()->getName()
-            ];
+            return array_merge($start, [
+                'value'      => $start['allDay'] ? $date->format('Y-m-d') : $date->format(DATE_ATOM),
+                'timestamp'  => $date->getTimestamp(),
+                'allDay'     => (bool) $start['allDay'],
+                'timezone'   => $date->getTimezone()->getName(),
+                'localValue' => $start['allDay'] ? $date->format('Ymd') : $date->format('Ymd\THis')
+            ]);
         } catch (Throwable) {
             return self::defaultEnd($start);
         }
@@ -492,14 +1960,16 @@ final class ICalendarCodec
     /**
      * @param array{value: string, params: array<string, string>}|null $property
      */
-    private static function parseOptionalDate(?array $property): string
-    {
+    private static function parseOptionalDate(
+        ?array $property,
+        ?ICalendarTimezoneResolver $timezoneResolver = null
+    ): string {
         if ($property === null) {
             return '';
         }
 
         try {
-            return self::parseDateProperty($property)['value'];
+            return self::parseDateProperty($property, $timezoneResolver)['value'];
         } catch (Throwable) {
             return '';
         }

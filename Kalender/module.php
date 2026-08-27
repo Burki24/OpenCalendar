@@ -5,24 +5,29 @@ declare(strict_types=1);
 use Burki24\SymconModuleHelper\ChunkedJsonTransferHelper;
 use Burki24\SymconModuleHelper\ConfigurationFormHelper;
 use Burki24\SymconModuleHelper\DataFlowHelper;
+use Burki24\SymconModuleHelper\DebugHelper;
 use Burki24\SymconModuleHelper\PersistentJsonCacheHelper;
 use Burki24\SymconModuleHelper\VariableHelper;
 use IPSKalender\CalendarEventCounter;
+use IPSKalender\CalendarEventRecurrence;
 use IPSKalender\SynchronizationSchedule;
 
 require_once __DIR__ . '/../libs/helper/ChunkedJsonTransferHelper.php';
 require_once __DIR__ . '/../libs/helper/ConfigurationFormHelper.php';
 require_once __DIR__ . '/../libs/helper/DataFlowHelper.php';
+require_once __DIR__ . '/../libs/helper/DebugHelper.php';
 require_once __DIR__ . '/../libs/helper/PersistentJsonCacheHelper.php';
 require_once __DIR__ . '/../libs/helper/VariableHelper.php';
 require_once __DIR__ . '/../libs/CalendarEventCounter.php';
+require_once __DIR__ . '/../libs/CalendarEventRecurrence.php';
 require_once __DIR__ . '/../libs/SynchronizationSchedule.php';
 
-class Kalender extends IPSModuleStrict
+class Calendar extends IPSModuleStrict
 {
     use ChunkedJsonTransferHelper;
     use ConfigurationFormHelper;
     use DataFlowHelper;
+    use DebugHelper;
     use PersistentJsonCacheHelper;
     use VariableHelper;
 
@@ -35,6 +40,17 @@ class Kalender extends IPSModuleStrict
     private const STATUS_SYNCHRONIZATION_FAILED = 202;
     private const STATUS_INVALID_RESPONSE = 203;
     private const STATUS_WRITE_CONFLICT = 204;
+
+    private const ANNIVERSARY_TYPE_BIRTHDAY = 'birthday';
+    private const ANNIVERSARY_TYPE_ANNIVERSARY = 'anniversary';
+    private const ANNIVERSARY_TYPE_WEDDING = 'wedding';
+    private const ANNIVERSARY_TYPE_DEATH = 'death';
+    private const ANNIVERSARY_TYPES = [
+        self::ANNIVERSARY_TYPE_BIRTHDAY,
+        self::ANNIVERSARY_TYPE_ANNIVERSARY,
+        self::ANNIVERSARY_TYPE_WEDDING,
+        self::ANNIVERSARY_TYPE_DEATH
+    ];
 
     /**
      * Registers properties, attributes, variables, and timers for the calendar instance.
@@ -56,12 +72,30 @@ class Kalender extends IPSModuleStrict
         $this->RegisterPropertyInteger('FutureDays', 365);
 
         $this->RegisterPersistentJsonCache('CachedEvents');
+        $this->RegisterAttributeString('AnniversaryMetadata', '[]');
+        $this->RegisterAttributeString('BirthdayMetadata', '[]');
         $this->RegisterAttributeInteger('LastSynchronization', 0);
         $this->RegisterAttributeString('LastError', '');
+        $this->RegisterAttributeString('IncrementalSyncToken', '');
+        $this->RegisterAttributeInteger('IncrementalSyncWindowStart', 0);
+        $this->RegisterAttributeInteger('IncrementalSyncWindowEnd', 0);
+        $this->RegisterAttributeString('IncrementalSyncCalendarID', '');
         $this->RegisterAttributeBoolean('CalendarMetadataAvailable', false);
         $this->RegisterAttributeString('ResolvedCalendarID', '');
         $this->RegisterAttributeString('DetectedCalendarColor', '');
         $this->RegisterAttributeBoolean('DetectedCanWrite', false);
+        $this->RegisterAttributeBoolean('DetectedCanCreateRecurrence', false);
+        $this->RegisterAttributeBoolean('DetectedCanUpdateRecurrence', false);
+        $this->RegisterAttributeBoolean('DetectedCanUpdateOccurrence', false);
+        $this->RegisterAttributeBoolean('DetectedCanDeleteOccurrence', false);
+        $this->RegisterAttributeBoolean('DetectedCanUpdateFollowing', false);
+        $this->RegisterAttributeBoolean('DetectedCanUpdateSeries', false);
+        $this->RegisterAttributeBoolean('DetectedCanDeleteSeries', false);
+        $this->RegisterAttributeBoolean('DetectedCanUseDefaultReminder', false);
+        $this->RegisterAttributeBoolean('DetectedCanCreateWithDefaultReminder', false);
+        $this->RegisterAttributeInteger('DetectedMaxReminders', 1);
+        $this->RegisterAttributeString('DetectedDefaultReminder', '{}');
+        $this->RegisterAttributeString('DetectedCalendarTimezone', '');
         $this->RegisterAttributeBoolean('DetectedWriteAccessKnown', false);
         $this->RegisterAttributeBoolean('RuntimeReady', false);
 
@@ -145,6 +179,7 @@ class Kalender extends IPSModuleStrict
 
         $this->removeLegacyEventsVariable();
         $this->WriteAttributeBoolean('RuntimeReady', false);
+        $this->clearIncrementalSyncState();
         $this->RegisterMessage(0, IPS_KERNELSTARTED);
         $this->SetTimerInterval('InitializationTimer', 0);
         $this->SetTimerInterval('SynchronizationTimer', 0);
@@ -268,7 +303,7 @@ class Kalender extends IPSModuleStrict
                 $this->applyCalendarMetadata($message['Payload']);
             }
         } catch (Throwable $exception) {
-            $this->SendDebug('CalendarMetadata', $exception->getMessage(), 0);
+            $this->SendSafeDebugException('CalendarMetadataError', $exception);
         }
 
         return '';
@@ -285,13 +320,22 @@ class Kalender extends IPSModuleStrict
             return false;
         }
 
+        $startedAt = microtime(true);
+        $this->SendSafeDebug('SynchronizationStart', [
+            'pastDays'   => max(0, min(1095, $this->ReadPropertyInteger('PastDays'))),
+            'futureDays' => max(1, min(1095, $this->ReadPropertyInteger('FutureDays')))
+        ]);
+
         try {
             $this->refreshCalendarMetadataSafely();
             $events = $this->requestEvents();
             $this->storeEvents($events);
             $this->WriteAttributeString('LastError', '');
             $this->SetStatus(IS_ACTIVE);
-            $this->SendDebug('Synchronize', sprintf('%d events synchronized.', count($events)), 0);
+            $this->SendSafeDebug('SynchronizationCompleted', [
+                'eventCount' => count($events),
+                'durationMs' => (int) round((microtime(true) - $startedAt) * 1000)
+            ]);
             return true;
         } catch (Throwable $exception) {
             $this->handleError($exception);
@@ -313,6 +357,268 @@ class Kalender extends IPSModuleStrict
                 | JSON_PRESERVE_ZERO_FRACTION
                 | JSON_THROW_ON_ERROR
         );
+    }
+
+    /**
+     * Returns annual events managed locally by OpenCalendar.
+     *
+     * A zero day window returns every stored annual event. Positive values only return
+     * entries whose next occurrence is within the requested number of calendar days.
+     * The optional type filter accepts birthday, anniversary, wedding, or death.
+     *
+     * @param int $Days Optional look-ahead window in days. Zero returns all annual events.
+     * @param string $Type Optional annual-event type. Empty returns every supported type.
+     * @return string JSON-encoded annual-event list sorted by the next occurrence.
+     */
+    public function GetAnniversaryList(int $Days = 0, string $Type = ''): string
+    {
+        if ($Days < 0) {
+            throw new InvalidArgumentException('Annual-event look-ahead days must not be negative.');
+        }
+        $type = $this->normalizeAnniversaryType($Type, true);
+
+        $today = new DateTimeImmutable('today');
+        $entries = [];
+        foreach ($this->readAnniversaryMetadata() as $metadata) {
+            if ($type !== '' && $metadata['type'] !== $type) {
+                continue;
+            }
+            $anniversaryDate = $this->normalizeAnniversaryDate((string) ($metadata['date'] ?? ''));
+            if ($anniversaryDate === '') {
+                continue;
+            }
+            $nextDate = $this->nextAnniversaryDate($anniversaryDate, $today);
+            $daysUntil = (int) $today->diff($nextDate)->format('%a');
+            if ($Days > 0 && $daysUntil > $Days) {
+                continue;
+            }
+
+            $startYear = (int) substr($anniversaryDate, 0, 4);
+            $years = max(0, (int) $nextDate->format('Y') - $startYear);
+            $name = trim((string) ($metadata['summary'] ?? ''));
+            $entry = [
+                'name'            => $name,
+                'anniversaryType' => $metadata['type'],
+                'anniversaryDate' => $anniversaryDate,
+                'nextDate'        => $nextDate->format('Y-m-d'),
+                'years'           => $years,
+                'displayName'     => $name !== '' ? sprintf('%s (%dJ)', $name, $years) : sprintf('(%dJ)', $years),
+                'daysUntil'       => $daysUntil
+            ];
+            if ($metadata['type'] === self::ANNIVERSARY_TYPE_BIRTHDAY) {
+                $entry['birthDate'] = $anniversaryDate;
+                $entry['nextBirthday'] = $entry['nextDate'];
+                $entry['age'] = $years;
+            }
+            $entries[] = $entry;
+        }
+
+        usort(
+            $entries,
+            static fn (array $left, array $right): int => ((int) $left['daysUntil'] <=> (int) $right['daysUntil'])
+                ?: strcasecmp((string) $left['name'], (string) $right['name'])
+                ?: strcasecmp((string) $left['anniversaryType'], (string) $right['anniversaryType'])
+        );
+
+        return json_encode(
+            $entries,
+            JSON_UNESCAPED_SLASHES
+                | JSON_UNESCAPED_UNICODE
+                | JSON_PRESERVE_ZERO_FRACTION
+                | JSON_THROW_ON_ERROR
+        );
+    }
+
+    /**
+     * Returns birthdays managed locally by OpenCalendar.
+     *
+     * This compatibility function delegates to GetAnniversaryList() with the birthday filter.
+     *
+     * @param int $Days Optional look-ahead window in days. Zero returns all birthdays.
+     * @return string JSON-encoded birthday list sorted by the next birthday.
+     */
+    public function GetBirthdayList(int $Days = 0): string
+    {
+        return $this->GetAnniversaryList($Days, self::ANNIVERSARY_TYPE_BIRTHDAY);
+    }
+
+    /**
+     * Marks an existing recurring series as an annual event managed locally by OpenCalendar.
+     *
+     * The provider event itself is not modified. The event identity should come from
+     * GetEvents() or, preferably for a complete series, GetRecurringSeries().
+     * Supported types are birthday, anniversary, wedding, and death.
+     *
+     * @param string $EventJSON JSON-encoded recurring event identity.
+     * @param string $Type Annual-event type: birthday, anniversary, wedding, or death.
+     * @param string $Date Original annual-event date in YYYY-MM-DD format.
+     * @return bool True when the local annual-event metadata was stored.
+     */
+    public function SetAnniversary(string $EventJSON, string $Type, string $Date): bool
+    {
+        $event = $this->decodeObject($EventJSON, 'event');
+        $type = $this->normalizeAnniversaryType($Type, true);
+        $date = $this->normalizeAnniversaryDate($Date);
+        if ($type === '') {
+            throw new InvalidArgumentException('The annual-event type is missing.');
+        }
+        if ($date === '' || $date > date('Y-m-d')) {
+            throw new InvalidArgumentException('The annual-event date is invalid.');
+        }
+        $recurrence = CalendarEventRecurrence::fromEvent($event);
+        if (!(bool) ($recurrence['recurring'] ?? false)
+            && trim((string) ($event['seriesId'] ?? '')) === '') {
+            throw new InvalidArgumentException('Annual-event metadata requires a recurring series.');
+        }
+
+        $this->upsertAnniversaryMetadata(
+            $event,
+            $type,
+            $date,
+            trim((string) ($event['summary'] ?? ''))
+        );
+        $events = $this->enrichAnniversaryEvents($this->readEvents());
+        $this->WritePersistentJsonCache('CachedEvents', $events);
+
+        return true;
+    }
+
+    /**
+     * Returns the current provider version of one event before it is edited.
+     *
+     * This read intentionally bypasses the local event cache so the editor receives
+     * the provider's current ETag and other write-relevant identity fields.
+     *
+     * @param string $EventJSON JSON-encoded event identity and current time range.
+     * @return string JSON-encoded normalized current event.
+     */
+    public function GetEventForEdit(string $EventJSON): string
+    {
+        try {
+            $event = $this->decodeObject($EventJSON, 'event');
+            $startTimestamp = (int) ($event['startTimestamp'] ?? 0);
+            $endTimestamp = (int) ($event['endTimestamp'] ?? 0);
+            if ($startTimestamp <= 0) {
+                throw new InvalidArgumentException('The selected event start is invalid.');
+            }
+
+            $currentEvent = $this->sendRequest('GetEventForEdit', [
+                'ResourceURL'    => trim((string) ($event['resourceUrl'] ?? '')),
+                'EventReference' => trim((string) ($event['eventReference'] ?? '')),
+                'UID'            => trim((string) ($event['uid'] ?? '')),
+                'SeriesID'       => trim((string) ($event['seriesId'] ?? '')),
+                'OccurrenceID'   => trim((string) ($event['occurrenceId'] ?? '')),
+                'OriginalStart'  => trim((string) ($event['originalStart'] ?? '')),
+                'RecurrenceID'   => trim((string) ($event['recurrenceId'] ?? '')),
+                'Start'          => $startTimestamp,
+                'End'            => $endTimestamp
+            ]);
+            $currentEvent = $this->enrichAnniversaryEvent($currentEvent);
+
+            return json_encode(
+                $currentEvent,
+                JSON_UNESCAPED_SLASHES
+                    | JSON_UNESCAPED_UNICODE
+                    | JSON_PRESERVE_ZERO_FRACTION
+                    | JSON_THROW_ON_ERROR
+            );
+        } catch (Throwable $exception) {
+            throw new RuntimeException($this->handleError($exception), 0, $exception);
+        }
+    }
+
+    /**
+     * Returns the verified parent event for a recurring series.
+     *
+     * @param string $SeriesID Provider-specific recurring parent event identifier.
+     * @param string $ResourceURL Optional provider-specific resource URL already known for the series.
+     * @return string JSON-encoded normalized recurring parent event.
+     */
+    public function GetRecurringSeries(string $SeriesID, string $ResourceURL = ''): string
+    {
+        try {
+            $seriesId = trim($SeriesID);
+            if ($seriesId === '') {
+                throw new InvalidArgumentException('The recurring series ID is missing.');
+            }
+            if (!$this->ReadAttributeBoolean('CalendarMetadataAvailable')
+                || !$this->ReadAttributeBoolean('DetectedCanUpdateSeries')) {
+                $this->refreshCalendarMetadataSafely();
+            }
+            if (!$this->ReadAttributeBoolean('DetectedCanUpdateSeries')) {
+                throw new InvalidArgumentException('Recurring series updates are not supported by this calendar.');
+            }
+
+            $series = $this->sendRequest(
+                'GetRecurringSeries',
+                [
+                    'SeriesID'    => $seriesId,
+                    'ResourceURL' => trim($ResourceURL)
+                ]
+            );
+            $series = $this->enrichAnniversaryEvent($series);
+            return json_encode(
+                $series,
+                JSON_UNESCAPED_SLASHES
+                    | JSON_UNESCAPED_UNICODE
+                    | JSON_PRESERVE_ZERO_FRACTION
+                    | JSON_THROW_ON_ERROR
+            );
+        } catch (Throwable $exception) {
+            throw new RuntimeException($this->handleError($exception), 0, $exception);
+        }
+    }
+
+    /**
+     * Returns an editable recurring event starting at the selected occurrence.
+     *
+     * @param string $SeriesID Provider-specific recurring parent event identifier.
+     * @param string $OccurrenceID Provider-specific target occurrence identifier.
+     * @param string $OriginalStart Immutable original start of the target occurrence.
+     * @param string $ResourceURL Optional provider-specific resource URL already known for the series.
+     * @return string JSON-encoded normalized recurring target event.
+     */
+    public function GetRecurringFollowing(
+        string $SeriesID,
+        string $OccurrenceID,
+        string $OriginalStart,
+        string $ResourceURL = ''
+    ): string {
+        try {
+            $seriesId = trim($SeriesID);
+            $occurrenceId = trim($OccurrenceID);
+            $originalStart = trim($OriginalStart);
+            if ($seriesId === '' || $occurrenceId === '' || $originalStart === '') {
+                throw new InvalidArgumentException('The recurring occurrence identity is incomplete.');
+            }
+            if (!$this->ReadAttributeBoolean('CalendarMetadataAvailable')
+                || !$this->ReadAttributeBoolean('DetectedCanUpdateFollowing')) {
+                $this->refreshCalendarMetadataSafely();
+            }
+            if (!$this->ReadAttributeBoolean('DetectedCanUpdateFollowing')) {
+                throw new InvalidArgumentException('This and following updates are not supported by this calendar.');
+            }
+
+            $following = $this->sendRequest(
+                'GetRecurringFollowing',
+                [
+                    'SeriesID'      => $seriesId,
+                    'OccurrenceID'  => $occurrenceId,
+                    'OriginalStart' => $originalStart,
+                    'ResourceURL'   => trim($ResourceURL)
+                ]
+            );
+            $following = $this->enrichAnniversaryEvent($following);
+            return json_encode(
+                $following,
+                JSON_UNESCAPED_SLASHES
+                    | JSON_UNESCAPED_UNICODE
+                    | JSON_PRESERVE_ZERO_FRACTION
+                    | JSON_THROW_ON_ERROR
+            );
+        } catch (Throwable $exception) {
+            throw new RuntimeException($this->handleError($exception), 0, $exception);
+        }
     }
 
     /**
@@ -395,8 +701,66 @@ class Kalender extends IPSModuleStrict
     {
         try {
             $event = $this->decodeObject($EventJSON, 'event');
-            $created = $this->sendRequest('CreateEvent', ['Event' => $event]);
-            $this->refreshAfterWrite();
+            $anniversary = $this->anniversaryInput($event);
+            if ($anniversary !== null && $anniversary['enabled']) {
+                $recurrenceInput = $event['recurrence'] ?? null;
+                if (!is_array($recurrenceInput) || $recurrenceInput === []) {
+                    $this->applyAnniversaryEventDefaults($event, $anniversary['date']);
+                } else {
+                    $this->assertAnniversaryRecurrence($event);
+                }
+            }
+            $recurrence = $event['recurrence'] ?? null;
+            if ($recurrence !== null && $recurrence !== []) {
+                if (!is_array($recurrence) || array_is_list($recurrence)) {
+                    throw new InvalidArgumentException('The recurrence settings are invalid.');
+                }
+                if (!$this->ReadAttributeBoolean('CalendarMetadataAvailable')
+                    || !$this->ReadAttributeBoolean('DetectedCanCreateRecurrence')) {
+                    $this->refreshCalendarMetadataSafely();
+                }
+                if (!$this->ReadAttributeBoolean('DetectedCanCreateRecurrence')) {
+                    throw new InvalidArgumentException('Recurring event creation is not supported by this calendar.');
+                }
+                if (trim((string) ($event['timezone'] ?? '')) === '') {
+                    $timezone = trim($this->ReadAttributeString('DetectedCalendarTimezone'));
+                    if ($timezone === '') {
+                        $timezone = date_default_timezone_get();
+                    }
+                    $event['timezone'] = $timezone;
+                }
+            }
+            $providerEvent = $event;
+            unset(
+                $providerEvent['anniversaryType'],
+                $providerEvent['anniversaryDate'],
+                $providerEvent['birthday'],
+                $providerEvent['birthDate']
+            );
+            $this->SendSafeDebug('EventCreate', [
+                'allDay'      => (bool) ($event['allDay'] ?? false),
+                'recurring'   => is_array($recurrence) && $recurrence !== [],
+                'frequency'   => is_array($recurrence)
+                    ? strtoupper(trim((string) ($recurrence['frequency'] ?? '')))
+                    : '',
+                'timezone'    => trim((string) ($event['timezone'] ?? '')),
+                'annualEvent' => $anniversary !== null && $anniversary['enabled']
+            ]);
+            $created = $this->sendRequest('CreateEvent', ['Event' => $providerEvent]);
+            if ($anniversary !== null && $anniversary['enabled']) {
+                $this->upsertAnniversaryMetadata(
+                    array_merge($event, is_array($created) ? $created : []),
+                    $anniversary['type'],
+                    $anniversary['date'],
+                    trim((string) ($event['summary'] ?? ''))
+                );
+            }
+            $simpleSingleWrite = ($recurrence === null || $recurrence === [])
+                && ($anniversary === null || !$anniversary['enabled']);
+            if (!$simpleSingleWrite
+                || !$this->refreshSingleEventAfterWrite(array_merge($event, $created))) {
+                $this->refreshAfterWrite();
+            }
 
             return $this->encodeResult(true, $created);
         } catch (Throwable $exception) {
@@ -418,23 +782,122 @@ class Kalender extends IPSModuleStrict
             if (!is_array($changes)) {
                 throw new InvalidArgumentException('The event changes are invalid.');
             }
-            foreach (['uid', 'resourceUrl', 'etag', 'recurrenceId', 'changes'] as $metadataKey) {
+            $recurrence = $this->resolveWriteRecurrence($event, true);
+            $anniversary = $this->anniversaryInput($changes);
+            $existingAnniversary = $this->anniversaryMetadataForEvent($event);
+            $writeScope = (string) ($recurrence['writeScope'] ?? '');
+            if ($anniversary !== null && $anniversary['enabled']) {
+                if (in_array(
+                    $writeScope,
+                    [CalendarEventRecurrence::WRITE_SCOPE_OCCURRENCE, CalendarEventRecurrence::WRITE_SCOPE_FOLLOWING],
+                    true
+                )) {
+                    throw new InvalidArgumentException('Annual-event settings can only be changed for a complete recurring series.');
+                }
+                $this->applyAnniversaryEventDefaults($changes, $anniversary['date']);
+            }
+            $requestedRecurrence = $changes['recurrence'] ?? null;
+            $recurrenceType = (string) ($recurrence['recurrenceType'] ?? CalendarEventRecurrence::SINGLE);
+            $convertingSingleToSeries = $recurrenceType === CalendarEventRecurrence::SINGLE
+                && is_array($requestedRecurrence)
+                && $requestedRecurrence !== [];
+            if ($convertingSingleToSeries) {
+                if (!$this->ReadAttributeBoolean('CalendarMetadataAvailable')
+                    || !$this->ReadAttributeBoolean('DetectedCanUpdateRecurrence')) {
+                    $this->refreshCalendarMetadataSafely();
+                }
+                if (!$this->ReadAttributeBoolean('DetectedCanUpdateRecurrence')) {
+                    throw new InvalidArgumentException(
+                        'Converting this event into a recurring series is not supported by this calendar.'
+                    );
+                }
+                if (trim((string) ($changes['timezone'] ?? '')) === '') {
+                    $timezone = trim($this->ReadAttributeString('DetectedCalendarTimezone'));
+                    if ($timezone === '') {
+                        $timezone = date_default_timezone_get();
+                    }
+                    $changes['timezone'] = $timezone;
+                }
+            }
+            foreach ([
+                'uid',
+                'resourceUrl',
+                'etag',
+                'recurrenceType',
+                'seriesId',
+                'occurrenceId',
+                'originalStart',
+                'recurrenceId',
+                'recurring',
+                'canUpdateOccurrence',
+                'canDeleteOccurrence',
+                'canUpdateFollowing',
+                'canUpdateSeries',
+                'canDeleteSeries',
+                'writeScope',
+                'changes'
+            ] as $metadataKey) {
                 unset($changes[$metadataKey]);
             }
-            if ($changes === []) {
+            $anniversaryEnabled = $anniversary !== null && $anniversary['enabled'];
+            $anniversaryDisabled = $anniversary !== null && !$anniversary['enabled'];
+            $anniversaryType = $anniversaryEnabled
+                ? $anniversary['type']
+                : (string) ($existingAnniversary['type'] ?? '');
+            $anniversaryDate = $anniversaryEnabled
+                ? $anniversary['date']
+                : (string) ($existingAnniversary['date'] ?? '');
+            unset($changes['anniversaryType'], $changes['anniversaryDate'], $changes['birthday'], $changes['birthDate']);
+            if ($changes === [] && !$anniversaryDisabled) {
                 throw new InvalidArgumentException('No event changes were supplied.');
             }
+            $simpleSingleWrite = $recurrenceType === CalendarEventRecurrence::SINGLE
+                && !$convertingSingleToSeries
+                && $anniversary === null
+                && $existingAnniversary === null;
+            $cachedEvent = $simpleSingleWrite ? $this->cachedEventForIdentity($event) : null;
 
-            $updated = $this->sendRequest(
-                'UpdateEvent',
-                [
-                    'UID'         => trim((string) ($event['uid'] ?? '')),
-                    'ResourceURL' => trim((string) ($event['resourceUrl'] ?? '')),
-                    'ETag'        => trim((string) ($event['etag'] ?? '')),
-                    'Event'       => $changes
-                ]
-            );
-            $this->refreshAfterWrite();
+            $this->SendSafeDebug('EventUpdate', [
+                'recurrenceType'     => $recurrenceType,
+                'writeScope'         => $writeScope,
+                'convertingToSeries' => $convertingSingleToSeries,
+                'changedFields'      => array_values(array_keys($changes)),
+                'annualEventChange'  => $anniversary !== null
+            ]);
+
+            $updated = $changes === []
+                ? []
+                : $this->sendRequest(
+                    'UpdateEvent',
+                    [
+                        'UID'         => trim((string) ($event['uid'] ?? '')),
+                        'ResourceURL' => trim((string) ($event['resourceUrl'] ?? '')),
+                        'ETag'        => trim((string) ($event['etag'] ?? '')),
+                        'Event'       => $changes,
+                        'Recurrence'  => $recurrence
+                    ]
+                );
+
+            if ($anniversaryDisabled) {
+                $this->removeAnniversaryMetadata($event);
+            } elseif ($anniversaryEnabled || $existingAnniversary !== null) {
+                $summary = trim((string) ($changes['summary'] ?? $existingAnniversary['summary'] ?? $event['summary'] ?? ''));
+                $this->upsertAnniversaryMetadata(
+                    array_merge($event, is_array($updated) ? $updated : []),
+                    $anniversaryType,
+                    $anniversaryDate,
+                    $summary,
+                    $event
+                );
+            }
+            if (!$simpleSingleWrite
+                || $cachedEvent === null
+                || !$this->refreshSingleEventAfterWrite(
+                    array_merge($cachedEvent, $changes, $updated),
+                    $event
+                )) {
+                $this->refreshAfterWrite();
+            }
 
             return $this->encodeResult(true, $updated);
         } catch (Throwable $exception) {
@@ -452,18 +915,37 @@ class Kalender extends IPSModuleStrict
     {
         try {
             $event = $this->decodeObject($EventJSON, 'event');
+            $recurrence = $this->resolveWriteRecurrence($event, false);
+            $writeScope = (string) ($recurrence['writeScope'] ?? '');
+            $recurrenceType = (string) ($recurrence['recurrenceType'] ?? CalendarEventRecurrence::SINGLE);
+            $this->SendSafeDebug('EventDelete', [
+                'recurrenceType' => $recurrenceType,
+                'writeScope'     => $writeScope
+            ]);
             $result = $this->sendRequest(
                 'DeleteEvent',
                 [
                     'ResourceURL'  => trim((string) ($event['resourceUrl'] ?? '')),
                     'ETag'         => trim((string) ($event['etag'] ?? '')),
-                    'RecurrenceID' => trim((string) ($event['recurrenceId'] ?? ''))
+                    'RecurrenceID' => trim((string) ($recurrence['recurrenceId'] ?? '')),
+                    'Recurrence'   => $recurrence
                 ]
             );
             if (!(bool) ($result['success'] ?? false)) {
                 throw new RuntimeException('The calendar account did not confirm the deletion.');
             }
-            $this->refreshAfterWrite();
+            if (!CalendarEventRecurrence::isOccurrence($recurrence)
+                || in_array(
+                    $writeScope,
+                    [CalendarEventRecurrence::WRITE_SCOPE_FOLLOWING, CalendarEventRecurrence::WRITE_SCOPE_SERIES],
+                    true
+                )) {
+                $this->removeAnniversaryMetadata($event);
+            }
+            if ($recurrenceType !== CalendarEventRecurrence::SINGLE
+                || !$this->removeSingleEventFromCache($event)) {
+                $this->refreshAfterWrite();
+            }
             return true;
         } catch (Throwable $exception) {
             $this->handleError($exception);
@@ -476,6 +958,7 @@ class Kalender extends IPSModuleStrict
      */
     public function ClearCache(): void
     {
+        $this->clearIncrementalSyncState();
         $this->storeEvents([]);
         $this->WriteAttributeInteger('LastSynchronization', 0);
         $this->SetValue('LastSynchronization', 0);
@@ -496,27 +979,56 @@ class Kalender extends IPSModuleStrict
         $writeAccessKnown = $metadataAvailable
             && $this->ReadAttributeBoolean('DetectedWriteAccessKnown');
         $detectedColor = $this->ReadAttributeString('DetectedCalendarColor');
+        $defaultReminder = json_decode($this->ReadAttributeString('DetectedDefaultReminder'), true);
+        if (!is_array($defaultReminder) || array_is_list($defaultReminder)) {
+            $defaultReminder = [];
+        }
         $events = $this->readEvents();
 
         return json_encode(
             [
-                'calendarId'          => $this->effectiveCalendarId(),
-                'calendarColor'       => $metadataAvailable && $detectedColor !== ''
+                'calendarId'                   => $this->effectiveCalendarId(),
+                'calendarColor'                => $metadataAvailable && $detectedColor !== ''
                     ? $detectedColor
                     : $this->ReadPropertyString('CalendarColor'),
-                'canWrite'            => $metadataAvailable
+                'canWrite'                     => $metadataAvailable
                     ? ($writeAccessKnown
                         ? $this->ReadAttributeBoolean('DetectedCanWrite')
                         : $this->ReadAttributeBoolean('DetectedCanWrite')
                             || $this->ReadPropertyBoolean('CanWrite'))
                     : $this->ReadPropertyBoolean('CanWrite'),
-                'eventCount'          => count($events),
-                'todayEventCount'     => CalendarEventCounter::countForDay(
+                'timezone'                     => $metadataAvailable
+                    ? $this->ReadAttributeString('DetectedCalendarTimezone')
+                    : '',
+                'canCreateRecurrence'          => $metadataAvailable
+                    && $this->ReadAttributeBoolean('DetectedCanCreateRecurrence'),
+                'canUpdateRecurrence'          => $metadataAvailable
+                    && $this->ReadAttributeBoolean('DetectedCanUpdateRecurrence'),
+                'canUpdateOccurrence'          => $metadataAvailable
+                    && $this->ReadAttributeBoolean('DetectedCanUpdateOccurrence'),
+                'canDeleteOccurrence'          => $metadataAvailable
+                    && $this->ReadAttributeBoolean('DetectedCanDeleteOccurrence'),
+                'canUpdateFollowing'           => $metadataAvailable
+                    && $this->ReadAttributeBoolean('DetectedCanUpdateFollowing'),
+                'canUpdateSeries'              => $metadataAvailable
+                    && $this->ReadAttributeBoolean('DetectedCanUpdateSeries'),
+                'canDeleteSeries'              => $metadataAvailable
+                    && $this->ReadAttributeBoolean('DetectedCanDeleteSeries'),
+                'canUseDefaultReminder'        => $metadataAvailable
+                    && $this->ReadAttributeBoolean('DetectedCanUseDefaultReminder'),
+                'canCreateWithDefaultReminder' => $metadataAvailable
+                    && $this->ReadAttributeBoolean('DetectedCanCreateWithDefaultReminder'),
+                'defaultReminder'              => $metadataAvailable ? $defaultReminder : [],
+                'maxReminders'                 => $metadataAvailable
+                    ? max(1, min(5, $this->ReadAttributeInteger('DetectedMaxReminders')))
+                    : 1,
+                'eventCount'                   => count($events),
+                'todayEventCount'              => CalendarEventCounter::countForDay(
                     $events,
                     new DateTimeImmutable('today')
                 ),
-                'lastSynchronization' => $this->ReadAttributeInteger('LastSynchronization'),
-                'lastError'           => $this->ReadAttributeString('LastError')
+                'lastSynchronization'          => $this->ReadAttributeInteger('LastSynchronization'),
+                'lastError'                    => $this->ReadAttributeString('LastError')
             ],
             JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR
         );
@@ -527,7 +1039,7 @@ class Kalender extends IPSModuleStrict
         try {
             $this->applyCalendarMetadata($this->sendRequest('GetCalendars'));
         } catch (Throwable $exception) {
-            $this->SendDebug('CalendarMetadata', $exception->getMessage(), 0);
+            $this->SendSafeDebugException('CalendarMetadataError', $exception);
         }
     }
 
@@ -567,10 +1079,9 @@ class Kalender extends IPSModuleStrict
                 ) === 0
             ));
             if (count($nameMatches) === 1) {
-                $this->SendDebug(
+                $this->SendSafeDebug(
                     'CalendarResolution',
-                    'Recovered the calendar identity from the unique instance name.',
-                    0
+                    'Recovered the calendar identity from the unique instance name.'
                 );
                 $this->storeCalendarMetadata($nameMatches[0]);
                 return;
@@ -584,6 +1095,18 @@ class Kalender extends IPSModuleStrict
 
         if ($availableCalendars !== []) {
             $this->WriteAttributeString('ResolvedCalendarID', '');
+            $this->WriteAttributeBoolean('DetectedCanCreateRecurrence', false);
+            $this->WriteAttributeBoolean('DetectedCanUpdateRecurrence', false);
+            $this->WriteAttributeBoolean('DetectedCanUpdateOccurrence', false);
+            $this->WriteAttributeBoolean('DetectedCanDeleteOccurrence', false);
+            $this->WriteAttributeBoolean('DetectedCanUpdateFollowing', false);
+            $this->WriteAttributeBoolean('DetectedCanUpdateSeries', false);
+            $this->WriteAttributeBoolean('DetectedCanDeleteSeries', false);
+            $this->WriteAttributeBoolean('DetectedCanUseDefaultReminder', false);
+            $this->WriteAttributeBoolean('DetectedCanCreateWithDefaultReminder', false);
+            $this->WriteAttributeInteger('DetectedMaxReminders', 1);
+            $this->WriteAttributeString('DetectedDefaultReminder', '{}');
+            $this->WriteAttributeString('DetectedCalendarTimezone', '');
             $this->WriteAttributeBoolean('DetectedWriteAccessKnown', false);
             $this->WriteAttributeBoolean('CalendarMetadataAvailable', false);
         }
@@ -598,6 +1121,21 @@ class Kalender extends IPSModuleStrict
         $canWrite = (bool) ($capabilities['create'] ?? false)
             || (bool) ($capabilities['update'] ?? false)
             || (bool) ($capabilities['delete'] ?? false);
+        $canCreateRecurrence = (bool) ($capabilities['createRecurrence'] ?? false);
+        $canUpdateRecurrence = (bool) ($capabilities['updateRecurrence'] ?? false);
+        $canUpdateOccurrence = (bool) ($capabilities['updateOccurrence'] ?? false);
+        $canDeleteOccurrence = (bool) ($capabilities['deleteOccurrence'] ?? false);
+        $canUpdateFollowing = (bool) ($capabilities['updateFollowing'] ?? false);
+        $canUpdateSeries = (bool) ($capabilities['updateSeries'] ?? false);
+        $canDeleteSeries = (bool) ($capabilities['deleteSeries'] ?? false);
+        $canUseDefaultReminder = (bool) ($capabilities['useDefaultReminder'] ?? false);
+        $canCreateWithDefaultReminder = (bool) ($capabilities['createWithDefaultReminder'] ?? false);
+        $maxReminders = max(1, min(5, (int) ($capabilities['maxReminders'] ?? 1)));
+        $defaultReminder = is_array($calendar['defaultReminder'] ?? null)
+            && !array_is_list($calendar['defaultReminder'])
+            ? $calendar['defaultReminder']
+            : [];
+        $timezone = trim((string) ($calendar['timezone'] ?? ''));
         // Cached calendar metadata created before writeAccessKnown existed cannot
         // distinguish an explicit read-only result from incomplete DAV privilege
         // discovery. Keep it unknown so the persisted CanWrite value can recover
@@ -607,8 +1145,43 @@ class Kalender extends IPSModuleStrict
         $this->WriteAttributeString('ResolvedCalendarID', trim((string) ($calendar['id'] ?? '')));
         $this->WriteAttributeString('DetectedCalendarColor', trim((string) ($calendar['color'] ?? '')));
         $this->WriteAttributeBoolean('DetectedCanWrite', $canWrite);
+        $this->WriteAttributeBoolean('DetectedCanCreateRecurrence', $canCreateRecurrence);
+        $this->WriteAttributeBoolean('DetectedCanUpdateRecurrence', $canUpdateRecurrence);
+        $this->WriteAttributeBoolean('DetectedCanUpdateOccurrence', $canUpdateOccurrence);
+        $this->WriteAttributeBoolean('DetectedCanDeleteOccurrence', $canDeleteOccurrence);
+        $this->WriteAttributeBoolean('DetectedCanUpdateFollowing', $canUpdateFollowing);
+        $this->WriteAttributeBoolean('DetectedCanUpdateSeries', $canUpdateSeries);
+        $this->WriteAttributeBoolean('DetectedCanDeleteSeries', $canDeleteSeries);
+        $this->WriteAttributeBoolean('DetectedCanUseDefaultReminder', $canUseDefaultReminder);
+        $this->WriteAttributeBoolean(
+            'DetectedCanCreateWithDefaultReminder',
+            $canCreateWithDefaultReminder
+        );
+        $this->WriteAttributeInteger('DetectedMaxReminders', $maxReminders);
+        $this->WriteAttributeString(
+            'DetectedDefaultReminder',
+            json_encode(
+                $canUseDefaultReminder ? $defaultReminder : [],
+                JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR
+            )
+        );
+        $this->WriteAttributeString('DetectedCalendarTimezone', $timezone);
         $this->WriteAttributeBoolean('DetectedWriteAccessKnown', $writeAccessKnown);
         $this->WriteAttributeBoolean('CalendarMetadataAvailable', true);
+        $this->SendSafeDebug('CalendarMetadata', [
+            'canWrite'                 => $canWrite,
+            'writeAccessKnown'         => $writeAccessKnown,
+            'timezone'                 => $timezone,
+            'canCreateRecurrence'      => $canCreateRecurrence,
+            'canUpdateRecurrence'      => $canUpdateRecurrence,
+            'canUpdateOccurrence'      => $canUpdateOccurrence,
+            'canUpdateFollowing'       => $canUpdateFollowing,
+            'canUpdateSeries'          => $canUpdateSeries,
+            'canDeleteSeries'          => $canDeleteSeries,
+            'maxReminders'             => $maxReminders,
+            'canUseDefaultReminder'    => $canUseDefaultReminder,
+            'canCreateDefaultReminder' => $canCreateWithDefaultReminder
+        ]);
     }
 
     /**
@@ -621,21 +1194,44 @@ class Kalender extends IPSModuleStrict
         $today = new DateTimeImmutable('today');
         $start = $today->modify('-' . $pastDays . ' days');
         $end = $today->modify('+' . ($futureDays + 1) . ' days');
+        $startTimestamp = $start->getTimestamp();
+        $endTimestamp = $end->getTimestamp();
+        $syncToken = $this->incrementalSyncTokenForWindow($startTimestamp, $endTimestamp);
+        $startedAt = microtime(true);
+        $this->SendSafeDebug('EventTransferStart', [
+            'start'                => $start->format(DATE_ATOM),
+            'end'                  => $end->format(DATE_ATOM),
+            'incrementalRequested' => $syncToken !== ''
+        ]);
         $transfer = $this->sendRequest(
             'BeginEventsTransfer',
-            ['Start' => $start->getTimestamp(), 'End' => $end->getTimestamp()]
+            [
+                'Start'     => $startTimestamp,
+                'End'       => $endTimestamp,
+                'SyncToken' => $syncToken
+            ]
         );
         $token = trim((string) ($transfer['Token'] ?? ''));
         $pageCount = (int) ($transfer['PageCount'] ?? 0);
         $itemCount = (int) ($transfer['ItemCount'] ?? -1);
+        $nextSyncToken = trim((string) ($transfer['SyncToken'] ?? ''));
+        $incremental = (bool) ($transfer['Incremental'] ?? false);
+        if ($incremental && $syncToken === '') {
+            throw new UnexpectedValueException('The calendar account returned an unexpected incremental event transfer.');
+        }
         if (preg_match('/^[a-f0-9]{32}$/D', $token) !== 1
             || $pageCount < 1
             || $pageCount > 10_000
             || $itemCount < 0) {
             throw new UnexpectedValueException('The calendar account returned invalid event transfer metadata.');
         }
+        $this->SendSafeDebug('EventTransferMetadata', [
+            'pageCount'   => $pageCount,
+            'itemCount'   => $itemCount,
+            'incremental' => $incremental
+        ]);
 
-        $events = [];
+        $transferredEvents = [];
         try {
             for ($page = 0; $page < $pageCount; ++$page) {
                 $payload = $this->sendRequest(
@@ -656,16 +1252,181 @@ class Kalender extends IPSModuleStrict
                     if (!is_array($event) || array_is_list($event)) {
                         throw new UnexpectedValueException('The calendar account returned invalid event data.');
                     }
-                    $events[] = $event;
+                    $transferredEvents[] = $event;
                 }
             }
         } finally {
             $this->finishEventTransfer($token);
         }
 
-        if (count($events) !== $itemCount) {
+        if (count($transferredEvents) !== $itemCount) {
             throw new UnexpectedValueException('The calendar account returned an incomplete event transfer.');
         }
+
+        $cachedEvents = $this->readEvents();
+        $events = $incremental
+            ? $this->mergeIncrementalEvents($cachedEvents, $transferredEvents)
+            : array_values(array_filter(
+                $transferredEvents,
+                static fn (array $event): bool => !($event['_syncDeleted'] ?? false)
+            ));
+        $this->reconcileAnniversaryMetadataAfterSynchronization($events, $cachedEvents);
+        if ($nextSyncToken !== '') {
+            $this->storeIncrementalSyncState($nextSyncToken, $startTimestamp, $endTimestamp);
+        } else {
+            $this->clearIncrementalSyncState();
+        }
+
+        $this->SendSafeDebug('EventTransferCompleted', [
+            'eventCount'        => count($events),
+            'transferredCount'  => count($transferredEvents),
+            'incremental'       => $incremental,
+            'durationMs'        => (int) round((microtime(true) - $startedAt) * 1000)
+        ]);
+
+        return $events;
+    }
+
+    private function incrementalSyncTokenForWindow(int $startTimestamp, int $endTimestamp): string
+    {
+        $token = trim($this->ReadAttributeString('IncrementalSyncToken'));
+        if ($token === ''
+            || $this->ReadAttributeInteger('IncrementalSyncWindowStart') !== $startTimestamp
+            || $this->ReadAttributeInteger('IncrementalSyncWindowEnd') !== $endTimestamp
+            || !hash_equals(
+                $this->ReadAttributeString('IncrementalSyncCalendarID'),
+                $this->effectiveCalendarId()
+            )) {
+            return '';
+        }
+
+        return $token;
+    }
+
+    private function storeIncrementalSyncState(string $token, int $startTimestamp, int $endTimestamp): void
+    {
+        $this->WriteAttributeString('IncrementalSyncToken', trim($token));
+        $this->WriteAttributeInteger('IncrementalSyncWindowStart', $startTimestamp);
+        $this->WriteAttributeInteger('IncrementalSyncWindowEnd', $endTimestamp);
+        $this->WriteAttributeString('IncrementalSyncCalendarID', $this->effectiveCalendarId());
+    }
+
+    private function clearIncrementalSyncState(): void
+    {
+        $this->WriteAttributeString('IncrementalSyncToken', '');
+        $this->WriteAttributeInteger('IncrementalSyncWindowStart', 0);
+        $this->WriteAttributeInteger('IncrementalSyncWindowEnd', 0);
+        $this->WriteAttributeString('IncrementalSyncCalendarID', '');
+    }
+
+    /**
+     * @param list<array<string, mixed>> $events
+     * @param list<array<string, mixed>> $changes
+     * @return list<array<string, mixed>>
+     */
+    private function mergeIncrementalEvents(array $events, array $changes): array
+    {
+        $replacedResources = [];
+        foreach ($changes as $change) {
+            if ((bool) ($change['_syncDeleted'] ?? false)
+                || !(bool) ($change['_syncReplaceResource'] ?? false)) {
+                continue;
+            }
+            $resourceUrl = trim((string) ($change['resourceUrl'] ?? ''));
+            if ($resourceUrl !== '') {
+                $replacedResources[$resourceUrl] = true;
+            }
+        }
+        if ($replacedResources !== []) {
+            $events = array_values(array_filter(
+                $events,
+                static function (array $event) use ($replacedResources): bool
+                {
+                    $resourceUrl = trim((string) ($event['resourceUrl'] ?? ''));
+                    return $resourceUrl === '' || !isset($replacedResources[$resourceUrl]);
+                }
+            ));
+        }
+
+        foreach ($changes as $change) {
+            $eventReference = trim((string) ($change['eventReference'] ?? ''));
+            $resourceUrl = trim((string) ($change['resourceUrl'] ?? ''));
+            if ((bool) ($change['_syncDeleted'] ?? false)) {
+                if ($eventReference === '' && $resourceUrl === '') {
+                    continue;
+                }
+                $deletedSeriesId = trim((string) ($change['seriesId'] ?? ''));
+                $events = array_values(array_filter(
+                    $events,
+                    static function (array $event) use (
+                        $eventReference,
+                        $resourceUrl,
+                        $deletedSeriesId
+                    ): bool {
+                        $candidateResource = trim((string) ($event['resourceUrl'] ?? ''));
+                        if ($resourceUrl !== ''
+                            && $candidateResource !== ''
+                            && hash_equals($resourceUrl, $candidateResource)) {
+                            return false;
+                        }
+
+                        if ($eventReference === '') {
+                            return true;
+                        }
+                        $candidateReference = trim((string) ($event['eventReference'] ?? ''));
+                        $candidateOccurrence = trim((string) ($event['occurrenceId'] ?? ''));
+                        if (($candidateReference !== '' && hash_equals($eventReference, $candidateReference))
+                            || ($candidateOccurrence !== '' && hash_equals($eventReference, $candidateOccurrence))) {
+                            return false;
+                        }
+
+                        $candidateSeries = trim((string) ($event['seriesId'] ?? ''));
+                        return $deletedSeriesId !== ''
+                            || $candidateSeries === ''
+                            || !hash_equals($eventReference, $candidateSeries);
+                    }
+                ));
+                continue;
+            }
+
+            $occurrenceId = trim((string) ($change['occurrenceId'] ?? ''));
+            $replaceResource = (bool) ($change['_syncReplaceResource'] ?? false);
+            if ($eventReference === '' && $resourceUrl === '' && $occurrenceId === '') {
+                continue;
+            }
+            $events = array_values(array_filter(
+                $events,
+                static function (array $event) use (
+                    $eventReference,
+                    $resourceUrl,
+                    $occurrenceId,
+                    $replaceResource
+                ): bool {
+                    foreach ([
+                        [$eventReference, trim((string) ($event['eventReference'] ?? ''))],
+                        [$replaceResource ? '' : $resourceUrl, trim((string) ($event['resourceUrl'] ?? ''))],
+                        [$occurrenceId, trim((string) ($event['occurrenceId'] ?? ''))]
+                    ] as [$expected, $actual]) {
+                        if ($expected !== '' && $actual !== '' && hash_equals($expected, $actual)) {
+                            return false;
+                        }
+                    }
+
+                    return true;
+                }
+            ));
+            if ($this->eventOverlapsConfiguredRange($change)) {
+                unset($change['_syncReplaceResource']);
+                $events[] = $change;
+            }
+        }
+
+        usort(
+            $events,
+            static fn (array $left, array $right): int => ((int) ($left['startTimestamp'] ?? 0)
+                <=> (int) ($right['startTimestamp'] ?? 0))
+                ?: strcasecmp((string) ($left['summary'] ?? ''), (string) ($right['summary'] ?? ''))
+        );
 
         return $events;
     }
@@ -675,7 +1436,7 @@ class Kalender extends IPSModuleStrict
         try {
             $this->sendRequest('FinishEventsTransfer', ['Token' => $token]);
         } catch (Throwable $exception) {
-            $this->SendDebug('EventTransferCleanup', $exception->getMessage(), 0);
+            $this->SendSafeDebugException('EventTransferCleanupError', $exception);
         }
     }
 
@@ -747,6 +1508,7 @@ class Kalender extends IPSModuleStrict
     private function storeEvents(array $events): void
     {
         $timestamp = time();
+        $events = $this->enrichAnniversaryEvents($events);
         $this->WritePersistentJsonCache('CachedEvents', $events);
         $this->WriteAttributeInteger('LastSynchronization', $timestamp);
         $this->updateEventCounters($events);
@@ -790,6 +1552,673 @@ class Kalender extends IPSModuleStrict
         }
     }
 
+    /**
+     * @return list<array{keys: list<string>, type: string, date: string, summary: string}>
+     */
+    private function readAnniversaryMetadata(): array
+    {
+        $decoded = $this->decodeAnniversaryMetadata($this->ReadAttributeString('AnniversaryMetadata'));
+        if ($decoded !== []) {
+            return $decoded;
+        }
+
+        return $this->decodeAnniversaryMetadata($this->ReadAttributeString('BirthdayMetadata'), true);
+    }
+
+    /**
+     * @return list<array{keys: list<string>, type: string, date: string, summary: string}>
+     */
+    private function decodeAnniversaryMetadata(string $json, bool $legacyBirthday = false): array
+    {
+        try {
+            $decoded = json_decode($json, true, 512, JSON_THROW_ON_ERROR);
+        } catch (Throwable) {
+            return [];
+        }
+        if (!is_array($decoded) || !array_is_list($decoded)) {
+            return [];
+        }
+
+        $result = [];
+        foreach ($decoded as $entry) {
+            if (!is_array($entry) || !array_is_list($entry['keys'] ?? [])) {
+                continue;
+            }
+            $type = $legacyBirthday
+                ? self::ANNIVERSARY_TYPE_BIRTHDAY
+                : $this->normalizeAnniversaryType((string) ($entry['type'] ?? ''));
+            $date = $this->normalizeAnniversaryDate((string) ($entry['date'] ?? $entry['birthDate'] ?? ''));
+            $keys = array_values(array_unique(array_filter(
+                array_map(static fn (mixed $key): string => trim((string) $key), $entry['keys']),
+                static fn (string $key): bool => $key !== ''
+            )));
+            if ($type === '' || $date === '' || $keys === []) {
+                continue;
+            }
+            $result[] = [
+                'keys'    => $keys,
+                'type'    => $type,
+                'date'    => $date,
+                'summary' => trim((string) ($entry['summary'] ?? ''))
+            ];
+        }
+
+        return $result;
+    }
+
+    /** @param list<array{keys: list<string>, type: string, date: string, summary: string}> $metadata */
+    private function writeAnniversaryMetadata(array $metadata): void
+    {
+        $this->WriteAttributeString(
+            'AnniversaryMetadata',
+            json_encode(
+                array_values($metadata),
+                JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR
+            )
+        );
+        if ($this->ReadAttributeString('BirthdayMetadata') !== '[]') {
+            $this->WriteAttributeString('BirthdayMetadata', '[]');
+        }
+    }
+
+    /**
+     * @param array<string, mixed> $event
+     * @return list<string>
+     */
+    private function anniversaryEventKeys(array $event): array
+    {
+        $keys = [];
+        $seriesId = trim((string) ($event['seriesId'] ?? ''));
+        $eventReference = trim((string) ($event['eventReference'] ?? ''));
+        if ($seriesId !== '') {
+            $keys[] = 'id:' . $seriesId;
+        } elseif ($eventReference !== '') {
+            $keys[] = 'id:' . $eventReference;
+        }
+
+        $uid = trim((string) ($event['uid'] ?? ''));
+        if ($uid !== '') {
+            $keys[] = 'uid:' . $uid;
+        }
+        $resourceUrl = trim((string) ($event['resourceUrl'] ?? ''));
+        if ($resourceUrl !== '') {
+            $keys[] = 'resource:' . $resourceUrl;
+        }
+
+        return array_values(array_unique($keys));
+    }
+
+    /**
+     * @param array<string, mixed> $event
+     * @param list<array{keys: list<string>, type: string, date: string, summary: string}> $metadata
+     */
+    private function anniversaryMetadataIndex(array $event, array $metadata): ?int
+    {
+        $keys = $this->anniversaryEventKeys($event);
+        if ($keys === []) {
+            return null;
+        }
+        foreach ($metadata as $index => $entry) {
+            if (array_intersect($keys, $entry['keys']) !== []) {
+                return $index;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @param array<string, mixed> $event
+     * @return array{keys: list<string>, type: string, date: string, summary: string}|null
+     */
+    private function anniversaryMetadataForEvent(array $event): ?array
+    {
+        $metadata = $this->readAnniversaryMetadata();
+        $index = $this->anniversaryMetadataIndex($event, $metadata);
+        return $index === null ? null : $metadata[$index];
+    }
+
+    /**
+     * @param array<string, mixed> $event
+     * @param array<string, mixed> $sourceEvent
+     */
+    private function upsertAnniversaryMetadata(
+        array $event,
+        string $type,
+        string $date,
+        string $summary,
+        array $sourceEvent = []
+    ): void {
+        $type = $this->normalizeAnniversaryType($type);
+        $date = $this->normalizeAnniversaryDate($date);
+        if ($type === '' || $date === '') {
+            throw new InvalidArgumentException('The annual-event metadata is invalid.');
+        }
+        $metadata = $this->readAnniversaryMetadata();
+        $index = $sourceEvent !== [] ? $this->anniversaryMetadataIndex($sourceEvent, $metadata) : null;
+        if ($index === null) {
+            $index = $this->anniversaryMetadataIndex($event, $metadata);
+        }
+        $keys = $this->anniversaryEventKeys($event);
+        if ($sourceEvent !== []) {
+            $keys = array_merge($keys, $this->anniversaryEventKeys($sourceEvent));
+        }
+        if ($index === null) {
+            if ($keys === []) {
+                throw new InvalidArgumentException('The annual-event identity is incomplete.');
+            }
+            $metadata[] = [
+                'keys'    => array_values(array_unique($keys)),
+                'type'    => $type,
+                'date'    => $date,
+                'summary' => trim($summary)
+            ];
+        } else {
+            $metadata[$index]['keys'] = array_values(array_unique(array_merge($metadata[$index]['keys'], $keys)));
+            $metadata[$index]['type'] = $type;
+            $metadata[$index]['date'] = $date;
+            if (trim($summary) !== '') {
+                $metadata[$index]['summary'] = trim($summary);
+            }
+        }
+        $this->writeAnniversaryMetadata($metadata);
+    }
+
+    /**
+     * Removes local annual-event metadata only after the provider has explicitly
+     * confirmed that a recurring parent event no longer exists.
+     *
+     * Missing cached occurrences alone are never treated as a deletion. This is
+     * important for excluded occurrences, short synchronization windows, and
+     * leap-day annual events.
+     *
+     * @param list<array<string, mixed>> $events Current synchronized event cache.
+     * @param list<array<string, mixed>> $previousEvents Event cache before synchronization.
+     */
+    private function reconcileAnniversaryMetadataAfterSynchronization(
+        array $events,
+        array $previousEvents
+    ): void {
+        $metadata = $this->readAnniversaryMetadata();
+        if ($metadata === []) {
+            return;
+        }
+
+        $dailyVerification = $this->shouldVerifyMissingAnniversaryMetadataToday();
+        $retained = [];
+        $removed = 0;
+        foreach ($metadata as $entry) {
+            if ($this->anniversaryMetadataMatchesEvents($entry, $events)) {
+                $retained[] = $entry;
+                continue;
+            }
+
+            $wasCached = $this->anniversaryMetadataMatchesEvents($entry, $previousEvents);
+            if (!$wasCached && !$dailyVerification) {
+                $retained[] = $entry;
+                continue;
+            }
+
+            $candidates = $this->anniversaryVerificationCandidates($entry);
+            if ($candidates === [] || $this->verifyAnniversarySeriesCandidates($candidates) !== false) {
+                $retained[] = $entry;
+                continue;
+            }
+
+            ++$removed;
+        }
+
+        if ($removed === 0) {
+            return;
+        }
+
+        $this->writeAnniversaryMetadata($retained);
+        $this->SendSafeDebug('AnniversaryMetadataCleanup', [
+            'removed'   => $removed,
+            'remaining' => count($retained)
+        ]);
+    }
+
+    /**
+     * @param array{keys: list<string>, type: string, date: string, summary: string} $metadata
+     * @param list<array<string, mixed>> $events
+     */
+    private function anniversaryMetadataMatchesEvents(array $metadata, array $events): bool
+    {
+        foreach ($events as $event) {
+            if (!is_array($event)) {
+                continue;
+            }
+            if (array_intersect($metadata['keys'], $this->anniversaryEventKeys($event)) !== []) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @param array{keys: list<string>, type: string, date: string, summary: string} $metadata
+     * @return list<array{seriesId: string, resourceUrl: string}>
+     */
+    private function anniversaryVerificationCandidates(array $metadata): array
+    {
+        $seriesIds = [];
+        $resourceUrls = [];
+        foreach ($metadata['keys'] as $key) {
+            if (str_starts_with($key, 'id:')) {
+                $seriesId = trim(substr($key, 3));
+                if ($seriesId !== '') {
+                    $seriesIds[] = $seriesId;
+                }
+            } elseif (str_starts_with($key, 'resource:')) {
+                $resourceUrl = trim(substr($key, 9));
+                if ($resourceUrl !== '') {
+                    $resourceUrls[] = $resourceUrl;
+                }
+            }
+        }
+
+        $seriesIds = array_values(array_unique($seriesIds));
+        $resourceUrls = array_values(array_unique($resourceUrls));
+        if ($seriesIds === []) {
+            return [];
+        }
+        if ($resourceUrls === []) {
+            $resourceUrls = [''];
+        }
+
+        $candidates = [];
+        foreach ($seriesIds as $seriesId) {
+            foreach ($resourceUrls as $resourceUrl) {
+                $candidates[] = [
+                    'seriesId'    => $seriesId,
+                    'resourceUrl' => $resourceUrl
+                ];
+                if (count($candidates) >= 16) {
+                    return $candidates;
+                }
+            }
+        }
+
+        return $candidates;
+    }
+
+    /**
+     * @param list<array{seriesId: string, resourceUrl: string}> $candidates
+     * @return bool|null True when a parent exists, false when every candidate is confirmed missing, null when unknown.
+     */
+    private function verifyAnniversarySeriesCandidates(array $candidates): ?bool
+    {
+        $confirmedMissing = false;
+        $unknown = false;
+        foreach ($candidates as $candidate) {
+            try {
+                $verification = $this->sendRequest('CheckRecurringSeries', [
+                    'SeriesID'    => $candidate['seriesId'],
+                    'ResourceURL' => $candidate['resourceUrl']
+                ]);
+            } catch (Throwable $exception) {
+                $this->SendSafeDebugException('AnniversaryMetadataVerificationError', $exception);
+                $unknown = true;
+                continue;
+            }
+
+            if (($verification['supported'] ?? false) !== true) {
+                $unknown = true;
+                continue;
+            }
+            if (($verification['exists'] ?? null) === true) {
+                return true;
+            }
+            if (($verification['exists'] ?? null) !== false) {
+                $unknown = true;
+                continue;
+            }
+            $confirmedMissing = true;
+        }
+
+        return !$unknown && $confirmedMissing ? false : null;
+    }
+
+    private function shouldVerifyMissingAnniversaryMetadataToday(): bool
+    {
+        $lastSynchronization = $this->ReadAttributeInteger('LastSynchronization');
+        if ($lastSynchronization <= 0) {
+            return true;
+        }
+
+        $timezone = new DateTimeZone(date_default_timezone_get());
+        $lastDate = (new DateTimeImmutable('@' . $lastSynchronization))
+            ->setTimezone($timezone)
+            ->format('Y-m-d');
+
+        return $lastDate !== (new DateTimeImmutable('now', $timezone))->format('Y-m-d');
+    }
+
+    /** @param array<string, mixed> $event */
+    private function removeAnniversaryMetadata(array $event): void
+    {
+        $metadata = $this->readAnniversaryMetadata();
+        $index = $this->anniversaryMetadataIndex($event, $metadata);
+        if ($index === null) {
+            return;
+        }
+        unset($metadata[$index]);
+        $this->writeAnniversaryMetadata(array_values($metadata));
+    }
+
+    /**
+     * @param array<string, mixed> $event
+     * @return array{enabled: bool, type: string, date: string}|null
+     */
+    private function anniversaryInput(array $event): ?array
+    {
+        if (array_key_exists('anniversaryType', $event) || array_key_exists('anniversaryDate', $event)) {
+            $type = $this->normalizeAnniversaryType((string) ($event['anniversaryType'] ?? ''), true);
+            if ($type === '') {
+                return ['enabled' => false, 'type' => '', 'date' => ''];
+            }
+            $date = $this->normalizeAnniversaryDate((string) ($event['anniversaryDate'] ?? ''));
+            if ($date === '' || $date > date('Y-m-d')) {
+                throw new InvalidArgumentException('The annual-event date is invalid.');
+            }
+
+            return ['enabled' => true, 'type' => $type, 'date' => $date];
+        }
+
+        if (!array_key_exists('birthday', $event)) {
+            return null;
+        }
+        if (!is_bool($event['birthday'])) {
+            throw new InvalidArgumentException('The birthday flag must be boolean.');
+        }
+        if (!$event['birthday']) {
+            return ['enabled' => false, 'type' => '', 'date' => ''];
+        }
+        $date = $this->normalizeAnniversaryDate((string) ($event['birthDate'] ?? ''));
+        if ($date === '' || $date > date('Y-m-d')) {
+            throw new InvalidArgumentException('The birth date is invalid.');
+        }
+
+        return ['enabled' => true, 'type' => self::ANNIVERSARY_TYPE_BIRTHDAY, 'date' => $date];
+    }
+
+    /** @param array<string, mixed> $event */
+    private function assertAnniversaryRecurrence(array $event): void
+    {
+        $recurrence = $event['recurrence'] ?? null;
+        if (!is_array($recurrence)
+            || strtoupper(trim((string) ($recurrence['frequency'] ?? ''))) !== 'YEARLY'
+            || max(1, (int) ($recurrence['interval'] ?? 1)) !== 1
+            || !(bool) ($event['allDay'] ?? false)) {
+            throw new InvalidArgumentException('Annual events must be all-day yearly recurring events.');
+        }
+    }
+
+    /** @param array<string, mixed> $event */
+    private function applyAnniversaryEventDefaults(array &$event, string $date): void
+    {
+        $date = $this->normalizeAnniversaryDate($date);
+        if ($date === '') {
+            throw new InvalidArgumentException('The annual-event date is invalid.');
+        }
+        $start = new DateTimeImmutable($date . ' 00:00:00');
+        $event['allDay'] = true;
+        $event['start'] = $date;
+        $event['end'] = $start->modify('+1 day')->format('Y-m-d');
+        $event['recurrence'] = [
+            'frequency' => 'YEARLY',
+            'interval'  => 1,
+            'endMode'   => 'never'
+        ];
+    }
+
+    private function normalizeAnniversaryType(string $type, bool $allowEmpty = false): string
+    {
+        $type = strtolower(trim($type));
+        if ($type === '' && $allowEmpty) {
+            return '';
+        }
+        if (!in_array($type, self::ANNIVERSARY_TYPES, true)) {
+            if ($allowEmpty) {
+                throw new InvalidArgumentException('The annual-event type is invalid.');
+            }
+            return '';
+        }
+
+        return $type;
+    }
+
+    private function normalizeAnniversaryDate(string $date): string
+    {
+        $date = trim($date);
+        if (preg_match('/^\d{4}-\d{2}-\d{2}$/D', $date) !== 1) {
+            return '';
+        }
+        $parsed = DateTimeImmutable::createFromFormat('!Y-m-d', $date);
+        if ($parsed === false || $parsed->format('Y-m-d') !== $date) {
+            return '';
+        }
+
+        return $date;
+    }
+
+    private function nextAnniversaryDate(string $date, DateTimeImmutable $today): DateTimeImmutable
+    {
+        $month = (int) substr($date, 5, 2);
+        $day = (int) substr($date, 8, 2);
+        $year = (int) $today->format('Y');
+        for ($offset = 0; $offset <= 8; ++$offset) {
+            $candidateText = sprintf('%04d-%02d-%02d', $year + $offset, $month, $day);
+            $candidate = DateTimeImmutable::createFromFormat('!Y-m-d', $candidateText, $today->getTimezone());
+            if ($candidate === false || $candidate->format('Y-m-d') !== $candidateText) {
+                continue;
+            }
+            if ($candidate >= $today) {
+                return $candidate;
+            }
+        }
+
+        throw new RuntimeException('The next annual-event date could not be calculated.');
+    }
+
+    /** @param array<string, mixed> $event */
+    private function enrichAnniversaryEvent(array $event): array
+    {
+        $metadata = $this->anniversaryMetadataForEvent($event);
+        if ($metadata === null) {
+            return $event;
+        }
+
+        return $this->applyAnniversaryPresentation($event, $metadata);
+    }
+
+    /**
+     * @param list<array<string, mixed>> $events
+     * @return list<array<string, mixed>>
+     */
+    private function enrichAnniversaryEvents(array $events): array
+    {
+        $metadata = $this->readAnniversaryMetadata();
+        if ($metadata === []) {
+            return $events;
+        }
+        $changed = false;
+        foreach ($events as &$event) {
+            if (!is_array($event)) {
+                continue;
+            }
+            $index = $this->anniversaryMetadataIndex($event, $metadata);
+            if ($index === null) {
+                continue;
+            }
+            $event = $this->applyAnniversaryPresentation($event, $metadata[$index]);
+            $summary = trim((string) ($event['summary'] ?? ''));
+            if ($summary !== '' && $summary !== $metadata[$index]['summary']) {
+                $metadata[$index]['summary'] = $summary;
+                $changed = true;
+            }
+        }
+        unset($event);
+        if ($changed) {
+            $this->writeAnniversaryMetadata($metadata);
+        }
+
+        return $events;
+    }
+
+    /**
+     * @param array<string, mixed> $event
+     * @param array{keys: list<string>, type: string, date: string, summary: string} $metadata
+     * @return array<string, mixed>
+     */
+    private function applyAnniversaryPresentation(array $event, array $metadata): array
+    {
+        $date = $metadata['date'];
+        $startYear = (int) substr($date, 0, 4);
+        $occurrenceDate = trim((string) ($event['originalStart'] ?? $event['start'] ?? ''));
+        $occurrenceYear = preg_match('/^\d{4}/', $occurrenceDate, $matches) === 1
+            ? (int) $matches[0]
+            : (int) date('Y');
+        $years = max(0, $occurrenceYear - $startYear);
+        $summary = trim((string) ($event['summary'] ?? $metadata['summary']));
+
+        $event['anniversaryType'] = $metadata['type'];
+        $event['anniversaryDate'] = $date;
+        $event['years'] = $years;
+        $event['displaySummary'] = $summary !== '' ? sprintf('%s (%dJ)', $summary, $years) : sprintf('(%dJ)', $years);
+        unset($event['birthday'], $event['birthDate'], $event['age']);
+        if ($metadata['type'] === self::ANNIVERSARY_TYPE_BIRTHDAY) {
+            $event['birthday'] = true;
+            $event['birthDate'] = $date;
+            $event['age'] = $years;
+        }
+
+        return $event;
+    }
+
+    /**
+     * Resolves recurrence capabilities from the synchronized event cache whenever possible.
+     *
+     * @param array<string, mixed> $event
+     * @return array<string, mixed>
+     */
+    private function resolveWriteRecurrence(array $event, bool $updating): array
+    {
+        $resourceUrl = trim((string) ($event['resourceUrl'] ?? ''));
+        $identity = CalendarEventRecurrence::fromEvent($event);
+        $writeScope = (string) ($identity['writeScope'] ?? '');
+
+        // A synchronized CalDAV cache contains expanded occurrences, not the recurring
+        // master. All occurrences of one series share the same resource URL. Therefore
+        // a resource-URL cache match must never be used to validate a whole-series
+        // write: it would turn the verified master back into an occurrence. Verify the
+        // master directly with the provider before considering cached occurrence data.
+        if ($writeScope === CalendarEventRecurrence::WRITE_SCOPE_SERIES) {
+            $seriesId = trim((string) ($identity['seriesId'] ?? ''));
+            $capabilityAvailable = $updating
+                ? $this->ReadAttributeBoolean('DetectedCanUpdateSeries')
+                : $this->ReadAttributeBoolean('DetectedCanDeleteSeries');
+            if ($seriesId === '' || !$capabilityAvailable) {
+                throw new InvalidArgumentException('The recurring series cannot be modified by this calendar.');
+            }
+
+            $verifiedSeries = $this->sendRequest(
+                'GetRecurringSeries',
+                [
+                    'SeriesID'    => $seriesId,
+                    'ResourceURL' => $resourceUrl
+                ]
+            );
+            $verifiedIdentity = CalendarEventRecurrence::fromEvent($verifiedSeries);
+            $capability = $updating ? 'canUpdateSeries' : 'canDeleteSeries';
+            if (($verifiedIdentity['recurrenceType'] ?? '') !== CalendarEventRecurrence::MASTER
+                || !hash_equals($seriesId, (string) ($verifiedIdentity['seriesId'] ?? ''))
+                || !(bool) ($verifiedIdentity[$capability] ?? false)) {
+                throw new InvalidArgumentException('The recurring series could not be verified for this calendar.');
+            }
+
+            $verifiedIdentity['writeScope'] = CalendarEventRecurrence::WRITE_SCOPE_SERIES;
+            return CalendarEventRecurrence::fromEvent($verifiedIdentity);
+        }
+
+        $occurrenceId = trim((string) ($event['occurrenceId'] ?? ''));
+        foreach ($this->readEvents() as $cachedEvent) {
+            $cachedResourceUrl = trim((string) ($cachedEvent['resourceUrl'] ?? ''));
+            $cachedOccurrenceId = trim((string) ($cachedEvent['occurrenceId'] ?? ''));
+            $matchesOccurrence = $occurrenceId !== ''
+                && $cachedOccurrenceId !== ''
+                && hash_equals($cachedOccurrenceId, $occurrenceId);
+            $matchesResource = $occurrenceId === ''
+                && $resourceUrl !== ''
+                && hash_equals($cachedResourceUrl, $resourceUrl);
+            if ($matchesOccurrence || $matchesResource) {
+                $cachedEvent['writeScope'] = (string) ($event['writeScope'] ?? '');
+                if (trim((string) ($cachedEvent['originalStart'] ?? '')) === ''
+                    && trim((string) ($event['originalStart'] ?? '')) !== ''
+                    && ($cachedEvent['recurrenceType'] ?? '') === CalendarEventRecurrence::OCCURRENCE) {
+                    $cachedEvent['originalStart'] = trim((string) $event['originalStart']);
+                }
+                if ((bool) ($cachedEvent['recurring'] ?? false)
+                    && trim((string) ($cachedEvent['occurrenceId'] ?? '')) !== ''
+                    && trim((string) ($cachedEvent['seriesId'] ?? '')) !== '') {
+                    if ($this->ReadAttributeBoolean('DetectedCanUpdateOccurrence')) {
+                        $cachedEvent['canUpdateOccurrence'] = true;
+                    }
+                    if ($this->ReadAttributeBoolean('DetectedCanDeleteOccurrence')) {
+                        $cachedEvent['canDeleteOccurrence'] = true;
+                    }
+                }
+                if ($this->ReadAttributeBoolean('DetectedCanUpdateFollowing')
+                    && (bool) ($cachedEvent['recurring'] ?? false)
+                    && trim((string) ($cachedEvent['occurrenceId'] ?? '')) !== ''
+                    && trim((string) ($cachedEvent['seriesId'] ?? '')) !== '') {
+                    $cachedEvent['canUpdateFollowing'] = true;
+                }
+                if ($this->ReadAttributeBoolean('DetectedCanUpdateSeries')
+                    && (bool) ($cachedEvent['recurring'] ?? false)
+                    && trim((string) ($cachedEvent['seriesId'] ?? '')) !== '') {
+                    $cachedEvent['canUpdateSeries'] = true;
+                }
+                if ($this->ReadAttributeBoolean('DetectedCanDeleteSeries')
+                    && (bool) ($cachedEvent['recurring'] ?? false)
+                    && trim((string) ($cachedEvent['seriesId'] ?? '')) !== '') {
+                    $cachedEvent['canDeleteOccurrence'] = true;
+                    $cachedEvent['canDeleteSeries'] = true;
+                }
+                return CalendarEventRecurrence::fromEvent($cachedEvent);
+            }
+        }
+
+        if ($writeScope === CalendarEventRecurrence::WRITE_SCOPE_OCCURRENCE
+            && CalendarEventRecurrence::isOccurrence($identity)) {
+            if ($this->ReadAttributeBoolean('DetectedCanUpdateOccurrence')) {
+                $identity['canUpdateOccurrence'] = true;
+            }
+            if ($this->ReadAttributeBoolean('DetectedCanDeleteOccurrence')) {
+                $identity['canDeleteOccurrence'] = true;
+            }
+            return CalendarEventRecurrence::fromEvent($identity);
+        }
+        if ($writeScope === CalendarEventRecurrence::WRITE_SCOPE_FOLLOWING) {
+            if (!$this->ReadAttributeBoolean('DetectedCanUpdateFollowing')
+                || (!$updating && !$this->ReadAttributeBoolean('DetectedCanDeleteSeries'))
+                || !CalendarEventRecurrence::isOccurrence($identity)
+                || trim((string) ($identity['seriesId'] ?? '')) === ''
+                || trim((string) ($identity['occurrenceId'] ?? '')) === ''
+                || trim((string) ($identity['originalStart'] ?? '')) === '') {
+                throw new InvalidArgumentException('The recurring event cannot be split by this calendar.');
+            }
+            $identity['canUpdateFollowing'] = true;
+            if (!$updating) {
+                $identity['canDeleteSeries'] = true;
+            }
+            return CalendarEventRecurrence::fromEvent($identity);
+        }
+        return $identity;
+    }
+
     private function removeLegacyEventsVariable(): void
     {
         if ($this->VariableExists('Events')) {
@@ -797,8 +2226,189 @@ class Kalender extends IPSModuleStrict
         }
     }
 
+    /**
+     * Refreshes one non-recurring event directly from the provider and updates the local cache.
+     *
+     * @param array<string, mixed> $event Event identity and current time boundaries after the write.
+     * @param array<string, mixed> $sourceEvent Previous event identity when an existing event was updated.
+     */
+    private function refreshSingleEventAfterWrite(array $event, array $sourceEvent = []): bool
+    {
+        $startTimestamp = $this->eventBoundaryTimestamp($event, 'start');
+        $endTimestamp = $this->eventBoundaryTimestamp($event, 'end');
+        if ($startTimestamp <= 0) {
+            return false;
+        }
+        if ($endTimestamp <= $startTimestamp) {
+            $endTimestamp = $startTimestamp + 1;
+        }
+
+        $currentEvent = null;
+        $eventReference = trim((string) ($event['eventReference'] ?? ''));
+        if ($eventReference !== '') {
+            try {
+                $currentEvent = $this->sendRequest(
+                    'GetEventAfterWrite',
+                    ['EventReference' => $eventReference]
+                );
+            } catch (Throwable $exception) {
+                $this->SendSafeDebugException('EventDirectCacheRefreshFallback', $exception);
+            }
+        }
+
+        if ($currentEvent === null) {
+            try {
+                $currentEvent = $this->sendRequest(
+                    'GetEventForEdit',
+                    [
+                        'ResourceURL'    => trim((string) ($event['resourceUrl'] ?? '')),
+                        'EventReference' => $eventReference,
+                        'UID'            => trim((string) ($event['uid'] ?? '')),
+                        'OccurrenceID'   => '',
+                        'OriginalStart'  => '',
+                        'RecurrenceID'   => '',
+                        'Start'          => $startTimestamp,
+                        'End'            => $endTimestamp
+                    ]
+                );
+            } catch (Throwable $exception) {
+                $this->SendSafeDebugException('EventCacheRefreshFallback', $exception);
+                return false;
+            }
+        }
+
+        if ((bool) ($currentEvent['recurring'] ?? false)
+            || (string) ($currentEvent['recurrenceType'] ?? CalendarEventRecurrence::SINGLE)
+                !== CalendarEventRecurrence::SINGLE) {
+            return false;
+        }
+
+        $previousIdentity = $sourceEvent !== [] ? $sourceEvent : $event;
+        $events = array_values(array_filter(
+            $this->readEvents(),
+            fn (array $cachedEvent): bool => !$this->eventIdentityMatches($cachedEvent, $previousIdentity)
+                && !$this->eventIdentityMatches($cachedEvent, $currentEvent)
+        ));
+        if ($this->eventOverlapsConfiguredRange($currentEvent)) {
+            $events[] = $currentEvent;
+        }
+        $this->storeEventsAfterWrite($events);
+
+        return true;
+    }
+
+    /** @param array<string, mixed> $identity */
+    private function cachedEventForIdentity(array $identity): ?array
+    {
+        foreach ($this->readEvents() as $event) {
+            if ($this->eventIdentityMatches($event, $identity)) {
+                return $event;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @param array<string, mixed> $candidate
+     * @param array<string, mixed> $identity
+     */
+    private function eventIdentityMatches(array $candidate, array $identity): bool
+    {
+        foreach (['resourceUrl', 'eventReference', 'uid'] as $key) {
+            $expected = trim((string) ($identity[$key] ?? ''));
+            $actual = trim((string) ($candidate[$key] ?? ''));
+            if ($expected !== '' && $actual !== '' && hash_equals($expected, $actual)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /** @param array<string, mixed> $event */
+    private function removeSingleEventFromCache(array $event): bool
+    {
+        $events = $this->readEvents();
+        $filtered = array_values(array_filter(
+            $events,
+            fn (array $cachedEvent): bool => !$this->eventIdentityMatches($cachedEvent, $event)
+        ));
+        if (count($filtered) === count($events)) {
+            return false;
+        }
+
+        $this->storeEventsAfterWrite($filtered);
+        return true;
+    }
+
+    /** @param array<string, mixed> $event */
+    private function eventBoundaryTimestamp(array $event, string $key): int
+    {
+        $value = trim((string) ($event[$key] ?? ''));
+        if ($value !== '') {
+            try {
+                if (preg_match('/^\d{4}-\d{2}-\d{2}$/D', $value) === 1) {
+                    $date = DateTimeImmutable::createFromFormat('!Y-m-d', $value);
+                    if ($date !== false && $date->format('Y-m-d') === $value) {
+                        return $date->getTimestamp();
+                    }
+                }
+
+                return (new DateTimeImmutable($value))->getTimestamp();
+            } catch (Throwable) {
+                return 0;
+            }
+        }
+
+        return max(0, (int) ($event[$key . 'Timestamp'] ?? 0));
+    }
+
+    /** @param array<string, mixed> $event */
+    private function eventOverlapsConfiguredRange(array $event): bool
+    {
+        $startTimestamp = $this->eventBoundaryTimestamp($event, 'start');
+        if ($startTimestamp <= 0) {
+            return false;
+        }
+        $endTimestamp = $this->eventBoundaryTimestamp($event, 'end');
+        if ($endTimestamp <= $startTimestamp) {
+            $endTimestamp = $startTimestamp + 1;
+        }
+
+        $pastDays = max(0, min(1095, $this->ReadPropertyInteger('PastDays')));
+        $futureDays = max(1, min(1095, $this->ReadPropertyInteger('FutureDays')));
+        $today = new DateTimeImmutable('today');
+        $rangeStart = $today->modify('-' . $pastDays . ' days')->getTimestamp();
+        $rangeEnd = $today->modify('+' . ($futureDays + 1) . ' days')->getTimestamp();
+
+        return $endTimestamp >= $rangeStart && $startTimestamp < $rangeEnd;
+    }
+
+    /** @param list<array<string, mixed>> $events */
+    private function storeEventsAfterWrite(array $events): void
+    {
+        $events = $this->enrichAnniversaryEvents($events);
+        usort(
+            $events,
+            static fn (array $left, array $right): int => ((int) ($left['startTimestamp'] ?? 0)
+                <=> (int) ($right['startTimestamp'] ?? 0))
+                ?: strcasecmp((string) ($left['summary'] ?? ''), (string) ($right['summary'] ?? ''))
+        );
+        $this->WritePersistentJsonCache('CachedEvents', $events);
+        $this->updateEventCounters($events);
+        $this->WriteAttributeString('LastError', '');
+        $this->SetStatus($this->ReadPropertyBoolean('Active') ? IS_ACTIVE : IS_INACTIVE);
+
+        // Notify Calendar View instances without changing the true synchronization timestamp.
+        $this->SetValue('LastSynchronization', $this->ReadAttributeInteger('LastSynchronization'));
+    }
+
     private function refreshAfterWrite(): void
     {
+        // Preserve the existing incremental synchronization state after a successful write.
+        // Creating a fresh delta baseline immediately after a provider write can miss an event
+        // that is not yet visible in the provider's calendar view and permanently advance past it.
         $events = $this->requestEvents();
         $this->storeEvents($events);
         $this->WriteAttributeString('LastError', '');
@@ -851,7 +2461,11 @@ class Kalender extends IPSModuleStrict
             ? $this->Translate('Invalid JSON data.')
             : $this->translateErrorMessage($rawMessage);
         $this->WriteAttributeString('LastError', $message);
-        $this->SendDebug('CalendarError', $rawMessage, 0);
+        $this->SendSafeDebug('CalendarError', [
+            'type'    => $exception::class,
+            'message' => $rawMessage,
+            'code'    => $exception->getCode()
+        ]);
 
         return $message;
     }

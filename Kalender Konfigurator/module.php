@@ -10,7 +10,7 @@ require_once __DIR__ . '/../libs/helper/DataFlowHelper.php';
 require_once __DIR__ . '/../libs/helper/ParentConnectionHelper.php';
 require_once __DIR__ . '/../libs/helper/ConfigurationFormHelper.php';
 
-class KalenderKonfigurator extends IPSModuleStrict
+class CalendarConfigurator extends IPSModuleStrict
 {
     use DataFlowHelper;
     use ParentConnectionHelper;

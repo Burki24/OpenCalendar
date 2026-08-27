@@ -47,6 +47,7 @@ interface CalendarProviderInterface
      * @param string               $etag              Current entity tag used for optimistic concurrency.
      * @param string               $uid               Calendar event UID.
      * @param array<string, mixed> $event             Normalized event changes.
+     * @param array<string, mixed> $recurrence        Normalized recurrence identity.
      * @return array<string, mixed> Normalized updated event data.
      */
     public function updateEvent(
@@ -54,7 +55,8 @@ interface CalendarProviderInterface
         string $eventReference,
         string $etag,
         string $uid,
-        array $event
+        array $event,
+        array $recurrence = []
     ): array;
 
     /**
@@ -64,12 +66,14 @@ interface CalendarProviderInterface
      * @param string $eventReference    Provider-specific event identifier or resource URL.
      * @param string $etag              Current entity tag used for optimistic concurrency.
      * @param string $recurrenceId      Optional recurrence instance identifier.
+     * @param array<string, mixed> $recurrence Normalized recurrence identity.
      * @return bool True when the event was deleted successfully.
      */
     public function deleteEvent(
         string $calendarReference,
         string $eventReference,
         string $etag,
-        string $recurrenceId = ''
+        string $recurrenceId = '',
+        array $recurrence = []
     ): bool;
 }

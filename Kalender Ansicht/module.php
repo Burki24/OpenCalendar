@@ -9,8 +9,10 @@ use Burki24\SymconModuleHelper\VariableHelper;
 use Burki24\SymconModuleHelper\VisualizationAssetHelper;
 use Burki24\SymconModuleHelper\VisualizationThemeHelper;
 use IPSKalender\CalendarAppointmentRange;
+use IPSKalender\CalendarEventReminder;
 
 require_once __DIR__ . '/../libs/CalendarAppointmentRange.php';
+require_once __DIR__ . '/../libs/CalendarEventReminder.php';
 require_once __DIR__ . '/../libs/helper/ConfigurationFormHelper.php';
 require_once __DIR__ . '/../libs/helper/IPSViewHTMLPageHelper.php';
 require_once __DIR__ . '/../libs/helper/IPSViewStyleHelper.php';
@@ -18,7 +20,7 @@ require_once __DIR__ . '/../libs/helper/VariableHelper.php';
 require_once __DIR__ . '/../libs/helper/VisualizationAssetHelper.php';
 require_once __DIR__ . '/../libs/helper/VisualizationThemeHelper.php';
 
-class KalenderAnsicht extends IPSModuleStrict
+class CalendarView extends IPSModuleStrict
 {
     use ConfigurationFormHelper;
     use IPSViewHTMLPageHelper;
@@ -28,8 +30,12 @@ class KalenderAnsicht extends IPSModuleStrict
     use VisualizationThemeHelper;
 
     private const CALENDAR_MODULE_ID = '{227B63E4-4223-316B-76E9-FD3849689562}';
+    private const CALENDAR_ACCOUNT_MODULE_ID = '{966D6119-7FF3-5CA5-06C3-536FBF8100C4}';
     private const INITIALIZATION_DELAY_MS = 5_000;
     private const APPOINTMENT_LOOKAHEAD_DAYS = 1095;
+    private const VISUALIZATION_BOOTSTRAP_PAST_DAYS = 7;
+    private const VISUALIZATION_BOOTSTRAP_FUTURE_DAYS = 42;
+    private const VISUALIZATION_MAX_RANGE_DAYS = 370;
     private const ATTRIBUTE_IPSVIEW_TOKEN_1 = 'IPSViewToken1';
     private const ATTRIBUTE_IPSVIEW_TOKEN_2 = 'IPSViewToken2';
     private const ATTRIBUTE_IPSVIEW_TOKEN_3 = 'IPSViewToken3';
@@ -127,10 +133,12 @@ class KalenderAnsicht extends IPSModuleStrict
         $this->RegisterPropertyBoolean('ShowListEnd', true);
         $this->RegisterPropertyBoolean('ShowListTitle', true);
         $this->RegisterPropertyBoolean('ShowListCalendarName', true);
+        $this->RegisterPropertyBoolean('ShowListAnniversaryType', true);
         $this->RegisterPropertyBoolean('ShowListLocation', false);
         $this->RegisterPropertyBoolean('ShowListDescription', false);
         $this->RegisterPropertyBoolean('ShowListControls', true);
         $this->RegisterPropertyBoolean('ShowCalendarName', true);
+        $this->RegisterPropertyBoolean('ShowAnniversaryType', true);
         $this->RegisterPropertyBoolean('ShowLocation', true);
         $this->RegisterPropertyBoolean('ShowDescription', false);
         $this->RegisterIPSViewHTMLPageProperties();
@@ -368,7 +376,7 @@ class KalenderAnsicht extends IPSModuleStrict
             $this->SetStatus(self::STATUS_INVALID_CONFIGURATION);
         }
 
-        $this->broadcastState();
+        $this->broadcastState(null, true);
 
         return true;
     }
@@ -386,7 +394,7 @@ class KalenderAnsicht extends IPSModuleStrict
         }
         if ($this->IsIPSViewStyleMediaUpdate($SenderID, $Message)) {
             if ($this->isRuntimeReady()) {
-                $this->broadcastState();
+                $this->broadcastState(null, true);
             }
 
             return;
@@ -395,7 +403,7 @@ class KalenderAnsicht extends IPSModuleStrict
             return;
         }
 
-        $this->broadcastState();
+        $this->broadcastStateInvalidation();
     }
 
     /**
@@ -450,13 +458,13 @@ class KalenderAnsicht extends IPSModuleStrict
 
                 default:
                     $result = $this->executeVisualizationAction($Ident, $Value);
-                    $this->UpdateVisualizationValue($this->getFullUpdateMessage(
-                        $result['state'],
-                        [
+                    $toast = $result['message'] !== ''
+                        ? [
                             'level'   => $result['level'],
                             'message' => $result['message']
                         ]
-                    ));
+                        : null;
+                    $this->UpdateVisualizationValue($this->getFullUpdateMessage($result['state'], $toast));
                     break;
             }
         } catch (Throwable $exception) {
@@ -473,7 +481,7 @@ class KalenderAnsicht extends IPSModuleStrict
     public function SynchronizeCalendars(): bool
     {
         $success = $this->synchronizeSelectedCalendars();
-        $this->broadcastState();
+        $this->broadcastStateInvalidation();
 
         return $success;
     }
@@ -541,6 +549,90 @@ class KalenderAnsicht extends IPSModuleStrict
     }
 
     /**
+     * Returns annual events from the calendars selected in this Calendar View.
+     *
+     * Calendar instance ID zero includes every selected calendar. A positive day
+     * window only returns entries whose next occurrence is within that many days;
+     * zero returns every annual event stored by OpenCalendar. The optional type
+     * filter accepts birthday, anniversary, wedding, or death.
+     *
+     * @param int $CalendarInstanceID Optional selected calendar instance ID. Zero includes all selected calendars.
+     * @param int $Days Optional look-ahead window in days. Zero returns all annual events.
+     * @param string $Type Optional annual-event type. Empty returns every supported type.
+     * @return string JSON-encoded annual-event list sorted by the next occurrence.
+     */
+    public function GetAnniversaryList(int $CalendarInstanceID = 0, int $Days = 0, string $Type = ''): string
+    {
+        if ($Days < 0) {
+            throw new InvalidArgumentException('Annual-event look-ahead days must not be negative.');
+        }
+        $type = strtolower(trim($Type));
+        if ($type !== '' && !in_array($type, ['birthday', 'anniversary', 'wedding', 'death'], true)) {
+            throw new InvalidArgumentException('The annual-event type is invalid.');
+        }
+
+        $entries = [];
+        foreach ($this->loadSelectedCalendars() as $calendar) {
+            if ($CalendarInstanceID !== 0 && $calendar['instanceId'] !== $CalendarInstanceID) {
+                continue;
+            }
+            try {
+                $calendarEntries = json_decode(
+                    IPSKAL_GetAnniversaryList($calendar['instanceId'], $Days, $type),
+                    true,
+                    512,
+                    JSON_THROW_ON_ERROR
+                );
+            } catch (Throwable $exception) {
+                $this->SendDebug('AnniversaryList', $exception->getMessage(), 0);
+                continue;
+            }
+            if (!is_array($calendarEntries) || !array_is_list($calendarEntries)) {
+                continue;
+            }
+            foreach ($calendarEntries as $entry) {
+                if (!is_array($entry)) {
+                    continue;
+                }
+                $entry['calendarInstanceId'] = $calendar['instanceId'];
+                $entry['calendarName'] = $calendar['name'];
+                $entry['calendarColor'] = $calendar['color'];
+                $entries[] = $entry;
+            }
+        }
+
+        usort(
+            $entries,
+            static fn (array $left, array $right): int => ((int) ($left['daysUntil'] ?? PHP_INT_MAX)
+                <=> (int) ($right['daysUntil'] ?? PHP_INT_MAX))
+                ?: strcasecmp((string) ($left['name'] ?? ''), (string) ($right['name'] ?? ''))
+                ?: strcasecmp((string) ($left['calendarName'] ?? ''), (string) ($right['calendarName'] ?? ''))
+        );
+
+        return json_encode(
+            $entries,
+            JSON_UNESCAPED_SLASHES
+                | JSON_UNESCAPED_UNICODE
+                | JSON_PRESERVE_ZERO_FRACTION
+                | JSON_THROW_ON_ERROR
+        );
+    }
+
+    /**
+     * Returns birthdays from the calendars selected in this Calendar View.
+     *
+     * This compatibility function delegates to GetAnniversaryList() with the birthday filter.
+     *
+     * @param int $CalendarInstanceID Optional selected calendar instance ID. Zero includes all selected calendars.
+     * @param int $Days Optional look-ahead window in days. Zero returns all birthdays.
+     * @return string JSON-encoded birthday list sorted by the next birthday.
+     */
+    public function GetBirthdayList(int $CalendarInstanceID = 0, int $Days = 0): string
+    {
+        return $this->GetAnniversaryList($CalendarInstanceID, $Days, 'birthday');
+    }
+
+    /**
      * Returns appointments from all selected calendars that overlap an inclusive local date range.
      *
      * This API deliberately ignores the visualization properties PastDays, FutureDays and
@@ -565,9 +657,9 @@ class KalenderAnsicht extends IPSModuleStrict
     /**
      * Returns a compact appointment list for one local calendar day.
      *
-     * Each result contains only summary, start, end, startTime and endTime.
-     * Start and end are local YYYY-MM-DD dates. Timed appointments use local
-     * HH:MM values while all-day appointments use the localized "All day"
+     * Each result contains summary, start, end, startTime, endTime, hasReminder
+     * and calendarName. Start and end are local YYYY-MM-DD dates. Timed appointments
+     * use local HH:MM values while all-day appointments use the localized "All day"
      * label as startTime, an empty endTime and an inclusive visible end date.
      *
      * @param string $Date Local date in YYYY-MM-DD format.
@@ -593,13 +685,10 @@ class KalenderAnsicht extends IPSModuleStrict
     public function GetAppointmentsCompact(string $From, string $To, int $CalendarInstanceID = 0): string
     {
         [$rangeStart, $rangeEnd] = CalendarAppointmentRange::fromInclusiveDates($From, $To);
-        $appointments = $this->collectAppointmentsForRange($rangeStart, $rangeEnd);
+        $appointments = $this->collectAppointmentsForRange($rangeStart, $rangeEnd, true);
 
-        return json_encode(
-            $this->compactAppointments($this->filterAppointmentsByCalendarInstanceId($appointments, $CalendarInstanceID)),
-            JSON_UNESCAPED_SLASHES
-                | JSON_UNESCAPED_UNICODE
-                | JSON_THROW_ON_ERROR
+        return $this->encodeCompactAppointmentList(
+            $this->filterAppointmentsByCalendarInstanceId($appointments, $CalendarInstanceID)
         );
     }
 
@@ -778,6 +867,38 @@ class KalenderAnsicht extends IPSModuleStrict
     }
 
     /**
+     * Returns a compact list of appointments starting within the next number of hours.
+     *
+     * The time-window and calendar-filter semantics are identical to GetUpcomingAppointments(),
+     * but provider metadata and technical timestamps are omitted.
+     *
+     * @param int $Hours Number of hours to look ahead, from 1 up to the maximum synchronized future range.
+     * @param int $CalendarInstanceID Optional selected calendar instance ID. Zero includes all selected calendars.
+     * @return string JSON-encoded compact appointment list.
+     */
+    public function GetUpcomingAppointmentsCompact(int $Hours, int $CalendarInstanceID = 0): string
+    {
+        $this->validateUpcomingHours($Hours);
+
+        $now = new DateTimeImmutable('now');
+        $until = $now->modify('+' . $Hours . ' hours');
+        [$rangeStart, $rangeEnd] = CalendarAppointmentRange::fromInclusiveDates(
+            $now->format('Y-m-d'),
+            $until->format('Y-m-d')
+        );
+        $appointments = $this->collectAppointmentsForRange($rangeStart, $rangeEnd, true);
+        $appointments = $this->filterAppointmentsByCalendarInstanceId($appointments, $CalendarInstanceID);
+
+        return $this->encodeCompactAppointmentList(
+            $this->filterUpcomingAppointments(
+                $appointments,
+                $now->getTimestamp(),
+                $until->getTimestamp()
+            )
+        );
+    }
+
+    /**
      * Counts appointments starting within the next number of hours.
      *
      * Appointments already in progress are intentionally excluded.
@@ -818,9 +939,7 @@ class KalenderAnsicht extends IPSModuleStrict
      */
     public function GetNextAppointments(int $Count, int $CalendarInstanceID = 0): string
     {
-        if ($Count < 1 || $Count > 1000) {
-            throw new InvalidArgumentException('Count must be between 1 and 1000.');
-        }
+        $this->validateAppointmentCount($Count);
 
         $now = new DateTimeImmutable('now');
         $today = $now->format('Y-m-d');
@@ -835,9 +954,153 @@ class KalenderAnsicht extends IPSModuleStrict
     }
 
     /**
+     * Returns a compact list of the next requested appointments that have not started yet.
+     *
+     * The count and calendar-filter semantics are identical to GetNextAppointments(),
+     * but provider metadata and technical timestamps are omitted.
+     *
+     * @param int $Count Number of future appointments to return, between 1 and 1000.
+     * @param int $CalendarInstanceID Optional selected calendar instance ID. Zero includes all selected calendars.
+     * @return string JSON-encoded compact appointment list.
+     */
+    public function GetNextAppointmentsCompact(int $Count, int $CalendarInstanceID = 0): string
+    {
+        $this->validateAppointmentCount($Count);
+
+        $now = new DateTimeImmutable('now');
+        $today = $now->format('Y-m-d');
+        $lastDay = $now->modify('+' . self::APPOINTMENT_LOOKAHEAD_DAYS . ' days')->format('Y-m-d');
+        [$rangeStart, $rangeEnd] = CalendarAppointmentRange::fromInclusiveDates($today, $lastDay);
+        $appointments = $this->collectAppointmentsForRange($rangeStart, $rangeEnd, true);
+        $appointments = $this->filterAppointmentsByCalendarInstanceId($appointments, $CalendarInstanceID);
+
+        return $this->encodeCompactAppointmentList(
+            array_slice(
+                $this->filterFutureAppointments($appointments, $now->getTimestamp()),
+                0,
+                $Count
+            )
+        );
+    }
+
+    /**
+     * Returns reminders whose effective trigger falls on one local calendar day.
+     *
+     * Only provider-neutral reminders with an exact trigger timestamp are returned.
+     * Provider defaults are resolved through the selected calendar metadata when possible.
+     *
+     * @param string $Date Local reminder date in YYYY-MM-DD format.
+     * @param int $CalendarInstanceID Optional selected calendar instance ID. Zero includes all selected calendars.
+     * @return string JSON-encoded reminder list.
+     */
+    public function GetDayReminders(string $Date, int $CalendarInstanceID = 0): string
+    {
+        return $this->GetReminders($Date, $Date, $CalendarInstanceID);
+    }
+
+    /**
+     * Returns reminders whose effective trigger falls inside an inclusive local date range.
+     *
+     * The queried range applies to the reminder trigger, not to the event start. Events may
+     * therefore start after the requested range when their reminder falls inside it.
+     * Disabled or complex reminder configurations without exact provider-neutral triggers
+     * are intentionally omitted.
+     *
+     * @param string $From First local reminder date in YYYY-MM-DD format.
+     * @param string $To Last local reminder date in YYYY-MM-DD format, inclusive.
+     * @param int $CalendarInstanceID Optional selected calendar instance ID. Zero includes all selected calendars.
+     * @return string JSON-encoded reminder list.
+     */
+    public function GetReminders(string $From, string $To, int $CalendarInstanceID = 0): string
+    {
+        [$rangeStart, $rangeEnd] = CalendarAppointmentRange::fromInclusiveDates($From, $To);
+
+        return $this->encodeReminderList($this->collectRemindersForTimestampRange(
+            $rangeStart->getTimestamp(),
+            $rangeEnd->getTimestamp() - 1,
+            $CalendarInstanceID
+        ));
+    }
+
+    /**
+     * Returns reminders becoming due within the next requested number of minutes.
+     *
+     * The current timestamp is included and the end of the requested window is inclusive.
+     *
+     * @param int $Minutes Number of minutes to look ahead.
+     * @param int $CalendarInstanceID Optional selected calendar instance ID. Zero includes all selected calendars.
+     * @return string JSON-encoded reminder list.
+     */
+    public function GetUpcomingReminders(int $Minutes, int $CalendarInstanceID = 0): string
+    {
+        $this->validateReminderMinutesWindow($Minutes);
+
+        $now = new DateTimeImmutable('now');
+
+        return $this->encodeReminderList($this->collectRemindersForTimestampRange(
+            $now->getTimestamp(),
+            $now->getTimestamp() + ($Minutes * 60),
+            $CalendarInstanceID
+        ));
+    }
+
+    /**
+     * Returns the next reminder whose exact trigger has not passed yet.
+     *
+     * The search covers the maximum synchronized future range supported by Calendar instances.
+     * If no determinable future reminder is cached, JSON null is returned.
+     *
+     * @param int $CalendarInstanceID Optional selected calendar instance ID. Zero includes all selected calendars.
+     * @return string JSON-encoded reminder object or null.
+     */
+    public function GetNextReminder(int $CalendarInstanceID = 0): string
+    {
+        $now = new DateTimeImmutable('now');
+        $until = $now->modify('+' . self::APPOINTMENT_LOOKAHEAD_DAYS . ' days')->getTimestamp();
+        $reminders = $this->collectRemindersForTimestampRange(
+            $now->getTimestamp(),
+            $until,
+            $CalendarInstanceID
+        );
+
+        return json_encode(
+            $reminders[0] ?? null,
+            JSON_UNESCAPED_SLASHES
+                | JSON_UNESCAPED_UNICODE
+                | JSON_PRESERVE_ZERO_FRACTION
+                | JSON_THROW_ON_ERROR
+        );
+    }
+
+    /**
+     * Returns reminders that became due during the requested look-back tolerance.
+     *
+     * The function never returns future triggers. It is intended for cyclic scripts whose
+     * execution may drift slightly. Callers can persist reminderId to suppress duplicate
+     * processing when consecutive runs overlap.
+     *
+     * @param int $ToleranceMinutes Number of minutes to look back from now.
+     * @param int $CalendarInstanceID Optional selected calendar instance ID. Zero includes all selected calendars.
+     * @return string JSON-encoded reminder list.
+     */
+    public function GetDueReminders(int $ToleranceMinutes = 1, int $CalendarInstanceID = 0): string
+    {
+        $this->validateReminderMinutesWindow($ToleranceMinutes);
+
+        $now = new DateTimeImmutable('now');
+
+        return $this->encodeReminderList($this->collectRemindersForTimestampRange(
+            $now->getTimestamp() - ($ToleranceMinutes * 60),
+            $now->getTimestamp(),
+            $CalendarInstanceID
+        ));
+    }
+
+    /**
      * Returns the calendar instances selected and enabled in this Calendar View.
      *
-     * The result contains instanceId, name, color and canWrite for each selected calendar.
+     * In addition to display and capability metadata, the result contains the provider key,
+     * last successful synchronization timestamp, current Symcon instance status, and last error.
      * Client-side temporary calendar filters do not alter this configured selection.
      *
      * @return string JSON-encoded selected calendar list.
@@ -845,7 +1108,7 @@ class KalenderAnsicht extends IPSModuleStrict
     public function GetSelectedCalendars(): string
     {
         return json_encode(
-            $this->loadSelectedCalendars(),
+            $this->loadSelectedCalendars(true),
             JSON_UNESCAPED_SLASHES
                 | JSON_UNESCAPED_UNICODE
                 | JSON_THROW_ON_ERROR
@@ -948,14 +1211,17 @@ class KalenderAnsicht extends IPSModuleStrict
 
         try {
             $result = $this->executeVisualizationAction($action, $value);
-            $this->outputIPSViewResponse([
+            $response = [
                 'type'    => 'state',
-                'payload' => $result['state'],
-                'toast'   => [
+                'payload' => $result['state']
+            ];
+            if ($result['message'] !== '') {
+                $response['toast'] = [
                     'level'   => $result['level'],
                     'message' => $result['message']
-                ]
-            ]);
+                ];
+            }
+            $this->outputIPSViewResponse($response);
         } catch (InvalidArgumentException $exception) {
             $this->outputIPSViewResponse(['Error' => $exception->getMessage()], 400);
         } catch (RuntimeException $exception) {
@@ -966,7 +1232,23 @@ class KalenderAnsicht extends IPSModuleStrict
         }
     }
 
-    private function broadcastState(?array $state = null): void
+    private function broadcastStateInvalidation(): void
+    {
+        if (!$this->isRuntimeReady()) {
+            return;
+        }
+
+        try {
+            $this->UpdateVisualizationValue(json_encode(
+                ['type' => 'invalidate'],
+                JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR
+            ));
+        } catch (Throwable $exception) {
+            $this->SendDebug('VisualizationUpdate', $exception->getMessage(), 0);
+        }
+    }
+
+    private function broadcastState(?array $state = null, bool $updateIPSViewHTML = false): void
     {
         if (!$this->isRuntimeReady()) {
             return;
@@ -988,7 +1270,7 @@ class KalenderAnsicht extends IPSModuleStrict
             $this->SendDebug('VisualizationUpdate', $exception->getMessage(), 0);
         }
 
-        if ($this->IsIPSViewHTMLPageEnabled()) {
+        if ($updateIPSViewHTML && $this->IsIPSViewHTMLPageEnabled()) {
             try {
                 $html = $this->renderNonEmptyIPSViewHTML($state, 'IPSViewUpdate');
                 if ($html !== null) {
@@ -1112,6 +1394,8 @@ class KalenderAnsicht extends IPSModuleStrict
             'Days',
             'Week',
             'Weeks',
+            'Full week',
+            'Work week',
             'Month',
             'Months',
             'CW',
@@ -1139,17 +1423,58 @@ class KalenderAnsicht extends IPSModuleStrict
             'Calendar',
             'Date',
             'Title',
+            'Occasion',
+            'Birthday',
+            'Anniversary',
+            'Wedding anniversary',
+            'Death anniversary',
             'Start',
             'End',
             'Location',
             'Description',
+            'Reminder',
+            'Calendar default',
+            'No reminder',
+            'Custom',
+            'Before start',
+            'Unit',
+            'Minute',
+            'Minutes',
+            'Hour',
+            'Hours',
+            'Existing reminder settings',
+            'Add reminder',
+            'Remove reminder',
+            'This calendar supports up to %d reminders.',
+            'Reminder times must be unique.',
+            'The selected calendar does not support these reminder settings.',
+            'Repeat',
+            'Does not repeat',
+            'Daily',
+            'Weekly',
+            'Monthly',
+            'Yearly',
+            'Interval',
+            'Ends',
+            'Never',
+            'After occurrences',
+            'On date',
+            'Weekdays',
+            'Occurrences',
+            'End date',
+            'Year',
+            'Years',
             'Cancel',
             'Save',
             'Move',
             'Event moved.',
+            'Events with complex reminder settings cannot be moved safely.',
             'Delete',
             'Delete event',
             'Do you really want to delete this event?',
+            'Recurring event',
+            'Only this event',
+            'Entire series',
             'Close',
             'Day events',
             'Filter calendars',
@@ -1161,7 +1486,17 @@ class KalenderAnsicht extends IPSModuleStrict
             'This filter only changes the current view on this browser or monitor.',
             'Tomorrow',
             'Yesterday',
+            'Recurring event creation is not supported by this calendar.',
             'Recurring occurrences are currently read-only.',
+            'Only this occurrence of the recurring event will be changed.',
+            'Changes will apply to this and all following occurrences.',
+            'Existing exceptions from this occurrence onward will be reset.',
+            'Changes will apply to the entire recurring series.',
+            'The recurrence pattern of this series cannot be edited here.',
+            'Edit recurring event',
+            'Which events do you want to edit?',
+            'This and following events',
+            'Continue',
             'This calendar is read-only.',
             'Editing events is unavailable because no action bridge is configured.',
             'Action failed.',
@@ -1172,42 +1507,69 @@ class KalenderAnsicht extends IPSModuleStrict
     /**
      * @return array<string, mixed>
      */
-    private function buildState(): array
+    private function buildState(?int $requestedRangeStart = null, ?int $requestedRangeEnd = null, int $eventOffset = 0): array
     {
         if (!$this->isRuntimeReady()) {
             return $this->emptyState();
         }
 
+        [$rangeStart, $rangeEnd] = $this->resolveVisualizationRange(
+            $requestedRangeStart,
+            $requestedRangeEnd
+        );
+        [$queryStart, $queryEnd] = $this->visualizationQueryRange($rangeStart, $rangeEnd);
+
         $calendars = $this->loadSelectedCalendars();
         $events = [];
-        $pastDays = max(0, min(1095, $this->ReadPropertyInteger('PastDays')));
-        $futureDays = max(1, min(1095, $this->ReadPropertyInteger('FutureDays')));
-        $rangeStart = (new DateTimeImmutable('today'))->modify('-' . $pastDays . ' days')->getTimestamp();
-        $rangeEnd = (new DateTimeImmutable('today'))->modify('+' . ($futureDays + 1) . ' days')->getTimestamp();
-
-        foreach ($calendars as $calendar) {
-            try {
-                $calendarEvents = $this->readCalendarEventsForRange(
-                    $calendar['instanceId'],
-                    $rangeStart,
-                    $rangeEnd
-                );
-            } catch (Throwable $exception) {
-                $this->SendDebug('CalendarData', $exception->getMessage(), 0);
-                continue;
-            }
-
-            foreach ($calendarEvents as $event) {
-                $startTimestamp = (int) ($event['startTimestamp'] ?? 0);
-                $endTimestamp = (int) ($event['endTimestamp'] ?? $startTimestamp);
-                if ($startTimestamp <= 0 || $endTimestamp < $rangeStart || $startTimestamp >= $rangeEnd) {
+        if ($queryEnd > $queryStart) {
+            foreach ($calendars as $calendar) {
+                try {
+                    $calendarEvents = $this->readCalendarEventsForRange(
+                        $calendar['instanceId'],
+                        $queryStart,
+                        $queryEnd
+                    );
+                } catch (Throwable $exception) {
+                    $this->SendDebug('CalendarData', $exception->getMessage(), 0);
                     continue;
                 }
-                $event['calendarInstanceId'] = $calendar['instanceId'];
-                $event['calendarName'] = $calendar['name'];
-                $event['calendarColor'] = $calendar['color'];
-                $event['canWrite'] = $calendar['canWrite'];
-                $events[] = $event;
+
+                foreach ($calendarEvents as $event) {
+                    $startTimestamp = (int) ($event['startTimestamp'] ?? 0);
+                    $endTimestamp = (int) ($event['endTimestamp'] ?? $startTimestamp);
+                    if ($startTimestamp <= 0 || $endTimestamp < $rangeStart || $startTimestamp >= $rangeEnd) {
+                        continue;
+                    }
+                    $event['calendarInstanceId'] = $calendar['instanceId'];
+                    $event['calendarName'] = $calendar['name'];
+                    $event['calendarColor'] = $calendar['color'];
+                    $event['canWrite'] = $calendar['canWrite'];
+                    if (($event['recurrenceType'] ?? '') === 'occurrence'
+                        && trim((string) ($event['originalStart'] ?? '')) === '') {
+                        $event['originalStart'] = trim((string) ($event['start'] ?? ''));
+                    }
+                    $recurringOccurrence = (bool) ($event['recurring'] ?? false)
+                        && trim((string) ($event['occurrenceId'] ?? '')) !== ''
+                        && trim((string) ($event['seriesId'] ?? '')) !== '';
+                    $event['canUpdateOccurrence'] = (bool) ($event['canUpdateOccurrence'] ?? false)
+                        || ($recurringOccurrence && $calendar['canUpdateOccurrence']);
+                    $event['canDeleteOccurrence'] = (bool) ($event['canDeleteOccurrence'] ?? false)
+                        || ($recurringOccurrence && $calendar['canDeleteOccurrence']);
+                    $event['canUpdateFollowing'] = (bool) ($event['canUpdateFollowing'] ?? false)
+                        || ((bool) ($event['recurring'] ?? false)
+                            && trim((string) ($event['occurrenceId'] ?? '')) !== ''
+                            && trim((string) ($event['seriesId'] ?? '')) !== ''
+                            && $calendar['canUpdateFollowing']);
+                    $event['canUpdateSeries'] = (bool) ($event['canUpdateSeries'] ?? false)
+                        || ((bool) ($event['recurring'] ?? false)
+                            && trim((string) ($event['seriesId'] ?? '')) !== ''
+                            && $calendar['canUpdateSeries']);
+                    $event['canDeleteSeries'] = (bool) ($event['canDeleteSeries'] ?? false)
+                        || ((bool) ($event['recurring'] ?? false)
+                            && trim((string) ($event['seriesId'] ?? '')) !== ''
+                            && $calendar['canDeleteSeries']);
+                    $events[] = $event;
+                }
             }
         }
 
@@ -1216,14 +1578,84 @@ class KalenderAnsicht extends IPSModuleStrict
             static fn (array $left, array $right): int => ((int) $left['startTimestamp'] <=> (int) $right['startTimestamp'])
                 ?: strcasecmp((string) ($left['summary'] ?? ''), (string) ($right['summary'] ?? ''))
         );
-        $events = array_slice($events, 0, max(1, min(1000, $this->ReadPropertyInteger('MaxEvents'))));
+        $totalEventCount = count($events);
+        $maximumEvents = max(1, min(1000, $this->ReadPropertyInteger('MaxEvents')));
+        $eventOffset = max(0, $eventOffset);
+        $events = array_slice($events, $eventOffset, $maximumEvents);
+        $nextOffset = $eventOffset + count($events);
+        $hasMore = $nextOffset < $totalEventCount;
 
         return [
             'events'      => $events,
             'calendars'   => array_values($calendars),
             'generatedAt' => time(),
+            'eventRange'  => [
+                'start'      => $rangeStart,
+                'end'        => $rangeEnd,
+                'offset'     => $eventOffset,
+                'pageCount'  => count($events),
+                'truncated'  => $hasMore,
+                'hasMore'    => $hasMore,
+                'nextOffset' => $hasMore ? $nextOffset : null,
+                'totalCount' => $totalEventCount
+            ],
             'settings'    => $this->viewSettings()
         ];
+    }
+
+    /**
+     * Resolves the event interval embedded into one visualization state.
+     *
+     * The initial HTML only carries a compact bootstrap interval. After the client
+     * restores its view and cursor it requests the exact visible interval through
+     * the action bridge.
+     *
+     * @return array{0: int, 1: int}
+     */
+    private function resolveVisualizationRange(?int $requestedRangeStart, ?int $requestedRangeEnd): array
+    {
+        if ($requestedRangeStart === null || $requestedRangeEnd === null) {
+            $today = new DateTimeImmutable('today');
+
+            return [
+                $today->modify('-' . self::VISUALIZATION_BOOTSTRAP_PAST_DAYS . ' days')->getTimestamp(),
+                $today->modify('+' . (self::VISUALIZATION_BOOTSTRAP_FUTURE_DAYS + 1) . ' days')->getTimestamp()
+            ];
+        }
+
+        if ($requestedRangeStart <= 0 || $requestedRangeEnd <= $requestedRangeStart) {
+            throw new InvalidArgumentException($this->Translate('The visualization request is invalid.'));
+        }
+        if (($requestedRangeEnd - $requestedRangeStart) > self::VISUALIZATION_MAX_RANGE_DAYS * 86400) {
+            throw new InvalidArgumentException($this->Translate('The visualization request is invalid.'));
+        }
+
+        return [$requestedRangeStart, $requestedRangeEnd];
+    }
+
+    /**
+     * Intersects a requested visualization interval with the configured cache window.
+     *
+     * The requested interval itself remains part of the returned state so a client
+     * outside the configured past/future limits does not repeatedly request the same
+     * empty range.
+     *
+     * @return array{0: int, 1: int}
+     */
+    private function visualizationQueryRange(int $rangeStart, int $rangeEnd): array
+    {
+        $pastDays = max(0, min(1095, $this->ReadPropertyInteger('PastDays')));
+        $futureDays = max(1, min(1095, $this->ReadPropertyInteger('FutureDays')));
+        $today = new DateTimeImmutable('today');
+        $configuredStart = $today->modify('-' . $pastDays . ' days')->getTimestamp();
+        $configuredEnd = $today->modify('+' . ($futureDays + 1) . ' days')->getTimestamp();
+
+        $queryStart = max($rangeStart, $configuredStart);
+        $queryEnd = min($rangeEnd, $configuredEnd);
+
+        return $queryEnd > $queryStart
+            ? [$queryStart, $queryEnd]
+            : [$rangeStart, $rangeStart];
     }
 
     /**
@@ -1233,7 +1665,8 @@ class KalenderAnsicht extends IPSModuleStrict
      */
     private function collectAppointmentsForRange(
         DateTimeImmutable $rangeStart,
-        DateTimeImmutable $rangeEnd
+        DateTimeImmutable $rangeEnd,
+        bool $includeCompactMetadata = false
     ): array {
         $events = [];
         foreach ($this->loadSelectedCalendars() as $calendar) {
@@ -1252,6 +1685,33 @@ class KalenderAnsicht extends IPSModuleStrict
                 $event['calendarName'] = $calendar['name'];
                 $event['calendarColor'] = $calendar['color'];
                 $event['canWrite'] = $calendar['canWrite'];
+                if (($event['recurrenceType'] ?? '') === 'occurrence'
+                    && trim((string) ($event['originalStart'] ?? '')) === '') {
+                    $event['originalStart'] = trim((string) ($event['start'] ?? ''));
+                }
+                $recurringOccurrence = (bool) ($event['recurring'] ?? false)
+                    && trim((string) ($event['occurrenceId'] ?? '')) !== ''
+                    && trim((string) ($event['seriesId'] ?? '')) !== '';
+                $event['canUpdateOccurrence'] = (bool) ($event['canUpdateOccurrence'] ?? false)
+                    || ($recurringOccurrence && $calendar['canUpdateOccurrence']);
+                $event['canDeleteOccurrence'] = (bool) ($event['canDeleteOccurrence'] ?? false)
+                    || ($recurringOccurrence && $calendar['canDeleteOccurrence']);
+                $event['canUpdateFollowing'] = (bool) ($event['canUpdateFollowing'] ?? false)
+                    || ((bool) ($event['recurring'] ?? false)
+                        && trim((string) ($event['occurrenceId'] ?? '')) !== ''
+                        && trim((string) ($event['seriesId'] ?? '')) !== ''
+                        && $calendar['canUpdateFollowing']);
+                $event['canUpdateSeries'] = (bool) ($event['canUpdateSeries'] ?? false)
+                    || ((bool) ($event['recurring'] ?? false)
+                        && trim((string) ($event['seriesId'] ?? '')) !== ''
+                        && $calendar['canUpdateSeries']);
+                $event['canDeleteSeries'] = (bool) ($event['canDeleteSeries'] ?? false)
+                    || ((bool) ($event['recurring'] ?? false)
+                        && trim((string) ($event['seriesId'] ?? '')) !== ''
+                        && $calendar['canDeleteSeries']);
+                if ($includeCompactMetadata) {
+                    $event['hasReminder'] = $this->appointmentHasReminder($event, $calendar);
+                }
                 $events[] = $event;
             }
         }
@@ -1265,6 +1725,51 @@ class KalenderAnsicht extends IPSModuleStrict
         );
 
         return $events;
+    }
+
+    /**
+     * Returns whether an appointment has an effective reminder configuration.
+     *
+     * Provider-default reminders are resolved against the selected calendar metadata.
+     * Complex reminder configurations count as active even when their exact trigger
+     * cannot be represented by the provider-neutral reminder API.
+     *
+     * @param array<string, mixed> $appointment Full normalized appointment.
+     * @param array<string, mixed> $calendar Selected calendar metadata.
+     */
+    private function appointmentHasReminder(array $appointment, array $calendar): bool
+    {
+        $reminder = $appointment['reminder'] ?? null;
+        if (!is_array($reminder) || array_is_list($reminder)) {
+            return false;
+        }
+
+        $mode = strtolower(trim((string) ($reminder['mode'] ?? '')));
+        if ($mode === CalendarEventReminder::MODE_NONE || $mode === '') {
+            return false;
+        }
+        if (in_array(
+            $mode,
+            [CalendarEventReminder::MODE_CUSTOM, CalendarEventReminder::MODE_MULTIPLE, CalendarEventReminder::MODE_COMPLEX],
+            true
+        )) {
+            return true;
+        }
+        if ($mode !== CalendarEventReminder::MODE_DEFAULT || !(bool) ($calendar['canUseDefaultReminder'] ?? false)) {
+            return false;
+        }
+
+        $defaultReminder = $calendar['defaultReminder'] ?? null;
+        if (!is_array($defaultReminder) || array_is_list($defaultReminder)) {
+            return false;
+        }
+        $defaultMode = strtolower(trim((string) ($defaultReminder['mode'] ?? '')));
+
+        return in_array(
+            $defaultMode,
+            [CalendarEventReminder::MODE_CUSTOM, CalendarEventReminder::MODE_MULTIPLE, CalendarEventReminder::MODE_COMPLEX],
+            true
+        );
     }
 
     /**
@@ -1286,6 +1791,224 @@ class KalenderAnsicht extends IPSModuleStrict
             $appointments,
             static fn (array $appointment): bool => (int) ($appointment['calendarInstanceId'] ?? 0) === $CalendarInstanceID
         ));
+    }
+
+    /**
+     * Collects provider-neutral reminder triggers inside an inclusive timestamp range.
+     *
+     * Event loading is extended by the maximum supported reminder lead time so a reminder
+     * can be returned even when its event starts after the requested reminder range.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function collectRemindersForTimestampRange(
+        int $fromTimestamp,
+        int $toTimestamp,
+        int $CalendarInstanceID
+    ): array {
+        if ($fromTimestamp <= 0 || $toTimestamp < $fromTimestamp) {
+            throw new InvalidArgumentException('The reminder time range is invalid.');
+        }
+
+        $timezone = new DateTimeZone(date_default_timezone_get());
+        $eventRangeStartDate = (new DateTimeImmutable('@' . $fromTimestamp))
+            ->setTimezone($timezone)
+            ->format('Y-m-d');
+        $eventRangeEndDate = (new DateTimeImmutable(
+            '@' . ($toTimestamp + (CalendarEventReminder::MAX_MINUTES_BEFORE_START * 60))
+        ))
+            ->setTimezone($timezone)
+            ->format('Y-m-d');
+        [$eventRangeStart, $eventRangeEnd] = CalendarAppointmentRange::fromInclusiveDates(
+            $eventRangeStartDate,
+            $eventRangeEndDate
+        );
+
+        $appointments = $this->collectAppointmentsForRange($eventRangeStart, $eventRangeEnd);
+        $appointments = $this->filterAppointmentsByCalendarInstanceId($appointments, $CalendarInstanceID);
+
+        $calendars = [];
+        foreach ($this->loadSelectedCalendars() as $calendar) {
+            $calendars[(int) $calendar['instanceId']] = $calendar;
+        }
+
+        $reminders = [];
+        foreach ($appointments as $appointment) {
+            $calendarInstanceId = (int) ($appointment['calendarInstanceId'] ?? 0);
+            if (!isset($calendars[$calendarInstanceId])) {
+                continue;
+            }
+
+            foreach ($this->buildReminderRecords($appointment, $calendars[$calendarInstanceId]) as $reminder) {
+                $reminderTimestamp = (int) ($reminder['reminderTimestamp'] ?? 0);
+                if ($reminderTimestamp < $fromTimestamp || $reminderTimestamp > $toTimestamp) {
+                    continue;
+                }
+
+                $reminders[] = $reminder;
+            }
+        }
+
+        usort(
+            $reminders,
+            static fn (array $left, array $right): int => ((int) ($left['reminderTimestamp'] ?? 0)
+                <=> (int) ($right['reminderTimestamp'] ?? 0))
+                ?: ((int) ($left['startTimestamp'] ?? 0) <=> (int) ($right['startTimestamp'] ?? 0))
+                ?: strcasecmp((string) ($left['summary'] ?? ''), (string) ($right['summary'] ?? ''))
+                ?: strcasecmp((string) ($left['calendarName'] ?? ''), (string) ($right['calendarName'] ?? ''))
+        );
+
+        return $reminders;
+    }
+
+    /**
+     * Builds the first script-friendly reminder record from a normalized appointment.
+     *
+     * Kept as a small compatibility wrapper for existing internal tests and callers.
+     * Multiple reminder configurations are exposed completely through buildReminderRecords().
+     *
+     * @param array<string, mixed> $appointment Full normalized appointment.
+     * @param array<string, mixed> $calendar Selected calendar metadata.
+     * @return array<string, mixed>|null Exact reminder record or null when no exact trigger can be determined.
+     */
+    private function buildReminderRecord(array $appointment, array $calendar): ?array
+    {
+        return $this->buildReminderRecords($appointment, $calendar)[0] ?? null;
+    }
+
+    /**
+     * Builds all script-friendly reminder records from a normalized appointment.
+     *
+     * @param array<string, mixed> $appointment Full normalized appointment.
+     * @param array<string, mixed> $calendar Selected calendar metadata.
+     * @return list<array<string, mixed>> Exact reminder records.
+     */
+    private function buildReminderRecords(array $appointment, array $calendar): array
+    {
+        $startTimestamp = (int) ($appointment['startTimestamp'] ?? 0);
+        $calendarInstanceId = (int) ($appointment['calendarInstanceId'] ?? $calendar['instanceId'] ?? 0);
+        $reminder = $appointment['reminder'] ?? null;
+        if ($startTimestamp <= 0 || $calendarInstanceId <= 0 || !is_array($reminder) || array_is_list($reminder)) {
+            return [];
+        }
+
+        try {
+            $normalizedReminder = CalendarEventReminder::normalizeInput($reminder, true);
+        } catch (InvalidArgumentException) {
+            return [];
+        }
+
+        $sourceMode = (string) ($normalizedReminder['mode'] ?? '');
+        $effectiveReminder = $normalizedReminder;
+        if ($sourceMode === CalendarEventReminder::MODE_DEFAULT) {
+            if (!(bool) ($calendar['canUseDefaultReminder'] ?? false)) {
+                return [];
+            }
+
+            try {
+                $effectiveReminder = CalendarEventReminder::normalizeInput($calendar['defaultReminder'] ?? null);
+            } catch (InvalidArgumentException) {
+                return [];
+            }
+        }
+
+        $minutesBeforeStartValues = CalendarEventReminder::minutesBeforeStartValues($effectiveReminder);
+        if ($minutesBeforeStartValues === []) {
+            return [];
+        }
+
+        $timezone = new DateTimeZone(date_default_timezone_get());
+        $eventIdentity = $this->reminderEventIdentity($appointment);
+        $reminderCount = count($minutesBeforeStartValues);
+        $records = [];
+        foreach ($minutesBeforeStartValues as $reminderIndex => $minutesBeforeStart) {
+            $reminderTimestamp = $startTimestamp - ($minutesBeforeStart * 60);
+            $reminderId = hash(
+                'sha256',
+                $calendarInstanceId . '|' . $eventIdentity . '|' . $startTimestamp . '|' . $reminderTimestamp
+            );
+
+            $records[] = [
+                'reminderId'         => $reminderId,
+                'summary'            => (string) ($appointment['summary'] ?? ''),
+                'calendarInstanceId' => $calendarInstanceId,
+                'calendarName'       => (string) ($appointment['calendarName'] ?? $calendar['name'] ?? ''),
+                'calendarColor'      => (string) ($appointment['calendarColor'] ?? $calendar['color'] ?? ''),
+                'start'              => (string) ($appointment['start'] ?? ''),
+                'startTimestamp'     => $startTimestamp,
+                'allDay'             => (bool) ($appointment['allDay'] ?? false),
+                'location'           => (string) ($appointment['location'] ?? ''),
+                'reminderMode'       => $sourceMode,
+                'reminderIndex'      => $reminderIndex,
+                'reminderCount'      => $reminderCount,
+                'minutesBeforeStart' => $minutesBeforeStart,
+                'reminderTimestamp'  => $reminderTimestamp,
+                'reminderDateTime'   => (new DateTimeImmutable('@' . $reminderTimestamp))
+                    ->setTimezone($timezone)
+                    ->format(DATE_ATOM)
+            ];
+        }
+
+        return $records;
+    }
+
+    /**
+     * Returns a stable provider-independent identity input for reminder IDs.
+     *
+     * @param array<string, mixed> $appointment Full normalized appointment.
+     */
+    private function reminderEventIdentity(array $appointment): string
+    {
+        foreach (['occurrenceId', 'eventReference', 'uid', 'resourceUrl', 'id'] as $key) {
+            $value = trim((string) ($appointment[$key] ?? ''));
+            if ($value !== '') {
+                return $key . ':' . $value;
+            }
+        }
+
+        $seriesId = trim((string) ($appointment['seriesId'] ?? ''));
+        $originalStart = trim((string) ($appointment['originalStart'] ?? ''));
+        if ($seriesId !== '' || $originalStart !== '') {
+            return 'series:' . $seriesId . '|' . $originalStart;
+        }
+
+        return 'fallback:' . hash(
+            'sha256',
+            (string) ($appointment['summary'] ?? '')
+                . '|'
+                . (string) ($appointment['start'] ?? '')
+                . '|'
+                . (string) ($appointment['end'] ?? '')
+        );
+    }
+
+    /**
+     * Encodes provider-neutral reminder records for PHP callers.
+     *
+     * @param list<array<string, mixed>> $reminders Reminder records sorted by trigger timestamp.
+     */
+    private function encodeReminderList(array $reminders): string
+    {
+        return json_encode(
+            $reminders,
+            JSON_UNESCAPED_SLASHES
+                | JSON_UNESCAPED_UNICODE
+                | JSON_PRESERVE_ZERO_FRACTION
+                | JSON_THROW_ON_ERROR
+        );
+    }
+
+    /**
+     * Validates minute windows used by upcoming and due reminder queries.
+     */
+    private function validateReminderMinutesWindow(int $Minutes): void
+    {
+        $maximumMinutes = self::APPOINTMENT_LOOKAHEAD_DAYS * 24 * 60;
+        if ($Minutes < 1 || $Minutes > $maximumMinutes) {
+            throw new InvalidArgumentException(
+                'Minutes must be between 1 and ' . $maximumMinutes . '.'
+            );
+        }
     }
 
     /**
@@ -1359,6 +2082,16 @@ class KalenderAnsicht extends IPSModuleStrict
     }
 
     /**
+     * Validates the requested number of future appointments.
+     */
+    private function validateAppointmentCount(int $Count): void
+    {
+        if ($Count < 1 || $Count > 1000) {
+            throw new InvalidArgumentException('Count must be between 1 and 1000.');
+        }
+    }
+
+    /**
      * Validates the requested upcoming appointment time window.
      */
     private function validateUpcomingHours(int $Hours): void
@@ -1407,10 +2140,25 @@ class KalenderAnsicht extends IPSModuleStrict
     }
 
     /**
+     * Encodes compact provider-independent appointments for PHP callers.
+     *
+     * @param list<array<string, mixed>> $appointments Full normalized appointments.
+     */
+    private function encodeCompactAppointmentList(array $appointments): string
+    {
+        return json_encode(
+            $this->compactAppointments($appointments),
+            JSON_UNESCAPED_SLASHES
+                | JSON_UNESCAPED_UNICODE
+                | JSON_THROW_ON_ERROR
+        );
+    }
+
+    /**
      * Reduces full appointment data to the compact scripting representation.
      *
      * @param list<array<string, mixed>> $appointments Full normalized appointments.
-     * @return list<array{summary: string, start: string, end: string, startTime: string, endTime: string}>
+     * @return list<array{summary: string, start: string, end: string, startTime: string, endTime: string, hasReminder: bool, calendarName: string}>
      */
     private function compactAppointments(array $appointments): array
     {
@@ -1434,11 +2182,13 @@ class KalenderAnsicht extends IPSModuleStrict
                 : $this->formatAppointmentDate($endTimestamp, $timezone);
 
             $result[] = [
-                'summary'   => (string) ($appointment['summary'] ?? ''),
-                'start'     => $startDate,
-                'end'       => $endDate,
-                'startTime' => $allDay ? $this->Translate('All day') : $this->formatAppointmentTime($startTimestamp, $timezone),
-                'endTime'   => $allDay ? '' : $this->formatAppointmentTime($endTimestamp, $timezone)
+                'summary'      => (string) ($appointment['summary'] ?? ''),
+                'start'        => $startDate,
+                'end'          => $endDate,
+                'startTime'    => $allDay ? $this->Translate('All day') : $this->formatAppointmentTime($startTimestamp, $timezone),
+                'endTime'      => $allDay ? '' : $this->formatAppointmentTime($endTimestamp, $timezone),
+                'hasReminder'  => (bool) ($appointment['hasReminder'] ?? false),
+                'calendarName' => (string) ($appointment['calendarName'] ?? '')
             ];
         }
 
@@ -1581,6 +2331,7 @@ class KalenderAnsicht extends IPSModuleStrict
             'events'      => [],
             'calendars'   => [],
             'generatedAt' => time(),
+            'eventRange'  => null,
             'settings'    => $this->viewSettings()
         ];
     }
@@ -1596,8 +2347,11 @@ class KalenderAnsicht extends IPSModuleStrict
                 2       => 'month',
                 3       => 'threeDays',
                 4       => 'list',
+                5       => 'workWeek',
                 default => 'agenda'
             },
+            'pastDays'                  => max(0, min(1095, $this->ReadPropertyInteger('PastDays'))),
+            'futureDays'                => max(1, min(1095, $this->ReadPropertyInteger('FutureDays'))),
             'agendaPeriodDays'          => max(1, min(366, $this->ReadPropertyInteger('AgendaPeriodDays'))),
             'listPeriodDays'            => max(1, min(366, $this->ReadPropertyInteger('ListPeriodDays'))),
             'threeDaysPeriodDays'       => max(1, min(31, $this->ReadPropertyInteger('ThreeDaysPeriodDays'))),
@@ -1622,19 +2376,15 @@ class KalenderAnsicht extends IPSModuleStrict
             'showListEnd'               => $this->ReadPropertyBoolean('ShowListEnd'),
             'showListTitle'             => $this->ReadPropertyBoolean('ShowListTitle'),
             'showListCalendarName'      => $this->ReadPropertyBoolean('ShowListCalendarName'),
+            'showListAnniversaryType'   => $this->ReadPropertyBoolean('ShowListAnniversaryType'),
             'showListLocation'          => $this->ReadPropertyBoolean('ShowListLocation'),
             'showListDescription'       => $this->ReadPropertyBoolean('ShowListDescription'),
             'showListControls'          => $this->ReadPropertyBoolean('ShowListControls'),
             'showCalendarName'          => $this->ReadPropertyBoolean('ShowCalendarName'),
+            'showAnniversaryType'       => $this->ReadPropertyBoolean('ShowAnniversaryType'),
             'showLocation'              => $this->ReadPropertyBoolean('ShowLocation'),
             'showDescription'           => $this->ReadPropertyBoolean('ShowDescription'),
-            'tileFontScale'             => max(50, min(200, $this->ReadPropertyInteger('TileFontScale'))),
-            'tileWeekOrientation'       => $this->ReadPropertyInteger('TileWeekOrientation') === 1
-                ? 'vertical'
-                : 'horizontal',
-            'ipsViewWeekOrientation'    => $this->ReadPropertyInteger('IPSViewWeekOrientation') === 1
-                ? 'vertical'
-                : 'horizontal'
+            'tileFontScale'             => max(50, min(200, $this->ReadPropertyInteger('TileFontScale')))
         ];
     }
 
@@ -1652,9 +2402,9 @@ class KalenderAnsicht extends IPSModuleStrict
     }
 
     /**
-     * @return list<array{instanceId: int, name: string, color: string, canWrite: bool}>
+     * @return list<array{instanceId: int, name: string, color: string, canWrite: bool, timezone: string, canCreateRecurrence: bool, canUpdateRecurrence: bool, canUpdateOccurrence: bool, canDeleteOccurrence: bool, canUpdateFollowing: bool, canUpdateSeries: bool, canDeleteSeries: bool, canUseDefaultReminder: bool, canCreateWithDefaultReminder: bool, defaultReminder: array<string, mixed>, maxReminders: int, provider?: string, lastSynchronization?: int, status?: int, lastError?: string}>
      */
-    private function loadSelectedCalendars(): array
+    private function loadSelectedCalendars(bool $includeOperationalMetadata = false): array
     {
         $configuration = $this->effectiveCalendarConfiguration();
 
@@ -1690,16 +2440,65 @@ class KalenderAnsicht extends IPSModuleStrict
                 $color = $palette[abs(crc32((string) $instanceId)) % count($palette)];
             }
 
-            $result[] = [
-                'instanceId' => $instanceId,
-                'name'       => IPS_GetName($instanceId),
-                'color'      => $color,
-                'canWrite'   => (bool) ($calendarStatus['canWrite']
-                    ?? IPS_GetProperty($instanceId, 'CanWrite'))
+            $calendar = [
+                'instanceId'                   => $instanceId,
+                'name'                         => IPS_GetName($instanceId),
+                'color'                        => $color,
+                'canWrite'                     => (bool) ($calendarStatus['canWrite']
+                    ?? IPS_GetProperty($instanceId, 'CanWrite')),
+                'timezone'                     => trim((string) ($calendarStatus['timezone'] ?? '')),
+                'canCreateRecurrence'          => (bool) ($calendarStatus['canCreateRecurrence'] ?? false),
+                'canUpdateRecurrence'          => (bool) ($calendarStatus['canUpdateRecurrence'] ?? false),
+                'canUpdateOccurrence'          => (bool) ($calendarStatus['canUpdateOccurrence'] ?? false),
+                'canDeleteOccurrence'          => (bool) ($calendarStatus['canDeleteOccurrence'] ?? false),
+                'canUpdateFollowing'           => (bool) ($calendarStatus['canUpdateFollowing'] ?? false),
+                'canUpdateSeries'              => (bool) ($calendarStatus['canUpdateSeries'] ?? false),
+                'canDeleteSeries'              => (bool) ($calendarStatus['canDeleteSeries'] ?? false),
+                'canUseDefaultReminder'        => (bool) ($calendarStatus['canUseDefaultReminder'] ?? false),
+                'canCreateWithDefaultReminder' => (bool) ($calendarStatus['canCreateWithDefaultReminder'] ?? false),
+                'defaultReminder'              => is_array($calendarStatus['defaultReminder'] ?? null)
+                    && !array_is_list($calendarStatus['defaultReminder'])
+                    ? $calendarStatus['defaultReminder']
+                    : [],
+                'maxReminders'                 => max(1, min(CalendarEventReminder::MAX_REMINDERS, (int) ($calendarStatus['maxReminders'] ?? 1)))
             ];
+            if ($includeOperationalMetadata) {
+                $calendar['provider'] = $this->calendarProviderKey($instance);
+                $calendar['lastSynchronization'] = max(0, (int) ($calendarStatus['lastSynchronization'] ?? 0));
+                $calendar['status'] = (int) ($instance['InstanceStatus'] ?? 0);
+                $calendar['lastError'] = trim((string) ($calendarStatus['lastError'] ?? ''));
+            }
+            $result[] = $calendar;
         }
 
         return $result;
+    }
+
+    /**
+     * Returns the stable provider key for one Calendar instance.
+     *
+     * @param array<string, mixed> $calendarInstance Calendar instance metadata returned by Symcon.
+     */
+    private function calendarProviderKey(array $calendarInstance): string
+    {
+        $accountInstanceId = (int) ($calendarInstance['ConnectionID'] ?? 0);
+        if ($accountInstanceId <= 0 || !IPS_InstanceExists($accountInstanceId)) {
+            return 'unknown';
+        }
+
+        $accountInstance = IPS_GetInstance($accountInstanceId);
+        if (($accountInstance['ModuleInfo']['ModuleID'] ?? '') !== self::CALENDAR_ACCOUNT_MODULE_ID) {
+            return 'unknown';
+        }
+
+        return match ((int) IPS_GetProperty($accountInstanceId, 'Provider')) {
+            0       => 'apple',
+            1       => 'caldav',
+            2       => 'google',
+            3       => 'microsoft',
+            4       => 'ics',
+            default => 'unknown'
+        };
     }
 
     /**
@@ -1781,8 +2580,14 @@ class KalenderAnsicht extends IPSModuleStrict
     {
         $level = 'success';
         $message = '';
+        $eventEdit = null;
+        $seriesEdit = null;
 
         switch ($ident) {
+            case 'LoadRange':
+                $this->validateVisualizationActionRange($value);
+                break;
+
             case 'Refresh':
                 $success = $this->synchronizeSelectedCalendars();
                 $level = $success ? 'success' : 'error';
@@ -1809,6 +2614,117 @@ class KalenderAnsicht extends IPSModuleStrict
                     throw new RuntimeException((string) ($result['error'] ?? $this->Translate('Event creation failed.')));
                 }
                 $message = 'Event created.';
+                break;
+
+            case 'PrepareEventEdit':
+                $request = $this->decodeActionValue($value);
+                $instanceId = $this->requireWritableCalendar($request);
+                $event = $request['event'] ?? null;
+                if (!is_array($event) || array_is_list($event)) {
+                    throw new InvalidArgumentException($this->Translate('The event data is invalid.'));
+                }
+
+                $eventEdit = json_decode(
+                    IPSKAL_GetEventForEdit(
+                        $instanceId,
+                        json_encode(
+                            $event,
+                            JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR
+                        )
+                    ),
+                    true,
+                    512,
+                    JSON_THROW_ON_ERROR
+                );
+                if (!is_array($eventEdit) || array_is_list($eventEdit)) {
+                    throw new RuntimeException($this->Translate('The event data is invalid.'));
+                }
+
+                $calendar = null;
+                foreach ($this->loadSelectedCalendars() as $selectedCalendar) {
+                    if ($selectedCalendar['instanceId'] === $instanceId) {
+                        $calendar = $selectedCalendar;
+                        break;
+                    }
+                }
+                if ($calendar === null) {
+                    throw new RuntimeException($this->Translate('The selected calendar is not writable.'));
+                }
+
+                $eventEdit['calendarInstanceId'] = $instanceId;
+                $eventEdit['calendarName'] = $calendar['name'];
+                $eventEdit['calendarColor'] = $calendar['color'];
+                $eventEdit['canWrite'] = true;
+                if (($eventEdit['recurrenceType'] ?? '') === 'occurrence'
+                    && trim((string) ($eventEdit['originalStart'] ?? '')) === '') {
+                    $eventEdit['originalStart'] = trim((string) ($eventEdit['start'] ?? ''));
+                }
+                $recurringOccurrence = (bool) ($eventEdit['recurring'] ?? false)
+                    && trim((string) ($eventEdit['occurrenceId'] ?? '')) !== ''
+                    && trim((string) ($eventEdit['seriesId'] ?? '')) !== '';
+                $eventEdit['canUpdateOccurrence'] = (bool) ($eventEdit['canUpdateOccurrence'] ?? false)
+                    || ($recurringOccurrence && $calendar['canUpdateOccurrence']);
+                $eventEdit['canDeleteOccurrence'] = (bool) ($eventEdit['canDeleteOccurrence'] ?? false)
+                    || ($recurringOccurrence && $calendar['canDeleteOccurrence']);
+                $eventEdit['canUpdateFollowing'] = (bool) ($eventEdit['canUpdateFollowing'] ?? false)
+                    || ($recurringOccurrence && $calendar['canUpdateFollowing']);
+                $eventEdit['canUpdateSeries'] = (bool) ($eventEdit['canUpdateSeries'] ?? false)
+                    || ((bool) ($eventEdit['recurring'] ?? false)
+                        && trim((string) ($eventEdit['seriesId'] ?? '')) !== ''
+                        && $calendar['canUpdateSeries']);
+                $eventEdit['canDeleteSeries'] = (bool) ($eventEdit['canDeleteSeries'] ?? false)
+                    || ((bool) ($eventEdit['recurring'] ?? false)
+                        && trim((string) ($eventEdit['seriesId'] ?? '')) !== ''
+                        && $calendar['canDeleteSeries']);
+                $eventEdit['writeScope'] = 'occurrence';
+                break;
+
+            case 'PrepareSeriesEdit':
+                $request = $this->decodeActionValue($value);
+                $instanceId = $this->requireWritableCalendar($request);
+                $seriesId = trim((string) ($request['seriesId'] ?? ''));
+                $resourceUrl = trim((string) ($request['resourceUrl'] ?? ''));
+                $writeScope = strtolower(trim((string) ($request['writeScope'] ?? 'series')));
+                if ($seriesId === '') {
+                    throw new InvalidArgumentException($this->Translate('The recurring series ID is missing.'));
+                }
+                if (!in_array($writeScope, ['following', 'series'], true)) {
+                    throw new InvalidArgumentException($this->Translate('The event data is invalid.'));
+                }
+
+                if ($writeScope === 'following') {
+                    $occurrenceId = trim((string) ($request['occurrenceId'] ?? ''));
+                    $originalStart = trim((string) ($request['originalStart'] ?? ''));
+                    if ($occurrenceId === '' || $originalStart === '') {
+                        throw new InvalidArgumentException($this->Translate('The event data is invalid.'));
+                    }
+                    $seriesEdit = json_decode(
+                        IPSKAL_GetRecurringFollowing($instanceId, $seriesId, $occurrenceId, $originalStart, $resourceUrl),
+                        true,
+                        512,
+                        JSON_THROW_ON_ERROR
+                    );
+                    if (!is_array($seriesEdit) || !($seriesEdit['canUpdateFollowing'] ?? false)) {
+                        throw new RuntimeException(
+                            $this->Translate('This and following updates are not supported by this calendar.')
+                        );
+                    }
+                } else {
+                    $seriesEdit = json_decode(
+                        IPSKAL_GetRecurringSeries($instanceId, $seriesId, $resourceUrl),
+                        true,
+                        512,
+                        JSON_THROW_ON_ERROR
+                    );
+                    if (!is_array($seriesEdit) || !($seriesEdit['canUpdateSeries'] ?? false)) {
+                        throw new RuntimeException(
+                            $this->Translate('Recurring series updates are not supported by this calendar.')
+                        );
+                    }
+                }
+                $seriesEdit['calendarInstanceId'] = $instanceId;
+                $seriesEdit['canWrite'] = true;
+                $seriesEdit['writeScope'] = $writeScope;
                 break;
 
             case 'UpdateEvent':
@@ -1846,11 +2762,58 @@ class KalenderAnsicht extends IPSModuleStrict
                 }
                 $sourceEvent = $request['sourceEvent'] ?? null;
                 $event = $request['event'] ?? null;
-                if (!is_array($sourceEvent) || !is_array($event)) {
+                if (!is_array($sourceEvent) || array_is_list($sourceEvent)
+                    || !is_array($event) || array_is_list($event)) {
                     throw new InvalidArgumentException($this->Translate('The event data is invalid.'));
                 }
-                if (($sourceEvent['recurring'] ?? false) || trim((string) ($sourceEvent['recurrenceId'] ?? '')) !== '') {
-                    throw new RuntimeException($this->Translate('Recurring events cannot be moved yet.'));
+                $sourceReminder = is_array($sourceEvent['reminder'] ?? null)
+                    ? $sourceEvent['reminder']
+                    : [];
+                if (($sourceReminder['mode'] ?? '') === 'complex'
+                    || ($sourceReminder !== [] && ($sourceReminder['editable'] ?? true) === false)) {
+                    throw new RuntimeException(
+                        $this->Translate('Events with complex reminder settings cannot be moved safely.')
+                    );
+                }
+                if (($sourceReminder['mode'] ?? '') === CalendarEventReminder::MODE_DEFAULT) {
+                    $event['reminder'] = $this->defaultReminderForMove($sourceInstanceId);
+                }
+                if (array_key_exists('reminder', $event)) {
+                    $this->assertReminderSupportedByCalendar($targetInstanceId, $event['reminder']);
+                }
+
+                $sourceRecurring = (bool) ($sourceEvent['recurring'] ?? false);
+                $writeScope = strtolower(trim((string) ($sourceEvent['writeScope'] ?? '')));
+                $targetRecurrenceProvided = array_key_exists('recurrence', $event);
+                $targetRecurrence = $event['recurrence'] ?? null;
+                $targetRecurring = is_array($targetRecurrence) && $targetRecurrence !== [];
+                if ($targetRecurrenceProvided
+                    && $targetRecurrence !== null
+                    && (!is_array($targetRecurrence) || $targetRecurrence === [] || array_is_list($targetRecurrence))) {
+                    throw new InvalidArgumentException($this->Translate('The recurrence settings are invalid.'));
+                }
+
+                if ($sourceRecurring) {
+                    if (!in_array($writeScope, ['occurrence', 'following', 'series'], true)) {
+                        throw new InvalidArgumentException($this->Translate('The event data is invalid.'));
+                    }
+                    if ($writeScope === 'following' && !$targetRecurring) {
+                        throw new RuntimeException($this->Translate('The recurrence pattern cannot be split safely.'));
+                    }
+                    if ($writeScope === 'series' && !$targetRecurrenceProvided) {
+                        throw new RuntimeException($this->Translate('The recurrence pattern cannot be edited safely.'));
+                    }
+                    if ($writeScope === 'occurrence' && $targetRecurring) {
+                        throw new RuntimeException($this->Translate('The recurrence settings are invalid.'));
+                    }
+                } elseif ($targetRecurring) {
+                    $writeScope = '';
+                }
+
+                if ($targetRecurring) {
+                    $this->requireRecurrenceCreationCalendar($targetInstanceId);
+                } elseif ($targetRecurrenceProvided && $targetRecurrence === null) {
+                    unset($event['recurrence']);
                 }
 
                 $creationResult = json_decode(
@@ -1869,14 +2832,13 @@ class KalenderAnsicht extends IPSModuleStrict
                 if (!IPSKAL_DeleteEvent(
                     $sourceInstanceId,
                     json_encode(
-                        [
-                            'resourceUrl'  => (string) ($sourceEvent['resourceUrl'] ?? ''),
-                            'etag'         => (string) ($sourceEvent['etag'] ?? ''),
-                            'recurrenceId' => (string) ($sourceEvent['recurrenceId'] ?? '')
-                        ],
+                        $sourceEvent,
                         JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR
                     )
                 )) {
+                    if ($this->rollbackMovedTargetEvent($targetInstanceId, $creationResult, $targetRecurring)) {
+                        throw new RuntimeException($this->Translate('Event move failed.'));
+                    }
                     throw new RuntimeException($this->Translate(
                         'The event was created in the target calendar, but could not be deleted from the source calendar. Please check both calendars.'
                     ));
@@ -1895,7 +2857,11 @@ class KalenderAnsicht extends IPSModuleStrict
                     $instanceId,
                     json_encode($event, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR)
                 )) {
-                    throw new RuntimeException($this->Translate('Event deletion failed.'));
+                    $status = json_decode(IPSKAL_GetCalendarStatus($instanceId), true, 512, JSON_THROW_ON_ERROR);
+                    $lastError = is_array($status) ? trim((string) ($status['lastError'] ?? '')) : '';
+                    throw new RuntimeException(
+                        $lastError !== '' ? $lastError : $this->Translate('Event deletion failed.')
+                    );
                 }
                 $message = 'Event deleted.';
                 break;
@@ -1907,8 +2873,16 @@ class KalenderAnsicht extends IPSModuleStrict
                 ));
         }
 
-        $state = $this->buildState();
-        $this->broadcastState($state);
+        $state = $this->buildStateForActionValue($value);
+        if ($eventEdit !== null) {
+            $state['eventEdit'] = $eventEdit;
+        }
+        if ($seriesEdit !== null) {
+            $state['seriesEdit'] = $seriesEdit;
+        }
+        if ($ident !== 'LoadRange') {
+            $this->broadcastState($state);
+        }
 
         return [
             'state'   => $state,
@@ -1990,6 +2964,93 @@ class KalenderAnsicht extends IPSModuleStrict
     }
 
     /**
+     * Rejects malformed or oversized explicit range requests.
+     *
+     * LoadRange is the only action whose sole purpose is to retrieve one client-specific
+     * interval, so silently falling back to the bootstrap range would return unrelated
+     * data and can make concurrent clients overwrite each other's visible state.
+     */
+    private function validateVisualizationActionRange(mixed $value): void
+    {
+        $range = $this->visualizationRangeFromActionValue($value);
+        if ($range === null) {
+            throw new InvalidArgumentException($this->Translate('The visualization request is invalid.'));
+        }
+
+        $this->resolveVisualizationRange($range[0], $range[1]);
+    }
+
+    /**
+     * Builds the visualization state for the range supplied by an interactive action.
+     *
+     * @return array<string, mixed>
+     */
+    private function buildStateForActionValue(mixed $value): array
+    {
+        $range = $this->visualizationRangeFromActionValue($value);
+        if ($range === null) {
+            return $this->buildState();
+        }
+
+        return $this->buildState(
+            $range[0],
+            $range[1],
+            $this->visualizationEventOffsetFromActionValue($value)
+        );
+    }
+
+    /**
+     * @return array{0: int, 1: int}|null
+     */
+    private function visualizationRangeFromActionValue(mixed $value): ?array
+    {
+        $request = $value;
+        if (is_string($value)) {
+            try {
+                $request = json_decode($value, true, 512, JSON_THROW_ON_ERROR);
+            } catch (JsonException) {
+                return null;
+            }
+        }
+        if (!is_array($request) || array_is_list($request)) {
+            return null;
+        }
+
+        $range = $request['_viewRange'] ?? null;
+        if (!is_array($range) || array_is_list($range)) {
+            return null;
+        }
+
+        $start = (int) ($range['start'] ?? 0);
+        $end = (int) ($range['end'] ?? 0);
+        if ($start <= 0 || $end <= $start) {
+            return null;
+        }
+
+        return [$start, $end];
+    }
+
+    /**
+     * Returns the zero-based event offset requested for a paged visualization range.
+     */
+    private function visualizationEventOffsetFromActionValue(mixed $value): int
+    {
+        $request = $value;
+        if (is_string($value)) {
+            try {
+                $request = json_decode($value, true, 512, JSON_THROW_ON_ERROR);
+            } catch (JsonException) {
+                return 0;
+            }
+        }
+        if (!is_array($request) || array_is_list($request)) {
+            return 0;
+        }
+
+        return max(0, (int) ($request['_eventOffset'] ?? 0));
+    }
+
+    /**
      * @return array<string, mixed>
      */
     private function decodeActionValue(mixed $value): array
@@ -2017,6 +3078,122 @@ class KalenderAnsicht extends IPSModuleStrict
             }
         }
         throw new RuntimeException($this->Translate('The selected calendar is not writable.'));
+    }
+
+    private function requireRecurrenceCreationCalendar(int $instanceId): void
+    {
+        foreach ($this->loadSelectedCalendars() as $calendar) {
+            if ($calendar['instanceId'] === $instanceId
+                && $calendar['canWrite']
+                && $calendar['canCreateRecurrence']) {
+                return;
+            }
+        }
+        throw new RuntimeException($this->Translate('Recurring event creation is not supported by this calendar.'));
+    }
+
+    private function assertReminderSupportedByCalendar(int $instanceId, mixed $value): void
+    {
+        foreach ($this->loadSelectedCalendars() as $calendar) {
+            if ($calendar['instanceId'] !== $instanceId) {
+                continue;
+            }
+
+            $maxReminders = max(1, min(CalendarEventReminder::MAX_REMINDERS, (int) ($calendar['maxReminders'] ?? 1)));
+            try {
+                $normalized = CalendarEventReminder::normalizeInput($value, true);
+                $reminderCount = count(CalendarEventReminder::minutesBeforeStartValues($normalized));
+                if ($reminderCount > $maxReminders) {
+                    throw new RuntimeException(sprintf(
+                        $this->Translate('This calendar supports up to %d reminders.'),
+                        $maxReminders
+                    ));
+                }
+                CalendarEventReminder::normalizeInput(
+                    $value,
+                    (bool) ($calendar['canUseDefaultReminder'] ?? false),
+                    $maxReminders
+                );
+                return;
+            } catch (RuntimeException $exception) {
+                throw $exception;
+            } catch (InvalidArgumentException $exception) {
+                throw new RuntimeException(
+                    $this->Translate('The selected calendar does not support these reminder settings.'),
+                    0,
+                    $exception
+                );
+            }
+        }
+
+        throw new RuntimeException($this->Translate('The selected calendar is not writable.'));
+    }
+
+    /** @return array<string, mixed> */
+    private function defaultReminderForMove(int $instanceId): array
+    {
+        foreach ($this->loadSelectedCalendars() as $calendar) {
+            if ($calendar['instanceId'] !== $instanceId) {
+                continue;
+            }
+            if (!$calendar['canUseDefaultReminder']) {
+                break;
+            }
+
+            try {
+                return CalendarEventReminder::normalizeInput($calendar['defaultReminder']);
+            } catch (InvalidArgumentException) {
+                break;
+            }
+        }
+
+        throw new RuntimeException(
+            $this->Translate('Events with complex reminder settings cannot be moved safely.')
+        );
+    }
+
+    /** @param array<string, mixed> $creationResult */
+    private function rollbackMovedTargetEvent(int $instanceId, array $creationResult, bool $recurring): bool
+    {
+        $createdEvent = $creationResult['event'] ?? null;
+        if (!is_array($createdEvent) || array_is_list($createdEvent)) {
+            return false;
+        }
+
+        $rollbackEvent = [
+            'uid'         => trim((string) ($createdEvent['uid'] ?? '')),
+            'resourceUrl' => trim((string) ($createdEvent['resourceUrl'] ?? '')),
+            'etag'        => trim((string) ($createdEvent['etag'] ?? ''))
+        ];
+        if ($recurring) {
+            $seriesId = trim((string) ($createdEvent['eventReference'] ?? ''));
+            if ($seriesId === '') {
+                $seriesId = $rollbackEvent['uid'];
+            }
+            if ($seriesId === '') {
+                return false;
+            }
+            $rollbackEvent = array_merge($rollbackEvent, [
+                'recurrenceType'  => 'master',
+                'seriesId'        => $seriesId,
+                'recurring'       => true,
+                'canDeleteSeries' => true,
+                'writeScope'      => 'series'
+            ]);
+        }
+
+        try {
+            return IPSKAL_DeleteEvent(
+                $instanceId,
+                json_encode(
+                    $rollbackEvent,
+                    JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR
+                )
+            );
+        } catch (Throwable $exception) {
+            $this->SendDebug('MoveRollback', $exception->getMessage(), 0);
+            return false;
+        }
     }
 
     private function sendToast(string $level, string $message): void

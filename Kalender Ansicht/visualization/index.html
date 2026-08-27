@@ -64,7 +64,10 @@
                 <span class="view-selector-option-label">Days</span><span class="view-selector-option-period"></span>
             </button>
             <button type="button" class="view-selector-option" data-view="week" role="radio" aria-checked="false">
-                <span class="view-selector-option-label">Week</span><span class="view-selector-option-period"></span>
+                <span class="view-selector-option-label">Full week</span><span class="view-selector-option-period"></span>
+            </button>
+            <button type="button" class="view-selector-option" data-view="workWeek" role="radio" aria-checked="false">
+                <span class="view-selector-option-label">Work week</span><span class="view-selector-option-period"></span>
             </button>
             <button type="button" class="view-selector-option" data-view="month" role="radio" aria-checked="false">
                 <span class="view-selector-option-label">Month</span><span class="view-selector-option-period"></span>
@@ -103,8 +106,24 @@
                 <label for="event-summary">Title</label>
                 <input id="event-summary" maxlength="250" required>
             </div>
-            <label class="checkbox-row"><input type="checkbox" id="event-all-day"> <span id="all-day-label">All day</span></label>
-            <div class="form-row two">
+            <label class="checkbox-row" id="event-all-day-row"><input type="checkbox" id="event-all-day"> <span id="all-day-label">All day</span></label>
+            <div class="form-row two" id="event-anniversary-row">
+                <div class="form-row">
+                    <label for="event-anniversary-type" data-i18n="Annual event">Annual event</label>
+                    <select id="event-anniversary-type">
+                        <option value="" data-i18n="No annual event">No annual event</option>
+                        <option value="birthday" data-i18n="Birthday">Birthday</option>
+                        <option value="anniversary" data-i18n="Anniversary">Anniversary</option>
+                        <option value="wedding" data-i18n="Wedding anniversary">Wedding anniversary</option>
+                        <option value="death" data-i18n="Death anniversary">Death anniversary</option>
+                    </select>
+                </div>
+                <div class="form-row hidden" id="event-anniversary-date-row">
+                    <label for="event-anniversary-date" id="event-anniversary-date-label" data-i18n="Anniversary date">Anniversary date</label>
+                    <input id="event-anniversary-date" type="date">
+                </div>
+            </div>
+            <div class="form-row two" id="event-date-row">
                 <div class="form-row">
                     <label for="event-start">Start</label>
                     <input id="event-start" type="datetime-local" required>
@@ -114,6 +133,83 @@
                     <input id="event-end" type="datetime-local" required>
                 </div>
             </div>
+            <div class="form-row recurrence-section" id="event-recurrence-row">
+                <label for="event-recurrence-frequency">Repeat</label>
+                <select id="event-recurrence-frequency">
+                    <option value="none" data-i18n="Does not repeat">Does not repeat</option>
+                    <option value="daily" data-i18n="Daily">Daily</option>
+                    <option value="weekly" data-i18n="Weekly">Weekly</option>
+                    <option value="monthly" data-i18n="Monthly">Monthly</option>
+                    <option value="yearly" data-i18n="Yearly">Yearly</option>
+                </select>
+            </div>
+            <div class="recurrence-options hidden" id="event-recurrence-options">
+                <div class="form-row two">
+                    <div class="form-row">
+                        <label for="event-recurrence-interval">Interval</label>
+                        <div class="recurrence-interval-control">
+                            <input id="event-recurrence-interval" type="number" min="1" max="999" value="1">
+                            <span id="event-recurrence-interval-unit"></span>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <label for="event-recurrence-end-mode">Ends</label>
+                        <select id="event-recurrence-end-mode">
+                            <option value="never" data-i18n="Never">Never</option>
+                            <option value="count" data-i18n="After occurrences">After occurrences</option>
+                            <option value="until" data-i18n="On date">On date</option>
+                        </select>
+                    </div>
+                </div>
+                <fieldset class="recurrence-weekdays hidden" id="event-recurrence-weekdays">
+                    <legend data-i18n="Weekdays">Weekdays</legend>
+                    <div class="recurrence-weekday-grid">
+                        <label><input type="checkbox" value="MO"><span data-weekday="1">Mo</span></label>
+                        <label><input type="checkbox" value="TU"><span data-weekday="2">Tu</span></label>
+                        <label><input type="checkbox" value="WE"><span data-weekday="3">We</span></label>
+                        <label><input type="checkbox" value="TH"><span data-weekday="4">Th</span></label>
+                        <label><input type="checkbox" value="FR"><span data-weekday="5">Fr</span></label>
+                        <label><input type="checkbox" value="SA"><span data-weekday="6">Sa</span></label>
+                        <label><input type="checkbox" value="SU"><span data-weekday="7">Su</span></label>
+                    </div>
+                </fieldset>
+                <div class="form-row hidden" id="event-recurrence-count-row">
+                    <label for="event-recurrence-count">Occurrences</label>
+                    <input id="event-recurrence-count" type="number" min="1" max="9999" value="10">
+                </div>
+                <div class="form-row hidden" id="event-recurrence-until-row">
+                    <label for="event-recurrence-until">End date</label>
+                    <input id="event-recurrence-until" type="date">
+                </div>
+            </div>
+            <div class="form-row" id="event-reminder-row">
+                <label for="event-reminder-mode">Reminder</label>
+                <select id="event-reminder-mode">
+                    <option value="default" data-i18n="Calendar default">Calendar default</option>
+                    <option value="none" data-i18n="No reminder">No reminder</option>
+                    <option value="custom" data-i18n="Custom">Custom</option>
+                    <option value="complex" data-i18n="Existing reminder settings" disabled>Existing reminder settings</option>
+                </select>
+            </div>
+            <div class="form-row two hidden" id="event-reminder-custom-row">
+                <div class="form-row">
+                    <label for="event-reminder-value">Before start</label>
+                    <input id="event-reminder-value" type="number" min="0" max="40320" value="15">
+                </div>
+                <div class="form-row">
+                    <label for="event-reminder-unit">Unit</label>
+                    <select id="event-reminder-unit">
+                        <option value="minutes" data-i18n="Minutes">Minutes</option>
+                        <option value="hours" data-i18n="Hours">Hours</option>
+                        <option value="days" data-i18n="Days">Days</option>
+                        <option value="weeks" data-i18n="Weeks">Weeks</option>
+                    </select>
+                </div>
+            </div>
+            <div id="event-reminder-extra-list"></div>
+            <div class="form-row hidden" id="event-reminder-add-row">
+                <button type="button" class="secondary-button" id="event-reminder-add-button" data-i18n="Add reminder">Add reminder</button>
+            </div>
             <div class="form-row">
                 <label for="event-location">Location</label>
                 <input id="event-location" maxlength="500">
@@ -122,11 +218,16 @@
                 <label for="event-description">Description</label>
                 <textarea id="event-description" maxlength="5000"></textarea>
             </div>
+            <div class="dialog-note hidden" id="event-description-html-note" role="note"></div>
             <div class="dialog-note hidden" id="dialog-note"></div>
         </div>
         <div class="dialog-actions">
             <div class="dialog-actions-start">
                 <button type="button" class="danger-button hidden" id="delete-button">Delete</button>
+                <label class="secondary-button hidden" id="ics-import-button" style="position:relative;display:inline-flex;align-items:center;overflow:hidden">
+                    <span id="ics-import-button-label">Import ICS</span>
+                    <input type="file" id="ics-import-file" accept=".ics,text/calendar,text/x-vcalendar" style="position:absolute;inset:0;width:100%;height:100%;margin:0;opacity:0;cursor:pointer">
+                </label>
             </div>
             <div class="dialog-actions-end">
                 <button type="button" class="secondary-button" id="cancel-button">Cancel</button>
@@ -136,7 +237,7 @@
     </form>
 </dialog>
 
-<dialog id="event-details-dialog" class="oc-dialog oc-dialog-medium event-details-dialog">
+<dialog id="event-details-dialog" class="oc-dialog oc-dialog-extra-large event-details-dialog">
     <div class="dialog-header">
         <span id="details-color" class="dialog-accent" style="--dialog-accent-color:var(--cal-accent)"></span>
         <h2 id="details-dialog-title">Event details</h2>
@@ -149,6 +250,10 @@
                 <dt id="details-calendar-label">Calendar</dt>
                 <dd id="details-calendar"></dd>
             </div>
+            <div class="event-details-row hidden" id="details-occasion-row">
+                <dt id="details-occasion-label">Occasion</dt>
+                <dd id="details-occasion"></dd>
+            </div>
             <div class="event-details-row">
                 <dt id="details-start-label">Start</dt>
                 <dd id="details-start"></dd>
@@ -156,6 +261,10 @@
             <div class="event-details-row">
                 <dt id="details-end-label">End</dt>
                 <dd id="details-end"></dd>
+            </div>
+            <div class="event-details-row hidden" id="details-reminder-row">
+                <dt id="details-reminder-label">Reminder</dt>
+                <dd id="details-reminder"></dd>
             </div>
             <div class="event-details-row hidden" id="details-location-row">
                 <dt id="details-location-label">Location</dt>
@@ -173,8 +282,42 @@
             <button type="button" class="danger-button hidden" id="details-delete-button">Delete</button>
         </div>
         <div class="dialog-actions-end">
+            <button type="button" class="secondary-button hidden" id="details-provider-button">Open in provider</button>
             <button type="button" class="secondary-button" id="details-close-button">Close</button>
             <button type="button" class="primary-button hidden" id="details-edit-button">Edit</button>
+        </div>
+    </div>
+</dialog>
+
+
+<dialog id="edit-scope-dialog" class="oc-dialog oc-dialog-small edit-scope-dialog">
+    <div class="dialog-header">
+        <span class="dialog-accent" style="--dialog-accent-color:var(--cal-accent)"></span>
+        <h2 id="edit-scope-dialog-title">Edit recurring event</h2>
+        <button type="button" class="icon-button dialog-close-button" id="edit-scope-close" aria-label="Close">×</button>
+    </div>
+    <div class="dialog-body edit-scope-body">
+        <p id="edit-scope-question">Which events do you want to edit?</p>
+        <fieldset class="edit-scope" id="edit-scope">
+            <legend data-i18n="Recurring event">Recurring event</legend>
+            <label class="edit-scope-option" id="edit-scope-occurrence-option">
+                <input type="radio" name="edit-scope" value="occurrence" checked>
+                <span data-i18n="Only this event">Only this event</span>
+            </label>
+            <label class="edit-scope-option" id="edit-scope-following-option">
+                <input type="radio" name="edit-scope" value="following">
+                <span data-i18n="This and following events">This and following events</span>
+            </label>
+            <label class="edit-scope-option" id="edit-scope-series-option">
+                <input type="radio" name="edit-scope" value="series">
+                <span data-i18n="Entire series">Entire series</span>
+            </label>
+        </fieldset>
+    </div>
+    <div class="dialog-actions">
+        <div class="dialog-actions-end">
+            <button type="button" class="secondary-button" id="edit-scope-cancel">Cancel</button>
+            <button type="button" class="primary-button" id="edit-scope-confirm">Continue</button>
         </div>
     </div>
 </dialog>
@@ -189,6 +332,21 @@
         <div class="delete-confirm-summary" id="delete-confirm-summary"></div>
         <div class="delete-confirm-period" id="delete-confirm-period"></div>
         <p class="delete-confirm-question" id="delete-confirm-question">Do you really want to delete this event?</p>
+        <fieldset class="delete-scope hidden" id="delete-scope">
+            <legend data-i18n="Recurring event">Recurring event</legend>
+            <label class="delete-scope-option" id="delete-scope-occurrence-option">
+                <input type="radio" name="delete-scope" value="occurrence" checked>
+                <span data-i18n="Only this event">Only this event</span>
+            </label>
+            <label class="delete-scope-option" id="delete-scope-following-option">
+                <input type="radio" name="delete-scope" value="following">
+                <span data-i18n="This and following events">This and following events</span>
+            </label>
+            <label class="delete-scope-option" id="delete-scope-series-option">
+                <input type="radio" name="delete-scope" value="series">
+                <span data-i18n="Entire series">Entire series</span>
+            </label>
+        </fieldset>
     </div>
     <div class="dialog-actions">
         <div class="dialog-actions-end">
@@ -242,6 +400,270 @@
 <script>
 window.SYMC_VISUALIZATION = {{BOOTSTRAP_JSON}};
 {{MODULE_SCRIPT}}
+
+(() => {
+    'use strict';
+
+    const detailsTarget = document.getElementById('details-description');
+    const eventDescription = document.getElementById('event-description');
+    const eventDescriptionHtmlNote = document.getElementById('event-description-html-note');
+    const eventDialogElement = document.getElementById('event-dialog');
+    const eventFormElement = document.getElementById('event-form');
+    const calendarContent = document.getElementById('calendar-content');
+    if (typeof DOMParser !== 'function') return;
+
+    let htmlEditorPlainDescription = '';
+    let htmlEditorActive = false;
+
+    function decodeHtmlEntities(value) {
+        const decoder = document.createElement('textarea');
+        decoder.innerHTML = String(value || '');
+        return decoder.value;
+    }
+
+    function looksLikeHtml(value) {
+        return /<\/?(?:html|head|body|style|table|thead|tbody|tfoot|tr|th|td|div|span|p|br|hr|h[1-6]|ul|ol|li|a|img|strong|b|em|i|u|blockquote|pre|font|center|section|article|header|footer|main|address|dl|dt|dd|code)\b[^>]*>/i
+            .test(String(value || ''));
+    }
+
+    function htmlDescriptionSource(value) {
+        const source = String(value || '').trim();
+        if (looksLikeHtml(source)) return source;
+        const decoded = decodeHtmlEntities(source);
+        return decoded !== source && looksLikeHtml(decoded) ? decoded : '';
+    }
+
+    function htmlDescriptionToPlainText(source) {
+        const parsed = new DOMParser().parseFromString(String(source || ''), 'text/html');
+        parsed.querySelectorAll('script, style, noscript, template').forEach(element => element.remove());
+        parsed.querySelectorAll('br').forEach(element => element.replaceWith('\n'));
+        parsed.querySelectorAll('td, th').forEach(element => element.append('\t'));
+        parsed.querySelectorAll('li').forEach(element => {
+            element.prepend('• ');
+            element.append('\n');
+        });
+        parsed.querySelectorAll('p, div, tr, h1, h2, h3, h4, h5, h6, blockquote, pre, section, article, header, footer, main, address, dl, dt, dd')
+            .forEach(element => element.append('\n'));
+
+        return String(parsed.body?.textContent || '')
+            .replace(/\u00a0/g, ' ')
+            .replace(/[ \t]+\n/g, '\n')
+            .replace(/\n[ \t]+/g, '\n')
+            .replace(/[ \t]{2,}/g, ' ')
+            .replace(/\n{3,}/g, '\n\n')
+            .trim();
+    }
+
+    function sanitizeLink(value) {
+        const href = String(value || '').trim();
+        return /^(?:https?:|mailto:)/i.test(href) ? href : '';
+    }
+
+    function sanitizeImageSource(value) {
+        const source = String(value || '').trim();
+        return /^data:image\/(?:png|gif|jpe?g|webp);base64,/i.test(source) ? source : '';
+    }
+
+    function sanitizeHtmlDocument(source) {
+        const parsed = new DOMParser().parseFromString(source, 'text/html');
+        parsed.querySelectorAll('script, iframe, frame, frameset, object, embed, form, input, button, select, textarea, base, link, svg, math')
+            .forEach(element => element.remove());
+        parsed.querySelectorAll('meta').forEach(element => element.remove());
+
+        parsed.querySelectorAll('*').forEach(element => {
+            Array.from(element.attributes).forEach(attribute => {
+                const name = attribute.name.toLowerCase();
+                if (name.startsWith('on') || ['srcdoc', 'action', 'formaction'].includes(name)) {
+                    element.removeAttribute(attribute.name);
+                    return;
+                }
+
+                if (name === 'href') {
+                    const href = sanitizeLink(attribute.value);
+                    if (!href) {
+                        element.removeAttribute('href');
+                        element.removeAttribute('target');
+                    } else {
+                        element.setAttribute('href', href);
+                        element.setAttribute('target', '_blank');
+                        element.setAttribute('rel', 'noopener noreferrer');
+                    }
+                    return;
+                }
+
+                if (element.tagName === 'IMG' && name === 'src') {
+                    const imageSource = sanitizeImageSource(attribute.value);
+                    if (imageSource) element.setAttribute('src', imageSource);
+                    else element.removeAttribute('src');
+                }
+            });
+        });
+
+        const charset = parsed.createElement('meta');
+        charset.setAttribute('charset', 'UTF-8');
+        const policy = parsed.createElement('meta');
+        policy.setAttribute('http-equiv', 'Content-Security-Policy');
+        policy.setAttribute(
+            'content',
+            "default-src 'none'; img-src data:; style-src 'unsafe-inline'; font-src data:; base-uri 'none'; form-action 'none'"
+        );
+        const defaults = parsed.createElement('style');
+        defaults.textContent = `
+            html, body { box-sizing:border-box; max-width:100%; margin:0; padding:0; }
+            body { padding:12px; background:#fff; color:#111; overflow-wrap:anywhere; }
+            img { max-width:100%; height:auto; }
+            table { max-width:100%; }
+        `;
+        parsed.head.prepend(charset, policy, defaults);
+
+        return '<!DOCTYPE html>\n' + parsed.documentElement.outerHTML;
+    }
+
+    function renderHtmlDescription(source) {
+        if (!detailsTarget) return;
+        const frame = document.createElement('iframe');
+        frame.className = 'open-calendar-html-description';
+        frame.title = document.getElementById('details-description-label')?.textContent || 'Description';
+        frame.setAttribute('sandbox', 'allow-same-origin allow-popups allow-popups-to-escape-sandbox');
+        frame.setAttribute('referrerpolicy', 'no-referrer');
+        frame.style.display = 'block';
+        frame.style.boxSizing = 'border-box';
+        frame.style.width = '100%';
+        frame.style.maxWidth = '100%';
+        frame.style.minHeight = '180px';
+        frame.style.height = 'clamp(260px, 50vh, 640px)';
+        frame.style.border = '1px solid rgba(127, 127, 127, .28)';
+        frame.style.borderRadius = '6px';
+        frame.style.background = '#fff';
+        frame.addEventListener('load', () => {
+            try {
+                const documentHeight = frame.contentDocument?.documentElement?.scrollHeight || 0;
+                const maximumHeight = Math.max(260, Math.round(window.innerHeight * 0.6));
+                if (documentHeight > 0) {
+                    frame.style.height = `${Math.min(Math.max(180, documentHeight + 4), maximumHeight)}px`;
+                }
+            } catch (error) {
+                // The fixed fallback height remains available if iframe sizing is not accessible.
+            }
+        });
+        frame.srcdoc = sanitizeHtmlDocument(source);
+        detailsTarget.replaceChildren(frame);
+    }
+
+    function updateDescriptionRendering() {
+        if (!detailsTarget || detailsTarget.querySelector('.open-calendar-html-description')) return;
+        const source = htmlDescriptionSource(detailsTarget.textContent);
+        if (!source) return;
+        renderHtmlDescription(source);
+    }
+
+    function editorNoteText() {
+        const language = String(document.documentElement.lang || '').toLowerCase();
+        if (language === 'de' || language.startsWith('de-')) {
+            return 'Die Beschreibung enthält HTML-Formatierung. Sie wird hier als Klartext angezeigt. Änderungen an der Beschreibung werden als Klartext gespeichert.';
+        }
+        return 'The description contains HTML formatting. It is shown here as plain text. Changes to the description will be saved as plain text.';
+    }
+
+    function resetHtmlDescriptionEditor() {
+        htmlEditorPlainDescription = '';
+        htmlEditorActive = false;
+        if (eventDescriptionHtmlNote) eventDescriptionHtmlNote.classList.add('hidden');
+    }
+
+    function prepareHtmlDescriptionEditor() {
+        if (!eventDescription || !eventDialogElement?.open) return;
+        if (htmlEditorActive && eventDescription.value === htmlEditorPlainDescription) return;
+
+        const originalDescription = eventDescription.value;
+        const source = htmlDescriptionSource(originalDescription);
+        if (!source) {
+            resetHtmlDescriptionEditor();
+            return;
+        }
+
+        htmlEditorPlainDescription = htmlDescriptionToPlainText(source);
+        if (eventDescription.maxLength > 0 && htmlEditorPlainDescription.length > eventDescription.maxLength) {
+            htmlEditorPlainDescription = htmlEditorPlainDescription.slice(0, eventDescription.maxLength);
+        }
+        htmlEditorActive = true;
+        eventDescription.value = htmlEditorPlainDescription;
+        if (eventDescriptionHtmlNote) {
+            eventDescriptionHtmlNote.textContent = editorNoteText();
+            eventDescriptionHtmlNote.classList.remove('hidden');
+        }
+    }
+
+    function updatePlainTextDescriptions(root = document) {
+        root.querySelectorAll?.('.event-description, .list-cell-description').forEach(element => {
+            const source = htmlDescriptionSource(element.textContent);
+            if (!source) return;
+            element.textContent = htmlDescriptionToPlainText(source);
+        });
+    }
+
+    if (detailsTarget && typeof MutationObserver === 'function') {
+        new MutationObserver(updateDescriptionRendering).observe(detailsTarget, {
+            childList: true,
+            characterData: true,
+            subtree: true
+        });
+    }
+
+    if (calendarContent && typeof MutationObserver === 'function') {
+        new MutationObserver(() => updatePlainTextDescriptions(calendarContent)).observe(calendarContent, {
+            childList: true,
+            subtree: true
+        });
+        updatePlainTextDescriptions(calendarContent);
+    }
+
+    if (eventDescription && eventDialogElement) {
+        if (typeof showEventDialog === 'function') {
+            const originalShowEventDialog = showEventDialog;
+            showEventDialog = function () {
+                const result = originalShowEventDialog();
+                queueMicrotask(prepareHtmlDescriptionEditor);
+                return result;
+            };
+        }
+
+        eventDescription.addEventListener('focus', prepareHtmlDescriptionEditor);
+        eventDescription.addEventListener('input', () => {
+            if (!htmlEditorActive) return;
+            if (eventDescriptionHtmlNote) eventDescriptionHtmlNote.classList.remove('hidden');
+        });
+        eventDialogElement.addEventListener('close', resetHtmlDescriptionEditor);
+
+        if (typeof MutationObserver === 'function') {
+            new MutationObserver(() => {
+                if (!eventDialogElement.open) {
+                    resetHtmlDescriptionEditor();
+                    return;
+                }
+                queueMicrotask(prepareHtmlDescriptionEditor);
+            }).observe(eventDialogElement, {
+                attributes: true,
+                attributeFilter: ['open', 'aria-busy']
+            });
+        }
+    }
+
+    if (eventFormElement && typeof sendAction === 'function') {
+        const originalSendAction = sendAction;
+        sendAction = async function (ident, value) {
+            if (htmlEditorActive && eventDescription && eventDialogElement?.open) {
+                const descriptionUnchanged = eventDescription.value === htmlEditorPlainDescription;
+                if (descriptionUnchanged && ident === 'UpdateEvent' && value?.event?.changes) {
+                    delete value.event.changes.description;
+                } else if (descriptionUnchanged && ident === 'MoveEvent' && value?.event) {
+                    value.event.description = htmlEditorPlainDescription;
+                }
+            }
+            return originalSendAction(ident, value);
+        };
+    }
+})();
 </script>
 </body>
 </html>

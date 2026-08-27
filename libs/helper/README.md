@@ -8,11 +8,12 @@ The files in this directory are vendored from
 | `ChunkedJsonTransferHelper.php` | 1.0.0 | `b9922d52dab18a253b1a1b371d93aec1631396741cbd611cf34922219ec6ab30` |
 | `ConfigurationFormHelper.php` | 1.0.0 | `fa87dd4c67f43a3838fe87110387e4c1a1b98685c13403eeb52c189246045678` |
 | `DataFlowHelper.php` | 1.0.0 | `4c25828b283367692d0db1631d2b7d71ba6012883798bc5ffddb8f2d551d6dfb` |
+| `DebugHelper.php` | 1.0.1 | `c5433bf0cd7141c93d98f16ae23325a7f00ab9d11438c44fbfd12ad239e21373` |
 | `HttpResponseHelper.php` | 1.1.0 | `be4fae4c23f757ab462237d8e74d2a9dca1b504937ed4d4b51c7ff76004cf1cd` |
 | `IPSViewHTMLPageHelper.php` | 1.3.0 | `8fc9692ccc6143e4bdff1c262dbe138f7507a9c8816ac0326de0bc5c578a4236` |
 | `HelperTranslationHelper.php` | 1.0.0 | `d3deee581eca9f8eb11e9adce060170227a2dc836ee898bd134f93d27604f639` |
 | `VisualizationAssetHelper.php` | 1.0.0 | `1693b2399bcf95d270a6d9a01df6534caad906497bd4ba9489916a951abaffcc` |
-| `IPSViewStyleHelper.php` | 1.4.1 | `1e5d2c47180e9ca686661307ebd8b37ffac177a91d8889c593f3663d88e011e1` |
+| `IPSViewStyleHelper.php` | 1.4.3 | `d60cf4ba7f4e93fc71642b858658af127e770250f85ffcb364d88c80a13944aa` |
 | `ParentConnectionHelper.php` | 1.0.0 | `d4f01dee721aa32e64410979ca15b2795a0fcc59c0232c0ad69e4702d9ff573c` |
 | `PersistentJsonCacheHelper.php` | 1.0.0 | `adbc7680abe814dc6c15a9cda1312cc30023073595052006662716bc0d65f2a4` |
 | `SymconOAuthHelper.php` | 1.0.0 | `d9053bfd083a581b96f8526cbb05e8568a6ad24a81cafa3e9b05108343bf2a65` |
