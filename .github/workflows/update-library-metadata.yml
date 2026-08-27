@@ -27,13 +27,6 @@ jobs:
           private-key: ${{ secrets.HELPER_SYNC_APP_PRIVATE_KEY }}
           permission-contents: write
 
-      - name: Checkout
-        uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
-          ref: ${{ github.ref_name }}
-          token: ${{ steps.app-token.outputs.token }}
-
       - name: Get GitHub App user ID
         id: app-user
         shell: bash
@@ -41,6 +34,23 @@ jobs:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
           echo "user-id=$(gh api "/users/${{ steps.app-token.outputs.app-slug }}[bot]" --jq .id)" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          ref: ${{ github.ref_name }}
+          token: ${{ steps.app-token.outputs.token }}
+
+      - name: Apply automatic Symcon style fixes
+        uses: Burki24/Symcon_ModuleCI/style-fix@dev
+        with:
+          push: 'false'
+          commit-user-name: ${{ steps.app-token.outputs.app-slug }}[bot]
+          commit-user-email: ${{ steps.app-user.outputs.user-id }}+${{ steps.app-token.outputs.app-slug }}[bot]@users.noreply.github.com
+
+      - name: Verify Symcon style after automatic fixes
+        uses: Burki24/Symcon_ModuleCI/style@v1.0.0
 
       - name: Run shared module tests
         uses: Burki24/Symcon_ModuleCI/php-tests@v1.0.0
@@ -74,7 +84,6 @@ jobs:
         env:
           APP_SLUG: ${{ steps.app-token.outputs.app-slug }}
           APP_USER_ID: ${{ steps.app-user.outputs.user-id }}
-          SOURCE_SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
 
@@ -88,7 +97,8 @@ jobs:
 
           version=$(php -r '$library = json_decode(file_get_contents("library.json"), true); echo (string) $library["version"];')
           build=$(php -r '$library = json_decode(file_get_contents("library.json"), true); echo (int) $library["build"];')
-          short_sha=${SOURCE_SHA:0:7}
+          source_sha="$(git rev-parse HEAD)"
+          short_sha=${source_sha:0:7}
 
           git add library.json
           git commit -m "CHORE: Update library metadata to v${version} build ${build} (${short_sha})"
