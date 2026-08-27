@@ -107,12 +107,12 @@ assertUiContainsAll(
 );
 
 $dialogs = [
-    'view-selector-dialog'  => 'view-selector-dialog-title',
-    'event-dialog'          => 'dialog-title',
-    'event-details-dialog'  => 'details-dialog-title',
-    'edit-scope-dialog'     => 'edit-scope-dialog-title',
-    'delete-confirm-dialog' => 'delete-confirm-dialog-title',
-    'day-events-dialog'     => 'day-events-dialog-title',
+    'view-selector-dialog'   => 'view-selector-dialog-title',
+    'event-dialog'           => 'dialog-title',
+    'event-details-dialog'   => 'details-dialog-title',
+    'edit-scope-dialog'      => 'edit-scope-dialog-title',
+    'delete-confirm-dialog'  => 'delete-confirm-dialog-title',
+    'day-events-dialog'      => 'day-events-dialog-title',
     'calendar-filter-dialog' => 'calendar-filter-dialog-title'
 ];
 foreach ($dialogs as $dialogId => $labelId) {
