@@ -127,10 +127,21 @@ final class ICalendarCodec
         DateTimeImmutable $start,
         DateTimeImmutable $end
     ): array {
-        return ICalendarRecurrence::expand(
-            self::parseEvents($ical, $resourceUrl, $etag),
-            $start,
-            $end
+        $events = self::parseEvents($ical, $resourceUrl, $etag);
+        $durations = self::recurrenceDurations($ical);
+        foreach ($events as &$event) {
+            $key = (string) ($event['uid'] ?? '') . "\0" . (string) ($event['recurrenceId'] ?? '');
+            if (isset($durations[$key])) {
+                $event['_recurrenceDuration'] = $durations[$key];
+            }
+        }
+        unset($event);
+
+        $events = ICalendarRecurrence::expand($events, $start, $end);
+
+        return array_map(
+            static fn (array $event): array => self::applyRecurringDuration($event),
+            $events
         );
     }
 
@@ -1017,6 +1028,7 @@ final class ICalendarCodec
             ? self::parseDateProperty($masterEndProperty)
             : self::endFromDuration($masterStart, self::propertyValue($properties, 'DURATION'));
 
+        $duration = strtoupper(trim(self::propertyValue($properties, 'DURATION')));
         if ($masterStart['allDay']) {
             $masterStartDate = (new DateTimeImmutable('@' . $masterStart['timestamp']))
                 ->setTimezone(self::timezone($masterStart['timezone']));
@@ -1024,6 +1036,17 @@ final class ICalendarCodec
                 ->setTimezone(self::timezone($masterStart['timezone']));
             $durationDays = max(1, (int) $masterStartDate->diff($masterEndDate)->format('%a'));
             $targetEnd = $targetStart->add(new DateInterval('P' . $durationDays . 'D'));
+        } elseif ($masterEndProperty === null && $duration !== '') {
+            try {
+                if (str_starts_with($duration, '-')) {
+                    throw new RuntimeException('Negative event duration.');
+                }
+                $targetEnd = $targetStart->add(new DateInterval($duration));
+            } catch (Throwable) {
+                $durationSeconds = max(0, $masterEnd['timestamp'] - $masterStart['timestamp']);
+                $targetEnd = (new DateTimeImmutable('@' . ($targetStart->getTimestamp() + $durationSeconds)))
+                    ->setTimezone(self::timezone($masterStart['timezone']));
+            }
         } else {
             $durationSeconds = max(0, $masterEnd['timestamp'] - $masterStart['timestamp']);
             $targetEnd = (new DateTimeImmutable('@' . ($targetStart->getTimestamp() + $durationSeconds)))
@@ -1885,6 +1908,67 @@ final class ICalendarCodec
         }
 
         return $result;
+    }
+
+    /**
+     * Returns RFC 5545 DURATION values for VEVENTs that do not define DTEND.
+     *
+     * @return array<string, string> Map keyed by UID and RECURRENCE-ID.
+     */
+    private static function recurrenceDurations(string $ical): array
+    {
+        $durations = [];
+        foreach (self::extractEventBlocks(self::unfoldLines($ical)) as $block) {
+            $properties = self::readTopLevelProperties($block);
+            if (self::firstProperty($properties, 'DTEND') !== null) {
+                continue;
+            }
+            $uid = self::propertyValue($properties, 'UID');
+            $duration = strtoupper(trim(self::propertyValue($properties, 'DURATION')));
+            if ($uid === '' || $duration === '') {
+                continue;
+            }
+            $durations[$uid . "\0" . self::propertyValue($properties, 'RECURRENCE-ID')] = $duration;
+        }
+
+        return $durations;
+    }
+
+    /**
+     * Applies an RFC 5545 DURATION to an expanded recurring instance.
+     *
+     * DTEND defines one exact duration for every generated instance, while
+     * DURATION is applied at each local occurrence start. This preserves the
+     * nominal day/week part and the exact hour/minute/second part across DST.
+     *
+     * @param array<string, mixed> $event
+     * @return array<string, mixed>
+     */
+    private static function applyRecurringDuration(array $event): array
+    {
+        $duration = strtoupper(trim((string) ($event['_recurrenceDuration'] ?? '')));
+        unset($event['_recurrenceDuration']);
+        if ($duration === '' || !(bool) ($event['recurring'] ?? false)) {
+            return $event;
+        }
+
+        try {
+            if (str_starts_with($duration, '-')) {
+                return $event;
+            }
+            $timezone = self::timezone((string) ($event['timezone'] ?? 'UTC'));
+            $start = (new DateTimeImmutable('@' . (int) ($event['startTimestamp'] ?? 0)))
+                ->setTimezone($timezone);
+            $end = $start->add(new DateInterval($duration));
+            $event['end'] = (bool) ($event['allDay'] ?? false)
+                ? $end->format('Y-m-d')
+                : $end->format(DATE_ATOM);
+            $event['endTimestamp'] = $end->getTimestamp();
+        } catch (Throwable) {
+            return $event;
+        }
+
+        return $event;
     }
 
     /**
