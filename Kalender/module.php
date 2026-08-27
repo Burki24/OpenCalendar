@@ -765,10 +765,7 @@ class Calendar extends IPSModuleStrict
                     trim((string) ($event['summary'] ?? ''))
                 );
             }
-            $simpleSingleWrite = ($recurrence === null || $recurrence === [])
-                && ($anniversary === null || !$anniversary['enabled']);
-            if (!$simpleSingleWrite
-                || !$this->refreshSingleEventAfterWrite(array_merge($event, $created))) {
+            if (!$this->refreshEventAfterWrite(array_merge($event, $created))) {
                 $this->refreshAfterWrite();
             }
 
@@ -861,11 +858,9 @@ class Calendar extends IPSModuleStrict
             if ($changes === [] && !$anniversaryDisabled) {
                 throw new InvalidArgumentException('No event changes were supplied.');
             }
-            $simpleSingleWrite = $recurrenceType === CalendarEventRecurrence::SINGLE
-                && !$convertingSingleToSeries
-                && $anniversary === null
-                && $existingAnniversary === null;
-            $cachedEvent = $simpleSingleWrite ? $this->cachedEventForIdentity($event) : null;
+            $cachedEvent = $recurrenceType === CalendarEventRecurrence::SINGLE
+                ? $this->cachedEventForIdentity($event)
+                : null;
 
             $this->SendSafeDebug('EventUpdate', [
                 'recurrenceType'     => $recurrenceType,
@@ -900,12 +895,8 @@ class Calendar extends IPSModuleStrict
                     $event
                 );
             }
-            if (!$simpleSingleWrite
-                || $cachedEvent === null
-                || !$this->refreshSingleEventAfterWrite(
-                    array_merge($cachedEvent, $changes, $updated),
-                    $event
-                )) {
+            $writtenEvent = array_merge($cachedEvent ?? $event, $changes, $updated);
+            if (!$this->refreshEventAfterWrite($writtenEvent, $event)) {
                 $this->refreshAfterWrite();
             }
 
@@ -2290,19 +2281,16 @@ class Calendar extends IPSModuleStrict
     }
 
     /**
-     * Refreshes one non-recurring event directly from the provider and updates the local cache.
+     * Refreshes a written event through the provider-neutral direct lookup and updates the local cache when possible.
      *
      * @param array<string, mixed> $event Event identity and current time boundaries after the write.
      * @param array<string, mixed> $sourceEvent Previous event identity when an existing event was updated.
      */
-    private function refreshSingleEventAfterWrite(array $event, array $sourceEvent = []): bool
+    private function refreshEventAfterWrite(array $event, array $sourceEvent = []): bool
     {
         $startTimestamp = $this->eventBoundaryTimestamp($event, 'start');
         $endTimestamp = $this->eventBoundaryTimestamp($event, 'end');
-        if ($startTimestamp <= 0) {
-            return false;
-        }
-        if ($endTimestamp <= $startTimestamp) {
+        if ($startTimestamp > 0 && $endTimestamp <= $startTimestamp) {
             $endTimestamp = $startTimestamp + 1;
         }
 
@@ -2318,9 +2306,16 @@ class Calendar extends IPSModuleStrict
             'Start'          => $startTimestamp,
             'End'            => $endTimestamp
         ];
-        if ($lookupIdentity['EventReference'] !== ''
+        $hasLookupIdentity = $lookupIdentity['EventReference'] !== ''
             || $lookupIdentity['ResourceURL'] !== ''
-            || $lookupIdentity['UID'] !== '') {
+            || $lookupIdentity['UID'] !== ''
+            || $lookupIdentity['SeriesID'] !== ''
+            || $lookupIdentity['OccurrenceID'] !== '';
+        if (!$hasLookupIdentity && $startTimestamp <= 0) {
+            return false;
+        }
+
+        if ($hasLookupIdentity) {
             try {
                 $currentEvent = $this->sendRequest('GetEventAfterWrite', $lookupIdentity);
             } catch (Throwable $exception) {

@@ -214,11 +214,15 @@ microsoftWriteSyncExpect(
     'Post-write synchronization must preserve the existing delta token instead of creating a new baseline.'
 );
 microsoftWriteSyncExpect(
-    str_contains($calendarSource, "'GetEventAfterWrite'")
+    str_contains($calendarSource, 'private function refreshEventAfterWrite(array $event, array $sourceEvent = []): bool')
+        && str_contains($calendarSource, '$this->refreshEventAfterWrite(array_merge($event, $created))')
+        && str_contains($calendarSource, '$this->refreshEventAfterWrite($writtenEvent, $event)')
+        && str_contains($calendarSource, "'GetEventAfterWrite'")
         && str_contains($calendarSource, '$lookupIdentity = [')
         && str_contains($calendarSource, "\$this->sendRequest('GetEventAfterWrite', \$lookupIdentity)")
-        && str_contains($calendarSource, "'GetEventForEdit'"),
-    'Single writes must use the provider-neutral identity for direct refresh before the edit fallback.'
+        && str_contains($calendarSource, "'GetEventForEdit'")
+        && !str_contains($calendarSource, '$simpleSingleWrite'),
+    'All writes must use the provider-neutral identity for direct readback before the bounded refresh fallback.'
 );
 $gatewaySource = (string) file_get_contents(__DIR__ . '/../Kalender Konto/traits/ChildGatewayTrait.php');
 microsoftWriteSyncExpect(
