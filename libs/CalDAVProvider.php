@@ -1164,7 +1164,25 @@ final class CalDAVProvider implements CalendarEventLookupProviderInterface, Cale
      */
     private function eventMatchesLookupIdentity(array $event, array $identity): bool
     {
-        $matchedPrimaryIdentity = false;
+        foreach (['uid', 'seriesId'] as $key) {
+            $expected = trim((string) ($identity[$key] ?? ''));
+            $actual = trim((string) ($event[$key] ?? ''));
+            if ($expected !== '' && $actual !== '' && !hash_equals($expected, $actual)) {
+                return false;
+            }
+        }
+
+        $expectedOriginalStart = trim((string) ($identity['originalStart'] ?? ''));
+        $actualOriginalStart = trim((string) ($event['originalStart'] ?? ''));
+        if ($expectedOriginalStart !== '' && $actualOriginalStart !== '') {
+            if (!$this->lookupDateIdentityMatches($expectedOriginalStart, $actualOriginalStart)) {
+                return false;
+            }
+
+            return trim((string) ($identity['uid'] ?? '')) !== ''
+                || trim((string) ($identity['seriesId'] ?? '')) !== '';
+        }
+
         foreach ([
             'occurrenceId',
             'eventReference',
@@ -1174,28 +1192,30 @@ final class CalDAVProvider implements CalendarEventLookupProviderInterface, Cale
         ] as $key) {
             $expected = trim((string) ($identity[$key] ?? ''));
             $actual = trim((string) ($event[$key] ?? ''));
-            if ($expected === '' || $actual === '') {
-                continue;
+            if ($expected !== '' && $actual !== '' && hash_equals($expected, $actual)) {
+                return true;
             }
-            if (!hash_equals($expected, $actual)) {
-                return false;
-            }
-            $matchedPrimaryIdentity = true;
-            break;
         }
-        if (!$matchedPrimaryIdentity) {
+
+        return false;
+    }
+
+    private function lookupDateIdentityMatches(string $expected, string $actual): bool
+    {
+        if (hash_equals($expected, $actual)) {
+            return true;
+        }
+        if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $expected) === 1
+            || preg_match('/^\d{4}-\d{2}-\d{2}$/', $actual) === 1) {
             return false;
         }
 
-        foreach (['originalStart', 'recurrenceId'] as $key) {
-            $expected = trim((string) ($identity[$key] ?? ''));
-            $actual = trim((string) ($event[$key] ?? ''));
-            if ($expected !== '' && $actual !== '' && !hash_equals($expected, $actual)) {
-                return false;
-            }
+        try {
+            return (new DateTimeImmutable($expected))->getTimestamp()
+                === (new DateTimeImmutable($actual))->getTimestamp();
+        } catch (Throwable) {
+            return false;
         }
-
-        return true;
     }
 
     /**

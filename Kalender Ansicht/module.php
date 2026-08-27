@@ -2707,14 +2707,13 @@ class CalendarView extends IPSModuleStrict
                 if (!is_array($event)) {
                     throw new InvalidArgumentException($this->Translate('The event data is invalid.'));
                 }
-                $result = json_decode(
+                $result = $this->decodeCalendarModuleJson(
                     IPSKAL_CreateEvent(
                         $instanceId,
                         json_encode($event, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR)
                     ),
-                    true,
-                    512,
-                    JSON_THROW_ON_ERROR
+                    $instanceId,
+                    'Event creation failed.'
                 );
                 if (!is_array($result) || !($result['success'] ?? false)) {
                     throw new RuntimeException((string) ($result['error'] ?? $this->Translate('Event creation failed.')));
@@ -2730,7 +2729,7 @@ class CalendarView extends IPSModuleStrict
                     throw new InvalidArgumentException($this->Translate('The event data is invalid.'));
                 }
 
-                $eventEdit = json_decode(
+                $eventEdit = $this->decodeCalendarModuleJson(
                     IPSKAL_GetEventForEdit(
                         $instanceId,
                         json_encode(
@@ -2738,9 +2737,8 @@ class CalendarView extends IPSModuleStrict
                             JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR
                         )
                     ),
-                    true,
-                    512,
-                    JSON_THROW_ON_ERROR
+                    $instanceId,
+                    'The selected event is no longer available.'
                 );
                 if (!is_array($eventEdit) || array_is_list($eventEdit)) {
                     throw new RuntimeException($this->Translate('The event data is invalid.'));
@@ -2804,11 +2802,10 @@ class CalendarView extends IPSModuleStrict
                     if ($occurrenceId === '' || $originalStart === '') {
                         throw new InvalidArgumentException($this->Translate('The event data is invalid.'));
                     }
-                    $seriesEdit = json_decode(
+                    $seriesEdit = $this->decodeCalendarModuleJson(
                         IPSKAL_GetRecurringFollowing($instanceId, $seriesId, $occurrenceId, $originalStart, $resourceUrl),
-                        true,
-                        512,
-                        JSON_THROW_ON_ERROR
+                        $instanceId,
+                        'This and following updates are not supported by this calendar.'
                     );
                     if (!is_array($seriesEdit) || !($seriesEdit['canUpdateFollowing'] ?? false)) {
                         throw new RuntimeException(
@@ -2816,11 +2813,10 @@ class CalendarView extends IPSModuleStrict
                         );
                     }
                 } else {
-                    $seriesEdit = json_decode(
+                    $seriesEdit = $this->decodeCalendarModuleJson(
                         IPSKAL_GetRecurringSeries($instanceId, $seriesId, $resourceUrl),
-                        true,
-                        512,
-                        JSON_THROW_ON_ERROR
+                        $instanceId,
+                        'Recurring series updates are not supported by this calendar.'
                     );
                     if (!is_array($seriesEdit) || !($seriesEdit['canUpdateSeries'] ?? false)) {
                         throw new RuntimeException(
@@ -2840,14 +2836,13 @@ class CalendarView extends IPSModuleStrict
                 if (!is_array($event)) {
                     throw new InvalidArgumentException($this->Translate('The event data is invalid.'));
                 }
-                $result = json_decode(
+                $result = $this->decodeCalendarModuleJson(
                     IPSKAL_UpdateEvent(
                         $instanceId,
                         json_encode($event, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR)
                     ),
-                    true,
-                    512,
-                    JSON_THROW_ON_ERROR
+                    $instanceId,
+                    'Event update failed.'
                 );
                 if (!is_array($result) || !($result['success'] ?? false)) {
                     throw new RuntimeException((string) ($result['error'] ?? $this->Translate('Event update failed.')));
@@ -2922,14 +2917,13 @@ class CalendarView extends IPSModuleStrict
                     unset($event['recurrence']);
                 }
 
-                $creationResult = json_decode(
+                $creationResult = $this->decodeCalendarModuleJson(
                     IPSKAL_CreateEvent(
                         $targetInstanceId,
                         json_encode($event, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR)
                     ),
-                    true,
-                    512,
-                    JSON_THROW_ON_ERROR
+                    $targetInstanceId,
+                    'Event move failed.'
                 );
                 if (!is_array($creationResult) || !($creationResult['success'] ?? false)) {
                     throw new RuntimeException((string) ($creationResult['error'] ?? $this->Translate('Event move failed.')));
@@ -2963,10 +2957,8 @@ class CalendarView extends IPSModuleStrict
                     $instanceId,
                     json_encode($event, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR)
                 )) {
-                    $status = json_decode(IPSKAL_GetCalendarStatus($instanceId), true, 512, JSON_THROW_ON_ERROR);
-                    $lastError = is_array($status) ? trim((string) ($status['lastError'] ?? '')) : '';
                     throw new RuntimeException(
-                        $lastError !== '' ? $lastError : $this->Translate('Event deletion failed.')
+                        $this->calendarModuleErrorMessage($instanceId, 'Event deletion failed.')
                     );
                 }
                 $message = 'Event deleted.';
@@ -2995,6 +2987,43 @@ class CalendarView extends IPSModuleStrict
             'level'   => $level,
             'message' => $message
         ];
+    }
+
+    private function decodeCalendarModuleJson(mixed $response, int $instanceId, string $fallbackMessage): mixed
+    {
+        if (!is_string($response) || trim($response) === '') {
+            throw new RuntimeException($this->calendarModuleErrorMessage($instanceId, $fallbackMessage));
+        }
+
+        try {
+            return json_decode($response, true, 512, JSON_THROW_ON_ERROR);
+        } catch (JsonException $exception) {
+            throw new RuntimeException(
+                $this->calendarModuleErrorMessage($instanceId, $fallbackMessage),
+                0,
+                $exception
+            );
+        }
+    }
+
+    private function calendarModuleErrorMessage(int $instanceId, string $fallbackMessage): string
+    {
+        try {
+            $statusResponse = IPSKAL_GetCalendarStatus($instanceId);
+            if (is_string($statusResponse) && trim($statusResponse) !== '') {
+                $status = json_decode($statusResponse, true, 512, JSON_THROW_ON_ERROR);
+                if (is_array($status)) {
+                    $lastError = trim((string) ($status['lastError'] ?? ''));
+                    if ($lastError !== '') {
+                        return $lastError;
+                    }
+                }
+            }
+        } catch (Throwable $exception) {
+            $this->SendDebug('CalendarStatus', $exception->getMessage(), 0);
+        }
+
+        return $this->Translate($fallbackMessage);
     }
 
     private function synchronizeSelectedCalendars(): bool

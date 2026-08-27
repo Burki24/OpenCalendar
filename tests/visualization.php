@@ -561,6 +561,18 @@ assertVisualization(
 );
 
 assertVisualization(
+    str_contains($moduleSource, 'private function decodeCalendarModuleJson(')
+        && str_contains($moduleSource, 'private function calendarModuleErrorMessage(')
+        && str_contains($moduleSource, '$eventEdit = $this->decodeCalendarModuleJson(')
+        && substr_count($moduleSource, '$seriesEdit = $this->decodeCalendarModuleJson(') === 2
+        && str_contains($moduleSource, '$result = $this->decodeCalendarModuleJson(')
+        && str_contains($moduleSource, '$statusResponse = IPSKAL_GetCalendarStatus($instanceId);')
+        && str_contains($moduleSource, 'is_string($response)')
+        && !str_contains($moduleSource, '$eventEdit = json_decode('),
+    'Visualization write and edit actions must never pass a failed Symcon module-call result directly to json_decode and must surface the calendar error instead.'
+);
+
+assertVisualization(
     str_contains($script, "let eventDialogLoadingMode = '';")
         && str_contains($script, "function openPendingEventEditor(event, writeScope = '')")
         && str_contains($script, "setEventDialogLoading('provider');")

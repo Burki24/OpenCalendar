@@ -671,6 +671,63 @@ assertCalDAVSame(true, $recurringEvents[0]['canUpdateSeries'], 'Expanded CalDAV 
 assertCalDAVSame(true, $recurringEvents[0]['canDeleteSeries'], 'Expanded CalDAV occurrences must advertise complete-series deletion.');
 assertCalDAVSame('2026-08-24T10:00:00+00:00', $recurringEvents[1]['originalStart'], 'RECURRENCE-ID must remain the immutable original occurrence start.');
 
+// A server-expanded occurrence can carry an RFC 5545 RECURRENCE-ID such as
+// 20260824T100000Z, while the same occurrence expanded locally from the master
+// uses 20260824T100000. Direct edit lookup must therefore use the immutable
+// originalStart plus the recurring UID/series identity instead of rejecting the
+// occurrence because the provider-neutral occurrenceId string differs.
+$iCloudOccurrenceEditClient = new FakeCalDAVHttpClient([
+    caldavResponseWithHeaders(
+        200,
+        ['etag' => '"icloud-occurrence-edit-etag"'],
+        recurringSeriesIcal(),
+        $iCloudRedirectedSeriesResourceUrl
+    )
+]);
+$iCloudOccurrenceIdentity = $recurringEvents[1];
+$iCloudOccurrenceIdentity['resourceUrl'] = $iCloudSeriesResourceUrl;
+$iCloudOccurrenceEdit = (new CalDAVProvider(
+    $iCloudOccurrenceEditClient,
+    'https://caldav.icloud.com/'
+))->getEventForEdit(
+    $iCloudCalendarUrl,
+    [
+        'resourceUrl'    => $iCloudSeriesResourceUrl,
+        'uid'            => (string) ($iCloudOccurrenceIdentity['uid'] ?? ''),
+        'seriesId'       => (string) ($iCloudOccurrenceIdentity['seriesId'] ?? ''),
+        'occurrenceId'   => (string) ($iCloudOccurrenceIdentity['occurrenceId'] ?? ''),
+        'originalStart'  => (string) ($iCloudOccurrenceIdentity['originalStart'] ?? ''),
+        'recurrenceId'   => (string) ($iCloudOccurrenceIdentity['recurrenceId'] ?? ''),
+        'startTimestamp' => (int) ($iCloudOccurrenceIdentity['startTimestamp'] ?? 0),
+        'endTimestamp'   => (int) ($iCloudOccurrenceIdentity['endTimestamp'] ?? 0)
+    ]
+);
+assertCalDAVSame(
+    'occurrence',
+    $iCloudOccurrenceEdit['recurrenceType'],
+    'A synchronized iCloud occurrence must remain directly editable when GET expands the master locally.'
+);
+assertCalDAVSame(
+    $iCloudOccurrenceIdentity['originalStart'],
+    $iCloudOccurrenceEdit['originalStart'],
+    'Direct iCloud occurrence editing must keep the immutable original occurrence start.'
+);
+assertCalDAVTrue(
+    (string) ($iCloudOccurrenceIdentity['occurrenceId'] ?? '')
+        !== (string) ($iCloudOccurrenceEdit['occurrenceId'] ?? ''),
+    'The regression fixture must cover differing server-expanded and locally expanded occurrence IDs.'
+);
+assertCalDAVSame(
+    $iCloudRedirectedSeriesResourceUrl,
+    $iCloudOccurrenceEdit['resourceUrl'],
+    'Direct iCloud occurrence editing must retain the effective trusted shard resource URL.'
+);
+assertCalDAVSame(
+    1,
+    count($iCloudOccurrenceEditClient->requests),
+    'Direct iCloud occurrence editing must use one bounded object GET without a UID REPORT.'
+);
+
 // iCloud rejects calendar-query UID prop-filter lookups with HTTP 412. When the
 // synchronized occurrence already carries its calendar object URL, complete-series
 // editing must open that exact resource directly and must not issue a UID REPORT.
