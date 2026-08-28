@@ -539,6 +539,16 @@ window.SYMC_VISUALIZATION = {{BOOTSTRAP_JSON}};
 
 (() => {
     'use strict';
+    const detailsTarget = document.getElementById('details-description');
+    const eventDescription = document.getElementById('event-description');
+    const eventDescriptionHtmlNote = document.getElementById('event-description-html-note');
+    const eventDialogElement = document.getElementById('event-dialog');
+    const eventFormElement = document.getElementById('event-form');
+    const calendarContent = document.getElementById('calendar-content');
+    if (typeof DOMParser !== 'function') return;
+
+    let htmlEditorPlainDescription = '';
+    let htmlEditorActive = false;
 
     function decodeHtmlEntities(value) {
         const decoder = document.createElement('textarea');
