@@ -29,7 +29,7 @@ beliebig verschoben oder vom Benutzer umbenannt werden.
 
 ## Funktionsumfang
 
-- Abruf von CalDAV-Terminen über einen konfigurierbaren Zeitraum
+- providerneutraler Abruf von Terminen über einen konfigurierbaren Zeitraum
 - Auflösen wiederkehrender Termine für die lokale Anzeige
 - lokaler JSON-Cache und zyklische Synchronisation
 - Erstellen neuer Termine sowie neuer Google-, Microsoft-, Apple-iCloud- und CalDAV-Serientermine
@@ -90,6 +90,7 @@ string IPSKAL_GetEvents(int $InstanzID);
 string IPSKAL_GetAnniversaryList(int $InstanzID, int $Days = 0, string $Type = '');
 string IPSKAL_GetBirthdayList(int $InstanzID, int $Days = 0);
 bool IPSKAL_SetAnniversary(int $InstanzID, string $EventJSON, string $Type, string $Date);
+string IPSKAL_GetEventForEdit(int $InstanzID, string $EventJSON);
 string IPSKAL_GetRecurringSeries(int $InstanzID, string $SeriesID, string $ResourceURL = '');
 string IPSKAL_GetRecurringFollowing(int $InstanzID, string $SeriesID, string $OccurrenceID, string $OriginalStart, string $ResourceURL = '');
 string IPSKAL_BeginEventsTransfer(int $InstanzID, int $StartTimestamp, int $EndTimestamp);
@@ -117,10 +118,16 @@ $series = IPSKAL_GetRecurringSeries(12345, 'provider-series-id');
 IPSKAL_SetAnniversary(12345, $series, 'birthday', '1993-07-20');
 ```
 
+`IPSKAL_GetEventForEdit()` lädt die aktuelle providerseitige Identität eines
+Termins erneut und liefert den normalisierten Termin einschließlich der für
+Schreibvorgänge relevanten Felder wie dem aktuellen ETag.
+
 `IPSKAL_GetCalendarStatus()` liefert neben Synchronisations- und Zählerinformationen
-auch `calendarColor`, `canWrite`, `timezone`, `canCreateRecurrence`, `canUpdateFollowing`,
-`canUpdateSeries` und `canDeleteSeries`. Die Serienfähigkeiten und die Zeitzone werden aus den vom
-Provider erkannten Kalender-Metadaten übernommen.
+auch `calendarColor`, `canWrite`, `timezone`, die Serienfähigkeiten,
+`maxReminders`, `canUseDefaultReminder`, `canCreateDefaultReminder`,
+`canWriteStatus` und `canWriteTransparency` sowie providerabhängige Standardwerte
+für Status, Verfügbarkeit und Erinnerungen. Die Fähigkeiten und Standardwerte
+werden aus den vom Provider erkannten Kalender-Metadaten übernommen.
 
 ### Termin erstellen
 

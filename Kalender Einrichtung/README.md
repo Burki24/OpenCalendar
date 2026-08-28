@@ -62,6 +62,11 @@ der Assistent keinen Konfigurator an.
 ### Apple iCloud
 
 Der Wizard übernimmt Apple-Account-E-Mail-Adresse und app-spezifisches Passwort.
+Für OpenCalendar muss im Apple Account unter **Anmelden und Sicherheit >
+App-spezifische Passwörter** ein eigenes Passwort erzeugt werden; dafür muss die
+Zwei-Faktor-Authentifizierung aktiviert sein. Direkt im Wizard stehen dazu
+Schaltflächen zum [Apple Account](https://account.apple.com/) und zur offiziellen
+[Apple-Support-Anleitung](https://support.apple.com/102654) bereit.
 Die bekannte iCloud-CalDAV-Adresse wird automatisch gesetzt. Beim Klick auf
 **Weiter** wird die Verbindung mit der vorhandenen
 `IPSKALACC_TestConnection()`-Funktion geprüft.

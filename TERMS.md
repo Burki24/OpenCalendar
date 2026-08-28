@@ -1,8 +1,8 @@
 # Nutzungsbedingungen / Terms of Use
 
-**Stand / Last updated: 10.08.2026**
+**Stand / Last updated: 28.08.2026**
 
-OpenCalendar ist quelloffene Software und wird unter der im Repository enthaltenen [PolyForm Noncommercial License 1.0.0](https://github.com/Burki24/OpenCalendar/blob/main/LICENSE) bereitgestellt. Die Lizenz gestattet die Nutzung, Änderung und Weitergabe ausschließlich für die in ihr definierten nichtkommerziellen Zwecke. Eine kommerzielle Nutzung wird durch diese Lizenz nicht gestattet und erfordert eine gesonderte Erlaubnis des Lizenzgebers.
+OpenCalendar ist quellverfügbare Software und wird unter der im Repository enthaltenen [PolyForm Noncommercial License 1.0.0](https://github.com/Burki24/OpenCalendar/blob/main/LICENSE) bereitgestellt. Die Lizenz gestattet die Nutzung, Änderung und Weitergabe ausschließlich für die in ihr definierten nichtkommerziellen Zwecke. Eine kommerzielle Nutzung wird durch diese Lizenz nicht gestattet und erfordert eine gesonderte Erlaubnis des Lizenzgebers.
 
 ## Nutzung
 
