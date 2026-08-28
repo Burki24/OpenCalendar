@@ -45,6 +45,7 @@ $commands = [
     ['Check Symcon Strict compliance', [PHP_BINARY, 'tests/symcon-strict.php']],
     ['Verify live provider E2E harness contract', [PHP_BINARY, 'tests/live-provider-e2e-contract.php']],
     ['Audit Symcon 9.1 Rust runtime boundaries', [PHP_BINARY, 'tests/symcon-9.1-runtime.php']],
+    ['Verify OpenCalendar 2.0 -> 3.0 upgrade contract', [PHP_BINARY, 'tests/upgrade-migration.php']],
     ['Run CalDAV provider tests', [PHP_BINARY, 'tests/caldav.php']],
     ['Run CalDAV HTTP integration tests', ['bash', 'tests/run-caldav-http.sh']]
 ];
