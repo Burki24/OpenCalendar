@@ -45,6 +45,9 @@ class OpenCalendarDiscovery extends IPSModuleStrict
     private const ICALENDAR_AUTH_URL_ACCESS_KEY = 1;
     private const ICALENDAR_AUTH_USERNAME_PASSWORD = 2;
 
+    /**
+     * Registers the persistent setup state used by the OpenCalendar discovery wizard.
+     */
     public function Create(): void
     {
         parent::Create();
@@ -57,6 +60,11 @@ class OpenCalendarDiscovery extends IPSModuleStrict
         $this->RegisterAttributeString('LastSetupResult', '{}');
     }
 
+    /**
+     * Builds the discovery wizard form and injects current account, calendar, view, and result state.
+     *
+     * @return string JSON-encoded configuration form.
+     */
     public function GetConfigurationForm(): string
     {
         $form = json_decode(
@@ -112,6 +120,12 @@ class OpenCalendarDiscovery extends IPSModuleStrict
         return json_encode($form, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE);
     }
 
+    /**
+     * Handles discovery-wizard actions and forwards unsupported actions to the Symcon base module.
+     *
+     * @param string $Ident Action identifier supplied by the configuration form.
+     * @param mixed  $Value Action payload supplied by the configuration form.
+     */
     public function RequestAction(string $Ident, mixed $Value): void
     {
         switch ($Ident) {
@@ -201,6 +215,14 @@ class OpenCalendarDiscovery extends IPSModuleStrict
         }
     }
 
+    /**
+     * Validates whether the wizard can use the selected existing or new calendar account.
+     *
+     * @param string $AccountMode Existing-account or new-account mode.
+     * @param int    $ExistingAccountID Existing account instance ID when applicable.
+     * @param string $AccountName Name for a newly created account.
+     * @return string Empty string when valid, otherwise a localized validation message.
+     */
     public function ValidateWizardAccountSelection(
         string $AccountMode,
         int $ExistingAccountID,
@@ -220,6 +242,11 @@ class OpenCalendarDiscovery extends IPSModuleStrict
         return '';
     }
 
+    /**
+     * Returns the provider-specific wizard page for the currently selected provider.
+     *
+     * @return string Provider page identifier.
+     */
     public function GetWizardProviderPage(): string
     {
         return match ($this->wizardProvider()) {
@@ -231,6 +258,13 @@ class OpenCalendarDiscovery extends IPSModuleStrict
         };
     }
 
+    /**
+     * Applies and verifies Apple iCloud credentials entered in the wizard.
+     *
+     * @param string $Username Apple Account email address.
+     * @param string $Password App-specific Apple password.
+     * @return string Empty string on success, otherwise a localized validation or connection error.
+     */
     public function ValidateWizardAppleConfiguration(string $Username, string $Password): string
     {
         try {
@@ -265,6 +299,14 @@ class OpenCalendarDiscovery extends IPSModuleStrict
         }
     }
 
+    /**
+     * Applies and verifies generic CalDAV connection settings entered in the wizard.
+     *
+     * @param string $ServerURL CalDAV server URL.
+     * @param string $Username Optional CalDAV username.
+     * @param string $Password Optional CalDAV password.
+     * @return string Empty string on success, otherwise a localized validation or connection error.
+     */
     public function ValidateWizardCalDAVConfiguration(
         string $ServerURL,
         string $Username,
@@ -298,6 +340,16 @@ class OpenCalendarDiscovery extends IPSModuleStrict
         }
     }
 
+    /**
+     * Applies and verifies a single ICS/Webcal subscription entered in the wizard.
+     *
+     * @param string $ServerURL iCalendar feed URL.
+     * @param string $CalendarName Display name for the subscription.
+     * @param int    $AuthenticationMode Selected iCalendar authentication mode.
+     * @param string $Username Optional HTTP authentication username.
+     * @param string $Password Optional HTTP authentication password.
+     * @return string Empty string on success, otherwise a localized validation or connection error.
+     */
     public function ValidateWizardICalendarConfiguration(
         string $ServerURL,
         string $CalendarName,
@@ -379,6 +431,11 @@ class OpenCalendarDiscovery extends IPSModuleStrict
         }
     }
 
+    /**
+     * Starts the native OAuth flow for the currently selected Google or Microsoft account.
+     *
+     * @return string OAuth authorization URL.
+     */
     public function BeginWizardOAuth(): string
     {
         $accountID = $this->wizardAccountID();
@@ -398,6 +455,11 @@ class OpenCalendarDiscovery extends IPSModuleStrict
         return $result;
     }
 
+    /**
+     * Verifies OAuth state and the provider connection for the prepared Google or Microsoft account.
+     *
+     * @return string Empty string on success, otherwise a localized validation or connection error.
+     */
     public function ValidateWizardOAuthConnection(): string
     {
         try {
@@ -427,6 +489,11 @@ class OpenCalendarDiscovery extends IPSModuleStrict
         }
     }
 
+    /**
+     * Validates that at least one currently discovered calendar is selected.
+     *
+     * @return string Empty string when valid, otherwise a localized validation message.
+     */
     public function ValidateWizardCalendarSelection(): string
     {
         try {
@@ -438,6 +505,14 @@ class OpenCalendarDiscovery extends IPSModuleStrict
         return '';
     }
 
+    /**
+     * Validates the existing or new Calendar View selected by the discovery wizard.
+     *
+     * @param string $ViewMode Existing-view or new-view mode.
+     * @param int    $ExistingViewID Existing Calendar View instance ID when applicable.
+     * @param string $ViewName Name for a newly created Calendar View.
+     * @return string Empty string when valid, otherwise a localized validation message.
+     */
     public function ValidateWizardCalendarViewSelection(
         string $ViewMode,
         int $ExistingViewID,
@@ -452,6 +527,11 @@ class OpenCalendarDiscovery extends IPSModuleStrict
         return '';
     }
 
+    /**
+     * Validates the final wizard state before instances are created, reused, and verified.
+     *
+     * @return string Empty string when valid, otherwise a localized validation message.
+     */
     public function ValidateWizardConfirmation(): string
     {
         try {
@@ -881,7 +961,7 @@ class OpenCalendarDiscovery extends IPSModuleStrict
     private function normalizeWizardErrorMessage(string $message): string
     {
         $message = strip_tags($message);
-        $message = preg_replace('/\\s+/', ' ', $message) ?? $message;
+        $message = preg_replace('/\s+/', ' ', $message) ?? $message;
         $message = trim($message);
 
         return strlen($message) > 600 ? substr($message, 0, 597) . '...' : $message;
