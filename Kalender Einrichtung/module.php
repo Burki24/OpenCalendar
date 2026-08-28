@@ -961,7 +961,7 @@ class OpenCalendarDiscovery extends IPSModuleStrict
     private function normalizeWizardErrorMessage(string $message): string
     {
         $message = strip_tags($message);
-        $message = preg_replace('/\s+/', ' ', $message) ?? $message;
+        $message = preg_replace('/\\s+/', ' ', $message) ?? $message;
         $message = trim($message);
 
         return strlen($message) > 600 ? substr($message, 0, 597) . '...' : $message;

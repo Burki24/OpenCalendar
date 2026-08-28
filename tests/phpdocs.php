@@ -26,51 +26,29 @@ foreach ($roots as $root) {
             throw new RuntimeException('Could not read ' . $file->getPathname());
         }
 
-        preg_match_all(
-            '/\bpublic\s+(?:static\s+)?function\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(/',
-            $source,
-            $matches,
-            PREG_OFFSET_CAPTURE
-        );
+        foreach (publicMethods($source) as $method) {
+            $relativeMethod = relativePath($file->getPathname()) . '::' . $method['name'];
+            $docBlock = $method['docBlock'];
 
-        foreach ($matches[1] as $index => $methodMatch) {
-            $method = $methodMatch[0];
-            $declarationOffset = $matches[0][$index][1];
-            $prefix = rtrim(substr($source, 0, $declarationOffset));
-            $relativeMethod = relativePath($file->getPathname()) . '::' . $method;
-
-            if (!str_ends_with($prefix, '*/')) {
+            if ($docBlock === null) {
                 $missing[] = $relativeMethod;
                 continue;
             }
 
-            $docStart = strrpos($prefix, '/**');
-            $commentStart = strrpos($prefix, '/*');
-            if ($docStart === false || $commentStart !== $docStart) {
-                $missing[] = $relativeMethod;
-                continue;
-            }
+            $parameterTags = documentedParameterTags($docBlock);
+            $documentedParameters = [];
 
-            $docBlock = substr($prefix, $docStart);
-            $declaration = publicMethodDeclaration($source, $declarationOffset);
-            if ($declaration === '') {
-                $invalid[] = $relativeMethod . ' (could not parse declaration)';
-                continue;
-            }
+            foreach ($parameterTags as $parameterTag) {
+                preg_match_all('/\$([A-Za-z_][A-Za-z0-9_]*)\b/', $parameterTag, $variableMatches);
+                $variables = $variableMatches[1] ?? [];
+                if ($variables === []) {
+                    $invalid[] = $relativeMethod . ' (malformed @param tag)';
+                    continue;
+                }
 
-            preg_match_all('/\$([A-Za-z_][A-Za-z0-9_]*)/', methodParameterList($declaration), $parameterMatches);
-            $parameters = array_values(array_unique($parameterMatches[1] ?? []));
-
-            preg_match_all(
-                '/@param\s+[^\s]+\s+\$([A-Za-z_][A-Za-z0-9_]*)\b/',
-                $docBlock,
-                $documentedParameterMatches
-            );
-            $documentedParameters = $documentedParameterMatches[1] ?? [];
-            $paramTagCount = preg_match_all('/@param\b/', $docBlock);
-
-            if ($paramTagCount !== count($documentedParameters)) {
-                $invalid[] = $relativeMethod . ' (malformed @param tag)';
+                // Complex PHPDoc types may contain named callable parameters.
+                // The documented method parameter is the final variable in the tag.
+                $documentedParameters[] = $variables[array_key_last($variables)];
             }
 
             if (count($documentedParameters) !== count(array_unique($documentedParameters))) {
@@ -78,15 +56,12 @@ foreach ($roots as $root) {
             }
 
             foreach ($documentedParameters as $documentedParameter) {
-                if (!in_array($documentedParameter, $parameters, true)) {
+                if (!in_array($documentedParameter, $method['parameters'], true)) {
                     $invalid[] = $relativeMethod . ' (unknown @param $' . $documentedParameter . ')';
                 }
             }
 
-            if (
-                preg_match('/\)\s*:\s*void\b/', $declaration) === 1
-                && preg_match('/@return\b/', $docBlock) === 1
-            ) {
+            if ($method['returnsVoid'] && preg_match('/@return\b/', $docBlock) === 1) {
                 $invalid[] = $relativeMethod . ' (@return used for void method)';
             }
         }
@@ -107,42 +82,288 @@ if ($missing !== [] || $invalid !== []) {
 
 echo "Public PHPDoc coverage and tag validation: OK\n";
 
-function publicMethodDeclaration(string $source, int $offset): string
+/**
+ * @return list<array{name: string, parameters: list<string>, returnsVoid: bool, docBlock: ?string}>
+ */
+function publicMethods(string $source): array
 {
-    $braceOffset = strpos($source, '{', $offset);
-    if ($braceOffset === false) {
-        return '';
+    $tokens = token_get_all($source);
+    $methods = [];
+    $braceDepth = 0;
+    $classDepths = [];
+    $pendingClassLike = false;
+
+    foreach ($tokens as $index => $token) {
+        if (is_array($token)) {
+            if (in_array($token[0], [T_CLASS, T_INTERFACE, T_TRAIT, T_ENUM], true)) {
+                $pendingClassLike = true;
+                continue;
+            }
+
+            if ($token[0] !== T_FUNCTION || $classDepths === []) {
+                continue;
+            }
+
+            $name = namedFunctionName($tokens, $index);
+            if ($name === null || !isPublicFunction($tokens, $index)) {
+                continue;
+            }
+
+            $signature = functionSignature($tokens, $index);
+            if ($signature === null) {
+                throw new RuntimeException('Could not parse public method declaration: ' . $name);
+            }
+
+            $methods[] = [
+                'name'        => $name,
+                'parameters'  => signatureParameterNames($signature),
+                'returnsVoid' => signatureReturnsVoid($signature),
+                'docBlock'    => precedingMethodDocBlock($tokens, $index)
+            ];
+            continue;
+        }
+
+        if ($token === '{') {
+            ++$braceDepth;
+            if ($pendingClassLike) {
+                $classDepths[] = $braceDepth;
+                $pendingClassLike = false;
+            }
+            continue;
+        }
+
+        if ($token !== '}') {
+            continue;
+        }
+
+        if ($classDepths !== [] && end($classDepths) === $braceDepth) {
+            array_pop($classDepths);
+        }
+        --$braceDepth;
     }
 
-    return trim(substr($source, $offset, $braceOffset - $offset));
+    return $methods;
 }
 
-function methodParameterList(string $declaration): string
+/**
+ * @param array<int, array{0: int, 1: string, 2: int}|string> $tokens
+ */
+function namedFunctionName(array $tokens, int $functionIndex): ?string
 {
-    $open = strpos($declaration, '(');
-    if ($open === false) {
-        return '';
-    }
+    $count = count($tokens);
+    for ($index = $functionIndex + 1; $index < $count; ++$index) {
+        $token = $tokens[$index];
 
-    $depth = 0;
-    $length = strlen($declaration);
-    for ($index = $open; $index < $length; ++$index) {
-        if ($declaration[$index] === '(') {
-            ++$depth;
+        if (is_array($token) && $token[0] === T_WHITESPACE) {
+            continue;
+        }
+        if ($token === '&') {
             continue;
         }
 
-        if ($declaration[$index] !== ')') {
+        return is_array($token) && $token[0] === T_STRING ? $token[1] : null;
+    }
+
+    return null;
+}
+
+/**
+ * @param array<int, array{0: int, 1: string, 2: int}|string> $tokens
+ */
+function isPublicFunction(array $tokens, int $functionIndex): bool
+{
+    for ($index = $functionIndex - 1; $index >= 0; --$index) {
+        $token = $tokens[$index];
+
+        if (is_array($token) && in_array(
+            $token[0],
+            [T_WHITESPACE, T_STATIC, T_ABSTRACT, T_FINAL, T_PUBLIC, T_PROTECTED, T_PRIVATE, T_READONLY],
+            true
+        )) {
+            if ($token[0] === T_PRIVATE || $token[0] === T_PROTECTED) {
+                return false;
+            }
+            if ($token[0] === T_PUBLIC) {
+                return true;
+            }
             continue;
         }
 
-        --$depth;
-        if ($depth === 0) {
-            return substr($declaration, $open + 1, $index - $open - 1);
+        break;
+    }
+
+    // PHP methods without an explicit visibility modifier are public by default.
+    return true;
+}
+
+/**
+ * @param array<int, array{0: int, 1: string, 2: int}|string> $tokens
+ */
+function precedingMethodDocBlock(array $tokens, int $functionIndex): ?string
+{
+    for ($index = $functionIndex - 1; $index >= 0; --$index) {
+        $token = $tokens[$index];
+
+        if (is_array($token) && in_array(
+            $token[0],
+            [T_WHITESPACE, T_STATIC, T_ABSTRACT, T_FINAL, T_PUBLIC, T_PROTECTED, T_PRIVATE, T_READONLY],
+            true
+        )) {
+            continue;
+        }
+
+        return is_array($token) && $token[0] === T_DOC_COMMENT ? $token[1] : null;
+    }
+
+    return null;
+}
+
+/**
+ * @param array<int, array{0: int, 1: string, 2: int}|string> $tokens
+ * @return list<array{0: int, 1: string, 2: int}|string>|null
+ */
+function functionSignature(array $tokens, int $functionIndex): ?array
+{
+    $signature = [];
+    $parenthesisDepth = 0;
+    $seenParameters = false;
+    $count = count($tokens);
+
+    for ($index = $functionIndex; $index < $count; ++$index) {
+        $token = $tokens[$index];
+        $signature[] = $token;
+
+        if ($token === '(') {
+            ++$parenthesisDepth;
+            $seenParameters = true;
+            continue;
+        }
+
+        if ($token === ')') {
+            --$parenthesisDepth;
+            continue;
+        }
+
+        if ($seenParameters && $parenthesisDepth === 0 && ($token === '{' || $token === ';')) {
+            return $signature;
         }
     }
 
-    return '';
+    return null;
+}
+
+/**
+ * @param list<array{0: int, 1: string, 2: int}|string> $signature
+ * @return list<string>
+ */
+function signatureParameterNames(array $signature): array
+{
+    $parameters = [];
+    $parenthesisDepth = 0;
+    $seenParameters = false;
+
+    foreach ($signature as $token) {
+        if ($token === '(') {
+            ++$parenthesisDepth;
+            $seenParameters = true;
+            continue;
+        }
+
+        if ($token === ')') {
+            --$parenthesisDepth;
+            continue;
+        }
+
+        if (
+            $seenParameters
+            && $parenthesisDepth === 1
+            && is_array($token)
+            && $token[0] === T_VARIABLE
+        ) {
+            $parameters[] = substr($token[1], 1);
+        }
+    }
+
+    return array_values(array_unique($parameters));
+}
+
+/**
+ * @param list<array{0: int, 1: string, 2: int}|string> $signature
+ */
+function signatureReturnsVoid(array $signature): bool
+{
+    $parenthesisDepth = 0;
+    $seenParameters = false;
+    $afterParameters = false;
+    $returnType = '';
+
+    foreach ($signature as $token) {
+        if ($token === '(') {
+            ++$parenthesisDepth;
+            $seenParameters = true;
+            continue;
+        }
+
+        if ($token === ')') {
+            --$parenthesisDepth;
+            if ($seenParameters && $parenthesisDepth === 0) {
+                $afterParameters = true;
+            }
+            continue;
+        }
+
+        if (!$afterParameters || $parenthesisDepth !== 0) {
+            continue;
+        }
+
+        if ($token === '{' || $token === ';') {
+            break;
+        }
+
+        $returnType .= is_array($token) ? $token[1] : $token;
+    }
+
+    return preg_match('/:\s*void\b/i', $returnType) === 1;
+}
+
+/**
+ * @return list<string>
+ */
+function documentedParameterTags(string $docBlock): array
+{
+    $lines = preg_split('/\R/', $docBlock) ?: [];
+    $tags = [];
+    $current = null;
+
+    foreach ($lines as $line) {
+        $line = preg_replace('/^\s*\/?\*+\s?|\s*\*\/\s*$/', '', $line) ?? $line;
+
+        if (preg_match('/^@param\b(.*)$/', $line, $matches) === 1) {
+            if ($current !== null) {
+                $tags[] = $current;
+            }
+            $current = trim($matches[1]);
+            continue;
+        }
+
+        if (preg_match('/^@[A-Za-z_]/', $line) === 1) {
+            if ($current !== null) {
+                $tags[] = $current;
+                $current = null;
+            }
+            continue;
+        }
+
+        if ($current !== null && trim($line) !== '') {
+            $current .= ' ' . trim($line);
+        }
+    }
+
+    if ($current !== null) {
+        $tags[] = $current;
+    }
+
+    return $tags;
 }
 
 function relativePath(string $path): string
