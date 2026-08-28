@@ -211,6 +211,22 @@
                             },
                             {
                                 "type": "Label",
+                                "caption": "OpenCalendar requires an app-specific password. Create it in the Apple Account under Sign-In and Security > App-Specific Passwords. Two-factor authentication must be enabled."
+                            },
+                            {
+                                "type": "Button",
+                                "caption": "Open Apple Account",
+                                "link": true,
+                                "onClick": "echo 'https://account.apple.com/';"
+                            },
+                            {
+                                "type": "Button",
+                                "caption": "How to create an app-specific password",
+                                "link": true,
+                                "onClick": "echo 'https://support.apple.com/102654';"
+                            },
+                            {
+                                "type": "Label",
                                 "caption": "For an existing account, empty fields keep the currently stored values."
                             },
                             {

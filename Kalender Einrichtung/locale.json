@@ -200,7 +200,10 @@
             "No completed OpenCalendar setup is available for verification.": "Es ist keine abgeschlossene OpenCalendar-Einrichtung für eine erneute Prüfung vorhanden.",
             "The completed OpenCalendar setup is no longer available.": "Die abgeschlossene OpenCalendar-Einrichtung ist nicht mehr vollständig vorhanden.",
             "The selected setup continuation is invalid.": "Die ausgewählte Fortsetzung der Einrichtung ist ungültig.",
-            "Calendar View: %s": "Kalender Ansicht: %s"
+            "Calendar View: %s": "Kalender Ansicht: %s",
+            "OpenCalendar requires an app-specific password. Create it in the Apple Account under Sign-In and Security > App-Specific Passwords. Two-factor authentication must be enabled.": "OpenCalendar benötigt ein app-spezifisches Passwort. Dieses wird im Apple Account unter „Anmelden und Sicherheit > App-spezifische Passwörter“ erstellt. Dafür muss die Zwei-Faktor-Authentifizierung aktiviert sein.",
+            "Open Apple Account": "Apple Account öffnen",
+            "How to create an app-specific password": "Anleitung: App-spezifisches Passwort erstellen"
         }
     }
 }
