@@ -27,7 +27,7 @@ function assertUiContainsAll(string $source, array $needles, string $message): v
  */
 function uiElementIds(string $source): array
 {
-    preg_match_all('/\bid="([^"]+)"/', $source, $matches);
+    preg_match_all('/\\bid="([^"]+)"/', $source, $matches);
 
     return array_count_values($matches[1] ?? []);
 }
@@ -51,12 +51,12 @@ assertUiRegression(
 );
 
 preg_match_all(
-    '/\b(?:aria-controls|aria-labelledby|aria-describedby)="([^"]+)"/',
+    '/\\b(?:aria-controls|aria-labelledby|aria-describedby)="([^"]+)"/',
     $indexSource,
     $ariaReferences
 );
 foreach ($ariaReferences[1] ?? [] as $referenceList) {
-    foreach (preg_split('/\s+/', trim($referenceList)) ?: [] as $reference) {
+    foreach (preg_split('/\\s+/', trim($referenceList)) ?: [] as $reference) {
         if ($reference === '') {
             continue;
         }
@@ -67,7 +67,7 @@ foreach ($ariaReferences[1] ?? [] as $referenceList) {
     }
 }
 
-preg_match_all('/<label\b[^>]*\bfor="([^"]+)"/', $indexSource, $labelReferences);
+preg_match_all('/<label\\b[^>]*\\bfor="([^"]+)"/', $indexSource, $labelReferences);
 foreach ($labelReferences[1] ?? [] as $reference) {
     assertUiRegression(
         isset($ids[$reference]),
@@ -118,7 +118,7 @@ $dialogs = [
 foreach ($dialogs as $dialogId => $labelId) {
     assertUiRegression(
         preg_match(
-            '/<dialog\b[^>]*\bid="' . preg_quote($dialogId, '/') . '"[^>]*\baria-labelledby="'
+            '/<dialog\\b[^>]*\\bid="' . preg_quote($dialogId, '/') . '"[^>]*\\baria-labelledby="'
                 . preg_quote($labelId, '/') . '"[^>]*>/',
             $indexSource
         ) === 1,
@@ -184,14 +184,17 @@ assertUiContainsAll(
 assertUiContainsAll(
     $indexSource,
     [
-        "const target = document.getElementById('details-description');",
+        "const detailsTarget = document.getElementById('details-description');",
+        "const eventDescriptionHtmlNote = document.getElementById('event-description-html-note');",
+        'function htmlDescriptionToPlainText(source) {',
         "new DOMParser().parseFromString(source, 'text/html');",
         "parsed.querySelectorAll('script, iframe, frame, frameset, object, embed, form, input, button, select, textarea, base, link, svg, math')",
         "\"default-src 'none'; img-src data:; style-src 'unsafe-inline'; font-src data:; base-uri 'none'; form-action 'none'\"",
         "frame.setAttribute('sandbox', 'allow-same-origin allow-popups allow-popups-to-escape-sandbox');",
-        "frame.setAttribute('referrerpolicy', 'no-referrer');"
+        "frame.setAttribute('referrerpolicy', 'no-referrer');",
+        "if (descriptionUnchanged && ident === 'UpdateEvent' && value?.event?.changes) {"
     ],
-    'HTML event descriptions must retain the isolated and sanitized rendering contract.'
+    'HTML event descriptions must retain the isolated, sanitized and edit-safe rendering contract.'
 );
 
 fwrite(STDOUT, "Visualization UI regression contract passed.\n");
