@@ -349,7 +349,7 @@ $htmlHelperSource = upgradeMigrationSource($root . '/libs/helper/IPSViewHTMLPage
 assertSourceContainsAll(
     $htmlHelperSource,
     [
-        "\$this->RegisterPropertyBoolean(self::IPSVIEW_HTML_ENABLE_PROPERTY, false);",
+        '$this->RegisterPropertyBoolean(self::IPSVIEW_HTML_ENABLE_PROPERTY, false);',
         "\$this->RegisterAttributeString(self::IPSVIEW_HTML_VARIABLE_REGISTRY_ATTRIBUTE, '[]');"
     ],
     'IPSView HTML helper persistence'
