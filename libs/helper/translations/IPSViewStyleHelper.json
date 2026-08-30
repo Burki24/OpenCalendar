@@ -14,6 +14,14 @@
             "en": "The media source imports the whitelisted standard style from an IPSView media object. Custom values below are used only for the custom source.",
             "de": "Die Medienquelle übernimmt die freigegebenen Standardstil-Werte aus einem IPSView-Medienobjekt. Die nachfolgenden benutzerdefinierten Werte werden nur für die Stilquelle „Benutzerdefinierter Stil“ verwendet."
         },
+        "description.profile_source": {
+            "en": "The style profile source loads a complete validated Style Profile V1 from a media object. Invalid profiles fall back safely to the light preset.",
+            "de": "Die Stilprofilquelle lädt ein vollständig validiertes Style Profile V1 aus einem Medienobjekt. Ungültige Profile fallen sicher auf die helle Vorgabe zurück."
+        },
+        "description.preset_source": {
+            "en": "The shared preset source applies one of the centralized IPSView Assistant color palettes without changing the existing legacy light and dark sources.",
+            "de": "Die Quelle „Zentrale Vorgabe“ verwendet eine der zentralen IPSView-Assistant-Farbpaletten, ohne die bestehenden hellen und dunklen Vorgaben zu verändern."
+        },
         "section.universal_colors": {
             "en": "Universal colors",
             "de": "Universelle Farben"
@@ -33,6 +41,14 @@
         "field.media_object": {
             "en": "IPSView media object",
             "de": "IPSView-Medienobjekt"
+        },
+        "field.profile_media_object": {
+            "en": "Style profile media object",
+            "de": "Stilprofil-Medienobjekt"
+        },
+        "field.style_preset": {
+            "en": "Shared preset",
+            "de": "Zentrale Vorgabe"
         },
         "field.transparent_background": {
             "en": "Transparent background",
@@ -58,6 +74,14 @@
             "en": "Dark preset",
             "de": "Dunkle Vorgabe"
         },
+        "option.style_profile": {
+            "en": "Style profile",
+            "de": "Stilprofil"
+        },
+        "option.shared_preset": {
+            "en": "Shared preset",
+            "de": "Zentrale Vorgabe"
+        },
         "option.system_font": {
             "en": "System default",
             "de": "Systemstandard"
@@ -65,6 +89,38 @@
         "option.legacy_font": {
             "en": "Legacy/custom",
             "de": "Bisherig/benutzerdefiniert"
+        },
+        "preset.standard": {
+            "en": "IPSView Standard",
+            "de": "IPSView Standard"
+        },
+        "preset.light": {
+            "en": "Light",
+            "de": "Hell"
+        },
+        "preset.dark": {
+            "en": "Dark",
+            "de": "Dunkel"
+        },
+        "preset.warm": {
+            "en": "Warm",
+            "de": "Warm"
+        },
+        "preset.cool": {
+            "en": "Cool",
+            "de": "Kühl"
+        },
+        "preset.earthy": {
+            "en": "Earthy",
+            "de": "Erdig"
+        },
+        "preset.water": {
+            "en": "Water",
+            "de": "Wasser"
+        },
+        "preset.sunny": {
+            "en": "Sunny",
+            "de": "Sonnig"
         },
         "color.view_background": {
             "en": "View background",
