@@ -58,6 +58,14 @@
             "en": "Dark preset",
             "de": "Dunkle Vorgabe"
         },
+        "option.system_font": {
+            "en": "System default",
+            "de": "Systemstandard"
+        },
+        "option.legacy_font": {
+            "en": "Legacy/custom",
+            "de": "Bisherig/benutzerdefiniert"
+        },
         "color.view_background": {
             "en": "View background",
             "de": "View-Hintergrund"
