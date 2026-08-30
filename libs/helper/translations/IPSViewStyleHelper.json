@@ -22,6 +22,14 @@
             "en": "The centralized IPSView Assistant presets are selected directly from the style source list.",
             "de": "Die zentralen IPSView-Assistant-Vorgaben werden direkt in der Stilquelle ausgewählt."
         },
+        "description.custom_values": {
+            "en": "The values below define the custom style and can be edited directly.",
+            "de": "Die folgenden Werte definieren den benutzerdefinierten Stil und können direkt bearbeitet werden."
+        },
+        "description.active_values": {
+            "en": "The values below show the active style source and are read-only. Copy the style to custom to use it as a starting point for individual adjustments.",
+            "de": "Die folgenden Werte zeigen die aktive Stilquelle und sind schreibgeschützt. Über „In benutzerdefinierten Stil übernehmen“ können sie als Ausgangspunkt für eigene Anpassungen verwendet werden."
+        },
         "section.universal_colors": {
             "en": "Universal colors",
             "de": "Universelle Farben"
@@ -58,6 +66,10 @@
             "en": "Font scale (%)",
             "de": "Schriftskalierung (%)"
         },
+        "field.font_style": {
+            "en": "Font style",
+            "de": "Schriftschnitt"
+        },
         "option.custom_style": {
             "en": "Custom style",
             "de": "Benutzerdefinierter Stil"
@@ -93,6 +105,30 @@
         "option.legacy_font": {
             "en": "Legacy/custom",
             "de": "Bisherig/benutzerdefiniert"
+        },
+        "font_style.regular": {
+            "en": "Regular",
+            "de": "Normal"
+        },
+        "font_style.bold": {
+            "en": "Bold",
+            "de": "Fett"
+        },
+        "font_style.italic": {
+            "en": "Italic",
+            "de": "Kursiv"
+        },
+        "font_style.bold_italic": {
+            "en": "Bold italic",
+            "de": "Fett kursiv"
+        },
+        "action.copy_to_custom": {
+            "en": "Copy to custom style",
+            "de": "In benutzerdefinierten Stil übernehmen"
+        },
+        "action.copy_to_custom_confirm": {
+            "en": "Copy the currently active style values to the custom style and switch to it?",
+            "de": "Die aktuell wirksamen Stilwerte als benutzerdefinierten Stil übernehmen und zu diesem wechseln?"
         },
         "preset.standard": {
             "en": "IPSView Standard",

@@ -58,14 +58,14 @@
             ]
         },
         "IPSViewStyleHelper": {
-            "version": "1.6.2",
-            "sha256": "ea9504255022f495c7fcebf648d66042734565b9e50f8835b5d16e71ba2065c1",
+            "version": "1.6.3",
+            "sha256": "afaa194c439fe3fb77caa892b453b39a798b34067188ec9a86c772f9125a830b",
             "path": "libs/helper/IPSViewStyleHelper.php",
-            "source_sha": "5d4f018440076b21a340965fde877d0748c9d776",
+            "source_sha": "c73f242c892d57ff47a0605df47d56f9b2b34d02",
             "assets": [
                 {
                     "path": "libs/helper/translations/IPSViewStyleHelper.json",
-                    "sha256": "ab754f8e0e606ffa5614e73891893804186f23e7947e029e2b008943b22f35b6"
+                    "sha256": "b1ad10c03c1e3baf0526b805862d49ac4ce65a05a40cd26ae8d81b77edbfd4fb"
                 }
             ],
             "dependencies": [
@@ -74,28 +74,28 @@
                     "version": "1.0.0",
                     "sha256": "d3deee581eca9f8eb11e9adce060170227a2dc836ee898bd134f93d27604f639",
                     "path": "libs/helper/HelperTranslationHelper.php",
-                    "source_sha": "5d4f018440076b21a340965fde877d0748c9d776"
+                    "source_sha": "c73f242c892d57ff47a0605df47d56f9b2b34d02"
                 },
                 {
                     "name": "IPSViewFontCatalogHelper",
                     "version": "1.0.0",
                     "sha256": "8f352af086f4ac98b57e5768d15f538301c54cb41e5f8d1d41c62330592bc660",
                     "path": "libs/helper/IPSViewFontCatalogHelper.php",
-                    "source_sha": "5d4f018440076b21a340965fde877d0748c9d776"
+                    "source_sha": "c73f242c892d57ff47a0605df47d56f9b2b34d02"
                 },
                 {
                     "name": "IPSViewStylePresetHelper",
                     "version": "1.0.1",
                     "sha256": "770bfc48051a908b55e931f6d4eba6e8984ba73b4aa78cd987470006c7b3a9e7",
                     "path": "libs/helper/IPSViewStylePresetHelper.php",
-                    "source_sha": "5d4f018440076b21a340965fde877d0748c9d776"
+                    "source_sha": "c73f242c892d57ff47a0605df47d56f9b2b34d02"
                 },
                 {
                     "name": "IPSViewStyleProfileHelper",
                     "version": "1.0.1",
                     "sha256": "eca6aa486d60b0db11cc7db0b486dc5b1723c49e26c23fe72465a33cf73f453d",
                     "path": "libs/helper/IPSViewStyleProfileHelper.php",
-                    "source_sha": "5d4f018440076b21a340965fde877d0748c9d776"
+                    "source_sha": "c73f242c892d57ff47a0605df47d56f9b2b34d02"
                 }
             ]
         },
