@@ -19,8 +19,8 @@
             "de": "Die Stilprofilquelle lädt ein vollständig validiertes Style Profile V1 aus einem Medienobjekt. Ungültige Profile fallen sicher auf die helle Vorgabe zurück."
         },
         "description.preset_source": {
-            "en": "The shared preset source applies one of the centralized IPSView Assistant color palettes without changing the existing legacy light and dark sources.",
-            "de": "Die Quelle „Zentrale Vorgabe“ verwendet eine der zentralen IPSView-Assistant-Farbpaletten, ohne die bestehenden hellen und dunklen Vorgaben zu verändern."
+            "en": "The centralized IPSView Assistant presets are selected directly from the style source list.",
+            "de": "Die zentralen IPSView-Assistant-Vorgaben werden direkt in der Stilquelle ausgewählt."
         },
         "section.universal_colors": {
             "en": "Universal colors",
@@ -81,6 +81,10 @@
         "option.shared_preset": {
             "en": "Shared preset",
             "de": "Zentrale Vorgabe"
+        },
+        "option.previous_selection": {
+            "en": "previous selection",
+            "de": "bisherige Auswahl"
         },
         "option.system_font": {
             "en": "System default",
