@@ -14,6 +14,10 @@
             "en": "The media source imports the whitelisted standard style from an IPSView media object. Custom values below are used only for the custom source.",
             "de": "Die Medienquelle übernimmt die freigegebenen Standardstil-Werte aus einem IPSView-Medienobjekt. Die nachfolgenden benutzerdefinierten Werte werden nur für die Stilquelle „Benutzerdefinierter Stil“ verwendet."
         },
+        "description.profile_source": {
+            "en": "The style profile source loads a complete validated Style Profile V1 from a media object. Invalid profiles fall back safely to the light preset.",
+            "de": "Die Stilprofilquelle lädt ein vollständig validiertes Style Profile V1 aus einem Medienobjekt. Ungültige Profile fallen sicher auf die helle Vorgabe zurück."
+        },
         "section.universal_colors": {
             "en": "Universal colors",
             "de": "Universelle Farben"
@@ -33,6 +37,10 @@
         "field.media_object": {
             "en": "IPSView media object",
             "de": "IPSView-Medienobjekt"
+        },
+        "field.profile_media_object": {
+            "en": "Style profile media object",
+            "de": "Stilprofil-Medienobjekt"
         },
         "field.transparent_background": {
             "en": "Transparent background",
@@ -57,6 +65,10 @@
         "option.dark_preset": {
             "en": "Dark preset",
             "de": "Dunkle Vorgabe"
+        },
+        "option.style_profile": {
+            "en": "Style profile",
+            "de": "Stilprofil"
         },
         "option.system_font": {
             "en": "System default",

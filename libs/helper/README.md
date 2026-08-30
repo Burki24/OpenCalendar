@@ -13,8 +13,9 @@ The files in this directory are vendored from
 | `IPSViewHTMLPageHelper.php` | 1.3.0 | `8fc9692ccc6143e4bdff1c262dbe138f7507a9c8816ac0326de0bc5c578a4236` |
 | `HelperTranslationHelper.php` | 1.0.0 | `d3deee581eca9f8eb11e9adce060170227a2dc836ee898bd134f93d27604f639` |
 | `VisualizationAssetHelper.php` | 1.0.0 | `1693b2399bcf95d270a6d9a01df6534caad906497bd4ba9489916a951abaffcc` |
-| `IPSViewStyleHelper.php` | 1.5.0 | `f64192b07561b2e74d8dd16f3fc459ef11322125c82150717d884402e401a0e6` |
+| `IPSViewStyleHelper.php` | 1.6.0 | `72ea12d4da11ce1900ac5f73c34f1c30162749c733663ee7f65c65aa58a72ef3` |
 | `IPSViewFontCatalogHelper.php` | 1.0.0 | `8f352af086f4ac98b57e5768d15f538301c54cb41e5f8d1d41c62330592bc660` |
+| `IPSViewStyleProfileHelper.php` | 1.0.0 | `306cf55073acffe90c4f3340ca7614203523912dac4690dc82e1440355764a35` |
 | `ParentConnectionHelper.php` | 1.0.0 | `d4f01dee721aa32e64410979ca15b2795a0fcc59c0232c0ad69e4702d9ff573c` |
 | `PersistentJsonCacheHelper.php` | 1.0.0 | `adbc7680abe814dc6c15a9cda1312cc30023073595052006662716bc0d65f2a4` |
 | `SymconOAuthHelper.php` | 1.0.0 | `d9053bfd083a581b96f8526cbb05e8568a6ad24a81cafa3e9b05108343bf2a65` |

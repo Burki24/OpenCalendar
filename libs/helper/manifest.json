@@ -58,14 +58,14 @@
             ]
         },
         "IPSViewStyleHelper": {
-            "version": "1.5.0",
-            "sha256": "f64192b07561b2e74d8dd16f3fc459ef11322125c82150717d884402e401a0e6",
+            "version": "1.6.0",
+            "sha256": "72ea12d4da11ce1900ac5f73c34f1c30162749c733663ee7f65c65aa58a72ef3",
             "path": "libs/helper/IPSViewStyleHelper.php",
-            "source_sha": "a1dd69c2efd38b9240b3ba50d61229643aece01d",
+            "source_sha": "fe1756350d915b3a0deb6242893ede50784f85ea",
             "assets": [
                 {
                     "path": "libs/helper/translations/IPSViewStyleHelper.json",
-                    "sha256": "960361f9653ed7b60e390849c3abb97b0b3765aa0555f7ec9b8f499b624767e4"
+                    "sha256": "dc349224e886851df72af6a85ef8b763c3fb1cd077023293b016a2fd65e76de6"
                 }
             ],
             "dependencies": [
@@ -74,14 +74,21 @@
                     "version": "1.0.0",
                     "sha256": "d3deee581eca9f8eb11e9adce060170227a2dc836ee898bd134f93d27604f639",
                     "path": "libs/helper/HelperTranslationHelper.php",
-                    "source_sha": "a1dd69c2efd38b9240b3ba50d61229643aece01d"
+                    "source_sha": "fe1756350d915b3a0deb6242893ede50784f85ea"
                 },
                 {
                     "name": "IPSViewFontCatalogHelper",
                     "version": "1.0.0",
                     "sha256": "8f352af086f4ac98b57e5768d15f538301c54cb41e5f8d1d41c62330592bc660",
                     "path": "libs/helper/IPSViewFontCatalogHelper.php",
-                    "source_sha": "a1dd69c2efd38b9240b3ba50d61229643aece01d"
+                    "source_sha": "fe1756350d915b3a0deb6242893ede50784f85ea"
+                },
+                {
+                    "name": "IPSViewStyleProfileHelper",
+                    "version": "1.0.0",
+                    "sha256": "306cf55073acffe90c4f3340ca7614203523912dac4690dc82e1440355764a35",
+                    "path": "libs/helper/IPSViewStyleProfileHelper.php",
+                    "source_sha": "fe1756350d915b3a0deb6242893ede50784f85ea"
                 }
             ]
         },
