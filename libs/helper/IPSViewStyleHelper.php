@@ -19,7 +19,7 @@ require_once __DIR__ . '/IPSViewStyleProfileHelper.php';
  * their components, but do not define module-specific colors, gradients,
  * typography, borders or shadows.
  *
- * @version 1.6.1
+ * @version 1.6.2
  */
 trait IPSViewStyleHelper
 {
@@ -30,7 +30,15 @@ trait IPSViewStyleHelper
     public const IPSVIEW_STYLE_SOURCE_LIGHT = 2;
     public const IPSVIEW_STYLE_SOURCE_DARK = 3;
     public const IPSVIEW_STYLE_SOURCE_PROFILE = 4;
+    /** Legacy generic preset source kept for stored configurations from v1.6.1. */
     public const IPSVIEW_STYLE_SOURCE_PRESET = 5;
+    public const IPSVIEW_STYLE_SOURCE_PRESET_LIGHT = 6;
+    public const IPSVIEW_STYLE_SOURCE_PRESET_DARK = 7;
+    public const IPSVIEW_STYLE_SOURCE_PRESET_WARM = 8;
+    public const IPSVIEW_STYLE_SOURCE_PRESET_COOL = 9;
+    public const IPSVIEW_STYLE_SOURCE_PRESET_EARTHY = 10;
+    public const IPSVIEW_STYLE_SOURCE_PRESET_WATER = 11;
+    public const IPSVIEW_STYLE_SOURCE_PRESET_SUNNY = 12;
 
     private const IPSVIEW_STYLE_SYSTEM_FONT_FAMILY = '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
 
@@ -162,7 +170,7 @@ trait IPSViewStyleHelper
         'description.choose_source'         => 'Choose a shared IPSView style source. The same roles and effects are used by every consuming module.',
         'description.media_source'          => 'The media source imports the whitelisted standard style from an IPSView media object. Custom values below are used only for the custom source.',
         'description.profile_source'        => 'The style profile source loads a complete validated Style Profile V1 from a media object. Invalid profiles fall back safely to the light preset.',
-        'description.preset_source'         => 'The shared preset source applies one of the centralized IPSView Assistant color palettes without changing the existing legacy light and dark sources.',
+        'description.preset_source'         => 'The centralized IPSView Assistant presets are selected directly from the style source list.',
         'section.universal_colors'          => 'Universal colors',
         'section.surface_transparency'      => 'Surface transparency',
         'section.typography_effects'        => 'Typography, borders and effects',
@@ -178,6 +186,7 @@ trait IPSViewStyleHelper
         'option.dark_preset'                => 'Dark preset',
         'option.style_profile'              => 'Style profile',
         'option.shared_preset'              => 'Shared preset',
+        'option.previous_selection'         => 'previous selection',
         'option.system_font'                => 'System default',
         'option.legacy_font'                => 'Legacy/custom',
         'preset.standard'                   => 'IPSView Standard',
@@ -363,15 +372,8 @@ trait IPSViewStyleHelper
                         'type'    => 'Select',
                         'name'    => 'IPSViewStyleSource',
                         'caption' => $this->IPSViewStyleText('field.style_source'),
-                        'options' => [
-                            ['caption' => $this->IPSViewStyleText('option.custom_style'), 'value' => self::IPSVIEW_STYLE_SOURCE_CUSTOM],
-                            ['caption' => $this->IPSViewStyleText('option.ipsview_standard_style'), 'value' => self::IPSVIEW_STYLE_SOURCE_MEDIA],
-                            ['caption' => $this->IPSViewStyleText('option.light_preset'), 'value' => self::IPSVIEW_STYLE_SOURCE_LIGHT],
-                            ['caption' => $this->IPSViewStyleText('option.dark_preset'), 'value' => self::IPSVIEW_STYLE_SOURCE_DARK],
-                            ['caption' => $this->IPSViewStyleText('option.style_profile'), 'value' => self::IPSVIEW_STYLE_SOURCE_PROFILE],
-                            ['caption' => $this->IPSViewStyleText('option.shared_preset'), 'value' => self::IPSVIEW_STYLE_SOURCE_PRESET]
-                        ],
-                        'width' => '220px'
+                        'options' => $this->IPSViewStyleSourceOptions(),
+                        'width'   => '220px'
                     ],
                     [
                         'type'    => 'SelectMedia',
@@ -390,13 +392,6 @@ trait IPSViewStyleHelper
             [
                 'type'  => 'RowLayout',
                 'items' => [
-                    [
-                        'type'    => 'Select',
-                        'name'    => 'IPSViewStylePreset',
-                        'caption' => $this->IPSViewStyleText('field.style_preset'),
-                        'options' => $this->IPSViewStylePresetOptions(),
-                        'width'   => '220px'
-                    ],
                     [
                         'type'    => 'CheckBox',
                         'name'    => 'IPSViewStyleTransparentBackground',
@@ -679,7 +674,14 @@ trait IPSViewStyleHelper
             self::IPSVIEW_STYLE_SOURCE_LIGHT,
             self::IPSVIEW_STYLE_SOURCE_DARK,
             self::IPSVIEW_STYLE_SOURCE_PROFILE,
-            self::IPSVIEW_STYLE_SOURCE_PRESET
+            self::IPSVIEW_STYLE_SOURCE_PRESET,
+            self::IPSVIEW_STYLE_SOURCE_PRESET_LIGHT,
+            self::IPSVIEW_STYLE_SOURCE_PRESET_DARK,
+            self::IPSVIEW_STYLE_SOURCE_PRESET_WARM,
+            self::IPSVIEW_STYLE_SOURCE_PRESET_COOL,
+            self::IPSVIEW_STYLE_SOURCE_PRESET_EARTHY,
+            self::IPSVIEW_STYLE_SOURCE_PRESET_WATER,
+            self::IPSVIEW_STYLE_SOURCE_PRESET_SUNNY
         ], true) ? $source : self::IPSVIEW_STYLE_SOURCE_CUSTOM;
     }
 
@@ -757,8 +759,8 @@ trait IPSViewStyleHelper
         } elseif ($source === self::IPSVIEW_STYLE_SOURCE_PROFILE) {
             $profileStyle = $this->IPSViewStyleFromProfile($document ?? $this->ReadIPSViewStyleProfileMediaContent());
             $base = $profileStyle ?? self::IPSVIEW_STYLE_LIGHT_PRESET;
-        } elseif ($source === self::IPSVIEW_STYLE_SOURCE_PRESET) {
-            $base = $this->IPSViewStyleFromPreset($this->IPSViewStylePreset());
+        } elseif (($preset = $this->IPSViewStylePresetForSource($source)) !== null) {
+            $base = $this->IPSViewStyleFromPreset($preset);
         } elseif ($source === self::IPSVIEW_STYLE_SOURCE_LIGHT) {
             $base = self::IPSVIEW_STYLE_LIGHT_PRESET;
         } elseif ($source === self::IPSVIEW_STYLE_SOURCE_DARK) {
@@ -977,28 +979,58 @@ trait IPSViewStyleHelper
         return $this->TranslateHelperText('IPSViewStyleHelper', $key, $fallback);
     }
 
-    /** @return list<array{caption:string,value:string}> */
-    private function IPSViewStylePresetOptions(): array
+    /** @return list<array{caption:string,value:int}> */
+    private function IPSViewStyleSourceOptions(): array
     {
-        $translationKeys = [
-            IPSViewStylePresetHelper::PRESET_STANDARD => 'preset.standard',
-            IPSViewStylePresetHelper::PRESET_LIGHT    => 'preset.light',
-            IPSViewStylePresetHelper::PRESET_DARK     => 'preset.dark',
-            IPSViewStylePresetHelper::PRESET_WARM     => 'preset.warm',
-            IPSViewStylePresetHelper::PRESET_COOL     => 'preset.cool',
-            IPSViewStylePresetHelper::PRESET_EARTHY   => 'preset.earthy',
-            IPSViewStylePresetHelper::PRESET_WATER    => 'preset.water',
-            IPSViewStylePresetHelper::PRESET_SUNNY    => 'preset.sunny'
+        $options = [
+            ['caption' => $this->IPSViewStyleText('option.custom_style'), 'value' => self::IPSVIEW_STYLE_SOURCE_CUSTOM],
+            ['caption' => $this->IPSViewStyleText('option.ipsview_standard_style'), 'value' => self::IPSVIEW_STYLE_SOURCE_MEDIA],
+            ['caption' => $this->IPSViewStyleText('option.light_preset'), 'value' => self::IPSVIEW_STYLE_SOURCE_LIGHT],
+            ['caption' => $this->IPSViewStyleText('option.dark_preset'), 'value' => self::IPSVIEW_STYLE_SOURCE_DARK],
+            ['caption' => $this->IPSViewStyleText('option.style_profile'), 'value' => self::IPSVIEW_STYLE_SOURCE_PROFILE],
+            ['caption' => $this->IPSViewStyleText('preset.light'), 'value' => self::IPSVIEW_STYLE_SOURCE_PRESET_LIGHT],
+            ['caption' => $this->IPSViewStyleText('preset.dark'), 'value' => self::IPSVIEW_STYLE_SOURCE_PRESET_DARK],
+            ['caption' => $this->IPSViewStyleText('preset.warm'), 'value' => self::IPSVIEW_STYLE_SOURCE_PRESET_WARM],
+            ['caption' => $this->IPSViewStyleText('preset.cool'), 'value' => self::IPSVIEW_STYLE_SOURCE_PRESET_COOL],
+            ['caption' => $this->IPSViewStyleText('preset.earthy'), 'value' => self::IPSVIEW_STYLE_SOURCE_PRESET_EARTHY],
+            ['caption' => $this->IPSViewStyleText('preset.water'), 'value' => self::IPSVIEW_STYLE_SOURCE_PRESET_WATER],
+            ['caption' => $this->IPSViewStyleText('preset.sunny'), 'value' => self::IPSVIEW_STYLE_SOURCE_PRESET_SUNNY]
         ];
-        $options = [];
-        foreach (IPSViewStylePresetHelper::ids() as $preset) {
+
+        if ($this->ReadPropertyInteger('IPSViewStyleSource') === self::IPSVIEW_STYLE_SOURCE_PRESET) {
+            $preset = $this->IPSViewStylePreset();
+            $translationKeys = [
+                IPSViewStylePresetHelper::PRESET_STANDARD => 'preset.standard',
+                IPSViewStylePresetHelper::PRESET_LIGHT    => 'preset.light',
+                IPSViewStylePresetHelper::PRESET_DARK     => 'preset.dark',
+                IPSViewStylePresetHelper::PRESET_WARM     => 'preset.warm',
+                IPSViewStylePresetHelper::PRESET_COOL     => 'preset.cool',
+                IPSViewStylePresetHelper::PRESET_EARTHY   => 'preset.earthy',
+                IPSViewStylePresetHelper::PRESET_WATER    => 'preset.water',
+                IPSViewStylePresetHelper::PRESET_SUNNY    => 'preset.sunny'
+            ];
             $options[] = [
-                'caption' => $this->IPSViewStyleText($translationKeys[$preset]),
-                'value'   => $preset
+                'caption' => $this->IPSViewStyleText($translationKeys[$preset]) . ' (' . $this->IPSViewStyleText('option.previous_selection') . ')',
+                'value'   => self::IPSVIEW_STYLE_SOURCE_PRESET
             ];
         }
 
         return $options;
+    }
+
+    private function IPSViewStylePresetForSource(int $source): ?string
+    {
+        return match ($source) {
+            self::IPSVIEW_STYLE_SOURCE_PRESET        => $this->IPSViewStylePreset(),
+            self::IPSVIEW_STYLE_SOURCE_PRESET_LIGHT  => IPSViewStylePresetHelper::PRESET_LIGHT,
+            self::IPSVIEW_STYLE_SOURCE_PRESET_DARK   => IPSViewStylePresetHelper::PRESET_DARK,
+            self::IPSVIEW_STYLE_SOURCE_PRESET_WARM   => IPSViewStylePresetHelper::PRESET_WARM,
+            self::IPSVIEW_STYLE_SOURCE_PRESET_COOL   => IPSViewStylePresetHelper::PRESET_COOL,
+            self::IPSVIEW_STYLE_SOURCE_PRESET_EARTHY => IPSViewStylePresetHelper::PRESET_EARTHY,
+            self::IPSVIEW_STYLE_SOURCE_PRESET_WATER  => IPSViewStylePresetHelper::PRESET_WATER,
+            self::IPSVIEW_STYLE_SOURCE_PRESET_SUNNY  => IPSViewStylePresetHelper::PRESET_SUNNY,
+            default                                  => null
+        };
     }
 
     /** @return array<string,mixed> */
