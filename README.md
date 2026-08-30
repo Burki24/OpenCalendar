@@ -40,6 +40,32 @@ müssen umfangreiche Kalenderdateien nicht manuell aufgeteilt werden.
 Die ausführlichen Einstellungen der Anbieter sind in der Dokumentation des
 [Kalender Kontos](Kalender%20Konto) beschrieben.
 
+## IPSView-Stile
+
+Die **Kalender Ansicht** verwendet für die optionale IPSView-Ausgabe das zentrale
+IPSView-Stilsystem aus `Symcon_ModuleHelper`. Die Stilquelle wird direkt in der
+Instanzkonfiguration gewählt. Zur Verfügung stehen ein vollständig
+benutzerdefinierter Stil, ein IPSView-Medienobjekt, ein **Stilprofil** (Style Profile V1) sowie
+die festen Vorgaben **Helle Vorgabe**, **Dunkle Vorgabe**, **Hell**, **Dunkel**,
+**Warm**, **Kühl**, **Erdig**, **Wasser** und **Sonnig**.
+
+Bei einer Vorgabe zeigt die Konfiguration die **tatsächlich wirksamen Farben,
+Deckkräfte, Schriftwerte, Rahmen- und Schattenparameter** an. Diese Werte sind
+schreibgeschützt, damit die zuvor gespeicherten benutzerdefinierten Einstellungen
+nicht durch bloßes Ausprobieren eines Stils überschrieben werden. Mit
+**In benutzerdefinierten Stil übernehmen** kann die aktuelle Vorgabe vollständig
+als Ausgangspunkt kopiert und anschließend individuell verändert werden.
+
+Die gemeinsame Typografie unterstützt die IPSView-Schriften **Roboto**,
+**Roboto Mono**, **Open Sans**, **PT Sans**, **Dancing Script**, **Bebas Neue**,
+**Indie Flower** und **Segment7**. Verfügbare Schriftschnitte werden abhängig von
+der jeweiligen Schrift angeboten.
+
+Kalender- und Terminfarben bleiben fachliche Inhaltsfarben von OpenCalendar und
+werden nicht durch die globale IPSView-Stilquelle ersetzt. Die ausführliche
+Einrichtung befindet sich in der
+[Dokumentation der Kalender Ansicht](Kalender%20Ansicht#einrichtung-in-ipsview).
+
 ## Anbieter im Überblick
 
 Anbieter | Benötigte Angaben | Zugriff
@@ -97,7 +123,7 @@ vollständig im gemeinsamen Dialog-Workflow der Kachelvisualisierung und IPSView
 - Bei zeitgebundenen Serien wird die Zeitzone des Google-Kalenders verwendet,
   damit die lokale Uhrzeit auch über Sommer-/Winterzeitwechsel erhalten bleibt.
 - Einzelne Serienvorkommnisse können bearbeitet und gelöscht werden.
-- **Diesen und alle folgenden Termine** können gemeinsam bearbeitet oder
+- **Diesen und alle folgenden Termine** können gemeinsam bearbeitet und
   gelöscht werden. Beim Bearbeiten wird die Serie am gewählten Vorkommnis
   geteilt; der zurückliegende Teil bleibt unverändert. Beim Löschen endet die
   Serie unmittelbar vor dem gewählten Vorkommnis.

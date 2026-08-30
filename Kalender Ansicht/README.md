@@ -105,6 +105,9 @@ Anzeigeoptionen → Tageszahl | Je Ansicht separat für Agenda, Liste, Tage, Woc
 Anzeigeoptionen → Listenansicht | Bedienelemente der Listenansicht ein-/ausblenden; Zeitraum und Ansichtswechsel bleiben sichtbar
 Anzeigeoptionen → Listenspalten | Legt fest, welche Datenfelder in der Listenansicht als Spalten erscheinen; der Anlass von Jahresereignissen kann als eigene Spalte eingeblendet werden
 Ansichtszeiträume | Sichtbare Länge jeder Ansicht im aufklappbaren Bereich; Agenda/Liste/Tage in Tagen, Woche in Wochen und Monat in Monaten
+IPSView → Stilquelle | Gemeinsame Stilquelle für die IPSView-Ausgabe: Benutzerdefiniert, IPSView-Medium, Style Profile V1 oder eine der festen Vorgaben
+IPSView → Transparenter Hintergrund | Macht ausschließlich den äußeren View-Hintergrund transparent; die übrigen Flächen behalten ihre Stilwerte
+IPSView → Schrift-/Stilwerte | Schriftfamilie, Schriftschnitt, Größe, Skalierung, Farben, Transparenzen, Rahmen, Schatten und Effekte; bei Vorgaben als wirksame schreibgeschützte Vorschau
 
 Die Kalenderwoche erscheint in der Wochenansicht in der Zeitraumüberschrift.
 In der Tage-Ansicht werden bei einem Wochenwechsel beide Kalenderwochen
@@ -162,24 +165,46 @@ Ansicht, ohne Symcons Größenlimit für einzelne PHP-Rückgaben zu überschreit
 
 1. Den Bereich **IPSView** in der Instanzkonfiguration öffnen.
 2. **IPSView-HTML-Ausgabe bereitstellen** aktivieren.
-3. Unter **Stilquelle** zwischen **Benutzerdefinierter Stil**,
-   **IPSView-Standardstil**, **Helle Vorgabe** und **Dunkle Vorgabe** wählen.
-4. Für **IPSView-Standardstil** das Medienobjekt auswählen, das die gewünschte
-   `.ipsView`-Datei enthält. Aus der Datei werden ausschließlich freigegebene
-   Standardstilwerte wie Farben, Schrift, Rahmen, Schatten und Rundungen
-   übernommen.
-5. Beim benutzerdefinierten Stil die benötigten Flächen-, Text-, Icon-, Rahmen-,
-   Popup- und Statusfarben sowie Typografie und Effekte einstellen.
-6. Mit **Transparenter Hintergrund** festlegen, ob die umgebende IPSView sichtbar
-   bleiben soll.
-7. Farbbalkenbreite einstellen und die Konfiguration übernehmen.
-8. Unterhalb der Instanz wird die String-Variable **IPSView-Kalender** mit der
-   Darstellung **Webinhalt** angelegt.
-9. Im IPSView Designer ein Steuerelement vom Typ **HTML-Box** einfügen und die
-   Variable **IPSView-Kalender** als ID auswählen.
-10. Als HTML-Renderer **Browser des Clients** oder **Automatisch** verwenden. Der
+3. Unter **Stilquelle** direkt den gewünschten Stil wählen:
+   - **Benutzerdefinierter Stil**,
+   - **IPSView-Standardstil** aus einem `.ipsView`-Medienobjekt,
+   - **Helle Vorgabe** oder **Dunkle Vorgabe** als kompatible Standardquellen,
+   - **Stilprofil** aus einem Style-Profile-V1-Medienobjekt,
+   - **Hell**, **Dunkel**, **Warm**, **Kühl**, **Erdig**, **Wasser** oder **Sonnig**
+     als zentrale IPSView-Vorgaben.
+4. Bei **IPSView-Standardstil** das Medienobjekt mit der gewünschten
+   `.ipsView`-Datei auswählen. Bei **Stilprofil** das Medienobjekt mit dem
+   vollständigen validierten Style Profile V1 auswählen.
+5. Bei allen nicht benutzerdefinierten Quellen werden darunter die **aktuell
+   wirksamen** Farben, Deckkräfte, Schriftwerte, Rahmen, Schatten und Effekte
+   schreibgeschützt angezeigt. Dadurch bleiben vorhandene eigene Einstellungen
+   beim Ausprobieren einer Vorgabe unverändert.
+6. Soll eine Vorgabe angepasst werden, **In benutzerdefinierten Stil übernehmen**
+   wählen. Die aktuell wirksamen Werte werden vollständig in die
+   benutzerdefinierten Felder kopiert und die Stilquelle wechselt auf
+   **Benutzerdefinierter Stil**. Anschließend können die Werte frei verändert
+   werden.
+7. Im benutzerdefinierten Stil stehen die zentralen IPSView-Schriften
+   **Roboto**, **Roboto Mono**, **Open Sans**, **PT Sans**, **Dancing Script**,
+   **Bebas Neue**, **Indie Flower** und **Segment7** zur Verfügung. Der
+   Schriftschnitt wird passend zur gewählten Schrift angeboten und ebenfalls
+   beim Übernehmen einer Vorgabe kopiert.
+8. Mit **Transparenter Hintergrund** festlegen, ob die umgebende IPSView sichtbar
+   bleiben soll. Diese Einstellung ist global und wird beim Kopieren eines Stils
+   nicht verändert.
+9. Farbbalkenbreite einstellen und die Konfiguration übernehmen.
+10. Unterhalb der Instanz wird die String-Variable **IPSView-Kalender** mit der
+    Darstellung **Webinhalt** angelegt.
+11. Im IPSView Designer ein Steuerelement vom Typ **HTML-Box** einfügen und die
+    Variable **IPSView-Kalender** als ID auswählen.
+12. Als HTML-Renderer **Browser des Clients** oder **Automatisch** verwenden. Der
     einfache native HTML-Renderer genügt nicht, weil Navigation, Ansichtswechsel
     und Terminbearbeitung JavaScript verwenden.
+
+Kalender- und Terminfarben bleiben von der globalen Stilquelle unabhängig. Die
+Stilquelle steuert das gemeinsame Erscheinungsbild der View – Hintergründe,
+Bedienelemente, Texte, Rahmen, Popups, Schatten und semantische Statusfarben –
+aber nicht die fachlichen Farben der einzelnen Kalender.
 
 Agenda, Listen-, Tage-, Wochen- und Monatsansicht funktionieren direkt in der
 IPSView-HTML-Box. In beschreibbaren Kalendern lassen sich dort außerdem Termine
@@ -216,6 +241,7 @@ Synchronisation schlägt fehl | Jede ausgewählte Kalender-Instanz einzeln synch
 Schaltfläche „＋ Termin“ ist deaktiviert | Mindestens einen ausgewählten Kalender mit Schreibrechten verwenden; ICS/Webcal ist immer schreibgeschützt
 IPSView zeigt nur statisches oder unvollständiges HTML | Im IPSView-Steuerelement **Browser des Clients** oder **Automatisch** als Renderer wählen
 IPSView-Inhalt ist veraltet | **IPSView-HTML neu generieren** ausführen und prüfen, ob die Ausgabe aktiviert ist
+IPSView-Stil zeigt andere Werte als erwartet | Prüfen, welche **Stilquelle** aktiv ist. Bei einer Vorgabe zeigen die Felder die wirksamen Werte schreibgeschützt; eigene Änderungen sind erst nach **In benutzerdefinierten Stil übernehmen** möglich
 Kalenderauswahl ist leer oder unvollständig | **Alle Kalenderinstanzen auswählen** verwenden, die gewünschte Auswahl anpassen und anschließend **Übernehmen**
 
 ## PHP-Befehlsreferenz
@@ -465,8 +491,10 @@ konnte.
 
 Kachel und IPSView-Seite werden aus derselben Asset-Struktur unter
 `visualization/` erzeugt. Die vendorten Helper `VisualizationThemeHelper`,
-`IPSViewStyleHelper` und `IPSViewHTMLPageHelper` sorgen für gemeinsame
-Symcon-Designvariablen, IPSView-Stilrollen und die kontrollierte Verwaltung der
+`IPSViewFontCatalogHelper`, `IPSViewStylePresetHelper`,
+`IPSViewStyleProfileHelper`, `IPSViewStyleHelper` und `IPSViewHTMLPageHelper`
+sorgen für gemeinsame Symcon-Designvariablen, Schriftkatalog, Presets,
+Style-Profile, IPSView-Stilrollen und die kontrollierte Verwaltung der
 WebContent-Variable. Kalender- und Terminfarben bleiben davon unabhängige
 fachliche Inhaltsfarben.
 
