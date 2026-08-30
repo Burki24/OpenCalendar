@@ -7,6 +7,7 @@ namespace Burki24\SymconModuleHelper;
 use InvalidArgumentException;
 
 require_once __DIR__ . '/HelperTranslationHelper.php';
+require_once __DIR__ . '/IPSViewFontCatalogHelper.php';
 
 /**
  * Provides a reusable IPSView style source, form controls and CSS tokens.
@@ -16,15 +17,18 @@ require_once __DIR__ . '/HelperTranslationHelper.php';
  * their components, but do not define module-specific colors, gradients,
  * typography, borders or shadows.
  *
- * @version 1.4.3
+ * @version 1.5.0
  */
 trait IPSViewStyleHelper
 {
     use HelperTranslationHelper;
+
     public const IPSVIEW_STYLE_SOURCE_CUSTOM = 0;
     public const IPSVIEW_STYLE_SOURCE_MEDIA = 1;
     public const IPSVIEW_STYLE_SOURCE_LIGHT = 2;
     public const IPSVIEW_STYLE_SOURCE_DARK = 3;
+
+    private const IPSVIEW_STYLE_SYSTEM_FONT_FAMILY = '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
 
     /** @var array<string,string> */
     private const IPSVIEW_STYLE_COLOR_PROPERTIES = [
@@ -164,6 +168,8 @@ trait IPSViewStyleHelper
         'option.ipsview_standard_style'     => 'IPSView standard style',
         'option.light_preset'               => 'Light preset',
         'option.dark_preset'                => 'Dark preset',
+        'option.system_font'                => 'System default',
+        'option.legacy_font'                => 'Legacy/custom',
         'color.view_background'             => 'View background',
         'color.page_background'             => 'Page background',
         'color.label_background'            => 'Label background',
@@ -233,7 +239,7 @@ trait IPSViewStyleHelper
         'Positive'                  => '#56C881',
         'Warning'                   => '#E6A93F',
         'Critical'                  => '#E36D6D',
-        'FontFamily'                => '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+        'FontFamily'                => self::IPSVIEW_STYLE_SYSTEM_FONT_FAMILY,
         'FontSize'                  => 16.0,
         'BorderRadius'              => 8.0,
         'BorderWidth'               => 1.0,
@@ -268,7 +274,7 @@ trait IPSViewStyleHelper
         'Positive'                  => '#63DC92',
         'Warning'                   => '#FFC15F',
         'Critical'                  => '#FF7B7B',
-        'FontFamily'                => '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+        'FontFamily'                => self::IPSVIEW_STYLE_SYSTEM_FONT_FAMILY,
         'FontSize'                  => 16.0,
         'BorderRadius'              => 8.0,
         'BorderWidth'               => 1.0,
@@ -433,9 +439,10 @@ trait IPSViewStyleHelper
             'type'  => 'RowLayout',
             'items' => [
                 [
-                    'type'    => 'ValidationTextBox',
+                    'type'    => 'Select',
                     'name'    => 'IPSViewStyleFontFamily',
                     'caption' => $this->IPSViewStyleText('field.font_family'),
+                    'options' => $this->IPSViewStyleFontFamilyOptions(),
                     'width'   => '300px'
                 ],
                 [
@@ -974,8 +981,10 @@ trait IPSViewStyleHelper
         return $style;
     }
 
-    /** @param array<string,mixed> $style
-     *  @return array<string,string|float>
+    /**
+     * @param array<string,mixed> $style
+     *
+     * @return array<string,string|float>
      */
     private function IPSViewFinalizeStyle(array $style): array
     {
@@ -984,7 +993,6 @@ trait IPSViewStyleHelper
         $controlInactive = $this->IPSViewCSSColorToRGB((string) $style['ControlInactiveBackground']);
         $popup = $this->IPSViewCSSColorToRGB((string) $style['PopupBackground']);
         $label = $this->IPSViewCSSColorToRGB((string) $style['LabelBackground']);
-        $page = $this->IPSViewCSSColorToRGB((string) $style['PageBackground']);
         $text = $this->IPSViewCSSColorToRGB((string) $style['Text']);
         $textActive = $this->IPSViewCSSColorToRGB((string) $style['TextActive']);
         $textInactive = $this->IPSViewCSSColorToRGB((string) $style['TextInactive']);
@@ -1073,8 +1081,9 @@ trait IPSViewStyleHelper
         return $this->IPSViewColorObjectToCSS($document[$key] ?? null) ?? $fallback;
     }
 
-    /** @param array<string,mixed> $document
-     *  @param array<int,string>   $keys
+    /**
+     * @param array<string,mixed> $document
+     * @param array<int,string>   $keys
      */
     private function IPSViewFirstDocumentColor(array $document, array $keys, string $fallback): string
     {
@@ -1088,8 +1097,9 @@ trait IPSViewStyleHelper
         return $fallback;
     }
 
-    /** @param array<string,mixed> $document
-     *  @param array<int,string>   $keywords
+    /**
+     * @param array<string,mixed> $document
+     * @param array<int,string>   $keywords
      */
     private function IPSViewFavoriteColor(array $document, array $keywords, string $fallback): string
     {
@@ -1169,14 +1179,76 @@ trait IPSViewStyleHelper
         return max(0, min(100, $this->ReadPropertyInteger($propertyName))) / 100;
     }
 
+    /**
+     * Returns font-family options from the shared IPSView catalogue.
+     *
+     * Existing safe custom values are appended as a compatibility option so
+     * updating the helper does not silently replace a user's stored setting.
+     *
+     * @return list<array{caption:string,value:string}>
+     */
+    private function IPSViewStyleFontFamilyOptions(): array
+    {
+        $options = [
+            [
+                'caption' => $this->IPSViewStyleText('option.system_font'),
+                'value'   => ''
+            ]
+        ];
+
+        foreach (IPSViewFontCatalogHelper::options() as $option) {
+            $options[] = $option;
+        }
+
+        $configured = trim($this->ReadPropertyString('IPSViewStyleFontFamily'));
+        if (
+            $configured !== ''
+            && !$this->IPSViewFontOptionExists($options, $configured)
+            && $this->IPSViewIsSafeLegacyFontFamily($configured)
+        ) {
+            $options[] = [
+                'caption' => $configured . ' (' . $this->IPSViewStyleText('option.legacy_font') . ')',
+                'value'   => $configured
+            ];
+        }
+
+        return $options;
+    }
+
+    /**
+     * @param list<array{caption:string,value:string}> $options
+     */
+    private function IPSViewFontOptionExists(array $options, string $fontFamily): bool
+    {
+        foreach ($options as $option) {
+            if ($option['value'] === $fontFamily) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     private function IPSViewNormalizeFontFamily(string $fontFamily): string
     {
         $fontFamily = trim($fontFamily);
-        if ($fontFamily === '' || preg_match('/[{};]/', $fontFamily) === 1) {
-            return '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+        if ($fontFamily === '') {
+            return self::IPSVIEW_STYLE_SYSTEM_FONT_FAMILY;
         }
 
-        return $fontFamily;
+        $catalogFamily = IPSViewFontCatalogHelper::normalizeFamily($fontFamily);
+        if ($catalogFamily !== null) {
+            return $catalogFamily;
+        }
+
+        return $this->IPSViewIsSafeLegacyFontFamily($fontFamily)
+            ? $fontFamily
+            : self::IPSVIEW_STYLE_SYSTEM_FONT_FAMILY;
+    }
+
+    private function IPSViewIsSafeLegacyFontFamily(string $fontFamily): bool
+    {
+        return preg_match('/[{};\x00-\x1F\x7F]/', $fontFamily) !== 1;
     }
 
     private function IPSViewIsValidColorInteger(mixed $value): bool
@@ -1251,9 +1323,11 @@ trait IPSViewStyleHelper
         return sprintf('rgba(%d, %d, %d, %.3f)', $red, $green, $blue, $alpha);
     }
 
-    /** @param array{red:float,green:float,blue:float,alpha?:float} $first
-     *  @param array{red:float,green:float,blue:float,alpha?:float} $second
-     *  @return array{red:float,green:float,blue:float,alpha:float}
+    /**
+     * @param array{red:float,green:float,blue:float,alpha?:float} $first
+     * @param array{red:float,green:float,blue:float,alpha?:float} $second
+     *
+     * @return array{red:float,green:float,blue:float,alpha:float}
      */
     private function IPSViewMixRGB(array $first, array $second, float $amount): array
     {
@@ -1284,8 +1358,9 @@ trait IPSViewStyleHelper
             + (0.0722 * $channel($color['blue']));
     }
 
-    /** @param array{red:float,green:float,blue:float,alpha?:float} $first
-     *  @param array{red:float,green:float,blue:float,alpha?:float} $second
+    /**
+     * @param array{red:float,green:float,blue:float,alpha?:float} $first
+     * @param array{red:float,green:float,blue:float,alpha?:float} $second
      */
     private function IPSViewContrastRatio(array $first, array $second): float
     {
