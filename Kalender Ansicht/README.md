@@ -201,6 +201,27 @@ Ansicht, ohne Symcons Größenlimit für einzelne PHP-Rückgaben zu überschreit
     einfache native HTML-Renderer genügt nicht, weil Navigation, Ansichtswechsel
     und Terminbearbeitung JavaScript verwenden.
 
+### Style-Profile-Kompatibilität
+
+Die Kalender Ansicht ist Referenz-Consumer für **Style Profile V1** des
+IPSViewAssistant. Ein dort exportiertes Profil kann als Symcon-Dokumentmedium
+hinterlegt und anschließend direkt über **Stilprofil** ausgewählt werden. Der
+zentrale `IPSViewStyleHelper` übernimmt den vollständigen portablen Snapshot.
+
+OpenCalendar berücksichtigt dabei Farben und ihre jeweils unabhängigen
+Deckkräfte, Schriftfamilie, Schriftschnitt, Basisschriftgröße und Skalierung,
+Eckenradius, Rahmen- und Linienstärke, Schattenparameter, Inaktivitätsdeckkraft
+und Verlaufsstärke. **Fett**, **Kursiv** und **Fett kursiv** werden in der
+IPSView-Ausgabe ebenfalls angewendet. Popups verwenden die Profilwerte für
+Hintergrund, Rahmen und Schatten; die responsive Darstellung bleibt davon
+unabhängig erhalten.
+
+Ein vollständiges, unverändert aus dem IPSViewAssistant exportiertes Referenzprofil
+liegt unter `tests/fixtures/ipsview-assistant-style-profile-v1.json`. Der
+Ende-zu-Ende-Test prüft, dass dieses Profil über den tatsächlich vendorten
+Style-Helper aufgelöst wird und danach weiterhin verlustfrei als kanonisches
+Style Profile V1 validiert und serialisiert werden kann.
+
 Kalender- und Terminfarben bleiben von der globalen Stilquelle unabhängig. Die
 Stilquelle steuert das gemeinsame Erscheinungsbild der View – Hintergründe,
 Bedienelemente, Texte, Rahmen, Popups, Schatten und semantische Statusfarben –

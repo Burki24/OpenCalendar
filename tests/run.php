@@ -30,6 +30,7 @@ $commands = [
     ['Verify CalDAV incremental synchronization', [PHP_BINARY, 'tests/caldav-incremental-sync.php']],
     ['Run OpenCalendar provider and integration tests', [PHP_BINARY, 'tests/calendar-provider.php']],
     ['Check shared visualization contract', [PHP_BINARY, 'tests/visualization.php']],
+    ['Verify IPSView Assistant/OpenCalendar style profile E2E', [PHP_BINARY, 'tests/style-profile-e2e.php']],
     ['Run account module structure tests', [PHP_BINARY, 'tests/account-module.php']],
     ['Check public PHPDoc coverage', [PHP_BINARY, 'tests/phpdocs.php']],
     ['Check Symcon Strict compliance', [PHP_BINARY, 'tests/symcon-strict.php']],

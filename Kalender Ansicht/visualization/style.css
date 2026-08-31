@@ -96,6 +96,8 @@ html.ipsview-mode {
     --cal-popup-shadow: var(--ipsview-role-popup-shadow);
     --cal-disabled-opacity: var(--ipsview-role-disabled-opacity);
     --cal-font-family: var(--ipsview-role-font-family);
+    font-style: var(--ipsview-role-font-style);
+    font-weight: var(--ipsview-role-font-weight);
     --cal-dialog-small-width: 420px;
     --cal-dialog-medium-width: 540px;
     --cal-dialog-large-width: 680px;

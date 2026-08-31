@@ -59,7 +59,15 @@ als Ausgangspunkt kopiert und anschließend individuell verändert werden.
 Die gemeinsame Typografie unterstützt die IPSView-Schriften **Roboto**,
 **Roboto Mono**, **Open Sans**, **PT Sans**, **Dancing Script**, **Bebas Neue**,
 **Indie Flower** und **Segment7**. Verfügbare Schriftschnitte werden abhängig von
-der jeweiligen Schrift angeboten.
+der jeweiligen Schrift angeboten und in der IPSView-Ausgabe einschließlich
+Normal/Fett und Kursiv korrekt angewendet.
+
+OpenCalendar dient als Referenz-Consumer für **Style Profile V1** aus dem
+IPSViewAssistant. Die Tests verwenden ein vom Assistant exportiertes vollständiges
+Referenzprofil und prüfen Farben samt unabhängigen Deckkräften, Typografie mit
+Schriftfamilie, Schriftschnitt, Größe und Skalierung, Rahmen und Linien sowie
+Schatten und Effekte. Das Profil bleibt dabei im zentralen kanonischen Format
+verlustfrei validier- und erneut serialisierbar.
 
 Kalender- und Terminfarben bleiben fachliche Inhaltsfarben von OpenCalendar und
 werden nicht durch die globale IPSView-Stilquelle ersetzt. Die ausführliche
