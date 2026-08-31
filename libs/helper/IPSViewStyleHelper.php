@@ -7,6 +7,9 @@ namespace Burki24\SymconModuleHelper;
 use InvalidArgumentException;
 
 require_once __DIR__ . '/HelperTranslationHelper.php';
+require_once __DIR__ . '/IPSViewFontCatalogHelper.php';
+require_once __DIR__ . '/IPSViewStylePresetHelper.php';
+require_once __DIR__ . '/IPSViewStyleProfileHelper.php';
 
 /**
  * Provides a reusable IPSView style source, form controls and CSS tokens.
@@ -16,15 +19,28 @@ require_once __DIR__ . '/HelperTranslationHelper.php';
  * their components, but do not define module-specific colors, gradients,
  * typography, borders or shadows.
  *
- * @version 1.4.3
+ * @version 1.6.4
  */
 trait IPSViewStyleHelper
 {
     use HelperTranslationHelper;
+
     public const IPSVIEW_STYLE_SOURCE_CUSTOM = 0;
     public const IPSVIEW_STYLE_SOURCE_MEDIA = 1;
     public const IPSVIEW_STYLE_SOURCE_LIGHT = 2;
     public const IPSVIEW_STYLE_SOURCE_DARK = 3;
+    public const IPSVIEW_STYLE_SOURCE_PROFILE = 4;
+    /** Legacy generic preset source kept for stored configurations from v1.6.1. */
+    public const IPSVIEW_STYLE_SOURCE_PRESET = 5;
+    public const IPSVIEW_STYLE_SOURCE_PRESET_LIGHT = 6;
+    public const IPSVIEW_STYLE_SOURCE_PRESET_DARK = 7;
+    public const IPSVIEW_STYLE_SOURCE_PRESET_WARM = 8;
+    public const IPSVIEW_STYLE_SOURCE_PRESET_COOL = 9;
+    public const IPSVIEW_STYLE_SOURCE_PRESET_EARTHY = 10;
+    public const IPSVIEW_STYLE_SOURCE_PRESET_WATER = 11;
+    public const IPSVIEW_STYLE_SOURCE_PRESET_SUNNY = 12;
+
+    private const IPSVIEW_STYLE_SYSTEM_FONT_FAMILY = '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
 
     /** @var array<string,string> */
     private const IPSVIEW_STYLE_COLOR_PROPERTIES = [
@@ -153,17 +169,43 @@ trait IPSViewStyleHelper
     private const IPSVIEW_STYLE_TRANSLATION_SOURCES = [
         'description.choose_source'         => 'Choose a shared IPSView style source. The same roles and effects are used by every consuming module.',
         'description.media_source'          => 'The media source imports the whitelisted standard style from an IPSView media object. Custom values below are used only for the custom source.',
+        'description.profile_source'        => 'The style profile source loads a complete validated Style Profile V1 from a media object. Invalid profiles fall back safely to the light preset.',
+        'description.preset_source'         => 'The centralized IPSView Assistant presets are selected directly from the style source list.',
+        'description.custom_values'         => 'The values below define the custom style and can be edited directly.',
+        'description.active_values'         => 'The values below show the active style source and are read-only. Copy the style to custom to use it as a starting point for individual adjustments.',
         'section.universal_colors'          => 'Universal colors',
         'section.surface_transparency'      => 'Surface transparency',
         'section.typography_effects'        => 'Typography, borders and effects',
         'field.style_source'                => 'Style source',
         'field.media_object'                => 'IPSView media object',
+        'field.profile_media_object'        => 'Style profile media object',
+        'field.style_preset'                => 'Shared preset',
         'field.transparent_background'      => 'Transparent background',
         'field.font_scale'                  => 'Font scale (%)',
+        'field.font_style'                  => 'Font style',
         'option.custom_style'               => 'Custom style',
         'option.ipsview_standard_style'     => 'IPSView standard style',
         'option.light_preset'               => 'Light preset',
         'option.dark_preset'                => 'Dark preset',
+        'option.style_profile'              => 'Style profile',
+        'option.shared_preset'              => 'Shared preset',
+        'option.previous_selection'         => 'previous selection',
+        'option.system_font'                => 'System default',
+        'option.legacy_font'                => 'Legacy/custom',
+        'font_style.regular'                => 'Regular',
+        'font_style.bold'                   => 'Bold',
+        'font_style.italic'                 => 'Italic',
+        'font_style.bold_italic'            => 'Bold italic',
+        'action.copy_to_custom'             => 'Copy to custom style',
+        'action.copy_to_custom_confirm'     => 'Copy the currently active style values to the custom style and switch to it?',
+        'preset.standard'                   => 'IPSView Standard',
+        'preset.light'                      => 'Light',
+        'preset.dark'                       => 'Dark',
+        'preset.warm'                       => 'Warm',
+        'preset.cool'                       => 'Cool',
+        'preset.earthy'                     => 'Earthy',
+        'preset.water'                      => 'Water',
+        'preset.sunny'                      => 'Sunny',
         'color.view_background'             => 'View background',
         'color.page_background'             => 'Page background',
         'color.label_background'            => 'Label background',
@@ -233,7 +275,7 @@ trait IPSViewStyleHelper
         'Positive'                  => '#56C881',
         'Warning'                   => '#E6A93F',
         'Critical'                  => '#E36D6D',
-        'FontFamily'                => '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+        'FontFamily'                => self::IPSVIEW_STYLE_SYSTEM_FONT_FAMILY,
         'FontSize'                  => 16.0,
         'BorderRadius'              => 8.0,
         'BorderWidth'               => 1.0,
@@ -268,7 +310,7 @@ trait IPSViewStyleHelper
         'Positive'                  => '#63DC92',
         'Warning'                   => '#FFC15F',
         'Critical'                  => '#FF7B7B',
-        'FontFamily'                => '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+        'FontFamily'                => self::IPSVIEW_STYLE_SYSTEM_FONT_FAMILY,
         'FontSize'                  => 16.0,
         'BorderRadius'              => 8.0,
         'BorderWidth'               => 1.0,
@@ -287,6 +329,8 @@ trait IPSViewStyleHelper
     {
         $this->RegisterPropertyInteger('IPSViewStyleSource', self::IPSVIEW_STYLE_SOURCE_CUSTOM);
         $this->RegisterPropertyInteger('IPSViewStyleMediaID', 0);
+        $this->RegisterPropertyInteger('IPSViewStyleProfileMediaID', 0);
+        $this->RegisterPropertyString('IPSViewStylePreset', IPSViewStylePresetHelper::PRESET_STANDARD);
         $this->RegisterPropertyBoolean('IPSViewStyleTransparentBackground', false);
         $this->RegisterPropertyInteger('IPSViewStyleFontScale', 100);
 
@@ -298,6 +342,7 @@ trait IPSViewStyleHelper
         }
 
         $this->RegisterPropertyString('IPSViewStyleFontFamily', '');
+        $this->RegisterPropertyString('IPSViewStyleFontStyle', IPSViewFontCatalogHelper::STYLE_REGULAR);
         $this->RegisterPropertyInteger('IPSViewStyleBaseFontSize', 16);
         $this->RegisterPropertyFloat('IPSViewStyleBorderRadius', 8.0);
         $this->RegisterPropertyFloat('IPSViewStyleBorderWidth', 1.0);
@@ -325,6 +370,37 @@ trait IPSViewStyleHelper
             throw new InvalidArgumentException('IPSView style color-control width must not be empty.');
         }
 
+        $source = $this->IPSViewStyleSource();
+        $editable = $source === self::IPSVIEW_STYLE_SOURCE_CUSTOM;
+        $values = $editable ? [] : $this->IPSViewStyleCustomPropertyValues();
+        $mediaSource = $source === self::IPSVIEW_STYLE_SOURCE_MEDIA;
+        $profileSource = $source === self::IPSVIEW_STYLE_SOURCE_PROFILE;
+        $presetSource = !$editable && !$mediaSource && !$profileSource;
+
+        $fontScaleControl = $profileSource
+            ? $this->IPSViewStyleFormControl(
+                [
+                    'type'    => 'NumberSpinner',
+                    'caption' => $this->IPSViewStyleText('field.font_scale'),
+                    'minimum' => 60,
+                    'maximum' => 200,
+                    'suffix'  => ' %',
+                    'width'   => '180px'
+                ],
+                'IPSViewStyleFontScale',
+                false,
+                $values
+            )
+            : [
+                'type'    => 'NumberSpinner',
+                'name'    => 'IPSViewStyleFontScale',
+                'caption' => $this->IPSViewStyleText('field.font_scale'),
+                'minimum' => 60,
+                'maximum' => 200,
+                'suffix'  => ' %',
+                'width'   => '180px'
+            ];
+
         $items = [
             [
                 'type'    => 'Label',
@@ -337,18 +413,21 @@ trait IPSViewStyleHelper
                         'type'    => 'Select',
                         'name'    => 'IPSViewStyleSource',
                         'caption' => $this->IPSViewStyleText('field.style_source'),
-                        'options' => [
-                            ['caption' => $this->IPSViewStyleText('option.custom_style'), 'value' => self::IPSVIEW_STYLE_SOURCE_CUSTOM],
-                            ['caption' => $this->IPSViewStyleText('option.ipsview_standard_style'), 'value' => self::IPSVIEW_STYLE_SOURCE_MEDIA],
-                            ['caption' => $this->IPSViewStyleText('option.light_preset'), 'value' => self::IPSVIEW_STYLE_SOURCE_LIGHT],
-                            ['caption' => $this->IPSViewStyleText('option.dark_preset'), 'value' => self::IPSVIEW_STYLE_SOURCE_DARK]
-                        ],
-                        'width' => '220px'
+                        'options' => $this->IPSViewStyleSourceOptions(),
+                        'width'   => '220px'
                     ],
                     [
                         'type'    => 'SelectMedia',
                         'name'    => 'IPSViewStyleMediaID',
                         'caption' => $this->IPSViewStyleText('field.media_object'),
+                        'visible' => $mediaSource,
+                        'width'   => '320px'
+                    ],
+                    [
+                        'type'    => 'SelectMedia',
+                        'name'    => 'IPSViewStyleProfileMediaID',
+                        'caption' => $this->IPSViewStyleText('field.profile_media_object'),
+                        'visible' => $profileSource,
                         'width'   => '320px'
                     ]
                 ]
@@ -362,37 +441,58 @@ trait IPSViewStyleHelper
                         'caption' => $this->IPSViewStyleText('field.transparent_background'),
                         'width'   => '260px'
                     ],
-                    [
-                        'type'    => 'NumberSpinner',
-                        'name'    => 'IPSViewStyleFontScale',
-                        'caption' => $this->IPSViewStyleText('field.font_scale'),
-                        'minimum' => 60,
-                        'maximum' => 200,
-                        'suffix'  => ' %',
-                        'width'   => '180px'
-                    ]
+                    $fontScaleControl
                 ]
             ],
             [
                 'type'    => 'Label',
-                'caption' => $this->IPSViewStyleText('description.media_source')
+                'caption' => $this->IPSViewStyleText('description.media_source'),
+                'visible' => $mediaSource
             ],
             [
                 'type'    => 'Label',
-                'caption' => $this->IPSViewStyleText('section.universal_colors')
+                'caption' => $this->IPSViewStyleText('description.profile_source'),
+                'visible' => $profileSource
+            ],
+            [
+                'type'    => 'Label',
+                'caption' => $this->IPSViewStyleText('description.preset_source'),
+                'visible' => $presetSource
+            ],
+            [
+                'type'    => 'Label',
+                'caption' => $this->IPSViewStyleText($editable ? 'description.custom_values' : 'description.active_values')
             ]
+        ];
+
+        if (!$editable) {
+            $items[] = [
+                'type'    => 'Button',
+                'caption' => $this->IPSViewStyleText('action.copy_to_custom'),
+                'confirm' => $this->IPSViewStyleText('action.copy_to_custom_confirm'),
+                'onClick' => $this->IPSViewStyleCopyToCustomScript($values)
+            ];
+        }
+
+        $items[] = [
+            'type'    => 'Label',
+            'caption' => $this->IPSViewStyleText('section.universal_colors')
         ];
 
         foreach (array_chunk(array_keys(self::IPSVIEW_STYLE_COLOR_PROPERTIES), 3) as $keys) {
             $row = [];
             foreach ($keys as $key) {
-                $row[] = [
-                    'type'             => 'SelectColor',
-                    'name'             => self::IPSVIEW_STYLE_COLOR_PROPERTIES[$key],
-                    'caption'          => $this->IPSViewStyleText(self::IPSVIEW_STYLE_COLOR_CAPTIONS[$key]),
-                    'allowTransparent' => false,
-                    'width'            => $colorWidth
-                ];
+                $row[] = $this->IPSViewStyleFormControl(
+                    [
+                        'type'             => 'SelectColor',
+                        'caption'          => $this->IPSViewStyleText(self::IPSVIEW_STYLE_COLOR_CAPTIONS[$key]),
+                        'allowTransparent' => false,
+                        'width'            => $colorWidth
+                    ],
+                    self::IPSVIEW_STYLE_COLOR_PROPERTIES[$key],
+                    $editable,
+                    $values
+                );
             }
 
             $items[] = [
@@ -408,15 +508,19 @@ trait IPSViewStyleHelper
         foreach (array_chunk(array_keys(self::IPSVIEW_STYLE_OPACITY_PROPERTIES), 3) as $keys) {
             $row = [];
             foreach ($keys as $key) {
-                $row[] = [
-                    'type'    => 'NumberSpinner',
-                    'name'    => self::IPSVIEW_STYLE_OPACITY_PROPERTIES[$key],
-                    'caption' => $this->IPSViewStyleText(self::IPSVIEW_STYLE_OPACITY_CAPTIONS[$key]),
-                    'minimum' => 0,
-                    'maximum' => 100,
-                    'suffix'  => ' %',
-                    'width'   => '260px'
-                ];
+                $row[] = $this->IPSViewStyleFormControl(
+                    [
+                        'type'    => 'NumberSpinner',
+                        'caption' => $this->IPSViewStyleText(self::IPSVIEW_STYLE_OPACITY_CAPTIONS[$key]),
+                        'minimum' => 0,
+                        'maximum' => 100,
+                        'suffix'  => ' %',
+                        'width'   => '260px'
+                    ],
+                    self::IPSVIEW_STYLE_OPACITY_PROPERTIES[$key],
+                    $editable,
+                    $values
+                );
             }
 
             $items[] = [
@@ -429,127 +533,191 @@ trait IPSViewStyleHelper
             'type'    => 'Label',
             'caption' => $this->IPSViewStyleText('section.typography_effects')
         ];
+
+        $fontFamily = $editable
+            ? $this->ReadPropertyString('IPSViewStyleFontFamily')
+            : (string) $values['IPSViewStyleFontFamily'];
+        $fontStyle = $editable
+            ? $this->ReadPropertyString('IPSViewStyleFontStyle')
+            : (string) $values['IPSViewStyleFontStyle'];
+
         $items[] = [
             'type'  => 'RowLayout',
             'items' => [
-                [
-                    'type'    => 'ValidationTextBox',
-                    'name'    => 'IPSViewStyleFontFamily',
-                    'caption' => $this->IPSViewStyleText('field.font_family'),
-                    'width'   => '300px'
-                ],
-                [
-                    'type'    => 'NumberSpinner',
-                    'name'    => 'IPSViewStyleBaseFontSize',
-                    'caption' => $this->IPSViewStyleText('field.base_font_size'),
-                    'minimum' => 8,
-                    'maximum' => 32,
-                    'suffix'  => ' px',
-                    'width'   => '220px'
-                ],
-                [
-                    'type'    => 'NumberSpinner',
-                    'name'    => 'IPSViewStyleBorderRadius',
-                    'caption' => $this->IPSViewStyleText('field.border_radius'),
-                    'minimum' => 0,
-                    'maximum' => 40,
-                    'digits'  => 1,
-                    'suffix'  => ' px',
-                    'width'   => '220px'
-                ]
+                $this->IPSViewStyleFormControl(
+                    [
+                        'type'    => 'Select',
+                        'caption' => $this->IPSViewStyleText('field.font_family'),
+                        'options' => $this->IPSViewStyleFontFamilyOptions($fontFamily),
+                        'width'   => '300px'
+                    ],
+                    'IPSViewStyleFontFamily',
+                    $editable,
+                    $values
+                ),
+                $this->IPSViewStyleFormControl(
+                    [
+                        'type'    => 'Select',
+                        'caption' => $this->IPSViewStyleText('field.font_style'),
+                        'options' => $this->IPSViewStyleFontStyleOptions($fontFamily, $fontStyle),
+                        'width'   => '200px'
+                    ],
+                    'IPSViewStyleFontStyle',
+                    $editable,
+                    $values
+                ),
+                $this->IPSViewStyleFormControl(
+                    [
+                        'type'    => 'NumberSpinner',
+                        'caption' => $this->IPSViewStyleText('field.base_font_size'),
+                        'minimum' => 8,
+                        'maximum' => 32,
+                        'suffix'  => ' px',
+                        'width'   => '220px'
+                    ],
+                    'IPSViewStyleBaseFontSize',
+                    $editable,
+                    $values
+                )
             ]
         ];
         $items[] = [
             'type'  => 'RowLayout',
             'items' => [
-                [
-                    'type'    => 'NumberSpinner',
-                    'name'    => 'IPSViewStyleBorderWidth',
-                    'caption' => $this->IPSViewStyleText('field.border_width'),
-                    'minimum' => 0,
-                    'maximum' => 10,
-                    'digits'  => 1,
-                    'suffix'  => ' px',
-                    'width'   => '220px'
-                ],
-                [
-                    'type'    => 'NumberSpinner',
-                    'name'    => 'IPSViewStyleLineWidth',
-                    'caption' => $this->IPSViewStyleText('field.line_width'),
-                    'minimum' => 0,
-                    'maximum' => 10,
-                    'digits'  => 1,
-                    'suffix'  => ' px',
-                    'width'   => '220px'
-                ],
-                [
-                    'type'    => 'NumberSpinner',
-                    'name'    => 'IPSViewStyleShadowBlur',
-                    'caption' => $this->IPSViewStyleText('field.shadow_blur'),
-                    'minimum' => 0,
-                    'maximum' => 80,
-                    'digits'  => 1,
-                    'suffix'  => ' px',
-                    'width'   => '220px'
-                ]
+                $this->IPSViewStyleFormControl(
+                    [
+                        'type'    => 'NumberSpinner',
+                        'caption' => $this->IPSViewStyleText('field.border_radius'),
+                        'minimum' => 0,
+                        'maximum' => 40,
+                        'digits'  => 1,
+                        'suffix'  => ' px',
+                        'width'   => '220px'
+                    ],
+                    'IPSViewStyleBorderRadius',
+                    $editable,
+                    $values
+                ),
+                $this->IPSViewStyleFormControl(
+                    [
+                        'type'    => 'NumberSpinner',
+                        'caption' => $this->IPSViewStyleText('field.border_width'),
+                        'minimum' => 0,
+                        'maximum' => 10,
+                        'digits'  => 1,
+                        'suffix'  => ' px',
+                        'width'   => '220px'
+                    ],
+                    'IPSViewStyleBorderWidth',
+                    $editable,
+                    $values
+                ),
+                $this->IPSViewStyleFormControl(
+                    [
+                        'type'    => 'NumberSpinner',
+                        'caption' => $this->IPSViewStyleText('field.line_width'),
+                        'minimum' => 0,
+                        'maximum' => 10,
+                        'digits'  => 1,
+                        'suffix'  => ' px',
+                        'width'   => '220px'
+                    ],
+                    'IPSViewStyleLineWidth',
+                    $editable,
+                    $values
+                )
             ]
         ];
         $items[] = [
             'type'  => 'RowLayout',
             'items' => [
-                [
-                    'type'    => 'NumberSpinner',
-                    'name'    => 'IPSViewStyleShadowSpread',
-                    'caption' => $this->IPSViewStyleText('field.shadow_spread'),
-                    'minimum' => -20,
-                    'maximum' => 40,
-                    'digits'  => 1,
-                    'suffix'  => ' px',
-                    'width'   => '220px'
-                ],
-                [
-                    'type'    => 'NumberSpinner',
-                    'name'    => 'IPSViewStyleShadowOffsetX',
-                    'caption' => $this->IPSViewStyleText('field.shadow_offset_x'),
-                    'minimum' => -40,
-                    'maximum' => 40,
-                    'digits'  => 1,
-                    'suffix'  => ' px',
-                    'width'   => '220px'
-                ],
-                [
-                    'type'    => 'NumberSpinner',
-                    'name'    => 'IPSViewStyleShadowOffsetY',
-                    'caption' => $this->IPSViewStyleText('field.shadow_offset_y'),
-                    'minimum' => -40,
-                    'maximum' => 40,
-                    'digits'  => 1,
-                    'suffix'  => ' px',
-                    'width'   => '220px'
-                ]
+                $this->IPSViewStyleFormControl(
+                    [
+                        'type'    => 'NumberSpinner',
+                        'caption' => $this->IPSViewStyleText('field.shadow_blur'),
+                        'minimum' => 0,
+                        'maximum' => 80,
+                        'digits'  => 1,
+                        'suffix'  => ' px',
+                        'width'   => '220px'
+                    ],
+                    'IPSViewStyleShadowBlur',
+                    $editable,
+                    $values
+                ),
+                $this->IPSViewStyleFormControl(
+                    [
+                        'type'    => 'NumberSpinner',
+                        'caption' => $this->IPSViewStyleText('field.shadow_spread'),
+                        'minimum' => -20,
+                        'maximum' => 40,
+                        'digits'  => 1,
+                        'suffix'  => ' px',
+                        'width'   => '220px'
+                    ],
+                    'IPSViewStyleShadowSpread',
+                    $editable,
+                    $values
+                ),
+                $this->IPSViewStyleFormControl(
+                    [
+                        'type'    => 'NumberSpinner',
+                        'caption' => $this->IPSViewStyleText('field.shadow_offset_x'),
+                        'minimum' => -40,
+                        'maximum' => 40,
+                        'digits'  => 1,
+                        'suffix'  => ' px',
+                        'width'   => '220px'
+                    ],
+                    'IPSViewStyleShadowOffsetX',
+                    $editable,
+                    $values
+                )
             ]
         ];
         $items[] = [
             'type'  => 'RowLayout',
             'items' => [
-                [
-                    'type'    => 'NumberSpinner',
-                    'name'    => 'IPSViewStyleDisabledOpacity',
-                    'caption' => $this->IPSViewStyleText('field.inactive_opacity'),
-                    'minimum' => 10,
-                    'maximum' => 100,
-                    'suffix'  => ' %',
-                    'width'   => '220px'
-                ],
-                [
-                    'type'    => 'NumberSpinner',
-                    'name'    => 'IPSViewStyleGradientStrength',
-                    'caption' => $this->IPSViewStyleText('field.gradient_strength'),
-                    'minimum' => 0,
-                    'maximum' => 80,
-                    'suffix'  => ' %',
-                    'width'   => '220px'
-                ]
+                $this->IPSViewStyleFormControl(
+                    [
+                        'type'    => 'NumberSpinner',
+                        'caption' => $this->IPSViewStyleText('field.shadow_offset_y'),
+                        'minimum' => -40,
+                        'maximum' => 40,
+                        'digits'  => 1,
+                        'suffix'  => ' px',
+                        'width'   => '220px'
+                    ],
+                    'IPSViewStyleShadowOffsetY',
+                    $editable,
+                    $values
+                ),
+                $this->IPSViewStyleFormControl(
+                    [
+                        'type'    => 'NumberSpinner',
+                        'caption' => $this->IPSViewStyleText('field.inactive_opacity'),
+                        'minimum' => 10,
+                        'maximum' => 100,
+                        'suffix'  => ' %',
+                        'width'   => '220px'
+                    ],
+                    'IPSViewStyleDisabledOpacity',
+                    $editable,
+                    $values
+                ),
+                $this->IPSViewStyleFormControl(
+                    [
+                        'type'    => 'NumberSpinner',
+                        'caption' => $this->IPSViewStyleText('field.gradient_strength'),
+                        'minimum' => 0,
+                        'maximum' => 80,
+                        'suffix'  => ' %',
+                        'width'   => '220px'
+                    ],
+                    'IPSViewStyleGradientStrength',
+                    $editable,
+                    $values
+                )
             ]
         ];
 
@@ -612,7 +780,7 @@ trait IPSViewStyleHelper
     protected function IPSViewStyleRootFontSize(?string $document = null): string
     {
         $style = $this->IPSViewResolvedStyle($document);
-        $fontScale = max(60, min(200, $this->ReadPropertyInteger('IPSViewStyleFontScale'))) / 100;
+        $fontScale = (float) $style['FontScale'];
         $fontSize = max(8, min(64, (int) round((float) $style['FontSize'] * $fontScale)));
 
         return $fontSize . 'px';
@@ -627,7 +795,16 @@ trait IPSViewStyleHelper
             self::IPSVIEW_STYLE_SOURCE_CUSTOM,
             self::IPSVIEW_STYLE_SOURCE_MEDIA,
             self::IPSVIEW_STYLE_SOURCE_LIGHT,
-            self::IPSVIEW_STYLE_SOURCE_DARK
+            self::IPSVIEW_STYLE_SOURCE_DARK,
+            self::IPSVIEW_STYLE_SOURCE_PROFILE,
+            self::IPSVIEW_STYLE_SOURCE_PRESET,
+            self::IPSVIEW_STYLE_SOURCE_PRESET_LIGHT,
+            self::IPSVIEW_STYLE_SOURCE_PRESET_DARK,
+            self::IPSVIEW_STYLE_SOURCE_PRESET_WARM,
+            self::IPSVIEW_STYLE_SOURCE_PRESET_COOL,
+            self::IPSVIEW_STYLE_SOURCE_PRESET_EARTHY,
+            self::IPSVIEW_STYLE_SOURCE_PRESET_WATER,
+            self::IPSVIEW_STYLE_SOURCE_PRESET_SUNNY
         ], true) ? $source : self::IPSVIEW_STYLE_SOURCE_CUSTOM;
     }
 
@@ -635,6 +812,21 @@ trait IPSViewStyleHelper
     protected function IPSViewStyleMediaID(): int
     {
         return max(0, $this->ReadPropertyInteger('IPSViewStyleMediaID'));
+    }
+
+    /** Returns the selected Style Profile media object ID, or zero. */
+    protected function IPSViewStyleProfileMediaID(): int
+    {
+        return max(0, $this->ReadPropertyInteger('IPSViewStyleProfileMediaID'));
+    }
+
+    /** Returns the selected centralized IPSView preset identifier. */
+    protected function IPSViewStylePreset(): string
+    {
+        return IPSViewStylePresetHelper::normalize(
+            $this->ReadPropertyString('IPSViewStylePreset'),
+            IPSViewStylePresetHelper::PRESET_STANDARD
+        ) ?? IPSViewStylePresetHelper::PRESET_STANDARD;
     }
 
     /**
@@ -647,9 +839,7 @@ trait IPSViewStyleHelper
     {
         $message = defined('MM_UPDATE') ? constant('MM_UPDATE') : 10905;
         $registeredMediaID = $this->ReadAttributeInteger('IPSViewStyleRegisteredMediaID');
-        $mediaID = $this->IPSViewStyleSource() === self::IPSVIEW_STYLE_SOURCE_MEDIA
-            ? $this->IPSViewStyleMediaID()
-            : 0;
+        $mediaID = $this->IPSViewStyleActiveMediaID();
 
         if ($registeredMediaID > 0 && $registeredMediaID !== $mediaID) {
             $this->UnregisterMessage($registeredMediaID, $message);
@@ -667,8 +857,10 @@ trait IPSViewStyleHelper
     {
         $updateMessage = defined('MM_UPDATE') ? constant('MM_UPDATE') : 10905;
 
-        return $this->IPSViewStyleSource() === self::IPSVIEW_STYLE_SOURCE_MEDIA
-            && $senderID === $this->IPSViewStyleMediaID()
+        $mediaID = $this->IPSViewStyleActiveMediaID();
+
+        return $mediaID > 0
+            && $senderID === $mediaID
             && $message === $updateMessage;
     }
 
@@ -683,19 +875,7 @@ trait IPSViewStyleHelper
      */
     protected function IPSViewResolvedStyle(?string $document = null): array
     {
-        $source = $this->IPSViewStyleSource();
-        if ($source === self::IPSVIEW_STYLE_SOURCE_MEDIA) {
-            $mediaStyle = $this->IPSViewStyleFromDocument($document ?? $this->ReadIPSViewStyleMediaContent());
-            $base = $mediaStyle ?? self::IPSVIEW_STYLE_LIGHT_PRESET;
-        } elseif ($source === self::IPSVIEW_STYLE_SOURCE_LIGHT) {
-            $base = self::IPSVIEW_STYLE_LIGHT_PRESET;
-        } elseif ($source === self::IPSVIEW_STYLE_SOURCE_DARK) {
-            $base = self::IPSVIEW_STYLE_DARK_PRESET;
-        } else {
-            $base = $this->IPSViewCustomStyle();
-        }
-
-        return $this->IPSViewFinalizeStyle($base);
+        return $this->IPSViewFinalizeStyle($this->IPSViewStyleBase($document));
     }
 
     /**
@@ -712,7 +892,14 @@ trait IPSViewStyleHelper
 
         $style = $this->IPSViewResolvedStyle($document);
         $transparent = $this->ReadPropertyBoolean('IPSViewStyleTransparentBackground');
-        $fontScale = max(60, min(200, $this->ReadPropertyInteger('IPSViewStyleFontScale'))) / 100;
+        $fontScale = (float) $style['FontScale'];
+        $fontCut = (string) $style['FontStyle'];
+        $fontStyle = in_array($fontCut, [IPSViewFontCatalogHelper::STYLE_ITALIC, IPSViewFontCatalogHelper::STYLE_BOLD_ITALIC], true)
+            ? 'italic'
+            : 'normal';
+        $fontWeight = in_array($fontCut, [IPSViewFontCatalogHelper::STYLE_BOLD, IPSViewFontCatalogHelper::STYLE_BOLD_ITALIC], true)
+            ? '700'
+            : '400';
         $variables = [
             'color-scheme'                                  => $style['ColorScheme'],
             '--ipsview-view-background'                     => $this->IPSViewCSSVariableColor((string) $style['ViewBackground']),
@@ -768,6 +955,8 @@ trait IPSViewStyleHelper
             '--ipsview-gradient-critical'                   => $style['GradientCritical'],
             '--ipsview-font-family'                         => $style['FontFamily'],
             '--ipsview-font-size'                           => $this->IPSViewFormatNumber((float) $style['FontSize']) . 'px',
+            '--ipsview-font-style'                          => $fontStyle,
+            '--ipsview-font-weight'                         => $fontWeight,
             '--ipsview-font-scale'                          => $this->IPSViewFormatNumber($fontScale),
             '--ipsview-radius'                              => $this->IPSViewFormatNumber((float) $style['BorderRadius']) . 'px',
             '--ipsview-border-width'                        => $this->IPSViewFormatNumber((float) $style['BorderWidth']) . 'px',
@@ -816,6 +1005,8 @@ trait IPSViewStyleHelper
             '--ipsview-role-gradient-critical'              => 'var(--ipsview-gradient-critical)',
             '--ipsview-role-font-family'                    => 'var(--ipsview-font-family)',
             '--ipsview-role-font-size'                      => 'var(--ipsview-font-size)',
+            '--ipsview-role-font-style'                     => 'var(--ipsview-font-style)',
+            '--ipsview-role-font-weight'                    => 'var(--ipsview-font-weight)',
             '--ipsview-role-radius'                         => 'var(--ipsview-radius)',
             '--ipsview-role-border-width'                   => 'var(--ipsview-border-width)',
             '--ipsview-role-line-width'                     => 'var(--ipsview-line-width)',
@@ -847,7 +1038,28 @@ trait IPSViewStyleHelper
     /** Reads and decodes the selected IPSView media object. */
     protected function ReadIPSViewStyleMediaContent(): string
     {
-        $mediaID = $this->IPSViewStyleMediaID();
+        return $this->ReadIPSViewStyleMediaObjectContent($this->IPSViewStyleMediaID());
+    }
+
+    /** Reads and decodes the selected Style Profile media object. */
+    protected function ReadIPSViewStyleProfileMediaContent(): string
+    {
+        return $this->ReadIPSViewStyleMediaObjectContent($this->IPSViewStyleProfileMediaID());
+    }
+
+    /** Returns the media ID used by the currently active media-backed source. */
+    private function IPSViewStyleActiveMediaID(): int
+    {
+        return match ($this->IPSViewStyleSource()) {
+            self::IPSVIEW_STYLE_SOURCE_MEDIA   => $this->IPSViewStyleMediaID(),
+            self::IPSVIEW_STYLE_SOURCE_PROFILE => $this->IPSViewStyleProfileMediaID(),
+            default                            => 0
+        };
+    }
+
+    /** Reads and decodes one Symcon media object. */
+    private function ReadIPSViewStyleMediaObjectContent(int $mediaID): string
+    {
         if ($mediaID <= 0 || !function_exists('IPS_GetMediaContent')) {
             return '';
         }
@@ -873,6 +1085,179 @@ trait IPSViewStyleHelper
         return $this->TranslateHelperText('IPSViewStyleHelper', $key, $fallback);
     }
 
+    /** @return list<array{caption:string,value:int}> */
+    private function IPSViewStyleSourceOptions(): array
+    {
+        $options = [
+            ['caption' => $this->IPSViewStyleText('option.custom_style'), 'value' => self::IPSVIEW_STYLE_SOURCE_CUSTOM],
+            ['caption' => $this->IPSViewStyleText('option.ipsview_standard_style'), 'value' => self::IPSVIEW_STYLE_SOURCE_MEDIA],
+            ['caption' => $this->IPSViewStyleText('option.light_preset'), 'value' => self::IPSVIEW_STYLE_SOURCE_LIGHT],
+            ['caption' => $this->IPSViewStyleText('option.dark_preset'), 'value' => self::IPSVIEW_STYLE_SOURCE_DARK],
+            ['caption' => $this->IPSViewStyleText('option.style_profile'), 'value' => self::IPSVIEW_STYLE_SOURCE_PROFILE],
+            ['caption' => $this->IPSViewStyleText('preset.light'), 'value' => self::IPSVIEW_STYLE_SOURCE_PRESET_LIGHT],
+            ['caption' => $this->IPSViewStyleText('preset.dark'), 'value' => self::IPSVIEW_STYLE_SOURCE_PRESET_DARK],
+            ['caption' => $this->IPSViewStyleText('preset.warm'), 'value' => self::IPSVIEW_STYLE_SOURCE_PRESET_WARM],
+            ['caption' => $this->IPSViewStyleText('preset.cool'), 'value' => self::IPSVIEW_STYLE_SOURCE_PRESET_COOL],
+            ['caption' => $this->IPSViewStyleText('preset.earthy'), 'value' => self::IPSVIEW_STYLE_SOURCE_PRESET_EARTHY],
+            ['caption' => $this->IPSViewStyleText('preset.water'), 'value' => self::IPSVIEW_STYLE_SOURCE_PRESET_WATER],
+            ['caption' => $this->IPSViewStyleText('preset.sunny'), 'value' => self::IPSVIEW_STYLE_SOURCE_PRESET_SUNNY]
+        ];
+
+        if ($this->ReadPropertyInteger('IPSViewStyleSource') === self::IPSVIEW_STYLE_SOURCE_PRESET) {
+            $preset = $this->IPSViewStylePreset();
+            $translationKeys = [
+                IPSViewStylePresetHelper::PRESET_STANDARD => 'preset.standard',
+                IPSViewStylePresetHelper::PRESET_LIGHT    => 'preset.light',
+                IPSViewStylePresetHelper::PRESET_DARK     => 'preset.dark',
+                IPSViewStylePresetHelper::PRESET_WARM     => 'preset.warm',
+                IPSViewStylePresetHelper::PRESET_COOL     => 'preset.cool',
+                IPSViewStylePresetHelper::PRESET_EARTHY   => 'preset.earthy',
+                IPSViewStylePresetHelper::PRESET_WATER    => 'preset.water',
+                IPSViewStylePresetHelper::PRESET_SUNNY    => 'preset.sunny'
+            ];
+            $options[] = [
+                'caption' => $this->IPSViewStyleText($translationKeys[$preset]) . ' (' . $this->IPSViewStyleText('option.previous_selection') . ')',
+                'value'   => self::IPSVIEW_STYLE_SOURCE_PRESET
+            ];
+        }
+
+        return $options;
+    }
+
+    /**
+     * @param array<string,mixed> $control
+     * @param array<string,mixed> $values
+     *
+     * @return array<string,mixed>
+     */
+    private function IPSViewStyleFormControl(
+        array $control,
+        string $propertyName,
+        bool $editable,
+        array $values
+    ): array {
+        if ($editable) {
+            $control['name'] = $propertyName;
+        } else {
+            $control['enabled'] = false;
+            $control['value'] = $values[$propertyName];
+        }
+
+        return $control;
+    }
+
+    /** @param array<string,mixed> $values */
+    private function IPSViewStyleCopyToCustomScript(array $values): array
+    {
+        $script = [];
+        foreach ($values as $propertyName => $value) {
+            $script[] = sprintf(
+                'IPS_SetProperty($id, %s, %s);',
+                var_export($propertyName, true),
+                var_export($value, true)
+            );
+        }
+        $script[] = sprintf(
+            'IPS_SetProperty($id, %s, %d);',
+            var_export('IPSViewStyleSource', true),
+            self::IPSVIEW_STYLE_SOURCE_CUSTOM
+        );
+        $script[] = 'IPS_ApplyChanges($id);';
+
+        return $script;
+    }
+
+    /** @return array<string,mixed> */
+    private function IPSViewStyleCustomPropertyValues(?string $document = null): array
+    {
+        $style = $this->IPSViewStyleBase($document);
+        $values = [];
+
+        foreach (self::IPSVIEW_STYLE_COLOR_PROPERTIES as $key => $propertyName) {
+            $styleKey = $key === 'Shadow' ? 'ShadowColor' : $key;
+            $values[$propertyName] = $this->IPSViewCSSColorToInteger((string) $style[$styleKey]);
+        }
+        foreach (self::IPSVIEW_STYLE_OPACITY_PROPERTIES as $key => $propertyName) {
+            $styleKey = match ($key) {
+                'ShadowColor' => 'ShadowColor',
+                'PopupShadow' => 'PopupShadow',
+                default       => $key
+            };
+            $color = $this->IPSViewCSSColorToRGB((string) $style[$styleKey]);
+            $values[$propertyName] = (int) round($color['alpha'] * 100);
+        }
+
+        $values['IPSViewStyleFontFamily'] = $this->IPSViewStyleFontFamilyPropertyValue((string) $style['FontFamily']);
+        $values['IPSViewStyleFontStyle'] = (string) $style['FontStyle'];
+        $values['IPSViewStyleBaseFontSize'] = (int) round((float) $style['FontSize']);
+        $values['IPSViewStyleFontScale'] = (int) $style['FontScale'];
+        $values['IPSViewStyleBorderRadius'] = (float) $style['BorderRadius'];
+        $values['IPSViewStyleBorderWidth'] = (float) $style['BorderWidth'];
+        $values['IPSViewStyleLineWidth'] = (float) $style['LineWidth'];
+        $values['IPSViewStyleShadowBlur'] = (float) $style['ShadowBlur'];
+        $values['IPSViewStyleShadowSpread'] = (float) $style['ShadowSpread'];
+        $values['IPSViewStyleShadowOffsetX'] = (float) $style['ShadowOffsetX'];
+        $values['IPSViewStyleShadowOffsetY'] = (float) $style['ShadowOffsetY'];
+        $values['IPSViewStyleDisabledOpacity'] = (int) $style['DisabledOpacity'];
+        $values['IPSViewStyleGradientStrength'] = (int) $style['GradientStrength'];
+
+        return $values;
+    }
+
+    /** @return array<string,mixed> */
+    private function IPSViewStyleBase(?string $document = null): array
+    {
+        $source = $this->IPSViewStyleSource();
+        if ($source === self::IPSVIEW_STYLE_SOURCE_MEDIA) {
+            $mediaStyle = $this->IPSViewStyleFromDocument($document ?? $this->ReadIPSViewStyleMediaContent());
+            $base = $mediaStyle ?? self::IPSVIEW_STYLE_LIGHT_PRESET;
+        } elseif ($source === self::IPSVIEW_STYLE_SOURCE_PROFILE) {
+            $profileStyle = $this->IPSViewStyleFromProfile($document ?? $this->ReadIPSViewStyleProfileMediaContent());
+            $base = $profileStyle ?? self::IPSVIEW_STYLE_LIGHT_PRESET;
+        } elseif (($preset = $this->IPSViewStylePresetForSource($source)) !== null) {
+            $base = $this->IPSViewStyleFromPreset($preset);
+        } elseif ($source === self::IPSVIEW_STYLE_SOURCE_LIGHT) {
+            $base = self::IPSVIEW_STYLE_LIGHT_PRESET;
+        } elseif ($source === self::IPSVIEW_STYLE_SOURCE_DARK) {
+            $base = self::IPSVIEW_STYLE_DARK_PRESET;
+        } else {
+            $base = $this->IPSViewCustomStyle();
+        }
+
+        return $this->IPSViewCompleteBaseStyle($base);
+    }
+
+    /** @param array<string,mixed> $style */
+    private function IPSViewCompleteBaseStyle(array $style): array
+    {
+        $fontFamily = (string) ($style['FontFamily'] ?? self::IPSVIEW_STYLE_SYSTEM_FONT_FAMILY);
+        $fontStyle = is_string($style['FontStyle'] ?? null)
+            ? (string) $style['FontStyle']
+            : IPSViewFontCatalogHelper::STYLE_REGULAR;
+        $style['FontFamily'] = $fontFamily;
+        $style['FontStyle'] = $this->IPSViewNormalizeFontStyle($fontFamily, $fontStyle);
+        $style['FontScale'] = max(60, min(200, (int) ($style['FontScale'] ?? $this->ReadPropertyInteger('IPSViewStyleFontScale'))));
+        $style['DisabledOpacity'] = max(10, min(100, (int) ($style['DisabledOpacity'] ?? $this->ReadPropertyInteger('IPSViewStyleDisabledOpacity'))));
+        $style['GradientStrength'] = max(0, min(80, (int) ($style['GradientStrength'] ?? $this->ReadPropertyInteger('IPSViewStyleGradientStrength'))));
+
+        return $style;
+    }
+
+    private function IPSViewStylePresetForSource(int $source): ?string
+    {
+        return match ($source) {
+            self::IPSVIEW_STYLE_SOURCE_PRESET        => $this->IPSViewStylePreset(),
+            self::IPSVIEW_STYLE_SOURCE_PRESET_LIGHT  => IPSViewStylePresetHelper::PRESET_LIGHT,
+            self::IPSVIEW_STYLE_SOURCE_PRESET_DARK   => IPSViewStylePresetHelper::PRESET_DARK,
+            self::IPSVIEW_STYLE_SOURCE_PRESET_WARM   => IPSViewStylePresetHelper::PRESET_WARM,
+            self::IPSVIEW_STYLE_SOURCE_PRESET_COOL   => IPSViewStylePresetHelper::PRESET_COOL,
+            self::IPSVIEW_STYLE_SOURCE_PRESET_EARTHY => IPSViewStylePresetHelper::PRESET_EARTHY,
+            self::IPSVIEW_STYLE_SOURCE_PRESET_WATER  => IPSViewStylePresetHelper::PRESET_WATER,
+            self::IPSVIEW_STYLE_SOURCE_PRESET_SUNNY  => IPSViewStylePresetHelper::PRESET_SUNNY,
+            default                                  => null
+        };
+    }
+
     /** @return array<string,mixed> */
     private function IPSViewCustomStyle(): array
     {
@@ -895,6 +1280,10 @@ trait IPSViewStyleHelper
 
         $style['PopupShadow'] = $this->IPSViewColorWithAlpha($style['Shadow'], $this->IPSViewOpacityProperty('PopupShadow'));
         $style['FontFamily'] = $this->IPSViewNormalizeFontFamily($this->ReadPropertyString('IPSViewStyleFontFamily'));
+        $style['FontStyle'] = $this->IPSViewNormalizeFontStyle(
+            $style['FontFamily'],
+            $this->ReadPropertyString('IPSViewStyleFontStyle')
+        );
         $style['FontSize'] = (float) max(8, min(32, $this->ReadPropertyInteger('IPSViewStyleBaseFontSize')));
         $style['BorderRadius'] = $this->IPSViewClampFloat($this->ReadPropertyFloat('IPSViewStyleBorderRadius'), 0.0, 40.0);
         $style['BorderWidth'] = $this->IPSViewClampFloat($this->ReadPropertyFloat('IPSViewStyleBorderWidth'), 0.0, 10.0);
@@ -906,6 +1295,125 @@ trait IPSViewStyleHelper
         $style['ShadowOffsetY'] = $this->IPSViewClampFloat($this->ReadPropertyFloat('IPSViewStyleShadowOffsetY'), -40.0, 40.0);
 
         return $style;
+    }
+
+    /** @return array<string,mixed> */
+    private function IPSViewStyleFromPreset(string $preset): array
+    {
+        $palette = IPSViewStylePresetHelper::palette($preset);
+        $shadowRGB = $this->IPSViewMixRGB(
+            $this->IPSViewCSSColorToRGB($palette[IPSViewStylePresetHelper::ROLE_VIEW_BACKGROUND]),
+            $this->IPSViewCSSColorToRGB('#000000'),
+            0.68
+        );
+        $shadowColor = $this->IPSViewRGBToCSS($shadowRGB);
+
+        return [
+            'ViewBackground'            => $palette[IPSViewStylePresetHelper::ROLE_VIEW_BACKGROUND],
+            'PageBackground'            => $palette[IPSViewStylePresetHelper::ROLE_PAGE_BACKGROUND],
+            'LabelBackground'           => $palette[IPSViewStylePresetHelper::ROLE_SURFACE],
+            'ControlBackground'         => $palette[IPSViewStylePresetHelper::ROLE_SURFACE],
+            'ControlActiveBackground'   => $palette[IPSViewStylePresetHelper::ROLE_ACTIVE],
+            'ControlInactiveBackground' => $palette[IPSViewStylePresetHelper::ROLE_INACTIVE],
+            'Text'                      => $palette[IPSViewStylePresetHelper::ROLE_PRIMARY_TEXT],
+            'TextActive'                => $palette[IPSViewStylePresetHelper::ROLE_PRIMARY_TEXT],
+            'TextInactive'              => $palette[IPSViewStylePresetHelper::ROLE_SECONDARY_TEXT],
+            'LabelText'                 => $palette[IPSViewStylePresetHelper::ROLE_PRIMARY_TEXT],
+            'Icon'                      => $palette[IPSViewStylePresetHelper::ROLE_PRIMARY_TEXT],
+            'Border'                    => $palette[IPSViewStylePresetHelper::ROLE_BORDER],
+            'Line'                      => $palette[IPSViewStylePresetHelper::ROLE_BORDER],
+            'PopupBackground'           => $palette[IPSViewStylePresetHelper::ROLE_PAGE_BACKGROUND],
+            'PopupBorder'               => $palette[IPSViewStylePresetHelper::ROLE_BORDER],
+            'PopupShadow'               => $this->IPSViewColorWithAlpha($shadowColor, 0.32),
+            'Accent'                    => $palette[IPSViewStylePresetHelper::ROLE_ACCENT],
+            'Information'               => $palette[IPSViewStylePresetHelper::ROLE_ACCENT],
+            'Positive'                  => $palette[IPSViewStylePresetHelper::ROLE_SUCCESS],
+            'Warning'                   => $palette[IPSViewStylePresetHelper::ROLE_WARNING],
+            'Critical'                  => $palette[IPSViewStylePresetHelper::ROLE_ERROR],
+            'FontFamily'                => self::IPSVIEW_STYLE_SYSTEM_FONT_FAMILY,
+            'FontStyle'                 => IPSViewFontCatalogHelper::STYLE_REGULAR,
+            'FontSize'                  => 16.0,
+            'BorderRadius'              => 8.0,
+            'BorderWidth'               => 1.0,
+            'LineWidth'                 => 1.0,
+            'ShadowColor'               => $this->IPSViewColorWithAlpha($shadowColor, 0.24),
+            'ShadowBlur'                => 18.0,
+            'ShadowSpread'              => 0.0,
+            'ShadowOffsetX'             => 0.0,
+            'ShadowOffsetY'             => 8.0
+        ];
+    }
+
+    /** @return array<string,mixed>|null */
+    private function IPSViewStyleFromProfile(string $document): ?array
+    {
+        $document = trim($document);
+        if ($document === '') {
+            return null;
+        }
+
+        try {
+            $profile = IPSViewStyleProfileHelper::decode($document);
+        } catch (InvalidArgumentException | \JsonException) {
+            $raw = base64_decode($document, true);
+            if ($raw === false) {
+                return null;
+            }
+
+            try {
+                $profile = IPSViewStyleProfileHelper::decode($raw);
+            } catch (InvalidArgumentException | \JsonException) {
+                return null;
+            }
+        }
+
+        $style = $profile['style'];
+        if (!is_array($style)) {
+            return null;
+        }
+
+        $fontFamily = (string) $style['FontFamily'];
+        if ($fontFamily === IPSViewStyleProfileHelper::FONT_SYSTEM) {
+            $fontFamily = self::IPSVIEW_STYLE_SYSTEM_FONT_FAMILY;
+        }
+
+        return [
+            'ViewBackground'            => $this->IPSViewColorWithAlpha((string) $style['ViewBackground'], (int) $style['ViewBackgroundOpacity'] / 100),
+            'PageBackground'            => $this->IPSViewColorWithAlpha((string) $style['PageBackground'], (int) $style['PageBackgroundOpacity'] / 100),
+            'LabelBackground'           => $this->IPSViewColorWithAlpha((string) $style['LabelBackground'], (int) $style['LabelBackgroundOpacity'] / 100),
+            'ControlBackground'         => $this->IPSViewColorWithAlpha((string) $style['ControlBackground'], (int) $style['ControlBackgroundOpacity'] / 100),
+            'ControlActiveBackground'   => $this->IPSViewColorWithAlpha((string) $style['ControlActiveBackground'], (int) $style['ControlActiveOpacity'] / 100),
+            'ControlInactiveBackground' => $this->IPSViewColorWithAlpha((string) $style['ControlInactiveBackground'], (int) $style['ControlInactiveOpacity'] / 100),
+            'Text'                      => (string) $style['Text'],
+            'TextActive'                => (string) $style['TextActive'],
+            'TextInactive'              => (string) $style['TextInactive'],
+            'LabelText'                 => (string) $style['LabelText'],
+            'Icon'                      => (string) $style['Icon'],
+            'Border'                    => $this->IPSViewColorWithAlpha((string) $style['Border'], (int) $style['BorderOpacity'] / 100),
+            'Line'                      => $this->IPSViewColorWithAlpha((string) $style['Line'], (int) $style['LineOpacity'] / 100),
+            'PopupBackground'           => $this->IPSViewColorWithAlpha((string) $style['PopupBackground'], (int) $style['PopupBackgroundOpacity'] / 100),
+            'PopupBorder'               => $this->IPSViewColorWithAlpha((string) $style['PopupBorder'], (int) $style['PopupBorderOpacity'] / 100),
+            'PopupShadow'               => $this->IPSViewColorWithAlpha((string) $style['ShadowColor'], (int) $style['PopupShadowOpacity'] / 100),
+            'Accent'                    => (string) $style['Accent'],
+            'Information'               => (string) $style['Information'],
+            'Positive'                  => (string) $style['Positive'],
+            'Warning'                   => (string) $style['Warning'],
+            'Critical'                  => (string) $style['Critical'],
+            'FontFamily'                => $fontFamily,
+            'FontStyle'                 => (string) $style['FontStyle'],
+            'FontSize'                  => (float) $style['FontSize'],
+            'FontScale'                 => (int) $style['FontScale'],
+            'BorderRadius'              => (float) $style['BorderRadius'],
+            'BorderWidth'               => (float) $style['BorderWidth'],
+            'LineWidth'                 => (float) $style['LineWidth'],
+            'ShadowColor'               => $this->IPSViewColorWithAlpha((string) $style['ShadowColor'], (int) $style['ShadowOpacity'] / 100),
+            'ShadowBlur'                => (float) $style['ShadowBlur'],
+            'ShadowSpread'              => (float) $style['ShadowSpread'],
+            'ShadowOffsetX'             => (float) $style['ShadowOffsetX'],
+            'ShadowOffsetY'             => (float) $style['ShadowOffsetY'],
+            'DisabledOpacity'           => (int) $style['DisabledOpacity'],
+            'GradientStrength'          => (int) $style['GradientStrength']
+        ];
     }
 
     /** @return array<string,mixed>|null */
@@ -974,8 +1482,10 @@ trait IPSViewStyleHelper
         return $style;
     }
 
-    /** @param array<string,mixed> $style
-     *  @return array<string,string|float>
+    /**
+     * @param array<string,mixed> $style
+     *
+     * @return array<string,string|float>
      */
     private function IPSViewFinalizeStyle(array $style): array
     {
@@ -984,7 +1494,6 @@ trait IPSViewStyleHelper
         $controlInactive = $this->IPSViewCSSColorToRGB((string) $style['ControlInactiveBackground']);
         $popup = $this->IPSViewCSSColorToRGB((string) $style['PopupBackground']);
         $label = $this->IPSViewCSSColorToRGB((string) $style['LabelBackground']);
-        $page = $this->IPSViewCSSColorToRGB((string) $style['PageBackground']);
         $text = $this->IPSViewCSSColorToRGB((string) $style['Text']);
         $textActive = $this->IPSViewCSSColorToRGB((string) $style['TextActive']);
         $textInactive = $this->IPSViewCSSColorToRGB((string) $style['TextInactive']);
@@ -994,8 +1503,12 @@ trait IPSViewStyleHelper
         $faint = $text;
         $faint['alpha'] = 0.52;
         $soft = $this->IPSViewMixRGB($control, $this->IPSViewCSSColorToRGB((string) $style['PageBackground']), 0.20);
-        $gradientStrength = max(0, min(80, $this->ReadPropertyInteger('IPSViewStyleGradientStrength'))) / 100;
-        $disabledOpacity = max(10, min(100, $this->ReadPropertyInteger('IPSViewStyleDisabledOpacity'))) / 100;
+        $gradientStrength = max(0, min(80, (int) ($style['GradientStrength'] ?? $this->ReadPropertyInteger('IPSViewStyleGradientStrength')))) / 100;
+        $disabledOpacity = max(10, min(100, (int) ($style['DisabledOpacity'] ?? $this->ReadPropertyInteger('IPSViewStyleDisabledOpacity')))) / 100;
+        $fontScale = max(60, min(200, (int) ($style['FontScale'] ?? $this->ReadPropertyInteger('IPSViewStyleFontScale')))) / 100;
+        $fontStyle = is_string($style['FontStyle'] ?? null)
+            ? (string) $style['FontStyle']
+            : IPSViewFontCatalogHelper::STYLE_REGULAR;
         $shadowColor = $this->IPSViewCSSColorToRGB((string) $style['ShadowColor']);
         $popupShadowColor = $this->IPSViewCSSColorToRGB((string) $style['PopupShadow']);
         $shadow = $this->IPSViewBoxShadow(
@@ -1034,7 +1547,9 @@ trait IPSViewStyleHelper
             'Line'                      => (string) $style['Line'],
             'PopupBorder'               => (string) $style['PopupBorder'],
             'FontFamily'                => (string) $style['FontFamily'],
+            'FontStyle'                 => $fontStyle,
             'FontSize'                  => (float) $style['FontSize'],
+            'FontScale'                 => $fontScale,
             'BorderRadius'              => (float) $style['BorderRadius'],
             'BorderWidth'               => (float) $style['BorderWidth'],
             'LineWidth'                 => (float) $style['LineWidth'],
@@ -1073,8 +1588,9 @@ trait IPSViewStyleHelper
         return $this->IPSViewColorObjectToCSS($document[$key] ?? null) ?? $fallback;
     }
 
-    /** @param array<string,mixed> $document
-     *  @param array<int,string>   $keys
+    /**
+     * @param array<string,mixed> $document
+     * @param array<int,string>   $keys
      */
     private function IPSViewFirstDocumentColor(array $document, array $keys, string $fallback): string
     {
@@ -1088,8 +1604,9 @@ trait IPSViewStyleHelper
         return $fallback;
     }
 
-    /** @param array<string,mixed> $document
-     *  @param array<int,string>   $keywords
+    /**
+     * @param array<string,mixed> $document
+     * @param array<int,string>   $keywords
      */
     private function IPSViewFavoriteColor(array $document, array $keywords, string $fallback): string
     {
@@ -1169,14 +1686,145 @@ trait IPSViewStyleHelper
         return max(0, min(100, $this->ReadPropertyInteger($propertyName))) / 100;
     }
 
+    /**
+     * Returns font-family options from the shared IPSView catalogue.
+     *
+     * Existing safe custom values are appended as a compatibility option so
+     * updating the helper does not silently replace a user's stored setting.
+     *
+     * @return list<array{caption:string,value:string}>
+     */
+    private function IPSViewStyleFontFamilyOptions(?string $fontFamily = null): array
+    {
+        $options = [
+            [
+                'caption' => $this->IPSViewStyleText('option.system_font'),
+                'value'   => ''
+            ]
+        ];
+
+        foreach (IPSViewFontCatalogHelper::options() as $option) {
+            $options[] = $option;
+        }
+
+        $configured = trim($fontFamily ?? $this->ReadPropertyString('IPSViewStyleFontFamily'));
+        if (
+            $configured !== ''
+            && !$this->IPSViewFontOptionExists($options, $configured)
+            && $this->IPSViewIsSafeLegacyFontFamily($configured)
+        ) {
+            $options[] = [
+                'caption' => $configured . ' (' . $this->IPSViewStyleText('option.legacy_font') . ')',
+                'value'   => $configured
+            ];
+        }
+
+        return $options;
+    }
+
+    /** @return list<array{caption:string,value:string}> */
+    private function IPSViewStyleFontStyleOptions(string $fontFamily, string $fontStyle): array
+    {
+        $labels = [
+            IPSViewFontCatalogHelper::STYLE_REGULAR     => 'font_style.regular',
+            IPSViewFontCatalogHelper::STYLE_BOLD        => 'font_style.bold',
+            IPSViewFontCatalogHelper::STYLE_ITALIC      => 'font_style.italic',
+            IPSViewFontCatalogHelper::STYLE_BOLD_ITALIC => 'font_style.bold_italic'
+        ];
+        $available = array_keys($labels);
+        $normalizedFamily = trim($fontFamily);
+        if ($normalizedFamily !== '' && $normalizedFamily !== self::IPSVIEW_STYLE_SYSTEM_FONT_FAMILY) {
+            $catalogFamily = IPSViewFontCatalogHelper::normalizeFamily($normalizedFamily);
+            if ($catalogFamily !== null) {
+                $available = IPSViewFontCatalogHelper::styles($catalogFamily);
+            }
+        }
+
+        $normalizedStyle = $this->IPSViewNormalizeFontStyle($normalizedFamily, $fontStyle);
+        if (!in_array($normalizedStyle, $available, true)) {
+            $available[] = $normalizedStyle;
+        }
+
+        $options = [];
+        foreach ($available as $style) {
+            $options[] = [
+                'caption' => $this->IPSViewStyleText($labels[$style] ?? 'font_style.regular'),
+                'value'   => $style
+            ];
+        }
+
+        return $options;
+    }
+
+    private function IPSViewNormalizeFontStyle(string $fontFamily, string $fontStyle): string
+    {
+        $fontStyle = trim($fontStyle);
+        $allStyles = [
+            IPSViewFontCatalogHelper::STYLE_REGULAR,
+            IPSViewFontCatalogHelper::STYLE_BOLD,
+            IPSViewFontCatalogHelper::STYLE_ITALIC,
+            IPSViewFontCatalogHelper::STYLE_BOLD_ITALIC
+        ];
+        if (!in_array($fontStyle, $allStyles, true)) {
+            return IPSViewFontCatalogHelper::STYLE_REGULAR;
+        }
+
+        $fontFamily = trim($fontFamily);
+        if ($fontFamily === '' || $fontFamily === self::IPSVIEW_STYLE_SYSTEM_FONT_FAMILY) {
+            return $fontStyle;
+        }
+
+        $catalogFamily = IPSViewFontCatalogHelper::normalizeFamily($fontFamily);
+        if ($catalogFamily === null) {
+            return $fontStyle;
+        }
+
+        return IPSViewFontCatalogHelper::isValidStyle($catalogFamily, $fontStyle)
+            ? $fontStyle
+            : IPSViewFontCatalogHelper::STYLE_REGULAR;
+    }
+
+    private function IPSViewStyleFontFamilyPropertyValue(string $fontFamily): string
+    {
+        $normalized = $this->IPSViewNormalizeFontFamily($fontFamily);
+
+        return $normalized === self::IPSVIEW_STYLE_SYSTEM_FONT_FAMILY ? '' : $normalized;
+    }
+
+    /**
+     * @param list<array{caption:string,value:string}> $options
+     */
+    private function IPSViewFontOptionExists(array $options, string $fontFamily): bool
+    {
+        foreach ($options as $option) {
+            if ($option['value'] === $fontFamily) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     private function IPSViewNormalizeFontFamily(string $fontFamily): string
     {
         $fontFamily = trim($fontFamily);
-        if ($fontFamily === '' || preg_match('/[{};]/', $fontFamily) === 1) {
-            return '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+        if ($fontFamily === '') {
+            return self::IPSVIEW_STYLE_SYSTEM_FONT_FAMILY;
         }
 
-        return $fontFamily;
+        $catalogFamily = IPSViewFontCatalogHelper::normalizeFamily($fontFamily);
+        if ($catalogFamily !== null) {
+            return $catalogFamily;
+        }
+
+        return $this->IPSViewIsSafeLegacyFontFamily($fontFamily)
+            ? $fontFamily
+            : self::IPSVIEW_STYLE_SYSTEM_FONT_FAMILY;
+    }
+
+    private function IPSViewIsSafeLegacyFontFamily(string $fontFamily): bool
+    {
+        return preg_match('/[{};\x00-\x1F\x7F]/', $fontFamily) !== 1;
     }
 
     private function IPSViewIsValidColorInteger(mixed $value): bool
@@ -1187,6 +1835,16 @@ trait IPSViewStyleHelper
     private function IPSViewColorIntegerToHex(int $value): string
     {
         return sprintf('#%06X', $value);
+    }
+
+    private function IPSViewCSSColorToInteger(string $color): int
+    {
+        $rgb = $this->IPSViewCSSColorToRGB($color);
+        $red = (int) round(max(0.0, min(255.0, $rgb['red'])));
+        $green = (int) round(max(0.0, min(255.0, $rgb['green'])));
+        $blue = (int) round(max(0.0, min(255.0, $rgb['blue'])));
+
+        return ($red << 16) | ($green << 8) | $blue;
     }
 
     private function IPSViewColorWithAlpha(string $color, float $alpha): string
@@ -1251,9 +1909,11 @@ trait IPSViewStyleHelper
         return sprintf('rgba(%d, %d, %d, %.3f)', $red, $green, $blue, $alpha);
     }
 
-    /** @param array{red:float,green:float,blue:float,alpha?:float} $first
-     *  @param array{red:float,green:float,blue:float,alpha?:float} $second
-     *  @return array{red:float,green:float,blue:float,alpha:float}
+    /**
+     * @param array{red:float,green:float,blue:float,alpha?:float} $first
+     * @param array{red:float,green:float,blue:float,alpha?:float} $second
+     *
+     * @return array{red:float,green:float,blue:float,alpha:float}
      */
     private function IPSViewMixRGB(array $first, array $second, float $amount): array
     {
@@ -1284,8 +1944,9 @@ trait IPSViewStyleHelper
             + (0.0722 * $channel($color['blue']));
     }
 
-    /** @param array{red:float,green:float,blue:float,alpha?:float} $first
-     *  @param array{red:float,green:float,blue:float,alpha?:float} $second
+    /**
+     * @param array{red:float,green:float,blue:float,alpha?:float} $first
+     * @param array{red:float,green:float,blue:float,alpha?:float} $second
      */
     private function IPSViewContrastRatio(array $first, array $second): float
     {
