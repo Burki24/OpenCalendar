@@ -82,6 +82,40 @@ für gezielte Änderungen an bestehenden Installationen sinnvoll.
 Die ausführlichen Einstellungen der Anbieter sind in der Dokumentation des
 [Kalender Kontos](Kalender%20Konto) beschrieben.
 
+## IPSView-Stile
+
+Die **Kalender Ansicht** verwendet für die optionale IPSView-Ausgabe das zentrale
+IPSView-Stilsystem aus `Symcon_ModuleHelper`. Die Stilquelle wird direkt in der
+Instanzkonfiguration gewählt. Zur Verfügung stehen ein vollständig
+benutzerdefinierter Stil, ein IPSView-Medienobjekt, ein **Stilprofil** (Style Profile V1) sowie
+die festen Vorgaben **Helle Vorgabe**, **Dunkle Vorgabe**, **Hell**, **Dunkel**,
+**Warm**, **Kühl**, **Erdig**, **Wasser** und **Sonnig**.
+
+Bei einer Vorgabe zeigt die Konfiguration die **tatsächlich wirksamen Farben,
+Deckkräfte, Schriftwerte, Rahmen- und Schattenparameter** an. Diese Werte sind
+schreibgeschützt, damit die zuvor gespeicherten benutzerdefinierten Einstellungen
+nicht durch bloßes Ausprobieren eines Stils überschrieben werden. Mit
+**In benutzerdefinierten Stil übernehmen** kann die aktuelle Vorgabe vollständig
+als Ausgangspunkt kopiert und anschließend individuell verändert werden.
+
+Die gemeinsame Typografie unterstützt die IPSView-Schriften **Roboto**,
+**Roboto Mono**, **Open Sans**, **PT Sans**, **Dancing Script**, **Bebas Neue**,
+**Indie Flower** und **Segment7**. Verfügbare Schriftschnitte werden abhängig von
+der jeweiligen Schrift angeboten und in der IPSView-Ausgabe einschließlich
+Normal/Fett und Kursiv korrekt angewendet.
+
+OpenCalendar dient als Referenz-Consumer für **Style Profile V1** aus dem
+IPSViewAssistant. Die Tests verwenden ein vom Assistant exportiertes vollständiges
+Referenzprofil und prüfen Farben samt unabhängigen Deckkräften, Typografie mit
+Schriftfamilie, Schriftschnitt, Größe und Skalierung, Rahmen und Linien sowie
+Schatten und Effekte. Das Profil bleibt dabei im zentralen kanonischen Format
+verlustfrei validier- und erneut serialisierbar.
+
+Kalender- und Terminfarben bleiben fachliche Inhaltsfarben von OpenCalendar und
+werden nicht durch die globale IPSView-Stilquelle ersetzt. Die ausführliche
+Einrichtung befindet sich in der
+[Dokumentation der Kalender Ansicht](Kalender%20Ansicht#einrichtung-in-ipsview).
+
 ## Anbieter im Überblick
 
 Anbieter | Benötigte Angaben | Zugriff
