@@ -15,7 +15,7 @@ final class OpenCalendarStyleProfileConsumer
     /** @var array<string,mixed> */
     private array $properties = [
         'IPSViewStyleSource'                 => self::IPSVIEW_STYLE_SOURCE_PROFILE,
-        'IPSViewStyleTransparentBackground' => false,
+        'IPSViewStyleTransparentBackground'  => false,
         'IPSViewStylePreset'                 => 'standard',
         'IPSViewStyleFontScale'              => 100,
         'IPSViewStyleDisabledOpacity'        => 52,
