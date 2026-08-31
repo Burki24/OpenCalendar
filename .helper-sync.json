@@ -1,7 +1,7 @@
 {
     "schema": 1,
     "source_repository": "Burki24/Symcon_ModuleHelper",
-    "base_branch": "dev",
+    "base_branch": "dev_9.1",
     "readme_language": "en",
     "helpers": {
         "ChunkedJsonTransferHelper": {
