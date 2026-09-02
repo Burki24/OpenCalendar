@@ -19,7 +19,7 @@ require_once __DIR__ . '/IPSViewControlThemeHelper.php';
  * collapsed advanced section exposes all known native IPSView color fields grouped by family.
  * Disabled native overrides always inherit their current semantic base color.
  *
- * @version 1.0.4
+ * @version 1.0.5
  */
 trait IPSViewStyleConfigurationHelper
 {
@@ -94,7 +94,14 @@ trait IPSViewStyleConfigurationHelper
         'ShadowColor'               => 'color.shadow'
     ];
 
-    /** Registers the shared style plus all native override lists. */
+    /**
+     * Registers the shared semantic style properties and all 15 native override-list properties.
+     *
+     * Existing IPSViewStyleHelper property names remain unchanged so consumers can migrate without
+     * rewriting their stored base-style configuration.
+     *
+     * @return void
+     */
     protected function RegisterIPSViewStyleProperties(): void
     {
         $this->RegisterIPSViewBaseStyleProperties();
@@ -106,6 +113,8 @@ trait IPSViewStyleConfigurationHelper
 
     /**
      * Returns the shared style form with one collapsed advanced native-color section.
+     *
+     * @param string $colorWidth Width used for the shared color controls.
      *
      * @return array<int,array<string,mixed>>
      */
@@ -162,6 +171,8 @@ trait IPSViewStyleConfigurationHelper
      * Current IPSView documents may omit ColorView until the View color differs from
      * the IPSView default. In that case the View background is #404040; ColorPage
      * remains the independent page background and is never used as a View fallback.
+     *
+     * @param ?string $document Optional raw or base64-encoded IPSView document used instead of the selected media source.
      *
      * @return array<string,string|float>
      */
@@ -223,6 +234,8 @@ trait IPSViewStyleConfigurationHelper
     /**
      * Resolves the complete known native IPSView color theme from the active shared style.
      *
+     * @param ?string $document Optional raw or base64-encoded IPSView document used while resolving a media style.
+     *
      * @return array<string,mixed>
      */
     protected function IPSViewStyleNativeTheme(?string $document = null): array
@@ -243,6 +256,10 @@ trait IPSViewStyleConfigurationHelper
     /**
      * Applies the active shared native color theme to an IPSView document.
      *
+     * @param stdClass $document      Decoded IPSView document that receives the native colors.
+     * @param ?string  $styleDocument Optional raw or base64-encoded source document used to resolve the active style.
+     * @param bool     $createMissing Whether native fields missing from the target document may be created.
+     *
      * @return array{knownApplied:int,unknownApplied:int,namedColorsApplied:int}
      */
     protected function ApplyIPSViewStyleNativeTheme(
@@ -257,15 +274,23 @@ trait IPSViewStyleConfigurationHelper
         );
     }
 
-    /** @return array<string,string> */
+    /**
+     * Returns the property name used for each native IPSView color family.
+     *
+     * @return array<string,string>
+     */
     protected function IPSViewStyleNativeOverrideProperties(): array
     {
         return self::IPSVIEW_NATIVE_OVERRIDE_PROPERTIES;
     }
 
     /**
-     * @param list<string>              $fields
-     * @param array<string,string|float> $style
+     * Builds one read-only or editable native-color family list for the configuration form.
+     *
+     * @param string                    $family   Canonical native family identifier.
+     * @param list<string>              $fields   Native IPSView fields belonging to the family.
+     * @param array<string,string|float> $style    Fully resolved semantic style.
+     * @param bool                      $editable Whether native overrides may be edited.
      *
      * @return array<string,mixed>
      */
@@ -366,8 +391,10 @@ trait IPSViewStyleConfigurationHelper
      * the shared configuration layer makes the common form and its "copy to custom" action follow
      * the same native semantics as the resolved style until all direct base-helper consumers migrate.
      *
-     * @param array<int,array<string,mixed>> $items
-     * @param array<string,string|float>      $style
+     * @param array<int,array<string,mixed>> $items Form items patched in place.
+     * @param array<string,string|float>      $style Fully resolved media style.
+     *
+     * @return void
      */
     private function IPSViewStyleConfigurationPatchMediaForm(array &$items, array $style): void
     {
@@ -395,7 +422,15 @@ trait IPSViewStyleConfigurationHelper
         unset($item);
     }
 
-    /** @param array<string,mixed> $button */
+    /**
+     * Rewrites the base helper's copy-to-custom script with the corrected View color values.
+     *
+     * @param array<string,mixed> $button      Button definition patched in place.
+     * @param int                 $viewColor   Corrected RGB View color as integer.
+     * @param int                 $viewOpacity Corrected View opacity in percent.
+     *
+     * @return void
+     */
     private function IPSViewStyleConfigurationPatchCopyScript(array &$button, int $viewColor, int $viewOpacity): void
     {
         if (!isset($button['onClick']) || !is_array($button['onClick'])) {
@@ -423,7 +458,13 @@ trait IPSViewStyleConfigurationHelper
         unset($line);
     }
 
-    /** @return list<array<string,mixed>> */
+    /**
+     * Reads and normalizes the stored override rows for one native family property.
+     *
+     * @param string $propertyName Symcon property that stores the family list as JSON.
+     *
+     * @return list<array<string,mixed>>
+     */
     private function IPSViewStyleNativeStoredRows(string $propertyName): array
     {
         $json = trim($this->ReadPropertyString($propertyName));
@@ -443,7 +484,14 @@ trait IPSViewStyleConfigurationHelper
         return array_values(array_filter($decoded, 'is_array'));
     }
 
-    /** @param array<string,string|float> $style */
+    /**
+     * Resolves the semantic source color used to derive one native IPSView field.
+     *
+     * @param array<string,string|float> $style      Fully resolved semantic style.
+     * @param string                     $styleField Semantic Style Profile field name.
+     *
+     * @return string Normalized #RRGGBB color.
+     */
     private function IPSViewStyleNativeSourceColor(array $style, string $styleField): string
     {
         if (array_key_exists($styleField, $style)) {
@@ -466,7 +514,13 @@ trait IPSViewStyleConfigurationHelper
         );
     }
 
-    /** @return array<string,mixed>|null */
+    /**
+     * Decodes a raw or base64-encoded IPSView JSON document.
+     *
+     * @param string $document Raw or base64-encoded document content.
+     *
+     * @return array<string,mixed>|null Decoded document or null when the input is invalid.
+     */
     private function IPSViewStyleConfigurationDecodeDocument(string $document): ?array
     {
         $document = trim($document);
@@ -489,6 +543,13 @@ trait IPSViewStyleConfigurationHelper
         return is_array($decoded) ? $decoded : null;
     }
 
+    /**
+     * Converts one native IPSView ARGB object into a CSS color.
+     *
+     * @param mixed $color Native IPSView color candidate.
+     *
+     * @return ?string #RRGGBB/rgba() color or null for invalid input.
+     */
     private function IPSViewStyleConfigurationNativeColorToCSS(mixed $color): ?string
     {
         if (!is_array($color)) {
@@ -516,6 +577,13 @@ trait IPSViewStyleConfigurationHelper
         );
     }
 
+    /**
+     * Extracts a normalized alpha value from a CSS color.
+     *
+     * @param string $color CSS color string.
+     *
+     * @return float Alpha in the range 0.0..1.0.
+     */
     private function IPSViewStyleConfigurationColorAlpha(string $color): float
     {
         if (preg_match('/^rgba\(\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*([0-9.]+)\s*\)$/i', $color, $matches) === 1) {
@@ -525,6 +593,13 @@ trait IPSViewStyleConfigurationHelper
         return 1.0;
     }
 
+    /**
+     * Returns the localized caption for one semantic source field.
+     *
+     * @param string $styleField Semantic Style Profile field name.
+     *
+     * @return string Localized caption or the field name as fallback.
+     */
     private function IPSViewStyleNativeStyleFieldCaption(string $styleField): string
     {
         $key = self::IPSVIEW_NATIVE_STYLE_FIELD_LABEL_KEYS[$styleField] ?? null;
@@ -535,6 +610,14 @@ trait IPSViewStyleConfigurationHelper
         return $this->IPSViewStyleText($key);
     }
 
+    /**
+     * Resolves one helper-owned configuration translation.
+     *
+     * @param string $key      Stable translation key.
+     * @param string $fallback English fallback text.
+     *
+     * @return string Localized helper text.
+     */
     private function IPSViewStyleConfigurationText(string $key, string $fallback): string
     {
         return $this->TranslateHelperText(
@@ -544,6 +627,13 @@ trait IPSViewStyleConfigurationHelper
         );
     }
 
+    /**
+     * Normalizes supported semantic or form colors to #RRGGBB.
+     *
+     * @param mixed $color Color value as integer, float or CSS string.
+     *
+     * @return string Normalized #RRGGBB value.
+     */
     private function IPSViewStyleConfigurationColorToHex(mixed $color): string
     {
         if (is_int($color) || is_float($color)) {
@@ -575,11 +665,25 @@ trait IPSViewStyleConfigurationHelper
         return '#000000';
     }
 
+    /**
+     * Normalizes a supported color value to the integer representation used by SelectColor.
+     *
+     * @param mixed $color Color value as integer, float or CSS string.
+     *
+     * @return int RGB value in the range 0x000000..0xFFFFFF.
+     */
     private function IPSViewStyleConfigurationColorToInt(mixed $color): int
     {
         return hexdec(substr($this->IPSViewStyleConfigurationColorToHex($color), 1));
     }
 
+    /**
+     * Normalizes form/list values to a boolean override flag.
+     *
+     * @param mixed $value Value returned by the Symcon configuration form.
+     *
+     * @return bool Normalized boolean value.
+     */
     private function IPSViewStyleNativeBoolean(mixed $value): bool
     {
         if (is_bool($value)) {

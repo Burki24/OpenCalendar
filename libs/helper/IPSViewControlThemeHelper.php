@@ -20,7 +20,7 @@ require_once __DIR__ . '/IPSViewStylePresetHelper.php';
  * colors and unknown future properties. Unknown top-level IPSView color fields are transported in
  * a dedicated extension section instead of being discarded.
  *
- * @version 1.0.2
+ * @version 1.0.3
  */
 final class IPSViewControlThemeHelper
 {
@@ -393,7 +393,11 @@ final class IPSViewControlThemeHelper
         'B2'
     ];
 
-    /** @return list<string> */
+    /**
+     * Returns all 109 known native IPSView color-field names in canonical order.
+     *
+     * @return list<string>
+     */
     public static function fields(): array
     {
         $fields = [];
@@ -404,19 +408,31 @@ final class IPSViewControlThemeHelper
         return $fields;
     }
 
-    /** @return array<string,list<string>> */
+    /**
+     * Returns the 15 native IPSView color families and their canonical fields.
+     *
+     * @return array<string,list<string>>
+     */
     public static function families(): array
     {
         return self::FAMILY_FIELDS;
     }
 
-    /** @return list<string> */
+    /**
+     * Returns every semantic Style Profile color field known to the native mapping.
+     *
+     * @return list<string>
+     */
     public static function styleFields(): array
     {
         return array_keys(self::STYLE_FIELD_FIELDS);
     }
 
-    /** @return list<string> */
+    /**
+     * Returns semantic color fields required to derive the complete native theme.
+     *
+     * @return list<string>
+     */
     public static function requiredStyleFields(): array
     {
         $fields = [];
@@ -453,7 +469,13 @@ final class IPSViewControlThemeHelper
         return $catalog;
     }
 
-    /** Returns metadata for one known native field or null when it is unknown. */
+    /**
+     * Returns metadata for one known native field or null when it is unknown.
+     *
+     * @param string $field Native IPSView field name.
+     *
+     * @return array{family:string,styleField:string,presetRole:string|null,legacy:bool}|null
+     */
     public static function definition(string $field): ?array
     {
         $catalog = self::catalog();
@@ -461,13 +483,25 @@ final class IPSViewControlThemeHelper
         return $catalog[$field] ?? null;
     }
 
-    /** Returns true when the native field belongs to the current catalogue. */
+    /**
+     * Returns true when the native field belongs to the current catalogue.
+     *
+     * @param string $field Native IPSView field name.
+     *
+     * @return bool
+     */
     public static function isKnownField(string $field): bool
     {
         return array_key_exists($field, self::catalog());
     }
 
-    /** @return list<string> */
+    /**
+     * Returns all native fields assigned to one family.
+     *
+     * @param string $family Canonical family identifier.
+     *
+     * @return list<string>
+     */
     public static function fieldsForFamily(string $family): array
     {
         if (!array_key_exists($family, self::FAMILY_FIELDS)) {
@@ -477,7 +511,13 @@ final class IPSViewControlThemeHelper
         return self::FAMILY_FIELDS[$family];
     }
 
-    /** @return list<string> */
+    /**
+     * Returns native fields derived from one semantic Style Profile field.
+     *
+     * @param string $styleField Semantic Style Profile field name.
+     *
+     * @return list<string>
+     */
     public static function fieldsForStyleField(string $styleField): array
     {
         if (!array_key_exists($styleField, self::STYLE_FIELD_FIELDS)) {
@@ -487,7 +527,13 @@ final class IPSViewControlThemeHelper
         return self::STYLE_FIELD_FIELDS[$styleField];
     }
 
-    /** @return list<string> */
+    /**
+     * Returns native fields derived from one semantic preset role.
+     *
+     * @param string $presetRole Preset role defined by IPSViewStylePresetHelper.
+     *
+     * @return list<string>
+     */
     public static function fieldsForPresetRole(string $presetRole): array
     {
         $fields = [];
@@ -507,6 +553,11 @@ final class IPSViewControlThemeHelper
      * The document argument is retained for API compatibility and future format-specific rules.
      * Native field semantics are currently stable: ColorView is the View background and ColorPage
      * is the page background. Missing fields never change the meaning of fields that are present.
+     *
+     * @param array<string,mixed>|object $document Decoded IPSView document; retained for format-aware compatibility.
+     * @param string                     $field    Native IPSView field name.
+     *
+     * @return ?string Semantic Style Profile field or null for an unknown native field.
      */
     public static function styleFieldForDocument(array|object $document, string $field): ?string
     {
@@ -517,7 +568,14 @@ final class IPSViewControlThemeHelper
         return $definition['styleField'] ?? null;
     }
 
-    /** Resolves the semantic preset role for one native color in the context of a document. */
+    /**
+     * Resolves the semantic preset role for one native color in the context of a document.
+     *
+     * @param array<string,mixed>|object $document Decoded IPSView document.
+     * @param string                     $field    Native IPSView field name.
+     *
+     * @return ?string Preset role or null when no role can be resolved.
+     */
     public static function presetRoleForDocument(array|object $document, string $field): ?string
     {
         $styleField = self::styleFieldForDocument($document, $field);
@@ -530,6 +588,8 @@ final class IPSViewControlThemeHelper
 
     /**
      * Returns the complete native property mapping grouped by semantic preset role.
+     *
+     * @param array<string,mixed>|object $document Decoded IPSView document.
      *
      * @return array<string,list<string>>
      */
@@ -611,6 +671,15 @@ final class IPSViewControlThemeHelper
     /**
      * Creates one native IPSView color object.
      *
+     * @param string  $color           Primary color as #RRGGBB.
+     * @param int     $alpha           Primary alpha channel from 0 to 255.
+     * @param int     $type            Native IPSView color type.
+     * @param string  $pattern         Native IPSView pattern identifier.
+     * @param bool    $isEmpty         Native IPSView empty flag.
+     * @param string  $name            Optional native color name.
+     * @param ?string $secondaryColor  Optional secondary gradient color as #RRGGBB.
+     * @param ?int    $secondaryAlpha  Optional secondary alpha channel from 0 to 255.
+     *
      * @return array<string,mixed>
      */
     public static function createColor(
@@ -657,6 +726,8 @@ final class IPSViewControlThemeHelper
 
     /**
      * Normalizes one IPSView native color object while retaining unknown future properties.
+     *
+     * @param mixed $color Native color array/object or #RRGGBB string.
      *
      * @return array<string,mixed>
      */
@@ -716,7 +787,13 @@ final class IPSViewControlThemeHelper
         return $normalized;
     }
 
-    /** Returns one normalized native color as #RRGGBB. */
+    /**
+     * Returns one normalized native color as #RRGGBB.
+     *
+     * @param mixed $color Native color array/object or #RRGGBB string.
+     *
+     * @return string
+     */
     public static function colorToHex(mixed $color): string
     {
         $color = self::normalizeColor($color);
@@ -724,7 +801,13 @@ final class IPSViewControlThemeHelper
         return sprintf('#%02X%02X%02X', $color['R'], $color['G'], $color['B']);
     }
 
-    /** Returns the primary alpha channel as a percentage in the range 0..100. */
+    /**
+     * Returns the primary alpha channel as a percentage in the range 0..100.
+     *
+     * @param mixed $color Native color array/object or #RRGGBB string.
+     *
+     * @return float
+     */
     public static function alphaPercent(mixed $color): float
     {
         $color = self::normalizeColor($color);
@@ -736,6 +819,8 @@ final class IPSViewControlThemeHelper
      * Extracts all top-level native colors from a decoded IPSView document.
      *
      * Known fields, unknown future fields and the free named Colors palette are kept separate.
+     *
+     * @param array<string,mixed>|object $document Decoded IPSView document.
      *
      * @return array<string,mixed>
      */
@@ -788,6 +873,8 @@ final class IPSViewControlThemeHelper
 
     /**
      * Validates and canonicalizes one native theme document.
+     *
+     * @param array<string,mixed> $theme Native theme document.
      *
      * @return array<string,mixed>
      */
@@ -868,7 +955,13 @@ final class IPSViewControlThemeHelper
         return $normalizedTheme;
     }
 
-    /** Decodes one native theme JSON document. */
+    /**
+     * Decodes and normalizes one native theme JSON document.
+     *
+     * @param string $json Native theme JSON.
+     *
+     * @return array<string,mixed>
+     */
     public static function decode(string $json): array
     {
         $json = preg_replace('/^\xEF\xBB\xBF/', '', $json) ?? $json;
@@ -885,7 +978,14 @@ final class IPSViewControlThemeHelper
         return self::normalizeTheme($decoded);
     }
 
-    /** Encodes one native theme as deterministic UTF-8 JSON. */
+    /**
+     * Encodes one native theme as deterministic UTF-8 JSON.
+     *
+     * @param array<string,mixed> $theme  Native theme document.
+     * @param bool                $pretty Whether the result should be pretty-printed.
+     *
+     * @return string
+     */
     public static function encode(array $theme, bool $pretty = true): string
     {
         $options = JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE;
@@ -903,6 +1003,10 @@ final class IPSViewControlThemeHelper
      *
      * By default only properties already present in the document are changed. Set createMissing
      * to true when creating a new complete IPSView document or deliberately adding newer fields.
+     *
+     * @param stdClass           $document      Decoded IPSView document modified in place.
+     * @param array<string,mixed> $theme         Native theme document.
+     * @param bool               $createMissing Whether absent native fields may be created.
      *
      * @return array{knownApplied:int,unknownApplied:int,namedColorsApplied:int}
      */
@@ -945,7 +1049,13 @@ final class IPSViewControlThemeHelper
         return $report;
     }
 
-    /** @param array<string,list<string>> $groups */
+    /**
+     * Reverses grouped native-field mappings while rejecting duplicate field assignments.
+     *
+     * @param array<string,list<string>> $groups Group identifier => native fields.
+     *
+     * @return array<string,string> Native field => group identifier.
+     */
     private static function reverseGroups(array $groups): array
     {
         $reverse = [];
@@ -963,6 +1073,13 @@ final class IPSViewControlThemeHelper
         return $reverse;
     }
 
+    /**
+     * Returns whether a value has the minimum RGB structure of a native IPSView color.
+     *
+     * @param mixed $value Candidate color value.
+     *
+     * @return bool
+     */
     private static function looksLikeColor(mixed $value): bool
     {
         if (is_object($value)) {
@@ -975,6 +1092,13 @@ final class IPSViewControlThemeHelper
             && array_key_exists('B', $value);
     }
 
+    /**
+     * Validates a native color-field name.
+     *
+     * @param mixed $field Candidate field name.
+     *
+     * @return void
+     */
     private static function assertFieldName(mixed $field): void
     {
         if (!is_string($field) || trim($field) === '') {
@@ -982,6 +1106,14 @@ final class IPSViewControlThemeHelper
         }
     }
 
+    /**
+     * Normalizes one native byte channel.
+     *
+     * @param mixed  $value Candidate channel value.
+     * @param string $field Channel name used in validation errors.
+     *
+     * @return int Integer in the range 0..255.
+     */
     private static function normalizeByte(mixed $value, string $field): int
     {
         if (!is_int($value) && !is_float($value)) {
@@ -994,6 +1126,14 @@ final class IPSViewControlThemeHelper
         return (int) $value;
     }
 
+    /**
+     * Validates an already typed native byte channel.
+     *
+     * @param int    $value Channel value.
+     * @param string $field Channel name used in validation errors.
+     *
+     * @return void
+     */
     private static function assertByte(int $value, string $field): void
     {
         if ($value < 0 || $value > 255) {
@@ -1001,6 +1141,13 @@ final class IPSViewControlThemeHelper
         }
     }
 
+    /**
+     * Normalizes the native IPSView color type.
+     *
+     * @param mixed $value Candidate type value.
+     *
+     * @return int Non-negative native type identifier.
+     */
     private static function normalizeType(mixed $value): int
     {
         if (!is_int($value) && !is_float($value)) {
@@ -1013,6 +1160,13 @@ final class IPSViewControlThemeHelper
         return (int) $value;
     }
 
+    /**
+     * Normalizes the native IPSView pattern identifier.
+     *
+     * @param mixed $value Candidate pattern value.
+     *
+     * @return string
+     */
     private static function normalizePattern(mixed $value): string
     {
         if (!is_string($value) && !is_int($value) && !is_float($value)) {
@@ -1022,6 +1176,14 @@ final class IPSViewControlThemeHelper
         return (string) $value;
     }
 
+    /**
+     * Validates one native boolean color property.
+     *
+     * @param mixed  $value Candidate boolean value.
+     * @param string $field Property name used in validation errors.
+     *
+     * @return bool
+     */
     private static function normalizeBoolean(mixed $value, string $field): bool
     {
         if (!is_bool($value)) {
@@ -1031,6 +1193,13 @@ final class IPSViewControlThemeHelper
         return $value;
     }
 
+    /**
+     * Validates and returns the native color name.
+     *
+     * @param mixed $value Candidate name value.
+     *
+     * @return string
+     */
     private static function normalizeName(mixed $value): string
     {
         if (!is_string($value)) {
@@ -1040,7 +1209,13 @@ final class IPSViewControlThemeHelper
         return $value;
     }
 
-    /** @return array{0:int,1:int,2:int} */
+    /**
+     * Converts a semantic #RRGGBB color to RGB byte channels.
+     *
+     * @param string $color Semantic color value.
+     *
+     * @return array{0:int,1:int,2:int}
+     */
     private static function hexToRgb(string $color): array
     {
         $color = strtoupper(trim($color));
