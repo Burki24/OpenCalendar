@@ -42,6 +42,7 @@ $commands = [
     ['Verify IPSView font role rendering', [PHP_BINARY, 'tests/ipsview-style-font-rendering.php']],
     ['Verify IPSView Assistant Style Profile V1 E2E', [PHP_BINARY, 'tests/style-profile-e2e.php']],
     ['Verify shared IPSView style configuration', [PHP_BINARY, 'tests/ipsview-style-configuration.php']],
+    ['Verify IPSView documentation contract', [PHP_BINARY, 'tests/ipsview-documentation.php']],
     ['Check visualization UI regression contract', [PHP_BINARY, 'tests/ui-regression.php']],
     ['Run account module structure tests', [PHP_BINARY, 'tests/account-module.php']],
     ['Check public PHPDoc coverage', [PHP_BINARY, 'tests/phpdocs.php']],
