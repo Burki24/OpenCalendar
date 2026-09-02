@@ -70,6 +70,7 @@ foreach ([
     'VisualizationThemeHelper',
     'ParentConnectionHelper',
     'HttpResponseHelper',
+    'IPSViewStyleConfigurationHelper',
     'IPSViewStyleHelper',
     'SymconOAuthHelper'
 ] as $helperName) {
@@ -223,7 +224,7 @@ assertSymconStrict(
     'The calendar view must use VisualizationThemeHelper.'
 );
 assertSymconStrict(
-    str_contains($viewSource, 'use IPSViewStyleHelper;')
+    str_contains($viewSource, 'use IPSViewStyleConfigurationHelper;')
         && str_contains($viewSource, '$this->RegisterIPSViewStyleProperties()')
         && str_contains($viewSource, '$this->InsertIPSViewStyleFormItems(')
         && str_contains($viewSource, '$this->IPSViewStyleRootFontSize()')
@@ -233,7 +234,7 @@ assertSymconStrict(
         && !str_contains($viewSource, 'private function injectIPSViewStyleFormItems(')
         && !str_contains($viewSource, 'private function IPSViewRootFontSize(')
         && !str_contains($viewSource, 'private function renderIPSViewStyleCSS('),
-    'The calendar view must use IPSViewStyleHelper directly for the standalone IPSView style.'
+    'The calendar view must use IPSViewStyleConfigurationHelper for the standalone IPSView style.'
 );
 assertSymconStrict(
     is_file($root . '/Kalender Ansicht/visualization/index.html')

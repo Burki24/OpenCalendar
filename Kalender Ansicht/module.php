@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 use Burki24\SymconModuleHelper\ConfigurationFormHelper;
 use Burki24\SymconModuleHelper\IPSViewHTMLPageHelper;
-use Burki24\SymconModuleHelper\IPSViewStyleHelper;
+use Burki24\SymconModuleHelper\IPSViewStyleConfigurationHelper;
 use Burki24\SymconModuleHelper\VariableHelper;
 use Burki24\SymconModuleHelper\VisualizationAssetHelper;
 use Burki24\SymconModuleHelper\VisualizationThemeHelper;
@@ -17,7 +17,7 @@ require_once __DIR__ . '/../libs/CalendarEventReminder.php';
 require_once __DIR__ . '/../libs/CalendarEventState.php';
 require_once __DIR__ . '/../libs/helper/ConfigurationFormHelper.php';
 require_once __DIR__ . '/../libs/helper/IPSViewHTMLPageHelper.php';
-require_once __DIR__ . '/../libs/helper/IPSViewStyleHelper.php';
+require_once __DIR__ . '/../libs/helper/IPSViewStyleConfigurationHelper.php';
 require_once __DIR__ . '/../libs/helper/VariableHelper.php';
 require_once __DIR__ . '/../libs/helper/VisualizationAssetHelper.php';
 require_once __DIR__ . '/../libs/helper/VisualizationThemeHelper.php';
@@ -26,7 +26,7 @@ class CalendarView extends IPSModuleStrict
 {
     use ConfigurationFormHelper;
     use IPSViewHTMLPageHelper;
-    use IPSViewStyleHelper;
+    use IPSViewStyleConfigurationHelper;
     use VariableHelper;
     use VisualizationAssetHelper;
     use VisualizationThemeHelper;

@@ -4247,9 +4247,9 @@ assertTrueValue(
 );
 assertTrueValue(
     is_string($viewModuleSource)
-        && str_contains($viewModuleSource, 'use Burki24\\SymconModuleHelper\\IPSViewStyleHelper;')
-        && str_contains($viewModuleSource, "require_once __DIR__ . '/../libs/helper/IPSViewStyleHelper.php';")
-        && str_contains($viewModuleSource, 'use IPSViewStyleHelper;')
+        && str_contains($viewModuleSource, 'use Burki24\\SymconModuleHelper\\IPSViewStyleConfigurationHelper;')
+        && str_contains($viewModuleSource, "require_once __DIR__ . '/../libs/helper/IPSViewStyleConfigurationHelper.php';")
+        && str_contains($viewModuleSource, 'use IPSViewStyleConfigurationHelper;')
         && str_contains($viewModuleSource, '$this->RegisterIPSViewStyleProperties();')
         && str_contains($viewModuleSource, '$this->InsertIPSViewStyleFormItems(')
         && str_contains($viewModuleSource, '$this->IPSViewStyleRootFontSize()')
@@ -4269,7 +4269,7 @@ assertTrueValue(
         && str_contains($viewStyleSource, '--cal-accent: var(--ipsview-role-accent);')
         && str_contains($viewStyleSource, '--cal-danger: var(--ipsview-role-critical);')
         && str_contains($viewStyleSource, '--cal-popup-shadow: var(--ipsview-role-popup-shadow);'),
-    'The calendar view must consume IPSViewStyleHelper directly without replacing calendar event colors.'
+    'The calendar view must consume IPSViewStyleConfigurationHelper without replacing calendar event colors.'
 );
 assertTrueValue(
     is_string($viewFormSource)

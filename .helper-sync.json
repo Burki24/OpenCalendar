@@ -22,6 +22,9 @@
         "IPSViewHTMLPageHelper": {
             "target": "libs/helper/IPSViewHTMLPageHelper.php"
         },
+        "IPSViewStyleConfigurationHelper": {
+            "target": "libs/helper/IPSViewStyleConfigurationHelper.php"
+        },
         "IPSViewStyleHelper": {
             "target": "libs/helper/IPSViewStyleHelper.php"
         },
