@@ -63,15 +63,31 @@ assertIPSViewStyleConfiguration(
 );
 
 $configManifest = $helperManifest['helpers']['IPSViewStyleConfigurationHelper'] ?? null;
+$configVersionMatch = [];
 assertIPSViewStyleConfiguration(
     is_array($configManifest)
-        && ($configManifest['version'] ?? null) === '1.0.4'
+        && preg_match('/@version\s+(\d+\.\d+\.\d+)/', $configurationHelperSource, $configVersionMatch) === 1
+        && ($configManifest['version'] ?? null) === $configVersionMatch[1]
         && ($configManifest['sha256'] ?? null) === hash('sha256', $configurationHelperSource),
     'The vendored IPSViewStyleConfigurationHelper must match its helper manifest entry.'
 );
+
+$controlThemeManifest = $helperManifest['helpers']['IPSViewControlThemeHelper'] ?? null;
+if (!is_array($controlThemeManifest) && is_array($configManifest)) {
+    foreach ($configManifest['dependencies'] ?? [] as $dependency) {
+        if (is_array($dependency) && ($dependency['name'] ?? null) === 'IPSViewControlThemeHelper') {
+            $controlThemeManifest = $dependency;
+            break;
+        }
+    }
+}
+$controlThemeVersionMatch = [];
 assertIPSViewStyleConfiguration(
-    hash('sha256', $controlThemeSource) === '099e3e32d0840d13a6ca95277b31fdaa7378137db3d88ba96c3617582df3eae0',
-    'The vendored IPSViewControlThemeHelper must match the shared 1.0.2 helper source.'
+    is_array($controlThemeManifest)
+        && preg_match('/@version\s+(\d+\.\d+\.\d+)/', $controlThemeSource, $controlThemeVersionMatch) === 1
+        && ($controlThemeManifest['version'] ?? null) === $controlThemeVersionMatch[1]
+        && ($controlThemeManifest['sha256'] ?? null) === hash('sha256', $controlThemeSource),
+    'The vendored IPSViewControlThemeHelper must match its helper manifest entry.'
 );
 
 fwrite(STDOUT, "Shared IPSView style configuration integration verified.\n");
