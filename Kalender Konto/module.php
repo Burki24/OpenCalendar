@@ -148,79 +148,12 @@ class CalendarAccount extends IPSModuleStrict
     public function GetConfigurationForm(): string
     {
         $form = $this->LoadConfigurationForm();
-        $provider = $this->ReadPropertyInteger('Provider');
-        $isPasswordProvider = in_array($provider, [self::PROVIDER_APPLE, self::PROVIDER_CALDAV, self::PROVIDER_ICS], true);
-        $iCalendarAuthenticationMode = $this->ReadPropertyInteger('ICalendarAuthenticationMode');
-        $showIcsCredentials = $iCalendarAuthenticationMode === ICalendarAuthentication::USERNAME_PASSWORD
-            || ($iCalendarAuthenticationMode === ICalendarAuthentication::AUTOMATIC
-                && (trim($this->ReadPropertyString('Username')) !== '' || $this->ReadPropertyString('Password') !== ''));
-        $isGoogle = $provider === self::PROVIDER_GOOGLE;
-        $isMicrosoft = $provider === self::PROVIDER_MICROSOFT;
-        $isIcs = $provider === self::PROVIDER_ICS;
-        $canConfigureTls = in_array($provider, [self::PROVIDER_CALDAV, self::PROVIDER_ICS], true);
-
-        foreach ($form['elements'] as &$element) {
-            $name = (string) ($element['name'] ?? '');
-            if ($name === 'ServerURL') {
-                $element['visible'] = $isPasswordProvider;
-                $element['enabled'] = in_array($provider, [self::PROVIDER_CALDAV, self::PROVIDER_ICS], true);
-                $element['caption'] = $isIcs ? $this->Translate('iCalendar URL') : $this->Translate('Server URL');
-                if ($provider === self::PROVIDER_APPLE) {
-                    $element['value'] = self::APPLE_CALDAV_URL;
-                }
-            } elseif ($name === 'ICalendarAuthenticationMode') {
-                $element['visible'] = $isIcs;
-            } elseif (in_array($name, ['Username', 'Password'], true)) {
-                $element['visible'] = in_array($provider, [self::PROVIDER_APPLE, self::PROVIDER_CALDAV], true)
-                    || ($isIcs && $showIcsCredentials);
-            } elseif (in_array($name, ['CalendarName', 'ICalendarTranslationProfile'], true)) {
-                $element['visible'] = $isIcs;
-            } elseif (in_array($name, ['ICalendarSubscriptionsPanel', 'ICalendarFilesPanel'], true)) {
-                $element['visible'] = $isIcs;
-            } elseif ($name === 'UpdateSchedule') {
-                $element['caption'] = $isIcs
-                    ? $this->Translate('Account discovery schedule')
-                    : $this->Translate('Synchronization schedule');
-            } elseif ($name === 'UpdateInterval') {
-                $element['visible'] = $this->ReadPropertyInteger('UpdateSchedule') === SynchronizationSchedule::CUSTOM;
-                $element['caption'] = $isIcs
-                    ? $this->Translate('Account custom interval')
-                    : $this->Translate('Custom interval');
-            } elseif ($name === 'VerifyTLS') {
-                $element['visible'] = $canConfigureTls;
-            } elseif (in_array($name, [
-                'GoogleOAuthHint',
-                'GoogleConnectHint',
-                'GoogleStatus',
-                'GoogleConnect',
-                'GoogleDisconnect'
-            ], true)) {
-                $element['visible'] = $isGoogle;
-                if ($name === 'GoogleStatus') {
-                    $element['caption'] = $this->googleStatusText();
-                } elseif ($name === 'GoogleConnect') {
-                    $element['visible'] = $isGoogle && !$this->isGoogleConnected();
-                } elseif ($name === 'GoogleDisconnect') {
-                    $element['visible'] = $isGoogle && $this->isGoogleConnected();
-                }
-            } elseif (in_array($name, [
-                'MicrosoftOAuthHint',
-                'MicrosoftConnectHint',
-                'MicrosoftStatus',
-                'MicrosoftConnect',
-                'MicrosoftDisconnect'
-            ], true)) {
-                $element['visible'] = $isMicrosoft;
-                if ($name === 'MicrosoftStatus') {
-                    $element['caption'] = $this->microsoftStatusText();
-                } elseif ($name === 'MicrosoftConnect') {
-                    $element['visible'] = $isMicrosoft && !$this->isMicrosoftConnected();
-                } elseif ($name === 'MicrosoftDisconnect') {
-                    $element['visible'] = $isMicrosoft && $this->isMicrosoftConnected();
-                }
-            }
-        }
-        unset($element);
+        $state = $this->currentProviderFormState($this->ReadPropertyInteger('Provider'));
+        $state['GoogleStatus']['caption'] = $this->googleStatusText();
+        $state['MicrosoftStatus']['caption'] = $this->microsoftStatusText();
+        $state['UpdateInterval']['visible'] = $this->ReadPropertyInteger('UpdateSchedule')
+            === SynchronizationSchedule::CUSTOM;
+        $this->applyProviderFormStateToConfiguration($form, $state);
 
         return $this->EncodeConfigurationForm($form);
     }
@@ -230,76 +163,19 @@ class CalendarAccount extends IPSModuleStrict
      */
     public function UpdateProviderForm(int $provider): void
     {
-        $isPasswordProvider = in_array($provider, [self::PROVIDER_APPLE, self::PROVIDER_CALDAV, self::PROVIDER_ICS], true);
-        $isGoogle = $provider === self::PROVIDER_GOOGLE;
-        $isMicrosoft = $provider === self::PROVIDER_MICROSOFT;
-        $isIcs = $provider === self::PROVIDER_ICS;
-        $iCalendarAuthenticationMode = $this->ReadPropertyInteger('ICalendarAuthenticationMode');
-        $showIcsCredentials = $iCalendarAuthenticationMode === ICalendarAuthentication::USERNAME_PASSWORD
-            || ($iCalendarAuthenticationMode === ICalendarAuthentication::AUTOMATIC
-                && (trim($this->ReadPropertyString('Username')) !== '' || $this->ReadPropertyString('Password') !== ''));
-        $canConfigureTls = in_array($provider, [self::PROVIDER_CALDAV, self::PROVIDER_ICS], true);
-        $this->UpdateFormField('ServerURL', 'visible', $isPasswordProvider);
-        $this->UpdateFormField('ServerURL', 'caption', $isIcs ? $this->Translate('iCalendar URL') : $this->Translate('Server URL'));
-        $this->UpdateFormField('ICalendarAuthenticationMode', 'visible', $isIcs);
-        $showCredentials = in_array($provider, [self::PROVIDER_APPLE, self::PROVIDER_CALDAV], true)
-            || ($isIcs && $showIcsCredentials);
-        $this->UpdateFormField('Username', 'visible', $showCredentials);
-        $this->UpdateFormField('Password', 'visible', $showCredentials);
-        $this->UpdateFormField('CalendarName', 'visible', $isIcs);
-        $this->UpdateFormField('ICalendarTranslationProfile', 'visible', $isIcs);
-        $this->UpdateFormField('ICalendarSubscriptionsPanel', 'visible', $isIcs);
-        $this->UpdateFormField('ICalendarFilesPanel', 'visible', $isIcs);
-        $this->UpdateFormField('VerifyTLS', 'visible', $canConfigureTls);
-        $this->UpdateFormField(
-            'UpdateSchedule',
-            'caption',
-            $isIcs ? $this->Translate('Account discovery schedule') : $this->Translate('Synchronization schedule')
-        );
-        $this->UpdateFormField(
-            'UpdateInterval',
-            'caption',
-            $isIcs ? $this->Translate('Account custom interval') : $this->Translate('Custom interval')
-        );
-        $this->UpdateFormField('GoogleStatus', 'visible', $isGoogle);
-        $this->UpdateFormField('GoogleOAuthHint', 'visible', $isGoogle);
-        $this->UpdateFormField('GoogleConnectHint', 'visible', $isGoogle);
-        $this->UpdateFormField('GoogleConnect', 'visible', $isGoogle && !$this->isGoogleConnected());
-        $this->UpdateFormField('GoogleDisconnect', 'visible', $isGoogle && $this->isGoogleConnected());
-        $this->UpdateFormField('MicrosoftOAuthHint', 'visible', $isMicrosoft);
-        $this->UpdateFormField('MicrosoftConnectHint', 'visible', $isMicrosoft);
-        $this->UpdateFormField('MicrosoftStatus', 'visible', $isMicrosoft);
-        $this->UpdateFormField('MicrosoftStatus', 'caption', $this->microsoftStatusText());
-        $this->UpdateFormField('MicrosoftConnect', 'visible', $isMicrosoft && !$this->isMicrosoftConnected());
-        $this->UpdateFormField('MicrosoftDisconnect', 'visible', $isMicrosoft && $this->isMicrosoftConnected());
+        $state = $this->currentProviderFormState($provider);
+        $state['MicrosoftStatus']['caption'] = $this->microsoftStatusText();
+        $this->applyProviderFormStateToOpenForm($state);
 
-        if ($provider === self::PROVIDER_APPLE) {
-            $this->UpdateFormField('ServerURL', 'value', self::APPLE_CALDAV_URL);
-            $this->UpdateFormField('ServerURL', 'enabled', false);
+        if (!in_array($provider, [self::PROVIDER_CALDAV, self::PROVIDER_ICS], true)) {
             return;
         }
 
-        if ($provider === self::PROVIDER_CALDAV) {
-            $storedProvider = $this->ReadPropertyInteger('Provider');
-            $storedServerUrl = trim($this->ReadPropertyString('ServerURL'));
-            if ($storedProvider === self::PROVIDER_APPLE || $storedServerUrl === self::APPLE_CALDAV_URL) {
-                $this->UpdateFormField('ServerURL', 'value', '');
-            }
-            $this->UpdateFormField('ServerURL', 'enabled', true);
-            return;
+        $storedProvider = $this->ReadPropertyInteger('Provider');
+        $storedServerUrl = trim($this->ReadPropertyString('ServerURL'));
+        if ($storedProvider === self::PROVIDER_APPLE || $storedServerUrl === self::APPLE_CALDAV_URL) {
+            $this->UpdateFormField('ServerURL', 'value', '');
         }
-
-        if ($provider === self::PROVIDER_ICS) {
-            $storedProvider = $this->ReadPropertyInteger('Provider');
-            $storedServerUrl = trim($this->ReadPropertyString('ServerURL'));
-            if ($storedProvider === self::PROVIDER_APPLE || $storedServerUrl === self::APPLE_CALDAV_URL) {
-                $this->UpdateFormField('ServerURL', 'value', '');
-            }
-            $this->UpdateFormField('ServerURL', 'enabled', true);
-            return;
-        }
-
-        $this->UpdateFormField('ServerURL', 'enabled', false);
     }
 
     /**
@@ -307,9 +183,7 @@ class CalendarAccount extends IPSModuleStrict
      */
     public function UpdateICalendarAuthenticationForm(int $authenticationMode): void
     {
-        $showCredentials = $authenticationMode === ICalendarAuthentication::USERNAME_PASSWORD
-            || ($authenticationMode === ICalendarAuthentication::AUTOMATIC
-                && (trim($this->ReadPropertyString('Username')) !== '' || $this->ReadPropertyString('Password') !== ''));
+        $showCredentials = $this->showICalendarCredentials($authenticationMode);
         $this->UpdateFormField('Username', 'visible', $showCredentials);
         $this->UpdateFormField('Password', 'visible', $showCredentials);
     }
@@ -821,6 +695,138 @@ class CalendarAccount extends IPSModuleStrict
         unset($calendar);
 
         return $calendars;
+    }
+
+    /**
+     * Resolves provider-dependent form fields from the current account state.
+     *
+     * @return array<string, array<string, mixed>>
+     */
+    private function currentProviderFormState(int $provider): array
+    {
+        return $this->providerFormState(
+            $provider,
+            $this->showICalendarCredentials(),
+            $provider === self::PROVIDER_GOOGLE && $this->isGoogleConnected(),
+            $provider === self::PROVIDER_MICROSOFT && $this->isMicrosoftConnected()
+        );
+    }
+
+    /**
+     * Builds the provider-dependent field state shared by initial and dynamic form rendering.
+     *
+     * @return array<string, array<string, mixed>>
+     */
+    private function providerFormState(
+        int $provider,
+        bool $showIcsCredentials,
+        bool $googleConnected,
+        bool $microsoftConnected
+    ): array {
+        $isPasswordProvider = in_array(
+            $provider,
+            [self::PROVIDER_APPLE, self::PROVIDER_CALDAV, self::PROVIDER_ICS],
+            true
+        );
+        $isGoogle = $provider === self::PROVIDER_GOOGLE;
+        $isMicrosoft = $provider === self::PROVIDER_MICROSOFT;
+        $isIcs = $provider === self::PROVIDER_ICS;
+        $showCredentials = in_array($provider, [self::PROVIDER_APPLE, self::PROVIDER_CALDAV], true)
+            || ($isIcs && $showIcsCredentials);
+        $canConfigureTls = in_array($provider, [self::PROVIDER_CALDAV, self::PROVIDER_ICS], true);
+        $serverUrlState = [
+            'visible' => $isPasswordProvider,
+            'enabled' => $canConfigureTls,
+            'caption' => $isIcs ? $this->Translate('iCalendar URL') : $this->Translate('Server URL')
+        ];
+        if ($provider === self::PROVIDER_APPLE) {
+            $serverUrlState['value'] = self::APPLE_CALDAV_URL;
+        }
+
+        return [
+            'ServerURL'                   => $serverUrlState,
+            'ICalendarAuthenticationMode' => ['visible' => $isIcs],
+            'Username'                    => ['visible' => $showCredentials],
+            'Password'                    => ['visible' => $showCredentials],
+            'CalendarName'                => ['visible' => $isIcs],
+            'ICalendarTranslationProfile' => ['visible' => $isIcs],
+            'ICalendarSubscriptionsPanel' => ['visible' => $isIcs],
+            'ICalendarFilesPanel'         => ['visible' => $isIcs],
+            'UpdateSchedule'              => [
+                'caption' => $isIcs
+                    ? $this->Translate('Account discovery schedule')
+                    : $this->Translate('Synchronization schedule')
+            ],
+            'UpdateInterval'              => [
+                'caption' => $isIcs
+                    ? $this->Translate('Account custom interval')
+                    : $this->Translate('Custom interval')
+            ],
+            'VerifyTLS'                   => ['visible' => $canConfigureTls],
+            'GoogleOAuthHint'             => ['visible' => $isGoogle],
+            'GoogleConnectHint'           => ['visible' => $isGoogle],
+            'GoogleStatus'                => ['visible' => $isGoogle],
+            'GoogleConnect'               => ['visible' => $isGoogle && !$googleConnected],
+            'GoogleDisconnect'            => ['visible' => $isGoogle && $googleConnected],
+            'MicrosoftOAuthHint'          => ['visible' => $isMicrosoft],
+            'MicrosoftConnectHint'        => ['visible' => $isMicrosoft],
+            'MicrosoftStatus'             => ['visible' => $isMicrosoft],
+            'MicrosoftConnect'            => ['visible' => $isMicrosoft && !$microsoftConnected],
+            'MicrosoftDisconnect'         => ['visible' => $isMicrosoft && $microsoftConnected]
+        ];
+    }
+
+    /**
+     * Applies provider-dependent fields to a freshly loaded configuration form.
+     *
+     * @param array<string, mixed>                $form
+     * @param array<string, array<string, mixed>> $state
+     */
+    private function applyProviderFormStateToConfiguration(array &$form, array $state): void
+    {
+        if (!isset($form['elements']) || !is_array($form['elements'])) {
+            return;
+        }
+
+        foreach ($form['elements'] as &$element) {
+            if (!is_array($element)) {
+                continue;
+            }
+            $name = (string) ($element['name'] ?? '');
+            if (!isset($state[$name])) {
+                continue;
+            }
+            foreach ($state[$name] as $property => $value) {
+                $element[$property] = $value;
+            }
+        }
+        unset($element);
+    }
+
+    /**
+     * Applies provider-dependent fields to the currently open configuration form.
+     *
+     * @param array<string, array<string, mixed>> $state
+     */
+    private function applyProviderFormStateToOpenForm(array $state): void
+    {
+        foreach ($state as $name => $properties) {
+            foreach ($properties as $property => $value) {
+                $this->UpdateFormField($name, $property, $value);
+            }
+        }
+    }
+
+    /**
+     * Resolves whether the legacy iCalendar username/password fields should be shown.
+     */
+    private function showICalendarCredentials(?int $authenticationMode = null): bool
+    {
+        $authenticationMode ??= $this->ReadPropertyInteger('ICalendarAuthenticationMode');
+
+        return $authenticationMode === ICalendarAuthentication::USERNAME_PASSWORD
+            || ($authenticationMode === ICalendarAuthentication::AUTOMATIC
+                && (trim($this->ReadPropertyString('Username')) !== '' || $this->ReadPropertyString('Password') !== ''));
     }
 
     private function scheduleOAuthRegistration(): void

@@ -263,6 +263,78 @@ foreach ([
     );
 }
 
+$providerFormState = $reflection->getMethod('providerFormState');
+$providerFormState->setAccessible(true);
+$formStateProbe = new class extends CalendarAccount {
+    public function Translate(string $text): string
+    {
+        return $text;
+    }
+};
+$appleFormState = $providerFormState->invoke($formStateProbe, 0, false, false, false);
+$calDavFormState = $providerFormState->invoke($formStateProbe, 1, false, false, false);
+$googleFormState = $providerFormState->invoke($formStateProbe, 2, false, false, false);
+$microsoftFormState = $providerFormState->invoke($formStateProbe, 3, false, false, true);
+$icsFormState = $providerFormState->invoke($formStateProbe, 4, false, false, false);
+$icsCredentialsFormState = $providerFormState->invoke($formStateProbe, 4, true, false, false);
+assertAccountStructure(
+    ($appleFormState['ServerURL']['visible'] ?? false) === true
+        && ($appleFormState['ServerURL']['enabled'] ?? true) === false
+        && ($appleFormState['ServerURL']['value'] ?? '') === 'https://caldav.icloud.com'
+        && ($appleFormState['Username']['visible'] ?? false) === true
+        && ($appleFormState['VerifyTLS']['visible'] ?? true) === false,
+    'Apple provider form state must keep the fixed iCloud URL, credentials, and TLS policy.'
+);
+assertAccountStructure(
+    ($calDavFormState['ServerURL']['visible'] ?? false) === true
+        && ($calDavFormState['ServerURL']['enabled'] ?? false) === true
+        && !array_key_exists('value', $calDavFormState['ServerURL'])
+        && ($calDavFormState['Username']['visible'] ?? false) === true
+        && ($calDavFormState['VerifyTLS']['visible'] ?? false) === true,
+    'CalDAV provider form state must expose editable server, credential, and TLS fields.'
+);
+assertAccountStructure(
+    ($googleFormState['ServerURL']['visible'] ?? true) === false
+        && ($googleFormState['GoogleStatus']['visible'] ?? false) === true
+        && ($googleFormState['GoogleConnect']['visible'] ?? false) === true
+        && ($googleFormState['GoogleDisconnect']['visible'] ?? true) === false
+        && ($googleFormState['MicrosoftStatus']['visible'] ?? true) === false,
+    'Google provider form state must expose only Google OAuth controls while disconnected.'
+);
+assertAccountStructure(
+    ($microsoftFormState['MicrosoftStatus']['visible'] ?? false) === true
+        && ($microsoftFormState['MicrosoftConnect']['visible'] ?? true) === false
+        && ($microsoftFormState['MicrosoftDisconnect']['visible'] ?? false) === true
+        && ($microsoftFormState['GoogleStatus']['visible'] ?? true) === false,
+    'Microsoft provider form state must expose the connected Microsoft OAuth controls.'
+);
+assertAccountStructure(
+    ($icsFormState['ServerURL']['caption'] ?? '') === 'iCalendar URL'
+        && ($icsFormState['ICalendarAuthenticationMode']['visible'] ?? false) === true
+        && ($icsFormState['Username']['visible'] ?? true) === false
+        && ($icsFormState['CalendarName']['visible'] ?? false) === true
+        && ($icsFormState['ICalendarSubscriptionsPanel']['visible'] ?? false) === true
+        && ($icsFormState['ICalendarFilesPanel']['visible'] ?? false) === true
+        && ($icsFormState['UpdateSchedule']['caption'] ?? '') === 'Account discovery schedule'
+        && ($icsFormState['UpdateInterval']['caption'] ?? '') === 'Account custom interval'
+        && ($icsFormState['VerifyTLS']['visible'] ?? false) === true,
+    'ICS provider form state must expose the iCalendar-specific fields and schedule labels.'
+);
+assertAccountStructure(
+    ($icsCredentialsFormState['Username']['visible'] ?? false) === true
+        && ($icsCredentialsFormState['Password']['visible'] ?? false) === true,
+    'ICS provider form state must expose credentials only when requested.'
+);
+$accountSource = (string) file_get_contents(__DIR__ . '/../Kalender Konto/module.php');
+assertAccountStructure(
+    substr_count($accountSource, '$this->currentProviderFormState(') === 2,
+    'Initial and dynamic provider form rendering must use the same resolved provider state.'
+);
+assertAccountStructure(
+    substr_count($accountSource, '$this->showICalendarCredentials(') === 2,
+    'Initial provider rendering and authentication-mode updates must share ICS credential visibility logic.'
+);
+
 assertAccountStructure(
     $reflection->hasMethod('ProcessOAuthData') && $reflection->getMethod('ProcessOAuthData')->isProtected(),
     'The native Google/Microsoft OAuth handler must remain protected.'
