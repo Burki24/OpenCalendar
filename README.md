@@ -56,6 +56,23 @@ nicht durch bloßes Ausprobieren eines Stils überschrieben werden. Mit
 **In benutzerdefinierten Stil übernehmen** kann die aktuelle Vorgabe vollständig
 als Ausgangspunkt kopiert und anschließend individuell verändert werden.
 
+Zusätzlich bildet der gemeinsame `IPSViewStyleConfigurationHelper` die **109
+nativen IPSView-Farbfelder in 15 Gruppen** ab: Basis, Assoziationen, Tabs,
+Switch, Slider, Fortschrittsanzeige, Kreis, Flow, Gauge, Schatten/Raster, Dialog,
+Chart, Schedule, Event und Kalender. Die nativen Felder erben standardmäßig aus
+den semantischen Designrollen. Im benutzerdefinierten Stil kann jedes Feld
+einzeln mit **Abweichend** überschrieben werden. Eine manuelle Farbänderung
+aktiviert die Abweichung automatisch; beim Deaktivieren wird der Override entfernt
+und das Feld folgt wieder seinem geerbten Wert. Bei allen anderen Stilquellen
+werden die aufgelösten nativen Farben schreibgeschützt angezeigt.
+
+`ColorView` und `ColorPage` bleiben dabei bewusst getrennt: `ColorView` steuert den
+Hintergrund der gesamten View, `ColorPage` den Seitenhintergrund. Fehlt in einem
+importierten `.ipsView`-Dokument `ColorView`, verwendet OpenCalendar dafür den
+nativen IPSView-Standard `#404040`; `ColorPage` wird nicht als Ersatz verwendet.
+Style Profile V1 kann neben den semantischen Designwerten auch native Overrides
+transportieren.
+
 Die gemeinsame Typografie unterstützt die IPSView-Schriften **Roboto**,
 **Roboto Mono**, **Open Sans**, **PT Sans**, **Dancing Script**, **Bebas Neue**,
 **Indie Flower** und **Segment7**. Verfügbare Schriftschnitte werden abhängig von

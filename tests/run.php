@@ -32,6 +32,7 @@ $commands = [
     ['Check shared visualization contract', [PHP_BINARY, 'tests/visualization.php']],
     ['Verify IPSView Assistant/OpenCalendar style profile E2E', [PHP_BINARY, 'tests/style-profile-e2e.php']],
     ['Verify shared IPSView style configuration', [PHP_BINARY, 'tests/ipsview-style-configuration.php']],
+    ['Verify IPSView documentation contract', [PHP_BINARY, 'tests/ipsview-documentation.php']],
     ['Run account module structure tests', [PHP_BINARY, 'tests/account-module.php']],
     ['Check public PHPDoc coverage', [PHP_BINARY, 'tests/phpdocs.php']],
     ['Check Symcon Strict compliance', [PHP_BINARY, 'tests/symcon-strict.php']],

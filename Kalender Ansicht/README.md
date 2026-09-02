@@ -108,6 +108,7 @@ Ansichtszeiträume | Sichtbare Länge jeder Ansicht im aufklappbaren Bereich; Ag
 IPSView → Stilquelle | Gemeinsame Stilquelle für die IPSView-Ausgabe: Benutzerdefiniert, IPSView-Medium, Style Profile V1 oder eine der festen Vorgaben
 IPSView → Transparenter Hintergrund | Macht ausschließlich den äußeren View-Hintergrund transparent; die übrigen Flächen behalten ihre Stilwerte
 IPSView → Schrift-/Stilwerte | Schriftfamilie, Schriftschnitt, Größe, Skalierung, Farben, Transparenzen, Rahmen, Schatten und Effekte; bei Vorgaben als wirksame schreibgeschützte Vorschau
+IPSView → Native Farben | 109 native IPSView-Farbfelder in 15 Gruppen; im benutzerdefinierten Stil einzeln über **Abweichend** überschreibbar, bei anderen Stilquellen als aufgelöste Werte schreibgeschützt
 
 Die Kalenderwoche erscheint in der Wochenansicht in der Zeitraumüberschrift.
 In der Tage-Ansicht werden bei einem Wochenwechsel beide Kalenderwochen
@@ -176,9 +177,9 @@ Ansicht, ohne Symcons Größenlimit für einzelne PHP-Rückgaben zu überschreit
    `.ipsView`-Datei auswählen. Bei **Stilprofil** das Medienobjekt mit dem
    vollständigen validierten Style Profile V1 auswählen.
 5. Bei allen nicht benutzerdefinierten Quellen werden darunter die **aktuell
-   wirksamen** Farben, Deckkräfte, Schriftwerte, Rahmen, Schatten und Effekte
-   schreibgeschützt angezeigt. Dadurch bleiben vorhandene eigene Einstellungen
-   beim Ausprobieren einer Vorgabe unverändert.
+   wirksamen** Farben, Deckkräfte, Schriftwerte, Rahmen, Schatten, Effekte und
+   nativen IPSView-Farben schreibgeschützt angezeigt. Dadurch bleiben vorhandene
+   eigene Einstellungen beim Ausprobieren einer Vorgabe unverändert.
 6. Soll eine Vorgabe angepasst werden, **In benutzerdefinierten Stil übernehmen**
    wählen. Die aktuell wirksamen Werte werden vollständig in die
    benutzerdefinierten Felder kopiert und die Stilquelle wechselt auf
@@ -201,12 +202,38 @@ Ansicht, ohne Symcons Größenlimit für einzelne PHP-Rückgaben zu überschreit
     einfache native HTML-Renderer genügt nicht, weil Navigation, Ansichtswechsel
     und Terminbearbeitung JavaScript verwenden.
 
+### Native IPSView-Farben und Vererbung
+
+Der gemeinsame `IPSViewStyleConfigurationHelper` bildet die **109 bekannten
+nativen IPSView-Farbfelder in 15 Gruppen** ab: Basis, Assoziationen, Tabs, Switch,
+Slider, Fortschrittsanzeige, Kreis, Flow, Gauge, Schatten/Raster, Dialog, Chart,
+Schedule, Event und Kalender. Diese nativen Felder werden nicht als zweiter,
+unabhängiger Stil gepflegt. Sie erben standardmäßig aus den semantischen
+Designrollen und folgen dadurch automatisch einer geänderten Grundfarbe oder
+Vorgabe.
+
+Im **benutzerdefinierten Stil** kann ein einzelnes natives Feld mit **Abweichend**
+von dieser Vererbung gelöst und mit einer eigenen Farbe versehen werden. Wird die
+Farbe eines bisher geerbten Feldes manuell geändert, aktiviert OpenCalendar die
+Abweichung automatisch. Wird **Abweichend** wieder deaktiviert, wird der gespeicherte
+Override entfernt und das Feld übernimmt wieder den aus der semantischen Rolle
+abgeleiteten Wert. Bei IPSView-Medium, Stilprofil und festen Vorgaben zeigt die
+Konfiguration die vollständig aufgelösten nativen Werte nur lesend an.
+
+`ColorView` und `ColorPage` haben unterschiedliche Aufgaben. `ColorView` ist der
+Hintergrund der gesamten View, `ColorPage` der Seitenhintergrund. Enthält ein als
+Stilquelle gewähltes `.ipsView`-Dokument kein `ColorView`, verwendet OpenCalendar
+für den View-Hintergrund den IPSView-Standard `#404040`; `ColorPage` wird nicht
+als Ersatz herangezogen. Der optionale **Transparente Hintergrund** betrifft
+ausschließlich den äußeren View-Hintergrund und ändert diese Farblogik nicht.
+
 ### Style-Profile-Kompatibilität
 
 Die Kalender Ansicht ist Referenz-Consumer für **Style Profile V1** des
 IPSViewAssistant. Ein dort exportiertes Profil kann als Symcon-Dokumentmedium
 hinterlegt und anschließend direkt über **Stilprofil** ausgewählt werden. Der
-zentrale `IPSViewStyleHelper` übernimmt den vollständigen portablen Snapshot.
+zentrale `IPSViewStyleConfigurationHelper` übernimmt den vollständigen portablen
+Snapshot einschließlich der nativen IPSView-Theme-Daten.
 
 OpenCalendar berücksichtigt dabei Farben und ihre jeweils unabhängigen
 Deckkräfte, Schriftfamilie, Schriftschnitt, Basisschriftgröße und Skalierung,
@@ -262,7 +289,7 @@ Synchronisation schlägt fehl | Jede ausgewählte Kalender-Instanz einzeln synch
 Schaltfläche „＋ Termin“ ist deaktiviert | Mindestens einen ausgewählten Kalender mit Schreibrechten verwenden; ICS/Webcal ist immer schreibgeschützt
 IPSView zeigt nur statisches oder unvollständiges HTML | Im IPSView-Steuerelement **Browser des Clients** oder **Automatisch** als Renderer wählen
 IPSView-Inhalt ist veraltet | **IPSView-HTML neu generieren** ausführen und prüfen, ob die Ausgabe aktiviert ist
-IPSView-Stil zeigt andere Werte als erwartet | Prüfen, welche **Stilquelle** aktiv ist. Bei einer Vorgabe zeigen die Felder die wirksamen Werte schreibgeschützt; eigene Änderungen sind erst nach **In benutzerdefinierten Stil übernehmen** möglich
+IPSView-Stil zeigt andere Werte als erwartet | Prüfen, welche **Stilquelle** aktiv ist. Bei einer Vorgabe zeigen die Felder die wirksamen Werte schreibgeschützt; eigene Änderungen sind erst nach **In benutzerdefinierten Stil übernehmen** möglich. Bei einem einzelnen nativen Farbfeld zusätzlich prüfen, ob **Abweichend** aktiv ist oder das Feld noch dem geerbten semantischen Wert folgt
 Kalenderauswahl ist leer oder unvollständig | **Alle Kalenderinstanzen auswählen** verwenden, die gewünschte Auswahl anpassen und anschließend **Übernehmen**
 
 ## PHP-Befehlsreferenz
@@ -516,8 +543,10 @@ Kachel und IPSView-Seite werden aus derselben Asset-Struktur unter
 `IPSViewStyleProfileHelper`, `IPSViewStyleHelper` und `IPSViewHTMLPageHelper`
 sorgen für gemeinsame Symcon-Designvariablen, Schriftkatalog, Presets,
 Style-Profile, IPSView-Stilrollen und die kontrollierte Verwaltung der
-WebContent-Variable. Kalender- und Terminfarben bleiben davon unabhängige
-fachliche Inhaltsfarben.
+WebContent-Variable. `IPSViewControlThemeHelper` und
+`IPSViewStyleConfigurationHelper` ergänzen den vollständigen nativen
+109-Farben-Katalog samt Vererbung und gezielten Overrides. Kalender- und
+Terminfarben bleiben davon unabhängige fachliche Inhaltsfarben.
 
 ### Tagesübersicht der Kalenderansichten
 
