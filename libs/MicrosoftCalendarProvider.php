@@ -13,6 +13,7 @@ use Throwable;
 
 require_once __DIR__ . '/CalendarProviderInterface.php';
 require_once __DIR__ . '/CalendarEventLookupProviderInterface.php';
+require_once __DIR__ . '/CalendarEventLookup.php';
 require_once __DIR__ . '/RecurringCalendarProviderInterface.php';
 require_once __DIR__ . '/CalendarHttpClient.php';
 require_once __DIR__ . '/CalendarEventRecurrence.php';
@@ -1314,25 +1315,11 @@ final class MicrosoftCalendarProvider implements CalendarEventLookupProviderInte
      */
     private function eventLookupRange(array $identity): ?array
     {
-        $startTimestamp = (int) ($identity['startTimestamp'] ?? 0);
-        if ($startTimestamp <= 0) {
-            return null;
+        try {
+            return CalendarEventLookup::range($identity);
+        } catch (CalendarEventLookupException $exception) {
+            throw new MicrosoftCalendarProviderException($exception->getMessage());
         }
-        $endTimestamp = (int) ($identity['endTimestamp'] ?? 0);
-        if ($endTimestamp <= $startTimestamp) {
-            $endTimestamp = $startTimestamp + 1;
-        }
-
-        $rangeStart = max(1, $startTimestamp - 86400);
-        $rangeEnd = $endTimestamp + 86400;
-        if (($rangeEnd - $rangeStart) > 6 * 366 * 86400) {
-            throw new MicrosoftCalendarProviderException('The selected event time range is too large.');
-        }
-
-        return [
-            new DateTimeImmutable('@' . $rangeStart),
-            new DateTimeImmutable('@' . $rangeEnd)
-        ];
     }
 
     /**
