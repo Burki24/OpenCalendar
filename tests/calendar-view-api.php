@@ -845,7 +845,7 @@ $validateVisualizationActionRangeMethod->invoke(
     [
         '_viewRange' => [
             'start' => $rangeStartTimestamp,
-            'end'   => $rangeStartTimestamp + (370 * 86400)
+            'end'   => $rangeStartTimestamp + (380 * 86400)
         ]
     ]
 );
@@ -871,7 +871,7 @@ assertCalendarViewApiThrows(
         [
             '_viewRange' => [
                 'start' => $rangeStartTimestamp,
-                'end'   => $rangeStartTimestamp + (370 * 86400) + 1
+                'end'   => $rangeStartTimestamp + (380 * 86400) + 1
             ]
         ]
     ),
