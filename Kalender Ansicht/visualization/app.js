@@ -976,10 +976,13 @@ function renderThreeDays() {
 }
 
 function renderMultiDayTimeline(days, showDayOfYear, showEventCount) {
+    const rangeStart = startOfDay(days[0]);
+    const rangeEnd = addDays(startOfDay(days[days.length - 1]), 1);
+    const eventsByDay = visibleCalendarEventsByDay(rangeStart, rangeEnd);
     const dayData = days.map(day => {
         const dayStart = startOfDay(day);
         const dayEnd = addDays(dayStart, 1);
-        const events = visibleCalendarEvents().filter(event => eventOverlaps(event, dayStart, dayEnd));
+        const events = eventsForIndexedDay(eventsByDay, dayStart);
         const timedEvents = events.filter(event => !event.allDay);
         return {
             day,
@@ -1070,7 +1073,8 @@ function renderMultiDayTimeline(days, showDayOfYear, showEventCount) {
 function renderSingleDayTimeline(day) {
     const dayStart = startOfDay(day);
     const dayEnd = addDays(dayStart, 1);
-    const events = visibleCalendarEvents().filter(event => eventOverlaps(event, dayStart, dayEnd));
+    const eventsByDay = visibleCalendarEventsByDay(dayStart, dayEnd);
+    const events = eventsForIndexedDay(eventsByDay, dayStart);
     const currentDay = isToday(day);
     const column = element('section', 'week-column single-day-column' + (currentDay ? ' today' : ''));
     const heading = element('div', 'week-heading');
@@ -1221,12 +1225,15 @@ function createSingleDayTimelineEvent(event) {
 }
 
 function renderDayColumns(days, className, showDayOfYear, showEventCount) {
+    const rangeStart = startOfDay(days[0]);
+    const rangeEnd = addDays(startOfDay(days[days.length - 1]), 1);
+    const eventsByDay = visibleCalendarEventsByDay(rangeStart, rangeEnd);
     const grid = element('div', className);
     days.forEach(day => {
         const currentDay = isToday(day);
         const column = element('section', 'week-column' + (currentDay ? ' today' : ''));
         const dayEnd = addDays(day, 1);
-        const events = visibleCalendarEvents().filter(event => eventOverlaps(event, day, dayEnd));
+        const events = eventsForIndexedDay(eventsByDay, day);
         const heading = element('div', 'week-heading');
         if (currentDay) {
             emphasizeCurrentDaySurface(column, 'var(--cal-surface)', true);
@@ -1360,6 +1367,9 @@ function getVisibleDays(start, count) {
 
 function renderMonth() {
     const monthCount = viewPeriod('month');
+    const rangeStart = new Date(cursorDate.getFullYear(), cursorDate.getMonth(), 1);
+    const rangeEnd = new Date(rangeStart.getFullYear(), rangeStart.getMonth() + monthCount, 1);
+    const eventsByDay = visibleCalendarEventsByDay(rangeStart, rangeEnd);
     for (let offset = 0; offset < monthCount; offset++) {
         const month = new Date(cursorDate.getFullYear(), cursorDate.getMonth() + offset, 1);
         const section = element('section', 'month-section');
@@ -1368,12 +1378,12 @@ function renderMonth() {
             heading.textContent = formatMonth(month);
             section.appendChild(heading);
         }
-        section.appendChild(createMonthGrid(month, monthCount === 1));
+        section.appendChild(createMonthGrid(month, monthCount === 1, eventsByDay));
         content.appendChild(section);
     }
 }
 
-function createMonthGrid(month, fillAvailableHeight) {
+function createMonthGrid(month, fillAvailableHeight, eventsByDay) {
     const first = new Date(month.getFullYear(), month.getMonth(), 1);
     const last = new Date(month.getFullYear(), month.getMonth() + 1, 0);
     const showWeekends = calendarState.settings.showWeekends !== false;
@@ -1437,10 +1447,7 @@ function createMonthGrid(month, fillAvailableHeight) {
         dayHeader.appendChild(dateMeta);
         cell.appendChild(dayHeader);
 
-        const dayEnd = addDays(day, 1);
-        const events = visibleCalendarEvents()
-            .filter(event => eventOverlaps(event, day, dayEnd))
-            .sort(compareEventsForDisplay);
+        const events = [...eventsForIndexedDay(eventsByDay, day)].sort(compareEventsForDisplay);
         const eventList = element('div', 'month-events');
         cell.appendChild(eventList);
         monthEventData.set(eventList, { day, events });
@@ -1631,6 +1638,44 @@ function calendarFilterActive() {
 function visibleCalendarEvents() {
     if (!calendarFilterActive()) return calendarState.events;
     return calendarState.events.filter(event => visibleCalendarIds.has(Number(event.calendarInstanceId)));
+}
+
+function visibleCalendarEventsByDay(rangeStart, rangeEnd) {
+    const firstDay = startOfDay(rangeStart);
+    const lastDayExclusive = startOfDay(rangeEnd);
+    const eventsByDay = new Map();
+    if (!Number.isFinite(firstDay.getTime())
+        || !Number.isFinite(lastDayExclusive.getTime())
+        || lastDayExclusive <= firstDay) {
+        return eventsByDay;
+    }
+
+    for (let day = firstDay; day < lastDayExclusive; day = addDays(day, 1)) {
+        eventsByDay.set(dayKey(day), []);
+    }
+
+    visibleCalendarEvents().forEach(event => {
+        const eventStartDate = eventStart(event);
+        let eventEndDate = eventEnd(event);
+        if (!Number.isFinite(eventStartDate.getTime()) || !Number.isFinite(eventEndDate.getTime())) return;
+        if (eventEndDate <= eventStartDate) {
+            eventEndDate = new Date(eventStartDate.getTime() + 1);
+        }
+        if (eventStartDate >= lastDayExclusive || eventEndDate <= firstDay) return;
+
+        let day = startOfDay(eventStartDate < firstDay ? firstDay : eventStartDate);
+        while (day < eventEndDate && day < lastDayExclusive) {
+            const dayEvents = eventsByDay.get(dayKey(day));
+            if (dayEvents) dayEvents.push(event);
+            day = addDays(day, 1);
+        }
+    });
+
+    return eventsByDay;
+}
+
+function eventsForIndexedDay(eventsByDay, day) {
+    return eventsByDay.get(dayKey(day)) || [];
 }
 
 function dailyViewEntries(events, rangeStart, rangeEnd) {

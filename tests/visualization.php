@@ -870,10 +870,67 @@ assertVisualization(
         && str_contains($script, 'function applyCalendarFilter()')
         && str_contains($script, 'function visibleCalendarEvents()')
         && str_contains($script, 'visibleCalendarEvents().filter(event => eventOverlaps(event, rangeStart, rangeEnd))')
-        && str_contains($script, 'visibleCalendarEvents().filter(event => eventOverlaps(event, day, dayEnd))')
+        && str_contains($script, 'function visibleCalendarEventsByDay(rangeStart, rangeEnd)')
+        && str_contains($script, 'visibleCalendarEvents().forEach(event => {')
         && str_contains($script, 'visibleCalendarIds.has(Number(event.calendarInstanceId))'),
     'The shared visualization must provide a client-side calendar filter and apply it consistently to all rendered events.'
 );
+assertVisualization(
+    str_contains($script, 'const eventsByDay = visibleCalendarEventsByDay(rangeStart, rangeEnd);')
+        && substr_count($script, 'const eventsByDay = visibleCalendarEventsByDay(rangeStart, rangeEnd);') >= 3
+        && str_contains($script, 'const eventsByDay = visibleCalendarEventsByDay(dayStart, dayEnd);')
+        && str_contains($script, 'createMonthGrid(month, monthCount === 1, eventsByDay)')
+        && str_contains($script, 'function createMonthGrid(month, fillAvailableHeight, eventsByDay)')
+        && str_contains($script, 'const events = [...eventsForIndexedDay(eventsByDay, day)].sort(compareEventsForDisplay);')
+        && !str_contains($script, 'visibleCalendarEvents().filter(event => eventOverlaps(event, dayStart, dayEnd))')
+        && !str_contains($script, 'visibleCalendarEvents().filter(event => eventOverlaps(event, day, dayEnd))'),
+    'Multi-day, week and month views must reuse one visible-event day index per render instead of scanning every event for every day.'
+);
+assertVisualization(
+    str_contains($script, 'const eventStartDate = eventStart(event);')
+        && str_contains($script, 'let eventEndDate = eventEnd(event);')
+        && str_contains($script, 'eventEndDate = new Date(eventStartDate.getTime() + 1);')
+        && str_contains($script, 'if (eventStartDate >= lastDayExclusive || eventEndDate <= firstDay) return;')
+        && str_contains($script, 'let day = startOfDay(eventStartDate < firstDay ? firstDay : eventStartDate);')
+        && str_contains($script, 'while (day < eventEndDate && day < lastDayExclusive)')
+        && str_contains($script, 'if (dayEvents) dayEvents.push(event);'),
+    'The day index must preserve normal, all-day, multi-day and exclusive-midnight overlap boundaries.'
+);
+
+$indexRegressionCases = [
+    'normal timed event' => [
+        'start'    => new DateTimeImmutable('2026-09-03 10:00:00'),
+        'end'      => new DateTimeImmutable('2026-09-03 11:00:00'),
+        'expected' => ['2026-09-03']
+    ],
+    'all-day event'      => [
+        'start'    => new DateTimeImmutable('2026-09-03 00:00:00'),
+        'end'      => new DateTimeImmutable('2026-09-04 00:00:00'),
+        'expected' => ['2026-09-03']
+    ],
+    'multi-day event'    => [
+        'start'    => new DateTimeImmutable('2026-09-03 18:00:00'),
+        'end'      => new DateTimeImmutable('2026-09-05 09:00:00'),
+        'expected' => ['2026-09-03', '2026-09-04', '2026-09-05']
+    ],
+    'midnight boundary'  => [
+        'start'    => new DateTimeImmutable('2026-09-03 23:00:00'),
+        'end'      => new DateTimeImmutable('2026-09-04 00:00:00'),
+        'expected' => ['2026-09-03']
+    ]
+];
+foreach ($indexRegressionCases as $caseName => $case) {
+    $days = [];
+    $day = $case['start']->setTime(0, 0);
+    while ($day < $case['end']) {
+        $days[] = $day->format('Y-m-d');
+        $day = $day->modify('+1 day');
+    }
+    assertVisualization(
+        $days === $case['expected'],
+        sprintf('The visible-event day-index regression case failed: %s.', $caseName)
+    );
+}
 
 assertVisualization(
     str_contains($indexSource, 'id="event-dialog" class="oc-dialog oc-dialog-large"')
