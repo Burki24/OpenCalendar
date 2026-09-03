@@ -4024,9 +4024,9 @@ assertTrueValue(
         && str_contains($calendarModuleSource, "RegisterAttributeString('DetectedDefaultStatus', CalendarEventState::STATUS_CONFIRMED)")
         && str_contains($calendarModuleSource, "\$capabilities['writeStatus'] ?? false")
         && str_contains($calendarModuleSource, "\$capabilities['writeTransparency'] ?? false")
-        && str_contains($calendarModuleSource, "'canWriteStatus'               => \$metadataAvailable")
-        && str_contains($calendarModuleSource, "'canWriteTransparency'         => \$metadataAvailable")
-        && str_contains($calendarModuleSource, "'defaultAllDayTransparency'     => \$metadataAvailable"),
+        && preg_match('/\'canWriteStatus\'\s*=>\s*\$metadataAvailable/', $calendarModuleSource) === 1
+        && preg_match('/\'canWriteTransparency\'\s*=>\s*\$metadataAvailable/', $calendarModuleSource) === 1
+        && preg_match('/\'defaultAllDayTransparency\'\s*=>\s*\$metadataAvailable/', $calendarModuleSource) === 1,
     'Calendar instances must persist and expose provider-neutral event-state capabilities and defaults.'
 );
 
