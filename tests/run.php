@@ -9,6 +9,7 @@ $commands = [
     ['Verify DataFlowHelper integration', ['python3', 'tests/data_flow_integration.py']],
     ['Check safe debug integration', [PHP_BINARY, 'tests/debug-integration.php']],
     ['Check RFC recurrence diagnostics', [PHP_BINARY, 'tests/recurrence-diagnostics.php']],
+    ['Check provider-neutral RFC recurrence handling', [PHP_BINARY, 'tests/recurrence-rrule.php']],
     ['Check RFC year/week recurrence rules', [PHP_BINARY, 'tests/recurrence-year-week.php']],
     ['Check RFC hour/minute recurrence rules', [PHP_BINARY, 'tests/recurrence-hour-minute.php']],
     ['Check RFC time-aware BYSETPOS rules', [PHP_BINARY, 'tests/recurrence-setpos-time.php']],

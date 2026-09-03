@@ -36,17 +36,16 @@ final class CalendarRecurrenceRule
     ];
 
     /**
-     * Builds the Google Calendar recurrence lines for a newly created event.
+     * Builds one supported RFC 5545 RRULE line from provider-neutral recurrence settings.
      *
      * @param array<string, mixed> $recurrence Provider-neutral recurrence settings.
-     * @return list<string> Google Calendar recurrence lines.
      */
-    public static function toGoogleLines(
+    public static function toRRule(
         array $recurrence,
         DateTimeImmutable $start,
         bool $allDay,
         string $timezone
-    ): array {
+    ): string {
         if ($recurrence === [] || array_is_list($recurrence)) {
             throw new InvalidArgumentException('The recurrence settings are invalid.');
         }
@@ -181,7 +180,22 @@ final class CalendarRecurrenceRule
             );
         }
 
-        return ['RRULE:' . implode(';', $parts)];
+        return 'RRULE:' . implode(';', $parts);
+    }
+
+    /**
+     * Builds the Google Calendar recurrence lines for a newly created event.
+     *
+     * @param array<string, mixed> $recurrence Provider-neutral recurrence settings.
+     * @return list<string> Google Calendar recurrence lines.
+     */
+    public static function toGoogleLines(
+        array $recurrence,
+        DateTimeImmutable $start,
+        bool $allDay,
+        string $timezone
+    ): array {
+        return [self::toRRule($recurrence, $start, $allDay, $timezone)];
     }
 
     /**
@@ -195,7 +209,7 @@ final class CalendarRecurrenceRule
         bool $allDay,
         string $timezone
     ): string {
-        return self::toGoogleLines($recurrence, $start, $allDay, $timezone)[0];
+        return self::toRRule($recurrence, $start, $allDay, $timezone);
     }
 
     /**
@@ -627,14 +641,14 @@ final class CalendarRecurrenceRule
     }
 
     /**
-     * Parses the supported subset of a Google Calendar RRULE for the recurrence editor.
+     * Parses the supported RFC 5545 RRULE subset for the provider-neutral recurrence editor.
      *
      * Unsupported or more complex rules return null so callers can preserve the original
      * provider rule without exposing a lossy editor representation.
      *
      * @return array<string, mixed>|null Provider-neutral recurrence settings.
      */
-    public static function fromGoogleRule(
+    public static function fromRRule(
         string $rule,
         bool $allDay,
         string $timezone
@@ -840,6 +854,19 @@ final class CalendarRecurrenceRule
     }
 
     /**
+     * Parses the supported subset of a Google Calendar RRULE for the recurrence editor.
+     *
+     * @return array<string, mixed>|null Provider-neutral recurrence settings.
+     */
+    public static function fromGoogleRule(
+        string $rule,
+        bool $allDay,
+        string $timezone
+    ): ?array {
+        return self::fromRRule($rule, $allDay, $timezone);
+    }
+
+    /**
      * Trims one supported Google RRULE so it ends before the target occurrence.
      *
      * COUNT is replaced by an UNTIL value because the original series is being
@@ -851,7 +878,7 @@ final class CalendarRecurrenceRule
         bool $allDay,
         string $timezone
     ): string {
-        if (self::fromGoogleRule($rule, $allDay, $timezone) === null) {
+        if (self::fromRRule($rule, $allDay, $timezone) === null) {
             throw new InvalidArgumentException('The recurrence pattern cannot be split safely.');
         }
 
