@@ -1100,7 +1100,7 @@ assertVisualization(
         && str_contains($style, '.month-section:only-child .calendar-grid {')
         && str_contains($style, 'grid-template-rows: auto repeat(6, minmax(0, 1fr));')
         && str_contains($style, '.month-events { flex: 1 1 auto; min-height: 0; overflow: hidden; }')
-        && str_contains($script, 'function createMonthGrid(month, fillAvailableHeight)')
+        && str_contains($script, 'function createMonthGrid(month, fillAvailableHeight, eventsByDay)')
         && str_contains($script, 'const last = new Date(month.getFullYear(), month.getMonth() + 1, 0);')
         && str_contains($script, 'while (!showWeekends && isWeekend(firstVisible)) firstVisible = addDays(firstVisible, 1);')
         && str_contains($script, 'while (!showWeekends && isWeekend(lastVisible)) lastVisible = addDays(lastVisible, -1);')
