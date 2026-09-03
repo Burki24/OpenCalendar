@@ -39,6 +39,7 @@ $commands = [
     ['Verify CalDAV incremental synchronization', [PHP_BINARY, 'tests/caldav-incremental-sync.php']],
     ['Verify provider parity matrix', [PHP_BINARY, 'tests/provider-parity.php']],
     ['Verify shared calendar provider type mapping', [PHP_BINARY, 'tests/provider-type.php']],
+    ['Verify calendar metadata state handling', [PHP_BINARY, 'tests/calendar-metadata.php']],
     ['Run OpenCalendar provider and integration tests', [PHP_BINARY, 'tests/calendar-provider.php']],
     ['Check shared visualization contract', [PHP_BINARY, 'tests/visualization.php']],
     ['Verify IPSView font role rendering', [PHP_BINARY, 'tests/ipsview-style-font-rendering.php']],

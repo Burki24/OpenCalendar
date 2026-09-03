@@ -59,6 +59,31 @@ class Calendar extends IPSModuleStrict
         self::ANNIVERSARY_TYPE_DEATH
     ];
 
+    private const CALENDAR_METADATA_ATTRIBUTES = [
+        'resolvedCalendarId'           => ['name' => 'ResolvedCalendarID', 'type' => 'string', 'default' => ''],
+        'calendarColor'                => ['name' => 'DetectedCalendarColor', 'type' => 'string', 'default' => ''],
+        'canWrite'                     => ['name' => 'DetectedCanWrite', 'type' => 'boolean', 'default' => false],
+        'canCreateRecurrence'          => ['name' => 'DetectedCanCreateRecurrence', 'type' => 'boolean', 'default' => false],
+        'canUpdateRecurrence'          => ['name' => 'DetectedCanUpdateRecurrence', 'type' => 'boolean', 'default' => false],
+        'canUpdateOccurrence'          => ['name' => 'DetectedCanUpdateOccurrence', 'type' => 'boolean', 'default' => false],
+        'canDeleteOccurrence'          => ['name' => 'DetectedCanDeleteOccurrence', 'type' => 'boolean', 'default' => false],
+        'canUpdateFollowing'           => ['name' => 'DetectedCanUpdateFollowing', 'type' => 'boolean', 'default' => false],
+        'canUpdateSeries'              => ['name' => 'DetectedCanUpdateSeries', 'type' => 'boolean', 'default' => false],
+        'canDeleteSeries'              => ['name' => 'DetectedCanDeleteSeries', 'type' => 'boolean', 'default' => false],
+        'canUseDefaultReminder'        => ['name' => 'DetectedCanUseDefaultReminder', 'type' => 'boolean', 'default' => false],
+        'canCreateWithDefaultReminder' => ['name' => 'DetectedCanCreateWithDefaultReminder', 'type' => 'boolean', 'default' => false],
+        'canWriteStatus'               => ['name' => 'DetectedCanWriteStatus', 'type' => 'boolean', 'default' => false],
+        'canWriteTransparency'         => ['name' => 'DetectedCanWriteTransparency', 'type' => 'boolean', 'default' => false],
+        'defaultStatus'                => ['name' => 'DetectedDefaultStatus', 'type' => 'string', 'default' => CalendarEventState::STATUS_CONFIRMED],
+        'defaultTransparency'          => ['name' => 'DetectedDefaultTransparency', 'type' => 'string', 'default' => CalendarEventState::TRANSP_OPAQUE],
+        'defaultAllDayTransparency'    => ['name' => 'DetectedDefaultAllDayTransparency', 'type' => 'string', 'default' => CalendarEventState::TRANSP_OPAQUE],
+        'maxReminders'                 => ['name' => 'DetectedMaxReminders', 'type' => 'integer', 'default' => 1],
+        'defaultReminderJson'          => ['name' => 'DetectedDefaultReminder', 'type' => 'string', 'default' => '{}'],
+        'calendarTimezone'             => ['name' => 'DetectedCalendarTimezone', 'type' => 'string', 'default' => ''],
+        'writeAccessKnown'             => ['name' => 'DetectedWriteAccessKnown', 'type' => 'boolean', 'default' => false],
+        'available'                    => ['name' => 'CalendarMetadataAvailable', 'type' => 'boolean', 'default' => false]
+    ];
+
     /**
      * Registers properties, attributes, variables, and timers for the calendar instance.
      */
@@ -87,28 +112,7 @@ class Calendar extends IPSModuleStrict
         $this->RegisterAttributeInteger('IncrementalSyncWindowStart', 0);
         $this->RegisterAttributeInteger('IncrementalSyncWindowEnd', 0);
         $this->RegisterAttributeString('IncrementalSyncCalendarID', '');
-        $this->RegisterAttributeBoolean('CalendarMetadataAvailable', false);
-        $this->RegisterAttributeString('ResolvedCalendarID', '');
-        $this->RegisterAttributeString('DetectedCalendarColor', '');
-        $this->RegisterAttributeBoolean('DetectedCanWrite', false);
-        $this->RegisterAttributeBoolean('DetectedCanCreateRecurrence', false);
-        $this->RegisterAttributeBoolean('DetectedCanUpdateRecurrence', false);
-        $this->RegisterAttributeBoolean('DetectedCanUpdateOccurrence', false);
-        $this->RegisterAttributeBoolean('DetectedCanDeleteOccurrence', false);
-        $this->RegisterAttributeBoolean('DetectedCanUpdateFollowing', false);
-        $this->RegisterAttributeBoolean('DetectedCanUpdateSeries', false);
-        $this->RegisterAttributeBoolean('DetectedCanDeleteSeries', false);
-        $this->RegisterAttributeBoolean('DetectedCanUseDefaultReminder', false);
-        $this->RegisterAttributeBoolean('DetectedCanCreateWithDefaultReminder', false);
-        $this->RegisterAttributeBoolean('DetectedCanWriteStatus', false);
-        $this->RegisterAttributeBoolean('DetectedCanWriteTransparency', false);
-        $this->RegisterAttributeString('DetectedDefaultStatus', CalendarEventState::STATUS_CONFIRMED);
-        $this->RegisterAttributeString('DetectedDefaultTransparency', CalendarEventState::TRANSP_OPAQUE);
-        $this->RegisterAttributeString('DetectedDefaultAllDayTransparency', CalendarEventState::TRANSP_OPAQUE);
-        $this->RegisterAttributeInteger('DetectedMaxReminders', 1);
-        $this->RegisterAttributeString('DetectedDefaultReminder', '{}');
-        $this->RegisterAttributeString('DetectedCalendarTimezone', '');
-        $this->RegisterAttributeBoolean('DetectedWriteAccessKnown', false);
+        $this->registerCalendarMetadataAttributes();
         $this->RegisterAttributeBoolean('RuntimeReady', false);
 
         $this->RegisterVariableInteger('EventCount', $this->Translate('Event count'), [], 10);
@@ -984,11 +988,11 @@ class Calendar extends IPSModuleStrict
         if ($this->isRuntimeReady()) {
             $this->refreshCalendarMetadataSafely();
         }
-        $metadataAvailable = $this->ReadAttributeBoolean('CalendarMetadataAvailable');
-        $writeAccessKnown = $metadataAvailable
-            && $this->ReadAttributeBoolean('DetectedWriteAccessKnown');
-        $detectedColor = $this->ReadAttributeString('DetectedCalendarColor');
-        $defaultReminder = json_decode($this->ReadAttributeString('DetectedDefaultReminder'), true);
+        $metadata = $this->readCalendarMetadata();
+        $metadataAvailable = (bool) $metadata['available'];
+        $writeAccessKnown = $metadataAvailable && (bool) $metadata['writeAccessKnown'];
+        $detectedColor = (string) $metadata['calendarColor'];
+        $defaultReminder = json_decode((string) $metadata['defaultReminderJson'], true);
         if (!is_array($defaultReminder) || array_is_list($defaultReminder)) {
             $defaultReminder = [];
         }
@@ -1002,64 +1006,50 @@ class Calendar extends IPSModuleStrict
                     : $this->ReadPropertyString('CalendarColor'),
                 'canWrite'                     => $metadataAvailable
                     ? ($writeAccessKnown
-                        ? $this->ReadAttributeBoolean('DetectedCanWrite')
-                        : $this->ReadAttributeBoolean('DetectedCanWrite')
-                            || $this->ReadPropertyBoolean('CanWrite'))
+                        ? (bool) $metadata['canWrite']
+                        : (bool) $metadata['canWrite'] || $this->ReadPropertyBoolean('CanWrite'))
                     : $this->ReadPropertyBoolean('CanWrite'),
-                'timezone'                     => $metadataAvailable
-                    ? $this->ReadAttributeString('DetectedCalendarTimezone')
-                    : '',
-                'canCreateRecurrence'          => $metadataAvailable
-                    && $this->ReadAttributeBoolean('DetectedCanCreateRecurrence'),
-                'canUpdateRecurrence'          => $metadataAvailable
-                    && $this->ReadAttributeBoolean('DetectedCanUpdateRecurrence'),
-                'canUpdateOccurrence'          => $metadataAvailable
-                    && $this->ReadAttributeBoolean('DetectedCanUpdateOccurrence'),
-                'canDeleteOccurrence'          => $metadataAvailable
-                    && $this->ReadAttributeBoolean('DetectedCanDeleteOccurrence'),
-                'canUpdateFollowing'           => $metadataAvailable
-                    && $this->ReadAttributeBoolean('DetectedCanUpdateFollowing'),
-                'canUpdateSeries'              => $metadataAvailable
-                    && $this->ReadAttributeBoolean('DetectedCanUpdateSeries'),
-                'canDeleteSeries'              => $metadataAvailable
-                    && $this->ReadAttributeBoolean('DetectedCanDeleteSeries'),
-                'canUseDefaultReminder'        => $metadataAvailable
-                    && $this->ReadAttributeBoolean('DetectedCanUseDefaultReminder'),
-                'canCreateWithDefaultReminder' => $metadataAvailable
-                    && $this->ReadAttributeBoolean('DetectedCanCreateWithDefaultReminder'),
-                'canWriteStatus'               => $metadataAvailable
-                    && $this->ReadAttributeBoolean('DetectedCanWriteStatus'),
-                'canWriteTransparency'         => $metadataAvailable
-                    && $this->ReadAttributeBoolean('DetectedCanWriteTransparency'),
+                'timezone'                     => $metadataAvailable ? (string) $metadata['calendarTimezone'] : '',
+                'canCreateRecurrence'          => $metadataAvailable && (bool) $metadata['canCreateRecurrence'],
+                'canUpdateRecurrence'          => $metadataAvailable && (bool) $metadata['canUpdateRecurrence'],
+                'canUpdateOccurrence'          => $metadataAvailable && (bool) $metadata['canUpdateOccurrence'],
+                'canDeleteOccurrence'          => $metadataAvailable && (bool) $metadata['canDeleteOccurrence'],
+                'canUpdateFollowing'           => $metadataAvailable && (bool) $metadata['canUpdateFollowing'],
+                'canUpdateSeries'              => $metadataAvailable && (bool) $metadata['canUpdateSeries'],
+                'canDeleteSeries'              => $metadataAvailable && (bool) $metadata['canDeleteSeries'],
+                'canUseDefaultReminder'        => $metadataAvailable && (bool) $metadata['canUseDefaultReminder'],
+                'canCreateWithDefaultReminder' => $metadataAvailable && (bool) $metadata['canCreateWithDefaultReminder'],
+                'canWriteStatus'               => $metadataAvailable && (bool) $metadata['canWriteStatus'],
+                'canWriteTransparency'         => $metadataAvailable && (bool) $metadata['canWriteTransparency'],
                 'defaultStatus'                 => $metadataAvailable
                     ? CalendarEventState::normalizeStatus(
-                        $this->ReadAttributeString('DetectedDefaultStatus'),
+                        (string) $metadata['defaultStatus'],
                         CalendarEventState::STATUS_CONFIRMED
                     )
                     : CalendarEventState::STATUS_CONFIRMED,
                 'defaultTransparency'           => $metadataAvailable
                     ? CalendarEventState::normalizeTransparency(
-                        $this->ReadAttributeString('DetectedDefaultTransparency'),
+                        (string) $metadata['defaultTransparency'],
                         CalendarEventState::TRANSP_OPAQUE
                     )
                     : CalendarEventState::TRANSP_OPAQUE,
                 'defaultAllDayTransparency'     => $metadataAvailable
                     ? CalendarEventState::normalizeTransparency(
-                        $this->ReadAttributeString('DetectedDefaultAllDayTransparency'),
+                        (string) $metadata['defaultAllDayTransparency'],
                         CalendarEventState::TRANSP_OPAQUE
                     )
                     : CalendarEventState::TRANSP_OPAQUE,
-                'defaultReminder'              => $metadataAvailable ? $defaultReminder : [],
-                'maxReminders'                 => $metadataAvailable
-                    ? max(1, min(5, $this->ReadAttributeInteger('DetectedMaxReminders')))
+                'defaultReminder'               => $metadataAvailable ? $defaultReminder : [],
+                'maxReminders'                  => $metadataAvailable
+                    ? max(1, min(5, (int) $metadata['maxReminders']))
                     : 1,
-                'eventCount'                   => count($events),
-                'todayEventCount'              => CalendarEventCounter::countForDay(
+                'eventCount'                    => count($events),
+                'todayEventCount'               => CalendarEventCounter::countForDay(
                     $events,
                     new DateTimeImmutable('today')
                 ),
-                'lastSynchronization'          => $this->ReadAttributeInteger('LastSynchronization'),
-                'lastError'                    => $this->ReadAttributeString('LastError')
+                'lastSynchronization'           => $this->ReadAttributeInteger('LastSynchronization'),
+                'lastError'                     => $this->ReadAttributeString('LastError')
             ],
             JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR
         );
@@ -1125,26 +1115,7 @@ class Calendar extends IPSModuleStrict
         }
 
         if ($availableCalendars !== []) {
-            $this->WriteAttributeString('ResolvedCalendarID', '');
-            $this->WriteAttributeBoolean('DetectedCanCreateRecurrence', false);
-            $this->WriteAttributeBoolean('DetectedCanUpdateRecurrence', false);
-            $this->WriteAttributeBoolean('DetectedCanUpdateOccurrence', false);
-            $this->WriteAttributeBoolean('DetectedCanDeleteOccurrence', false);
-            $this->WriteAttributeBoolean('DetectedCanUpdateFollowing', false);
-            $this->WriteAttributeBoolean('DetectedCanUpdateSeries', false);
-            $this->WriteAttributeBoolean('DetectedCanDeleteSeries', false);
-            $this->WriteAttributeBoolean('DetectedCanUseDefaultReminder', false);
-            $this->WriteAttributeBoolean('DetectedCanCreateWithDefaultReminder', false);
-            $this->WriteAttributeBoolean('DetectedCanWriteStatus', false);
-            $this->WriteAttributeBoolean('DetectedCanWriteTransparency', false);
-            $this->WriteAttributeString('DetectedDefaultStatus', CalendarEventState::STATUS_CONFIRMED);
-            $this->WriteAttributeString('DetectedDefaultTransparency', CalendarEventState::TRANSP_OPAQUE);
-            $this->WriteAttributeString('DetectedDefaultAllDayTransparency', CalendarEventState::TRANSP_OPAQUE);
-            $this->WriteAttributeInteger('DetectedMaxReminders', 1);
-            $this->WriteAttributeString('DetectedDefaultReminder', '{}');
-            $this->WriteAttributeString('DetectedCalendarTimezone', '');
-            $this->WriteAttributeBoolean('DetectedWriteAccessKnown', false);
-            $this->WriteAttributeBoolean('CalendarMetadataAvailable', false);
+            $this->resetCalendarMetadataResolution();
         }
     }
 
@@ -1153,94 +1124,186 @@ class Calendar extends IPSModuleStrict
      */
     private function storeCalendarMetadata(array $calendar): void
     {
+        $metadata = $this->calendarMetadataFromProvider($calendar);
+        $this->writeCalendarMetadata($metadata);
+        $this->SendSafeDebug('CalendarMetadata', [
+            'canWrite'                  => $metadata['canWrite'],
+            'writeAccessKnown'          => $metadata['writeAccessKnown'],
+            'timezone'                  => $metadata['calendarTimezone'],
+            'canCreateRecurrence'       => $metadata['canCreateRecurrence'],
+            'canUpdateRecurrence'       => $metadata['canUpdateRecurrence'],
+            'canUpdateOccurrence'       => $metadata['canUpdateOccurrence'],
+            'canUpdateFollowing'        => $metadata['canUpdateFollowing'],
+            'canUpdateSeries'           => $metadata['canUpdateSeries'],
+            'canDeleteSeries'           => $metadata['canDeleteSeries'],
+            'maxReminders'              => $metadata['maxReminders'],
+            'canUseDefaultReminder'     => $metadata['canUseDefaultReminder'],
+            'canCreateDefaultReminder'  => $metadata['canCreateWithDefaultReminder'],
+            'canWriteStatus'            => $metadata['canWriteStatus'],
+            'canWriteTransparency'      => $metadata['canWriteTransparency'],
+            'defaultStatus'             => $metadata['defaultStatus'],
+            'defaultTransparency'       => $metadata['defaultTransparency'],
+            'defaultAllDayTransparency' => $metadata['defaultAllDayTransparency']
+        ]);
+    }
+
+    /**
+     * @param array<string, mixed> $calendar
+     * @return array<string, mixed>
+     */
+    private function calendarMetadataFromProvider(array $calendar): array
+    {
         $capabilities = is_array($calendar['capabilities'] ?? null) ? $calendar['capabilities'] : [];
-        $canWrite = (bool) ($capabilities['create'] ?? false)
-            || (bool) ($capabilities['update'] ?? false)
-            || (bool) ($capabilities['delete'] ?? false);
-        $canCreateRecurrence = (bool) ($capabilities['createRecurrence'] ?? false);
-        $canUpdateRecurrence = (bool) ($capabilities['updateRecurrence'] ?? false);
-        $canUpdateOccurrence = (bool) ($capabilities['updateOccurrence'] ?? false);
-        $canDeleteOccurrence = (bool) ($capabilities['deleteOccurrence'] ?? false);
-        $canUpdateFollowing = (bool) ($capabilities['updateFollowing'] ?? false);
-        $canUpdateSeries = (bool) ($capabilities['updateSeries'] ?? false);
-        $canDeleteSeries = (bool) ($capabilities['deleteSeries'] ?? false);
         $canUseDefaultReminder = (bool) ($capabilities['useDefaultReminder'] ?? false);
-        $canCreateWithDefaultReminder = (bool) ($capabilities['createWithDefaultReminder'] ?? false);
-        $canWriteStatus = (bool) ($capabilities['writeStatus'] ?? false);
-        $canWriteTransparency = (bool) ($capabilities['writeTransparency'] ?? false);
-        $defaultStatus = CalendarEventState::normalizeStatus(
-            $calendar['defaultStatus'] ?? '',
-            CalendarEventState::STATUS_CONFIRMED
-        );
         $defaultTransparency = CalendarEventState::normalizeTransparency(
             $calendar['defaultTransparency'] ?? '',
             CalendarEventState::TRANSP_OPAQUE
         );
-        $defaultAllDayTransparency = CalendarEventState::normalizeTransparency(
-            $calendar['defaultAllDayTransparency'] ?? '',
-            $defaultTransparency
-        );
-        $maxReminders = max(1, min(5, (int) ($capabilities['maxReminders'] ?? 1)));
         $defaultReminder = is_array($calendar['defaultReminder'] ?? null)
             && !array_is_list($calendar['defaultReminder'])
             ? $calendar['defaultReminder']
             : [];
-        $timezone = trim((string) ($calendar['timezone'] ?? ''));
+
         // Cached calendar metadata created before writeAccessKnown existed cannot
         // distinguish an explicit read-only result from incomplete DAV privilege
         // discovery. Keep it unknown so the persisted CanWrite value can recover
         // existing writable calendar instances after an update.
         $writeAccessKnown = array_key_exists('writeAccessKnown', $calendar)
             && (bool) $calendar['writeAccessKnown'];
-        $this->WriteAttributeString('ResolvedCalendarID', trim((string) ($calendar['id'] ?? '')));
-        $this->WriteAttributeString('DetectedCalendarColor', trim((string) ($calendar['color'] ?? '')));
-        $this->WriteAttributeBoolean('DetectedCanWrite', $canWrite);
-        $this->WriteAttributeBoolean('DetectedCanCreateRecurrence', $canCreateRecurrence);
-        $this->WriteAttributeBoolean('DetectedCanUpdateRecurrence', $canUpdateRecurrence);
-        $this->WriteAttributeBoolean('DetectedCanUpdateOccurrence', $canUpdateOccurrence);
-        $this->WriteAttributeBoolean('DetectedCanDeleteOccurrence', $canDeleteOccurrence);
-        $this->WriteAttributeBoolean('DetectedCanUpdateFollowing', $canUpdateFollowing);
-        $this->WriteAttributeBoolean('DetectedCanUpdateSeries', $canUpdateSeries);
-        $this->WriteAttributeBoolean('DetectedCanDeleteSeries', $canDeleteSeries);
-        $this->WriteAttributeBoolean('DetectedCanUseDefaultReminder', $canUseDefaultReminder);
-        $this->WriteAttributeBoolean(
-            'DetectedCanCreateWithDefaultReminder',
-            $canCreateWithDefaultReminder
-        );
-        $this->WriteAttributeBoolean('DetectedCanWriteStatus', $canWriteStatus);
-        $this->WriteAttributeBoolean('DetectedCanWriteTransparency', $canWriteTransparency);
-        $this->WriteAttributeString('DetectedDefaultStatus', $defaultStatus);
-        $this->WriteAttributeString('DetectedDefaultTransparency', $defaultTransparency);
-        $this->WriteAttributeString('DetectedDefaultAllDayTransparency', $defaultAllDayTransparency);
-        $this->WriteAttributeInteger('DetectedMaxReminders', $maxReminders);
-        $this->WriteAttributeString(
-            'DetectedDefaultReminder',
-            json_encode(
+
+        return [
+            'available'                    => true,
+            'resolvedCalendarId'           => trim((string) ($calendar['id'] ?? '')),
+            'calendarColor'                => trim((string) ($calendar['color'] ?? '')),
+            'canWrite'                     => (bool) ($capabilities['create'] ?? false)
+                || (bool) ($capabilities['update'] ?? false)
+                || (bool) ($capabilities['delete'] ?? false),
+            'canCreateRecurrence'          => (bool) ($capabilities['createRecurrence'] ?? false),
+            'canUpdateRecurrence'          => (bool) ($capabilities['updateRecurrence'] ?? false),
+            'canUpdateOccurrence'          => (bool) ($capabilities['updateOccurrence'] ?? false),
+            'canDeleteOccurrence'          => (bool) ($capabilities['deleteOccurrence'] ?? false),
+            'canUpdateFollowing'           => (bool) ($capabilities['updateFollowing'] ?? false),
+            'canUpdateSeries'              => (bool) ($capabilities['updateSeries'] ?? false),
+            'canDeleteSeries'              => (bool) ($capabilities['deleteSeries'] ?? false),
+            'canUseDefaultReminder'        => $canUseDefaultReminder,
+            'canCreateWithDefaultReminder' => (bool) ($capabilities['createWithDefaultReminder'] ?? false),
+            'canWriteStatus'               => (bool) ($capabilities['writeStatus'] ?? false),
+            'canWriteTransparency'         => (bool) ($capabilities['writeTransparency'] ?? false),
+            'defaultStatus'                => CalendarEventState::normalizeStatus(
+                $calendar['defaultStatus'] ?? '',
+                CalendarEventState::STATUS_CONFIRMED
+            ),
+            'defaultTransparency'          => $defaultTransparency,
+            'defaultAllDayTransparency'    => CalendarEventState::normalizeTransparency(
+                $calendar['defaultAllDayTransparency'] ?? '',
+                $defaultTransparency
+            ),
+            'maxReminders'                 => max(1, min(5, (int) ($capabilities['maxReminders'] ?? 1))),
+            'defaultReminderJson'          => json_encode(
                 $canUseDefaultReminder ? $defaultReminder : [],
                 JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR
-            )
-        );
-        $this->WriteAttributeString('DetectedCalendarTimezone', $timezone);
-        $this->WriteAttributeBoolean('DetectedWriteAccessKnown', $writeAccessKnown);
-        $this->WriteAttributeBoolean('CalendarMetadataAvailable', true);
-        $this->SendSafeDebug('CalendarMetadata', [
-            'canWrite'                  => $canWrite,
-            'writeAccessKnown'          => $writeAccessKnown,
-            'timezone'                  => $timezone,
-            'canCreateRecurrence'       => $canCreateRecurrence,
-            'canUpdateRecurrence'       => $canUpdateRecurrence,
-            'canUpdateOccurrence'       => $canUpdateOccurrence,
-            'canUpdateFollowing'        => $canUpdateFollowing,
-            'canUpdateSeries'           => $canUpdateSeries,
-            'canDeleteSeries'           => $canDeleteSeries,
-            'maxReminders'              => $maxReminders,
-            'canUseDefaultReminder'     => $canUseDefaultReminder,
-            'canCreateDefaultReminder'  => $canCreateWithDefaultReminder,
-            'canWriteStatus'            => $canWriteStatus,
-            'canWriteTransparency'      => $canWriteTransparency,
-            'defaultStatus'             => $defaultStatus,
-            'defaultTransparency'       => $defaultTransparency,
-            'defaultAllDayTransparency' => $defaultAllDayTransparency
+            ),
+            'calendarTimezone'             => trim((string) ($calendar['timezone'] ?? '')),
+            'writeAccessKnown'             => $writeAccessKnown
+        ];
+    }
+
+    private function registerCalendarMetadataAttributes(): void
+    {
+        $this->RegisterAttributeBoolean('CalendarMetadataAvailable', false);
+        $this->RegisterAttributeString('ResolvedCalendarID', '');
+        $this->RegisterAttributeString('DetectedCalendarColor', '');
+        $this->RegisterAttributeBoolean('DetectedCanWrite', false);
+        $this->RegisterAttributeBoolean('DetectedCanCreateRecurrence', false);
+        $this->RegisterAttributeBoolean('DetectedCanUpdateRecurrence', false);
+        $this->RegisterAttributeBoolean('DetectedCanUpdateOccurrence', false);
+        $this->RegisterAttributeBoolean('DetectedCanDeleteOccurrence', false);
+        $this->RegisterAttributeBoolean('DetectedCanUpdateFollowing', false);
+        $this->RegisterAttributeBoolean('DetectedCanUpdateSeries', false);
+        $this->RegisterAttributeBoolean('DetectedCanDeleteSeries', false);
+        $this->RegisterAttributeBoolean('DetectedCanUseDefaultReminder', false);
+        $this->RegisterAttributeBoolean('DetectedCanCreateWithDefaultReminder', false);
+        $this->RegisterAttributeBoolean('DetectedCanWriteStatus', false);
+        $this->RegisterAttributeBoolean('DetectedCanWriteTransparency', false);
+        $this->RegisterAttributeString('DetectedDefaultStatus', CalendarEventState::STATUS_CONFIRMED);
+        $this->RegisterAttributeString('DetectedDefaultTransparency', CalendarEventState::TRANSP_OPAQUE);
+        $this->RegisterAttributeString('DetectedDefaultAllDayTransparency', CalendarEventState::TRANSP_OPAQUE);
+        $this->RegisterAttributeInteger('DetectedMaxReminders', 1);
+        $this->RegisterAttributeString('DetectedDefaultReminder', '{}');
+        $this->RegisterAttributeString('DetectedCalendarTimezone', '');
+        $this->RegisterAttributeBoolean('DetectedWriteAccessKnown', false);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function readCalendarMetadata(): array
+    {
+        $metadata = [];
+        foreach (self::CALENDAR_METADATA_ATTRIBUTES as $key => $definition) {
+            $metadata[$key] = match ($definition['type']) {
+                'boolean' => $this->ReadAttributeBoolean($definition['name']),
+                'integer' => $this->ReadAttributeInteger($definition['name']),
+                'string'  => $this->ReadAttributeString($definition['name']),
+                default   => $definition['default']
+            };
+        }
+
+        return $metadata;
+    }
+
+    /**
+     * @param array<string, mixed> $metadata
+     */
+    private function writeCalendarMetadata(array $metadata): void
+    {
+        foreach (self::CALENDAR_METADATA_ATTRIBUTES as $key => $definition) {
+            if (!array_key_exists($key, $metadata)) {
+                continue;
+            }
+
+            switch ($definition['type']) {
+                case 'boolean':
+                    $this->WriteAttributeBoolean($definition['name'], (bool) $metadata[$key]);
+                    break;
+
+                case 'integer':
+                    $this->WriteAttributeInteger($definition['name'], (int) $metadata[$key]);
+                    break;
+
+                case 'string':
+                    $this->WriteAttributeString($definition['name'], (string) $metadata[$key]);
+                    break;
+
+                default:
+                    throw new LogicException('Unsupported calendar metadata attribute type.');
+            }
+        }
+    }
+
+    private function resetCalendarMetadataResolution(): void
+    {
+        $this->writeCalendarMetadata([
+            'available'                    => false,
+            'resolvedCalendarId'           => '',
+            'canCreateRecurrence'          => false,
+            'canUpdateRecurrence'          => false,
+            'canUpdateOccurrence'          => false,
+            'canDeleteOccurrence'          => false,
+            'canUpdateFollowing'           => false,
+            'canUpdateSeries'              => false,
+            'canDeleteSeries'              => false,
+            'canUseDefaultReminder'        => false,
+            'canCreateWithDefaultReminder' => false,
+            'canWriteStatus'               => false,
+            'canWriteTransparency'         => false,
+            'defaultStatus'                => CalendarEventState::STATUS_CONFIRMED,
+            'defaultTransparency'          => CalendarEventState::TRANSP_OPAQUE,
+            'defaultAllDayTransparency'    => CalendarEventState::TRANSP_OPAQUE,
+            'maxReminders'                 => 1,
+            'defaultReminderJson'          => '{}',
+            'calendarTimezone'             => '',
+            'writeAccessKnown'             => false
         ]);
     }
 
