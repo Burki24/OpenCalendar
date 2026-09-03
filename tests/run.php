@@ -37,6 +37,7 @@ $commands = [
     ['Verify Microsoft event-edit identity', [PHP_BINARY, 'tests/microsoft-event-edit.php']],
     ['Verify CalDAV incremental synchronization', [PHP_BINARY, 'tests/caldav-incremental-sync.php']],
     ['Verify provider parity matrix', [PHP_BINARY, 'tests/provider-parity.php']],
+    ['Verify shared calendar provider type mapping', [PHP_BINARY, 'tests/provider-type.php']],
     ['Run OpenCalendar provider and integration tests', [PHP_BINARY, 'tests/calendar-provider.php']],
     ['Check shared visualization contract', [PHP_BINARY, 'tests/visualization.php']],
     ['Verify IPSView font role rendering', [PHP_BINARY, 'tests/ipsview-style-font-rendering.php']],

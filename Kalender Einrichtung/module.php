@@ -2,6 +2,10 @@
 
 declare(strict_types=1);
 
+use IPSKalender\CalendarProviderType;
+
+require_once __DIR__ . '/../libs/CalendarProviderType.php';
+
 class OpenCalendarDiscovery extends IPSModuleStrict
 {
     private const CALENDAR_ACCOUNT_MODULE_ID = '{966D6119-7FF3-5CA5-06C3-536FBF8100C4}';
@@ -10,22 +14,13 @@ class OpenCalendarDiscovery extends IPSModuleStrict
     private const CALENDAR_VIEW_MODULE_ID = '{1B19AB6B-9052-EA85-F158-86A13FE6F5BA}';
     private const APPLE_CALDAV_URL = 'https://caldav.icloud.com';
 
-    /** @var array<string, int> */
-    private const PROVIDERS = [
-        'apple'     => 0,
-        'caldav'    => 1,
-        'google'    => 2,
-        'microsoft' => 3,
-        'ics'       => 4
-    ];
-
     /** @var array<int, string> */
     private const PROVIDER_LABELS = [
-        0 => 'Apple iCloud',
-        1 => 'CalDAV',
-        2 => 'Google Calendar',
-        3 => 'Microsoft 365 / Outlook.com',
-        4 => 'ICS / Webcal'
+        CalendarProviderType::APPLE     => 'Apple iCloud',
+        CalendarProviderType::CALDAV    => 'CalDAV',
+        CalendarProviderType::GOOGLE    => 'Google Calendar',
+        CalendarProviderType::MICROSOFT => 'Microsoft 365 / Outlook.com',
+        CalendarProviderType::ICS       => 'ICS / Webcal'
     ];
 
     /** @var array<string, string> */
@@ -1497,7 +1492,6 @@ class OpenCalendarDiscovery extends IPSModuleStrict
 
             throw $exception;
         }
-
         return $configuratorID;
     }
 
@@ -1668,7 +1662,7 @@ class OpenCalendarDiscovery extends IPSModuleStrict
                 IPS_SetParent($accountID, $parentID);
             }
 
-            IPS_SetProperty($accountID, 'Provider', self::PROVIDERS[$provider]);
+            IPS_SetProperty($accountID, 'Provider', CalendarProviderType::fromKey($provider));
             IPS_SetProperty($accountID, 'Active', false);
             IPS_ApplyChanges($accountID);
         } catch (Throwable $exception) {
@@ -2187,7 +2181,7 @@ class OpenCalendarDiscovery extends IPSModuleStrict
     private function assertWizardProviderMatchesAccount(int $accountID, string $provider): void
     {
         $this->assertSupportedProvider($provider);
-        if ((int) IPS_GetProperty($accountID, 'Provider') !== self::PROVIDERS[$provider]) {
+        if ((int) IPS_GetProperty($accountID, 'Provider') !== CalendarProviderType::fromKey($provider)) {
             throw new RuntimeException(
                 $this->Translate('The selected calendar account uses a different calendar provider.')
             );
@@ -2290,7 +2284,7 @@ class OpenCalendarDiscovery extends IPSModuleStrict
             throw new InvalidArgumentException($this->Translate('The selected instance is not a calendar account.'));
         }
 
-        if ((int) IPS_GetProperty($existingAccountID, 'Provider') !== self::PROVIDERS[$provider]) {
+        if ((int) IPS_GetProperty($existingAccountID, 'Provider') !== CalendarProviderType::fromKey($provider)) {
             throw new InvalidArgumentException(
                 $this->Translate('The selected calendar account uses a different calendar provider.')
             );
@@ -2299,7 +2293,7 @@ class OpenCalendarDiscovery extends IPSModuleStrict
 
     private function assertSupportedProvider(string $provider): void
     {
-        if (!array_key_exists($provider, self::PROVIDERS)) {
+        if (!CalendarProviderType::isSupportedKey($provider)) {
             throw new InvalidArgumentException($this->Translate('Please select a calendar provider.'));
         }
     }

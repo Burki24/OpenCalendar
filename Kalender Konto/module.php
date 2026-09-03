@@ -17,6 +17,7 @@ use IPSKalender\CalendarEventTranslation;
 use IPSKalender\CalendarHttpClient;
 use IPSKalender\CalendarHttpOriginPolicyInterface;
 use IPSKalender\CalendarProviderInterface;
+use IPSKalender\CalendarProviderType;
 use IPSKalender\GoogleCalendarOriginPolicy;
 use IPSKalender\GoogleCalendarProvider;
 use IPSKalender\GoogleCalendarProviderException;
@@ -38,6 +39,7 @@ require_once __DIR__ . '/../libs/helper/DebugHelper.php';
 require_once __DIR__ . '/../libs/helper/HttpResponseHelper.php';
 require_once __DIR__ . '/../libs/helper/SymconOAuthHelper.php';
 require_once __DIR__ . '/../libs/CalendarProviderInterface.php';
+require_once __DIR__ . '/../libs/CalendarProviderType.php';
 require_once __DIR__ . '/../libs/RecurringCalendarProviderInterface.php';
 require_once __DIR__ . '/../libs/CalendarHttpClient.php';
 require_once __DIR__ . '/../libs/CalendarHttpOriginPolicyInterface.php';
@@ -88,11 +90,11 @@ class CalendarAccount extends IPSModuleStrict
     private const OAUTH_DISPATCHER_RECHECK_MS = 60_000;
     private const OAUTH_PENDING_TIMEOUT_SECONDS = 900;
 
-    private const PROVIDER_APPLE = 0;
-    private const PROVIDER_CALDAV = 1;
-    private const PROVIDER_GOOGLE = 2;
-    private const PROVIDER_MICROSOFT = 3;
-    private const PROVIDER_ICS = 4;
+    private const PROVIDER_APPLE = CalendarProviderType::APPLE;
+    private const PROVIDER_CALDAV = CalendarProviderType::CALDAV;
+    private const PROVIDER_GOOGLE = CalendarProviderType::GOOGLE;
+    private const PROVIDER_MICROSOFT = CalendarProviderType::MICROSOFT;
+    private const PROVIDER_ICS = CalendarProviderType::ICS;
 
     private const STATUS_CONFIGURATION_MISSING = 201;
     private const STATUS_AUTHENTICATION_FAILED = 202;
