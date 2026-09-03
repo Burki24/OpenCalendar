@@ -37,6 +37,7 @@ final class CalendarVisualizationRenderer
                     'showThreeDaysCalendarWeek' => false,
                     'showWeekCalendarWeek'      => true,
                     'showMonthCalendarWeek'     => true,
+                    'showMonthOverflowDays'     => true,
                     'showAgendaDayOfYear'       => false,
                     'showListDayOfYear'         => true,
                     'showThreeDaysDayOfYear'    => true,
@@ -613,6 +614,13 @@ foreach ([
         sprintf('The %s setting must be configurable, persisted and exposed to the visualization.', $property)
     );
 }
+assertVisualization(
+    str_contains($formSource, '"name": "ShowMonthOverflowDays"')
+        && str_contains($formSource, '"caption": "Adjacent month days"')
+        && str_contains($moduleSource, "RegisterPropertyBoolean('ShowMonthOverflowDays', false)")
+        && str_contains($moduleSource, "'showMonthOverflowDays'     => \$this->ReadPropertyBoolean('ShowMonthOverflowDays')"),
+    'The month overflow-day setting must be configurable, disabled by default and exposed to the visualization.'
+);
 foreach (['ShowAgendaDayOfYear', 'ShowThreeDaysDayOfYear', 'ShowWeekDayOfYear', 'ShowMonthDayOfYear'] as $property) {
     assertVisualization(
         str_contains($formSource, '"name": "' . $property . '"')
@@ -927,20 +935,27 @@ assertVisualization(
         && str_contains($style, '.month-section:only-child .calendar-grid {')
         && str_contains($style, 'grid-template-rows: auto repeat(6, minmax(0, 1fr));')
         && str_contains($style, '.month-events { flex: 1 1 auto; min-height: 0; overflow: hidden; }')
+        && str_contains($style, '.month-day.outside { opacity: var(--cal-disabled-opacity); }')
+        && str_contains($script, 'function monthGridRange(month)')
         && str_contains($script, 'function createMonthGrid(month, fillAvailableHeight)')
         && str_contains($script, 'const last = new Date(month.getFullYear(), month.getMonth() + 1, 0);')
         && str_contains($script, 'while (!showWeekends && isWeekend(firstVisible)) firstVisible = addDays(firstVisible, 1);')
         && str_contains($script, 'while (!showWeekends && isWeekend(lastVisible)) lastVisible = addDays(lastVisible, -1);')
-        && str_contains($script, 'const gridEnd = addDays(startOfWeek(lastVisible), 7);')
+        && str_contains($script, 'end: addDays(startOfWeek(lastVisible), 7)')
+        && str_contains($script, 'const showOverflowDays = calendarState.settings.showMonthOverflowDays === true;')
+        && str_contains($script, 'const { start: gridStart, end: gridEnd } = monthGridRange(month);')
         && str_contains($script, 'const rowCount = Math.max(1, Math.ceil(visibleDays.length / columnCount));')
         && str_contains($script, 'grid.style.gridTemplateRows = fillAvailableHeight')
+        && str_contains($script, 'if (outside && !showOverflowDays) {')
         && str_contains($script, "cell.classList.add('month-day-empty');")
         && str_contains($script, "cell.setAttribute('aria-hidden', 'true');")
+        && str_contains($script, "if (outside) cell.classList.add('outside');")
+        && str_contains($script, 'start = monthGridRange(firstMonth).start;')
+        && str_contains($script, 'end = monthGridRange(lastMonth).end;')
         && str_contains($script, '&& (day.getDay() === 1 || day.getDate() === 1)')
         && !str_contains($script, 'Array.from({ length: 42 }, (_, index) => addDays(gridStart, index))')
-        && !str_contains($script, 'showOutsideDetails')
-        && !str_contains($script, "cell.classList.add('outside');"),
-    'Month view must show only dates from the displayed month, preserve calendar-week labels, and size the grid to the occupied calendar weeks.'
+        && !str_contains($script, 'showOutsideDetails'),
+    'Month view must optionally render adjacent-month days with events while preserving empty overflow cells by default and loading the complete visible range.'
 );
 assertVisualization(
     str_contains($style, '.list-table {')
@@ -1068,7 +1083,7 @@ assertVisualization(
 
 assertVisualization(
     str_contains($moduleSource, 'private const VISUALIZATION_BOOTSTRAP_FUTURE_DAYS = 42;')
-        && str_contains($moduleSource, 'private const VISUALIZATION_MAX_RANGE_DAYS = 370;')
+        && str_contains($moduleSource, 'private const VISUALIZATION_MAX_RANGE_DAYS = 380;')
         && str_contains($moduleSource, 'private function buildState(?int $requestedRangeStart = null, ?int $requestedRangeEnd = null, int $eventOffset = 0): array')
         && str_contains($moduleSource, "'eventRange'  => [")
         && str_contains($moduleSource, "case 'LoadRange':")
@@ -1141,6 +1156,7 @@ foreach ([$native, $ipsView] as $html) {
     assertVisualization(str_contains($html, '"showThreeDaysCalendarWeek":false'), 'The three-day calendar-week setting must be serialized.');
     assertVisualization(str_contains($html, '"showWeekCalendarWeek":true'), 'The week calendar-week setting must be serialized.');
     assertVisualization(str_contains($html, '"showMonthCalendarWeek":true'), 'The month calendar-week setting must be serialized.');
+    assertVisualization(str_contains($html, '"showMonthOverflowDays":true'), 'The month overflow-day setting must be serialized.');
     assertVisualization(str_contains($html, '"showAgendaDayOfYear":false'), 'The agenda day-of-year setting must be serialized.');
     assertVisualization(str_contains($html, '"showThreeDaysDayOfYear":true'), 'The three-day day-of-year setting must be serialized.');
     assertVisualization(str_contains($html, '"showWeekDayOfYear":false'), 'The week day-of-year setting must be serialized.');

@@ -1368,7 +1368,7 @@ function renderMonth() {
     }
 }
 
-function createMonthGrid(month, fillAvailableHeight) {
+function monthGridRange(month) {
     const first = new Date(month.getFullYear(), month.getMonth(), 1);
     const last = new Date(month.getFullYear(), month.getMonth() + 1, 0);
     const showWeekends = calendarState.settings.showWeekends !== false;
@@ -1377,8 +1377,16 @@ function createMonthGrid(month, fillAvailableHeight) {
     while (!showWeekends && isWeekend(firstVisible)) firstVisible = addDays(firstVisible, 1);
     while (!showWeekends && isWeekend(lastVisible)) lastVisible = addDays(lastVisible, -1);
 
-    const gridStart = startOfWeek(firstVisible);
-    const gridEnd = addDays(startOfWeek(lastVisible), 7);
+    return {
+        start: startOfWeek(firstVisible),
+        end: addDays(startOfWeek(lastVisible), 7)
+    };
+}
+
+function createMonthGrid(month, fillAvailableHeight) {
+    const showWeekends = calendarState.settings.showWeekends !== false;
+    const showOverflowDays = calendarState.settings.showMonthOverflowDays === true;
+    const { start: gridStart, end: gridEnd } = monthGridRange(month);
     const days = [];
     for (let day = gridStart; day < gridEnd; day = addDays(day, 1)) {
         days.push(day);
@@ -1403,12 +1411,13 @@ function createMonthGrid(month, fillAvailableHeight) {
     visibleDays.forEach(day => {
         const outside = day.getMonth() !== month.getMonth();
         const cell = element('div', 'month-day');
-        if (outside) {
+        if (outside && !showOverflowDays) {
             cell.classList.add('month-day-empty');
             cell.setAttribute('aria-hidden', 'true');
             grid.appendChild(cell);
             return;
         }
+        if (outside) cell.classList.add('outside');
 
         if (isToday(day)) cell.classList.add('today');
         const dayHeader = element('div', 'month-day-header');
@@ -4130,8 +4139,17 @@ function visibleViewRange() {
     let end;
 
     if (activeView === 'month') {
-        start = new Date(cursorDate.getFullYear(), cursorDate.getMonth(), 1);
-        end = new Date(start.getFullYear(), start.getMonth() + viewPeriod('month'), 1);
+        const firstMonth = new Date(cursorDate.getFullYear(), cursorDate.getMonth(), 1);
+        const monthCount = viewPeriod('month');
+        const monthAfterLast = new Date(firstMonth.getFullYear(), firstMonth.getMonth() + monthCount, 1);
+        if (calendarState.settings.showMonthOverflowDays === true) {
+            const lastMonth = new Date(firstMonth.getFullYear(), firstMonth.getMonth() + monthCount - 1, 1);
+            start = monthGridRange(firstMonth).start;
+            end = monthGridRange(lastMonth).end;
+        } else {
+            start = firstMonth;
+            end = monthAfterLast;
+        }
     } else if (activeView === 'week' || activeView === 'workWeek') {
         const days = weekViewDays(activeView === 'workWeek');
         start = startOfDay(days[0] || startOfWeek(cursorDate));
