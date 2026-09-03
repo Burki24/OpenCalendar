@@ -99,6 +99,18 @@ calendarMetadataExpect(
         && str_contains($status, "(string) \$metadata['defaultReminderJson']"),
     'Calendar status must consume the centralized metadata state instead of rebuilding attribute reads.'
 );
+calendarMetadataExpect(
+    str_contains(
+        $status,
+        "\$writeAccessKnown = \$metadataAvailable && (bool) \$metadata['writeAccessKnown'];"
+    )
+        && str_contains($status, "? (bool) \$metadata['canWrite']")
+        && str_contains(
+            $status,
+            ": (bool) \$metadata['canWrite'] || \$this->ReadPropertyBoolean('CanWrite')"
+        ),
+    'Unknown write access must preserve the legacy CanWrite fallback after metadata centralization.'
+);
 
 $apply = calendarMetadataSourceBlock(
     $source,

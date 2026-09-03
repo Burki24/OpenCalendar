@@ -4052,8 +4052,15 @@ assertTrueValue(
         && str_contains($calendarModuleSource, "RegisterAttributeBoolean('DetectedWriteAccessKnown', false)")
         && str_contains($calendarModuleSource, "array_key_exists('writeAccessKnown', \$calendar)")
         && !str_contains($calendarModuleSource, ": array_key_exists('create', \$capabilities)")
-        && str_contains($calendarModuleSource, "\$this->ReadAttributeBoolean('DetectedCanWrite')
-                            || \$this->ReadPropertyBoolean('CanWrite')"),
+        && str_contains(
+            $calendarModuleSource,
+            "\$writeAccessKnown = \$metadataAvailable && (bool) \$metadata['writeAccessKnown'];"
+        )
+        && str_contains($calendarModuleSource, "? (bool) \$metadata['canWrite']")
+        && str_contains(
+            $calendarModuleSource,
+            ": (bool) \$metadata['canWrite'] || \$this->ReadPropertyBoolean('CanWrite')"
+        ),
     'Calendar instances must preserve writable operation for legacy caches and incomplete DAV privilege metadata.'
 );
 assertTrueValue(
