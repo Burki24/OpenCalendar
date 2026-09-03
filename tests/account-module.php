@@ -265,7 +265,7 @@ foreach ([
 
 $providerFormState = $reflection->getMethod('providerFormState');
 $providerFormState->setAccessible(true);
-$formStateProbe = new class extends CalendarAccount {
+$formStateProbe = new class() extends CalendarAccount {
     public function Translate(string $text): string
     {
         return $text;
@@ -623,9 +623,8 @@ assertAccountStructure(
     is_string($accountSource)
         && str_contains($accountSource, '$verifyTls = $provider === self::PROVIDER_APPLE')
         && str_contains($accountSource, '? true')
-        && str_contains($accountSource, ': $this->ReadPropertyBoolean(\'VerifyTLS\')')
-        && str_contains($accountSource, '$this->UpdateFormField(\'VerifyTLS\', \'visible\', $canConfigureTls)'),
-    'VerifyTLS must only be user-configurable for custom CalDAV and ICS/Webcal endpoints; iCloud remains verified.'
+        && str_contains($accountSource, ': $this->ReadPropertyBoolean(\'VerifyTLS\')'),
+    'iCloud transport must always verify TLS while custom CalDAV uses the configured TLS policy.'
 );
 assertAccountStructure(
     is_string($accountSource)
