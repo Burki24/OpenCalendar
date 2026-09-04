@@ -28,6 +28,7 @@ $commands = [
     ['Verify Microsoft post-write synchronization', [PHP_BINARY, 'tests/microsoft-write-sync.php']],
     ['Verify Microsoft event-edit identity', [PHP_BINARY, 'tests/microsoft-event-edit.php']],
     ['Verify CalDAV incremental synchronization', [PHP_BINARY, 'tests/caldav-incremental-sync.php']],
+    ['Verify iCalendar parsed feed cache', [PHP_BINARY, 'tests/icalendar-parse-cache.php']],
     ['Run OpenCalendar provider and integration tests', [PHP_BINARY, 'tests/calendar-provider.php']],
     ['Check shared visualization contract', [PHP_BINARY, 'tests/visualization.php']],
     ['Verify IPSView Assistant/OpenCalendar style profile E2E', [PHP_BINARY, 'tests/style-profile-e2e.php']],
