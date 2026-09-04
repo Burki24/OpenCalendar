@@ -116,7 +116,17 @@ final class ICalendarFeedProvider implements CalendarProviderInterface
         }
 
         $feed = $this->fetchFeed();
-        $events = ICalendarRecurrence::expand($this->parsedEvents($feed), $start, $end);
+        if (preg_match('/(?:^|\R)DURATION(?:;[^:]*)?:/i', $feed['body']) === 1) {
+            $events = ICalendarCodec::parseEventsInRange(
+                $feed['body'],
+                $this->eventResourceReference(),
+                $feed['etag'],
+                $start,
+                $end
+            );
+        } else {
+            $events = ICalendarRecurrence::expand($this->parsedEvents($feed), $start, $end);
+        }
 
         usort(
             $events,

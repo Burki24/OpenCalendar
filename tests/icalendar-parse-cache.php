@@ -245,4 +245,41 @@ assertParseCacheTrue(
     'Changed feed content must replace the serialized parsed payload.'
 );
 
+$durationFeedUrl = 'https://calendar.example/parse-cache-duration.ics';
+$durationFeed = "BEGIN:VCALENDAR\r\n"
+    . "VERSION:2.0\r\n"
+    . "BEGIN:VEVENT\r\n"
+    . "UID:parse-cache-duration@example.com\r\n"
+    . "DTSTART:20260904T080000Z\r\n"
+    . "DURATION:PT2H\r\n"
+    . "RRULE:FREQ=DAILY;COUNT=2\r\n"
+    . "SUMMARY:Duration event\r\n"
+    . "END:VEVENT\r\n"
+    . "END:VCALENDAR\r\n";
+$durationProvider = new ICalendarFeedProvider(
+    new ParseCacheHttpClient([
+        new CalendarHttpResponse(
+            200,
+            ['etag' => '"parse-cache-duration"'],
+            $durationFeed,
+            $durationFeedUrl
+        )
+    ]),
+    $durationFeedUrl
+);
+$durationEvents = $durationProvider->getEvents(
+    $durationFeedUrl,
+    new DateTimeImmutable('2026-09-04T00:00:00Z'),
+    new DateTimeImmutable('2026-09-06T00:00:00Z')
+);
+
+assertParseCacheSame(2, count($durationEvents), 'Recurring DURATION events must retain canonical range expansion.');
+foreach ($durationEvents as $durationEvent) {
+    assertParseCacheSame(
+        7200,
+        (int) ($durationEvent['endTimestamp'] ?? 0) - (int) ($durationEvent['startTimestamp'] ?? 0),
+        'The parsed feed cache must not bypass canonical recurring DURATION handling.'
+    );
+}
+
 fwrite(STDOUT, "iCalendar parsed feed cache checks passed.\n");

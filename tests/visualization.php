@@ -1227,7 +1227,6 @@ assertVisualization(
     'Multi-day day and week views must use one shared time scale so equal times align vertically and later starts are visibly offset in native and IPSView modes.'
 );
 
-
 assertVisualization(
     str_contains($script, "grid.classList.add('empty-timeline');")
         && str_contains($script, "? 'auto auto minmax(120px, 1fr)'")
