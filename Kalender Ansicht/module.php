@@ -312,6 +312,7 @@ class CalendarView extends IPSModuleStrict
     {
         parent::ApplyChanges();
 
+        $this->SetVisualizationType(1);
         $preservedIPSViewHTML = $this->existingIPSViewHTML();
         $this->ensureIPSViewToken();
         $this->WriteAttributeBoolean('RuntimeReady', false);

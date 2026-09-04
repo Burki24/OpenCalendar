@@ -555,6 +555,16 @@ assertVisualization(
         && str_contains($script, "return ['following', 'series'].includes(selected?.value) ? selected.value : 'occurrence';"),
     'Recurring Google, Microsoft and CalDAV events must offer deleting the selected occurrence and all following occurrences when splitting is supported.'
 );
+$applyChangesStart = strpos($moduleSource, 'public function ApplyChanges(): void');
+$initializeStart = strpos($moduleSource, 'public function Initialize(): bool', $applyChangesStart ?: 0);
+$applyChangesSource = $applyChangesStart !== false && $initializeStart !== false
+    ? substr($moduleSource, $applyChangesStart, $initializeStart - $applyChangesStart)
+    : '';
+assertVisualization(
+    str_contains($applyChangesSource, '$this->SetVisualizationType(1);'),
+    'Applying Calendar View configuration must re-register the native HTML visualization so updated tile assets are loaded.'
+);
+
 assertVisualization(
     str_contains($moduleSource, 'private function getFullUpdateMessage(?array $state = null, ?array $toast = null): string')
         && str_contains($moduleSource, '$message[\'toast\'] = $toast;')
