@@ -106,8 +106,8 @@ assertLocalization(
         && !str_contains($viewScript, 'const german = document.documentElement.lang')
         && str_contains($viewScript, "modeLabel.textContent = t('Pattern');")
         && str_contains($viewScript, "relative.textContent = t('Weekday position');")
-        && str_contains($viewScript, "option.textContent = t(label);")
-        && str_contains($viewScript, "return t(value);"),
+        && str_contains($viewScript, 'option.textContent = t(label);')
+        && str_contains($viewScript, 'return t(value);'),
     'Calendar View visualization must use the shared translation pipeline instead of German-only fallback maps.'
 );
 
