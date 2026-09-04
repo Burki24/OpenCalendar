@@ -559,6 +559,9 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
     border-radius: var(--cal-radius);
     background: var(--cal-border);
 }
+.multi-day-timeline-grid.empty-timeline {
+    min-height: calc(100% - 8px);
+}
 .multi-day-timeline-corner,
 .multi-day-heading,
 .multi-day-all-day-label,

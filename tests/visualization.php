@@ -1053,6 +1053,18 @@ assertVisualization(
 );
 
 assertVisualization(
+    str_contains($script, "grid.classList.add('empty-timeline');")
+        && str_contains($script, "? 'auto auto minmax(120px, 1fr)'")
+        && str_contains($script, ": 'auto minmax(120px, 1fr)';")
+        && str_contains($script, "const timescale = element('div', 'multi-day-timescale');")
+        && str_contains($script, "const canvas = element('div', 'multi-day-timeline-canvas' + (currentDay ? ' today' : ''));")
+        && str_contains($script, 'bindDayOverview(canvas, entry.day, entry.events);')
+        && str_contains($style, '.multi-day-timeline-grid.empty-timeline {')
+        && str_contains($style, 'min-height: calc(100% - 8px);'),
+    'Empty multi-day views must keep full-height day columns visible so days remain clearly separated in native and IPSView modes.'
+);
+
+assertVisualization(
     str_contains($style, 'grid-template-columns: var(--agenda-color-bar-width) var(--calendar-time-column-width) minmax(0, 1fr);')
         && str_contains($style, '.event-time { min-width: 0;')
         && str_contains($style, 'grid-template-columns: var(--calendar-time-column-width) minmax(0, 1fr);')

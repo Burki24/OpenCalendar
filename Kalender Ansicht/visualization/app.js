@@ -1057,6 +1057,26 @@ function renderMultiDayTimeline(days, showDayOfYear, showEventCount) {
             bindDayOverview(canvas, entry.day, entry.events);
             grid.appendChild(canvas);
         });
+    } else {
+        grid.classList.add('empty-timeline');
+        grid.style.gridTemplateRows = hasAllDayEvents
+            ? 'auto auto minmax(120px, 1fr)'
+            : 'auto minmax(120px, 1fr)';
+
+        const timescale = element('div', 'multi-day-timescale');
+        timescale.style.gridColumn = '1';
+        timescale.style.gridRow = String(timelineRow);
+        grid.appendChild(timescale);
+
+        dayData.forEach((entry, index) => {
+            const currentDay = isToday(entry.day);
+            const canvas = element('div', 'multi-day-timeline-canvas' + (currentDay ? ' today' : ''));
+            canvas.style.gridColumn = String(index + 2);
+            canvas.style.gridRow = String(timelineRow);
+            if (currentDay) emphasizeCurrentDayTimelineSection(canvas);
+            bindDayOverview(canvas, entry.day, entry.events);
+            grid.appendChild(canvas);
+        });
     }
 
     content.appendChild(grid);
