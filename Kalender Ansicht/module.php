@@ -37,7 +37,7 @@ class CalendarView extends IPSModuleStrict
     private const APPOINTMENT_LOOKAHEAD_DAYS = 1095;
     private const VISUALIZATION_BOOTSTRAP_PAST_DAYS = 7;
     private const VISUALIZATION_BOOTSTRAP_FUTURE_DAYS = 42;
-    private const VISUALIZATION_MAX_RANGE_DAYS = 370;
+    private const VISUALIZATION_MAX_RANGE_DAYS = 380;
     private const VISUALIZATION_CLIENT_CONTRACT_VERSION = 2;
     private const ATTRIBUTE_IPSVIEW_TOKEN_1 = 'IPSViewToken1';
     private const ATTRIBUTE_IPSVIEW_TOKEN_2 = 'IPSViewToken2';
@@ -128,6 +128,7 @@ class CalendarView extends IPSModuleStrict
         $this->RegisterPropertyBoolean('ShowThreeDaysCalendarWeek', false);
         $this->RegisterPropertyBoolean('ShowWeekCalendarWeek', true);
         $this->RegisterPropertyBoolean('ShowMonthCalendarWeek', false);
+        $this->RegisterPropertyBoolean('ShowMonthOverflowDays', false);
         $this->RegisterPropertyBoolean('ShowAgendaDayOfYear', true);
         $this->RegisterPropertyBoolean('ShowListDayOfYear', false);
         $this->RegisterPropertyBoolean('ShowThreeDaysDayOfYear', true);
@@ -316,6 +317,7 @@ class CalendarView extends IPSModuleStrict
     {
         parent::ApplyChanges();
 
+        $this->SetVisualizationType(1);
         $this->applyTileObjectVisibility();
 
         $preservedIPSViewHTML = $this->existingIPSViewHTML();
@@ -2457,6 +2459,7 @@ class CalendarView extends IPSModuleStrict
             'showThreeDaysCalendarWeek' => $this->ReadPropertyBoolean('ShowThreeDaysCalendarWeek'),
             'showWeekCalendarWeek'      => $this->ReadPropertyBoolean('ShowWeekCalendarWeek'),
             'showMonthCalendarWeek'     => $this->ReadPropertyBoolean('ShowMonthCalendarWeek'),
+            'showMonthOverflowDays'     => $this->ReadPropertyBoolean('ShowMonthOverflowDays'),
             'showAgendaDayOfYear'       => $this->ReadPropertyBoolean('ShowAgendaDayOfYear'),
             'showListDayOfYear'         => $this->ReadPropertyBoolean('ShowListDayOfYear'),
             'showThreeDaysDayOfYear'    => $this->ReadPropertyBoolean('ShowThreeDaysDayOfYear'),

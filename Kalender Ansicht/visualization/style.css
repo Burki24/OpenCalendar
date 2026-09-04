@@ -559,6 +559,9 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
     border-radius: var(--cal-radius);
     background: var(--cal-border);
 }
+.multi-day-timeline-grid.empty-timeline {
+    min-height: calc(100% - 8px);
+}
 .multi-day-timeline-corner,
 .multi-day-heading,
 .multi-day-all-day-label,
@@ -816,7 +819,6 @@ html.ipsview-mode #event-dialog .dialog-actions {
 
 .form-row { display: grid; min-width: 0; gap: 5px; }
 .form-row.two { grid-template-columns: 1fr 1fr; gap: 10px; }
-#event-state-row { align-items: start; }
 .form-row label { color: var(--cal-label-text); font-weight: 600; }
 .form-row input, .form-row select, .form-row textarea {
     width: 100%;

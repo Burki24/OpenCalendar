@@ -1065,6 +1065,26 @@ function renderMultiDayTimeline(days, showDayOfYear, showEventCount) {
             bindDayOverview(canvas, entry.day, entry.events);
             grid.appendChild(canvas);
         });
+    } else {
+        grid.classList.add('empty-timeline');
+        grid.style.gridTemplateRows = hasAllDayEvents
+            ? 'auto auto minmax(120px, 1fr)'
+            : 'auto minmax(120px, 1fr)';
+
+        const timescale = element('div', 'multi-day-timescale');
+        timescale.style.gridColumn = '1';
+        timescale.style.gridRow = String(timelineRow);
+        grid.appendChild(timescale);
+
+        dayData.forEach((entry, index) => {
+            const currentDay = isToday(entry.day);
+            const canvas = element('div', 'multi-day-timeline-canvas' + (currentDay ? ' today' : ''));
+            canvas.style.gridColumn = String(index + 2);
+            canvas.style.gridRow = String(timelineRow);
+            if (currentDay) emphasizeCurrentDayTimelineSection(canvas);
+            bindDayOverview(canvas, entry.day, entry.events);
+            grid.appendChild(canvas);
+        });
     }
 
     content.appendChild(grid);
@@ -1365,10 +1385,29 @@ function getVisibleDays(start, count) {
     return days;
 }
 
+function monthGridRange(month) {
+    const first = new Date(month.getFullYear(), month.getMonth(), 1);
+    const last = new Date(month.getFullYear(), month.getMonth() + 1, 0);
+    const showWeekends = calendarState.settings.showWeekends !== false;
+    let firstVisible = first;
+    let lastVisible = last;
+    while (!showWeekends && isWeekend(firstVisible)) firstVisible = addDays(firstVisible, 1);
+    while (!showWeekends && isWeekend(lastVisible)) lastVisible = addDays(lastVisible, -1);
+
+    return {
+        start: startOfWeek(firstVisible),
+        end: addDays(startOfWeek(lastVisible), 7)
+    };
+}
+
 function renderMonth() {
     const monthCount = viewPeriod('month');
-    const rangeStart = new Date(cursorDate.getFullYear(), cursorDate.getMonth(), 1);
-    const rangeEnd = new Date(rangeStart.getFullYear(), rangeStart.getMonth() + monthCount, 1);
+    const firstMonth = new Date(cursorDate.getFullYear(), cursorDate.getMonth(), 1);
+    const lastMonth = new Date(firstMonth.getFullYear(), firstMonth.getMonth() + monthCount - 1, 1);
+    const monthAfterLast = new Date(firstMonth.getFullYear(), firstMonth.getMonth() + monthCount, 1);
+    const showOverflowDays = calendarState.settings.showMonthOverflowDays === true;
+    const rangeStart = showOverflowDays ? monthGridRange(firstMonth).start : firstMonth;
+    const rangeEnd = showOverflowDays ? monthGridRange(lastMonth).end : monthAfterLast;
     const eventsByDay = visibleCalendarEventsByDay(rangeStart, rangeEnd);
     for (let offset = 0; offset < monthCount; offset++) {
         const month = new Date(cursorDate.getFullYear(), cursorDate.getMonth() + offset, 1);
@@ -1384,16 +1423,9 @@ function renderMonth() {
 }
 
 function createMonthGrid(month, fillAvailableHeight, eventsByDay) {
-    const first = new Date(month.getFullYear(), month.getMonth(), 1);
-    const last = new Date(month.getFullYear(), month.getMonth() + 1, 0);
     const showWeekends = calendarState.settings.showWeekends !== false;
-    let firstVisible = first;
-    let lastVisible = last;
-    while (!showWeekends && isWeekend(firstVisible)) firstVisible = addDays(firstVisible, 1);
-    while (!showWeekends && isWeekend(lastVisible)) lastVisible = addDays(lastVisible, -1);
-
-    const gridStart = startOfWeek(firstVisible);
-    const gridEnd = addDays(startOfWeek(lastVisible), 7);
+    const showOverflowDays = calendarState.settings.showMonthOverflowDays === true;
+    const { start: gridStart, end: gridEnd } = monthGridRange(month);
     const days = [];
     for (let day = gridStart; day < gridEnd; day = addDays(day, 1)) {
         days.push(day);
@@ -1418,12 +1450,13 @@ function createMonthGrid(month, fillAvailableHeight, eventsByDay) {
     visibleDays.forEach(day => {
         const outside = day.getMonth() !== month.getMonth();
         const cell = element('div', 'month-day');
-        if (outside) {
+        if (outside && !showOverflowDays) {
             cell.classList.add('month-day-empty');
             cell.setAttribute('aria-hidden', 'true');
             grid.appendChild(cell);
             return;
         }
+        if (outside) cell.classList.add('outside');
 
         if (isToday(day)) cell.classList.add('today');
         const dayHeader = element('div', 'month-day-header');
@@ -1909,35 +1942,12 @@ function anniversaryEditorChange() {
 }
 
 const icsImportMaximumBytes = 1024 * 1024;
-const icsImportMessages = {
-    de: {
-        'Import ICS': 'ICS importieren',
-        'ICS event imported.': 'ICS-Termin importiert.',
-        'The ICS file is too large.': 'Die ICS-Datei ist zu groß.',
-        'The selected file is not a valid single-event ICS file.': 'Die ausgewählte Datei ist keine gültige ICS-Datei mit einem einzelnen Termin.',
-        'This ICS file contains multiple events.': 'Diese ICS-Datei enthält mehrere Termine.',
-        'Recurring ICS invitations cannot be imported as a single event.': 'Wiederkehrende ICS-Einladungen können hier nicht als Einzeltermin importiert werden.'
-    }
-};
-
 function icsImportText(value) {
-    const translated = t(value);
-    if (translated !== value) return translated;
-    const language = String(document.documentElement.lang || '').toLowerCase().split('-')[0];
-    return icsImportMessages[language]?.[value] || value;
+    return t(value);
 }
 
-const providerLinkMessages = {
-    de: {
-        'Open in provider': 'Extern öffnen'
-    }
-};
-
 function providerLinkText(value) {
-    const translated = t(value);
-    if (translated !== value) return translated;
-    const language = String(document.documentElement.lang || '').toLowerCase().split('-')[0];
-    return providerLinkMessages[language]?.[value] || value;
+    return t(value);
 }
 
 function providerEventUrl(event) {
@@ -3780,7 +3790,6 @@ function recurrencePatternControls() {
         };
     }
 
-    const german = document.documentElement.lang.toLowerCase().startsWith('de');
     row = document.createElement('div');
     row.id = 'event-recurrence-pattern-row';
     row.className = 'form-row two hidden';
@@ -3789,14 +3798,14 @@ function recurrencePatternControls() {
     modeRow.className = 'form-row';
     const modeLabel = document.createElement('label');
     modeLabel.htmlFor = 'event-recurrence-pattern-mode';
-    modeLabel.textContent = german ? 'Muster' : 'Pattern';
+    modeLabel.textContent = t('Pattern');
     const mode = document.createElement('select');
     mode.id = 'event-recurrence-pattern-mode';
     const absolute = document.createElement('option');
     absolute.value = 'absolute';
     const relative = document.createElement('option');
     relative.value = 'relative';
-    relative.textContent = german ? 'Wochentagsposition' : 'Weekday position';
+    relative.textContent = t('Weekday position');
     mode.append(absolute, relative);
     modeRow.append(modeLabel, mode);
 
@@ -3805,16 +3814,14 @@ function recurrencePatternControls() {
     indexRow.id = 'event-recurrence-relative-index-row';
     const indexLabel = document.createElement('label');
     indexLabel.htmlFor = 'event-recurrence-relative-index';
-    indexLabel.textContent = german ? 'Position' : 'Position';
+    indexLabel.textContent = t('Position');
     const index = document.createElement('select');
     index.id = 'event-recurrence-relative-index';
-    const labels = german
-        ? { first: 'Erste', second: 'Zweite', third: 'Dritte', fourth: 'Vierte', last: 'Letzte' }
-        : { first: 'First', second: 'Second', third: 'Third', fourth: 'Fourth', last: 'Last' };
+    const labels = { first: 'First', second: 'Second', third: 'Third', fourth: 'Fourth', last: 'Last' };
     Object.entries(labels).forEach(([value, label]) => {
         const option = document.createElement('option');
         option.value = value;
-        option.textContent = label;
+        option.textContent = t(label);
         index.appendChild(option);
     });
     indexRow.append(indexLabel, index);
@@ -3831,11 +3838,8 @@ function recurrencePatternControls() {
 function updateRecurrencePatternLabels(frequency, mode) {
     const controls = recurrencePatternControls();
     const absolute = controls.mode.querySelector('option[value="absolute"]');
-    const german = document.documentElement.lang.toLowerCase().startsWith('de');
     if (absolute) {
-        absolute.textContent = frequency === 'yearly'
-            ? (german ? 'Festes Datum' : 'Fixed date')
-            : (german ? 'Fester Monatstag' : 'Fixed day of month');
+        absolute.textContent = t(frequency === 'yearly' ? 'Fixed date' : 'Fixed day of month');
     }
     controls.index.parentElement.classList.toggle('hidden', mode !== 'relative');
 }
@@ -4534,8 +4538,17 @@ function visibleViewRange() {
     let end;
 
     if (activeView === 'month') {
-        start = new Date(cursorDate.getFullYear(), cursorDate.getMonth(), 1);
-        end = new Date(start.getFullYear(), start.getMonth() + viewPeriod('month'), 1);
+        const firstMonth = new Date(cursorDate.getFullYear(), cursorDate.getMonth(), 1);
+        const monthCount = viewPeriod('month');
+        const monthAfterLast = new Date(firstMonth.getFullYear(), firstMonth.getMonth() + monthCount, 1);
+        if (calendarState.settings.showMonthOverflowDays === true) {
+            const lastMonth = new Date(firstMonth.getFullYear(), firstMonth.getMonth() + monthCount - 1, 1);
+            start = monthGridRange(firstMonth).start;
+            end = monthGridRange(lastMonth).end;
+        } else {
+            start = firstMonth;
+            end = monthAfterLast;
+        }
     } else if (activeView === 'week' || activeView === 'workWeek') {
         const days = weekViewDays(activeView === 'workWeek');
         start = startOfDay(days[0] || startOfWeek(cursorDate));

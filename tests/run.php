@@ -37,6 +37,7 @@ $commands = [
     ['Verify provider write parity matrix', [PHP_BINARY, 'tests/write-parity.php']],
     ['Verify Microsoft event-edit identity', [PHP_BINARY, 'tests/microsoft-event-edit.php']],
     ['Verify CalDAV incremental synchronization', [PHP_BINARY, 'tests/caldav-incremental-sync.php']],
+    ['Verify iCalendar parsed feed cache', [PHP_BINARY, 'tests/icalendar-parse-cache.php']],
     ['Verify provider parity matrix', [PHP_BINARY, 'tests/provider-parity.php']],
     ['Verify provider-neutral event lookup ranges', [PHP_BINARY, 'tests/event-lookup.php']],
     ['Verify shared calendar provider type mapping', [PHP_BINARY, 'tests/provider-type.php']],

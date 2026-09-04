@@ -72,20 +72,6 @@
             "suffix": "%"
         },
         {
-            "type": "CheckBox",
-            "name": "ShowTileTitle",
-            "caption": "Show tile title"
-        },
-        {
-            "type": "CheckBox",
-            "name": "ShowTileMaximizeButton",
-            "caption": "Show maximize button"
-        },
-        {
-            "type": "Label",
-            "caption": "Tile title and maximize settings also apply to existing links to this Calendar View."
-        },
-        {
             "type": "RowLayout",
             "items": [
                 {
@@ -93,24 +79,21 @@
                     "name": "PastDays",
                     "caption": "Past days",
                     "minimum": 0,
-                    "maximum": 1095,
-                    "width": "32%"
+                    "maximum": 1095
                 },
                 {
                     "type": "NumberSpinner",
                     "name": "FutureDays",
                     "caption": "Future days",
                     "minimum": 1,
-                    "maximum": 1095,
-                    "width": "32%"
+                    "maximum": 1095
                 },
                 {
                     "type": "NumberSpinner",
                     "name": "MaxEvents",
                     "caption": "Maximum events",
                     "minimum": 1,
-                    "maximum": 1000,
-                    "width": "32%"
+                    "maximum": 1000
                 }
             ]
         },
@@ -129,26 +112,22 @@
                         {
                             "type": "CheckBox",
                             "name": "ShowWeekends",
-                            "caption": "Show weekends",
-                            "width": "190px"
+                            "caption": "Show weekends"
                         },
                         {
                             "type": "CheckBox",
                             "name": "ShowCalendarName",
-                            "caption": "Show calendar name",
-                            "width": "190px"
+                            "caption": "Show calendar name"
                         },
                         {
                             "type": "CheckBox",
                             "name": "ShowLocation",
-                            "caption": "Show location",
-                            "width": "190px"
+                            "caption": "Show location"
                         },
                         {
                             "type": "CheckBox",
                             "name": "ShowDescription",
-                            "caption": "Show description",
-                            "width": "190px"
+                            "caption": "Show description"
                         }
                     ]
                 },
@@ -172,32 +151,32 @@
                         {
                             "type": "Label",
                             "caption": "Display",
-                            "width": "220px"
+                            "width": "190px"
                         },
                         {
                             "type": "Label",
                             "caption": "Agenda",
-                            "width": "110px"
+                            "width": "85px"
                         },
                         {
                             "type": "Label",
                             "caption": "List",
-                            "width": "110px"
+                            "width": "85px"
                         },
                         {
                             "type": "Label",
                             "caption": "Days",
-                            "width": "110px"
+                            "width": "85px"
                         },
                         {
                             "type": "Label",
                             "caption": "Week",
-                            "width": "110px"
+                            "width": "85px"
                         },
                         {
                             "type": "Label",
                             "caption": "Month",
-                            "width": "110px"
+                            "width": "85px"
                         }
                     ]
                 },
@@ -207,35 +186,35 @@
                         {
                             "type": "Label",
                             "caption": "Event count",
-                            "width": "220px"
+                            "width": "190px"
                         },
                         {
                             "type": "CheckBox",
                             "name": "ShowAgendaEventCount",
                             "caption": "",
-                            "width": "110px"
+                            "width": "85px"
                         },
                         {
                             "type": "Label",
                             "caption": "—",
-                            "width": "110px"
+                            "width": "85px"
                         },
                         {
                             "type": "CheckBox",
                             "name": "ShowThreeDaysEventCount",
                             "caption": "",
-                            "width": "110px"
+                            "width": "85px"
                         },
                         {
                             "type": "CheckBox",
                             "name": "ShowWeekEventCount",
                             "caption": "",
-                            "width": "110px"
+                            "width": "85px"
                         },
                         {
                             "type": "Label",
                             "caption": "—",
-                            "width": "110px"
+                            "width": "85px"
                         }
                     ]
                 },
@@ -245,37 +224,73 @@
                         {
                             "type": "Label",
                             "caption": "Calendar week",
-                            "width": "220px"
+                            "width": "190px"
                         },
                         {
                             "type": "CheckBox",
                             "name": "ShowAgendaCalendarWeek",
                             "caption": "",
-                            "width": "110px"
+                            "width": "85px"
                         },
                         {
                             "type": "CheckBox",
                             "name": "ShowListCalendarWeek",
                             "caption": "",
-                            "width": "110px"
+                            "width": "85px"
                         },
                         {
                             "type": "CheckBox",
                             "name": "ShowThreeDaysCalendarWeek",
                             "caption": "",
-                            "width": "110px"
+                            "width": "85px"
                         },
                         {
                             "type": "CheckBox",
                             "name": "ShowWeekCalendarWeek",
                             "caption": "",
-                            "width": "110px"
+                            "width": "85px"
                         },
                         {
                             "type": "CheckBox",
                             "name": "ShowMonthCalendarWeek",
                             "caption": "",
-                            "width": "110px"
+                            "width": "85px"
+                        }
+                    ]
+                },
+                {
+                    "type": "RowLayout",
+                    "items": [
+                        {
+                            "type": "Label",
+                            "caption": "Adjacent month days",
+                            "width": "190px"
+                        },
+                        {
+                            "type": "Label",
+                            "caption": "—",
+                            "width": "85px"
+                        },
+                        {
+                            "type": "Label",
+                            "caption": "—",
+                            "width": "85px"
+                        },
+                        {
+                            "type": "Label",
+                            "caption": "—",
+                            "width": "85px"
+                        },
+                        {
+                            "type": "Label",
+                            "caption": "—",
+                            "width": "85px"
+                        },
+                        {
+                            "type": "CheckBox",
+                            "name": "ShowMonthOverflowDays",
+                            "caption": "",
+                            "width": "85px"
                         }
                     ]
                 },
@@ -285,37 +300,37 @@
                         {
                             "type": "Label",
                             "caption": "Day of year",
-                            "width": "220px"
+                            "width": "190px"
                         },
                         {
                             "type": "CheckBox",
                             "name": "ShowAgendaDayOfYear",
                             "caption": "",
-                            "width": "110px"
+                            "width": "85px"
                         },
                         {
                             "type": "CheckBox",
                             "name": "ShowListDayOfYear",
                             "caption": "",
-                            "width": "110px"
+                            "width": "85px"
                         },
                         {
                             "type": "CheckBox",
                             "name": "ShowThreeDaysDayOfYear",
                             "caption": "",
-                            "width": "110px"
+                            "width": "85px"
                         },
                         {
                             "type": "CheckBox",
                             "name": "ShowWeekDayOfYear",
                             "caption": "",
-                            "width": "110px"
+                            "width": "85px"
                         },
                         {
                             "type": "CheckBox",
                             "name": "ShowMonthDayOfYear",
                             "caption": "",
-                            "width": "110px"
+                            "width": "85px"
                         }
                     ]
                 },
@@ -343,26 +358,22 @@
                         {
                             "type": "CheckBox",
                             "name": "ShowListDate",
-                            "caption": "Date",
-                            "width": "160px"
+                            "caption": "Date"
                         },
                         {
                             "type": "CheckBox",
                             "name": "ShowListStart",
-                            "caption": "Start",
-                            "width": "160px"
+                            "caption": "Start"
                         },
                         {
                             "type": "CheckBox",
                             "name": "ShowListEnd",
-                            "caption": "End",
-                            "width": "160px"
+                            "caption": "End"
                         },
                         {
                             "type": "CheckBox",
                             "name": "ShowListTitle",
-                            "caption": "Title",
-                            "width": "160px"
+                            "caption": "Title"
                         }
                     ]
                 },
@@ -372,26 +383,22 @@
                         {
                             "type": "CheckBox",
                             "name": "ShowListCalendarName",
-                            "caption": "Calendar",
-                            "width": "160px"
+                            "caption": "Calendar"
                         },
                         {
                             "type": "CheckBox",
                             "name": "ShowListAnniversaryType",
-                            "caption": "Occasion",
-                            "width": "160px"
+                            "caption": "Occasion"
                         },
                         {
                             "type": "CheckBox",
                             "name": "ShowListLocation",
-                            "caption": "Location",
-                            "width": "160px"
+                            "caption": "Location"
                         },
                         {
                             "type": "CheckBox",
                             "name": "ShowListDescription",
-                            "caption": "Description",
-                            "width": "160px"
+                            "caption": "Description"
                         }
                     ]
                 }
@@ -408,17 +415,17 @@
                         {
                             "type": "Label",
                             "caption": "View",
-                            "width": "42%"
+                            "width": "190px"
                         },
                         {
                             "type": "Label",
                             "caption": "Period",
-                            "width": "27%"
+                            "width": "120px"
                         },
                         {
                             "type": "Label",
                             "caption": "Unit",
-                            "width": "27%"
+                            "width": "120px"
                         }
                     ]
                 },
@@ -428,7 +435,7 @@
                         {
                             "type": "Label",
                             "caption": "Agenda",
-                            "width": "42%"
+                            "width": "190px"
                         },
                         {
                             "type": "NumberSpinner",
@@ -436,12 +443,12 @@
                             "caption": "",
                             "minimum": 1,
                             "maximum": 366,
-                            "width": "27%"
+                            "width": "120px"
                         },
                         {
                             "type": "Label",
                             "caption": "Days",
-                            "width": "27%"
+                            "width": "120px"
                         }
                     ]
                 },
@@ -451,7 +458,7 @@
                         {
                             "type": "Label",
                             "caption": "List",
-                            "width": "42%"
+                            "width": "190px"
                         },
                         {
                             "type": "NumberSpinner",
@@ -459,12 +466,12 @@
                             "caption": "",
                             "minimum": 1,
                             "maximum": 366,
-                            "width": "27%"
+                            "width": "120px"
                         },
                         {
                             "type": "Label",
                             "caption": "Days",
-                            "width": "27%"
+                            "width": "120px"
                         }
                     ]
                 },
@@ -474,7 +481,7 @@
                         {
                             "type": "Label",
                             "caption": "Days",
-                            "width": "42%"
+                            "width": "190px"
                         },
                         {
                             "type": "NumberSpinner",
@@ -482,12 +489,12 @@
                             "caption": "",
                             "minimum": 1,
                             "maximum": 31,
-                            "width": "27%"
+                            "width": "120px"
                         },
                         {
                             "type": "Label",
                             "caption": "Days",
-                            "width": "27%"
+                            "width": "120px"
                         }
                     ]
                 },
@@ -497,7 +504,7 @@
                         {
                             "type": "Label",
                             "caption": "Week",
-                            "width": "42%"
+                            "width": "190px"
                         },
                         {
                             "type": "NumberSpinner",
@@ -505,12 +512,12 @@
                             "caption": "",
                             "minimum": 1,
                             "maximum": 12,
-                            "width": "27%"
+                            "width": "120px"
                         },
                         {
                             "type": "Label",
                             "caption": "Weeks",
-                            "width": "27%"
+                            "width": "120px"
                         }
                     ]
                 },
@@ -520,7 +527,7 @@
                         {
                             "type": "Label",
                             "caption": "Month",
-                            "width": "42%"
+                            "width": "190px"
                         },
                         {
                             "type": "NumberSpinner",
@@ -528,12 +535,12 @@
                             "caption": "",
                             "minimum": 1,
                             "maximum": 12,
-                            "width": "27%"
+                            "width": "120px"
                         },
                         {
                             "type": "Label",
                             "caption": "Months",
-                            "width": "27%"
+                            "width": "120px"
                         }
                     ]
                 },
