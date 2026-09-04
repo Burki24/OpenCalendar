@@ -103,7 +103,7 @@ foreach ($requiredViewTranslations as [$source, $translation]) {
 assertLocalization(
     !str_contains($viewScript, 'const icsImportMessages =')
         && !str_contains($viewScript, 'const providerLinkMessages =')
-        && !str_contains($viewScript, "const german = document.documentElement.lang")
+        && !str_contains($viewScript, 'const german = document.documentElement.lang')
         && str_contains($viewScript, "modeLabel.textContent = t('Pattern');")
         && str_contains($viewScript, "relative.textContent = t('Weekday position');")
         && str_contains($viewScript, "option.textContent = t(label);")
