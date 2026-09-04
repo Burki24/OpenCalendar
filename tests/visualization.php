@@ -349,7 +349,8 @@ assertVisualization(
         && str_contains($script, 'eventCanDeleteFollowing(event)')
         && str_contains($script, '...recurrencePayload(selectedEvent)')
         && str_contains($script, "t('Only this occurrence of the recurring event will be changed.')")
-        && str_contains($script, "'Open in provider': 'Extern öffnen'"),
+        && str_contains($script, "function providerLinkText(value) {\n    return t(value);\n}")
+        && ($germanTranslations['Open in provider'] ?? '') === 'Extern öffnen',
     'Event clicks must open a read-first details modal and route editable events to the existing editor only on request.'
 );
 

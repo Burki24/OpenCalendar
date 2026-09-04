@@ -1867,35 +1867,12 @@ function anniversaryEditorChange() {
 }
 
 const icsImportMaximumBytes = 1024 * 1024;
-const icsImportMessages = {
-    de: {
-        'Import ICS': 'ICS importieren',
-        'ICS event imported.': 'ICS-Termin importiert.',
-        'The ICS file is too large.': 'Die ICS-Datei ist zu groß.',
-        'The selected file is not a valid single-event ICS file.': 'Die ausgewählte Datei ist keine gültige ICS-Datei mit einem einzelnen Termin.',
-        'This ICS file contains multiple events.': 'Diese ICS-Datei enthält mehrere Termine.',
-        'Recurring ICS invitations cannot be imported as a single event.': 'Wiederkehrende ICS-Einladungen können hier nicht als Einzeltermin importiert werden.'
-    }
-};
-
 function icsImportText(value) {
-    const translated = t(value);
-    if (translated !== value) return translated;
-    const language = String(document.documentElement.lang || '').toLowerCase().split('-')[0];
-    return icsImportMessages[language]?.[value] || value;
+    return t(value);
 }
 
-const providerLinkMessages = {
-    de: {
-        'Open in provider': 'Extern öffnen'
-    }
-};
-
 function providerLinkText(value) {
-    const translated = t(value);
-    if (translated !== value) return translated;
-    const language = String(document.documentElement.lang || '').toLowerCase().split('-')[0];
-    return providerLinkMessages[language]?.[value] || value;
+    return t(value);
 }
 
 function providerEventUrl(event) {
@@ -3413,7 +3390,6 @@ function recurrencePatternControls() {
         };
     }
 
-    const german = document.documentElement.lang.toLowerCase().startsWith('de');
     row = document.createElement('div');
     row.id = 'event-recurrence-pattern-row';
     row.className = 'form-row two hidden';
@@ -3422,14 +3398,14 @@ function recurrencePatternControls() {
     modeRow.className = 'form-row';
     const modeLabel = document.createElement('label');
     modeLabel.htmlFor = 'event-recurrence-pattern-mode';
-    modeLabel.textContent = german ? 'Muster' : 'Pattern';
+    modeLabel.textContent = t('Pattern');
     const mode = document.createElement('select');
     mode.id = 'event-recurrence-pattern-mode';
     const absolute = document.createElement('option');
     absolute.value = 'absolute';
     const relative = document.createElement('option');
     relative.value = 'relative';
-    relative.textContent = german ? 'Wochentagsposition' : 'Weekday position';
+    relative.textContent = t('Weekday position');
     mode.append(absolute, relative);
     modeRow.append(modeLabel, mode);
 
@@ -3438,16 +3414,14 @@ function recurrencePatternControls() {
     indexRow.id = 'event-recurrence-relative-index-row';
     const indexLabel = document.createElement('label');
     indexLabel.htmlFor = 'event-recurrence-relative-index';
-    indexLabel.textContent = german ? 'Position' : 'Position';
+    indexLabel.textContent = t('Position');
     const index = document.createElement('select');
     index.id = 'event-recurrence-relative-index';
-    const labels = german
-        ? { first: 'Erste', second: 'Zweite', third: 'Dritte', fourth: 'Vierte', last: 'Letzte' }
-        : { first: 'First', second: 'Second', third: 'Third', fourth: 'Fourth', last: 'Last' };
+    const labels = { first: 'First', second: 'Second', third: 'Third', fourth: 'Fourth', last: 'Last' };
     Object.entries(labels).forEach(([value, label]) => {
         const option = document.createElement('option');
         option.value = value;
-        option.textContent = label;
+        option.textContent = t(label);
         index.appendChild(option);
     });
     indexRow.append(indexLabel, index);
@@ -3462,11 +3436,8 @@ function recurrencePatternControls() {
 function updateRecurrencePatternLabels(frequency, mode) {
     const controls = recurrencePatternControls();
     const absolute = controls.mode.querySelector('option[value="absolute"]');
-    const german = document.documentElement.lang.toLowerCase().startsWith('de');
     if (absolute) {
-        absolute.textContent = frequency === 'yearly'
-            ? (german ? 'Festes Datum' : 'Fixed date')
-            : (german ? 'Fester Monatstag' : 'Fixed day of month');
+        absolute.textContent = t(frequency === 'yearly' ? 'Fixed date' : 'Fixed day of month');
     }
     controls.index.parentElement.classList.toggle('hidden', mode !== 'relative');
 }
