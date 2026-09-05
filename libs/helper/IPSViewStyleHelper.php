@@ -19,7 +19,7 @@ require_once __DIR__ . '/IPSViewStyleProfileHelper.php';
  * their components, but do not define module-specific colors, gradients,
  * typography, borders or shadows.
  *
- * @version 1.6.4
+ * @version 1.6.7
  */
 trait IPSViewStyleHelper
 {
@@ -1498,9 +1498,14 @@ trait IPSViewStyleHelper
         $textActive = $this->IPSViewCSSColorToRGB((string) $style['TextActive']);
         $textInactive = $this->IPSViewCSSColorToRGB((string) $style['TextInactive']);
         $labelText = $this->IPSViewCSSColorToRGB((string) $style['LabelText']);
-        $secondary = $text;
+        $pageBackground = $this->IPSViewCSSColorToRGB((string) $style['PageBackground']);
+        $textIsLight = $this->IPSViewRelativeLuminance($text) >= 0.40;
+        $pageIsLight = $this->IPSViewRelativeLuminance($pageBackground) >= 0.40;
+        $secondary = $textIsLight === $pageIsLight
+            ? $this->IPSViewCSSColorToRGB($this->IPSViewContrastText($pageBackground))
+            : $text;
         $secondary['alpha'] = 0.72;
-        $faint = $text;
+        $faint = $secondary;
         $faint['alpha'] = 0.52;
         $soft = $this->IPSViewMixRGB($control, $this->IPSViewCSSColorToRGB((string) $style['PageBackground']), 0.20);
         $gradientStrength = max(0, min(80, (int) ($style['GradientStrength'] ?? $this->ReadPropertyInteger('IPSViewStyleGradientStrength')))) / 100;
@@ -1554,6 +1559,7 @@ trait IPSViewStyleHelper
             'BorderWidth'               => (float) $style['BorderWidth'],
             'LineWidth'                 => (float) $style['LineWidth'],
             'DisabledOpacity'           => $disabledOpacity,
+            'ShadowColor'               => $this->IPSViewRGBToCSS($shadowColor),
             'Shadow'                    => $shadow,
             'PopupShadow'               => $popupShadow,
             'ViewBackgroundOpacity'     => $this->IPSViewCSSColorToRGB((string) $style['ViewBackground'])['alpha'],
@@ -1906,7 +1912,13 @@ trait IPSViewStyleHelper
             return sprintf('#%02X%02X%02X', $red, $green, $blue);
         }
 
-        return sprintf('rgba(%d, %d, %d, %.3f)', $red, $green, $blue, $alpha);
+        return sprintf(
+            'rgba(%d, %d, %d, %s)',
+            $red,
+            $green,
+            $blue,
+            number_format($alpha, 3, '.', '')
+        );
     }
 
     /**
