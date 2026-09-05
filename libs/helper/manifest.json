@@ -167,7 +167,8 @@
         "ParentConnectionHelper": {
             "version": "1.0.0",
             "sha256": "d4f01dee721aa32e64410979ca15b2795a0fcc59c0232c0ad69e4702d9ff573c",
-            "path": "libs/helper/ParentConnectionHelper.php"
+            "path": "libs/helper/ParentConnectionHelper.php",
+            "source_sha": "d0bb3e0a673de328d2cfc4dff53c6bce8dafe275"
         },
         "PersistentJsonCacheHelper": {
             "version": "1.0.0",
