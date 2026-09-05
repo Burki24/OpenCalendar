@@ -188,9 +188,10 @@
             "path": "libs/helper/VisualizationAssetHelper.php"
         },
         "VisualizationThemeHelper": {
-            "version": "1.0.0",
-            "sha256": "81ca4cdeac42ac97cecdb73305e9f68597a6037b1d50b843df11900c96c48dbf",
-            "path": "libs/helper/VisualizationThemeHelper.php"
+            "version": "1.1.0",
+            "sha256": "29fe61a7eccafeb8b2beb77fe3f7a4896f43b3eaace9ebe428a4fc8250fd9088",
+            "path": "libs/helper/VisualizationThemeHelper.php",
+            "source_sha": "b53280afa419df360070978003477d0bb8183fac"
         }
     }
 }
