@@ -19,7 +19,7 @@ require_once __DIR__ . '/IPSViewStyleProfileHelper.php';
  * their components, but do not define module-specific colors, gradients,
  * typography, borders or shadows.
  *
- * @version 1.6.4
+ * @version 1.6.5
  */
 trait IPSViewStyleHelper
 {
@@ -1554,6 +1554,7 @@ trait IPSViewStyleHelper
             'BorderWidth'               => (float) $style['BorderWidth'],
             'LineWidth'                 => (float) $style['LineWidth'],
             'DisabledOpacity'           => $disabledOpacity,
+            'ShadowColor'               => $this->IPSViewRGBToCSS($shadowColor),
             'Shadow'                    => $shadow,
             'PopupShadow'               => $popupShadow,
             'ViewBackgroundOpacity'     => $this->IPSViewCSSColorToRGB((string) $style['ViewBackground'])['alpha'],
