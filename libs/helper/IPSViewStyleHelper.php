@@ -19,7 +19,7 @@ require_once __DIR__ . '/IPSViewStyleProfileHelper.php';
  * their components, but do not define module-specific colors, gradients,
  * typography, borders or shadows.
  *
- * @version 1.6.6
+ * @version 1.6.7
  */
 trait IPSViewStyleHelper
 {
@@ -1912,7 +1912,13 @@ trait IPSViewStyleHelper
             return sprintf('#%02X%02X%02X', $red, $green, $blue);
         }
 
-        return sprintf('rgba(%d, %d, %d, %.3f)', $red, $green, $blue, $alpha);
+        return sprintf(
+            'rgba(%d, %d, %d, %s)',
+            $red,
+            $green,
+            $blue,
+            number_format($alpha, 3, '.', '')
+        );
     }
 
     /**
