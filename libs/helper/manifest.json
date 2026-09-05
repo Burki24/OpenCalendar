@@ -11,7 +11,8 @@
         "ConfigurationFormHelper": {
             "version": "1.0.0",
             "sha256": "fa87dd4c67f43a3838fe87110387e4c1a1b98685c13403eeb52c189246045678",
-            "path": "libs/helper/ConfigurationFormHelper.php"
+            "path": "libs/helper/ConfigurationFormHelper.php",
+            "source_sha": "d0bb3e0a673de328d2cfc4dff53c6bce8dafe275"
         },
         "DataFlowHelper": {
             "version": "1.0.0",
