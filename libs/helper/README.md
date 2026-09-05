@@ -23,6 +23,6 @@ The files in this directory are vendored from
 | `PersistentJsonCacheHelper.php` | 1.0.0 | `adbc7680abe814dc6c15a9cda1312cc30023073595052006662716bc0d65f2a4` |
 | `SymconOAuthHelper.php` | 1.0.0 | `d9053bfd083a581b96f8526cbb05e8568a6ad24a81cafa3e9b05108343bf2a65` |
 | `VariableHelper.php` | 1.2.0 | `43b205a2ca87553a3a59a9e94f1c5c72fc4643cebedb080a9706139d98b30624` |
-| `VisualizationThemeHelper.php` | 1.0.0 | `81ca4cdeac42ac97cecdb73305e9f68597a6037b1d50b843df11900c96c48dbf` |
+| `VisualizationThemeHelper.php` | 1.1.0 | `29fe61a7eccafeb8b2beb77fe3f7a4896f43b3eaace9ebe428a4fc8250fd9088` |
 
 The copies are shipped with the library deliberately; there is no external runtime dependency.
