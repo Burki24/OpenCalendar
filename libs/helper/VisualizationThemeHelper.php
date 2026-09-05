@@ -11,24 +11,28 @@ namespace Burki24\SymconModuleHelper;
  * light/dark fallbacks when a host does not provide them. Module-specific
  * components deliberately remain outside this helper.
  *
- * @version 1.0.0
+ * @version 1.1.0
  */
 trait VisualizationThemeHelper
 {
     /**
      * Returns the shared Symcon-compatible visualization theme.
      *
+     * @param array<string,string> $overrides Optional validated CSS token overrides.
+     *
      * @return string CSS custom properties and a small common foundation.
      */
-    protected function VisualizationThemeCSS(): string
+    protected function VisualizationThemeCSS(array $overrides = []): string
     {
-        return <<<'CSS'
+        $css = <<<'CSS'
 :root {
     color-scheme: light dark;
     --symc-font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     --symc-text: var(--content-color, light-dark(#202124, #f4f5f7));
     --symc-background: var(--card-color, light-dark(#ffffff, #333438));
     --symc-accent: var(--accent-color, #55cbb5);
+    --symc-heading: var(--symc-text);
+    --symc-subheading: color-mix(in srgb, var(--symc-text) 62%, transparent);
     --symc-muted: color-mix(in srgb, var(--symc-text) 62%, transparent);
     --symc-subtle: color-mix(in srgb, var(--symc-text) 44%, transparent);
     --symc-border: color-mix(in srgb, var(--symc-text) 15%, transparent);
@@ -72,5 +76,23 @@ textarea:focus-visible {
     box-shadow: var(--symc-focus-ring);
 }
 CSS;
+
+        $declarations = [];
+        foreach ($overrides as $token => $color) {
+            if (!is_string($token) || preg_match('/^--symc-[a-z][a-z0-9-]*$/', $token) !== 1) {
+                continue;
+            }
+            if (!is_string($color) || preg_match('/^#[0-9A-Fa-f]{6}$/', $color) !== 1) {
+                continue;
+            }
+
+            $declarations[] = '    ' . $token . ': ' . strtoupper($color) . ';';
+        }
+
+        if ($declarations === []) {
+            return $css;
+        }
+
+        return $css . "\n\n:root {\n" . implode("\n", $declarations) . "\n}";
     }
 }
