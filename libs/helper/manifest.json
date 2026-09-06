@@ -174,7 +174,8 @@
         "SymconOAuthHelper": {
             "version": "1.0.0",
             "sha256": "d9053bfd083a581b96f8526cbb05e8568a6ad24a81cafa3e9b05108343bf2a65",
-            "path": "libs/helper/SymconOAuthHelper.php"
+            "path": "libs/helper/SymconOAuthHelper.php",
+            "source_sha": "d0bb3e0a673de328d2cfc4dff53c6bce8dafe275"
         },
         "VariableHelper": {
             "version": "1.2.0",
