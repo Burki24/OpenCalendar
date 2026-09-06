@@ -16,7 +16,8 @@
         "DataFlowHelper": {
             "version": "1.0.0",
             "sha256": "4c25828b283367692d0db1631d2b7d71ba6012883798bc5ffddb8f2d551d6dfb",
-            "path": "libs/helper/DataFlowHelper.php"
+            "path": "libs/helper/DataFlowHelper.php",
+            "source_sha": "d0bb3e0a673de328d2cfc4dff53c6bce8dafe275"
         },
         "DebugHelper": {
             "version": "1.0.1",
