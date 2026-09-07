@@ -6,7 +6,7 @@
             "version": "1.0.0",
             "sha256": "b9922d52dab18a253b1a1b371d93aec1631396741cbd611cf34922219ec6ab30",
             "path": "libs/helper/ChunkedJsonTransferHelper.php",
-            "source_sha": "d0bb3e0a673de328d2cfc4dff53c6bce8dafe275"
+            "source_sha": "1dea4ac47b81f7380aff1dcb4e6d26d29861a6e0"
         },
         "ConfigurationFormHelper": {
             "version": "1.0.0",
