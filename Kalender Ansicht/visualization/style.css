@@ -1133,3 +1133,45 @@ html.ipsview-mode .view-selector-option { min-height: 48px; padding: 10px 13px; 
     .event-card { margin-block: 3px; padding-block: 6px; }
     .agenda-date { padding-block: 4px; }
 }
+
+/* Native Symcon tiles use their own width. Keep this separate from the
+ * viewport rules above so the same view stays usable in narrow app tiles. */
+@container symcon-visualization (max-width: 50rem) {
+    .week-grid,
+    .week-grid.hide-weekends,
+    .week-grid.three-day-grid {
+        grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    }
+    .week-grid.vertical-week-grid { grid-template-columns: minmax(0, 1fr); }
+    .week-column { min-height: 145px; }
+    .week-grid.vertical-week-grid .week-column { min-height: 0; }
+}
+
+@container symcon-visualization (max-width: 35rem) {
+    .toolbar {
+        gap: 4px;
+        min-height: calc(42px + var(--tile-title-clearance));
+        padding-inline: var(--symc-responsive-padding);
+    }
+    .toolbar-title { flex: 1 1 auto; padding-inline: 2px; font-size: .82em; }
+    .toolbar-spacer { flex: 0 1 4px; }
+    .view-selector-button { flex: 0 0 auto; padding-inline: 7px; }
+    .toolbar-actions { flex: 0 0 auto; }
+    .event-card { grid-template-columns: var(--agenda-color-bar-width) var(--calendar-time-column-width) minmax(0, 1fr); gap: 7px; }
+    .week-grid.vertical-week-grid .week-column { grid-template-columns: minmax(0, 1fr); gap: 5px; }
+    .week-grid.vertical-week-grid .week-heading {
+        min-height: 0;
+        padding: 4px 6px 6px;
+        border-right: 0;
+        border-bottom: var(--cal-line-width, 1px) solid var(--cal-line, var(--cal-border));
+    }
+}
+
+@container symcon-visualization (max-width: 26rem) {
+    .view-selector-label,
+    .view-selector-chevron { display: none; }
+    .view-selector-button { min-width: var(--symc-responsive-touch-target); min-height: var(--symc-responsive-touch-target); justify-content: center; padding-inline: 6px; }
+    .toolbar .icon-button { width: var(--symc-responsive-touch-target); height: var(--symc-responsive-touch-target); }
+    .floating-add-label { display: none; }
+    .floating-add { min-width: var(--symc-responsive-touch-target); min-height: var(--symc-responsive-touch-target); padding-inline: 10px; }
+}

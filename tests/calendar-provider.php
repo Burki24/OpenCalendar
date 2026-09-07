@@ -3778,6 +3778,7 @@ assertTrueValue(
     is_string($viewModuleSource)
         && str_contains($viewModuleSource, 'use Burki24\\SymconModuleHelper\\VisualizationAssetHelper;')
         && str_contains($viewModuleSource, "require_once __DIR__ . '/../libs/helper/VisualizationAssetHelper.php';")
+        && str_contains($viewModuleSource, "require_once __DIR__ . '/../libs/helper/ResponsiveVisualizationHelper.php';")
         && str_contains($viewModuleSource, 'use VisualizationAssetHelper;')
         && str_contains($viewModuleSource, 'use Burki24\\SymconModuleHelper\\IPSViewHTMLPageHelper;')
         && str_contains($viewModuleSource, "require_once __DIR__ . '/../libs/helper/IPSViewHTMLPageHelper.php';")
@@ -3790,6 +3791,15 @@ assertTrueValue(
         && !str_contains($viewModuleSource, "RegisterPropertyBoolean('EnableIPSView'")
         && !str_contains($viewModuleSource, '$this->MaintainVariable('),
     'The calendar view must manage and render its optional IPSView output through IPSViewHTMLPageHelper.'
+);
+assertTrueValue(
+    is_string($viewModuleSource)
+        && str_contains($viewModuleSource, 'use Burki24\\SymconModuleHelper\\ResponsiveVisualizationHelper;')
+        && str_contains($viewModuleSource, 'use ResponsiveVisualizationHelper;')
+        && str_contains($viewModuleSource, "ResponsiveVisualizationCSS('#calendar-app')")
+        && is_string($viewStyleSource)
+        && str_contains($viewStyleSource, '@container symcon-visualization'),
+    'The native calendar tile must use the shared container-query responsive visualization contract.'
 );
 assertTrueValue(
     is_string($viewModuleSource)

@@ -176,6 +176,12 @@
             "path": "libs/helper/PersistentJsonCacheHelper.php",
             "source_sha": "d0bb3e0a673de328d2cfc4dff53c6bce8dafe275"
         },
+        "ResponsiveVisualizationHelper": {
+            "version": "1.0.0",
+            "sha256": "0cebd0f08e6416a6d7d4d5fdbb19bf96d457d3e2d51fcf2a1d3e6adf5e967451",
+            "path": "libs/helper/ResponsiveVisualizationHelper.php",
+            "source_sha": "d0bb3e0a673de328d2cfc4dff53c6bce8dafe275"
+        },
         "SymconOAuthHelper": {
             "version": "1.0.0",
             "sha256": "d9053bfd083a581b96f8526cbb05e8568a6ad24a81cafa3e9b05108343bf2a65",

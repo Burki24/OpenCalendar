@@ -34,6 +34,9 @@
         "PersistentJsonCacheHelper": {
             "target": "libs/helper/PersistentJsonCacheHelper.php"
         },
+        "ResponsiveVisualizationHelper": {
+            "target": "libs/helper/ResponsiveVisualizationHelper.php"
+        },
         "SymconOAuthHelper": {
             "target": "libs/helper/SymconOAuthHelper.php"
         },
