@@ -254,6 +254,9 @@ function applyCalendarState(state) {
         persistClientViewState();
     }
     render();
+    if (isNativeVisualization()) {
+        void ensureVisibleRangeLoaded();
+    }
     restoreAgendaScrollPosition(agendaScrollPosition);
     if (releasePreservedAgendaScrollPosition) {
         clearAgendaScrollWorkflow();
@@ -4221,7 +4224,12 @@ function loadedRangeCovers(range) {
 }
 
 async function ensureVisibleRangeLoaded(force = false) {
-    if (!initialized || eventEditingActive || document.visibilityState === 'hidden' || !hasActionBridge()) return;
+    if (!initialized || eventEditingActive || document.visibilityState === 'hidden') return;
+    if (!hasActionBridge()) {
+        if (isNativeVisualization()) scheduleVisibleRangeRetry(force);
+
+        return;
+    }
 
     const range = visibleViewRange();
     const signature = visualizationRangeSignature(range);

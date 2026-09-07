@@ -567,6 +567,16 @@ assertVisualization(
 );
 
 assertVisualization(
+    str_contains($moduleSource, 'return $this->renderCalendarHtml($this->buildTileBootstrapState(), false);')
+        && str_contains($moduleSource, 'private function buildTileBootstrapState(): array')
+        && str_contains($moduleSource, "'events'      => []")
+        && str_contains($script, 'void ensureVisibleRangeLoaded();')
+        && str_contains($script, 'if (!hasActionBridge()) {')
+        && str_contains($script, 'if (isNativeVisualization()) scheduleVisibleRangeRetry(force);'),
+    'The native tile must bootstrap without a broad event payload and load only its visible range through the action bridge.'
+);
+
+assertVisualization(
     str_contains($moduleSource, 'private function getFullUpdateMessage(?array $state = null, ?array $toast = null): string')
         && str_contains($moduleSource, '$message[\'toast\'] = $toast;')
         && str_contains($moduleSource, '$this->UpdateVisualizationValue($this->getFullUpdateMessage(')

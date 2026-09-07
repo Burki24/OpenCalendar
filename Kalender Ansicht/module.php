@@ -457,7 +457,7 @@ class CalendarView extends IPSModuleStrict
      */
     public function GetVisualizationTile(): string
     {
-        return $this->renderCalendarHtml($this->buildState(), false);
+        return $this->renderCalendarHtml($this->buildTileBootstrapState(), false);
     }
 
     /**
@@ -1643,6 +1643,31 @@ class CalendarView extends IPSModuleStrict
                 'nextOffset' => $hasMore ? $nextOffset : null,
                 'totalCount' => $totalEventCount
             ],
+            'settings'    => $this->viewSettings()
+        ];
+    }
+
+    /**
+     * Builds the deliberately small initial state for the native HTML-SDK tile.
+     *
+     * The tile document itself already contains the complete UI assets. Embedding
+     * a broad event range as well can exceed the HTML-SDK response limit before
+     * JavaScript is able to render anything. After initialization the client
+     * requests its current visible range through the regular LoadRange action.
+     *
+     * @return array<string, mixed>
+     */
+    private function buildTileBootstrapState(): array
+    {
+        if (!$this->isRuntimeReady()) {
+            return $this->emptyState();
+        }
+
+        return [
+            'events'      => [],
+            'calendars'   => $this->loadSelectedCalendars(),
+            'generatedAt' => time(),
+            'eventRange'  => null,
             'settings'    => $this->viewSettings()
         ];
     }
