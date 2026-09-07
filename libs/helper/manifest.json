@@ -174,7 +174,7 @@
             "version": "1.0.0",
             "sha256": "adbc7680abe814dc6c15a9cda1312cc30023073595052006662716bc0d65f2a4",
             "path": "libs/helper/PersistentJsonCacheHelper.php",
-            "source_sha": "d0bb3e0a673de328d2cfc4dff53c6bce8dafe275"
+            "source_sha": "1dea4ac47b81f7380aff1dcb4e6d26d29861a6e0"
         },
         "SymconOAuthHelper": {
             "version": "1.0.0",
