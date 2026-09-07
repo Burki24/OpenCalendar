@@ -5,7 +5,6 @@ declare(strict_types=1);
 use Burki24\SymconModuleHelper\ConfigurationFormHelper;
 use Burki24\SymconModuleHelper\IPSViewHTMLPageHelper;
 use Burki24\SymconModuleHelper\IPSViewStyleConfigurationHelper;
-use Burki24\SymconModuleHelper\ResponsiveVisualizationHelper;
 use Burki24\SymconModuleHelper\VariableHelper;
 use Burki24\SymconModuleHelper\VisualizationAssetHelper;
 use Burki24\SymconModuleHelper\VisualizationThemeHelper;
@@ -17,7 +16,6 @@ require_once __DIR__ . '/../libs/CalendarEventReminder.php';
 require_once __DIR__ . '/../libs/helper/ConfigurationFormHelper.php';
 require_once __DIR__ . '/../libs/helper/IPSViewHTMLPageHelper.php';
 require_once __DIR__ . '/../libs/helper/IPSViewStyleConfigurationHelper.php';
-require_once __DIR__ . '/../libs/helper/ResponsiveVisualizationHelper.php';
 require_once __DIR__ . '/../libs/helper/VariableHelper.php';
 require_once __DIR__ . '/../libs/helper/VisualizationAssetHelper.php';
 require_once __DIR__ . '/../libs/helper/VisualizationThemeHelper.php';
@@ -27,7 +25,6 @@ class CalendarView extends IPSModuleStrict
     use ConfigurationFormHelper;
     use IPSViewHTMLPageHelper;
     use IPSViewStyleConfigurationHelper;
-    use ResponsiveVisualizationHelper;
     use VariableHelper;
     use VisualizationAssetHelper;
     use VisualizationThemeHelper;
@@ -1372,8 +1369,7 @@ class CalendarView extends IPSModuleStrict
                 ? $this->IPSViewStyleRootFontSize()
                 : max(50, min(200, $this->ReadPropertyInteger('TileFontScale'))) . '%',
             'title'              => $this->Translate('Calendar'),
-            'visualizationTheme' => $this->VisualizationThemeCSS()
-                . ($ipsView ? '' : "\n\n" . $this->ResponsiveVisualizationCSS('#calendar-app')),
+            'visualizationTheme' => $this->VisualizationThemeCSS(),
             'ipsViewStyle'       => $ipsView ? $this->IPSViewStyleCSSVariables(':root') : '',
             'state'              => $state,
             'runtime'            => $runtime,

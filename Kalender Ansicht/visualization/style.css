@@ -116,6 +116,14 @@ button { color: inherit; }
 
 #calendar-app {
     position: relative;
+    container-name: symcon-visualization;
+    container-type: inline-size;
+    min-inline-size: 0;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+    --symc-responsive-gap: clamp(0.5rem, 2cqi, 1rem);
+    --symc-responsive-padding: clamp(0.625rem, 2.5cqi, 1.25rem);
+    --symc-responsive-touch-target: 44px;
     font-size: 1rem;
     display: flex;
     flex-direction: column;
