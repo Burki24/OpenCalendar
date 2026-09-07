@@ -1027,6 +1027,7 @@ class Calendar extends IPSModuleStrict
                     $events,
                     new DateTimeImmutable('today')
                 ),
+                'runtimeReady'                 => $this->isRuntimeReady(),
                 'lastSynchronization'          => $this->ReadAttributeInteger('LastSynchronization'),
                 'lastError'                    => $this->ReadAttributeString('LastError')
             ],

@@ -32,6 +32,8 @@ class CalendarView extends IPSModuleStrict
     private const CALENDAR_MODULE_ID = '{227B63E4-4223-316B-76E9-FD3849689562}';
     private const CALENDAR_ACCOUNT_MODULE_ID = '{966D6119-7FF3-5CA5-06C3-536FBF8100C4}';
     private const INITIALIZATION_DELAY_MS = 5_000;
+    private const INITIALIZATION_REFRESH_DELAY_MS = 1_000;
+    private const MAX_INITIALIZATION_REFRESH_ATTEMPTS = 30;
     private const APPOINTMENT_LOOKAHEAD_DAYS = 1095;
     private const VISUALIZATION_BOOTSTRAP_PAST_DAYS = 7;
     private const VISUALIZATION_BOOTSTRAP_FUTURE_DAYS = 42;
@@ -148,6 +150,7 @@ class CalendarView extends IPSModuleStrict
         $this->RegisterIPSViewStyleProperties();
         $this->RegisterAttributeBoolean('RuntimeReady', false);
         $this->RegisterAttributeString('CalendarSelectionBackup', '[]');
+        $this->RegisterAttributeInteger('InitializationRefreshAttempts', 0);
         $this->RegisterAttributeInteger(self::ATTRIBUTE_IPSVIEW_TOKEN_1, 0);
         $this->RegisterAttributeInteger(self::ATTRIBUTE_IPSVIEW_TOKEN_2, 0);
         $this->RegisterAttributeInteger(self::ATTRIBUTE_IPSVIEW_TOKEN_3, 0);
@@ -160,6 +163,7 @@ class CalendarView extends IPSModuleStrict
 
         $this->SetVisualizationType(1);
         $this->RegisterTimer('InitializationTimer', 0, 'IPSKALVIEW_Initialize($_IPS[\'TARGET\']);');
+        $this->RegisterTimer('InitializationRefreshTimer', 0, 'IPSKALVIEW_RefreshInitialization($_IPS[\'TARGET\']);');
     }
 
     /**
@@ -323,6 +327,7 @@ class CalendarView extends IPSModuleStrict
         $this->RegisterMessage(0, IPS_KERNELSTARTED);
         $this->RegisterIPSViewStyleMediaMessages();
         $this->SetTimerInterval('InitializationTimer', 0);
+        $this->SetTimerInterval('InitializationRefreshTimer', 0);
         $this->MaintainIPSViewHTMLVariable(
             'IPSViewCalendar',
             $this->Translate('IPSView calendar'),
@@ -379,6 +384,41 @@ class CalendarView extends IPSModuleStrict
         }
 
         $this->broadcastState(null, true);
+        $this->WriteAttributeInteger('InitializationRefreshAttempts', 0);
+        $this->scheduleInitializationRefresh();
+
+        return true;
+    }
+
+    /**
+     * Refreshes the visualization after selected calendar instances completed their own startup.
+     *
+     * @return bool True when no selected active calendar is still initializing.
+     */
+    public function RefreshInitialization(): bool
+    {
+        $this->SetTimerInterval('InitializationRefreshTimer', 0);
+        if (!$this->isRuntimeReady()) {
+            return false;
+        }
+
+        if ($this->hasPendingSelectedCalendarInitialization()) {
+            $attempts = $this->ReadAttributeInteger('InitializationRefreshAttempts') + 1;
+            $this->WriteAttributeInteger('InitializationRefreshAttempts', $attempts);
+            if ($attempts < self::MAX_INITIALIZATION_REFRESH_ATTEMPTS) {
+                $this->scheduleInitializationRefresh();
+
+                return false;
+            }
+
+            $this->SendDebug(
+                'Initialization',
+                'Selected calendar instances did not finish initialization before the refresh limit.',
+                0
+            );
+        }
+
+        $this->broadcastState(null, true);
 
         return true;
     }
@@ -391,6 +431,8 @@ class CalendarView extends IPSModuleStrict
     public function MessageSink(int $TimeStamp, int $SenderID, int $Message, array $Data): void
     {
         if ($SenderID === 0 && $Message === IPS_KERNELSTARTED) {
+            $this->WriteAttributeInteger('InitializationRefreshAttempts', 0);
+            $this->SetTimerInterval('InitializationRefreshTimer', 0);
             $this->scheduleInitialization();
             return;
         }
@@ -2396,6 +2438,40 @@ class CalendarView extends IPSModuleStrict
         if (IPS_GetKernelRunlevel() === KR_READY) {
             $this->SetTimerInterval('InitializationTimer', self::INITIALIZATION_DELAY_MS);
         }
+    }
+
+    private function scheduleInitializationRefresh(): void
+    {
+        if (IPS_GetKernelRunlevel() === KR_READY && $this->isRuntimeReady()) {
+            $this->SetTimerInterval('InitializationRefreshTimer', self::INITIALIZATION_REFRESH_DELAY_MS);
+        }
+    }
+
+    private function hasPendingSelectedCalendarInitialization(): bool
+    {
+        foreach ($this->effectiveCalendarConfiguration() as $row) {
+            if (!is_array($row) || !($row['Enabled'] ?? true)) {
+                continue;
+            }
+            $instanceId = (int) ($row['InstanceID'] ?? 0);
+            if ($instanceId <= 0 || !IPS_InstanceExists($instanceId)
+                || !IPS_GetProperty($instanceId, 'Active')) {
+                continue;
+            }
+
+            try {
+                $status = json_decode(IPSKAL_GetCalendarStatus($instanceId), true, 512, JSON_THROW_ON_ERROR);
+                if (!is_array($status) || !($status['runtimeReady'] ?? false)) {
+                    return true;
+                }
+            } catch (Throwable $exception) {
+                $this->SendDebug('CalendarInitialization', $exception->getMessage(), 0);
+
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function isRuntimeReady(): bool

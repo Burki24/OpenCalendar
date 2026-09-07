@@ -3663,6 +3663,7 @@ assertTrueValue(
         && str_contains($calendarModuleSource, 'RegisterMessage(0, IPS_KERNELSTARTED)')
         && str_contains($calendarModuleSource, "RegisterTimer('InitializationTimer'")
         && str_contains($calendarModuleSource, "RegisterAttributeBoolean('RuntimeReady', false)")
+        && str_contains($calendarModuleSource, "'runtimeReady'                 => \$this->isRuntimeReady()")
         && str_contains($calendarModuleSource, 'IPS_GetKernelRunlevel() !== KR_READY'),
     'The calendar module must defer parent communication until the kernel is ready.'
 );
@@ -3758,9 +3759,13 @@ assertTrueValue(
     is_string($viewModuleSource)
         && str_contains($viewModuleSource, 'RegisterMessage(0, IPS_KERNELSTARTED)')
         && str_contains($viewModuleSource, "RegisterTimer('InitializationTimer'")
+        && str_contains($viewModuleSource, "RegisterTimer('InitializationRefreshTimer'")
         && str_contains($viewModuleSource, "RegisterAttributeBoolean('RuntimeReady', false)")
+        && str_contains($viewModuleSource, 'public function RefreshInitialization(): bool')
+        && str_contains($viewModuleSource, 'private function hasPendingSelectedCalendarInitialization(): bool')
+        && str_contains($viewModuleSource, 'MAX_INITIALIZATION_REFRESH_ATTEMPTS')
         && str_contains($viewModuleSource, 'IPS_GetKernelRunlevel() !== KR_READY'),
-    'The calendar view must defer cross-instance access until the kernel is ready.'
+    'The calendar view must defer cross-instance access until selected calendars are ready after a service restart.'
 );
 assertTrueValue(
     is_string($viewModuleSource)
