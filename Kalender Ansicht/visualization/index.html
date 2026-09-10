@@ -106,6 +106,8 @@
                 <label for="event-summary">Title</label>
                 <input id="event-summary" maxlength="250" required>
             </div>
+            <label class="checkbox-row" id="event-task-row"><input type="checkbox" id="event-task"> <span id="event-task-label">Task appointment</span></label>
+            <label class="checkbox-row hidden" id="event-task-completed-row"><input type="checkbox" id="event-task-completed"> <span id="event-task-completed-label">Completed</span></label>
             <label class="checkbox-row" id="event-all-day-row"><input type="checkbox" id="event-all-day"> <span id="all-day-label">All day</span></label>
             <div class="form-row two" id="event-anniversary-row">
                 <div class="form-row">
@@ -254,6 +256,10 @@
                 <dt id="details-occasion-label">Occasion</dt>
                 <dd id="details-occasion"></dd>
             </div>
+            <div class="event-details-row hidden" id="details-task-status-row">
+                <dt id="details-task-status-label">Task status</dt>
+                <dd id="details-task-status"></dd>
+            </div>
             <div class="event-details-row">
                 <dt id="details-start-label">Start</dt>
                 <dd id="details-start"></dd>
@@ -280,6 +286,7 @@
     <div class="dialog-actions">
         <div class="dialog-actions-start">
             <button type="button" class="danger-button hidden" id="details-delete-button">Delete</button>
+            <button type="button" class="secondary-button hidden" id="details-task-toggle-button">Mark completed</button>
         </div>
         <div class="dialog-actions-end">
             <button type="button" class="secondary-button hidden" id="details-provider-button">Open in provider</button>

@@ -33,6 +33,8 @@ beliebig verschoben oder vom Benutzer umbenannt werden.
 - Auflösen wiederkehrender Termine für die lokale Anzeige
 - lokaler JSON-Cache und zyklische Synchronisation
 - Erstellen neuer Termine sowie neuer Google-, Microsoft-, Apple-iCloud- und CalDAV-Serientermine
+- providerneutrale Aufgabentermine als ganztägige Einzeltermine mit offenem oder
+  erledigtem Status und automatischer Fortschreibung überfälliger Aufgaben
 - Ändern und Löschen einzelner Termine sowie einzelner Google-, Microsoft-, Apple-iCloud- und CalDAV-Serienvorkommnisse
 - Bearbeiten einer vollständigen Google-, Microsoft-, Apple-iCloud- oder CalDAV-Terminserie
 - Bearbeiten oder Löschen eines Google-, Microsoft-, Apple-iCloud- oder CalDAV-Serienvorkommnisses **und aller folgenden Termine** durch sicheres Teilen bzw. Kürzen der Serie
@@ -72,7 +74,8 @@ Letzte Synchronisation | Integer | Unix-Zeitpunkt der letzten erfolgreichen Abfr
 
 **Termine heute** berücksichtigt auch ganztägige und mehrtägige Termine. Der
 Wert wird bei jeder Synchronisation und zusätzlich beim lokalen Tageswechsel
-neu berechnet.
+neu berechnet. Beim Tageswechsel werden außerdem offene überfällige
+Aufgabentermine eines beschreibbaren Kalenders auf den neuen Tag verschoben.
 
 Die eigentlichen Termindaten werden bewusst nicht in einer Statusvariable
 gespiegelt, sondern nur im internen Modulcache gehalten. Konto, Kalender und
@@ -80,7 +83,7 @@ Kalenderansicht übertragen große Terminmengen automatisch in begrenzten Seiten
 Dadurch wird weder bei der Synchronisation noch beim Aufbau der Ansicht eine
 einzelne JSON-Antwort mit sämtlichen Terminen benötigt.
 
-Ein Termin enthält unter anderem `id`, `uid`, `resourceUrl`, `etag`, `summary`, `description`, `location`, `start`, `end`, `startTimestamp`, `endTimestamp`, `allDay`, `status`, `recurrenceRule` und `recurrenceId`. Wurde der Titel durch ein ausgewähltes iCalendar-Übersetzungsprofil angepasst, enthält `originalSummary` zusätzlich den unveränderten Originaltitel. Als Jahresereignis markierte Termine erhalten zusätzlich `anniversaryType`, `anniversaryDate`, `years` und `displaySummary`. Unterstützt werden `birthday`, `anniversary`, `wedding` und `death`. Für Geburtstage bleiben zusätzlich die kompatiblen Felder `birthday`, `birthDate` und `age` erhalten. Das Ausgangsdatum wird lokal in OpenCalendar gespeichert; der eigentliche Titel beim Kalenderanbieter bleibt unverändert.
+Ein Termin enthält unter anderem `id`, `uid`, `resourceUrl`, `etag`, `summary`, `description`, `location`, `start`, `end`, `startTimestamp`, `endTimestamp`, `allDay`, `status`, `recurrenceRule` und `recurrenceId`. Wurde der Titel durch ein ausgewähltes iCalendar-Übersetzungsprofil angepasst, enthält `originalSummary` zusätzlich den unveränderten Originaltitel. Aufgabentermine enthalten außerdem `task`, `taskCompleted`, `taskStatus` (`open` oder `completed`) und einen von der Statusmarkierung bereinigten `displaySummary`. Als Jahresereignis markierte Termine erhalten zusätzlich `anniversaryType`, `anniversaryDate`, `years` und `displaySummary`. Unterstützt werden `birthday`, `anniversary`, `wedding` und `death`. Für Geburtstage bleiben zusätzlich die kompatiblen Felder `birthday`, `birthDate` und `age` erhalten. Das Ausgangsdatum wird lokal in OpenCalendar gespeichert; der eigentliche Titel beim Kalenderanbieter bleibt unverändert.
 
 ## PHP-Befehlsreferenz
 
@@ -144,6 +147,47 @@ $result = IPSKAL_CreateEvent(12345, json_encode([
     'allDay'  => true
 ]));
 ```
+
+### Aufgabentermin erstellen und erledigen
+
+Ein Aufgabentermin ist ein ganztägiger, nicht wiederkehrender Kalendertermin.
+`task = true` setzt beim Anbieter automatisch den offenen Marker `☐` vor den
+Titel. `taskCompleted = true` verwendet stattdessen `☑`. Die Steuerfelder werden
+nicht als eigene Providerdaten übertragen; der Titelmarker ist die dauerhafte und
+anbieterübergreifende Kennzeichnung.
+
+```php
+$result = IPSKAL_CreateEvent(12345, json_encode([
+    'summary'       => 'Versicherung prüfen',
+    'task'          => true,
+    'taskCompleted' => false,
+    'allDay'        => true,
+    'start'         => '2026-09-10',
+    'end'           => '2026-09-11'
+]));
+```
+
+Zum Erledigen wird die Identität aus `IPSKAL_GetEvents()` zusammen mit der
+Statusänderung übergeben. Eine erneute Änderung auf `false` öffnet die Aufgabe
+wieder:
+
+```php
+$result = IPSKAL_UpdateEvent(12345, json_encode([
+    'uid'         => 'event-uid@example',
+    'resourceUrl' => 'https://server.example/calendar/task.ics',
+    'etag'        => '"123456"',
+    'changes'     => [
+        'task'          => true,
+        'taskCompleted' => true
+    ]
+]));
+```
+
+Offene Aufgabentermine mit einem Datum vor heute werden beim lokalen
+Tageswechsel und bei jeder Synchronisation auf heute verschoben. Erledigte
+Aufgaben bleiben unverändert. Da dabei der echte Kalendertermin aktualisiert
+wird, muss der Kalender beschreibbar sein. Aufgabenserien und zeitgebundene
+Aufgabentermine werden abgewiesen.
 
 Für beschreibbare Google-, Microsoft-, Apple-iCloud- und CalDAV-Kalender können beim Erstellen zusätzlich
 providerneutrale Serienangaben übergeben werden. Bei Google verwendet OpenCalendar

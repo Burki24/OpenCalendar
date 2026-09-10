@@ -228,6 +228,43 @@ Tagen als auch einen Filter nach Ereignistyp. Die vollständige Befehlsreferenz
 befindet sich in der Dokumentation der Module **Kalender** und
 **Kalender Ansicht**.
 
+## Aufgabentermine
+
+OpenCalendar kann einen gewöhnlichen ganztägigen Einzeltermin als
+**Aufgabentermin** behandeln. Dafür wird keine Aufgaben-API des Anbieters und
+keine zusätzliche OAuth-Berechtigung benötigt. Der Eintrag bleibt technisch ein
+normaler Kalendertermin und verwendet ausschließlich die bereits vorhandenen
+Schreibrechte des gewählten Kalenders.
+
+Beim Erstellen oder Bearbeiten wird im Termindialog **Aufgabentermin** aktiviert.
+Aufgabentermine sind bewusst ganztägig und nicht wiederkehrend. OpenCalendar
+speichert den Status direkt und providerunabhängig am Anfang des Termintitels:
+
+- `☐` kennzeichnet eine offene Aufgabe.
+- `☑` kennzeichnet eine erledigte Aufgabe.
+
+In der Kalenderansicht öffnet ein Klick auf den Eintrag die Termindetails. Dort
+kann die Aufgabe mit **Als erledigt markieren** abgeschlossen und mit
+**Aufgabe wieder öffnen** erneut aktiviert werden. Der eigentliche Titel wird im
+Editor ohne technischen Marker angezeigt. In Google Calendar, Outlook, Apple
+Calendar oder anderen Clients bleibt der Marker dagegen sichtbar, sodass der
+Status auch außerhalb von OpenCalendar erkennbar ist. Wird der Marker dort
+manuell entfernt oder geändert, übernimmt OpenCalendar diese Änderung bei der
+nächsten Synchronisation.
+
+Eine offene Aufgabe, deren Datum vor dem aktuellen lokalen Tag liegt, wird beim
+lokalen Tageswechsel und zusätzlich bei jeder Kalendersynchronisation auf den
+aktuellen Tag verschoben. Dadurch bleibt eine nicht erledigte Aufgabe täglich
+sichtbar. Erledigte Aufgaben werden nicht mehr verschoben und verbleiben an ihrem
+zuletzt erreichten Datum. Das Verschieben ändert den echten Termin beim
+Kalenderanbieter; es ist keine rein lokale Anzeige.
+
+Aufgabentermine stehen deshalb nur in beschreibbaren Kalendern zur Verfügung.
+ICS-/Webcal-Abonnements und lokale ICS-Dateien bleiben schreibgeschützt. Die
+Funktion ist bewusst keine Anbindung an Google Tasks: Es werden weder
+Google-Aufgabenlisten importiert noch bestehende Einträge aus „Meine Aufgaben“
+synchronisiert.
+
 ## Bekannte Einschränkungen
 
 - **Diesen und alle folgenden Termine** wird bei Microsoft-Onlinebesprechungen und

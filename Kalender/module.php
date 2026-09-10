@@ -10,6 +10,7 @@ use Burki24\SymconModuleHelper\PersistentJsonCacheHelper;
 use Burki24\SymconModuleHelper\VariableHelper;
 use IPSKalender\CalendarEventCounter;
 use IPSKalender\CalendarEventRecurrence;
+use IPSKalender\CalendarTaskEvent;
 use IPSKalender\SynchronizationSchedule;
 
 require_once __DIR__ . '/../libs/helper/ChunkedJsonTransferHelper.php';
@@ -20,6 +21,7 @@ require_once __DIR__ . '/../libs/helper/PersistentJsonCacheHelper.php';
 require_once __DIR__ . '/../libs/helper/VariableHelper.php';
 require_once __DIR__ . '/../libs/CalendarEventCounter.php';
 require_once __DIR__ . '/../libs/CalendarEventRecurrence.php';
+require_once __DIR__ . '/../libs/CalendarTaskEvent.php';
 require_once __DIR__ . '/../libs/SynchronizationSchedule.php';
 
 class Calendar extends IPSModuleStrict
@@ -271,9 +273,12 @@ class Calendar extends IPSModuleStrict
     }
 
     /**
-     * Recalculates the current-day event count after the local day changes.
+     * Handles the local day change and recalculates the current-day event count.
      *
-     * @return bool True when the counter was updated.
+     * Open overdue task appointments are moved to the new local day before the
+     * counter is updated.
+     *
+     * @return bool True when the day-change processing completed.
      */
     public function RefreshTodayEventCount(): bool
     {
@@ -281,11 +286,27 @@ class Calendar extends IPSModuleStrict
         if (IPS_GetKernelRunlevel() !== KR_READY) {
             return false;
         }
+        if (!$this->ReadPropertyBoolean('Active') || !$this->isRuntimeReady()) {
+            $this->updateEventCounters($this->readEvents());
+            $this->scheduleTodayEventCountRefresh();
+            return true;
+        }
 
-        $this->updateEventCounters($this->readEvents());
-        $this->scheduleTodayEventCountRefresh();
-
-        return true;
+        try {
+            $moved = 0;
+            $events = $this->rollForwardTaskEvents($this->readEvents(), $moved);
+            if ($moved > 0) {
+                $this->storeEventsAfterWrite($events);
+            } else {
+                $this->updateEventCounters($events);
+            }
+            return true;
+        } catch (Throwable $exception) {
+            $this->handleError($exception);
+            return false;
+        } finally {
+            $this->scheduleTodayEventCountRefresh();
+        }
     }
 
     /**
@@ -328,7 +349,7 @@ class Calendar extends IPSModuleStrict
 
         try {
             $this->refreshCalendarMetadataSafely();
-            $events = $this->requestEvents();
+            $events = $this->rollForwardTaskEvents($this->requestEvents());
             $this->storeEvents($events);
             $this->WriteAttributeString('LastError', '');
             $this->SetStatus(IS_ACTIVE);
@@ -513,7 +534,7 @@ class Calendar extends IPSModuleStrict
                 'Start'          => $startTimestamp,
                 'End'            => $endTimestamp
             ]);
-            $currentEvent = $this->enrichAnniversaryEvent($currentEvent);
+            $currentEvent = CalendarTaskEvent::enrich($this->enrichAnniversaryEvent($currentEvent));
 
             return json_encode(
                 $currentEvent,
@@ -556,7 +577,7 @@ class Calendar extends IPSModuleStrict
                     'ResourceURL' => trim($ResourceURL)
                 ]
             );
-            $series = $this->enrichAnniversaryEvent($series);
+            $series = CalendarTaskEvent::enrich($this->enrichAnniversaryEvent($series));
             return json_encode(
                 $series,
                 JSON_UNESCAPED_SLASHES
@@ -608,7 +629,7 @@ class Calendar extends IPSModuleStrict
                     'ResourceURL'   => trim($ResourceURL)
                 ]
             );
-            $following = $this->enrichAnniversaryEvent($following);
+            $following = CalendarTaskEvent::enrich($this->enrichAnniversaryEvent($following));
             return json_encode(
                 $following,
                 JSON_UNESCAPED_SLASHES
@@ -710,6 +731,7 @@ class Calendar extends IPSModuleStrict
                     $this->assertAnniversaryRecurrence($event);
                 }
             }
+            $event = CalendarTaskEvent::prepareWrite($event);
             $recurrence = $event['recurrence'] ?? null;
             if ($recurrence !== null && $recurrence !== []) {
                 if (!is_array($recurrence) || array_is_list($recurrence)) {
@@ -796,6 +818,7 @@ class Calendar extends IPSModuleStrict
                 }
                 $this->applyAnniversaryEventDefaults($changes, $anniversary['date']);
             }
+            $changes = CalendarTaskEvent::prepareWrite($changes, $event);
             $requestedRecurrence = $changes['recurrence'] ?? null;
             $recurrenceType = (string) ($recurrence['recurrenceType'] ?? CalendarEventRecurrence::SINGLE);
             $convertingSingleToSeries = $recurrenceType === CalendarEventRecurrence::SINGLE
@@ -1509,7 +1532,7 @@ class Calendar extends IPSModuleStrict
     private function storeEvents(array $events): void
     {
         $timestamp = time();
-        $events = $this->enrichAnniversaryEvents($events);
+        $events = $this->enrichTaskEvents($this->enrichAnniversaryEvents($events));
         $this->WritePersistentJsonCache('CachedEvents', $events);
         $this->WriteAttributeInteger('LastSynchronization', $timestamp);
         $this->updateEventCounters($events);
@@ -2389,7 +2412,7 @@ class Calendar extends IPSModuleStrict
     /** @param list<array<string, mixed>> $events */
     private function storeEventsAfterWrite(array $events): void
     {
-        $events = $this->enrichAnniversaryEvents($events);
+        $events = $this->enrichTaskEvents($this->enrichAnniversaryEvents($events));
         usort(
             $events,
             static fn (array $left, array $right): int => ((int) ($left['startTimestamp'] ?? 0)
@@ -2414,6 +2437,75 @@ class Calendar extends IPSModuleStrict
         $this->storeEvents($events);
         $this->WriteAttributeString('LastError', '');
         $this->SetStatus($this->ReadPropertyBoolean('Active') ? IS_ACTIVE : IS_INACTIVE);
+    }
+
+    /**
+     * Moves overdue open task appointments to the current local day.
+     *
+     * @param list<array<string, mixed>> $events
+     * @param int|null $moved Receives the number of successfully moved events.
+     * @return list<array<string, mixed>>
+     */
+    private function rollForwardTaskEvents(array $events, ?int &$moved = null): array
+    {
+        $moved = 0;
+        if (!$this->ReadPropertyBoolean('Active')
+            || !$this->isRuntimeReady()
+            || !$this->calendarCanWrite()) {
+            return $events;
+        }
+
+        $today = new DateTimeImmutable('today');
+        foreach ($events as $index => $event) {
+            $changes = CalendarTaskEvent::rollForwardChanges($event, $today);
+            if ($changes === null) {
+                continue;
+            }
+
+            $updated = $this->sendRequest('UpdateEvent', [
+                'UID'         => trim((string) ($event['uid'] ?? '')),
+                'ResourceURL' => trim((string) ($event['resourceUrl'] ?? '')),
+                'ETag'        => trim((string) ($event['etag'] ?? '')),
+                'Event'       => $changes,
+                'Recurrence'  => CalendarEventRecurrence::fromEvent($event)
+            ]);
+            $events[$index] = array_merge($event, $changes, $updated);
+            ++$moved;
+        }
+
+        if ($moved > 0) {
+            $this->SendSafeDebug('TaskAppointmentsRolledForward', [
+                'count' => $moved,
+                'date'  => $today->format('Y-m-d')
+            ]);
+        }
+
+        return $events;
+    }
+
+    private function calendarCanWrite(): bool
+    {
+        if (!$this->ReadAttributeBoolean('CalendarMetadataAvailable')) {
+            return $this->ReadPropertyBoolean('CanWrite');
+        }
+        if ($this->ReadAttributeBoolean('DetectedWriteAccessKnown')) {
+            return $this->ReadAttributeBoolean('DetectedCanWrite');
+        }
+
+        return $this->ReadAttributeBoolean('DetectedCanWrite')
+            || $this->ReadPropertyBoolean('CanWrite');
+    }
+
+    /**
+     * @param list<array<string, mixed>> $events
+     * @return list<array<string, mixed>>
+     */
+    private function enrichTaskEvents(array $events): array
+    {
+        return array_map(
+            static fn (array $event): array => CalendarTaskEvent::enrich($event),
+            $events
+        );
     }
 
     /**

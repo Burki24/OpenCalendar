@@ -1227,6 +1227,13 @@ foreach ([$native, $ipsView] as $html) {
         'The rendered visualization must include the styled delete-confirmation modal.'
     );
     assertVisualization(
+        str_contains($html, 'id="event-task"')
+            && str_contains($html, 'id="event-task-completed"')
+            && str_contains($html, 'id="details-task-toggle-button"')
+            && str_contains($html, "sendAction('UpdateEvent', value)"),
+        'Task appointments must be editable and directly completable in both visualization modes.'
+    );
+    assertVisualization(
         str_contains($html, 'id="event-calendar-options" role="listbox"')
             && str_contains($html, 'class="calendar-picker-trigger"')
             && !str_contains($html, '<select id="event-calendar"'),
