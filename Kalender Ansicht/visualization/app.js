@@ -2549,7 +2549,9 @@ function requestEdit(sourceDialog) {
     const occurrenceAllowed = eventCanUpdateOccurrence(event);
     const followingAllowed = eventCanUpdateFollowing(event);
     const seriesAllowed = eventCanUpdateSeries(event);
-    if (!eventIsRecurring(event) || (!followingAllowed && !seriesAllowed)) {
+    // Task series always edit the selected occurrence. The separate task option
+    // controls only whether overdue follow-up appointments are shifted later.
+    if (Boolean(event.task) || !eventIsRecurring(event) || (!followingAllowed && !seriesAllowed)) {
         beginAgendaScrollWorkflow('edit');
         sourceDialog?.close();
         void prepareEventEdit(event);
