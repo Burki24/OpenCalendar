@@ -48,6 +48,16 @@ assertTaskAppointment(
     'Completing a task must replace its open marker without changing the title.'
 );
 
+$followPlanned = CalendarTaskEvent::prepareWrite(
+    ['task' => true, 'taskFollowPlanned' => true],
+    $enriched + ['allDay' => true, 'recurring' => true, 'start' => '2026-09-08', 'end' => '2026-09-09']
+);
+assertTaskAppointment(
+    $followPlanned['summary'] === '☐↻ Versicherung prüfen'
+        && (CalendarTaskEvent::enrich($followPlanned)['taskFollowPlanned'] ?? false) === true,
+    'A task series must persist the choice to move planned follow-up appointments.'
+);
+
 $renamed = CalendarTaskEvent::prepareWrite(
     ['summary' => 'Versicherung wechseln'],
     $enriched + ['allDay' => true, 'recurring' => false]
@@ -141,7 +151,6 @@ assertTaskAppointment(
 
 foreach ([
     ['allDay' => false, 'recurrence' => null],
-    ['allDay' => true, 'recurrence' => ['frequency' => 'DAILY']],
     ['allDay' => true, 'recurrence' => null, 'start' => '2026-09-08', 'end' => '2026-09-10']
 ] as $invalidShape) {
     try {
@@ -154,5 +163,18 @@ foreach ([
     } catch (InvalidArgumentException) {
     }
 }
+
+$recurringTask = CalendarTaskEvent::prepareWrite([
+    'summary'       => 'Kühlschrank reinigen',
+    'task'          => true,
+    'allDay'        => true,
+    'start'         => '2026-09-08',
+    'end'           => '2026-09-09',
+    'recurrence'    => ['frequency' => 'DAILY']
+]);
+assertTaskAppointment(
+    $recurringTask['summary'] === '☐ Kühlschrank reinigen',
+    'One-day all-day task series must be accepted.'
+);
 
 fwrite(STDOUT, "Task appointment tests passed.\n");

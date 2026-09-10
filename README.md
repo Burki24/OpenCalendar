@@ -230,18 +230,21 @@ befindet sich in der Dokumentation der Module **Kalender** und
 
 ## Aufgabentermine
 
-OpenCalendar kann einen gewöhnlichen ganztägigen Einzeltermin als
+OpenCalendar kann einen gewöhnlichen ganztägigen Termin als
 **Aufgabentermin** behandeln. Dafür wird keine Aufgaben-API des Anbieters und
 keine zusätzliche OAuth-Berechtigung benötigt. Der Eintrag bleibt technisch ein
 normaler Kalendertermin und verwendet ausschließlich die bereits vorhandenen
 Schreibrechte des gewählten Kalenders.
 
 Beim Erstellen oder Bearbeiten wird im Termindialog **Aufgabentermin** aktiviert.
-Aufgabentermine sind bewusst ganztägig und nicht wiederkehrend. OpenCalendar
+Aufgabentermine sind bewusst ganztägig und dauern genau einen Tag. Sie dürfen
+auch wiederkehrend sein. OpenCalendar
 speichert den Status direkt und providerunabhängig am Anfang des Termintitels:
 
 - `☐` kennzeichnet eine offene Aufgabe.
 - `☑` kennzeichnet eine erledigte Aufgabe.
+- `☐↻` beziehungsweise `☑↻` kennzeichnet eine Aufgabenserie, deren geplante
+  Folgetermine beim täglichen Nachziehen ebenfalls verschoben werden sollen.
 
 In der Kalenderansicht öffnet ein Klick auf den Eintrag die Termindetails. Dort
 kann die Aufgabe mit **Als erledigt markieren** abgeschlossen und mit
@@ -258,6 +261,13 @@ aktuellen Tag verschoben. Dadurch bleibt eine nicht erledigte Aufgabe täglich
 sichtbar. Erledigte Aufgaben werden nicht mehr verschoben und verbleiben an ihrem
 zuletzt erreichten Datum. Das Verschieben ändert den echten Termin beim
 Kalenderanbieter; es ist keine rein lokale Anzeige.
+
+Bei einer Aufgabenserie entscheidet die Option **Geplante Folgetermine
+mitverschieben**: Ohne sie bleibt der reguläre Serienplan erhalten und nur das
+älteste überfällige Vorkommnis wird auf heute gezogen. Mit ihr verschiebt
+OpenCalendar den ab diesem Vorkommnis verbleibenden Serienteil gemeinsam. Diese
+Option wird nur bei Kalendern angeboten, die „diesen und alle folgenden Termine“
+sicher bearbeiten können.
 
 Aufgabentermine stehen deshalb nur in beschreibbaren Kalendern zur Verfügung.
 ICS-/Webcal-Abonnements und lokale ICS-Dateien bleiben schreibgeschützt. Die

@@ -62,8 +62,9 @@ Sicherung wiederhergestellt, soweit diese verfügbar ist.
 - Navigation innerhalb des dargestellten Zeitraums; passt die Tage-, Wochen- oder Monatsansicht vollständig in die verfügbare Breite, kann auf Touch-Geräten zusätzlich horizontal gewischt werden (links = weiter, rechts = zurück). Muss das Raster auf einer schmalen Anzeige horizontal scrollen, verschiebt die Wischgeste stattdessen das Raster; die Zeitraum-Navigation bleibt über die Pfeilschaltflächen erreichbar
 - manuelle Synchronisation aller ausgewählten Kalender
 - Erstellen, Bearbeiten, Verschieben und Löschen von Terminen in beschreibbaren Kalendern
-- Erstellen ganztägiger Aufgabentermine, direktes Erledigen oder Wiederöffnen in
-  den Termindetails und tägliches Weiterschieben offener überfälliger Aufgaben
+- Erstellen ganztägiger Aufgabentermine und Aufgabenserien, direktes Erledigen
+  oder Wiederöffnen in den Termindetails und tägliches Weiterschieben offener
+  überfälliger Aufgaben
 - Komfortable Zeiteingabe: Wird beim Beginn nur das Datum geändert, folgt das Enddatum automatisch auf denselben Tag und behält seine Uhrzeit bei. Bei einer geänderten Beginn-Uhrzeit wird das Ende automatisch auf eine Stunde später gesetzt; Ganztagstermine bleiben auf demselben sichtbaren Tag.
 - automatische Aktualisierung nach einer Kalendersynchronisation, ohne die am jeweiligen Client gewählte Ansicht oder das Bezugsdatum zurückzusetzen
 - responsive Bedienung auf großen Kacheln und schmalen Mobilansichten
@@ -96,20 +97,25 @@ dabei nicht übertragen.
 
 Im Dialog **Termin erstellen** beziehungsweise **Termin bearbeiten** aktiviert
 **Aufgabentermin** die Aufgabenfunktion. Das Datum bleibt frei wählbar;
-OpenCalendar setzt den Termin automatisch auf ganztägig und deaktiviert die
-Wiederholung sowie Jahresereignisse. Im Kalender kennzeichnet `☐` eine offene
-und `☑` eine erledigte Aufgabe.
+OpenCalendar setzt den Termin automatisch auf ganztägig und deaktiviert
+Jahresereignisse. Ein Aufgabentermin dauert genau einen Tag und kann auch eine
+Wiederholung erhalten. Im Kalender kennzeichnet `☐` eine offene und `☑` eine
+erledigte Aufgabe.
 
 In den Termindetails steht für offene Aufgaben **Als erledigt markieren** zur
 Verfügung. Bei erledigten Aufgaben wird daraus **Aufgabe wieder öffnen**. Eine
 offene Aufgabe mit einem Datum vor heute wird beim lokalen Tageswechsel oder bei
 der nächsten Synchronisation als echter Kalendertermin auf heute verschoben.
-Erledigte Aufgaben verbleiben an ihrem Datum. Damit funktionieren
+Erledigte Aufgaben verbleiben an ihrem Datum. Bei Aufgabenserien legt die
+Option **Geplante Folgetermine mitverschieben** fest, ob der restliche Serienplan
+beim Nachziehen unverändert bleibt oder ab dem überfälligen Vorkommnis gemeinsam
+verschoben wird. Die Option steht nur bei Kalendern mit Unterstützung für
+**Diesen und alle folgenden Termine** bereit. Damit funktionieren
 Aufgabentermine auch im IPSView-Client und ohne eine zusätzliche Aufgaben-API
 oder weitere OAuth-Berechtigungen.
 
 Die Funktion setzt einen beschreibbaren Kalender voraus und unterstützt bewusst
-nur ganztägige Einzeltermine. In externen Kalenderprogrammen bleiben die Marker
+nur eintägige ganztägige Termine. In externen Kalenderprogrammen bleiben die Marker
 im Titel sichtbar. Google Tasks und andere Aufgabenlisten werden nicht importiert
 oder synchronisiert.
 

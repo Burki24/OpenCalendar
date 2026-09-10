@@ -14,6 +14,8 @@ final class CalendarTaskEvent
 {
     public const OPEN_MARKER = '☐';
     public const COMPLETED_MARKER = '☑';
+    public const OPEN_FOLLOW_MARKER = '☐↻';
+    public const COMPLETED_FOLLOW_MARKER = '☑↻';
 
     /** @param array<string, mixed> $event */
     public static function enrich(array $event): array
@@ -23,14 +25,15 @@ final class CalendarTaskEvent
             if ((bool) ($event['task'] ?? false)) {
                 unset($event['displaySummary']);
             }
-            unset($event['task'], $event['taskCompleted'], $event['taskStatus']);
+            unset($event['task'], $event['taskCompleted'], $event['taskStatus'], $event['taskFollowPlanned']);
             return $event;
         }
 
-        $completed = $marker === self::COMPLETED_MARKER;
+        $completed = in_array($marker, [self::COMPLETED_MARKER, self::COMPLETED_FOLLOW_MARKER], true);
         $event['task'] = true;
         $event['taskCompleted'] = $completed;
         $event['taskStatus'] = $completed ? 'completed' : 'open';
+        $event['taskFollowPlanned'] = in_array($marker, [self::OPEN_FOLLOW_MARKER, self::COMPLETED_FOLLOW_MARKER], true);
         $event['displaySummary'] = self::plainSummary((string) ($event['summary'] ?? ''));
 
         return $event;
@@ -47,12 +50,14 @@ final class CalendarTaskEvent
     {
         $taskWasSupplied = array_key_exists('task', $event)
             || array_key_exists('taskCompleted', $event)
-            || array_key_exists('taskStatus', $event);
+            || array_key_exists('taskStatus', $event)
+            || array_key_exists('taskFollowPlanned', $event);
         $source = self::enrich($sourceEvent);
         $isTask = $taskWasSupplied
             ? (bool) ($event['task'] ?? true)
             : (bool) ($source['task'] ?? false);
         $completed = self::requestedCompletion($event, $source);
+        $followPlanned = self::requestedFollowPlanned($event, $source);
 
         if ($isTask) {
             self::assertTaskShape($event, $sourceEvent);
@@ -63,12 +68,12 @@ final class CalendarTaskEvent
             if ($summary === '') {
                 throw new InvalidArgumentException('The task title is missing.');
             }
-            $event['summary'] = ($completed ? self::COMPLETED_MARKER : self::OPEN_MARKER) . ' ' . $summary;
+            $event['summary'] = self::markerFor($completed, $followPlanned) . ' ' . $summary;
         } elseif ($taskWasSupplied && array_key_exists('summary', $event)) {
             $event['summary'] = self::plainSummary((string) $event['summary']);
         }
 
-        unset($event['task'], $event['taskCompleted'], $event['taskStatus'], $event['displaySummary']);
+        unset($event['task'], $event['taskCompleted'], $event['taskStatus'], $event['taskFollowPlanned'], $event['displaySummary']);
         return $event;
     }
 
@@ -83,8 +88,7 @@ final class CalendarTaskEvent
         $event = self::enrich($event);
         if (!(bool) ($event['task'] ?? false)
             || (bool) ($event['taskCompleted'] ?? false)
-            || !(bool) ($event['allDay'] ?? false)
-            || (bool) ($event['recurring'] ?? false)) {
+            || !(bool) ($event['allDay'] ?? false)) {
             return null;
         }
 
@@ -112,13 +116,13 @@ final class CalendarTaskEvent
      */
     public static function plainSummary(string $summary): string
     {
-        return trim((string) preg_replace('/^[☐☑]\s*/u', '', trim($summary)));
+        return trim((string) preg_replace('/^(?:☐↻|☑↻|☐|☑)\s*/u', '', trim($summary)));
     }
 
     private static function marker(string $summary): string
     {
         $summary = ltrim($summary);
-        foreach ([self::OPEN_MARKER, self::COMPLETED_MARKER] as $marker) {
+        foreach ([self::OPEN_FOLLOW_MARKER, self::COMPLETED_FOLLOW_MARKER, self::OPEN_MARKER, self::COMPLETED_MARKER] as $marker) {
             if (str_starts_with($summary, $marker)) {
                 return $marker;
             }
@@ -141,6 +145,25 @@ final class CalendarTaskEvent
     }
 
     /** @param array<string, mixed> $event @param array<string, mixed> $source */
+    private static function requestedFollowPlanned(array $event, array $source): bool
+    {
+        if (array_key_exists('taskFollowPlanned', $event)) {
+            return (bool) $event['taskFollowPlanned'];
+        }
+
+        return (bool) ($source['taskFollowPlanned'] ?? false);
+    }
+
+    private static function markerFor(bool $completed, bool $followPlanned): string
+    {
+        if ($followPlanned) {
+            return $completed ? self::COMPLETED_FOLLOW_MARKER : self::OPEN_FOLLOW_MARKER;
+        }
+
+        return $completed ? self::COMPLETED_MARKER : self::OPEN_MARKER;
+    }
+
+    /** @param array<string, mixed> $event @param array<string, mixed> $source */
     private static function assertTaskShape(array $event, array $source): void
     {
         $allDay = array_key_exists('allDay', $event)
@@ -149,13 +172,11 @@ final class CalendarTaskEvent
         $recurrence = array_key_exists('recurrence', $event)
             ? $event['recurrence']
             : ($source['recurrence'] ?? null);
-        $recurring = (bool) ($source['recurring'] ?? false)
-            || (is_array($recurrence) && $recurrence !== []);
         $start = self::date((string) ($event['start'] ?? $source['start'] ?? ''));
         $end = self::date((string) ($event['end'] ?? $source['end'] ?? ''));
         $oneDay = $start === null || $end === null || $end == $start->modify('+1 day');
-        if (!$allDay || $recurring || !$oneDay) {
-            throw new InvalidArgumentException('Task appointments must be non-recurring one-day all-day events.');
+        if (!$allDay || !$oneDay) {
+            throw new InvalidArgumentException('Task appointments must be one-day all-day events.');
         }
     }
 

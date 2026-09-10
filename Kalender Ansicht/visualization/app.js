@@ -102,6 +102,8 @@ const eventAnniversaryDateLabel = document.getElementById('event-anniversary-dat
 const eventTask = document.getElementById('event-task');
 const eventTaskCompleted = document.getElementById('event-task-completed');
 const eventTaskCompletedRow = document.getElementById('event-task-completed-row');
+const eventTaskFollowPlanned = document.getElementById('event-task-follow-planned');
+const eventTaskFollowPlannedRow = document.getElementById('event-task-follow-planned-row');
 const eventRecurrenceRow = document.getElementById('event-recurrence-row');
 const eventRecurrenceFrequency = document.getElementById('event-recurrence-frequency');
 const eventRecurrenceOptions = document.getElementById('event-recurrence-options');
@@ -1752,7 +1754,7 @@ function eventDisplaySummary(event) {
 }
 
 function taskPlainSummary(summary) {
-    return String(summary || '').trim().replace(/^[☐☑]\s*/u, '').trim();
+    return String(summary || '').trim().replace(/^(?:☐↻|☑↻|☐|☑)\s*/u, '').trim();
 }
 
 function editableEventSummary(event) {
@@ -1763,22 +1765,26 @@ function editableEventSummary(event) {
 function loadTaskEditor(event) {
     eventTask.checked = Boolean(event?.task);
     eventTaskCompleted.checked = Boolean(event?.taskCompleted);
+    eventTaskFollowPlanned.checked = Boolean(event?.taskFollowPlanned);
     updateTaskControls();
 }
 
 function updateTaskControls() {
     const enabled = eventTask.checked;
-    eventTask.disabled = !eventDialogEditable || Boolean(selectedEvent?.recurring);
+    eventTask.disabled = !eventDialogEditable;
     eventTaskCompletedRow.classList.toggle('hidden', !enabled);
     eventTaskCompleted.disabled = !eventDialogEditable || !enabled;
+    const recurring = eventRecurrenceFrequency.value !== 'none' || Boolean(selectedEvent?.recurring);
+    const canFollow = Boolean(selectedCalendarEntry()?.canUpdateFollowing);
+    eventTaskFollowPlannedRow.classList.toggle('hidden', !enabled || !recurring || !canFollow);
+    eventTaskFollowPlanned.disabled = !eventDialogEditable || !enabled || !recurring || !canFollow;
+    if (!recurring || !canFollow) eventTaskFollowPlanned.checked = false;
 
     if (!enabled || !eventDialogEditable) return;
 
     eventAnniversaryType.value = '';
     eventAnniversaryDate.value = '';
     eventAnniversaryDateRow.classList.add('hidden');
-    eventRecurrenceFrequency.value = 'none';
-    eventRecurrenceOptions.classList.add('hidden');
     const allDayInput = document.getElementById('event-all-day');
     const start = readInputDate(document.getElementById('event-start').value) || new Date();
     const displayedEnd = readInputDate(document.getElementById('event-end').value);
@@ -2482,6 +2488,11 @@ async function toggleSelectedTaskCompletion() {
             uid: selectedEvent.uid,
             resourceUrl: selectedEvent.resourceUrl,
             etag: selectedEvent.etag,
+            allDay: Boolean(selectedEvent.allDay),
+            start: selectedEvent.start,
+            end: selectedEvent.end,
+            summary: selectedEvent.summary,
+            taskFollowPlanned: Boolean(selectedEvent.taskFollowPlanned),
             ...recurrencePayload(selectedEvent),
             changes: {
                 task: true,
@@ -3557,13 +3568,6 @@ function selectDefaultRecurrenceWeekday(start) {
 
 function updateRecurrenceAvailability() {
     const calendar = selectedCalendarEntry();
-    if (eventTask.checked) {
-        eventRecurrenceRow.classList.add('hidden');
-        eventRecurrenceFrequency.value = 'none';
-        eventRecurrenceFrequency.disabled = true;
-        eventRecurrenceOptions.classList.add('hidden');
-        return;
-    }
     const editingSeries = Boolean(selectedEvent?.recurring) && selectedEvent?.writeScope === 'series';
     const editingFollowing = Boolean(selectedEvent?.recurring) && selectedEvent?.writeScope === 'following';
     const editingRecurringRange = editingSeries || editingFollowing;
@@ -3801,6 +3805,7 @@ eventForm.addEventListener('submit', async event => {
         location: document.getElementById('event-location').value.trim(),
         task: eventTask.checked,
         taskCompleted: eventTask.checked && eventTaskCompleted.checked,
+        taskFollowPlanned: eventTask.checked && eventTaskFollowPlanned.checked,
         allDay,
         start: inputDateValue(document.getElementById('event-start').value, allDay),
         end: inputDateValue(document.getElementById('event-end').value, allDay, allDay)
@@ -3923,7 +3928,10 @@ document.getElementById('event-all-day').addEventListener('change', event => {
     setDateInputs(start, end, event.target.checked);
 });
 eventTask.addEventListener('change', () => {
-    if (!eventTask.checked) eventTaskCompleted.checked = false;
+    if (!eventTask.checked) {
+        eventTaskCompleted.checked = false;
+        eventTaskFollowPlanned.checked = false;
+    }
     updateTaskControls();
     updateRecurrenceAvailability();
     updateAnniversaryControls();
@@ -3997,6 +4005,7 @@ eventRecurrenceFrequency.addEventListener('change', () => {
         controls.index.value = recurrencePatternContext.relativeIndex;
     }
     updateRecurrenceControls();
+    updateTaskControls();
 });
 eventRecurrenceInterval.addEventListener('input', updateRecurrenceControls);
 eventRecurrenceEndMode.addEventListener('change', updateRecurrenceControls);
@@ -4724,6 +4733,7 @@ function applyStaticTranslations() {
     document.getElementById('all-day-label').textContent = t('All day');
     document.getElementById('event-task-label').textContent = t('Task appointment');
     document.getElementById('event-task-completed-label').textContent = t('Completed');
+    document.getElementById('event-task-follow-planned-label').textContent = t('Move planned follow-up appointments');
     document.getElementById('dialog-title').textContent = t('Event');
     document.getElementById('details-dialog-title').textContent = t('Event details');
     document.getElementById('edit-scope-dialog-title').textContent = t('Edit recurring event');

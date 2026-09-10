@@ -825,7 +825,17 @@ class Calendar extends IPSModuleStrict
                 }
                 $this->applyAnniversaryEventDefaults($changes, $anniversary['date']);
             }
-            $changes = CalendarTaskEvent::prepareWrite($changes, $event);
+            $taskSource = $event;
+            if (array_key_exists('task', $changes)
+                || array_key_exists('taskCompleted', $changes)
+                || array_key_exists('taskStatus', $changes)
+                || array_key_exists('taskFollowPlanned', $changes)) {
+                $cachedEvent = $this->cachedEventForIdentity($event);
+                if ($cachedEvent !== null) {
+                    $taskSource = array_merge($cachedEvent, $event);
+                }
+            }
+            $changes = CalendarTaskEvent::prepareWrite($changes, $taskSource);
             $requestedRecurrence = $changes['recurrence'] ?? null;
             $recurrenceType = (string) ($recurrence['recurrenceType'] ?? CalendarEventRecurrence::SINGLE);
             $convertingSingleToSeries = $recurrenceType === CalendarEventRecurrence::SINGLE
@@ -2494,20 +2504,57 @@ class Calendar extends IPSModuleStrict
         }
 
         $today = new DateTimeImmutable('today');
+        $blockedSeries = [];
+        foreach ($events as $event) {
+            $seriesKey = $this->taskSeriesKey($event);
+            if ($seriesKey !== '' && $this->isRolledForwardOpenTask($event, $today)) {
+                $blockedSeries[$seriesKey] = true;
+            }
+        }
+
+        $candidates = [];
         foreach ($events as $index => $event) {
+            if ((bool) ($event['recurring'] ?? false)
+                && !CalendarEventRecurrence::isOccurrence($event)) {
+                continue;
+            }
             $changes = CalendarTaskEvent::rollForwardChanges($event, $today);
             if ($changes === null) {
                 continue;
             }
 
-            $updated = $this->sendRequest('UpdateEvent', [
-                'UID'         => trim((string) ($event['uid'] ?? '')),
-                'ResourceURL' => trim((string) ($event['resourceUrl'] ?? '')),
-                'ETag'        => trim((string) ($event['etag'] ?? '')),
-                'Event'       => $changes,
-                'Recurrence'  => CalendarEventRecurrence::fromEvent($event)
-            ]);
-            $events[$index] = array_merge($event, $changes, $updated);
+            $seriesKey = $this->taskSeriesKey($event);
+            if ($seriesKey !== '' && isset($blockedSeries[$seriesKey])) {
+                continue;
+            }
+            $candidates[] = [
+                'index'     => $index,
+                'event'     => $event,
+                'changes'   => $changes,
+                'seriesKey' => $seriesKey,
+                'start'     => $this->eventBoundaryTimestamp($event, 'start')
+            ];
+        }
+
+        usort(
+            $candidates,
+            static fn (array $left, array $right): int => ($left['start'] <=> $right['start'])
+                ?: ($left['index'] <=> $right['index'])
+        );
+        $movedSeries = [];
+        foreach ($candidates as $candidate) {
+            $seriesKey = $candidate['seriesKey'];
+            if ($seriesKey !== '' && isset($movedSeries[$seriesKey])) {
+                continue;
+            }
+
+            $index = $candidate['index'];
+            $event = $candidate['event'];
+            $updated = $this->rollForwardTaskEvent($event, $candidate['changes']);
+            $events[$index] = array_merge($event, $candidate['changes'], $updated);
+            if ($seriesKey !== '') {
+                $movedSeries[$seriesKey] = true;
+            }
             ++$moved;
         }
 
@@ -2519,6 +2566,91 @@ class Calendar extends IPSModuleStrict
         }
 
         return $events;
+    }
+
+    /**
+     * Updates an overdue task occurrence and optionally shifts its remaining series.
+     *
+     * @param array<string, mixed> $event
+     * @param array<string, mixed> $changes
+     * @return array<string, mixed>
+     */
+    private function rollForwardTaskEvent(array $event, array $changes): array
+    {
+        $recurrence = CalendarEventRecurrence::fromEvent($event);
+        $followPlanned = (bool) ($event['taskFollowPlanned'] ?? false)
+            && CalendarEventRecurrence::isOccurrence($event)
+            && (bool) ($recurrence['canUpdateFollowing'] ?? false);
+        if ($followPlanned) {
+            $following = $this->sendRequest('GetRecurringFollowing', [
+                'SeriesID'      => trim((string) ($event['seriesId'] ?? '')),
+                'OccurrenceID'  => trim((string) ($event['occurrenceId'] ?? '')),
+                'OriginalStart' => trim((string) ($event['originalStart'] ?? '')),
+                'ResourceURL'   => trim((string) ($event['resourceUrl'] ?? ''))
+            ]);
+            $settings = $following['recurrenceSettings'] ?? null;
+            if (!is_array($settings) || $settings === []) {
+                throw new InvalidArgumentException('The recurring task could not be prepared for moving following appointments.');
+            }
+            $changes['recurrence'] = $settings;
+            $recurrence = CalendarEventRecurrence::fromEvent($following);
+            $event = $following;
+        }
+
+        return $this->sendRequest('UpdateEvent', [
+            'UID'         => trim((string) ($event['uid'] ?? '')),
+            'ResourceURL' => trim((string) ($event['resourceUrl'] ?? '')),
+            'ETag'        => trim((string) ($event['etag'] ?? '')),
+            'Event'       => $changes,
+            'Recurrence'  => $recurrence
+        ]);
+    }
+
+    /** @param array<string, mixed> $event */
+    private function taskSeriesKey(array $event): string
+    {
+        if (!(bool) ($event['recurring'] ?? false)
+            || !CalendarEventRecurrence::isOccurrence($event)) {
+            return '';
+        }
+
+        $seriesId = trim((string) ($event['seriesId'] ?? ''));
+        if ($seriesId !== '') {
+            return 'series:' . $seriesId;
+        }
+
+        $uid = trim((string) ($event['uid'] ?? ''));
+        return $uid !== '' ? 'uid:' . $uid : '';
+    }
+
+    /** @param array<string, mixed> $event */
+    private function isRolledForwardOpenTask(array $event, DateTimeImmutable $today): bool
+    {
+        $event = CalendarTaskEvent::enrich($event);
+        if (!(bool) ($event['task'] ?? false)
+            || (bool) ($event['taskCompleted'] ?? false)
+            || !(bool) ($event['allDay'] ?? false)) {
+            return false;
+        }
+
+        $start = $this->taskEventDate($event, 'start');
+        $originalStart = $this->taskEventDate($event, 'originalStart');
+        return $start !== null
+            && $originalStart !== null
+            && $originalStart < $today
+            && $start >= $today;
+    }
+
+    /** @param array<string, mixed> $event */
+    private function taskEventDate(array $event, string $key): ?DateTimeImmutable
+    {
+        $value = substr(trim((string) ($event[$key] ?? '')), 0, 10);
+        if (preg_match('/^\d{4}-\d{2}-\d{2}$/D', $value) !== 1) {
+            return null;
+        }
+
+        $date = DateTimeImmutable::createFromFormat('!Y-m-d', $value);
+        return $date !== false && $date->format('Y-m-d') === $value ? $date : null;
     }
 
     private function calendarCanWrite(): bool

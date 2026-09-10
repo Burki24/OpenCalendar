@@ -33,8 +33,8 @@ beliebig verschoben oder vom Benutzer umbenannt werden.
 - Auflösen wiederkehrender Termine für die lokale Anzeige
 - lokaler JSON-Cache und zyklische Synchronisation
 - Erstellen neuer Termine sowie neuer Google-, Microsoft-, Apple-iCloud- und CalDAV-Serientermine
-- providerneutrale Aufgabentermine als ganztägige Einzeltermine mit offenem oder
-  erledigtem Status und automatischer Fortschreibung überfälliger Aufgaben
+- providerneutrale, eintägige ganztägige Aufgabentermine und Aufgabenserien mit
+  offenem oder erledigtem Status und automatischer Fortschreibung überfälliger Aufgaben
 - Ändern und Löschen einzelner Termine sowie einzelner Google-, Microsoft-, Apple-iCloud- und CalDAV-Serienvorkommnisse
 - Bearbeiten einer vollständigen Google-, Microsoft-, Apple-iCloud- oder CalDAV-Terminserie
 - Bearbeiten oder Löschen eines Google-, Microsoft-, Apple-iCloud- oder CalDAV-Serienvorkommnisses **und aller folgenden Termine** durch sicheres Teilen bzw. Kürzen der Serie
@@ -83,7 +83,7 @@ Kalenderansicht übertragen große Terminmengen automatisch in begrenzten Seiten
 Dadurch wird weder bei der Synchronisation noch beim Aufbau der Ansicht eine
 einzelne JSON-Antwort mit sämtlichen Terminen benötigt.
 
-Ein Termin enthält unter anderem `id`, `uid`, `resourceUrl`, `etag`, `summary`, `description`, `location`, `start`, `end`, `startTimestamp`, `endTimestamp`, `allDay`, `status`, `recurrenceRule` und `recurrenceId`. Wurde der Titel durch ein ausgewähltes iCalendar-Übersetzungsprofil angepasst, enthält `originalSummary` zusätzlich den unveränderten Originaltitel. Aufgabentermine enthalten außerdem `task`, `taskCompleted`, `taskStatus` (`open` oder `completed`) und einen von der Statusmarkierung bereinigten `displaySummary`. Als Jahresereignis markierte Termine erhalten zusätzlich `anniversaryType`, `anniversaryDate`, `years` und `displaySummary`. Unterstützt werden `birthday`, `anniversary`, `wedding` und `death`. Für Geburtstage bleiben zusätzlich die kompatiblen Felder `birthday`, `birthDate` und `age` erhalten. Das Ausgangsdatum wird lokal in OpenCalendar gespeichert; der eigentliche Titel beim Kalenderanbieter bleibt unverändert.
+Ein Termin enthält unter anderem `id`, `uid`, `resourceUrl`, `etag`, `summary`, `description`, `location`, `start`, `end`, `startTimestamp`, `endTimestamp`, `allDay`, `status`, `recurrenceRule` und `recurrenceId`. Wurde der Titel durch ein ausgewähltes iCalendar-Übersetzungsprofil angepasst, enthält `originalSummary` zusätzlich den unveränderten Originaltitel. Aufgabentermine enthalten außerdem `task`, `taskCompleted`, `taskStatus` (`open` oder `completed`), `taskFollowPlanned` und einen von der Statusmarkierung bereinigten `displaySummary`. Als Jahresereignis markierte Termine erhalten zusätzlich `anniversaryType`, `anniversaryDate`, `years` und `displaySummary`. Unterstützt werden `birthday`, `anniversary`, `wedding` und `death`. Für Geburtstage bleiben zusätzlich die kompatiblen Felder `birthday`, `birthDate` und `age` erhalten. Das Ausgangsdatum wird lokal in OpenCalendar gespeichert; der eigentliche Titel beim Kalenderanbieter bleibt unverändert.
 
 ## PHP-Befehlsreferenz
 
@@ -150,7 +150,8 @@ $result = IPSKAL_CreateEvent(12345, json_encode([
 
 ### Aufgabentermin erstellen und erledigen
 
-Ein Aufgabentermin ist ein ganztägiger, nicht wiederkehrender Kalendertermin.
+Ein Aufgabentermin ist ein eintägiger, ganztägiger Kalendertermin. Er darf
+wiederkehrend sein.
 `task = true` setzt beim Anbieter automatisch den offenen Marker `☐` vor den
 Titel. `taskCompleted = true` verwendet stattdessen `☑`. Die Steuerfelder werden
 nicht als eigene Providerdaten übertragen; der Titelmarker ist die dauerhafte und
@@ -185,9 +186,13 @@ $result = IPSKAL_UpdateEvent(12345, json_encode([
 
 Offene Aufgabentermine mit einem Datum vor heute werden beim lokalen
 Tageswechsel und bei jeder Synchronisation auf heute verschoben. Erledigte
-Aufgaben bleiben unverändert. Da dabei der echte Kalendertermin aktualisiert
-wird, muss der Kalender beschreibbar sein. Aufgabenserien und zeitgebundene
-Aufgabentermine werden abgewiesen.
+Aufgaben bleiben unverändert. Bei einer Aufgabenserie verschiebt
+`taskFollowPlanned = true` den ab dem überfälligen Termin verbleibenden
+Serienteil; ohne diese Option bleibt der ursprüngliche Serienplan erhalten und
+nur das älteste überfällige Vorkommnis wird nachgezogen. Das Mitverschieben
+erfordert eine Kalenderanbieter-Unterstützung für „diesen und alle folgenden
+Termine“. Da dabei der echte Kalendertermin aktualisiert wird, muss der Kalender
+beschreibbar sein. Zeitgebundene Aufgabentermine werden abgewiesen.
 
 Für beschreibbare Google-, Microsoft-, Apple-iCloud- und CalDAV-Kalender können beim Erstellen zusätzlich
 providerneutrale Serienangaben übergeben werden. Bei Google verwendet OpenCalendar

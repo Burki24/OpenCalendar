@@ -62,6 +62,7 @@
             "Task status": "Aufgabenstatus",
             "Open": "Offen",
             "Completed": "Erledigt",
+            "Move planned follow-up appointments": "Geplante Folgetermine mitverschieben",
             "Mark completed": "Als erledigt markieren",
             "Reopen task": "Aufgabe wieder öffnen",
             "Edit event": "Termin bearbeiten",
