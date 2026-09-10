@@ -42,6 +42,7 @@
             "Event created.": "Termin erstellt.",
             "Event updated.": "Termin geändert.",
             "Event deleted.": "Termin gelöscht.",
+            "The selected event could not be loaded. Synchronize the calendar and try again.": "Der ausgewählte Termin konnte nicht geladen werden. Synchronisieren Sie den Kalender und versuchen Sie es erneut.",
             "Previous": "Zurück",
             "Today": "Heute",
             "Next": "Weiter",

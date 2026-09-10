@@ -2728,14 +2728,20 @@ class CalendarView extends IPSModuleStrict
                     throw new InvalidArgumentException($this->Translate('The event data is invalid.'));
                 }
 
+                $eventEditJson = IPSKAL_GetEventForEdit(
+                    $instanceId,
+                    json_encode(
+                        $event,
+                        JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR
+                    )
+                );
+                if (!is_string($eventEditJson)) {
+                    throw new RuntimeException(
+                        $this->Translate('The selected event could not be loaded. Synchronize the calendar and try again.')
+                    );
+                }
                 $eventEdit = json_decode(
-                    IPSKAL_GetEventForEdit(
-                        $instanceId,
-                        json_encode(
-                            $event,
-                            JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR
-                        )
-                    ),
+                    $eventEditJson,
                     true,
                     512,
                     JSON_THROW_ON_ERROR

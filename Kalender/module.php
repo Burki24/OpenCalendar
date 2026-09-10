@@ -523,17 +523,24 @@ class Calendar extends IPSModuleStrict
                 throw new InvalidArgumentException('The selected event start is invalid.');
             }
 
-            $currentEvent = $this->sendRequest('GetEventForEdit', [
-                'ResourceURL'    => trim((string) ($event['resourceUrl'] ?? '')),
-                'EventReference' => trim((string) ($event['eventReference'] ?? '')),
-                'UID'            => trim((string) ($event['uid'] ?? '')),
-                'SeriesID'       => trim((string) ($event['seriesId'] ?? '')),
-                'OccurrenceID'   => trim((string) ($event['occurrenceId'] ?? '')),
-                'OriginalStart'  => trim((string) ($event['originalStart'] ?? '')),
-                'RecurrenceID'   => trim((string) ($event['recurrenceId'] ?? '')),
-                'Start'          => $startTimestamp,
-                'End'            => $endTimestamp
-            ]);
+            try {
+                $currentEvent = $this->sendRequest('GetEventForEdit', [
+                    'ResourceURL'    => trim((string) ($event['resourceUrl'] ?? '')),
+                    'EventReference' => trim((string) ($event['eventReference'] ?? '')),
+                    'UID'            => trim((string) ($event['uid'] ?? '')),
+                    'SeriesID'       => trim((string) ($event['seriesId'] ?? '')),
+                    'OccurrenceID'   => trim((string) ($event['occurrenceId'] ?? '')),
+                    'OriginalStart'  => trim((string) ($event['originalStart'] ?? '')),
+                    'RecurrenceID'   => trim((string) ($event['recurrenceId'] ?? '')),
+                    'Start'          => $startTimestamp,
+                    'End'            => $endTimestamp
+                ]);
+            } catch (Throwable $exception) {
+                $currentEvent = $this->cachedTaskEventForEdit($event, $exception);
+                if ($currentEvent === null) {
+                    throw $exception;
+                }
+            }
             $currentEvent = CalendarTaskEvent::enrich($this->enrichAnniversaryEvent($currentEvent));
 
             return json_encode(
@@ -2331,6 +2338,37 @@ class Calendar extends IPSModuleStrict
         }
 
         return null;
+    }
+
+    /**
+     * Returns a cached task event when a fresh provider lookup is temporarily unavailable.
+     *
+     * Task appointments may have just been shifted to the current day. In that short
+     * provider-consistency window their cached identity and ETag are still sufficient for
+     * editing; normal appointments retain the stricter fresh-lookup requirement.
+     *
+     * @param array<string, mixed> $identity
+     * @return array<string, mixed>|null
+     */
+    private function cachedTaskEventForEdit(array $identity, Throwable $exception): ?array
+    {
+        $event = $this->cachedEventForIdentity($identity);
+        if ($event === null) {
+            return null;
+        }
+
+        $event = CalendarTaskEvent::enrich($this->enrichAnniversaryEvent($event));
+        if (!(bool) ($event['task'] ?? false)) {
+            return null;
+        }
+
+        $this->SendSafeDebug('TaskEventEditCacheFallback', [
+            'reason'            => $exception->getMessage(),
+            'hasEventReference' => trim((string) ($event['eventReference'] ?? '')) !== '',
+            'hasResourceUrl'    => trim((string) ($event['resourceUrl'] ?? '')) !== ''
+        ]);
+
+        return $event;
     }
 
     /**
