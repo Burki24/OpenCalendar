@@ -149,6 +149,92 @@ assertTaskAppointment(
     'Completed task appointments must never roll forward.'
 );
 
+$shiftedRecurrence = CalendarTaskEvent::shiftPlannedRecurrence(
+    [
+        'frequency' => 'WEEKLY',
+        'interval'  => 1,
+        'byDay'     => ['SA'],
+        'endMode'   => 'until',
+        'until'     => '2026-10-31'
+    ],
+    '2026-09-12',
+    '2026-09-11'
+);
+assertTaskAppointment(
+    ($shiftedRecurrence['byDay'] ?? []) === ['FR']
+        && ($shiftedRecurrence['until'] ?? '') === '2026-10-30',
+    'Moving a planned task-series tail must rebase its weekday and end date to the new occurrence date.'
+);
+
+$seriesEvents = [
+    [
+        'uid'            => 'task-series@example.com',
+        'seriesId'       => 'task-series',
+        'occurrenceId'   => 'task-first',
+        'recurrenceType' => 'exception',
+        'recurring'      => true,
+        'summary'        => '☐↻ Serienaufgabe',
+        'allDay'         => true,
+        'originalStart'  => '2026-09-12',
+        'start'          => '2026-09-10',
+        'end'            => '2026-09-11',
+        'startTimestamp' => 1788998400,
+        'endTimestamp'   => 1789084800
+    ],
+    [
+        'uid'            => 'task-series@example.com',
+        'seriesId'       => 'task-series',
+        'occurrenceId'   => 'task-second',
+        'recurrenceType' => 'occurrence',
+        'recurring'      => true,
+        'summary'        => '☐↻ Serienaufgabe',
+        'allDay'         => true,
+        'originalStart'  => '2026-09-19',
+        'start'          => '2026-09-19',
+        'end'            => '2026-09-20',
+        'startTimestamp' => 1789776000,
+        'endTimestamp'   => 1789862400
+    ],
+    [
+        'uid'            => 'other-series@example.com',
+        'seriesId'       => 'other-series',
+        'occurrenceId'   => 'other-first',
+        'recurrenceType' => 'occurrence',
+        'recurring'      => true,
+        'originalStart'  => '2026-09-19',
+        'start'          => '2026-09-19',
+        'end'            => '2026-09-20'
+    ]
+];
+$shiftedEvents = CalendarTaskEvent::shiftFollowingEvents(
+    $seriesEvents,
+    $seriesEvents[0],
+    '2026-09-11'
+);
+assertTaskAppointment(
+    $shiftedEvents[0]['start'] === '2026-09-10'
+        && $shiftedEvents[1]['start'] === '2026-09-18'
+        && $shiftedEvents[1]['end'] === '2026-09-19'
+        && $shiftedEvents[1]['startTimestamp'] === 1789689600
+        && $shiftedEvents[2]['start'] === '2026-09-19',
+    'The synchronization cache must optimistically move only later occurrences of the affected task series.'
+);
+
+$cachedShiftedEvents = $shiftedEvents;
+$cachedShiftedEvents[0]['start'] = '2026-09-11';
+$cachedShiftedEvents[0]['end'] = '2026-09-12';
+$preservedEvents = CalendarTaskEvent::preservePendingSeries(
+    $seriesEvents,
+    $cachedShiftedEvents,
+    new DateTimeImmutable('2026-09-11')
+);
+assertTaskAppointment(
+    $preservedEvents[0]['start'] === '2026-09-11'
+        && $preservedEvents[1]['start'] === '2026-09-18'
+        && $preservedEvents[2]['start'] === '2026-09-19',
+    'A delayed provider response must not overwrite or repeat a task-series shift already completed today.'
+);
+
 foreach ([
     ['allDay' => false, 'recurrence' => null],
     ['allDay' => true, 'recurrence' => null, 'start' => '2026-09-08', 'end' => '2026-09-10']

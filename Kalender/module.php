@@ -2504,6 +2504,7 @@ class Calendar extends IPSModuleStrict
         }
 
         $today = new DateTimeImmutable('today');
+        $events = CalendarTaskEvent::preservePendingSeries($events, $this->readEvents(), $today);
         $blockedSeries = [];
         foreach ($events as $event) {
             $seriesKey = $this->taskSeriesKey($event);
@@ -2550,7 +2551,15 @@ class Calendar extends IPSModuleStrict
 
             $index = $candidate['index'];
             $event = $candidate['event'];
-            $updated = $this->rollForwardTaskEvent($event, $candidate['changes']);
+            $followingMoved = false;
+            $updated = $this->rollForwardTaskEvent($event, $candidate['changes'], $followingMoved);
+            if ($followingMoved) {
+                $events = CalendarTaskEvent::shiftFollowingEvents(
+                    $events,
+                    $event,
+                    (string) $candidate['changes']['start']
+                );
+            }
             $events[$index] = array_merge($event, $candidate['changes'], $updated);
             if ($seriesKey !== '') {
                 $movedSeries[$seriesKey] = true;
@@ -2575,8 +2584,9 @@ class Calendar extends IPSModuleStrict
      * @param array<string, mixed> $changes
      * @return array<string, mixed>
      */
-    private function rollForwardTaskEvent(array $event, array $changes): array
+    private function rollForwardTaskEvent(array $event, array $changes, ?bool &$followingMoved = null): array
     {
+        $followingMoved = false;
         $recurrence = CalendarEventRecurrence::fromEvent($event);
         $followPlanned = (bool) ($event['taskFollowPlanned'] ?? false)
             && CalendarEventRecurrence::isOccurrence($event)
@@ -2592,9 +2602,14 @@ class Calendar extends IPSModuleStrict
             if (!is_array($settings) || $settings === []) {
                 throw new InvalidArgumentException('The recurring task could not be prepared for moving following appointments.');
             }
-            $changes['recurrence'] = $settings;
+            $changes['recurrence'] = CalendarTaskEvent::shiftPlannedRecurrence(
+                $settings,
+                (string) ($following['originalStart'] ?? $event['originalStart'] ?? ''),
+                (string) ($changes['start'] ?? '')
+            );
             $recurrence = CalendarEventRecurrence::fromEvent($following);
             $event = $following;
+            $followingMoved = true;
         }
 
         return $this->sendRequest('UpdateEvent', [

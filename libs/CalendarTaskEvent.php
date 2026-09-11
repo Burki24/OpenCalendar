@@ -17,6 +17,8 @@ final class CalendarTaskEvent
     public const OPEN_FOLLOW_MARKER = '☐↻';
     public const COMPLETED_FOLLOW_MARKER = '☑↻';
 
+    private const WEEKDAYS = ['MO', 'TU', 'WE', 'TH', 'FR', 'SA', 'SU'];
+
     /** @param array<string, mixed> $event */
     public static function enrich(array $event): array
     {
@@ -112,6 +114,181 @@ final class CalendarTaskEvent
     }
 
     /**
+     * Reanchors recurrence settings when a planned task-series tail is moved.
+     *
+     * The offset is measured from the occurrence's immutable planned start. This
+     * matters for provider exceptions which may already have been moved independently.
+     *
+     * @param array<string, mixed> $recurrence
+     * @return array<string, mixed>
+     */
+    public static function shiftPlannedRecurrence(
+        array $recurrence,
+        string $originalStart,
+        string $newStart
+    ): array {
+        $original = self::eventDate($originalStart);
+        $target = self::eventDate($newStart);
+        if ($original === null || $target === null) {
+            throw new InvalidArgumentException('The task series contains an invalid occurrence date.');
+        }
+
+        $shift = (int) $original->diff($target)->format('%r%a');
+        if ($shift === 0) {
+            return $recurrence;
+        }
+
+        $frequency = strtoupper(trim((string) ($recurrence['frequency'] ?? '')));
+        $patternMode = strtolower(trim((string) ($recurrence['patternMode'] ?? 'absolute')));
+        if ($frequency === 'WEEKLY') {
+            $recurrence['byDay'] = self::shiftWeekdays(
+                $recurrence['byDay'] ?? [],
+                $original,
+                $shift
+            );
+        } elseif (in_array($frequency, ['MONTHLY', 'YEARLY'], true) && $patternMode === 'relative') {
+            $weekdays = self::shiftWeekdays($recurrence['byDay'] ?? [], $original, $shift);
+            $recurrence['byDay'] = $weekdays;
+            if (count($weekdays) === 1) {
+                $recurrence['relativeIndex'] = self::relativeIndex($target);
+            }
+            if ($frequency === 'YEARLY') {
+                $recurrence['month'] = (int) $target->format('n');
+            }
+        } elseif ($frequency === 'MONTHLY') {
+            $recurrence['dayOfMonth'] = (int) $target->format('j');
+        } elseif ($frequency === 'YEARLY') {
+            $recurrence['dayOfMonth'] = (int) $target->format('j');
+            $recurrence['month'] = (int) $target->format('n');
+        }
+
+        if (array_key_exists('rangeStart', $recurrence)) {
+            $recurrence['rangeStart'] = $target->format('Y-m-d');
+        }
+        if (strtolower(trim((string) ($recurrence['endMode'] ?? ''))) === 'until') {
+            $until = self::date(trim((string) ($recurrence['until'] ?? '')));
+            if ($until === null) {
+                throw new InvalidArgumentException('The task series contains an invalid end date.');
+            }
+            $recurrence['until'] = self::shiftDate($until, $shift)->format('Y-m-d');
+        }
+
+        return $recurrence;
+    }
+
+    /**
+     * Optimistically updates already fetched following occurrences after a series write.
+     *
+     * Provider synchronization remains authoritative. This prevents the stale snapshot
+     * fetched before the write from immediately overwriting the visible shifted dates.
+     *
+     * @param list<array<string, mixed>> $events
+     * @param array<string, mixed> $targetEvent
+     * @return list<array<string, mixed>>
+     */
+    public static function shiftFollowingEvents(
+        array $events,
+        array $targetEvent,
+        string $newStart
+    ): array {
+        $original = self::eventDate((string) ($targetEvent['originalStart'] ?? ''));
+        $target = self::eventDate($newStart);
+        $seriesKey = self::seriesKey($targetEvent);
+        if ($original === null || $target === null || $seriesKey === '') {
+            return $events;
+        }
+
+        $shift = (int) $original->diff($target)->format('%r%a');
+        if ($shift === 0) {
+            return $events;
+        }
+
+        foreach ($events as &$event) {
+            $eventOriginal = self::eventDate((string) ($event['originalStart'] ?? ''));
+            if (self::seriesKey($event) !== $seriesKey
+                || $eventOriginal === null
+                || $eventOriginal <= $original) {
+                continue;
+            }
+
+            foreach (['start', 'end'] as $key) {
+                $date = self::date(trim((string) ($event[$key] ?? '')));
+                if ($date !== null) {
+                    $event[$key] = self::shiftDate($date, $shift)->format('Y-m-d');
+                }
+            }
+            foreach (['startTimestamp', 'endTimestamp'] as $key) {
+                if (isset($event[$key]) && is_numeric($event[$key])) {
+                    $event[$key] = (int) $event[$key] + ($shift * 86400);
+                }
+            }
+        }
+        unset($event);
+
+        return $events;
+    }
+
+    /**
+     * Preserves a task-series shift while a provider still returns its pre-write snapshot.
+     *
+     * @param list<array<string, mixed>> $events Fresh provider events.
+     * @param list<array<string, mixed>> $cachedEvents Last successfully stored events.
+     * @return list<array<string, mixed>>
+     */
+    public static function preservePendingSeries(
+        array $events,
+        array $cachedEvents,
+        DateTimeImmutable $today
+    ): array {
+        $cachedByOccurrence = [];
+        foreach ($cachedEvents as $cachedEvent) {
+            $key = self::occurrenceKey($cachedEvent);
+            if ($key !== '') {
+                $cachedByOccurrence[$key] = $cachedEvent;
+            }
+        }
+
+        $pendingSeries = [];
+        foreach ($events as $event) {
+            if (self::rollForwardChanges($event, $today) === null) {
+                continue;
+            }
+            $key = self::occurrenceKey($event);
+            $cached = $cachedByOccurrence[$key] ?? null;
+            if (!is_array($cached)) {
+                continue;
+            }
+            $cached = self::enrich($cached);
+            $cachedStart = self::eventDate((string) ($cached['start'] ?? ''));
+            if ((bool) ($cached['task'] ?? false)
+                && !(bool) ($cached['taskCompleted'] ?? false)
+                && $cachedStart !== null
+                && $cachedStart == $today) {
+                $seriesKey = self::seriesKey($event);
+                if ($seriesKey !== '') {
+                    $pendingSeries[$seriesKey] = true;
+                }
+            }
+        }
+
+        if ($pendingSeries === []) {
+            return $events;
+        }
+        foreach ($events as &$event) {
+            if (!isset($pendingSeries[self::seriesKey($event)])) {
+                continue;
+            }
+            $cached = $cachedByOccurrence[self::occurrenceKey($event)] ?? null;
+            if (is_array($cached)) {
+                $event = $cached;
+            }
+        }
+        unset($event);
+
+        return $events;
+    }
+
+    /**
      * Removes an OpenCalendar task marker from an event title.
      */
     public static function plainSummary(string $summary): string
@@ -129,6 +306,84 @@ final class CalendarTaskEvent
         }
 
         return '';
+    }
+
+    /** @param mixed $weekdays @return list<string> */
+    private static function shiftWeekdays(mixed $weekdays, DateTimeImmutable $fallback, int $shift): array
+    {
+        $values = is_array($weekdays) ? $weekdays : [];
+        $values = array_values(array_filter(
+            array_map(static fn (mixed $day): string => strtoupper(trim((string) $day)), $values),
+            static fn (string $day): bool => in_array($day, self::WEEKDAYS, true)
+        ));
+        if ($values === []) {
+            $values = [self::WEEKDAYS[(int) $fallback->format('N') - 1]];
+        }
+
+        $shifted = [];
+        foreach ($values as $weekday) {
+            $index = array_search($weekday, self::WEEKDAYS, true);
+            if ($index === false) {
+                continue;
+            }
+            $shifted[] = self::WEEKDAYS[(($index + $shift) % 7 + 7) % 7];
+        }
+
+        return array_values(array_unique($shifted));
+    }
+
+    private static function relativeIndex(DateTimeImmutable $date): string
+    {
+        $position = (int) ceil(((int) $date->format('j')) / 7);
+        if ($date->modify('+7 days')->format('n') !== $date->format('n')) {
+            return 'last';
+        }
+
+        return match ($position) {
+            1       => 'first',
+            2       => 'second',
+            3       => 'third',
+            default => 'fourth'
+        };
+    }
+
+    /** @param array<string, mixed> $event */
+    private static function seriesKey(array $event): string
+    {
+        if (!(bool) ($event['recurring'] ?? false)) {
+            return '';
+        }
+        $seriesId = trim((string) ($event['seriesId'] ?? ''));
+        if ($seriesId !== '') {
+            return 'series:' . $seriesId;
+        }
+        $uid = trim((string) ($event['uid'] ?? ''));
+        return $uid !== '' ? 'uid:' . $uid : '';
+    }
+
+    /** @param array<string, mixed> $event */
+    private static function occurrenceKey(array $event): string
+    {
+        $seriesKey = self::seriesKey($event);
+        if ($seriesKey === '') {
+            return '';
+        }
+        $originalStart = trim((string) ($event['originalStart'] ?? ''));
+        if ($originalStart !== '') {
+            return $seriesKey . '|original:' . $originalStart;
+        }
+        $occurrenceId = trim((string) ($event['occurrenceId'] ?? ''));
+        return $occurrenceId !== '' ? $seriesKey . '|occurrence:' . $occurrenceId : '';
+    }
+
+    private static function eventDate(string $value): ?DateTimeImmutable
+    {
+        return self::date(substr(trim($value), 0, 10));
+    }
+
+    private static function shiftDate(DateTimeImmutable $date, int $days): DateTimeImmutable
+    {
+        return $date->modify(($days >= 0 ? '+' : '') . $days . ' days');
     }
 
     /** @param array<string, mixed> $event @param array<string, mixed> $source */
