@@ -122,6 +122,14 @@ die gesamte Serie. Bereits einzeln angepasste folgende Vorkommnisse werden dabei
 zurückgesetzt. Der Hinweis im Bearbeitungsdialog folgt der Auswahl. Das reine
 Erledigen ohne Datumsänderung betrifft weiterhin nur die ausgewählte Aufgabe.
 
+Die Auswahl gilt auch beim Wechsel in einen anderen Kalender: Mit **Geplante
+Folgetermine mitverschieben** werden das ausgewählte und alle folgenden
+Vorkommnisse als Serie übertragen, beim ersten Termin also die gesamte Serie.
+Ohne Häkchen wird nur das geöffnete Vorkommnis als Einzeltermin übertragen.
+Das Ziel muss Serien anlegen können. Erst nach erfolgreicher Erstellung im
+Ziel wird der übertragene Serienteil an der Quelle entfernt; bei einem Fehler
+greift die bestehende Rücknahme des Zieltermins. Offene Aufgaben bleiben offen.
+
 Das Datum darf auch nach hinten verschoben werden. Liegt eine offene Aufgabe
 danach in der Vergangenheit, greift bei der nächsten Synchronisation wieder
 das automatische Nachziehen auf heute; mit aktiviertem Häkchen wird dabei auch

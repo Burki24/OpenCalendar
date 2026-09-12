@@ -1802,7 +1802,10 @@ function updateTaskMoveNote() {
     if (!eventDialogEditable || !eventIsRecurring(selectedEvent)
         || ['series', 'following'].includes(selectedEvent?.writeScope)) return;
     const note = document.getElementById('dialog-note');
-    note.textContent = eventTask.checked && eventTaskFollowPlanned.checked
+    const moving = Number(eventCalendarInput.value) !== Number(selectedEvent?.calendarInstanceId);
+    note.textContent = eventTask.checked && eventTaskFollowPlanned.checked && moving
+        ? t('This and all following tasks will be moved to the selected calendar.')
+        : eventTask.checked && eventTaskFollowPlanned.checked
         ? t('Changing the date moves this and all following occurrences. Existing following exceptions will be reset.')
         : t('Only this occurrence of the recurring event will be changed.');
     note.classList.remove('hidden');
@@ -3968,6 +3971,7 @@ eventCalendarInput.addEventListener('change', () => {
     updateAnniversaryControls();
     resolveDefaultReminderForCalendarMove();
     updateReminderControls();
+    updateTaskMoveNote();
 });
 eventAnniversaryType.addEventListener('change', () => {
     if (eventAnniversaryType.value) {

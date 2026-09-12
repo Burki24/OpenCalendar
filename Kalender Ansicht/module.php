@@ -10,9 +10,11 @@ use Burki24\SymconModuleHelper\VisualizationAssetHelper;
 use Burki24\SymconModuleHelper\VisualizationThemeHelper;
 use IPSKalender\CalendarAppointmentRange;
 use IPSKalender\CalendarEventReminder;
+use IPSKalender\CalendarTaskEvent;
 
 require_once __DIR__ . '/../libs/CalendarAppointmentRange.php';
 require_once __DIR__ . '/../libs/CalendarEventReminder.php';
+require_once __DIR__ . '/../libs/CalendarTaskEvent.php';
 require_once __DIR__ . '/../libs/helper/ConfigurationFormHelper.php';
 require_once __DIR__ . '/../libs/helper/IPSViewHTMLPageHelper.php';
 require_once __DIR__ . '/../libs/helper/IPSViewStyleConfigurationHelper.php';
@@ -1534,6 +1536,7 @@ class CalendarView extends IPSModuleStrict
             'Recurring occurrences are currently read-only.',
             'Only this occurrence of the recurring event will be changed.',
             'Changing the date moves this and all following occurrences. Existing following exceptions will be reset.',
+            'This and all following tasks will be moved to the selected calendar.',
             'Changes will apply to this and all following occurrences.',
             'Existing exceptions from this occurrence onward will be reset.',
             'Changes will apply to the entire recurring series.',
@@ -2885,6 +2888,7 @@ class CalendarView extends IPSModuleStrict
                     || !is_array($event) || array_is_list($event)) {
                     throw new InvalidArgumentException($this->Translate('The event data is invalid.'));
                 }
+                $this->prepareTaskSeriesTransfer($sourceInstanceId, $sourceEvent, $event);
                 $sourceReminder = is_array($sourceEvent['reminder'] ?? null)
                     ? $sourceEvent['reminder']
                     : [];
@@ -3290,6 +3294,47 @@ class CalendarView extends IPSModuleStrict
         throw new RuntimeException(
             $this->Translate('Events with complex reminder settings cannot be moved safely.')
         );
+    }
+
+    /**
+     * Resolves the source series tail before creating a task in another calendar.
+     *
+     * @param array<string, mixed> $sourceEvent Receives the verified deletion scope.
+     * @param array<string, mixed> $event Receives the target recurrence settings.
+     */
+    private function prepareTaskSeriesTransfer(int $sourceInstanceId, array &$sourceEvent, array &$event): void
+    {
+        if (!(bool) ($event['task'] ?? false)
+            || !(bool) ($event['taskFollowPlanned'] ?? false)
+            || !(bool) ($sourceEvent['recurring'] ?? false)
+            || ($sourceEvent['writeScope'] ?? '') !== 'occurrence') {
+            return;
+        }
+
+        $following = json_decode(IPSKAL_GetRecurringFollowing(
+            $sourceInstanceId,
+            (string) ($sourceEvent['seriesId'] ?? ''),
+            (string) ($sourceEvent['occurrenceId'] ?? ''),
+            (string) ($sourceEvent['originalStart'] ?? ''),
+            (string) ($sourceEvent['resourceUrl'] ?? '')
+        ), true, 512, JSON_THROW_ON_ERROR);
+        if (!is_array($following)
+            || !(bool) ($following['canUpdateFollowing'] ?? false)
+            || !(bool) ($following['canDeleteSeries'] ?? false)
+            || !is_array($following['recurrenceSettings'] ?? null)
+            || $following['recurrenceSettings'] === []) {
+            throw new RuntimeException($this->Translate('The recurrence pattern cannot be split safely.'));
+        }
+        $event['recurrence'] = CalendarTaskEvent::shiftPlannedRecurrence(
+            $following['recurrenceSettings'],
+            (string) ($following['originalStart'] ?? ''),
+            (string) ($event['start'] ?? '')
+        );
+        if (trim((string) ($event['timezone'] ?? '')) === '') {
+            $event['timezone'] = (string) ($following['timezone'] ?? '');
+        }
+        $sourceEvent = $following;
+        $sourceEvent['writeScope'] = 'following';
     }
 
     /** @param array<string, mixed> $creationResult */

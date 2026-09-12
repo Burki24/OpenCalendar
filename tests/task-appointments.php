@@ -7,6 +7,16 @@ use IPSKalender\CalendarTaskEvent;
 require_once dirname(__DIR__) . '/libs/CalendarTaskEvent.php';
 require_once __DIR__ . '/stubs/autoload.php';
 require_once dirname(__DIR__) . '/Kalender/module.php';
+require_once dirname(__DIR__) . '/Kalender Ansicht/module.php';
+
+function IPSKAL_GetRecurringFollowing(int $instanceId, string $seriesId, string $occurrenceId, string $originalStart, string $resourceUrl): string
+{
+    return json_encode(array_merge(
+        IPSKalender\CalendarEventRecurrence::occurrence($seriesId, $occurrenceId, $originalStart, '', true, false, true, true, true),
+        ['uid'                   => 'verified', 'resourceUrl' => $resourceUrl, 'etag' => 'fresh', 'timezone' => 'Europe/Berlin',
+            'recurrenceSettings' => ['frequency' => 'DAILY', 'interval' => 10, 'endMode' => 'count', 'count' => 4]]
+    ), JSON_THROW_ON_ERROR);
+}
 
 function assertTaskAppointment(bool $condition, string $message): void
 {
@@ -151,6 +161,22 @@ assertTaskAppointment(
     array_filter($manualCalendar->requests, static fn (array $r): bool => $r['Operation'] === 'UpdateEvent') === [],
     'A failed series lookup must never silently fall back to writing a single occurrence.'
 );
+
+$transferView = new CalendarView(9014);
+$prepareTransfer = new ReflectionMethod(CalendarView::class, 'prepareTaskSeriesTransfer');
+foreach ([true, false] as $follow) {
+    $source = $manualCalendar->source;
+    $target = ['task' => true, 'taskCompleted' => false, 'taskFollowPlanned' => $follow,
+        'start'       => '2026-09-17', 'end' => '2026-09-18', 'summary' => 'Task', 'allDay' => true];
+    $prepareTransfer->invokeArgs($transferView, [9013, &$source, &$target]);
+    assertTaskAppointment(
+        $source['writeScope'] === ($follow ? 'following' : 'occurrence')
+            && ($target['taskCompleted'] === false)
+            && ($follow ? ($target['recurrence']['count'] === 4 && $target['recurrence']['interval'] === 10)
+                : !isset($target['recurrence'])),
+        'A cross-calendar task move must transfer the selected tail only when requested and preserve the open status.'
+    );
+}
 
 $created = CalendarTaskEvent::prepareWrite([
     'summary'       => 'Versicherung prüfen',
