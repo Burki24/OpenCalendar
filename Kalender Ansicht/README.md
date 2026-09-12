@@ -122,6 +122,11 @@ die gesamte Serie. Bereits einzeln angepasste folgende Vorkommnisse werden dabei
 zurückgesetzt. Der Hinweis im Bearbeitungsdialog folgt der Auswahl. Das reine
 Erledigen ohne Datumsänderung betrifft weiterhin nur die ausgewählte Aufgabe.
 
+Das Datum darf auch nach hinten verschoben werden. Liegt eine offene Aufgabe
+danach in der Vergangenheit, greift bei der nächsten Synchronisation wieder
+das automatische Nachziehen auf heute; mit aktiviertem Häkchen wird dabei auch
+der verbleibende Serienteil mitverschoben.
+
 Soll ein überfälliges Vorkommnis ohne Mitverschieben auf heute nachgezogen
 werden, während zwischen beiden Daten bereits weitere Serientermine liegen,
 wird dieses Vorkommnis als einzelner offener Aufgabentermin weitergeführt. Der

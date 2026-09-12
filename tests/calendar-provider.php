@@ -2352,6 +2352,30 @@ assertTrueValue(
     'A first-occurrence following delete must target the series master ID.'
 );
 
+foreach (['2026-10-17', '2026-10-22'] as $movedFirstDate) {
+    $firstMoveClient = new FakeHttpClient([
+        response(200, $msFollowingParent),
+        response(200, $msFirstFollowingTarget),
+        response(200, ['id' => 'series-master'])
+    ]);
+    $firstMoveProvider = new MicrosoftCalendarProvider($firstMoveClient, 'test-token');
+    $firstMoveProvider->updateEvent('AQMk-primary', 'instance-first', '', '', [
+        'summary'    => '[OC:TODO:FOLLOW] Task',
+        'allDay'     => true, 'start' => $movedFirstDate,
+        'end'        => (new DateTimeImmutable($movedFirstDate))->modify('+1 day')->format('Y-m-d'),
+        'recurrence' => ['frequency' => 'DAILY', 'interval' => 10, 'endMode' => 'count', 'count' => 8]
+    ], $msFirstFollowingIdentity);
+    $write = $firstMoveClient->requests[2];
+    $body = json_decode($write['body'], true, 512, JSON_THROW_ON_ERROR);
+    assertTrueValue(
+        $write['method'] === 'PATCH' && str_ends_with($write['url'], '/events/series-master')
+            && $body['recurrence']['range']['startDate'] === $movedFirstDate
+            && $body['recurrence']['range']['numberOfOccurrences'] === 8
+            && $body['recurrence']['pattern']['interval'] === 10,
+        'Moving the first Microsoft task occurrence in either direction must update the master and retain future repetitions.'
+    );
+}
+
 $msOnlineMeetingClient = new FakeHttpClient([
     response(200, ['isOnlineMeeting' => true])
 ]);

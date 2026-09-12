@@ -841,15 +841,22 @@ class Calendar extends IPSModuleStrict
             if (CalendarEventRecurrence::isOccurrence($recurrence)
                 && $writeScope === CalendarEventRecurrence::WRITE_SCOPE_OCCURRENCE
                 && (bool) ($taskAfterWrite['taskFollowPlanned'] ?? false)
-                && array_key_exists('start', $changes)
-                && $this->taskEventDate($taskSource, 'start') !== null
-                && $this->taskEventDate($changes, 'start') != $this->taskEventDate($taskSource, 'start')) {
+                && array_key_exists('start', $changes)) {
                 if (!(bool) ($recurrence['canUpdateFollowing'] ?? false)) {
                     throw new InvalidArgumentException('This and following updates are not supported by this calendar.');
                 }
-                $event = $this->prepareTaskFollowingMove(array_merge($taskSource, $recurrence), $changes);
-                $recurrence = CalendarEventRecurrence::fromEvent($event);
-                $writeScope = (string) $recurrence['writeScope'];
+                $followingChanges = $changes;
+                $following = $this->prepareTaskFollowingMove(array_merge($taskSource, $recurrence), $followingChanges);
+                $providerStart = $this->taskEventDate($following, 'start');
+                if ($providerStart === null) {
+                    throw new InvalidArgumentException('The task series contains an invalid occurrence date.');
+                }
+                if ($this->taskEventDate($changes, 'start') != $providerStart) {
+                    $event = $following;
+                    $changes = $followingChanges;
+                    $recurrence = CalendarEventRecurrence::fromEvent($event);
+                    $writeScope = (string) $recurrence['writeScope'];
+                }
             }
             $requestedRecurrence = $changes['recurrence'] ?? null;
             $recurrenceType = (string) ($recurrence['recurrenceType'] ?? CalendarEventRecurrence::SINGLE);

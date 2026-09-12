@@ -19,6 +19,8 @@ final class TaskSeriesWriteCalendar extends Calendar
 {
     public array $requests = [];
     public array $source = [];
+    public bool $cacheAvailable = true;
+    public bool $followingAvailable = true;
 
     protected function HasActiveParent(): bool
     {
@@ -32,7 +34,7 @@ final class TaskSeriesWriteCalendar extends Calendar
 
     protected function ReadAttributeString(string $Name): string
     {
-        return $Name === 'CachedEvents' ? json_encode([$this->source], JSON_THROW_ON_ERROR) : '[]';
+        return $Name === 'CachedEvents' && $this->cacheAvailable ? json_encode([$this->source], JSON_THROW_ON_ERROR) : '[]';
     }
 
     protected function ReadPropertyString(string $Name): string
@@ -59,6 +61,9 @@ final class TaskSeriesWriteCalendar extends Calendar
     {
         $request = json_decode($Data, true, 512, JSON_THROW_ON_ERROR);
         $this->requests[] = $request;
+        if ($request['Operation'] === 'GetRecurringFollowing' && !$this->followingAvailable) {
+            return json_encode(['Success' => false, 'Error' => 'Series lookup unavailable.'], JSON_THROW_ON_ERROR);
+        }
         $payload = match ($request['Operation']) {
             'GetRecurringFollowing' => array_merge($this->source, [
                 'etag'               => 'fresh-etag',
@@ -115,6 +120,36 @@ $writes = array_values(array_filter($manualCalendar->requests, static fn (array 
 assertTaskAppointment(
     count($writes) === 1 && $writes[0]['Recurrence']['writeScope'] === 'occurrence',
     'Completing a task with follow-up enabled must still affect only that occurrence.'
+);
+
+$manualCalendar->cacheAvailable = false;
+foreach (['2026-09-10' => '2026-10-10', '2026-09-17' => '2026-10-17', '2026-09-12' => null] as $newDate => $expectedUntil) {
+    $manualCalendar->requests = [];
+    $identity = IPSKalender\CalendarEventRecurrence::fromEvent($manualCalendar->source);
+    $manualCalendar->UpdateEvent(json_encode(array_merge($identity, [
+        'uid'     => 'first', 'resourceUrl' => 'first',
+        'changes' => [
+            'summary' => 'Task', 'task' => true, 'taskFollowPlanned' => true,
+            'allDay'  => true, 'start' => $newDate,
+            'end'     => (new DateTimeImmutable($newDate))->modify('+1 day')->format('Y-m-d')
+        ]
+    ]), JSON_THROW_ON_ERROR));
+    $writes = array_values(array_filter($manualCalendar->requests, static fn (array $r): bool => $r['Operation'] === 'UpdateEvent'));
+    assertTaskAppointment(
+        count($writes) === 1
+            && $writes[0]['Recurrence']['writeScope'] === ($expectedUntil === null ? 'occurrence' : 'following')
+            && ($writes[0]['Event']['recurrence']['until'] ?? null) === $expectedUntil,
+        'Moving a task to the past or future must retain its series even without a cached source date.'
+    );
+}
+$manualCalendar->requests = [];
+$manualCalendar->followingAvailable = false;
+$manualCalendar->UpdateEvent(json_encode(array_merge($manualCalendar->source, ['changes' => [
+    'task' => true, 'taskFollowPlanned' => true, 'start' => '2026-09-17', 'end' => '2026-09-18'
+]]), JSON_THROW_ON_ERROR));
+assertTaskAppointment(
+    array_filter($manualCalendar->requests, static fn (array $r): bool => $r['Operation'] === 'UpdateEvent') === [],
+    'A failed series lookup must never silently fall back to writing a single occurrence.'
 );
 
 $created = CalendarTaskEvent::prepareWrite([
