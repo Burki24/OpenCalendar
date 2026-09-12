@@ -837,6 +837,20 @@ class Calendar extends IPSModuleStrict
                 }
             }
             $changes = CalendarTaskEvent::prepareWrite($changes, $taskSource);
+            $taskAfterWrite = CalendarTaskEvent::enrich(array_merge($taskSource, $changes));
+            if (CalendarEventRecurrence::isOccurrence($recurrence)
+                && $writeScope === CalendarEventRecurrence::WRITE_SCOPE_OCCURRENCE
+                && (bool) ($taskAfterWrite['taskFollowPlanned'] ?? false)
+                && array_key_exists('start', $changes)
+                && $this->taskEventDate($taskSource, 'start') !== null
+                && $this->taskEventDate($changes, 'start') != $this->taskEventDate($taskSource, 'start')) {
+                if (!(bool) ($recurrence['canUpdateFollowing'] ?? false)) {
+                    throw new InvalidArgumentException('This and following updates are not supported by this calendar.');
+                }
+                $event = $this->prepareTaskFollowingMove(array_merge($taskSource, $recurrence), $changes);
+                $recurrence = CalendarEventRecurrence::fromEvent($event);
+                $writeScope = (string) $recurrence['writeScope'];
+            }
             $requestedRecurrence = $changes['recurrence'] ?? null;
             $recurrenceType = (string) ($recurrence['recurrenceType'] ?? CalendarEventRecurrence::SINGLE);
             $convertingSingleToSeries = $recurrenceType === CalendarEventRecurrence::SINGLE
@@ -2610,23 +2624,8 @@ class Calendar extends IPSModuleStrict
             && CalendarEventRecurrence::isOccurrence($event)
             && (bool) ($recurrence['canUpdateFollowing'] ?? false);
         if ($followPlanned) {
-            $following = $this->sendRequest('GetRecurringFollowing', [
-                'SeriesID'      => trim((string) ($event['seriesId'] ?? '')),
-                'OccurrenceID'  => trim((string) ($event['occurrenceId'] ?? '')),
-                'OriginalStart' => trim((string) ($event['originalStart'] ?? '')),
-                'ResourceURL'   => trim((string) ($event['resourceUrl'] ?? ''))
-            ]);
-            $settings = $following['recurrenceSettings'] ?? null;
-            if (!is_array($settings) || $settings === []) {
-                throw new InvalidArgumentException('The recurring task could not be prepared for moving following appointments.');
-            }
-            $changes['recurrence'] = CalendarTaskEvent::shiftPlannedRecurrence(
-                $settings,
-                (string) ($following['originalStart'] ?? $event['originalStart'] ?? ''),
-                (string) ($changes['start'] ?? '')
-            );
-            $recurrence = CalendarEventRecurrence::fromEvent($following);
-            $event = $following;
+            $event = $this->prepareTaskFollowingMove($event, $changes);
+            $recurrence = CalendarEventRecurrence::fromEvent($event);
             $followingMoved = true;
         }
 
@@ -2644,6 +2643,37 @@ class Calendar extends IPSModuleStrict
             'Event'       => $changes,
             'Recurrence'  => $recurrence
         ]);
+    }
+
+    /**
+     * Prepares a verified series tail for manual and automatic task date changes.
+     *
+     * @param array<string, mixed> $event
+     * @param array<string, mixed> $changes Receives the reanchored recurrence settings.
+     * @return array<string, mixed>
+     */
+    private function prepareTaskFollowingMove(array $event, array &$changes): array
+    {
+        $following = $this->sendRequest('GetRecurringFollowing', [
+            'SeriesID'      => trim((string) ($event['seriesId'] ?? '')),
+            'OccurrenceID'  => trim((string) ($event['occurrenceId'] ?? '')),
+            'OriginalStart' => trim((string) ($event['originalStart'] ?? '')),
+            'ResourceURL'   => trim((string) ($event['resourceUrl'] ?? ''))
+        ]);
+        $settings = $following['recurrenceSettings'] ?? null;
+        if (!is_array($settings) || $settings === []) {
+            throw new InvalidArgumentException('The recurring task could not be prepared for moving following appointments.');
+        }
+        $changes['recurrence'] = CalendarTaskEvent::shiftPlannedRecurrence(
+            $settings,
+            (string) ($following['originalStart'] ?? $event['originalStart'] ?? ''),
+            (string) ($changes['start'] ?? '')
+        );
+        if (trim((string) ($changes['timezone'] ?? '')) === '') {
+            $changes['timezone'] = (string) ($following['timezone'] ?? '');
+        }
+        $following['writeScope'] = CalendarEventRecurrence::WRITE_SCOPE_FOLLOWING;
+        return $following;
     }
 
     /**

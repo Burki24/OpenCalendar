@@ -1533,6 +1533,7 @@ class CalendarView extends IPSModuleStrict
             'Recurring event creation is not supported by this calendar.',
             'Recurring occurrences are currently read-only.',
             'Only this occurrence of the recurring event will be changed.',
+            'Changing the date moves this and all following occurrences. Existing following exceptions will be reset.',
             'Changes will apply to this and all following occurrences.',
             'Existing exceptions from this occurrence onward will be reset.',
             'Changes will apply to the entire recurring series.',

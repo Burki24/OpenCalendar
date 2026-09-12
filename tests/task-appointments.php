@@ -15,6 +15,108 @@ function assertTaskAppointment(bool $condition, string $message): void
     }
 }
 
+final class TaskSeriesWriteCalendar extends Calendar
+{
+    public array $requests = [];
+    public array $source = [];
+
+    protected function HasActiveParent(): bool
+    {
+        return true;
+    }
+
+    protected function ReadAttributeBoolean(string $Name): bool
+    {
+        return true;
+    }
+
+    protected function ReadAttributeString(string $Name): string
+    {
+        return $Name === 'CachedEvents' ? json_encode([$this->source], JSON_THROW_ON_ERROR) : '[]';
+    }
+
+    protected function ReadPropertyString(string $Name): string
+    {
+        return 'calendar';
+    }
+
+    protected function ReadPropertyInteger(string $Name): int
+    {
+        return 30;
+    }
+
+    protected function SetStatus(int $Status): bool
+    {
+        return true;
+    }
+
+    protected function WriteAttributeString(string $Name, string $Value): bool
+    {
+        return true;
+    }
+
+    protected function SendDataToParent(string $Data): string
+    {
+        $request = json_decode($Data, true, 512, JSON_THROW_ON_ERROR);
+        $this->requests[] = $request;
+        $payload = match ($request['Operation']) {
+            'GetRecurringFollowing' => array_merge($this->source, [
+                'etag'               => 'fresh-etag',
+                'writeScope'         => 'following',
+                'recurrenceSettings' => [
+                    'frequency' => 'DAILY', 'interval' => 10,
+                    'endMode'   => 'until', 'until' => '2026-10-12'
+                ]
+            ]),
+            'UpdateEvent' => ['uid' => 'updated'],
+            default       => []
+        };
+        // Stop after the actual write: provider refresh is outside this regression.
+        return json_encode(['Success' => true, 'Payload' => $payload], JSON_THROW_ON_ERROR);
+    }
+}
+
+$manualCalendar = new TaskSeriesWriteCalendar(9013);
+$manualCalendar->source = array_merge(
+    IPSKalender\CalendarEventRecurrence::occurrence('series', 'first', '2026-09-12', '', true, false, true, true, true),
+    ['uid'       => 'first', 'resourceUrl' => 'first', 'summary' => '[OC:TODO] Task',
+        'allDay' => true, 'start' => '2026-09-12', 'end' => '2026-09-13']
+);
+foreach ([true, false] as $follow) {
+    $manualCalendar->requests = [];
+    $manualCalendar->UpdateEvent(json_encode(array_merge(
+        array_intersect_key($manualCalendar->source, array_flip(['uid', 'resourceUrl', 'occurrenceId', 'seriesId', 'recurrenceType', 'writeScope'])),
+        ['changes' => [
+            'task'  => true, 'taskFollowPlanned' => $follow,
+            'start' => '2026-09-13', 'end' => '2026-09-14'
+        ]]
+    ), JSON_THROW_ON_ERROR));
+    $writes = array_values(array_filter($manualCalendar->requests, static fn (array $r): bool => $r['Operation'] === 'UpdateEvent'));
+    assertTaskAppointment(count($writes) === 1, 'A manual task date change must issue one provider write.');
+    assertTaskAppointment(
+        $writes[0]['Recurrence']['writeScope'] === ($follow ? 'following' : 'occurrence'),
+        'The checked follow-up option must route manual date changes to the series tail.'
+    );
+    if ($follow) {
+        assertTaskAppointment(
+            $writes[0]['Event']['recurrence']['interval'] === 10
+                && $writes[0]['Event']['recurrence']['until'] === '2026-10-13'
+                && $writes[0]['ETag'] === 'fresh-etag',
+            'Manual series moves must retain the interval, shift the end date and use the verified ETag.'
+        );
+    }
+}
+$manualCalendar->requests = [];
+$manualCalendar->source['summary'] = '[OC:TODO:FOLLOW] Task';
+$manualCalendar->UpdateEvent(json_encode(array_merge($manualCalendar->source, ['changes' => [
+    'task' => true, 'taskCompleted' => true
+]]), JSON_THROW_ON_ERROR));
+$writes = array_values(array_filter($manualCalendar->requests, static fn (array $r): bool => $r['Operation'] === 'UpdateEvent'));
+assertTaskAppointment(
+    count($writes) === 1 && $writes[0]['Recurrence']['writeScope'] === 'occurrence',
+    'Completing a task with follow-up enabled must still affect only that occurrence.'
+);
+
 $created = CalendarTaskEvent::prepareWrite([
     'summary'       => 'Versicherung prüfen',
     'task'          => true,

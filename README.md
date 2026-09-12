@@ -270,6 +270,13 @@ OpenCalendar den ab diesem Vorkommnis verbleibenden Serienteil gemeinsam. Diese
 Option wird nur bei Kalendern angeboten, die „diesen und alle folgenden Termine“
 sicher bearbeiten können.
 
+Die Option gilt auch beim manuellen Ändern des Datums einer Serienaufgabe:
+Mit Häkchen werden der ausgewählte und alle folgenden Termine gemeinsam
+verschoben. Beim ersten Vorkommnis betrifft das die gesamte Serie. Reines
+Erledigen oder Umbenennen ohne Datumsänderung betrifft weiterhin nur den
+ausgewählten Termin. Beim Verschieben des Serienteils werden bestehende
+Ausnahmen innerhalb dieses Teils zurückgesetzt.
+
 Liegt zwischen dem überfälligen und dem heutigen Datum bereits ein weiterer
 geplanter Serientermin, führt OpenCalendar den nachgezogenen Termin ohne
 Mitverschieben als einzelnen Aufgabentermin weiter. Dadurch bleibt der

@@ -1782,6 +1782,7 @@ function updateTaskControls() {
     eventTaskFollowPlannedRow.classList.toggle('hidden', !enabled || !recurring || !canFollow);
     eventTaskFollowPlanned.disabled = !eventDialogEditable || !enabled || !recurring || !canFollow;
     if (!recurring || !canFollow) eventTaskFollowPlanned.checked = false;
+    updateTaskMoveNote();
 
     if (!enabled || !eventDialogEditable) return;
 
@@ -1795,6 +1796,16 @@ function updateTaskControls() {
         setDateInputs(start, start, true);
         allDayInput.checked = true;
     }
+}
+
+function updateTaskMoveNote() {
+    if (!eventDialogEditable || !eventIsRecurring(selectedEvent)
+        || ['series', 'following'].includes(selectedEvent?.writeScope)) return;
+    const note = document.getElementById('dialog-note');
+    note.textContent = eventTask.checked && eventTaskFollowPlanned.checked
+        ? t('Changing the date moves this and all following occurrences. Existing following exceptions will be reset.')
+        : t('Only this occurrence of the recurring event will be changed.');
+    note.classList.remove('hidden');
 }
 
 function resetAnniversaryEditor() {
@@ -2953,6 +2964,7 @@ function openExistingEvent(event, writeScope = '') {
     }
     updateDialogColor();
     updateSaveButtonLabel();
+    updateTaskMoveNote();
     showEventDialog();
 }
 
@@ -3948,6 +3960,7 @@ eventTask.addEventListener('change', () => {
     updateRecurrenceAvailability();
     updateAnniversaryControls();
 });
+eventTaskFollowPlanned.addEventListener('change', updateTaskMoveNote);
 eventCalendarInput.addEventListener('change', () => {
     updateDialogColor();
     updateSaveButtonLabel();

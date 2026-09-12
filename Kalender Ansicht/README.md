@@ -116,6 +116,12 @@ verschoben wird. Die Option steht nur bei Kalendern mit Unterstützung für
 Aufgabentermine auch im IPSView-Client und ohne eine zusätzliche Aufgaben-API
 oder weitere OAuth-Berechtigungen.
 
+Auch beim manuellen Ändern des Datums gilt diese Auswahl: Mit Häkchen werden
+der ausgewählte und alle folgenden Termine verschoben, beim ersten Termin also
+die gesamte Serie. Bereits einzeln angepasste folgende Vorkommnisse werden dabei
+zurückgesetzt. Der Hinweis im Bearbeitungsdialog folgt der Auswahl. Das reine
+Erledigen ohne Datumsänderung betrifft weiterhin nur die ausgewählte Aufgabe.
+
 Soll ein überfälliges Vorkommnis ohne Mitverschieben auf heute nachgezogen
 werden, während zwischen beiden Daten bereits weitere Serientermine liegen,
 wird dieses Vorkommnis als einzelner offener Aufgabentermin weitergeführt. Der

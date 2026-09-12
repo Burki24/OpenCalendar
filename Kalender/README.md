@@ -198,6 +198,13 @@ dem neuen Datum, wird die offene Aufgabe als Einzeltermin weitergeführt. So
 bleibt der Serienplan erhalten und Microsoft 365 kann die Synchronisation nicht
 wegen eines überlappenden Serienelements ablehnen.
 
+Bei `UpdateEvent` gilt `taskFollowPlanned` ebenfalls für eine Änderung des
+Startdatums einer Serienaufgabe: Der ausgewählte und alle folgenden Termine
+werden mit neu verankertem Serienplan verschoben. Beim ersten Vorkommnis ist
+das die ganze Serie. Statusänderungen ohne Datumsänderung bleiben auf das
+einzelne Vorkommnis begrenzt. Bestehende Ausnahmen im verschobenen Serienteil
+werden zurückgesetzt.
+
 Für beschreibbare Google-, Microsoft-, Apple-iCloud- und CalDAV-Kalender können beim Erstellen zusätzlich
 providerneutrale Serienangaben übergeben werden. Bei Google verwendet OpenCalendar
 die Kalenderzeitzone. Für Microsoft und CalDAV wird die übergebene Zeitzone verwendet;
