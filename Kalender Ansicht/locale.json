@@ -36,6 +36,7 @@
             "No calendar instances found.": "Keine Kalenderinstanzen gefunden.",
             "Synchronization successful.": "Synchronisation erfolgreich.",
             "Synchronization failed.": "Synchronisation fehlgeschlagen.",
+            "Synchronization failed for: %s.": "Synchronisation fehlgeschlagen bei: %s.",
             "No calendars selected": "Keine Kalender ausgewählt",
             "Invalid configuration": "Ungültige Konfiguration",
             "Calendars synchronized.": "Kalender synchronisiert.",
