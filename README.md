@@ -270,6 +270,13 @@ OpenCalendar den ab diesem Vorkommnis verbleibenden Serienteil gemeinsam. Diese
 Option wird nur bei Kalendern angeboten, die „diesen und alle folgenden Termine“
 sicher bearbeiten können.
 
+Liegt zwischen dem überfälligen und dem heutigen Datum bereits ein weiterer
+geplanter Serientermin, führt OpenCalendar den nachgezogenen Termin ohne
+Mitverschieben als einzelnen Aufgabentermin weiter. Dadurch bleibt der
+ursprüngliche Serienplan unverändert und Microsoft 365 muss kein Vorkommnis über
+ein anderes Serienelement hinweg verschieben – eine von Microsoft technisch
+abgelehnte Operation.
+
 Aufgabentermine stehen deshalb nur in beschreibbaren Kalendern zur Verfügung.
 ICS-/Webcal-Abonnements und lokale ICS-Dateien bleiben schreibgeschützt. Die
 Funktion ist bewusst keine Anbindung an Google Tasks: Es werden weder

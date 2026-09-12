@@ -129,6 +129,39 @@ final class CalendarTaskEvent
     }
 
     /**
+     * Returns whether moving a single occurrence would cross another planned occurrence.
+     *
+     * Microsoft Graph rejects such updates. In that case the overdue task has to be
+     * continued as a separate single event while the planned series remains unchanged.
+     *
+     * @param list<array<string, mixed>> $events
+     * @param array<string, mixed> $event
+     */
+    public static function requiresOccurrenceDetachment(array $events, array $event, string $newStart): bool
+    {
+        $seriesKey = self::seriesKey($event);
+        $originalStart = self::eventDate((string) ($event['originalStart'] ?? ''));
+        $targetStart = self::eventDate($newStart);
+        if ($seriesKey === '' || $originalStart === null || $targetStart === null) {
+            return false;
+        }
+
+        foreach ($events as $candidate) {
+            if (self::seriesKey($candidate) !== $seriesKey) {
+                continue;
+            }
+            $candidateOriginalStart = self::eventDate((string) ($candidate['originalStart'] ?? ''));
+            if ($candidateOriginalStart !== null
+                && $candidateOriginalStart > $originalStart
+                && $candidateOriginalStart <= $targetStart) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
      * Reanchors recurrence settings when a planned task-series tail is moved.
      *
      * The offset is measured from the occurrence's immutable planned start. This

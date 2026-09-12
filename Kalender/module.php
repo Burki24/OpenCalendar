@@ -76,6 +76,7 @@ class Calendar extends IPSModuleStrict
         $this->RegisterPersistentJsonCache('CachedEvents');
         $this->RegisterAttributeString('AnniversaryMetadata', '[]');
         $this->RegisterAttributeString('BirthdayMetadata', '[]');
+        $this->RegisterAttributeString('PendingTaskSeries', '{}');
         $this->RegisterAttributeInteger('LastSynchronization', 0);
         $this->RegisterAttributeString('LastError', '');
         $this->RegisterAttributeString('IncrementalSyncToken', '');
@@ -2505,7 +2506,7 @@ class Calendar extends IPSModuleStrict
 
         $today = new DateTimeImmutable('today');
         $events = CalendarTaskEvent::preservePendingSeries($events, $this->readEvents(), $today);
-        $blockedSeries = [];
+        $blockedSeries = $this->pendingTaskSeries($events);
         foreach ($events as $event) {
             $seriesKey = $this->taskSeriesKey($event);
             if ($seriesKey !== '' && $this->isRolledForwardOpenTask($event, $today)) {
@@ -2552,7 +2553,14 @@ class Calendar extends IPSModuleStrict
             $index = $candidate['index'];
             $event = $candidate['event'];
             $followingMoved = false;
-            $updated = $this->rollForwardTaskEvent($event, $candidate['changes'], $followingMoved);
+            $detached = false;
+            $updated = $this->rollForwardTaskEvent(
+                $event,
+                $candidate['changes'],
+                $events,
+                $followingMoved,
+                $detached
+            );
             if ($followingMoved) {
                 $events = CalendarTaskEvent::shiftFollowingEvents(
                     $events,
@@ -2561,6 +2569,9 @@ class Calendar extends IPSModuleStrict
                 );
             }
             $events[$index] = array_merge($event, $candidate['changes'], $updated);
+            if ($detached && $seriesKey !== '') {
+                $this->rememberPendingTaskSeries($seriesKey, $events[$index]);
+            }
             if ($seriesKey !== '') {
                 $movedSeries[$seriesKey] = true;
             }
@@ -2582,11 +2593,18 @@ class Calendar extends IPSModuleStrict
      *
      * @param array<string, mixed> $event
      * @param array<string, mixed> $changes
+     * @param list<array<string, mixed>> $events
      * @return array<string, mixed>
      */
-    private function rollForwardTaskEvent(array $event, array $changes, ?bool &$followingMoved = null): array
-    {
+    private function rollForwardTaskEvent(
+        array $event,
+        array $changes,
+        array $events,
+        ?bool &$followingMoved = null,
+        ?bool &$detached = null
+    ): array {
         $followingMoved = false;
+        $detached = false;
         $recurrence = CalendarEventRecurrence::fromEvent($event);
         $followPlanned = (bool) ($event['taskFollowPlanned'] ?? false)
             && CalendarEventRecurrence::isOccurrence($event)
@@ -2612,12 +2630,80 @@ class Calendar extends IPSModuleStrict
             $followingMoved = true;
         }
 
+        if (!$followPlanned
+            && CalendarEventRecurrence::isOccurrence($event)
+            && CalendarTaskEvent::requiresOccurrenceDetachment($events, $event, (string) ($changes['start'] ?? ''))) {
+            $detached = true;
+            return $this->detachOverdueTaskOccurrence($event, $changes, $recurrence);
+        }
+
         return $this->sendRequest('UpdateEvent', [
             'UID'         => trim((string) ($event['uid'] ?? '')),
             'ResourceURL' => trim((string) ($event['resourceUrl'] ?? '')),
             'ETag'        => trim((string) ($event['etag'] ?? '')),
             'Event'       => $changes,
             'Recurrence'  => $recurrence
+        ]);
+    }
+
+    /**
+     * Continues one overdue task occurrence as a single event without changing its series.
+     *
+     * @param array<string, mixed> $event
+     * @param array<string, mixed> $changes
+     * @param array<string, mixed> $recurrence
+     * @return array<string, mixed>
+     */
+    private function detachOverdueTaskOccurrence(array $event, array $changes, array $recurrence): array
+    {
+        $detachedEvent = [];
+        foreach (['summary', 'allDay', 'timezone', 'location', 'description', 'reminder'] as $key) {
+            if (array_key_exists($key, $event)) {
+                $detachedEvent[$key] = $event[$key];
+            }
+        }
+        $detachedEvent = array_merge($detachedEvent, $changes);
+        $created = $this->sendRequest('CreateEvent', ['Event' => $detachedEvent]);
+
+        try {
+            $deleted = $this->sendRequest('DeleteEvent', [
+                'ResourceURL'  => trim((string) ($event['resourceUrl'] ?? '')),
+                'ETag'         => trim((string) ($event['etag'] ?? '')),
+                'RecurrenceID' => trim((string) ($recurrence['recurrenceId'] ?? '')),
+                'Recurrence'   => $recurrence
+            ]);
+            if (!(bool) ($deleted['success'] ?? false)) {
+                throw new RuntimeException('The calendar account did not confirm the task occurrence deletion.');
+            }
+        } catch (Throwable $exception) {
+            try {
+                $this->sendRequest('DeleteEvent', [
+                    'ResourceURL'  => trim((string) ($created['resourceUrl'] ?? '')),
+                    'ETag'         => trim((string) ($created['etag'] ?? '')),
+                    'RecurrenceID' => '',
+                    'Recurrence'   => CalendarEventRecurrence::single()
+                ]);
+            } catch (Throwable $cleanupException) {
+                $this->SendSafeDebugException('DetachedTaskCleanupError', $cleanupException);
+            }
+            throw $exception;
+        }
+
+        $detachedEvent['startTimestamp'] = $this->eventBoundaryTimestamp($detachedEvent, 'start');
+        $detachedEvent['endTimestamp'] = $this->eventBoundaryTimestamp($detachedEvent, 'end');
+
+        return array_merge($detachedEvent, $created, [
+            'recurrenceType'      => CalendarEventRecurrence::SINGLE,
+            'seriesId'            => '',
+            'occurrenceId'        => '',
+            'originalStart'       => '',
+            'recurrenceId'        => '',
+            'recurring'           => false,
+            'canUpdateOccurrence' => false,
+            'canDeleteOccurrence' => false,
+            'canUpdateFollowing'  => false,
+            'canUpdateSeries'     => false,
+            'canDeleteSeries'     => false
         ]);
     }
 
@@ -2636,6 +2722,90 @@ class Calendar extends IPSModuleStrict
 
         $uid = trim((string) ($event['uid'] ?? ''));
         return $uid !== '' ? 'uid:' . $uid : '';
+    }
+
+    /**
+     * Returns series keys which already have an open detached task.
+     *
+     * @param list<array<string, mixed>> $events
+     * @return array<string, true>
+     */
+    private function pendingTaskSeries(array $events): array
+    {
+        $pending = json_decode($this->ReadAttributeString('PendingTaskSeries'), true);
+        if (!is_array($pending) || array_is_list($pending)) {
+            $pending = [];
+        }
+
+        $openSeries = [];
+        $remaining = [];
+        foreach ($pending as $seriesKey => $identity) {
+            if (!is_string($seriesKey) || !is_array($identity)) {
+                continue;
+            }
+            foreach ($events as $event) {
+                if (!$this->matchesPendingTaskIdentity($event, $identity)) {
+                    continue;
+                }
+                $event = CalendarTaskEvent::enrich($event);
+                if ((bool) ($event['task'] ?? false) && !(bool) ($event['taskCompleted'] ?? false)) {
+                    $openSeries[$seriesKey] = true;
+                    $remaining[$seriesKey] = $identity;
+                }
+                break;
+            }
+        }
+
+        if ($remaining !== $pending) {
+            $this->WriteAttributeString(
+                'PendingTaskSeries',
+                json_encode($remaining, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR)
+            );
+        }
+
+        return $openSeries;
+    }
+
+    /** @param array<string, mixed> $event */
+    private function rememberPendingTaskSeries(string $seriesKey, array $event): void
+    {
+        $eventReference = trim((string) ($event['eventReference'] ?? ''));
+        $resourceUrl = trim((string) ($event['resourceUrl'] ?? ''));
+        $uid = trim((string) ($event['uid'] ?? ''));
+        if ($seriesKey === '' || ($eventReference === '' && $resourceUrl === '' && $uid === '')) {
+            return;
+        }
+
+        $pending = json_decode($this->ReadAttributeString('PendingTaskSeries'), true);
+        if (!is_array($pending) || array_is_list($pending)) {
+            $pending = [];
+        }
+        $pending[$seriesKey] = [
+            'eventReference' => $eventReference,
+            'resourceUrl'    => $resourceUrl,
+            'uid'            => $uid
+        ];
+        $this->WriteAttributeString(
+            'PendingTaskSeries',
+            json_encode($pending, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR)
+        );
+    }
+
+    /**
+     * @param array<string, mixed> $event
+     * @param array<string, mixed> $identity
+     */
+    private function matchesPendingTaskIdentity(array $event, array $identity): bool
+    {
+        foreach (['eventReference', 'resourceUrl', 'uid'] as $key) {
+            $expected = trim((string) ($identity[$key] ?? ''));
+            $actual = trim((string) ($event[$key] ?? ''));
+            if ($expected !== '' && $actual !== '' && hash_equals($expected, $actual)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /** @param array<string, mixed> $event */

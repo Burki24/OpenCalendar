@@ -213,6 +213,14 @@ $seriesEvents = [
         'end'            => '2026-09-20'
     ]
 ];
+assertTaskAppointment(
+    CalendarTaskEvent::requiresOccurrenceDetachment($seriesEvents, $seriesEvents[0], '2026-09-20'),
+    'A task occurrence must be detached when moving it would cross another planned occurrence.'
+);
+assertTaskAppointment(
+    !CalendarTaskEvent::requiresOccurrenceDetachment($seriesEvents, $seriesEvents[0], '2026-09-18'),
+    'A task occurrence must remain part of its series when its new date precedes the next planned occurrence.'
+);
 $shiftedEvents = CalendarTaskEvent::shiftFollowingEvents(
     $seriesEvents,
     $seriesEvents[0],

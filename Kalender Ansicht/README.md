@@ -116,6 +116,12 @@ verschoben wird. Die Option steht nur bei Kalendern mit Unterstützung für
 Aufgabentermine auch im IPSView-Client und ohne eine zusätzliche Aufgaben-API
 oder weitere OAuth-Berechtigungen.
 
+Soll ein überfälliges Vorkommnis ohne Mitverschieben auf heute nachgezogen
+werden, während zwischen beiden Daten bereits weitere Serientermine liegen,
+wird dieses Vorkommnis als einzelner offener Aufgabentermin weitergeführt. Der
+verbleibende Serienplan bleibt dadurch exakt erhalten; insbesondere Microsoft
+365 muss kein Vorkommnis über ein anderes Serienelement verschieben.
+
 Die Funktion setzt einen beschreibbaren Kalender voraus und unterstützt bewusst
 nur eintägige ganztägige Termine. In externen Kalenderprogrammen bleiben die Marker
 im Titel sichtbar. Google Tasks und andere Aufgabenlisten werden nicht importiert

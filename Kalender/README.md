@@ -192,7 +192,11 @@ Serienteil; ohne diese Option bleibt der ursprüngliche Serienplan erhalten und
 nur das älteste überfällige Vorkommnis wird nachgezogen. Das Mitverschieben
 erfordert eine Kalenderanbieter-Unterstützung für „diesen und alle folgenden
 Termine“. Da dabei der echte Kalendertermin aktualisiert wird, muss der Kalender
-beschreibbar sein. Zeitgebundene Aufgabentermine werden abgewiesen.
+beschreibbar sein. Zeitgebundene Aufgabentermine werden abgewiesen. Liegt ohne
+Mitverschieben bereits ein weiteres geplantes Vorkommnis zwischen dem alten und
+dem neuen Datum, wird die offene Aufgabe als Einzeltermin weitergeführt. So
+bleibt der Serienplan erhalten und Microsoft 365 kann die Synchronisation nicht
+wegen eines überlappenden Serienelements ablehnen.
 
 Für beschreibbare Google-, Microsoft-, Apple-iCloud- und CalDAV-Kalender können beim Erstellen zusätzlich
 providerneutrale Serienangaben übergeben werden. Bei Google verwendet OpenCalendar
