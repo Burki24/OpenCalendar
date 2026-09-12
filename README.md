@@ -241,19 +241,20 @@ Aufgabentermine sind bewusst ganztägig und dauern genau einen Tag. Sie dürfen
 auch wiederkehrend sein. OpenCalendar
 speichert den Status direkt und providerunabhängig am Anfang des Termintitels:
 
-- `☐` kennzeichnet eine offene Aufgabe.
-- `☑` kennzeichnet eine erledigte Aufgabe.
-- `☐↻` beziehungsweise `☑↻` kennzeichnet eine Aufgabenserie, deren geplante
+- `[OC:TODO]` kennzeichnet eine offene Aufgabe.
+- `[OC:DONE]` kennzeichnet eine erledigte Aufgabe.
+- `[OC:TODO:FOLLOW]` beziehungsweise `[OC:DONE:FOLLOW]` kennzeichnet eine Aufgabenserie, deren geplante
   Folgetermine beim täglichen Nachziehen ebenfalls verschoben werden sollen.
 
 In der Kalenderansicht öffnet ein Klick auf den Eintrag die Termindetails. Dort
 kann die Aufgabe mit **Als erledigt markieren** abgeschlossen und mit
 **Aufgabe wieder öffnen** erneut aktiviert werden. Der eigentliche Titel wird im
 Editor ohne technischen Marker angezeigt. In Google Calendar, Outlook, Apple
-Calendar oder anderen Clients bleibt der Marker dagegen sichtbar, sodass der
+Calendar oder anderen Clients bleibt der ASCII-Marker dagegen sichtbar, sodass der
 Status auch außerhalb von OpenCalendar erkennbar ist. Wird der Marker dort
 manuell entfernt oder geändert, übernimmt OpenCalendar diese Änderung bei der
-nächsten Synchronisation.
+nächsten Synchronisation. Die früher verwendeten grafischen Kästchen (`☐`, `☑`)
+werden weiterhin erkannt und bei der nächsten Aufgabenänderung automatisch ersetzt.
 
 Eine offene Aufgabe, deren Datum vor dem aktuellen lokalen Tag liegt, wird beim
 lokalen Tageswechsel und zusätzlich bei jeder Kalendersynchronisation auf den

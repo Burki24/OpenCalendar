@@ -152,8 +152,8 @@ $result = IPSKAL_CreateEvent(12345, json_encode([
 
 Ein Aufgabentermin ist ein eintägiger, ganztägiger Kalendertermin. Er darf
 wiederkehrend sein.
-`task = true` setzt beim Anbieter automatisch den offenen Marker `☐` vor den
-Titel. `taskCompleted = true` verwendet stattdessen `☑`. Die Steuerfelder werden
+`task = true` setzt beim Anbieter automatisch den offenen Marker `[OC:TODO]` vor den
+Titel. `taskCompleted = true` verwendet stattdessen `[OC:DONE]`. Die Steuerfelder werden
 nicht als eigene Providerdaten übertragen; der Titelmarker ist die dauerhafte und
 anbieterübergreifende Kennzeichnung.
 

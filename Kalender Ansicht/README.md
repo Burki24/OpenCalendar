@@ -99,8 +99,10 @@ Im Dialog **Termin erstellen** beziehungsweise **Termin bearbeiten** aktiviert
 **Aufgabentermin** die Aufgabenfunktion. Das Datum bleibt frei wählbar;
 OpenCalendar setzt den Termin automatisch auf ganztägig und deaktiviert
 Jahresereignisse. Ein Aufgabentermin dauert genau einen Tag und kann auch eine
-Wiederholung erhalten. Im Kalender kennzeichnet `☐` eine offene und `☑` eine
-erledigte Aufgabe.
+Wiederholung erhalten. Im Kalender kennzeichnet `[OC:TODO]` eine offene und
+`[OC:DONE]` eine erledigte Aufgabe. Die Kalenderansicht stellt sie weiterhin
+mit einem Kästchen dar; beim Kalenderanbieter wird bewusst nur die
+ASCII-kompatible Kennzeichnung gespeichert.
 
 In den Termindetails steht für offene Aufgaben **Als erledigt markieren** zur
 Verfügung. Bei erledigten Aufgaben wird daraus **Aufgabe wieder öffnen**. Eine

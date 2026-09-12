@@ -24,7 +24,7 @@ $created = CalendarTaskEvent::prepareWrite([
     'end'           => '2026-09-09'
 ]);
 assertTaskAppointment(
-    $created['summary'] === '☐ Versicherung prüfen'
+    $created['summary'] === '[OC:TODO] Versicherung prüfen'
         && !array_key_exists('task', $created)
         && !array_key_exists('taskCompleted', $created),
     'Creating a task appointment must persist only the open title marker.'
@@ -44,7 +44,7 @@ $completed = CalendarTaskEvent::prepareWrite(
     $enriched + ['allDay' => true, 'recurring' => false]
 );
 assertTaskAppointment(
-    $completed['summary'] === '☑ Versicherung prüfen',
+    $completed['summary'] === '[OC:DONE] Versicherung prüfen',
     'Completing a task must replace its open marker without changing the title.'
 );
 
@@ -53,7 +53,7 @@ $followPlanned = CalendarTaskEvent::prepareWrite(
     $enriched + ['allDay' => true, 'recurring' => true, 'start' => '2026-09-08', 'end' => '2026-09-09']
 );
 assertTaskAppointment(
-    $followPlanned['summary'] === '☐↻ Versicherung prüfen'
+    $followPlanned['summary'] === '[OC:TODO:FOLLOW] Versicherung prüfen'
         && (CalendarTaskEvent::enrich($followPlanned)['taskFollowPlanned'] ?? false) === true,
     'A task series must persist the choice to move planned follow-up appointments.'
 );
@@ -63,7 +63,7 @@ $renamed = CalendarTaskEvent::prepareWrite(
     $enriched + ['allDay' => true, 'recurring' => false]
 );
 assertTaskAppointment(
-    $renamed['summary'] === '☐ Versicherung wechseln',
+    $renamed['summary'] === '[OC:TODO] Versicherung wechseln',
     'Renaming a task without explicit task fields must preserve its current task status.'
 );
 
@@ -72,8 +72,15 @@ $reopened = CalendarTaskEvent::prepareWrite(
     CalendarTaskEvent::enrich($completed + ['allDay' => true, 'recurring' => false])
 );
 assertTaskAppointment(
-    $reopened['summary'] === '☐ Versicherung prüfen',
+    $reopened['summary'] === '[OC:TODO] Versicherung prüfen',
     'Reopening a task must restore its open marker.'
+);
+
+$legacyTask = CalendarTaskEvent::enrich(['summary' => '☐ Bestehende Aufgabe']);
+assertTaskAppointment(
+    ($legacyTask['task'] ?? false) === true
+        && ($legacyTask['displaySummary'] ?? '') === 'Bestehende Aufgabe',
+    'Legacy symbol task markers must remain readable after the ASCII marker migration.'
 );
 
 $normal = CalendarTaskEvent::prepareWrite(
@@ -259,7 +266,7 @@ $recurringTask = CalendarTaskEvent::prepareWrite([
     'recurrence'    => ['frequency' => 'DAILY']
 ]);
 assertTaskAppointment(
-    $recurringTask['summary'] === '☐ Kühlschrank reinigen',
+    $recurringTask['summary'] === '[OC:TODO] Kühlschrank reinigen',
     'One-day all-day task series must be accepted.'
 );
 

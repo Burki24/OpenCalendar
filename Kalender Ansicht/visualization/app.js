@@ -1754,7 +1754,9 @@ function eventDisplaySummary(event) {
 }
 
 function taskPlainSummary(summary) {
-    return String(summary || '').trim().replace(/^(?:☐↻|☑↻|☐|☑)\s*/u, '').trim();
+    return String(summary || '').trim()
+        .replace(/^(?:\[OC:(?:TODO|DONE)(?::FOLLOW)?\]|☐↻|☑↻|☐|☑)\s*/u, '')
+        .trim();
 }
 
 function editableEventSummary(event) {

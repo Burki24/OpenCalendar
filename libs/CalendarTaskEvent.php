@@ -12,10 +12,15 @@ use InvalidArgumentException;
  */
 final class CalendarTaskEvent
 {
-    public const OPEN_MARKER = '☐';
-    public const COMPLETED_MARKER = '☑';
-    public const OPEN_FOLLOW_MARKER = '☐↻';
-    public const COMPLETED_FOLLOW_MARKER = '☑↻';
+    public const OPEN_MARKER = '[OC:TODO]';
+    public const COMPLETED_MARKER = '[OC:DONE]';
+    public const OPEN_FOLLOW_MARKER = '[OC:TODO:FOLLOW]';
+    public const COMPLETED_FOLLOW_MARKER = '[OC:DONE:FOLLOW]';
+
+    private const LEGACY_OPEN_MARKER = '☐';
+    private const LEGACY_COMPLETED_MARKER = '☑';
+    private const LEGACY_OPEN_FOLLOW_MARKER = '☐↻';
+    private const LEGACY_COMPLETED_FOLLOW_MARKER = '☑↻';
 
     private const WEEKDAYS = ['MO', 'TU', 'WE', 'TH', 'FR', 'SA', 'SU'];
 
@@ -31,11 +36,21 @@ final class CalendarTaskEvent
             return $event;
         }
 
-        $completed = in_array($marker, [self::COMPLETED_MARKER, self::COMPLETED_FOLLOW_MARKER], true);
+        $completed = in_array($marker, [
+            self::COMPLETED_MARKER,
+            self::COMPLETED_FOLLOW_MARKER,
+            self::LEGACY_COMPLETED_MARKER,
+            self::LEGACY_COMPLETED_FOLLOW_MARKER
+        ], true);
         $event['task'] = true;
         $event['taskCompleted'] = $completed;
         $event['taskStatus'] = $completed ? 'completed' : 'open';
-        $event['taskFollowPlanned'] = in_array($marker, [self::OPEN_FOLLOW_MARKER, self::COMPLETED_FOLLOW_MARKER], true);
+        $event['taskFollowPlanned'] = in_array($marker, [
+            self::OPEN_FOLLOW_MARKER,
+            self::COMPLETED_FOLLOW_MARKER,
+            self::LEGACY_OPEN_FOLLOW_MARKER,
+            self::LEGACY_COMPLETED_FOLLOW_MARKER
+        ], true);
         $event['displaySummary'] = self::plainSummary((string) ($event['summary'] ?? ''));
 
         return $event;
@@ -293,13 +308,25 @@ final class CalendarTaskEvent
      */
     public static function plainSummary(string $summary): string
     {
-        return trim((string) preg_replace('/^(?:☐↻|☑↻|☐|☑)\s*/u', '', trim($summary)));
+        $summary = ltrim($summary);
+        $marker = self::marker($summary);
+
+        return $marker === '' ? trim($summary) : trim(substr($summary, strlen($marker)));
     }
 
     private static function marker(string $summary): string
     {
         $summary = ltrim($summary);
-        foreach ([self::OPEN_FOLLOW_MARKER, self::COMPLETED_FOLLOW_MARKER, self::OPEN_MARKER, self::COMPLETED_MARKER] as $marker) {
+        foreach ([
+            self::OPEN_FOLLOW_MARKER,
+            self::COMPLETED_FOLLOW_MARKER,
+            self::OPEN_MARKER,
+            self::COMPLETED_MARKER,
+            self::LEGACY_OPEN_FOLLOW_MARKER,
+            self::LEGACY_COMPLETED_FOLLOW_MARKER,
+            self::LEGACY_OPEN_MARKER,
+            self::LEGACY_COMPLETED_MARKER
+        ] as $marker) {
             if (str_starts_with($summary, $marker)) {
                 return $marker;
             }
