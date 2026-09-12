@@ -1750,7 +1750,8 @@ function eventDisplaySummary(event) {
     const displaySummary = String(event?.displaySummary || '').trim();
     const summary = displaySummary || taskPlainSummary(event?.summary);
     if (!event?.task) return summary;
-    return `${event.taskCompleted ? '☑' : '☐'} ${summary}`.trim();
+    const continued = event.taskRolledForward ? ' ↻' : '';
+    return `${event.taskCompleted ? '☑' : '☐'}${continued} ${summary}`.trim();
 }
 
 function taskPlainSummary(summary) {
@@ -2462,7 +2463,12 @@ function openEventDetails(event) {
     }
 
     setOptionalDetail('occasion', annualEventLabel(event));
-    setOptionalDetail('task-status', event.task ? t(event.taskCompleted ? 'Completed' : 'Open') : '');
+    setOptionalDetail(
+        'task-status',
+        event.task
+            ? t(event.taskCompleted ? 'Completed' : (event.taskRolledForward ? 'Continued from series' : 'Open'))
+            : ''
+    );
     setOptionalDetail('reminder', reminderDetailText(event));
     setOptionalDetail('location', event.location);
     setOptionalDetail('description', event.description);
@@ -2475,8 +2481,10 @@ function openEventDetails(event) {
 
     const note = document.getElementById('details-note');
     const reason = eventReadOnlyReason(event);
-    note.textContent = reason ? t(reason) : '';
-    note.classList.toggle('hidden', reason === '');
+    note.textContent = reason
+        ? t(reason)
+        : (event.taskRolledForward ? t('This overdue task was continued from a series.') : '');
+    note.classList.toggle('hidden', note.textContent === '');
     eventDetailsDialog.showModal();
 }
 

@@ -1235,6 +1235,12 @@ foreach ([$native, $ipsView] as $html) {
         'Task appointments must be editable and directly completable in both visualization modes.'
     );
     assertVisualization(
+        str_contains($script, "event.taskRolledForward ? ' ↻' : ''")
+            && str_contains($script, "'Continued from series'")
+            && str_contains($script, "t('This overdue task was continued from a series.')"),
+        'Rolled-forward task occurrences must be visibly distinguished in the calendar and event details.'
+    );
+    assertVisualization(
         str_contains($html, 'id="event-calendar-options" role="listbox"')
             && str_contains($html, 'class="calendar-picker-trigger"')
             && !str_contains($html, '<select id="event-calendar"'),

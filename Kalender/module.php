@@ -2730,12 +2730,17 @@ class Calendar extends IPSModuleStrict
      * @param list<array<string, mixed>> $events
      * @return array<string, true>
      */
-    private function pendingTaskSeries(array $events): array
+    private function pendingTaskSeries(array &$events): array
     {
         $pending = json_decode($this->ReadAttributeString('PendingTaskSeries'), true);
         if (!is_array($pending) || array_is_list($pending)) {
             $pending = [];
         }
+
+        foreach ($events as &$event) {
+            unset($event['taskRolledForward']);
+        }
+        unset($event);
 
         $openSeries = [];
         $remaining = [];
@@ -2743,17 +2748,19 @@ class Calendar extends IPSModuleStrict
             if (!is_string($seriesKey) || !is_array($identity)) {
                 continue;
             }
-            foreach ($events as $event) {
+            foreach ($events as &$event) {
                 if (!$this->matchesPendingTaskIdentity($event, $identity)) {
                     continue;
                 }
                 $event = CalendarTaskEvent::enrich($event);
                 if ((bool) ($event['task'] ?? false) && !(bool) ($event['taskCompleted'] ?? false)) {
+                    $event['taskRolledForward'] = true;
                     $openSeries[$seriesKey] = true;
                     $remaining[$seriesKey] = $identity;
                 }
                 break;
             }
+            unset($event);
         }
 
         if ($remaining !== $pending) {

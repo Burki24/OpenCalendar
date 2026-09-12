@@ -1544,6 +1544,8 @@ class CalendarView extends IPSModuleStrict
             'This calendar is read-only.',
             'Editing events is unavailable because no action bridge is configured.',
             'Action failed.',
+            'Continued from series',
+            'This overdue task was continued from a series.',
             'The description of Microsoft online meetings is protected and cannot be edited here.'
         ];
     }

@@ -63,6 +63,8 @@
             "Task status": "Aufgabenstatus",
             "Open": "Offen",
             "Completed": "Erledigt",
+            "Continued from series": "Aus Serie nachgezogen",
+            "This overdue task was continued from a series.": "Diese überfällige Aufgabe wurde aus einer Serie nachgezogen.",
             "Move planned follow-up appointments": "Geplante Folgetermine mitverschieben",
             "Mark completed": "Als erledigt markieren",
             "Reopen task": "Aufgabe wieder öffnen",

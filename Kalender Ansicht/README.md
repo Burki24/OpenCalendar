@@ -120,7 +120,10 @@ Soll ein überfälliges Vorkommnis ohne Mitverschieben auf heute nachgezogen
 werden, während zwischen beiden Daten bereits weitere Serientermine liegen,
 wird dieses Vorkommnis als einzelner offener Aufgabentermin weitergeführt. Der
 verbleibende Serienplan bleibt dadurch exakt erhalten; insbesondere Microsoft
-365 muss kein Vorkommnis über ein anderes Serienelement verschieben.
+365 muss kein Vorkommnis über ein anderes Serienelement verschieben. In der
+OpenCalendar-Ansicht kennzeichnet ein zusätzlicher Pfeil (`☐ ↻`) diesen
+nachgezogenen Einzeltermin; in den Termindetails wird er als **Aus Serie
+nachgezogen** bezeichnet.
 
 Die Funktion setzt einen beschreibbaren Kalender voraus und unterstützt bewusst
 nur eintägige ganztägige Termine. In externen Kalenderprogrammen bleiben die Marker
