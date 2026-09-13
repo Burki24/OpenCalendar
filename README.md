@@ -42,6 +42,7 @@ Die ausführlichen Einstellungen der Anbieter sind in der Dokumentation des
 [Kalender Kontos](Kalender%20Konto) beschrieben.
 
 ## IPSView-Stile
+<img width="1391" height="1131" alt="image" src="https://github.com/user-attachments/assets/d1b24f92-431e-4842-93ce-8307e7f8110e" />
 
 Die **Kalender Ansicht** verwendet für die optionale IPSView-Ausgabe das zentrale
 IPSView-Stilsystem aus `Symcon_ModuleHelper`. Die Stilquelle wird direkt in der
