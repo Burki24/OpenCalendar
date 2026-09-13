@@ -18,6 +18,7 @@ $commands = [
     ['Verify current-day event counting', [PHP_BINARY, 'tests/calendar-event-counter.php']],
     ['Verify task appointment behavior', [PHP_BINARY, 'tests/task-appointments.php']],
     ['Verify calendar failure recovery', [PHP_BINARY, 'tests/calendar-recovery.php']],
+    ['Verify CalDAV pending-task identity', [PHP_BINARY, 'tests/caldav-pending-task.php']],
     ['Verify annual-event metadata and calculations', [PHP_BINARY, 'tests/birthday.php']],
     ['Verify annual-event metadata synchronization', [PHP_BINARY, 'tests/anniversary-metadata-sync.php']],
     ['Verify Calendar View PHP API', [PHP_BINARY, 'tests/calendar-view-api.php']],

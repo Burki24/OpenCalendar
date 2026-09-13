@@ -1,6 +1,6 @@
 # Datenschutzhinweise / Privacy Notice
 
-**Stand / Last updated: 14.08.2026**
+**Stand / Last updated: 13.09.2026**
 
 OpenCalendar ist eine quellverfügbare, unter der PolyForm Noncommercial License 1.0.0 bereitgestellte Bibliothek für Symcon. Die Kalenderverarbeitung findet grundsätzlich auf der Symcon-Installation des Anwenders statt. Der Modulautor betreibt keinen eigenen Kalender-Backenddienst und erhält über OpenCalendar keine Kalenderinhalte.
 
@@ -16,6 +16,10 @@ Je nach gewähltem Anbieter verarbeitet OpenCalendar insbesondere:
 - Synchronisationszeitpunkte, ETags und technische Fehlerzustände.
 
 Kalender- und Termindaten werden lokal in Symcon zwischengespeichert, soweit dies für Synchronisation, Darstellung und Bearbeitung erforderlich ist. Dadurch können diese Daten auch Bestandteil eines vom Anwender erstellten Symcon-Backups werden.
+
+Wenn der Anwender einen Termin als **Aufgabentermin** kennzeichnet, verarbeitet OpenCalendar zusätzlich den Aufgabenstatus und gegebenenfalls die Zuordnung zu einer Ursprungsserie. Bei späteren Synchronisationen werden überfällige offene Aufgaben automatisch nachgezogen, bis sie erledigt sind oder die Aufgabenkennzeichnung entfernt wird. Dazu können beim Kalenderanbieter Termine geändert und bei Serien Einzeltermine angelegt sowie die zugehörigen ursprünglichen Vorkommnisse entfernt werden. Die vom Anwender gewählte Option **Geplante Folgetermine mitverschieben** bestimmt, ob der folgende Serienplan mit angepasst wird. Diese Verarbeitung verwendet normale Kalendertermine, keine Google-Tasks- oder Microsoft-To-Do-Anbindung.
+
+Wählt der Anwender beim Verschieben eines Termins oder einer unterstützten Serie einen anderen Kalenderanbieter als Ziel, überträgt die Symcon-Installation die hierfür erforderlichen Termindaten an diesen Zielanbieter. Erst nach bestätigter Erstellung im Ziel wird versucht, die entsprechende Quelle zu löschen. Eine solche providerübergreifende Übertragung erfolgt auf Veranlassung des Anwenders, nicht automatisch an beliebige Anbieter.
 
 OpenCalendar enthält keine eigene Telemetrie, Werbung oder Nutzeranalyse. Kalenderdaten werden nicht verkauft und nicht für Werbung, Profilbildung oder das Training von KI-Modellen verwendet.
 
@@ -58,6 +62,8 @@ Hierzu gehören:
 - Erstellen neuer Termine auf ausdrückliche Veranlassung des Anwenders,
 - Ändern bestehender Termine auf ausdrückliche Veranlassung des Anwenders,
 - Löschen bestehender Termine auf ausdrückliche Veranlassung des Anwenders,
+- automatisches Nachziehen offener Aufgaben bei der Synchronisation, nachdem der Anwender die Aufgabenfunktion für den Termin aktiviert hat, einschließlich der dafür erforderlichen Änderungen, Erstellungen und Löschungen bei Serien,
+- Übertragen von Terminen und unterstützten Serien in einen vom Anwender ausdrücklich ausgewählten Zielkalender, gegebenenfalls bei einem anderen Anbieter,
 - lokale Zwischenspeicherung der für Darstellung und Synchronisation erforderlichen Kalenderinformationen,
 - technische Verwaltung des OAuth-Zugriffs und der Synchronisation.
 
@@ -71,6 +77,8 @@ OpenCalendar übermittelt Google-Kalender- und Termindaten nicht an einen Backen
 
 Der eigentliche Austausch von Kalender- und Termindaten erfolgt direkt zwischen der Symcon-Installation des Anwenders und den Google-Calendar-APIs.
 
+Beim vom Anwender ausgelösten Verschieben aus einem Google-Kalender in einen Kalender eines anderen Anbieters übermittelt die Symcon-Installation die benötigten Termindaten direkt an den ausgewählten Zielanbieter. Beim Verschieben nach Google erfolgt die entsprechende Übertragung an Google. Es gibt dafür keinen Kalender-Backenddienst des Modulautors.
+
 Für die OAuth-Anmeldung und die Token-Aktualisierung werden die dafür erforderlichen OAuth-Daten über den zentralen Symcon-OAuth-Dienst unter `https://oauth.ipmagic.de` verarbeitet. Dazu gehören insbesondere Autorisierungscodes und Refresh-Tokens, die für den Austausch mit Google erforderlich sind. Für den OAuth-Callback wird eine aktive Symcon-Connect-Verbindung des Anwenders benötigt. Diese Dienste werden von der Symcon GmbH betrieben. Die eigentlichen Kalender- und Termininhalte werden von OpenCalendar nicht über einen Server des Modulautors geleitet.
 
 Der Modulautor erhält keinen automatischen Zugriff auf:
@@ -81,7 +89,7 @@ Der Modulautor erhält keinen automatischen Zugriff auf:
 - lokale Kalender-Caches,
 - sonstige Google-Nutzerdaten des Anwenders.
 
-Google-Nutzerdaten werden von OpenCalendar nicht verkauft, vermietet oder an Werbenetzwerke, Datenhändler, Analyseanbieter oder andere kommerzielle Dritte weitergegeben.
+Google-Nutzerdaten werden von OpenCalendar nicht verkauft, vermietet oder an Werbenetzwerke, Datenhändler oder Analyseanbieter weitergegeben. Die oben beschriebene, vom Anwender ausgelöste Übertragung an einen ausgewählten Kalenderanbieter dient ausschließlich dem gewünschten Kalenderwechsel.
 
 Eine Einsichtnahme durch den Modulautor oder andere Personen erfolgt nicht über OpenCalendar. Eine Ausnahme besteht nur dann, wenn ein Anwender selbst im Rahmen einer Supportanfrage freiwillig Logs, Screenshots oder andere Daten zur Verfügung stellt.
 
@@ -109,7 +117,7 @@ OpenCalendar verwendet mehrere technische und organisatorische Maßnahmen zum Sc
 - Refresh-Tokens werden als interne Symcon-Attribute gespeichert und nicht über die Kalender-Visualisierung ausgegeben.
 - Passwörter und OAuth-Tokens werden von OpenCalendar nicht absichtlich in Debug-Ausgaben oder Kalenderdarstellungen geschrieben.
 - OpenCalendar betreibt keinen zentralen Kalender-Backenddienst, wodurch keine zusätzliche zentrale Speicherung von Google-Kalenderdaten beim Modulautor erfolgt.
-- Beim Trennen eines Google-Kontos versucht OpenCalendar, das gespeicherte Refresh-Token bei Google zu widerrufen und entfernt anschließend die lokalen OAuth-Daten und Kalender-Caches.
+- Beim Trennen eines Google-Kontos versucht OpenCalendar, das gespeicherte Refresh-Token bei Google zu widerrufen und entfernt anschließend die lokalen Google-OAuth-Daten sowie die Kalenderlisten- und Feed-Caches der Konto-Instanz. Termincaches untergeordneter Kalender-Instanzen und bereits erzeugte IPSView-Inhalte werden dadurch nicht gelöscht; siehe Abschnitt 6.
 
 Der Schutz dauerhaft lokal gespeicherter Daten hängt zusätzlich von der Sicherheit der Symcon-Installation, des zugrunde liegenden Betriebssystems und der vom Anwender verwendeten Backup-Speicher ab.
 
@@ -136,7 +144,7 @@ Die eigentlichen Kalender- und Termindaten werden von der Symcon-Installation di
 
 Das Microsoft-Refresh-Token wird als internes, persistentes Symcon-Attribut gespeichert; kurzlebige Access-Tokens werden nur im Instanzpuffer gehalten. Zusätzlich können Konto-, Kalender- und Termininformationen lokal in Symcon zwischengespeichert werden.
 
-Beim Trennen eines Microsoft-Kontos entfernt OpenCalendar die lokal gespeicherten Microsoft-OAuth-Daten und Kalender-Caches. Eine bereits bei Microsoft erteilte Zustimmung kann zusätzlich vom Anwender in den Sicherheitseinstellungen seines Microsoft-Kontos beziehungsweise durch den Administrator des jeweiligen Microsoft-365-Mandanten widerrufen werden.
+Beim Trennen eines Microsoft-Kontos entfernt OpenCalendar die lokal gespeicherten Microsoft-OAuth-Daten sowie die Kalenderlisten- und Feed-Caches der Konto-Instanz. Termincaches untergeordneter Kalender-Instanzen und bereits erzeugte IPSView-Inhalte bleiben erhalten; siehe Abschnitt 6. Eine bereits bei Microsoft erteilte Zustimmung kann zusätzlich vom Anwender in den Sicherheitseinstellungen seines Microsoft-Kontos beziehungsweise durch den Administrator des jeweiligen Microsoft-365-Mandanten widerrufen werden.
 
 ## 4. Apple iCloud, CalDAV und ICS/Webcal
 
@@ -171,9 +179,14 @@ Dazu können insbesondere gehören:
 
 Der Anwender kann:
 
-- Kalender-Caches über die Funktion **Cache leeren** entfernen,
+- über **Cache leeren** im Kalender Konto dessen Kalenderlisten- und Feed-Caches entfernen,
+- über **Cache leeren** in jeder betroffenen Kalender-Instanz deren Termincache und Synchronisationsinformationen leeren,
 - OAuth-Verbindungen über **Google-Konto trennen** beziehungsweise **Microsoft-Konto trennen** lokal entfernen,
 - durch Löschen der betreffenden Symcon-Instanzen die zugehörigen lokalen Modulwerte entfernen.
+
+Das Trennen eines Kontos leert nicht die Termincaches der untergeordneten Kalender-Instanzen. Auch **Cache leeren** im Konto ist keine Löschung aller lokalen Termindaten. Aufgaben-/Serienzuordnungen und Jahresereignis-Metadaten können in Kalender-Instanzen zusätzlich zum Termincache gespeichert bleiben. Bei einer vollständigen lokalen Entfernung müssen daher auch die nicht mehr benötigten Kalender-Instanzen berücksichtigt werden.
+
+Bereits erzeugte IPSView-HTML-Variablen und deren Inhalte werden beim Trennen eines Kontos oder beim Deaktivieren der IPSView-Ausgabe nicht automatisch gelöscht. Nicht mehr benötigte Ausgabevariablen sind gesondert im Symcon-Objektbaum zu entfernen; gegebenenfalls müssen auch noch verwendete Kalender-Ansichten angepasst werden. Aktive Verbindungen und Synchronisationen können zuvor geleerte Caches erneut füllen. Das lokale Leeren von Caches oder Entfernen von Instanzen löscht keine Termine beim Kalenderanbieter.
 
 Beim Trennen eines Google-Kontos versucht OpenCalendar zusätzlich, das vorhandene Refresh-Token bei Google zu widerrufen.
 
@@ -218,7 +231,7 @@ Diese Datenschutzhinweise werden angepasst, wenn sich die Datenverarbeitung, die
 
 # Privacy Notice (English)
 
-**Last updated: 14 August 2026**
+**Last updated: 13 September 2026**
 
 OpenCalendar is a source-available library for Symcon distributed under the PolyForm Noncommercial License 1.0.0. Calendar processing generally takes place on the user's own Symcon installation. The module author does not operate a calendar backend service and does not receive calendar content through OpenCalendar.
 
@@ -234,6 +247,10 @@ Depending on the selected provider, OpenCalendar processes in particular:
 - synchronization timestamps, ETags and technical error states.
 
 Calendar and event data is cached locally in Symcon where required for synchronization, display and editing. This data may therefore also be included in Symcon backups created by the user.
+
+When the user marks an event as a **task appointment**, OpenCalendar additionally processes its task status and, where applicable, its association with an original series. During subsequent synchronizations, overdue open tasks are automatically moved forward until completed or no longer marked as tasks. This can update provider events and, for recurring tasks, create individual events and remove the corresponding original occurrences. The user's **Move planned following events as well** option determines whether the following series schedule is adjusted. This uses regular calendar events, not a Google Tasks or Microsoft To Do integration.
+
+When the user moves an event or a supported series to a calendar hosted by another provider, the Symcon installation transmits the required event data to that destination provider. Only after creation at the destination is confirmed does OpenCalendar attempt to delete the corresponding source. Such cross-provider transfers are initiated by the user, not performed automatically to arbitrary providers.
 
 OpenCalendar contains no proprietary telemetry, advertising or user analytics. Calendar data is not sold and is not used for advertising, profiling, creditworthiness assessment or AI model training.
 
@@ -278,6 +295,8 @@ This includes:
 - creating new events when explicitly initiated by the user,
 - updating existing events when explicitly initiated by the user,
 - deleting existing events when explicitly initiated by the user,
+- automatically moving open tasks forward during synchronization after the user has enabled the task feature for the event, including the updates, creations and deletions required for recurring tasks,
+- transferring events and supported series to a destination calendar explicitly selected by the user, including calendars hosted by another provider,
 - locally caching calendar information required for display and synchronization,
 - technically managing OAuth authorization and synchronization.
 
@@ -291,6 +310,8 @@ OpenCalendar does not transmit Google calendar or event data to a backend servic
 
 Actual calendar and event data is exchanged directly between the user's Symcon installation and the Google Calendar APIs.
 
+When the user initiates a move from a Google calendar to another provider's calendar, the Symcon installation sends the required event data directly to the selected destination provider. Moving an event to Google performs the corresponding transfer to Google. No calendar backend operated by the module author is involved.
+
 OAuth data required for authorization and token renewal is processed through Symcon's central OAuth service at `https://oauth.ipmagic.de`. This includes in particular authorization codes and refresh tokens required for the exchange with Google. An active Symcon Connect connection is required for the OAuth callback. These services are operated by Symcon GmbH. OpenCalendar does not route actual calendar and event content through a server operated by the module author.
 
 The module author does not automatically receive access to:
@@ -301,7 +322,7 @@ The module author does not automatically receive access to:
 - local calendar caches,
 - other Google user data belonging to the user.
 
-Google user data is not sold, rented or transferred by OpenCalendar to advertising networks, data brokers, analytics providers or other commercial third parties.
+Google user data is not sold, rented or transferred by OpenCalendar to advertising networks, data brokers or analytics providers. The user-initiated transfer to a selected calendar provider described above serves only the requested calendar move.
 
 The module author or other persons do not read Google user data through OpenCalendar. An exception exists only where a user voluntarily provides logs, screenshots or other information as part of a support request.
 
@@ -329,7 +350,7 @@ OpenCalendar uses several technical and organizational measures to protect Googl
 - Refresh tokens are stored as internal Symcon attributes and are not exposed through the calendar visualization.
 - OpenCalendar does not intentionally write passwords or OAuth tokens to debug output or calendar views.
 - OpenCalendar does not operate a central calendar backend, avoiding an additional centralized copy of users' Google calendar data under the module author's control.
-- When a Google account is disconnected, OpenCalendar attempts to revoke the stored refresh token at Google and subsequently removes local OAuth data and calendar caches.
+- When a Google account is disconnected, OpenCalendar attempts to revoke the stored refresh token at Google and subsequently removes local Google OAuth data and the account instance's calendar-list and feed caches. This does not delete child calendar instances' event caches or previously generated IPSView content; see section 6.
 
 Protection of data stored persistently on the local system also depends on the security of the user's Symcon installation, the underlying operating system and any backup storage used by the user.
 
@@ -356,7 +377,7 @@ Actual calendar and event data is exchanged directly between the user's Symcon i
 
 The Microsoft refresh token is stored as an internal persistent Symcon attribute; short-lived access tokens are kept only in the instance buffer. Account, calendar and event information may additionally be cached locally in Symcon.
 
-Disconnecting a Microsoft account removes the locally stored Microsoft OAuth data and calendar caches. Consent already granted at Microsoft can additionally be revoked by the user in their Microsoft account security settings or by the administrator of the relevant Microsoft 365 tenant.
+Disconnecting a Microsoft account removes the locally stored Microsoft OAuth data and the account instance's calendar-list and feed caches. Child calendar instances' event caches and previously generated IPSView content are retained; see section 6. Consent already granted at Microsoft can additionally be revoked by the user in their Microsoft account security settings or by the administrator of the relevant Microsoft 365 tenant.
 
 ## 4. Apple iCloud, CalDAV and ICS/Webcal
 
@@ -391,9 +412,14 @@ These may include:
 
 Users can:
 
-- clear calendar caches using the **Clear cache** function,
+- clear the calendar account's calendar-list and feed caches using its **Clear cache** function,
+- clear the event cache and synchronization information in each affected calendar instance using that instance's **Clear cache** function,
 - locally remove OAuth connections using **Disconnect Google account** or **Disconnect Microsoft account**,
 - remove associated local module data by deleting the relevant Symcon instances.
+
+Disconnecting an account does not clear its child calendar instances' event caches. **Clear cache** at account level does not delete all locally stored event data either. Task/series associations and anniversary metadata may remain stored in calendar instances separately from the event cache. Complete local removal therefore also needs to account for calendar instances that are no longer required.
+
+Previously generated IPSView HTML variables and their content are not automatically deleted when an account is disconnected or IPSView output is disabled. Output variables that are no longer required must be removed separately in Symcon's object tree; calendar views still in use may also need adjusting. Active connections and synchronizations can refill previously cleared caches. Clearing local caches or removing instances does not delete events at the calendar provider.
 
 When disconnecting a Google account, OpenCalendar additionally attempts to revoke the existing refresh token at Google.
 

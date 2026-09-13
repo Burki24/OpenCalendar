@@ -90,6 +90,7 @@ Ein Termin enthält unter anderem `id`, `uid`, `resourceUrl`, `etag`, `summary`,
 ```php
 bool IPSKAL_Synchronize(int $InstanzID);
 string IPSKAL_GetEvents(int $InstanzID);
+string IPSKAL_GetEventForEdit(int $InstanzID, string $EventJSON);
 string IPSKAL_GetAnniversaryList(int $InstanzID, int $Days = 0, string $Type = '');
 string IPSKAL_GetBirthdayList(int $InstanzID, int $Days = 0);
 bool IPSKAL_SetAnniversary(int $InstanzID, string $EventJSON, string $Type, string $Date);
@@ -110,6 +111,15 @@ erhalten. Eigene Integrationen mit potenziell vielen Terminen sollten einen
 Transfer beginnen, die Seiten von `0` bis `PageCount - 1` abrufen und den
 Transfer anschließend auch im Fehlerfall beenden. `StartTimestamp` ist inklusiv,
 `EndTimestamp` exklusiv.
+
+`IPSKAL_GetEventForEdit()` lädt vor dem Bearbeiten den aktuellen Providerstand
+eines Termins mit seinen schreibrelevanten Identitätsfeldern und dem ETag.
+`EventJSON` enthält den aus `GetEvents()` erhaltenen Termin einschließlich
+`startTimestamp`, `endTimestamp` und seiner Provideridentität. Die Rückgabe ist
+der normalisierte Termin als JSON, kein `success`-Wrapper. Bei einem fehlgeschlagenen
+Providerabruf kann ausschließlich für einen bereits lokal bekannten Aufgabentermin
+der passende Cacheeintrag zurückgegeben werden. Andernfalls wird eine Ausnahme
+ausgelöst und der Fehler im Kalenderstatus gespeichert.
 
 `IPSKAL_GetAnniversaryList()` liefert die in dieser Kalenderinstanz von OpenCalendar verwalteten Jahresereignisse nach dem nächsten Vorkommnis sortiert. `Days = 0` liefert alle Einträge; jeder positive Wert begrenzt die Ausgabe auf die frei wählbare Anzahl der nächsten Kalendertage. Der optionale Filter `Type` akzeptiert `birthday`, `anniversary`, `wedding` oder `death`; ein leerer Wert liefert alle Typen. Die Datensätze enthalten `name`, `anniversaryType`, `anniversaryDate`, `nextDate`, `years`, `displayName` und `daysUntil`. Für Geburtstage werden zusätzlich `birthDate`, `nextBirthday` und `age` geliefert. `IPSKAL_GetBirthdayList()` bleibt als kompatibler Spezialfall erhalten und entspricht dem Filter `birthday`.
 
@@ -301,7 +311,10 @@ $success = IPSKAL_DeleteEvent(12345, json_encode([
 ]));
 ```
 
-Nach jeder erfolgreichen Schreiboperation wird der lokale Termincache erneut vom Server geladen.
+Nach einer vom Anbieter bestätigten Schreiboperation wird versucht, den lokalen
+Termincache erneut vom Server zu laden. Schlägt nur dieses Nachladen fehl, bleibt
+der Schreibvorgang erfolgreich; Details und Hinweise zum erneuten Synchronisieren
+stehen unter [Schreibvorgänge und Synchronisationsfehler](#schreibvorgänge-und-synchronisationsfehler).
 
 ## Fehlerbehebung
 

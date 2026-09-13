@@ -420,7 +420,13 @@ trait KalenderKontoChildGatewayTrait
         $calendar = $this->resolveCalendar((string) ($request['CalendarID'] ?? ''));
         $provider = $this->createProvider();
         try {
-            $event = $this->directEventForEditForChild($calendar, $provider, $request);
+            $event = $provider instanceof CalDAVProvider
+                ? $provider->getSingleEventByResource(
+                    $this->calendarReference($calendar),
+                    (string) ($request['ResourceURL'] ?? ''),
+                    (string) ($request['UID'] ?? '')
+                )
+                : $this->directEventForEditForChild($calendar, $provider, $request);
         } catch (Throwable $exception) {
             $httpStatus = property_exists($exception, 'httpStatus') ? (int) $exception->httpStatus : 0;
             if (in_array($httpStatus, [404, 410], true)) {
@@ -429,8 +435,8 @@ trait KalenderKontoChildGatewayTrait
             throw $exception;
         }
 
-        // A bounded CalDAV lookup can return no match even though the resource
-        // exists outside that interval. Only an explicit 404/410 proves deletion.
+        // An unknown or ambiguous identity is not proof of deletion.
+        // Only an explicit 404/410 confirms that the resource is gone.
         return ['known' => $event !== null, 'event' => $event];
     }
 

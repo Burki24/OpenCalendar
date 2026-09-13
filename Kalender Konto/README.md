@@ -306,6 +306,12 @@ Unterstützte Anforderungen von Child-Modulen:
 - `BeginEventsTransfer`
 - `ReadEventsTransferPage`
 - `FinishEventsTransfer`
+- `GetEventForEdit`
+- `GetEventAfterWrite`
+- `CheckPendingTask`
+- `CheckRecurringSeries`
+- `GetRecurringSeries`
+- `GetRecurringFollowing`
 - `CreateEvent`
 - `UpdateEvent`
 - `DeleteEvent`
@@ -318,6 +324,19 @@ seine Children.
 `GetEvents` bleibt für kompatible kleine Abfragen erhalten. Die Kalender-Instanz
 verwendet für reguläre Synchronisationen den dreistufigen Seitentransfer, damit
 keine einzelne Datenflussantwort das Symcon-Ausgabelimit erreicht.
+
+`GetEventForEdit` liest den aktuellen Termin vor dem Bearbeiten;
+`GetEventAfterWrite` liest ihn nach einem bestätigten Schreibvorgang erneut.
+`CheckPendingTask` prüft eine nachgezogene Aufgabe anhand ihrer Identität,
+auch wenn sie außerhalb des normalen Ladezeitraums liegt. Ein unklarer Zustand
+oder Abfragefehler ist dabei keine bestätigte Löschung.
+`CheckRecurringSeries` prüft den Fortbestand einer Serie;
+`GetRecurringSeries` und `GetRecurringFollowing` laden die verifizierte Serie
+beziehungsweise die Daten zum Bearbeiten von „dieses und folgende“.
+Dies sind Operationen des internen Child-Datenflusses, keine gleichnamigen
+öffentlichen `IPSKALACC_`-PHP-Befehle. Für Skripte sind die nachstehenden
+Kontobefehle und die [PHP-Befehle der Kalender-Instanz](../Kalender/README.md#php-befehlsreferenz)
+vorgesehen.
 
 ## PHP-Befehlsreferenz
 

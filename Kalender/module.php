@@ -508,11 +508,12 @@ class Calendar extends IPSModuleStrict
     /**
      * Returns the current provider version of one event before it is edited.
      *
-     * This read intentionally bypasses the local event cache so the editor receives
-     * the provider's current ETag and other write-relevant identity fields.
+     * Normally reads the provider's current ETag and write-relevant identity fields.
+     * If that read fails, an already known task may fall back to its matching cached
+     * record; other failures are recorded in the calendar status and thrown.
      *
      * @param string $EventJSON JSON-encoded event identity and current time range.
-     * @return string JSON-encoded normalized current event.
+     * @return string JSON-encoded normalized provider event or matching cached task.
      */
     public function GetEventForEdit(string $EventJSON): string
     {
