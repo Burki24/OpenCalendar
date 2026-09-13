@@ -144,6 +144,17 @@ OpenCalendar-Ansicht kennzeichnet ein zusätzlicher Pfeil (`☐ ↻`) diesen
 nachgezogenen Einzeltermin; in den Termindetails wird er als **Aus Serie
 nachgezogen** bezeichnet.
 
+Diese Serienzuordnung bleibt erhalten, wenn die offene Aufgabe zeitweise
+außerhalb des geladenen Datumsbereichs liegt. Erst eine bestätigte Erledigung
+oder Löschung (beziehungsweise das Entfernen der Aufgabenkennzeichnung) gibt
+die Ursprungsserie wieder frei. Vorübergehende Abfragefehler lösen diese
+Zuordnung nicht auf.
+
+Beim Kalenderwechsel bleibt eine erfolgreich übertragene Aufgabe auch dann
+im Ziel erhalten, wenn das Nachladen der Quelle nach ihrer bestätigten Löschung
+fehlschlägt. In diesem Fall die Synchronisation wiederholen, nicht den Termin
+erneut verschieben.
+
 Die Funktion setzt einen beschreibbaren Kalender voraus und unterstützt bewusst
 nur eintägige ganztägige Termine. In externen Kalenderprogrammen bleiben die Marker
 im Titel sichtbar. Google Tasks und andere Aufgabenlisten werden nicht importiert

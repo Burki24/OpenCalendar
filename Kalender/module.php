@@ -722,12 +722,15 @@ class Calendar extends IPSModuleStrict
 
     /**
      * Creates an event in the configured calendar.
+     * A confirmed write remains successful if the subsequent cache refresh fails.
      *
      * @param string $EventJSON JSON-encoded event data.
      * @return string JSON-encoded operation result.
      */
     public function CreateEvent(string $EventJSON): string
     {
+        $writeConfirmed = false;
+        $created = [];
         try {
             $event = $this->decodeObject($EventJSON, 'event');
             $anniversary = $this->anniversaryInput($event);
@@ -777,6 +780,7 @@ class Calendar extends IPSModuleStrict
                 'annualEvent' => $anniversary !== null && $anniversary['enabled']
             ]);
             $created = $this->sendRequest('CreateEvent', ['Event' => $providerEvent]);
+            $writeConfirmed = true;
             if ($anniversary !== null && $anniversary['enabled']) {
                 $this->upsertAnniversaryMetadata(
                     array_merge($event, is_array($created) ? $created : []),
@@ -794,18 +798,22 @@ class Calendar extends IPSModuleStrict
 
             return $this->encodeResult(true, $created);
         } catch (Throwable $exception) {
-            return $this->encodeResult(false, null, $this->handleError($exception));
+            $error = $this->handleError($exception);
+            return $this->encodeResult($writeConfirmed, $writeConfirmed ? $created : null, $error);
         }
     }
 
     /**
      * Updates an existing event in the configured calendar.
+     * A confirmed write remains successful if the subsequent cache refresh fails.
      *
      * @param string $EventJSON JSON-encoded event metadata and changes.
      * @return string JSON-encoded operation result.
      */
     public function UpdateEvent(string $EventJSON): string
     {
+        $writeConfirmed = false;
+        $updated = [];
         try {
             $event = $this->decodeObject($EventJSON, 'event');
             $changes = $event['changes'] ?? $event;
@@ -939,7 +947,14 @@ class Calendar extends IPSModuleStrict
                         'Recurrence'  => $recurrence
                     ]
                 );
+            $writeConfirmed = true;
 
+            if (array_key_exists('summary', $changes)) {
+                $task = CalendarTaskEvent::enrich($changes);
+                if (!(bool) ($task['task'] ?? false) || (bool) ($task['taskCompleted'] ?? false)) {
+                    $this->forgetPendingTask($event);
+                }
+            }
             if ($anniversaryDisabled) {
                 $this->removeAnniversaryMetadata($event);
             } elseif ($anniversaryEnabled || $existingAnniversary !== null) {
@@ -963,7 +978,8 @@ class Calendar extends IPSModuleStrict
 
             return $this->encodeResult(true, $updated);
         } catch (Throwable $exception) {
-            return $this->encodeResult(false, null, $this->handleError($exception));
+            $error = $this->handleError($exception);
+            return $this->encodeResult($writeConfirmed, $writeConfirmed ? $updated : null, $error);
         }
     }
 
@@ -971,10 +987,11 @@ class Calendar extends IPSModuleStrict
      * Deletes an event from the configured calendar.
      *
      * @param string $EventJSON JSON-encoded event metadata.
-     * @return bool True when the event was deleted successfully.
+     * @return bool True once deletion is confirmed, even if the subsequent cache refresh fails.
      */
     public function DeleteEvent(string $EventJSON): bool
     {
+        $writeConfirmed = false;
         try {
             $event = $this->decodeObject($EventJSON, 'event');
             $recurrence = $this->resolveWriteRecurrence($event, false);
@@ -996,6 +1013,9 @@ class Calendar extends IPSModuleStrict
             if (!(bool) ($result['success'] ?? false)) {
                 throw new RuntimeException('The calendar account did not confirm the deletion.');
             }
+            // A later cache failure must never make a caller undo a confirmed move.
+            $writeConfirmed = true;
+            $this->forgetPendingTask($event);
             if (!CalendarEventRecurrence::isOccurrence($recurrence)
                 || in_array(
                     $writeScope,
@@ -1011,7 +1031,7 @@ class Calendar extends IPSModuleStrict
             return true;
         } catch (Throwable $exception) {
             $this->handleError($exception);
-            return false;
+            return $writeConfirmed;
         }
     }
 
@@ -1334,6 +1354,15 @@ class Calendar extends IPSModuleStrict
                 static fn (array $event): bool => !($event['_syncDeleted'] ?? false)
             ));
         $this->reconcileAnniversaryMetadataAfterSynchronization($events, $cachedEvents);
+        $events = CalendarTaskEvent::preservePendingSeries($events, $cachedEvents, $today);
+        // Commit the received data before advancing its delta cursor. Task writes
+        // happen afterwards and may fail independently of a successful read.
+        $this->storeEvents($events);
+        foreach ($transferredEvents as $transferredEvent) {
+            if ((bool) ($transferredEvent['_syncDeleted'] ?? false)) {
+                $this->forgetPendingTask($transferredEvent);
+            }
+        }
         if ($nextSyncToken !== '') {
             $this->storeIncrementalSyncState($nextSyncToken, $startTimestamp, $endTimestamp);
         } else {
@@ -2565,38 +2594,46 @@ class Calendar extends IPSModuleStrict
                 ?: ($left['index'] <=> $right['index'])
         );
         $movedSeries = [];
-        foreach ($candidates as $candidate) {
-            $seriesKey = $candidate['seriesKey'];
-            if ($seriesKey !== '' && isset($movedSeries[$seriesKey])) {
-                continue;
-            }
+        try {
+            foreach ($candidates as $candidate) {
+                $seriesKey = $candidate['seriesKey'];
+                if ($seriesKey !== '' && isset($movedSeries[$seriesKey])) {
+                    continue;
+                }
 
-            $index = $candidate['index'];
-            $event = $candidate['event'];
-            $followingMoved = false;
-            $detached = false;
-            $updated = $this->rollForwardTaskEvent(
-                $event,
-                $candidate['changes'],
-                $events,
-                $followingMoved,
-                $detached
-            );
-            if ($followingMoved) {
-                $events = CalendarTaskEvent::shiftFollowingEvents(
-                    $events,
+                $index = $candidate['index'];
+                $event = $candidate['event'];
+                $followingMoved = false;
+                $detached = false;
+                $updated = $this->rollForwardTaskEvent(
                     $event,
-                    (string) $candidate['changes']['start']
+                    $candidate['changes'],
+                    $events,
+                    $followingMoved,
+                    $detached
                 );
+                if ($followingMoved) {
+                    $events = CalendarTaskEvent::shiftFollowingEvents(
+                        $events,
+                        $event,
+                        (string) $candidate['changes']['start']
+                    );
+                }
+                $events[$index] = array_merge($event, $candidate['changes'], $updated);
+                if ($detached && $seriesKey !== '') {
+                    $this->rememberPendingTaskSeries($seriesKey, $events[$index]);
+                }
+                if ($seriesKey !== '') {
+                    $movedSeries[$seriesKey] = true;
+                }
+                ++$moved;
             }
-            $events[$index] = array_merge($event, $candidate['changes'], $updated);
-            if ($detached && $seriesKey !== '') {
-                $this->rememberPendingTaskSeries($seriesKey, $events[$index]);
+        } catch (Throwable $exception) {
+            // Keep confirmed earlier writes even when another task fails later.
+            if ($moved > 0) {
+                $this->storeEvents($events);
             }
-            if ($seriesKey !== '') {
-                $movedSeries[$seriesKey] = true;
-            }
-            ++$moved;
+            throw $exception;
         }
 
         if ($moved > 0) {
@@ -2785,19 +2822,30 @@ class Calendar extends IPSModuleStrict
             if (!is_string($seriesKey) || !is_array($identity)) {
                 continue;
             }
+            // An absent item may simply lie outside PastDays/FutureDays. Keep
+            // its association unless completion or deletion is confirmed.
+            $openSeries[$seriesKey] = true;
+            $remaining[$seriesKey] = $identity;
+            $found = false;
             foreach ($events as &$event) {
                 if (!$this->matchesPendingTaskIdentity($event, $identity)) {
                     continue;
                 }
+                $found = true;
                 $event = CalendarTaskEvent::enrich($event);
                 if ((bool) ($event['task'] ?? false) && !(bool) ($event['taskCompleted'] ?? false)) {
                     $event['taskRolledForward'] = true;
                     $openSeries[$seriesKey] = true;
                     $remaining[$seriesKey] = $identity;
+                } else {
+                    unset($openSeries[$seriesKey], $remaining[$seriesKey]);
                 }
                 break;
             }
             unset($event);
+            if (!$found && $this->pendingTaskWasClosed($identity)) {
+                unset($openSeries[$seriesKey], $remaining[$seriesKey]);
+            }
         }
 
         if ($remaining !== $pending) {
@@ -2808,6 +2856,53 @@ class Calendar extends IPSModuleStrict
         }
 
         return $openSeries;
+    }
+
+    /** @param array<string, mixed> $identity */
+    private function pendingTaskWasClosed(array $identity): bool
+    {
+        try {
+            $start = (int) ($identity['startTimestamp'] ?? (new DateTimeImmutable('today'))->getTimestamp());
+            $result = $this->sendRequest('CheckPendingTask', [
+                'EventReference' => (string) ($identity['eventReference'] ?? ''),
+                'ResourceURL'    => (string) ($identity['resourceUrl'] ?? ''),
+                'UID'            => (string) ($identity['uid'] ?? ''),
+                'Start'          => $start,
+                'End'            => max($start + 1, (int) ($identity['endTimestamp'] ?? $start + 86400))
+            ]);
+            if (!(bool) ($result['known'] ?? false) || !array_key_exists('event', $result)) {
+                return false;
+            }
+            if ($result['event'] === null) {
+                return true;
+            }
+            if (!is_array($result['event']) || !$this->matchesPendingTaskIdentity($result['event'], $identity)) {
+                return false;
+            }
+            $task = CalendarTaskEvent::enrich($result['event']);
+            return !(bool) ($task['task'] ?? false) || (bool) ($task['taskCompleted'] ?? false);
+        } catch (Throwable $exception) {
+            $this->SendSafeDebugException('PendingTaskLookupDeferred', $exception);
+            return false;
+        }
+    }
+
+    /** @param array<string, mixed> $event Confirmed closed, unmarked or deleted task identity. */
+    private function forgetPendingTask(array $event): void
+    {
+        $pending = json_decode($this->ReadAttributeString('PendingTaskSeries'), true);
+        if (!is_array($pending) || array_is_list($pending)) {
+            return;
+        }
+        foreach ($pending as $seriesKey => $identity) {
+            if (is_array($identity) && $this->matchesPendingTaskIdentity($event, $identity)) {
+                unset($pending[$seriesKey]);
+            }
+        }
+        $this->WriteAttributeString(
+            'PendingTaskSeries',
+            json_encode($pending, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR)
+        );
     }
 
     /** @param array<string, mixed> $event */
@@ -2827,7 +2922,9 @@ class Calendar extends IPSModuleStrict
         $pending[$seriesKey] = [
             'eventReference' => $eventReference,
             'resourceUrl'    => $resourceUrl,
-            'uid'            => $uid
+            'uid'            => $uid,
+            'startTimestamp' => $this->eventBoundaryTimestamp($event, 'start'),
+            'endTimestamp'   => $this->eventBoundaryTimestamp($event, 'end')
         ];
         $this->WriteAttributeString(
             'PendingTaskSeries',

@@ -205,6 +205,33 @@ das die ganze Serie. Statusänderungen ohne Datumsänderung bleiben auf das
 einzelne Vorkommnis begrenzt. Bestehende Ausnahmen im verschobenen Serienteil
 werden zurückgesetzt.
 
+Die Zuordnung eines nachgezogenen Einzeltermins zu seiner Ursprungsserie bleibt
+auch außerhalb des eingestellten Synchronisationszeitraums erhalten. Eine
+fehlende Aufgabe wird, soweit der Anbieter dies unterstützt, gezielt anhand
+ihrer Identität geprüft. Nur bestätigte Erledigung, Entfernung der
+Aufgabenkennzeichnung oder Löschung gibt die Serie wieder frei. Bei einem
+vorübergehenden Abfragefehler bleibt die Zuordnung vorsichtshalber bestehen.
+
+### Schreibvorgänge und Synchronisationsfehler
+
+Eine vom Kalenderanbieter bestätigte Erstellung, Änderung oder Löschung bleibt
+erfolgreich, auch wenn das anschließende Aktualisieren des lokalen Caches
+fehlschlägt. `CreateEvent` und `UpdateEvent` liefern dann weiterhin
+`success = true` und den bestätigten Termin; `error` enthält gegebenenfalls die
+nachgelagerte Fehlermeldung. `DeleteEvent` liefert weiterhin `true`.
+Der Aktualisierungsfehler ist außerdem über `GetCalendarStatus().lastError`
+erkennbar. Den Schreibvorgang deshalb nicht erneut ausführen, sondern die
+Synchronisation wiederholen. Beim Wechsel in einen anderen Kalender wird die
+Zielkopie nicht aufgrund eines solchen nachgelagerten Lesefehlers gelöscht.
+
+Erfolgreich empfangene Kalenderdaten werden vor dem zugehörigen
+Synchronisationsmarker gespeichert. Scheitert danach das automatische
+Nachziehen einer Aufgabe, bleiben auch unabhängige neue oder geänderte Termine
+erhalten. Die Synchronisation meldet den Aufgabenfehler und kann erneut
+gestartet werden.
+
+### Serientermine erstellen
+
 Für beschreibbare Google-, Microsoft-, Apple-iCloud- und CalDAV-Kalender können beim Erstellen zusätzlich
 providerneutrale Serienangaben übergeben werden. Bei Google verwendet OpenCalendar
 die Kalenderzeitzone. Für Microsoft und CalDAV wird die übergebene Zeitzone verwendet;

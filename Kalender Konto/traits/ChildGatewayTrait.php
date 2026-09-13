@@ -62,6 +62,7 @@ trait KalenderKontoChildGatewayTrait
                 ],
                 'GetEventForEdit'        => $this->getEventForEditForChild($request),
                 'GetEventAfterWrite'     => $this->getEventAfterWriteForChild($request),
+                'CheckPendingTask'       => $this->checkPendingTaskForChild($request),
                 'CheckRecurringSeries'   => $this->checkRecurringSeriesForChild($request),
                 'GetRecurringSeries'     => $this->getRecurringSeriesForChild($request),
                 'GetRecurringFollowing'  => $this->getRecurringFollowingForChild($request),
@@ -406,6 +407,31 @@ trait KalenderKontoChildGatewayTrait
         }
 
         throw new RuntimeException('Direct event lookup is not supported by this calendar provider.');
+    }
+
+    /**
+     * Checks a detached task by identity, independently of the calendar view window.
+     *
+     * @param array<string, mixed> $request
+     * @return array{known: bool, event: array<string, mixed>|null}
+     */
+    private function checkPendingTaskForChild(array $request): array
+    {
+        $calendar = $this->resolveCalendar((string) ($request['CalendarID'] ?? ''));
+        $provider = $this->createProvider();
+        try {
+            $event = $this->directEventForEditForChild($calendar, $provider, $request);
+        } catch (Throwable $exception) {
+            $httpStatus = property_exists($exception, 'httpStatus') ? (int) $exception->httpStatus : 0;
+            if (in_array($httpStatus, [404, 410], true)) {
+                return ['known' => true, 'event' => null];
+            }
+            throw $exception;
+        }
+
+        // A bounded CalDAV lookup can return no match even though the resource
+        // exists outside that interval. Only an explicit 404/410 proves deletion.
+        return ['known' => $event !== null, 'event' => $event];
     }
 
     /**
