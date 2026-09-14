@@ -5,6 +5,47 @@ gemeinsamen responsiven Darstellung zusammen. Sie kann direkt in der
 Symcon-Kachelvisualisierung oder über eine WebContent-Variable in IPSView
 verwendet werden.
 
+## Aufgabentermine
+
+Aufgaben werden als gewöhnliche ganztägige Kalendertermine gespeichert; eine
+zusätzliche Aufgaben-API oder OAuth-Freigabe ist nicht erforderlich.
+
+1. **Termin erstellen** öffnen, einen beschreibbaren Kalender auswählen und
+   **Aufgabentermin** aktivieren. Die Aufgabe wird automatisch ganztägig und
+   eintägig. Jahresereignisse und Aufgabentermine schließen sich aus.
+2. Bei Bedarf eine Wiederholung einstellen. Mit **Geplante Folgetermine
+   mitverschieben** festlegen, ob sich bei einer Datumsverschiebung auch die
+   folgenden Termine der Serie verschieben sollen.
+3. In den Termindetails die Aufgabe über **Als erledigt markieren** abschließen.
+   **Aufgabe wieder öffnen** setzt sie zurück auf offen. Das Erledigen betrifft
+   nur das ausgewählte Vorkommnis, nicht die gesamte Serie.
+
+Offene, überfällige Aufgaben werden durch das Kalender-Modul bei der
+Synchronisation und beim Tageswechsel nachgezogen. Bei einer Serie wird die
+aktuell anstehende Aufgabe weitergeführt; erledigte Aufgaben laufen nicht mit.
+Ein aus der Serie fortgeführter Einzeltermin erhält zusätzlich **↻** und in den
+Details den Hinweis **Aus Serie nachgezogen**.
+
+Beim Bearbeiten von Aufgabenterminen entfällt die zusätzliche Auswahl zwischen
+Einzelvorkommnis und gesamter Serie. Die Folgeterminoption steuert das
+Mitverschieben; der Hinweis im Editor erklärt den gewählten Umfang. Bei einem
+Kalenderwechsel mit aktivierter Option werden die ausgewählte Aufgabe und der
+verbleibende Serienteil übertragen. Ohne die Option wird nur das ausgewählte
+Vorkommnis verschoben. Für normale Terminserien bleibt die bisherige
+Umfangsauswahl erhalten. Vorhandene Ausnahmen im folgenden Serienteil werden
+beim Teilen einer Serie zurückgesetzt.
+
+**Aufgabenstatus** und die 9.1-Felder **Status** sowie **Verfügbarkeit** sind
+unabhängig: Eine erledigte Aufgabe ist nicht automatisch ein abgesagter Termin.
+Die zusätzlichen Felder und die IPSView-Auswahllisten bleiben verfügbar.
+In externen Kalendern wird der Aufgabenstatus über Titelmarker wie `[OC:TODO]`
+und `[OC:DONE]` gespeichert; OpenCalendar zeigt stattdessen Kästchen und einen
+bereinigten Titel an.
+
+Nach dem Update die Kachel neu laden. Für bereits gespeicherte IPSView-Seiten
+**IPSView-HTML neu generieren** ausführen und die Ansicht neu laden, damit die
+neuen Bedienelemente erscheinen.
+
 ## Voraussetzungen
 
 - Symcon ab Version 9.1 mit Kachelvisualisierung und HTML-SDK

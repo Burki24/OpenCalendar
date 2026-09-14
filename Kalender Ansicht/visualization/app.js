@@ -102,6 +102,11 @@ const eventAnniversaryType = document.getElementById('event-anniversary-type');
 const eventAnniversaryDateRow = document.getElementById('event-anniversary-date-row');
 const eventAnniversaryDate = document.getElementById('event-anniversary-date');
 const eventAnniversaryDateLabel = document.getElementById('event-anniversary-date-label');
+const eventTask = document.getElementById('event-task');
+const eventTaskCompleted = document.getElementById('event-task-completed');
+const eventTaskCompletedRow = document.getElementById('event-task-completed-row');
+const eventTaskFollowPlanned = document.getElementById('event-task-follow-planned');
+const eventTaskFollowPlannedRow = document.getElementById('event-task-follow-planned-row');
 const eventStatusInput = document.getElementById('event-status');
 const eventAvailabilityInput = document.getElementById('event-availability');
 const eventRecurrenceRow = document.getElementById('event-recurrence-row');
@@ -1794,7 +1799,68 @@ function applyCalendarFilter() {
 
 function eventDisplaySummary(event) {
     const displaySummary = String(event?.displaySummary || '').trim();
-    return displaySummary || String(event?.summary || '').trim();
+    const summary = displaySummary || taskPlainSummary(event?.summary);
+    if (!event?.task) return summary;
+    const continued = event.taskRolledForward ? ' ↻' : '';
+    return `${event.taskCompleted ? '☑' : '☐'}${continued} ${summary}`.trim();
+}
+
+function taskPlainSummary(summary) {
+    return String(summary || '').trim()
+        .replace(/^(?:\[OC:(?:TODO|DONE)(?::FOLLOW)?\]|☐↻|☑↻|☐|☑)\s*/u, '')
+        .trim();
+}
+
+function editableEventSummary(event) {
+    if (!event?.task) return String(event?.summary || '').trim();
+    return String(event?.displaySummary || '').trim() || taskPlainSummary(event?.summary);
+}
+
+function loadTaskEditor(event) {
+    eventTask.checked = Boolean(event?.task);
+    eventTaskCompleted.checked = Boolean(event?.taskCompleted);
+    eventTaskFollowPlanned.checked = Boolean(event?.taskFollowPlanned);
+    updateTaskControls();
+}
+
+function updateTaskControls() {
+    const enabled = eventTask.checked;
+    eventTask.disabled = !eventDialogEditable;
+    eventTaskCompletedRow.classList.toggle('hidden', !enabled);
+    eventTaskCompleted.disabled = !eventDialogEditable || !enabled;
+    const recurring = eventRecurrenceFrequency.value !== 'none' || Boolean(selectedEvent?.recurring);
+    const canFollow = Boolean(selectedCalendarEntry()?.canUpdateFollowing);
+    eventTaskFollowPlannedRow.classList.toggle('hidden', !enabled || !recurring || !canFollow);
+    eventTaskFollowPlanned.disabled = !eventDialogEditable || !enabled || !recurring || !canFollow;
+    if (!recurring || !canFollow) eventTaskFollowPlanned.checked = false;
+    updateTaskMoveNote();
+
+    if (!enabled || !eventDialogEditable) return;
+
+    eventAnniversaryType.value = '';
+    eventAnniversaryDate.value = '';
+    eventAnniversaryDateRow.classList.add('hidden');
+    const allDayInput = document.getElementById('event-all-day');
+    const start = readInputDate(document.getElementById('event-start').value) || new Date();
+    const displayedEnd = readInputDate(document.getElementById('event-end').value);
+    if (!allDayInput.checked || !displayedEnd || dayKey(displayedEnd) !== dayKey(start)) {
+        setDateInputs(start, start, true);
+        allDayInput.checked = true;
+        updateEventStateDefaults();
+    }
+}
+
+function updateTaskMoveNote() {
+    if (!eventDialogEditable || !eventIsRecurring(selectedEvent)
+        || ['series', 'following'].includes(selectedEvent?.writeScope)) return;
+    const note = document.getElementById('dialog-note');
+    const moving = Number(eventCalendarInput.value) !== Number(selectedEvent?.calendarInstanceId);
+    note.textContent = eventTask.checked && eventTaskFollowPlanned.checked && moving
+        ? t('This and all following tasks will be moved to the selected calendar.')
+        : eventTask.checked && eventTaskFollowPlanned.checked
+        ? t('Changing the date moves this and all following occurrences. Existing following exceptions will be reset.')
+        : t('Only this occurrence of the recurring event will be changed.');
+    note.classList.remove('hidden');
 }
 
 function resetAnniversaryEditor() {
@@ -1837,7 +1903,7 @@ function loadAnniversaryEditor(event) {
 
 function anniversaryEditorEditable() {
     const calendar = selectedCalendarEntry();
-    if (!eventDialogEditable || !calendar?.canWrite) return false;
+    if (!eventDialogEditable || !calendar?.canWrite || eventTask.checked) return false;
     if (selectedEvent === null) return Boolean(calendar.canCreateRecurrence);
     if (!selectedEvent.recurring) {
         const moving = Number(calendar.instanceId || 0) !== Number(selectedEvent.calendarInstanceId || 0);
@@ -1887,7 +1953,7 @@ function updateAnniversaryControls() {
         eventRecurrenceFrequency.disabled = true;
         eventRecurrenceOptions.classList.add('hidden');
     } else {
-        allDayInput.disabled = !eventDialogEditable;
+        allDayInput.disabled = !eventDialogEditable || eventTask.checked;
     }
     synchronizeIPSViewEventStatePickers();
 }
@@ -2362,6 +2428,9 @@ function applyImportedIcsEvent(importedEvent) {
     document.getElementById('event-location').value = importedEvent.location;
     document.getElementById('event-description').value = importedEvent.description;
     document.getElementById('event-all-day').checked = importedEvent.allDay;
+    eventTask.checked = false;
+    eventTaskCompleted.checked = false;
+    eventTaskFollowPlanned.checked = false;
     eventStatusInput.value = normalizedEventStatus(importedEvent.status, 'CONFIRMED');
     eventAvailabilityInput.value = normalizedEventTransparency(importedEvent.transparency);
     eventStatusEdited = normalizedEventStatus(importedEvent.status) !== '';
@@ -2371,6 +2440,7 @@ function applyImportedIcsEvent(importedEvent) {
     resetRecurrenceEditor(importedEvent.start);
     loadReminderEditor({ reminder: importedEvent.reminder });
     updateRecurrenceAvailability();
+    updateTaskControls();
     updateAnniversaryControls();
     updateReminderControls();
     updateEventStateControls();
@@ -2409,6 +2479,9 @@ function openNewEvent(preferredDay = null) {
     document.getElementById('event-location').value = '';
     document.getElementById('event-description').value = '';
     document.getElementById('event-all-day').checked = false;
+    eventTask.checked = false;
+    eventTaskCompleted.checked = false;
+    eventTaskFollowPlanned.checked = false;
     resetEventStateEditor();
     resetAnniversaryEditor();
     let start;
@@ -2477,6 +2550,12 @@ function openEventDetails(event) {
     }
 
     setOptionalDetail('occasion', annualEventLabel(event));
+    setOptionalDetail(
+        'task-status',
+        event.task
+            ? t(event.taskCompleted ? 'Completed' : (event.taskRolledForward ? 'Continued from series' : 'Open'))
+            : ''
+    );
     setOptionalDetail('status', eventStatusDetailText(event));
     setOptionalDetail('availability', eventAvailabilityDetailText(event));
     setOptionalDetail('reminder', reminderDetailText(event));
@@ -2485,12 +2564,51 @@ function openEventDetails(event) {
     document.getElementById('details-provider-button').classList.toggle('hidden', providerEventUrl(event) === '');
     document.getElementById('details-edit-button').classList.toggle('hidden', !editable);
     document.getElementById('details-delete-button').classList.toggle('hidden', !deletable);
+    const taskToggle = document.getElementById('details-task-toggle-button');
+    taskToggle.textContent = t(event.taskCompleted ? 'Reopen task' : 'Mark completed');
+    taskToggle.classList.toggle('hidden', !event.task || !eventCanUpdateOccurrence(event));
 
     const note = document.getElementById('details-note');
     const reason = eventReadOnlyReason(event);
-    note.textContent = reason ? t(reason) : '';
-    note.classList.toggle('hidden', reason === '');
+    note.textContent = reason
+        ? t(reason)
+        : (event.taskRolledForward ? t('This overdue task was continued from a series.') : '');
+    note.classList.toggle('hidden', note.textContent === '');
     eventDetailsDialog.showModal();
+}
+
+async function toggleSelectedTaskCompletion() {
+    if (!selectedEvent?.task || !eventCanUpdateOccurrence(selectedEvent)) return;
+    const button = document.getElementById('details-task-toggle-button');
+    button.disabled = true;
+    const value = {
+        calendarInstanceId: Number(selectedEvent.calendarInstanceId),
+        event: {
+            uid: selectedEvent.uid,
+            resourceUrl: selectedEvent.resourceUrl,
+            etag: selectedEvent.etag,
+            allDay: Boolean(selectedEvent.allDay),
+            start: selectedEvent.start,
+            end: selectedEvent.end,
+            summary: selectedEvent.summary,
+            taskFollowPlanned: Boolean(selectedEvent.taskFollowPlanned),
+            ...recurrencePayload(selectedEvent),
+            changes: {
+                task: true,
+                taskCompleted: !Boolean(selectedEvent.taskCompleted)
+            }
+        }
+    };
+    releaseAgendaScrollWorkflowAfterState();
+    try {
+        if (await sendAction('UpdateEvent', value)) {
+            eventDetailsDialog.close();
+        } else {
+            cancelAgendaScrollWorkflowRelease();
+        }
+    } finally {
+        button.disabled = false;
+    }
 }
 
 function openPendingEventEditor(event, writeScope = '') {
@@ -2504,10 +2622,11 @@ function openPendingEventEditor(event, writeScope = '') {
     populateCalendarSelect(calendar ? [calendar] : [], selectedEvent.calendarInstanceId);
     setCalendarSelectDisabled(true);
     document.getElementById('dialog-title').textContent = t(scope === 'series' ? 'Edit recurring event' : 'Edit event');
-    document.getElementById('event-summary').value = selectedEvent.summary || '';
+    document.getElementById('event-summary').value = editableEventSummary(selectedEvent);
     document.getElementById('event-location').value = selectedEvent.location || '';
     document.getElementById('event-description').value = selectedEvent.description || '';
     document.getElementById('event-all-day').checked = Boolean(selectedEvent.allDay);
+    loadTaskEditor(selectedEvent);
     loadEventStateEditor(selectedEvent);
     loadAnniversaryEditor(selectedEvent);
     setDateInputs(
@@ -2530,7 +2649,8 @@ function requestEdit(sourceDialog) {
     const occurrenceAllowed = eventCanUpdateOccurrence(event);
     const followingAllowed = eventCanUpdateFollowing(event);
     const seriesAllowed = eventCanUpdateSeries(event);
-    if (!eventIsRecurring(event) || (!followingAllowed && !seriesAllowed)) {
+    // Task appointments use their follow-up checkbox instead of the generic scope dialog.
+    if (Boolean(event.task) || !eventIsRecurring(event) || (!followingAllowed && !seriesAllowed)) {
         beginAgendaScrollWorkflow('edit');
         sourceDialog?.close();
         void prepareEventEdit(event);
@@ -3175,10 +3295,11 @@ function openExistingEvent(event, writeScope = '') {
     populateCalendarSelect(availableCalendars, selectedEvent.calendarInstanceId);
     setCalendarSelectDisabled(!canMove);
     document.getElementById('dialog-title').textContent = t(editingSeries ? 'Edit recurring event' : 'Edit event');
-    document.getElementById('event-summary').value = selectedEvent.summary || '';
+    document.getElementById('event-summary').value = editableEventSummary(selectedEvent);
     document.getElementById('event-location').value = selectedEvent.location || '';
     document.getElementById('event-description').value = selectedEvent.description || '';
     document.getElementById('event-all-day').checked = Boolean(selectedEvent.allDay);
+    loadTaskEditor(selectedEvent);
     loadEventStateEditor(selectedEvent);
     loadAnniversaryEditor(selectedEvent);
     setDateInputs(
@@ -3221,6 +3342,7 @@ function openExistingEvent(event, writeScope = '') {
     }
     updateDialogColor();
     updateSaveButtonLabel();
+    updateTaskMoveNote();
     showEventDialog();
 }
 
@@ -4014,6 +4136,8 @@ function setDialogEditable(editable, descriptionEditable = editable) {
     });
     document.getElementById('event-description').disabled = !descriptionEditable;
     document.getElementById('save-button').classList.toggle('hidden', !editable);
+    updateTaskControls();
+    updateRecurrenceAvailability();
     updateReminderControls();
     updateAnniversaryControls();
     updateEventStateControls();
@@ -4091,6 +4215,9 @@ eventForm.addEventListener('submit', async event => {
         summary: document.getElementById('event-summary').value.trim(),
         description: document.getElementById('event-description').value.trim(),
         location: document.getElementById('event-location').value.trim(),
+        task: eventTask.checked,
+        taskCompleted: eventTask.checked && eventTaskCompleted.checked,
+        taskFollowPlanned: eventTask.checked && eventTaskFollowPlanned.checked,
         allDay,
         start: inputDateValue(document.getElementById('event-start').value, allDay),
         end: inputDateValue(document.getElementById('event-end').value, allDay, allDay)
@@ -4212,13 +4339,25 @@ document.getElementById('event-all-day').addEventListener('change', event => {
     setDateInputs(start, end, event.target.checked);
     updateEventStateDefaults();
 });
+eventTask.addEventListener('change', () => {
+    if (!eventTask.checked) {
+        eventTaskCompleted.checked = false;
+        eventTaskFollowPlanned.checked = false;
+    }
+    updateTaskControls();
+    updateRecurrenceAvailability();
+    updateAnniversaryControls();
+    updateEventStateDefaults();
+});
+eventTaskFollowPlanned.addEventListener('change', updateTaskMoveNote);
 eventCalendarInput.addEventListener('change', () => {
     updateDialogColor();
     updateSaveButtonLabel();
     updateRecurrenceAvailability();
-    updateAnniversaryControls();
     resolveDefaultReminderForCalendarMove();
     updateReminderControls();
+    updateTaskControls();
+    updateAnniversaryControls();
     updateEventStateDefaults();
 });
 eventStatusInput.addEventListener('change', () => {
@@ -4228,6 +4367,11 @@ eventAvailabilityInput.addEventListener('change', () => {
     eventAvailabilityEdited = true;
 });
 eventAnniversaryType.addEventListener('change', () => {
+    if (eventAnniversaryType.value) {
+        eventTask.checked = false;
+        eventTaskCompleted.checked = false;
+        updateTaskControls();
+    }
     updateRecurrenceAvailability();
     if (eventAnniversaryType.value) {
         if (!eventAnniversaryDate.value) eventAnniversaryDate.value = suggestedAnniversaryDate();
@@ -4284,6 +4428,7 @@ eventRecurrenceFrequency.addEventListener('change', () => {
         controls.index.value = recurrencePatternContext.relativeIndex;
     }
     updateRecurrenceControls();
+    updateTaskControls();
 });
 eventRecurrenceInterval.addEventListener('input', updateRecurrenceControls);
 eventRecurrenceEndMode.addEventListener('change', updateRecurrenceControls);
@@ -4350,6 +4495,7 @@ document.getElementById('details-close').addEventListener('click', () => eventDe
 document.getElementById('details-close-button').addEventListener('click', () => eventDetailsDialog.close());
 document.getElementById('details-provider-button').addEventListener('click', openProviderEvent);
 document.getElementById('details-edit-button').addEventListener('click', () => requestEdit(eventDetailsDialog));
+document.getElementById('details-task-toggle-button').addEventListener('click', toggleSelectedTaskCompletion);
 document.getElementById('edit-scope-close').addEventListener('click', () => editScopeDialog.close());
 document.getElementById('edit-scope-cancel').addEventListener('click', () => editScopeDialog.close());
 editScopeConfirmButton.addEventListener('click', confirmEditScope);
@@ -4993,6 +5139,7 @@ function applyStaticTranslations() {
         ['cancel-button', 'Cancel'],
         ['save-button', 'Save'],
         ['details-delete-button', 'Delete'],
+        ['details-task-toggle-button', 'Mark completed'],
         ['details-close-button', 'Close'],
         ['details-edit-button', 'Edit'],
         ['edit-scope-cancel', 'Cancel'],
@@ -5016,6 +5163,9 @@ function applyStaticTranslations() {
     icsImportButton.title = icsImportText('Import ICS');
     icsImportFile.setAttribute('aria-label', icsImportText('Import ICS'));
     document.getElementById('all-day-label').textContent = t('All day');
+    document.getElementById('event-task-label').textContent = t('Task appointment');
+    document.getElementById('event-task-completed-label').textContent = t('Completed');
+    document.getElementById('event-task-follow-planned-label').textContent = t('Move planned follow-up appointments');
     document.getElementById('dialog-title').textContent = t('Event');
     document.getElementById('details-dialog-title').textContent = t('Event details');
     document.getElementById('edit-scope-dialog-title').textContent = t('Edit recurring event');
@@ -5027,7 +5177,7 @@ function applyStaticTranslations() {
     updateViewSelectorOptions();
     document.getElementById('calendar-filter-dialog-title').textContent = t('Filter calendars');
     document.getElementById('calendar-filter-note').textContent = t('This filter only changes the current view on this browser or monitor.');
-    ['calendar', 'occasion', 'start', 'end', 'status', 'availability', 'reminder', 'location', 'description'].forEach(name => {
+    ['calendar', 'occasion', 'task-status', 'start', 'end', 'status', 'availability', 'reminder', 'location', 'description'].forEach(name => {
         const label = document.getElementById(`details-${name}-label`);
         label.textContent = t(label.textContent.trim());
     });

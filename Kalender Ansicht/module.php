@@ -11,10 +11,12 @@ use Burki24\SymconModuleHelper\VisualizationThemeHelper;
 use IPSKalender\CalendarAppointmentRange;
 use IPSKalender\CalendarEventReminder;
 use IPSKalender\CalendarEventState;
+use IPSKalender\CalendarTaskEvent;
 
 require_once __DIR__ . '/../libs/CalendarAppointmentRange.php';
 require_once __DIR__ . '/../libs/CalendarEventReminder.php';
 require_once __DIR__ . '/../libs/CalendarEventState.php';
+require_once __DIR__ . '/../libs/CalendarTaskEvent.php';
 require_once __DIR__ . '/../libs/helper/ConfigurationFormHelper.php';
 require_once __DIR__ . '/../libs/helper/IPSViewHTMLPageHelper.php';
 require_once __DIR__ . '/../libs/helper/IPSViewStyleConfigurationHelper.php';
@@ -1498,6 +1500,17 @@ class CalendarView extends IPSModuleStrict
             'Event',
             'Events',
             'Untitled event',
+            'Task appointment',
+            'Task status',
+            'Open',
+            'This and all following tasks will be moved to the selected calendar.',
+            'Changing the date moves this and all following occurrences. Existing following exceptions will be reset.',
+            'Completed',
+            'Continued from series',
+            'This overdue task was continued from a series.',
+            'Move planned follow-up appointments',
+            'Mark completed',
+            'Reopen task',
             'more',
             'Create event',
             'Create event on this day',
@@ -2870,6 +2883,7 @@ class CalendarView extends IPSModuleStrict
                     || !is_array($event) || array_is_list($event)) {
                     throw new InvalidArgumentException($this->Translate('The event data is invalid.'));
                 }
+                $this->prepareTaskSeriesTransfer($sourceInstanceId, $sourceEvent, $event);
                 $sourceReminder = is_array($sourceEvent['reminder'] ?? null)
                     ? $sourceEvent['reminder']
                     : [];
@@ -3288,6 +3302,47 @@ class CalendarView extends IPSModuleStrict
         throw new RuntimeException(
             $this->Translate('Events with complex reminder settings cannot be moved safely.')
         );
+    }
+
+    /**
+     * Resolves the source series tail before creating a task in another calendar.
+     *
+     * @param array<string, mixed> $sourceEvent Receives the verified deletion scope.
+     * @param array<string, mixed> $event Receives the target recurrence settings.
+     */
+    private function prepareTaskSeriesTransfer(int $sourceInstanceId, array &$sourceEvent, array &$event): void
+    {
+        if (!(bool) ($event['task'] ?? false)
+            || !(bool) ($event['taskFollowPlanned'] ?? false)
+            || !(bool) ($sourceEvent['recurring'] ?? false)
+            || ($sourceEvent['writeScope'] ?? '') !== 'occurrence') {
+            return;
+        }
+
+        $following = $this->decodeCalendarModuleJson(IPSKAL_GetRecurringFollowing(
+            $sourceInstanceId,
+            (string) ($sourceEvent['seriesId'] ?? ''),
+            (string) ($sourceEvent['occurrenceId'] ?? ''),
+            (string) ($sourceEvent['originalStart'] ?? ''),
+            (string) ($sourceEvent['resourceUrl'] ?? '')
+        ), $sourceInstanceId, 'The recurrence pattern cannot be split safely.');
+        if (!is_array($following)
+            || !(bool) ($following['canUpdateFollowing'] ?? false)
+            || !(bool) ($following['canDeleteSeries'] ?? false)
+            || !is_array($following['recurrenceSettings'] ?? null)
+            || $following['recurrenceSettings'] === []) {
+            throw new RuntimeException($this->Translate('The recurrence pattern cannot be split safely.'));
+        }
+        $event['recurrence'] = CalendarTaskEvent::shiftPlannedRecurrence(
+            $following['recurrenceSettings'],
+            (string) ($following['originalStart'] ?? ''),
+            (string) ($event['start'] ?? '')
+        );
+        if (trim((string) ($event['timezone'] ?? '')) === '') {
+            $event['timezone'] = (string) ($following['timezone'] ?? '');
+        }
+        $sourceEvent = $following;
+        $sourceEvent['writeScope'] = 'following';
     }
 
     /** @param array<string, mixed> $creationResult */

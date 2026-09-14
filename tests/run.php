@@ -34,6 +34,8 @@ $commands = [
     ['Verify provider-neutral post-delete refresh', [PHP_BINARY, 'tests/post-delete-refresh.php']],
     ['Verify confirmed writes and synchronization recovery', [PHP_BINARY, 'tests/write-recovery.php']],
     ['Verify task appointment backend', [PHP_BINARY, 'tests/task-appointments.php']],
+    ['Verify task series calendar transfers', [PHP_BINARY, 'tests/task-series-transfer.php']],
+    ['Verify task UI behavior', ['node', 'tests/task-ui.js']],
     ['Verify task synchronization recovery', [PHP_BINARY, 'tests/calendar-recovery.php']],
     ['Verify pending task provider lookup', [PHP_BINARY, 'tests/task-pending-lookup.php']],
     ['Verify provider-neutral error contract', [PHP_BINARY, 'tests/provider-error-contract.php']],

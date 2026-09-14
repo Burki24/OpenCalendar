@@ -43,11 +43,11 @@ beliebig verschoben oder vom Benutzer umbenannt werden.
 
 Google-, Microsoft-, Apple-iCloud- und CalDAV-Serien können als einzelnes Vorkommnis, als vollständige Serie oder **ab dem ausgewählten Vorkommnis für alle folgenden Termine** bearbeitet und gelöscht werden. Beim Bearbeiten teilt OpenCalendar eine unterstützte Serie am gewählten Termin in einen unveränderten vorderen und einen neu angelegten hinteren Serienteil. Beim Löschen wird der bestehende Parent direkt vor dem ausgewählten Vorkommnis beendet; beginnt die Auswahl beim ersten Vorkommnis, wird die komplette Serie gelöscht. Bei nummerierten Serien übernimmt der neue Serienteil nur die verbleibende Anzahl. Bestehende Ausnahmen ab dem Trennpunkt werden beim Teilen nicht in die neue Serie übernommen. Bei CalDAV werden Einzeländerungen weiterhin als `RECURRENCE-ID`-Ausnahmen gespeichert und Einzellöschungen über `EXDATE` abgebildet. Beim Bearbeiten der vollständigen CalDAV-Serie wird nur der Serien-Master geändert; vorhandene Ausnahmen bleiben erhalten.
 
-## Aufgabentermine – Backend in dev_9.1
+## Aufgabentermine
 
 Die Kalender-API unterstützt jetzt die aus Version 2.1 übernommenen
-Aufgabentermine. Die Bedienoberfläche wird in einem separaten Migrationsschritt
-ergänzt; dieser Stand stellt zunächst die Backend-Funktionen bereit.
+Aufgabentermine. Die Bedienung in der Kalender Ansicht ist unter
+[Aufgabentermine](../Kalender%20Ansicht/README.md#aufgabentermine) beschrieben.
 
 - Aufgabentermine sind eintägige, ganztägige Kalendertermine. Über `CreateEvent`
   und `UpdateEvent` werden `task`, `taskCompleted` und `taskFollowPlanned`

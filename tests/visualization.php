@@ -612,7 +612,7 @@ assertVisualization(
         && str_contains($script, 'function eventCanUpdateFollowing(event)')
         && str_contains($script, "resourceUrl: String(event.resourceUrl || '')")
         && str_contains($script, "sendAction('PrepareSeriesEdit', pendingSeriesEdit)")
-        && str_contains($script, 'if (!eventIsRecurring(event) || (!followingAllowed && !seriesAllowed))')
+        && str_contains($script, 'if (Boolean(event.task) || !eventIsRecurring(event) || (!followingAllowed && !seriesAllowed))')
         && str_contains($script, "eventWriteCapability(event, 'canUpdateOccurrence')")
         && str_contains($script, "eventWriteCapability(event, 'canUpdateFollowing')")
         && str_contains($script, "eventWriteCapability(event, 'canUpdateSeries')")

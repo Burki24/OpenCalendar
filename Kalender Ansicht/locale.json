@@ -1,6 +1,17 @@
 {
     "translations": {
         "de": {
+            "Task appointment": "Aufgabentermin",
+            "Task status": "Aufgabenstatus",
+            "Open": "Offen",
+            "This and all following tasks will be moved to the selected calendar.": "Diese und alle folgenden Aufgaben werden in den ausgewählten Kalender verschoben.",
+            "Changing the date moves this and all following occurrences. Existing following exceptions will be reset.": "Eine Datumsänderung verschiebt diesen und alle folgenden Termine. Bereits angepasste folgende Einzelvorkommnisse werden zurückgesetzt.",
+            "Completed": "Erledigt",
+            "Continued from series": "Aus Serie nachgezogen",
+            "This overdue task was continued from a series.": "Diese überfällige Aufgabe wurde aus einer Serie nachgezogen.",
+            "Move planned follow-up appointments": "Geplante Folgetermine mitverschieben",
+            "Mark completed": "Als erledigt markieren",
+            "Reopen task": "Aufgabe wieder öffnen",
             "Calendar View": "Kalender Ansicht",
             "Calendars": "Kalender",
             "Calendar instance": "Kalenderinstanz",
