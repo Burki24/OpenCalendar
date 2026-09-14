@@ -712,12 +712,16 @@ class Calendar extends IPSModuleStrict
 
     /**
      * Creates an event in the configured calendar.
+     * A confirmed provider write remains successful if subsequent local processing fails;
+     * the result error and LastError retain the follow-up diagnostic.
      *
      * @param string $EventJSON JSON-encoded event data.
      * @return string JSON-encoded operation result.
      */
     public function CreateEvent(string $EventJSON): string
     {
+        $writeConfirmed = false;
+        $created = null;
         try {
             $event = $this->decodeObject($EventJSON, 'event');
             $anniversary = $this->anniversaryInput($event);
@@ -766,6 +770,7 @@ class Calendar extends IPSModuleStrict
                 'annualEvent' => $anniversary !== null && $anniversary['enabled']
             ]);
             $created = $this->sendRequest('CreateEvent', ['Event' => $providerEvent]);
+            $writeConfirmed = true;
             if ($anniversary !== null && $anniversary['enabled']) {
                 $this->upsertAnniversaryMetadata(
                     array_merge($event, is_array($created) ? $created : []),
@@ -780,18 +785,22 @@ class Calendar extends IPSModuleStrict
 
             return $this->encodeResult(true, $created);
         } catch (Throwable $exception) {
-            return $this->encodeResult(false, null, $this->handleError($exception));
+            return $this->encodeResult($writeConfirmed, $created, $this->handleError($exception));
         }
     }
 
     /**
      * Updates an existing event in the configured calendar.
+     * A confirmed provider write remains successful if subsequent local processing fails;
+     * the result error and LastError retain the follow-up diagnostic.
      *
      * @param string $EventJSON JSON-encoded event metadata and changes.
      * @return string JSON-encoded operation result.
      */
     public function UpdateEvent(string $EventJSON): string
     {
+        $writeConfirmed = false;
+        $updated = null;
         try {
             $event = $this->decodeObject($EventJSON, 'event');
             $changes = $event['changes'] ?? $event;
@@ -892,6 +901,7 @@ class Calendar extends IPSModuleStrict
                     ]
                 );
 
+            $writeConfirmed = $changes !== [];
             if ($anniversaryDisabled) {
                 $this->removeAnniversaryMetadata($event);
             } elseif ($anniversaryEnabled || $existingAnniversary !== null) {
@@ -911,18 +921,20 @@ class Calendar extends IPSModuleStrict
 
             return $this->encodeResult(true, $updated);
         } catch (Throwable $exception) {
-            return $this->encodeResult(false, null, $this->handleError($exception));
+            return $this->encodeResult($writeConfirmed, $updated, $this->handleError($exception));
         }
     }
 
     /**
      * Deletes an event from the configured calendar.
+     * A confirmed provider deletion remains successful even if local cache maintenance fails.
      *
      * @param string $EventJSON JSON-encoded event metadata.
      * @return bool True when the event was deleted successfully.
      */
     public function DeleteEvent(string $EventJSON): bool
     {
+        $writeConfirmed = false;
         try {
             $event = $this->decodeObject($EventJSON, 'event');
             $recurrence = $this->resolveWriteRecurrence($event, false);
@@ -944,6 +956,7 @@ class Calendar extends IPSModuleStrict
             if (!(bool) ($result['success'] ?? false)) {
                 throw new RuntimeException('The calendar account did not confirm the deletion.');
             }
+            $writeConfirmed = true;
             if (!CalendarEventRecurrence::isOccurrence($recurrence)
                 || in_array(
                     $writeScope,
@@ -962,7 +975,7 @@ class Calendar extends IPSModuleStrict
             return true;
         } catch (Throwable $exception) {
             $this->handleError($exception);
-            return false;
+            return $writeConfirmed;
         }
     }
 
@@ -1395,6 +1408,8 @@ class Calendar extends IPSModuleStrict
             ));
         $events = CalendarEventState::filterVisibleEvents($events);
         $this->reconcileAnniversaryMetadataAfterSynchronization($events, $cachedEvents);
+        // Persist the fetched state before advancing its delta cursor.
+        $this->storeEvents($events);
         if ($nextSyncToken !== '') {
             $this->storeIncrementalSyncState($nextSyncToken, $startTimestamp, $endTimestamp);
         } else {

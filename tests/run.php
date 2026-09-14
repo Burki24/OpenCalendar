@@ -32,6 +32,7 @@ $commands = [
     ['Verify Microsoft post-write synchronization', [PHP_BINARY, 'tests/microsoft-write-sync.php']],
     ['Verify provider-neutral post-write refresh', [PHP_BINARY, 'tests/post-write-refresh.php']],
     ['Verify provider-neutral post-delete refresh', [PHP_BINARY, 'tests/post-delete-refresh.php']],
+    ['Verify confirmed writes and synchronization recovery', [PHP_BINARY, 'tests/write-recovery.php']],
     ['Verify provider-neutral error contract', [PHP_BINARY, 'tests/provider-error-contract.php']],
     ['Verify realistic provider error handling', [PHP_BINARY, 'tests/provider-real-errors.php']],
     ['Verify provider write parity matrix', [PHP_BINARY, 'tests/write-parity.php']],
