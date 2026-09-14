@@ -1,0 +1,306 @@
+<?php
+
+declare(strict_types=1);
+
+use IPSKalender\CalendarEventRecurrence;
+
+require_once __DIR__ . '/stubs/autoload.php';
+require_once dirname(__DIR__) . '/Kalender/module.php';
+/** Exercises real Calendar workflows with failures only at the provider boundary. */
+final class RecoveryCalendar extends Calendar
+{
+    public array $attributes = [];
+    public array $requests = [];
+    public array $items = [];
+    public bool $failReads = false;
+    public bool $failWrites = false;
+    public bool $incremental = false;
+    public array $pendingResult = ['known' => false];
+    public bool $failPendingLookup = false;
+    public bool $failCacheWrite = false;
+    public string $nextSyncToken = 'delta-next';
+    public int $failUpdateNumber = 0;
+    public int $updateCount = 0;
+
+    protected function HasActiveParent(): bool
+    {
+        return true;
+    }
+
+    protected function ReadPropertyBoolean(string $Name): bool
+    {
+        return true;
+    }
+
+    protected function ReadPropertyInteger(string $Name): int
+    {
+        return 30;
+    }
+
+    protected function ReadPropertyString(string $Name): string
+    {
+        return $Name === 'CalendarID' ? 'recovery-calendar' : '';
+    }
+
+    protected function ReadAttributeBoolean(string $Name): bool
+    {
+        return $Name === 'RuntimeReady';
+    }
+
+    protected function ReadAttributeInteger(string $Name): int
+    {
+        return (int) ($this->attributes[$Name] ?? 0);
+    }
+
+    protected function ReadAttributeString(string $Name): string
+    {
+        return (string) ($this->attributes[$Name] ?? '[]');
+    }
+
+    protected function WriteAttributeString(string $Name, string $Value): bool
+    {
+        if ($Name === 'CachedEvents' && $this->failCacheWrite) {
+            throw new RuntimeException('Injected cache persistence failure.');
+        }
+        $this->attributes[$Name] = $Value;
+        return true;
+    }
+
+    protected function WriteAttributeInteger(string $Name, int $Value): bool
+    {
+        $this->attributes[$Name] = $Value;
+        return true;
+    }
+
+    protected function SetValue(string $Ident, mixed $Value): bool
+    {
+        return true;
+    }
+
+    protected function SetStatus(int $Status): bool
+    {
+        return true;
+    }
+
+    protected function SendDataToParent(string $Data): string
+    {
+        $request = json_decode($Data, true, 512, JSON_THROW_ON_ERROR);
+        $this->requests[] = $request;
+        $operation = $request['Operation'];
+        if ($operation === 'UpdateEvent') {
+            ++$this->updateCount;
+        }
+        if ($operation === 'GetCalendars'
+            || ($operation === 'CheckPendingTask' && $this->failPendingLookup)
+            || ($operation === 'UpdateEvent' && $this->failUpdateNumber === $this->updateCount)
+            || ($this->failReads && in_array($operation, ['BeginEventsTransfer', 'GetEventAfterWrite', 'GetEventForEdit'], true))
+            || ($this->failWrites && in_array($operation, ['CreateEvent', 'UpdateEvent', 'DeleteEvent'], true))) {
+            return json_encode(['Success' => false, 'Error' => 'Injected provider failure: ' . $operation], JSON_THROW_ON_ERROR);
+        }
+        $token = str_repeat('a', 32);
+        $payload = match ($operation) {
+            'CheckPendingTask'    => $this->pendingResult,
+            'BeginEventsTransfer' => [
+                'Token'     => $token, 'PageCount' => 1, 'ItemCount' => count($this->items),
+                'SyncToken' => $this->nextSyncToken, 'Incremental' => $this->incremental
+            ],
+            'ReadEventsTransferPage' => [
+                'Token'     => $token, 'Page' => 0, 'PageCount' => 1,
+                'ItemCount' => count($this->items), 'Complete' => true, 'Items' => $this->items
+            ],
+            'FinishEventsTransfer', 'DeleteEvent' => ['success' => true],
+            'UpdateEvent'                         => ['uid' => $request['UID'], 'resourceUrl' => $request['ResourceURL'], 'etag' => 'updated-etag'],
+            'CreateEvent'                         => ['uid' => 'written', 'resourceUrl' => 'written'],
+            default                               => []
+        };
+        return json_encode(['Success' => true, 'Payload' => $payload], JSON_THROW_ON_ERROR);
+    }
+}
+
+function recoveryEvent(string $uid, string $summary, string $relativeDay = 'today'): array
+{
+    $start = new DateTimeImmutable($relativeDay);
+    return array_merge(CalendarEventRecurrence::single(), [
+        'uid'            => $uid, 'resourceUrl' => $uid, 'summary' => $summary, 'allDay' => true,
+        'start'          => $start->format('Y-m-d'), 'end' => $start->modify('+1 day')->format('Y-m-d'),
+        'startTimestamp' => $start->getTimestamp(), 'endTimestamp' => $start->modify('+1 day')->getTimestamp()
+    ]);
+}
+
+$failures = [];
+$check = static function (bool $condition, string $message) use (&$failures): void
+{
+    if (!$condition) {
+        $failures[] = $message;
+    }
+};
+
+// A remote deletion is irreversible even if the following refresh fails.
+$calendar = new RecoveryCalendar(9091);
+$calendar->failReads = true;
+$calendar->failCacheWrite = true;
+$event = recoveryEvent('deleted', 'Normal event');
+$calendar->attributes['CachedEvents'] = json_encode([$event], JSON_THROW_ON_ERROR);
+$check($calendar->DeleteEvent(json_encode($event, JSON_THROW_ON_ERROR)), 'Confirmed deletion must remain successful after a refresh failure.');
+$check(str_contains($calendar->attributes['LastError'] ?? '', 'Injected cache persistence failure'), 'A failed local delete-cache update must retain its diagnostic.');
+$calendar->failCacheWrite = false;
+$calendar->failWrites = true;
+$check(!$calendar->DeleteEvent(json_encode($event, JSON_THROW_ON_ERROR)), 'An unconfirmed provider deletion must still fail.');
+$calendar->failWrites = false;
+$calendar->requests = [];
+$calendar->attributes['LastError'] = '';
+$created = json_decode($calendar->CreateEvent(json_encode($event, JSON_THROW_ON_ERROR)), true, 512, JSON_THROW_ON_ERROR);
+$check(($created['success'] ?? false) === true, 'Confirmed creation must remain successful after a refresh failure.');
+$check(str_contains($calendar->attributes['LastError'] ?? '', 'Injected provider failure: BeginEventsTransfer'), 'Creation must retain the actual refresh-failure diagnostic.');
+$check(in_array('BeginEventsTransfer', array_column($calendar->requests, 'Operation'), true), 'Creation must actually reach the failing refresh request.');
+$calendar->requests = [];
+$calendar->attributes['LastError'] = '';
+$updated = json_decode($calendar->UpdateEvent(json_encode(array_merge($event, ['changes' => ['summary' => 'Changed']]), JSON_THROW_ON_ERROR)), true, 512, JSON_THROW_ON_ERROR);
+$check(($updated['success'] ?? false) === true, 'Confirmed update must remain successful after a refresh failure.');
+$check(str_contains($calendar->attributes['LastError'] ?? '', 'Injected provider failure: BeginEventsTransfer'), 'Update must retain the actual refresh-failure diagnostic.');
+$check(in_array('BeginEventsTransfer', array_column($calendar->requests, 'Operation'), true), 'Update must actually reach the failing refresh request.');
+
+// The delta token and fetched cache must stay consistent when task processing fails.
+$calendar = new RecoveryCalendar(9092);
+$calendar->items = [recoveryEvent('old', 'Existing event')];
+$check($calendar->Synchronize(), 'The initial full synchronization must succeed.');
+$calendar->incremental = true;
+$calendar->items = [recoveryEvent('new', 'New normal event'), recoveryEvent('task', '[OC:TODO] Overdue task', 'yesterday')];
+$calendar->failWrites = true;
+$check(!$calendar->Synchronize(), 'The injected overdue task write must fail synchronization.');
+$writes = array_filter($calendar->requests, static fn (array $r): bool => $r['Operation'] === 'UpdateEvent');
+$check(count($writes) === 1, 'The failed sync must reach the real task provider write.');
+$calendar->items = [];
+$calendar->failWrites = false;
+$check($calendar->Synchronize(), 'An empty subsequent delta must recover successfully.');
+$events = json_decode($calendar->GetEvents(), true, 512, JSON_THROW_ON_ERROR);
+$check(in_array('new', array_column($events, 'uid'), true), 'A received normal event must survive a failed task write and an empty next delta.');
+$check(count($events) === 3, 'Both received events and the existing event must survive recovery.');
+
+$calendar = new RecoveryCalendar(9097);
+$calendar->items = [recoveryEvent('cached', 'Previously cached')];
+$calendar->nextSyncToken = 'before-cache-failure';
+$check($calendar->Synchronize(), 'The cache-failure baseline must synchronize.');
+$cacheBefore = $calendar->attributes['CachedEvents'];
+$calendar->incremental = true;
+$calendar->items = [recoveryEvent('unstored', 'Not yet persisted')];
+$calendar->nextSyncToken = 'after-cache-failure';
+$calendar->failCacheWrite = true;
+$check(!$calendar->Synchronize(), 'A failed cache write must fail synchronization.');
+$check($calendar->attributes['CachedEvents'] === $cacheBefore, 'Failed persistence must leave the previous cache intact.');
+$check($calendar->attributes['IncrementalSyncToken'] === 'before-cache-failure', 'A failed cache write must not advance the provider delta token.');
+$calendar->failCacheWrite = false;
+$check($calendar->Synchronize(), 'Retrying the uncommitted delta must recover.');
+$check(count(json_decode($calendar->GetEvents(), true)) === 2, 'Retry must retain both the old and newly received event.');
+
+$calendar = new RecoveryCalendar(9098);
+$calendar->items = [recoveryEvent('first', '[OC:TODO] First overdue', '-2 days'), recoveryEvent('second', '[OC:TODO] Second overdue', 'yesterday')];
+$calendar->failUpdateNumber = 2;
+$check(!$calendar->Synchronize(), 'The second rollover write failure must be reported.');
+$check($calendar->updateCount === 2, 'The partial-rollover fixture must perform one successful and one failed write.');
+$events = array_column(json_decode($calendar->GetEvents(), true), null, 'uid');
+$check(($events['first']['start'] ?? '') === (new DateTimeImmutable('today'))->format('Y-m-d'), 'The first confirmed rollover must remain in cache when the second write fails.');
+$check(($events['first']['etag'] ?? '') === 'updated-etag', 'The first confirmed rollover must retain its new ETag after a later failure.');
+
+// Absence from a bounded result is not evidence of deletion or completion.
+$calendar = new RecoveryCalendar(9093);
+$detached = recoveryEvent('detached', '[OC:TODO] Pending detached task', '+40 days');
+$identity = ['uid' => 'detached', 'resourceUrl' => 'detached', 'eventReference' => ''];
+$calendar->attributes['PendingTaskSeries'] = json_encode(['series:source' => $identity], JSON_THROW_ON_ERROR);
+$occurrence = array_merge(
+    recoveryEvent('next', '[OC:TODO] Next task', 'yesterday'),
+    CalendarEventRecurrence::occurrence('source', 'next', (new DateTimeImmutable('yesterday'))->format('Y-m-d'), '', true, false, true, true, true)
+);
+$calendar->items = [$occurrence];
+$check($calendar->Synchronize(), 'A window without the detached task must synchronize.');
+$writes = array_filter($calendar->requests, static fn (array $r): bool => in_array($r['Operation'], ['CreateEvent', 'UpdateEvent', 'DeleteEvent'], true));
+$check($writes === [], 'A detached task outside the window must still block further source-series rollover.');
+$check(isset(json_decode($calendar->attributes['PendingTaskSeries'], true)['series:source']), 'A bounded result must retain the pending series identity.');
+$calendar->items = [$detached];
+$check($calendar->Synchronize(), 'The detached task must be accepted when it reappears.');
+$events = json_decode($calendar->GetEvents(), true, 512, JSON_THROW_ON_ERROR);
+$check(($events[0]['taskRolledForward'] ?? false) === true, 'The reappearing task must retain its rolled-forward marker.');
+$calendar->items[0]['summary'] = '[OC:DONE] Completed detached task';
+$check($calendar->Synchronize(), 'A confirmed completed task must synchronize.');
+$check(json_decode($calendar->attributes['PendingTaskSeries'], true) === [], 'Confirmed task completion must release the source-series block.');
+
+$calendar->attributes['PendingTaskSeries'] = json_encode(['series:source' => $identity], JSON_THROW_ON_ERROR);
+$calendar->failReads = true;
+$calendar->failWrites = true;
+$check(!$calendar->DeleteEvent(json_encode($detached, JSON_THROW_ON_ERROR)), 'Rejected detached-task deletion must fail.');
+$check(isset(json_decode($calendar->attributes['PendingTaskSeries'], true)['series:source']), 'Rejected deletion must retain the source-series block.');
+$calendar->failWrites = false;
+$check($calendar->DeleteEvent(json_encode($detached, JSON_THROW_ON_ERROR)), 'Explicit detached-task deletion must succeed.');
+$check(json_decode($calendar->attributes['PendingTaskSeries'], true) === [], 'Confirmed explicit deletion must release the source-series block.');
+
+$calendar = new RecoveryCalendar(9094);
+$calendar->attributes['PendingTaskSeries'] = json_encode(['series:source' => $identity], JSON_THROW_ON_ERROR);
+$calendar->items = [$detached];
+$check($calendar->Synchronize(), 'The detached task baseline must synchronize.');
+$calendar->incremental = true;
+$calendar->items = [array_merge($identity, ['_syncDeleted' => true])];
+$check($calendar->Synchronize(), 'A provider-confirmed deletion delta must synchronize.');
+$check(json_decode($calendar->attributes['PendingTaskSeries'], true) === [], 'A provider deletion tombstone must release the source-series block.');
+
+// An external completion/deletion outside the date window needs direct evidence.
+$outsideCases = [
+    'deleted'             => [['known' => true, 'event' => null], false, false],
+    'completed'           => [['known' => true, 'event' => array_merge($detached, ['summary' => '[OC:DONE] Done'])], false, false],
+    'converted to normal' => [['known' => true, 'event' => array_merge($detached, ['summary' => 'Normal appointment'])], false, false],
+    'still open'          => [['known' => true, 'event' => $detached], false, true],
+    'unknown'             => [['known' => false], false, true],
+    'failed lookup'       => [['known' => false], true, true],
+    'mismatched identity' => [['known' => true, 'event' => recoveryEvent('another-task', '[OC:DONE] Unrelated')], false, true]
+];
+foreach ($outsideCases as $label => [$result, $fail, $retain]) {
+    $calendar = new RecoveryCalendar(9095);
+    $calendar->attributes['PendingTaskSeries'] = json_encode(['series:source' => $identity], JSON_THROW_ON_ERROR);
+    $calendar->pendingResult = $result;
+    $calendar->failPendingLookup = $fail;
+    $check($calendar->Synchronize(), 'Absent task lookup (' . $label . ') must not fail independent synchronization.');
+    $remaining = json_decode($calendar->attributes['PendingTaskSeries'], true);
+    $check(isset($remaining['series:source']) === $retain, 'Absent task lookup (' . $label . ') must retain/release only with trustworthy evidence.');
+    $lookups = array_values(array_filter($calendar->requests, static fn (array $r): bool => $r['Operation'] === 'CheckPendingTask'));
+    $check($lookups !== [], 'Absent pending tasks must receive a direct provider lookup: ' . $label . '.');
+    if ($lookups !== []) {
+        $check(($lookups[0]['UID'] ?? '') === 'detached' && ($lookups[0]['ResourceURL'] ?? '') === 'detached', 'Pending lookup must use the saved task identity.');
+    }
+}
+
+$calendar = new RecoveryCalendar(9096);
+$calendar->attributes['PendingTaskSeries'] = json_encode(['series:source' => $identity], JSON_THROW_ON_ERROR);
+$calendar->failReads = true;
+$result = json_decode($calendar->UpdateEvent(json_encode(array_merge($detached, ['changes' => ['task' => true, 'taskCompleted' => true]]), JSON_THROW_ON_ERROR)), true, 512, JSON_THROW_ON_ERROR);
+$check(($result['success'] ?? false) === true, 'Explicit completion outside the cache window must remain successful when refresh fails.');
+$check(json_decode($calendar->attributes['PendingTaskSeries'], true) === [], 'Confirmed explicit completion outside the cache window must release its source-series block.');
+
+// Detaching an overdue occurrence must preserve the additional 9.1 event state.
+$calendar = new RecoveryCalendar(9097);
+$first = array_merge(
+    recoveryEvent('first', '[OC:TODO] Clean fridge', '-3 days'),
+    CalendarEventRecurrence::occurrence('series', 'first', (new DateTimeImmutable('-3 days'))->format('Y-m-d'), '', true, false, true, true, true),
+    ['status' => 'TENTATIVE', 'transparency' => 'TRANSPARENT']
+);
+$second = array_merge(
+    recoveryEvent('second', '[OC:TODO] Clean fridge', '-1 day'),
+    CalendarEventRecurrence::occurrence('series', 'second', (new DateTimeImmutable('-1 day'))->format('Y-m-d'), '', true, false, true, true, true)
+);
+$calendar->items = [$first, $second];
+$check($calendar->Synchronize(), 'Overlapping overdue occurrences must detach successfully.');
+$creates = array_values(array_filter($calendar->requests, static fn (array $r): bool => $r['Operation'] === 'CreateEvent'));
+$check(count($creates) === 1, 'Only the earliest overdue occurrence may be detached.');
+$check(($creates[0]['Event']['status'] ?? '') === 'TENTATIVE'
+    && ($creates[0]['Event']['transparency'] ?? '') === 'TRANSPARENT', 'Detachment must preserve event status and availability.');
+$check(isset(json_decode($calendar->attributes['PendingTaskSeries'], true)['series:series']), 'Detachment must persist the source-series association.');
+
+$calendar = new RecoveryCalendar(9098);
+$calendar->items = [array_merge($first, ['status' => 'CANCELLED'])];
+$check($calendar->Synchronize(), 'Cancelled tasks must synchronize without rollover.');
+$check(array_filter($calendar->requests, static fn (array $r): bool => in_array($r['Operation'], ['CreateEvent', 'UpdateEvent'], true)) === [], 'Cancelled tasks must never be recreated or moved.');
+$check(json_decode($calendar->GetEvents(), true) === [], 'Cancelled tasks must remain hidden.');
+
+if ($failures !== []) {
+    fwrite(STDERR, implode(PHP_EOL, $failures) . PHP_EOL);
+    exit(1);
+}
+fwrite(STDOUT, "Calendar recovery tests passed.\n");

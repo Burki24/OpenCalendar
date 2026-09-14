@@ -43,6 +43,38 @@ beliebig verschoben oder vom Benutzer umbenannt werden.
 
 Google-, Microsoft-, Apple-iCloud- und CalDAV-Serien können als einzelnes Vorkommnis, als vollständige Serie oder **ab dem ausgewählten Vorkommnis für alle folgenden Termine** bearbeitet und gelöscht werden. Beim Bearbeiten teilt OpenCalendar eine unterstützte Serie am gewählten Termin in einen unveränderten vorderen und einen neu angelegten hinteren Serienteil. Beim Löschen wird der bestehende Parent direkt vor dem ausgewählten Vorkommnis beendet; beginnt die Auswahl beim ersten Vorkommnis, wird die komplette Serie gelöscht. Bei nummerierten Serien übernimmt der neue Serienteil nur die verbleibende Anzahl. Bestehende Ausnahmen ab dem Trennpunkt werden beim Teilen nicht in die neue Serie übernommen. Bei CalDAV werden Einzeländerungen weiterhin als `RECURRENCE-ID`-Ausnahmen gespeichert und Einzellöschungen über `EXDATE` abgebildet. Beim Bearbeiten der vollständigen CalDAV-Serie wird nur der Serien-Master geändert; vorhandene Ausnahmen bleiben erhalten.
 
+## Aufgabentermine – Backend in dev_9.1
+
+Die Kalender-API unterstützt jetzt die aus Version 2.1 übernommenen
+Aufgabentermine. Die Bedienoberfläche wird in einem separaten Migrationsschritt
+ergänzt; dieser Stand stellt zunächst die Backend-Funktionen bereit.
+
+- Aufgabentermine sind eintägige, ganztägige Kalendertermine. Über `CreateEvent`
+  und `UpdateEvent` werden `task`, `taskCompleted` und `taskFollowPlanned`
+  übergeben. Der Titel speichert den Zustand providerübergreifend als
+  `[OC:TODO]` beziehungsweise `[OC:DONE]`; die Variante `:FOLLOW` speichert die
+  Entscheidung zum Mitverschieben geplanter Folgetermine. Alte Kästchenmarker
+  werden weiterhin erkannt. Zusätzliche OAuth-Berechtigungen sind nicht nötig.
+- Offene, überfällige Aufgaben werden bei der Synchronisation und beim lokalen
+  Tageswechsel nachgezogen. Erledigte Aufgaben werden nicht weitergeschoben.
+  Bei Serien wird jeweils nur die früheste noch anstehende Aufgabe nachgezogen.
+- Mit `taskFollowPlanned` werden bei einer Datumsänderung auch die folgenden
+  Serientermine verschoben. Das Erledigen betrifft weiterhin nur das ausgewählte
+  Vorkommnis. Ohne diese Option bleibt die geplante Serie bestehen. Würde ein
+  nachgezogener Termin ein anderes Vorkommnis überschreiten, wird er als
+  Einzeltermin fortgeführt; die Zuordnung zur Ursprungsserie bleibt gespeichert.
+- Eine offene, fortgeführte Aufgabe blockiert weiteres Nachziehen aus ihrer
+  Ursprungsserie auch außerhalb des geladenen Zeitraums. Erst bestätigtes
+  Erledigen, Entfernen des Aufgabenmarkers oder Löschen gibt die Serie frei.
+  Fehlgeschlagene oder uneindeutige Provider-Abfragen lösen diese Zuordnung nicht.
+- Der Aufgabenstatus ist unabhängig vom Terminstatus und der Verfügbarkeit aus
+  Version 3.0. Beispielsweise bleibt ein vorläufiger, als frei markierter Termin
+  beim Fortführen als Einzelaufgabe weiterhin vorläufig und frei. Abgesagte
+  Termine bleiben ausgeblendet und werden nicht automatisch verschoben.
+- Beim Bearbeiten darf nur nach einem als vorübergehend klassifizierten
+  Providerfehler auf eine bekannte Aufgabe im Cache zurückgegriffen werden.
+  Berechtigungsfehler, Konflikte und bestätigtes Fehlen werden nicht verdeckt.
+
 ## Voraussetzungen
 
 - Symcon ab Version 9.1

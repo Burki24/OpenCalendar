@@ -65,6 +65,7 @@ trait KalenderKontoChildGatewayTrait
                 'GetEventForEdit'        => $this->getEventForEditForChild($request),
                 'GetEventAfterWrite'     => $this->getEventAfterWriteForChild($request),
                 'CheckRecurringSeries'   => $this->checkRecurringSeriesForChild($request),
+                'CheckPendingTask'       => $this->checkPendingTaskForChild($request),
                 'GetRecurringSeries'     => $this->getRecurringSeriesForChild($request),
                 'GetRecurringFollowing'  => $this->getRecurringFollowingForChild($request),
                 'CreateEvent'            => $this->createEventForChild($request),
@@ -393,6 +394,48 @@ trait KalenderKontoChildGatewayTrait
             $this->calendarReference($calendar),
             $this->eventLookupIdentityForChild($request)
         );
+    }
+
+    /**
+     * Resolves a detached task by stable identity without restricting its current date.
+     *
+     * Only explicit provider HTTP 404/410 responses confirm deletion. Missing,
+     * ambiguous or recurring identities never release a pending task implicitly.
+     *
+     * @param array<string, mixed> $request
+     * @return array{known: bool, event: array<string, mixed>|null}
+     */
+    private function checkPendingTaskForChild(array $request): array
+    {
+        $calendar = $this->resolveCalendar((string) ($request['CalendarID'] ?? ''));
+        $provider = $this->createProvider();
+        $identity = $this->eventLookupIdentityForChild($request);
+        if (!$provider instanceof CalendarEventLookupProviderInterface
+            || ($identity['eventReference'] === '' && $identity['resourceUrl'] === '' && $identity['uid'] === '')) {
+            return ['known' => false, 'event' => null];
+        }
+
+        // Stored dates describe the previous location, not the current provider event.
+        $identity['startTimestamp'] = 0;
+        $identity['endTimestamp'] = 0;
+        try {
+            $event = $provider->getEventForEdit($this->calendarReference($calendar), $identity);
+        } catch (Throwable $exception) {
+            $error = CalendarProviderError::fromThrowable($exception);
+            if (in_array($error['httpStatus'], [404, 410], true)) {
+                return ['known' => true, 'event' => null];
+            }
+            throw $exception;
+        }
+
+        if ((bool) ($event['recurring'] ?? false)
+            || trim((string) ($event['seriesId'] ?? '')) !== ''
+            || trim((string) ($event['recurrenceId'] ?? '')) !== ''
+            || ($identity['uid'] !== '' && !hash_equals($identity['uid'], (string) ($event['uid'] ?? '')))) {
+            return ['known' => false, 'event' => null];
+        }
+
+        return ['known' => true, 'event' => $event];
     }
 
     /**

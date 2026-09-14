@@ -174,7 +174,9 @@ final class CalDAVProvider implements CalendarEventLookupProviderInterface, Cale
             try {
                 $events = $this->eventsForLookupResource($calendarUrl, $resourceUrl, $range);
             } catch (Throwable $exception) {
-                if ($uid === '') {
+                // Only a stale resource URL justifies a UID fallback. Authentication,
+                // conflicts, transport errors and trust-policy failures must survive.
+                if ($uid === '' || !in_array((int) ($exception->httpStatus ?? 0), [404, 410], true)) {
                     throw $exception;
                 }
                 $resource = $this->findEventResourceByUid($calendarUrl, $uid);
