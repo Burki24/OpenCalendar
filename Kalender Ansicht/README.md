@@ -31,6 +31,8 @@ Maximieren bleiben erhalten.
 
 ## Aufgabentermine
 
+![Anonymisierte Beispielansicht eines Monats mit Terminen und Aufgaben](../docs/images/opencalendar-month-anonymized-20260913.png)
+
 Aufgaben werden als gewöhnliche ganztägige Kalendertermine gespeichert; eine
 zusätzliche Aufgaben-API oder OAuth-Freigabe ist nicht erforderlich.
 

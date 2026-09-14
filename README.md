@@ -8,6 +8,9 @@
 [![Run Tests](https://github.com/Burki24/OpenCalendar/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/Burki24/OpenCalendar/actions/workflows/tests.yml?query=branch%3Amain)
 
 OpenCalendar ist eine Anwendung für Symcon, mit der Nutzer ihre Online-Kalender verbinden, synchronisieren, anzeigen und bearbeiten können. Unterstützt werden Apple iCloud, Google Calendar, Microsoft 365/Outlook.com, generische CalDAV-Server sowie schreibgeschützte ICS-/Webcal-Abonnements.
+
+![OpenCalendar: Kalender und Aufgaben in der Symcon-Kachelvisualisierung und in IPSView](docs/images/opencalendar-readme-hero-design-v2.png)
+
 Die gefundenen Kalender können einzeln synchronisiert, in einer gemeinsamen Kachel angezeigt und optional als interaktive HTML-Seite in IPSView verwendet werden.
 
 Ab Version 3.0 steht zusätzlich die **Kalender Einrichtung** als zentraler
@@ -83,6 +86,11 @@ Die ausführlichen Einstellungen der Anbieter sind in der Dokumentation des
 [Kalender Kontos](Kalender%20Konto) beschrieben.
 
 ## IPSView-Stile
+
+![Beispiel der IPSView-Stilkonfiguration mit Farben, Schrift und Effekten](docs/images/opencalendar-ipsview-configuration-combined.png)
+
+Die Abbildung zeigt eine Beispielkonfiguration. Maßgeblich für die verfügbaren
+Einstellungen in Version 3.0 ist die folgende Beschreibung.
 
 Die **Kalender Ansicht** verwendet für die optionale IPSView-Ausgabe das zentrale
 IPSView-Stilsystem aus `Symcon_ModuleHelper`. Die Stilquelle wird direkt in der

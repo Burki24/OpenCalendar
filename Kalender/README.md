@@ -116,6 +116,13 @@ Ein Termin enthält unter anderem `id`, `uid`, `resourceUrl`, `etag`, `summary`,
 
 ## PHP-Befehlsreferenz
 
+Aufgabentermine enthalten zusätzlich `task`, `taskCompleted`, `taskStatus`
+(`open` oder `completed`), `taskFollowPlanned` und `displaySummary` mit dem von
+Aufgabenmarkern bereinigten Titel. Bei einem aus einer Serie nachgezogenen
+Einzeltermin kennzeichnet `taskRolledForward` die gespeicherte Serienzuordnung.
+Diese Aufgabenfelder sind unabhängig von `status` (Terminstatus) und
+`transparency` (`OPAQUE` für belegt, `TRANSPARENT` für frei).
+
 ```php
 bool IPSKAL_Synchronize(int $InstanzID);
 string IPSKAL_GetEvents(int $InstanzID);
@@ -156,7 +163,7 @@ Schreibvorgänge relevanten Felder wie dem aktuellen ETag.
 
 `IPSKAL_GetCalendarStatus()` liefert neben Synchronisations- und Zählerinformationen
 auch `calendarColor`, `canWrite`, `timezone`, die Serienfähigkeiten,
-`maxReminders`, `canUseDefaultReminder`, `canCreateDefaultReminder`,
+`maxReminders`, `canUseDefaultReminder`, `canCreateWithDefaultReminder`,
 `canWriteStatus` und `canWriteTransparency` sowie providerabhängige Standardwerte
 für Status, Verfügbarkeit und Erinnerungen. Die Fähigkeiten und Standardwerte
 werden aus den vom Provider erkannten Kalender-Metadaten übernommen.
@@ -253,7 +260,28 @@ $success = IPSKAL_DeleteEvent(12345, json_encode([
 ]));
 ```
 
-Nach jeder erfolgreichen Schreiboperation wird der lokale Termincache erneut vom Server geladen.
+### Schreibvorgänge und Synchronisationsfehler
+
+Nach dem Erstellen oder Ändern wird zunächst versucht, den geschriebenen Termin
+gezielt beim Anbieter abzurufen und den lokalen Cache zu aktualisieren. Ist das
+nicht möglich, wird eine Synchronisation versucht. Nach einer bestätigten
+Löschung werden die betroffenen Termine direkt aus dem lokalen Cache entfernt;
+ein erneuter Serverabruf ist dafür nicht erforderlich.
+
+Eine vom Anbieter bestätigte Erstellung, Änderung oder Löschung bleibt
+erfolgreich, auch wenn die anschließende lokale Verarbeitung oder Aktualisierung
+fehlschlägt. `CreateEvent` und `UpdateEvent` liefern dann weiterhin
+`success = true` und den bestätigten Termin; `error` enthält gegebenenfalls die
+nachgelagerte Fehlermeldung. `DeleteEvent` liefert weiterhin `true`.
+Der Fehler ist außerdem über `GetCalendarStatus().lastError` erkennbar.
+Den Schreibvorgang deshalb nicht erneut ausführen, sondern die Synchronisation
+wiederholen. Beim Kalenderwechsel wird die Zielkopie nicht wegen eines solchen
+Folgefehlers nach bestätigter Löschung an der Quelle zurückgenommen.
+
+Empfangene Kalenderdaten werden vor dem zugehörigen Synchronisationsmarker
+gespeichert. Scheitert danach das automatische Nachziehen einer Aufgabe,
+bleiben die zuvor empfangenen Termine erhalten. Die Synchronisation meldet
+den Aufgabenfehler und kann erneut gestartet werden.
 
 ## Fehlerbehebung
 
