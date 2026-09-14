@@ -53,6 +53,27 @@ function IPS_GetInstanceListByModuleID(string $moduleID): array
     return [];
 }
 
+/** @var array<string, mixed> */
+$localAccountConfiguration = [];
+/** @var list<array{instanceID: int, name: string, value: mixed}> */
+$localAccountPropertyWrites = [];
+
+function IPS_GetConfiguration(int $instanceID): string
+{
+    global $localAccountConfiguration;
+
+    return json_encode($localAccountConfiguration, JSON_THROW_ON_ERROR);
+}
+
+function IPS_SetProperty(int $instanceID, string $name, mixed $value): bool
+{
+    global $localAccountPropertyWrites;
+
+    $localAccountPropertyWrites[] = ['instanceID' => $instanceID, 'name' => $name, 'value' => $value];
+
+    return true;
+}
+
 require_once __DIR__ . '/../Kalender Konto/module.php';
 require_once __DIR__ . '/../Kalender Konfigurator/module.php';
 
@@ -88,13 +109,13 @@ localAccountExpect(
 $account = new CalendarAccount(42);
 $account->SetTestProperty('Provider', 5);
 $account->SetTestProperty('LocalCalendarName', 'Home');
-$account->SetTestProperty('LocalCalendarColor', '#4fb286');
+$account->SetTestProperty('LocalCalendarColor', 0xFF0000);
 $definitionMethod = new ReflectionMethod(CalendarAccount::class, 'localCalendarDefinition');
 $definition = $definitionMethod->invoke($account);
 localAccountExpect(
     $definition['id'] === 'local:42'
         && $definition['name'] === 'Home'
-        && $definition['color'] === '#4FB286'
+        && $definition['color'] === '#FF0000'
         && ($definition['localCalendar'] ?? false) === true
         && ($definition['capabilities']['createRecurrence'] ?? false) === true,
     'A local account must expose one writable local calendar with recurring-event support.'
@@ -109,12 +130,23 @@ localAccountExpect(
     $validateConfiguration->invoke($account) === '',
     'A complete local account configuration must be accepted without external credentials.'
 );
-$account->SetTestProperty('LocalCalendarColor', 'invalid');
+$account->SetTestProperty('LocalCalendarColor', -1);
 localAccountExpect(
     $validateConfiguration->invoke($account) === 'The local calendar color is invalid.',
     'Invalid local colors must be rejected before the configurator can create a calendar.'
 );
-$account->SetTestProperty('LocalCalendarColor', '#4fb286');
+$account->SetTestProperty('LocalCalendarColor', 0x4FB286);
+$localAccountConfiguration = ['LocalCalendarColor' => '#4fb286'];
+$migrateLegacyColor = new ReflectionMethod(CalendarAccount::class, 'migrateLegacyLocalCalendarColor');
+$migrateLegacyColor->invoke($account);
+localAccountExpect(
+    $localAccountPropertyWrites === [[
+        'instanceID' => 42,
+        'name'       => 'LocalCalendarColor',
+        'value'      => 0x4FB286
+    ]],
+    'Existing hexadecimal local calendar colors must migrate to SelectColor RGB values.'
+);
 
 $configurator = new CalendarConfigurator(100);
 $buildValues = new ReflectionMethod(CalendarConfigurator::class, 'buildConfiguratorValues');
