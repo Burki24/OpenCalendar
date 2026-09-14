@@ -1411,12 +1411,12 @@ class CalendarAccount extends IPSModuleStrict
     private function localCalendarDefinition(): array
     {
         return [
-            'id'           => 'local:' . $this->InstanceID,
-            'name'         => trim($this->ReadPropertyString('LocalCalendarName')),
-            'color'        => strtoupper(trim($this->ReadPropertyString('LocalCalendarColor'))),
-            'description'  => $this->Translate('Stored only in Symcon without external synchronization.'),
+            'id'            => 'local:' . $this->InstanceID,
+            'name'          => trim($this->ReadPropertyString('LocalCalendarName')),
+            'color'         => strtoupper(trim($this->ReadPropertyString('LocalCalendarColor'))),
+            'description'   => $this->Translate('Stored only in Symcon without external synchronization.'),
             'localCalendar' => true,
-            'capabilities' => [
+            'capabilities'  => [
                 'read'                      => true,
                 'create'                    => true,
                 'update'                    => true,
