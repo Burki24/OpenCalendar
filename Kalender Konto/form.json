@@ -62,10 +62,10 @@
             "visible": false
         },
         {
-            "type": "ValidationTextBox",
+            "type": "SelectColor",
             "name": "LocalCalendarColor",
             "caption": "Calendar color",
-            "validate": "^#[0-9A-Fa-f]{6}$",
+            "allowTransparent": false,
             "visible": false
         },
         {

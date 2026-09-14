@@ -75,6 +75,15 @@ localAccountExpect(
         && in_array('LocalCalendarColor', array_column($form['elements'], 'name'), true),
     'The local provider must have its own creation form fields.'
 );
+$localColorField = array_values(array_filter(
+    $form['elements'],
+    static fn (array $element): bool => ($element['name'] ?? '') === 'LocalCalendarColor'
+))[0] ?? [];
+localAccountExpect(
+    ($localColorField['type'] ?? '') === 'SelectColor'
+        && ($localColorField['allowTransparent'] ?? true) === false,
+    'The local calendar color must use Symcon\'s mandatory color picker.'
+);
 
 $account = new CalendarAccount(42);
 $account->SetTestProperty('Provider', 5);
