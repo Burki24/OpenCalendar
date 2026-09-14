@@ -34,6 +34,11 @@ final class Upgrade21Calendar extends Calendar
     public array $attributes = [];
     public array $diagnostics = [];
 
+    protected function ReadPropertyBoolean(string $Name): bool
+    {
+        return false;
+    }
+
     protected function SendDebug(string $Message, mixed $Data, int $Format): void
     {
         $this->diagnostics[] = $Data;

@@ -309,7 +309,7 @@ assertVisualization(
         && str_contains($moduleSource, "\$calendarStatus['defaultTransparency'] ?? ''")
         && str_contains($moduleSource, "\$calendarStatus['defaultAllDayTransparency'] ?? ''")
         && !str_contains($moduleSource, "in_array(\$provider, ['apple', 'caldav', 'google']")
-        && str_contains($moduleSource, "\$calendar['provider'] = \$this->calendarProviderKey(\$instance);"),
+        && str_contains(preg_replace('/\\s+/', ' ', $moduleSource) ?? '', "if (\$includeOperationalMetadata) { \$calendar['provider'] = (bool) (\$calendarStatus['localCalendar'] ?? false) ? 'local' : \$this->calendarProviderKey(\$instance);"),
     'The event editor must use provider-neutral write capabilities, preserve provider defaults, and retain imported RFC state without exposing provider metadata by default.'
 );
 

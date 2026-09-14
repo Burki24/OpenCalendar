@@ -5,6 +5,9 @@ declare(strict_types=1);
 $root = dirname(__DIR__);
 
 $commands = [
+    ['Verify local calendar provider and original data', [PHP_BINARY, 'tests/local-calendar-provider.php']],
+    ['Verify standalone local calendar runtime', [PHP_BINARY, 'tests/local-calendar-module.php']],
+    ['Verify local calendar setup', [PHP_BINARY, 'tests/local-calendar-setup.php']],
     ['Verify vendored helper integrity', ['python3', 'tests/helper_integrity.py']],
     ['Verify DataFlowHelper integration', ['python3', 'tests/data_flow_integration.py']],
     ['Check safe debug integration', [PHP_BINARY, 'tests/debug-integration.php']],

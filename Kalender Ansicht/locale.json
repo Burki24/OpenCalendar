@@ -1,6 +1,7 @@
 {
     "translations": {
         "de": {
+            "Local calendar": "Lokaler Kalender",
             "Unknown provider": "Unbekannter Anbieter",
             "Synchronization failed for: %s.": "Synchronisation fehlgeschlagen bei: %s.",
             "Task appointment": "Aufgabentermin",

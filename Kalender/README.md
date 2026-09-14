@@ -1,11 +1,11 @@
 # Kalender
 
-Das Modul repräsentiert einen einzelnen Online-Kalender.
+Das Modul repräsentiert einen einzelnen Online-Kalender oder einen eigenständigen lokalen Kalender.
 
 ## Einrichtung
 
-Eine Kalender-Instanz wird nicht über **Instanz hinzufügen** manuell eingerichtet.
-Sie wird entweder durch die **Kalender Einrichtung** oder aus der gefundenen
+Ein Online-Kalender wird nicht über **Instanz hinzufügen** manuell eingerichtet.
+Er wird entweder durch die **Kalender Einrichtung** oder aus der gefundenen
 Liste des **Kalender Konfigurators** erstellt. Beide Wege übernehmen Name,
 technische Kalender-ID, Anbieter-ID, Farbe, Schreibrechte und das richtige
 Kalender Konto automatisch.
@@ -18,7 +18,7 @@ Nach der Erstellung:
 3. **Jetzt synchronisieren** ausführen.
 4. Unter **Anzahl Termine** und **Letzte Synchronisation** das Ergebnis prüfen.
 
-> **Kalender-Instanzen nicht manuell anlegen oder lediglich über „Gateway
+> **Online-Kalender nicht manuell anlegen oder lediglich über „Gateway
 > ändern“ mit einem Konto verbinden.** Unterstützt sind die Erstellung durch die
 > **Kalender Einrichtung** und aus der aktuellen Liste des **Kalender
 > Konfigurators**. Beide Wege tragen die vollständige Kalenderidentität, Farbe,
@@ -26,6 +26,58 @@ Nach der Erstellung:
 
 Nach der korrekten Erstellung darf die Instanz im Objektbaum
 beliebig verschoben oder vom Benutzer umbenannt werden.
+
+## Lokaler Kalender
+
+Der empfohlene Weg ist **Kalender Einrichtung → Lokalen Kalender anlegen**:
+
+1. Name und Farbe wählen.
+2. Eine neue Kalender Ansicht benennen oder eine vorhandene Ansicht auswählen.
+3. **Lokalen Kalender anlegen** drücken. Kalender und Zuordnung werden angelegt;
+   vorhandene Ansichtszuordnungen bleiben erhalten.
+4. In der Kalender Ansicht Termine erstellen. Für einen weiteren lokalen Kalender
+   die Instanzkonfiguration der Kalender Einrichtung erneut öffnen.
+
+Technisch aktiviert die boolesche Eigenschaft `LocalCalendar` den lokalen Betrieb.
+Sie ist bei bestehenden Online-Kalendern standardmäßig `false`. Ein lokaler Kalender
+benötigt kein Kalender Konto und keine externe Kalender-ID oder URL. Online- und
+lokale Kalender sind getrennte Datenbestände: Zum Übernehmen bestehender Termine
+die Verschieben-Funktion benutzen, nicht den Betriebsmodus eines eingerichteten
+Online-Kalenders umstellen.
+
+Die Originaldaten einschließlich Serienregeln, Änderungen einzelner Vorkommnisse
+und Lösch-Ausnahmen werden im persistenten Attribut `LocalCalendarResources`
+gespeichert. Der normale Termin-Cache enthält lediglich den aufgelösten
+Anzeigezeitraum. **Cache leeren**, Änderungen an `PastDays`/`FutureDays` und Neustarts
+lassen den Originalbestand erhalten. Ein erneut geladener Zeitraum wird aus diesen
+Originalen berechnet. Bestätigte Schreibvorgänge aktualisieren die lokale Ansicht;
+**Synchronisieren** liest im lokalen Modus nur den lokalen Bestand neu und führt
+keine Netzwerkanfrage aus. Beim Tageswechsel werden fällige Aufgabentermine
+verarbeitet. Offene überfällige Aufgaben werden dabei auch außerhalb des
+eingestellten Anzeigezeitraums berücksichtigt, etwa nach längerer Abschaltung.
+
+Pro lokalem Kalender sind insgesamt höchstens **16 MiB unkomprimierte
+ICS-Originaldaten** vorgesehen. Eine Speicherung, die diese Grenze überschreiten
+würde, wird abgewiesen; der zuvor gespeicherte Bestand bleibt erhalten. Dies ist
+eine Speichergrenze für alle Originaltermine und Serien zusammen, keine Grenze
+für die Anzahl der im Anzeigezeitraum berechneten Vorkommnisse.
+
+Unterstützt werden Einzeltermine, Serien mit Einzel- und Folgeänderungen,
+Aufgabentermine mit Nachziehen, Jahresereignisse, explizite Erinnerungsangaben,
+Terminstatus und Verfügbarkeit. Erinnerungsangaben sind wie bei den anderen
+Kalendern Daten für die vorhandenen Erinnerungsabfragen und keine eigenständige
+Push-Benachrichtigung. Ein externer Kalenderlink ist nicht vorhanden.
+
+Lokale Kalender können Quelle oder Ziel der vorhandenen kalenderübergreifenden
+Verschieben-Funktion sein. Bei einem externen Ziel gelten dessen Möglichkeiten
+und Einschränkungen; die Quelldaten werden erst nach bestätigter Zielerstellung
+gelöscht. Schlägt das anschließende Löschen fehl, können beide Kopien existieren.
+
+**Datensicherung:** Symcon ist hier der einzige Speicherort der Originale.
+Regelmäßige Symcon-Backups sind erforderlich. Das Löschen der Kalender-Instanz
+entfernt auch den Originalbestand; **Cache leeren** ist ausdrücklich keine
+Terminlöschung. Bereits erstellte Backups werden durch Löschen nicht verändert.
+Ein zusätzlicher ICS-Exportdialog wird durch diese Erweiterung nicht eingeführt.
 
 ## Funktionsumfang
 

@@ -5,6 +5,13 @@ gemeinsamen responsiven Darstellung zusammen. Sie kann direkt in der
 Symcon-Kachelvisualisierung oder über eine WebContent-Variable in IPSView
 verwendet werden.
 
+Lokale Kalender ohne Konto lassen sich genauso auswählen und bearbeiten wie
+schreibbare Online-Kalender. Sie können mit diesen in derselben Ansicht kombiniert
+werden. **Kalender synchronisieren** aktualisiert ihren lokalen Datenbestand ohne
+Netzwerkzugriff; Fehlermeldungen kennzeichnen sie als **Lokaler Kalender**.
+Ein externer Öffnen-Link entfällt. Einrichtung und Datensicherung sind unter
+[Lokaler Kalender](../Kalender/README.md#lokaler-kalender) beschrieben.
+
 ## Startverhalten und schmale Kacheln
 
 Schlägt **Kalender synchronisieren** fehl, nennt die Meldung den Provider und

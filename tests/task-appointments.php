@@ -22,6 +22,11 @@ final class TaskSeriesWriteCalendar extends Calendar
     public bool $cacheAvailable = true;
     public bool $followingAvailable = true;
 
+    protected function ReadPropertyBoolean(string $Name): bool
+    {
+        return $Name !== 'LocalCalendar';
+    }
+
     protected function HasActiveParent(): bool
     {
         return true;

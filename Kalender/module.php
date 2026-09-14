@@ -15,6 +15,7 @@ use IPSKalender\CalendarEventState;
 use IPSKalender\CalendarProviderError;
 use IPSKalender\CalendarProviderErrorException;
 use IPSKalender\CalendarTaskEvent;
+use IPSKalender\LocalCalendarProvider;
 use IPSKalender\SynchronizationSchedule;
 
 require_once __DIR__ . '/../libs/helper/ChunkedJsonTransferHelper.php';
@@ -30,6 +31,7 @@ require_once __DIR__ . '/../libs/CalendarEventRecurrence.php';
 require_once __DIR__ . '/../libs/CalendarEventState.php';
 require_once __DIR__ . '/../libs/CalendarProviderError.php';
 require_once __DIR__ . '/../libs/SynchronizationSchedule.php';
+require_once __DIR__ . '/../libs/LocalCalendarProvider.php';
 
 class Calendar extends IPSModuleStrict
 {
@@ -43,6 +45,7 @@ class Calendar extends IPSModuleStrict
     private const DATA_ID_TO_PARENT = '{4E535B1D-69C7-AC77-1372-0282B21BAEC9}';
     private const DATA_ID_FROM_PARENT = '{8ED646DD-88E9-ACE2-95D5-9766EED4B5B0}';
     private const EVENT_TRANSFER_SCOPE = 'CalendarCachedEvents';
+    private const LOCAL_EVENT_TRANSFER_SCOPE = 'LocalCalendarEvents';
     private const INITIALIZATION_DELAY_MS = 3_000;
 
     private const STATUS_CONFIGURATION_MISSING = 201;
@@ -95,6 +98,7 @@ class Calendar extends IPSModuleStrict
 
         $this->RegisterMessage(0, IPS_KERNELSTARTED);
         $this->RegisterPropertyBoolean('Active', true);
+        $this->RegisterPropertyBoolean('LocalCalendar', false);
         $this->RegisterPropertyString('CalendarID', '');
         $this->RegisterPropertyString('ProviderCalendarID', '');
         $this->RegisterPropertyString('CalendarURL', '');
@@ -109,6 +113,8 @@ class Calendar extends IPSModuleStrict
         $this->RegisterAttributeString('AnniversaryMetadata', '[]');
         $this->RegisterAttributeString('BirthdayMetadata', '[]');
         $this->RegisterAttributeString('PendingTaskSeries', '{}');
+        // Original calendar objects, never part of the disposable event cache.
+        $this->RegisterAttributeString('LocalCalendarResources', '{}');
         $this->RegisterAttributeInteger('LastSynchronization', 0);
         $this->RegisterAttributeString('LastError', '');
         $this->RegisterAttributeString('IncrementalSyncToken', '');
@@ -144,13 +150,39 @@ class Calendar extends IPSModuleStrict
     {
         $form = $this->LoadConfigurationForm();
         $customSchedule = $this->ReadPropertyInteger('UpdateSchedule') === SynchronizationSchedule::CUSTOM;
+        $local = $this->ReadPropertyBoolean('LocalCalendar');
         foreach ($form['elements'] as &$element) {
             if (($element['name'] ?? '') === 'UpdateInterval') {
-                $element['visible'] = $customSchedule;
-                break;
+                $element['visible'] = !$local && $customSchedule;
+            }
+            if (($element['name'] ?? '') === 'UpdateSchedule') {
+                $element['visible'] = !$local;
+            }
+            if (($element['caption'] ?? '') === 'Calendar identity') {
+                foreach ($element['items'] as &$item) {
+                    if (($item['name'] ?? '') === 'CalendarColor') {
+                        $item['enabled'] = $local;
+                    }
+                }
+                unset($item);
             }
         }
         unset($element);
+
+        if ($local) {
+            foreach ($form['actions'] as &$action) {
+                if (($action['caption'] ?? '') === 'Synchronize now') {
+                    $action['caption'] = 'Refresh local calendar';
+                }
+                if (($action['name'] ?? '') === 'SynchronizationSuccessPopup') {
+                    $action['popup']['items'][0]['caption'] = 'Local calendar refreshed.';
+                }
+                if (($action['name'] ?? '') === 'SynchronizationFailurePopup') {
+                    $action['popup']['items'][0]['caption'] = 'Local calendar refresh failed. Please check the instance status for details.';
+                }
+            }
+            unset($action);
+        }
 
         return $this->EncodeConfigurationForm($form);
     }
@@ -176,6 +208,14 @@ class Calendar extends IPSModuleStrict
     public function RequestAction(string $Ident, mixed $Value): void
     {
         switch ($Ident) {
+            case 'FormLocalMode':
+                $local = (bool) $Value;
+                $this->UpdateFormField('UpdateSchedule', 'visible', !$local);
+                $this->UpdateFormField('UpdateInterval', 'visible', !$local
+                    && $this->ReadPropertyInteger('UpdateSchedule') === SynchronizationSchedule::CUSTOM);
+                $this->UpdateFormField('CalendarColor', 'enabled', $local);
+                break;
+
             case 'FormSynchronize':
                 $this->UpdateFormField(
                     $this->Synchronize() ? 'SynchronizationSuccessPopup' : 'SynchronizationFailurePopup',
@@ -258,7 +298,7 @@ class Calendar extends IPSModuleStrict
         $this->WriteAttributeBoolean('RuntimeReady', true);
         $this->SetTimerInterval(
             'SynchronizationTimer',
-            SynchronizationSchedule::timerInterval(
+            $this->ReadPropertyBoolean('LocalCalendar') ? 0 : SynchronizationSchedule::timerInterval(
                 $this->ReadPropertyInteger('UpdateSchedule'),
                 $this->ReadPropertyInteger('UpdateInterval')
             )
@@ -267,6 +307,10 @@ class Calendar extends IPSModuleStrict
         $this->updateEventCounters($this->readEvents());
         $this->scheduleTodayEventCountRefresh();
         $this->SetStatus(IS_ACTIVE);
+
+        if ($this->ReadPropertyBoolean('LocalCalendar')) {
+            return $this->Synchronize();
+        }
 
         return true;
     }
@@ -310,6 +354,9 @@ class Calendar extends IPSModuleStrict
         }
 
         try {
+            if ($this->ReadPropertyBoolean('LocalCalendar')) {
+                return $this->Synchronize();
+            }
             $moved = 0;
             $events = $this->rollForwardTaskEvents($this->readEvents(), $moved);
             if ($moved > 0) {
@@ -334,6 +381,9 @@ class Calendar extends IPSModuleStrict
      */
     public function ReceiveData(string $JSONString): string
     {
+        if ($this->ReadPropertyBoolean('LocalCalendar')) {
+            return '';
+        }
         try {
             $message = $this->DecodeDataFlowMessage($JSONString, self::DATA_ID_FROM_PARENT);
             if (($message['Operation'] ?? '') === 'CalendarsUpdated'
@@ -1083,6 +1133,7 @@ class Calendar extends IPSModuleStrict
 
         return json_encode(
             [
+                'localCalendar'                => $this->ReadPropertyBoolean('LocalCalendar'),
                 'calendarId'                   => $this->effectiveCalendarId(),
                 'calendarColor'                => $metadataAvailable && $detectedColor !== ''
                     ? $detectedColor
@@ -1664,6 +1715,13 @@ class Calendar extends IPSModuleStrict
         if (!$this->isRuntimeReady()) {
             throw new RuntimeException('The calendar instance is still initializing.');
         }
+        if ($this->ReadPropertyBoolean('LocalCalendar')) {
+            $error = $this->validateConfiguration();
+            if ($error !== '') {
+                throw new RuntimeException($error);
+            }
+            return $this->sendLocalRequest($operation, $additionalData);
+        }
         if (!$this->HasActiveParent()) {
             throw new RuntimeException('No active calendar account is connected.');
         }
@@ -1705,6 +1763,155 @@ class Calendar extends IPSModuleStrict
         return $payload;
     }
 
+    /**
+     * Executes one local operation against durable originals under an instance lock.
+     *
+     * A provider mutates its private working copy. Only a fully successful operation
+     * publishes that copy, including multi-resource series splits. Cache refreshes
+     * and transfer buffers never replace these original objects.
+     *
+     * @param array<string, mixed> $request
+     * @return array<mixed>
+     */
+    private function sendLocalRequest(string $operation, array $request): array
+    {
+        $lock = 'OpenCalendar.LocalCalendar.' . $this->InstanceID;
+        if (!IPS_SemaphoreEnter($lock, 5000)) {
+            throw new RuntimeException('The local calendar is busy. Please try again.');
+        }
+
+        try {
+            $resources = json_decode($this->ReadAttributeString('LocalCalendarResources'), true, 512, JSON_THROW_ON_ERROR);
+            if (!is_array($resources) || ($resources !== [] && array_is_list($resources))) {
+                throw new UnexpectedValueException('The local calendar original data is invalid. Restore a backup; do not clear it.');
+            }
+            $reference = $this->effectiveCalendarId();
+            $provider = new LocalCalendarProvider($resources, $reference);
+            $identity = [
+                'eventReference' => trim((string) ($request['EventReference'] ?? '')),
+                'resourceUrl'    => trim((string) ($request['ResourceURL'] ?? '')),
+                'uid'            => trim((string) ($request['UID'] ?? '')),
+                'seriesId'       => trim((string) ($request['SeriesID'] ?? '')),
+                'occurrenceId'   => trim((string) ($request['OccurrenceID'] ?? '')),
+                'originalStart'  => trim((string) ($request['OriginalStart'] ?? '')),
+                'recurrenceId'   => trim((string) ($request['RecurrenceID'] ?? '')),
+                'startTimestamp' => (int) ($request['Start'] ?? 0),
+                'endTimestamp'   => (int) ($request['End'] ?? 0)
+            ];
+            $result = match ($operation) {
+                'GetCalendars'        => $provider->getCalendars(),
+                'BeginEventsTransfer' => $this->CreateChunkedJsonTransfer(
+                    self::LOCAL_EVENT_TRANSFER_SCOPE,
+                    $provider->getEventsWithOverdueTasks(
+                        $reference,
+                        new DateTimeImmutable('@' . (int) ($request['Start'] ?? 0)),
+                        new DateTimeImmutable('@' . (int) ($request['End'] ?? 0)),
+                        new DateTimeImmutable('today')
+                    )
+                ),
+                'ReadEventsTransferPage' => $this->ReadChunkedJsonTransferPage(
+                    self::LOCAL_EVENT_TRANSFER_SCOPE,
+                    (string) ($request['Token'] ?? ''),
+                    (int) ($request['Page'] ?? -1)
+                ),
+                'FinishEventsTransfer' => ['success' => $this->ClearChunkedJsonTransfer(
+                    self::LOCAL_EVENT_TRANSFER_SCOPE,
+                    (string) ($request['Token'] ?? '')
+                )],
+                'GetEventForEdit', 'GetEventAfterWrite' => $provider->getEventForEdit($reference, $identity),
+                'CheckPendingTask'                      => $this->checkLocalPendingTask($provider, $reference, $identity),
+                'CheckRecurringSeries'                  => $this->checkLocalRecurringSeries($provider, $reference, $identity),
+                'GetRecurringSeries'                    => $provider->getRecurringSeries($reference, $identity['seriesId'], $identity['resourceUrl']),
+                'GetRecurringFollowing'                 => $provider->getRecurringFollowing(
+                    $reference,
+                    $identity['seriesId'],
+                    $identity['occurrenceId'],
+                    $identity['originalStart'],
+                    $identity['resourceUrl']
+                ),
+                'CreateEvent' => $provider->createEvent($reference, $request['Event'] ?? []),
+                'UpdateEvent' => $provider->updateEvent(
+                    $reference,
+                    $identity['resourceUrl'],
+                    (string) ($request['ETag'] ?? ''),
+                    $identity['uid'],
+                    $request['Event'] ?? [],
+                    $request['Recurrence'] ?? []
+                ),
+                'DeleteEvent' => ['success' => $provider->deleteEvent(
+                    $reference,
+                    $identity['resourceUrl'],
+                    (string) ($request['ETag'] ?? ''),
+                    $identity['recurrenceId'],
+                    $request['Recurrence'] ?? []
+                )],
+                default => throw new InvalidArgumentException('Unsupported local calendar operation: ' . $operation)
+            };
+
+            if ($operation === 'GetCalendars' && trim($this->ReadPropertyString('CalendarColor')) !== '') {
+                foreach ($result as &$calendar) {
+                    $calendar['color'] = trim($this->ReadPropertyString('CalendarColor'));
+                }
+                unset($calendar);
+            }
+            $updatedResources = $provider->exportResources();
+            if ($updatedResources !== $resources) {
+                $encoded = json_encode((object) $updatedResources, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+                if (!$this->WriteAttributeString('LocalCalendarResources', $encoded)) {
+                    throw new RuntimeException('The local calendar original data could not be saved.');
+                }
+            }
+            return $result;
+        } finally {
+            IPS_SemaphoreLeave($lock);
+        }
+    }
+
+    /**
+     * @param array<string, mixed> $identity
+     * @return array{known: bool, event: ?array<string, mixed>}
+     */
+    private function checkLocalPendingTask(LocalCalendarProvider $provider, string $reference, array $identity): array
+    {
+        if ($identity['eventReference'] === '' && $identity['resourceUrl'] === '' && $identity['uid'] === '') {
+            return ['known' => false, 'event' => null];
+        }
+        $identity['startTimestamp'] = 0;
+        $identity['endTimestamp'] = 0;
+        try {
+            $event = $provider->getEventForEdit($reference, $identity);
+        } catch (Throwable $exception) {
+            if (in_array(CalendarProviderError::fromThrowable($exception)['httpStatus'], [404, 410], true)) {
+                return ['known' => true, 'event' => null];
+            }
+            throw $exception;
+        }
+        if ((bool) ($event['recurring'] ?? false)
+            || trim((string) ($event['seriesId'] ?? '')) !== ''
+            || trim((string) ($event['recurrenceId'] ?? '')) !== ''
+            || ($identity['uid'] !== '' && !hash_equals($identity['uid'], (string) ($event['uid'] ?? '')))) {
+            return ['known' => false, 'event' => null];
+        }
+        return ['known' => true, 'event' => $event];
+    }
+
+    /**
+     * @param array<string, mixed> $identity
+     * @return array{supported: bool, exists: bool}
+     */
+    private function checkLocalRecurringSeries(LocalCalendarProvider $provider, string $reference, array $identity): array
+    {
+        try {
+            $provider->getRecurringSeries($reference, $identity['seriesId'], $identity['resourceUrl']);
+        } catch (Throwable $exception) {
+            if (in_array(CalendarProviderError::fromThrowable($exception)['httpStatus'], [404, 410], true)) {
+                return ['supported' => true, 'exists' => false];
+            }
+            throw $exception;
+        }
+        return ['supported' => true, 'exists' => true];
+    }
+
     private function scheduleInitialization(): void
     {
         if (IPS_GetKernelRunlevel() === KR_READY && $this->ReadPropertyBoolean('Active')) {
@@ -1720,6 +1927,9 @@ class Calendar extends IPSModuleStrict
 
     private function effectiveCalendarId(): string
     {
+        if ($this->ReadPropertyBoolean('LocalCalendar')) {
+            return 'https://opencalendar.invalid/local/' . $this->InstanceID . '/';
+        }
         $calendarId = trim($this->ReadPropertyString('CalendarID'));
         return $calendarId !== ''
             ? $calendarId
@@ -2653,6 +2863,18 @@ class Calendar extends IPSModuleStrict
 
     private function validateConfiguration(): string
     {
+        if ($this->ReadPropertyBoolean('LocalCalendar')) {
+            if ((int) (IPS_GetInstance($this->InstanceID)['ConnectionID'] ?? 0) !== 0
+                || trim($this->ReadPropertyString('CalendarID')) !== ''
+                || trim($this->ReadPropertyString('ProviderCalendarID')) !== ''
+                || trim($this->ReadPropertyString('CalendarURL')) !== '') {
+                return $this->Translate('A local calendar requires a separate instance without a connected account or external calendar identity.');
+            }
+            return '';
+        }
+        if (!in_array(trim($this->ReadAttributeString('LocalCalendarResources')), ['', '{}', '[]'], true)) {
+            return $this->Translate('This instance contains local original events. Keep local calendar mode enabled.');
+        }
         if (!SynchronizationSchedule::isValid($this->ReadPropertyInteger('UpdateSchedule'))) {
             return $this->Translate('The synchronization schedule is invalid.');
         }

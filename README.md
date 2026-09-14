@@ -7,7 +7,7 @@
 [![Check Style](https://github.com/Burki24/OpenCalendar/actions/workflows/style.yml/badge.svg?branch=main)](https://github.com/Burki24/OpenCalendar/actions/workflows/style.yml?query=branch%3Amain)
 [![Run Tests](https://github.com/Burki24/OpenCalendar/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/Burki24/OpenCalendar/actions/workflows/tests.yml?query=branch%3Amain)
 
-OpenCalendar ist eine Anwendung für Symcon, mit der Nutzer ihre Online-Kalender verbinden, synchronisieren, anzeigen und bearbeiten können. Unterstützt werden Apple iCloud, Google Calendar, Microsoft 365/Outlook.com, generische CalDAV-Server sowie schreibgeschützte ICS-/Webcal-Abonnements.
+OpenCalendar ist eine Anwendung für Symcon, mit der Nutzer ihre Online-Kalender verbinden, synchronisieren, anzeigen und bearbeiten sowie eigene lokale Kalender führen können. Unterstützt werden Apple iCloud, Google Calendar, Microsoft 365/Outlook.com, generische CalDAV-Server, schreibgeschützte ICS-/Webcal-Abonnements und lokale Kalender ohne Anbieter oder Konto.
 
 ![OpenCalendar: Kalender und Aufgaben in der Symcon-Kachelvisualisierung und in IPSView](docs/images/opencalendar-readme-hero-design-v2.png)
 
@@ -26,10 +26,31 @@ müssen umfangreiche Kalenderdateien nicht manuell aufgeteilt werden.
 **Datenschutz:** [Datenschutzhinweise](PRIVACY.md)  
 **Nutzungsbedingungen:** [Nutzungsbedingungen](TERMS.md)
 
+## Lokale Kalender ohne Synchronisierung
+
+Über **Kalender Einrichtung → Lokalen Kalender anlegen** können beliebig mehrere
+eigenständige Kalender mit Name und Farbe eingerichtet und einer vorhandenen
+oder neuen Kalender Ansicht zugeordnet werden. Es wird kein Kalender Konto
+angelegt; OAuth, Zugangsdaten und Internetzugriff sind dafür nicht erforderlich.
+
+Einzeltermine, Serien einschließlich Ausnahmen, Aufgabentermine, Erinnerungsangaben,
+Status und Verfügbarkeit werden lokal verarbeitet. Lokale und Online-Kalender
+können gemeinsam in der Kachelvisualisierung und in IPSView erscheinen. Über die
+bestehende Verschieben-Funktion lassen sich unterstützte Termine und Serien auch
+zwischen lokalen und externen Kalendern übertragen. Erst eine solche ausdrücklich
+gewählte Übertragung sendet die Daten des lokalen Termins an den Zielanbieter.
+
+**Wichtig:** Die lokalen Originaltermine liegen dauerhaft in der Kalender-Instanz,
+getrennt vom Anzeige-Cache. Zeitraumänderungen und **Cache leeren** löschen diese
+Originale nicht. Das Löschen der Kalender-Instanz löscht jedoch auch ihren lokalen
+Originalbestand. Bitte regelmäßige Symcon-Backups erstellen und schützen; es gibt
+keine externe Kopie beim Kalenderanbieter. Details stehen in der
+[Kalender-Dokumentation](Kalender/README.md#lokaler-kalender).
+
 ## Voraussetzungen
 
 - Symcon ab Version 9.1
-- Netzwerkzugriff des Symcon-Servers auf den jeweiligen Kalenderdienst
+- Für Online-Kalender: Netzwerkzugriff des Symcon-Servers auf den jeweiligen Kalenderdienst
 - für Google und Microsoft eine aktive Symcon-Connect-Verbindung; eine eigene
   OAuth-Client-ID oder ein eigener Clientschlüssel ist nicht erforderlich
 - für Apple iCloud ein anwendungsspezifisches Apple-Passwort

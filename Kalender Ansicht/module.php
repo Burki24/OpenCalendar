@@ -2687,7 +2687,9 @@ class CalendarView extends IPSModuleStrict
                 )
             ];
             if ($includeOperationalMetadata) {
-                $calendar['provider'] = $this->calendarProviderKey($instance);
+                $calendar['provider'] = (bool) ($calendarStatus['localCalendar'] ?? false)
+                    ? 'local'
+                    : $this->calendarProviderKey($instance);
                 $calendar['lastSynchronization'] = max(0, (int) ($calendarStatus['lastSynchronization'] ?? 0));
                 $calendar['status'] = (int) ($instance['InstanceStatus'] ?? 0);
                 $calendar['lastError'] = trim((string) ($calendarStatus['lastError'] ?? ''));
@@ -3176,6 +3178,7 @@ class CalendarView extends IPSModuleStrict
             'google'    => 'Google Calendar',
             'microsoft' => 'Microsoft 365',
             'ics'       => 'ICS/WebCal',
+            'local'     => $this->Translate('Local calendar'),
             default     => $this->Translate('Unknown provider')
         };
         $name = trim((string) ($calendar['name'] ?? ''));

@@ -1,6 +1,16 @@
 {
     "translations": {
         "de": {
+            "Create local calendar": "Lokalen Kalender anlegen",
+            "Local calendars store original appointments in Symcon. No account, internet connection or synchronization is required. Include them in your Symcon backups.": "Lokale Kalender speichern die Originaltermine in Symcon. Konto, Internetverbindung und Synchronisierung sind nicht erforderlich. Bitte in Symcon-Backups sichern.",
+            "Calendar color": "Kalenderfarbe",
+            "Create a new Calendar View": "Neue Kalender Ansicht anlegen",
+            "Use an existing Calendar View": "Vorhandene Kalender Ansicht verwenden",
+            "Name for the new Calendar View": "Name der neuen Kalender Ansicht",
+            "Existing Calendar View": "Vorhandene Kalender Ansicht",
+            "To create another local calendar after completion, reopen this instance configuration.": "Zum Anlegen eines weiteren lokalen Kalenders diese Instanzkonfiguration nach Abschluss erneut öffnen.",
+            "The local calendar configuration is invalid.": "Die Konfiguration des lokalen Kalenders ist ungültig.",
+            "Local calendar created: %s (#%d). Calendar View: #%d.": "Lokaler Kalender angelegt: %s (#%d). Kalender Ansicht: #%d.",
             "OpenCalendar Discovery": "Kalender Einrichtung",
             "OpenCalendar can be configured step by step with the setup assistant.": "OpenCalendar kann mit dem Einrichtungsassistenten Schritt für Schritt konfiguriert werden.",
             "The setup assistant handles the technical OpenCalendar structure for you and guides you through all required steps.": "Der Einrichtungsassistent übernimmt die technische OpenCalendar-Struktur und führt durch alle erforderlichen Schritte.",

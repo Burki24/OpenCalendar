@@ -428,7 +428,7 @@ assertCalendarViewApi(
         && str_contains($normalizedModuleSource, "'canCreateRecurrence' => (bool) (\$calendarStatus['canCreateRecurrence'] ?? false)")
         && str_contains($normalizedModuleSource, "'canDeleteSeries' => (bool) (\$calendarStatus['canDeleteSeries'] ?? false)")
         && str_contains($normalizedModuleSource, "'maxReminders' => max(1, min(CalendarEventReminder::MAX_REMINDERS, (int) (\$calendarStatus['maxReminders'] ?? 1)))")
-        && str_contains($moduleSource, "\$calendar['provider'] = \$this->calendarProviderKey(\$instance);")
+        && str_contains($normalizedModuleSource, "if (\$includeOperationalMetadata) { \$calendar['provider'] = (bool) (\$calendarStatus['localCalendar'] ?? false) ? 'local' : \$this->calendarProviderKey(\$instance);")
         && str_contains($moduleSource, "\$calendar['lastSynchronization'] = max(0, (int) (\$calendarStatus['lastSynchronization'] ?? 0));")
         && str_contains($moduleSource, "\$calendar['status'] = (int) (\$instance['InstanceStatus'] ?? 0);")
         && str_contains($moduleSource, "\$calendar['lastError'] = trim((string) (\$calendarStatus['lastError'] ?? ''));")

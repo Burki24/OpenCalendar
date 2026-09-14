@@ -1,6 +1,25 @@
 {
     "actions": [
         {
+            "type": "PopupButton",
+            "name": "LocalCalendarSetup",
+            "caption": "Create local calendar",
+            "width": "400px",
+            "popup": {
+                "caption": "Create local calendar",
+                "items": [
+                    { "type": "Label", "caption": "Local calendars store original appointments in Symcon. No account, internet connection or synchronization is required. Include them in your Symcon backups." },
+                    { "type": "ValidationTextBox", "name": "LocalCalendarName", "caption": "Calendar name", "value": "" },
+                    { "type": "SelectColor", "name": "LocalCalendarColor", "caption": "Calendar color", "value": 5223046 },
+                    { "type": "Select", "name": "LocalViewMode", "caption": "Calendar view", "value": "new", "options": [ { "caption": "Create a new Calendar View", "value": "new" }, { "caption": "Use an existing Calendar View", "value": "existing" } ] },
+                    { "type": "ValidationTextBox", "name": "LocalViewName", "caption": "Name for the new Calendar View", "value": "Calendar View" },
+                    { "type": "Select", "name": "LocalExistingViewID", "caption": "Existing Calendar View", "value": 0, "options": [] },
+                    { "type": "Button", "name": "CreateLocalCalendarButton", "caption": "Create local calendar", "onClick": "IPS_RequestAction($id, 'CreateLocalCalendar', json_encode(['name' => $LocalCalendarName, 'color' => $LocalCalendarColor, 'mode' => $LocalViewMode, 'viewName' => $LocalViewName, 'existingViewID' => $LocalExistingViewID]));" },
+                    { "type": "Label", "name": "LocalCalendarResult", "caption": "To create another local calendar after completion, reopen this instance configuration." }
+                ]
+            }
+        },
+        {
             "type": "Label",
             "caption": "OpenCalendar can be configured step by step with the setup assistant."
         },

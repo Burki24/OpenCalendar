@@ -6,6 +6,16 @@
             "caption": "Active"
         },
         {
+            "type": "CheckBox",
+            "name": "LocalCalendar",
+            "caption": "Local calendar without synchronization",
+            "onChange": "IPS_RequestAction($id, 'FormLocalMode', $LocalCalendar);"
+        },
+        {
+            "type": "Label",
+            "caption": "Local calendars need a separate instance without an account. Events are stored permanently in Symcon; clearing the cache does not delete them. Include this instance in your backups."
+        },
+        {
             "type": "Select",
             "name": "UpdateSchedule",
             "caption": "Synchronization schedule",
