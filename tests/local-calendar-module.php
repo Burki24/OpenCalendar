@@ -183,7 +183,7 @@ localModuleCheck($restart->RefreshTodayEventCount() && count(json_decode($restar
 $restart->properties['LocalCalendar'] = false;
 $restart->ApplyChanges();
 localModuleCheck($restart->status === 201 && str_contains($restart->attributes['LastError'], 'original events'), 'Switching a populated local calendar to provider mode must be rejected.');
-foreach (['CalendarID', 'ProviderCalendarID', 'CalendarURL'] as $property) {
+foreach (['ProviderCalendarID', 'CalendarURL'] as $property) {
     $invalid = localModuleNew(43);
     $invalid->properties[$property] = 'external';
     $invalid->ApplyChanges();
@@ -192,7 +192,7 @@ foreach (['CalendarID', 'ProviderCalendarID', 'CalendarURL'] as $property) {
 $invalid = localModuleNew(44);
 $GLOBALS['localConnections'][44] = 99;
 $invalid->ApplyChanges();
-localModuleCheck($invalid->status === 201 && !$invalid->Initialize(), 'Even an inactive connected account must block local mode.');
+localModuleCheck($invalid->Initialize(), 'A local calendar may be connected through a local Calendar Account.');
 
 $corrupt = localModuleNew(45);
 $corrupt->attributes['LocalCalendarResources'] = '{broken';

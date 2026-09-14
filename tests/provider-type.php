@@ -45,8 +45,8 @@ providerTypeExpect(
     CalendarProviderType::fromKey('unknown') === null
         && !CalendarProviderType::isSupportedKey('unknown')
         && !CalendarProviderType::isValid(-1)
-        && !CalendarProviderType::isValid(5),
-    'Unsupported provider keys and provider types must be rejected.'
+        && CalendarProviderType::isValid(CalendarProviderType::LOCAL),
+    'Unknown provider keys and provider types must be rejected while the local account type remains valid.'
 );
 
 $accountSource = (string) file_get_contents(__DIR__ . '/../Kalender Konto/module.php');
@@ -58,7 +58,8 @@ providerTypeExpect(
         && str_contains($accountSource, 'private const PROVIDER_CALDAV = CalendarProviderType::CALDAV;')
         && str_contains($accountSource, 'private const PROVIDER_GOOGLE = CalendarProviderType::GOOGLE;')
         && str_contains($accountSource, 'private const PROVIDER_MICROSOFT = CalendarProviderType::MICROSOFT;')
-        && str_contains($accountSource, 'private const PROVIDER_ICS = CalendarProviderType::ICS;'),
+        && str_contains($accountSource, 'private const PROVIDER_ICS = CalendarProviderType::ICS;')
+        && str_contains($accountSource, 'private const PROVIDER_LOCAL = CalendarProviderType::LOCAL;'),
     'Calendar Account provider aliases must use the shared provider type catalogue.'
 );
 

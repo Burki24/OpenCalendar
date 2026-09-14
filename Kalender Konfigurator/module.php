@@ -290,12 +290,31 @@ class CalendarConfigurator extends IPSModuleStrict
             $capabilities = is_array($calendar['capabilities'] ?? null)
                 ? $calendar['capabilities']
                 : [];
+            $isLocalCalendar = (bool) ($calendar['localCalendar'] ?? false);
             $canWrite = (bool) ($capabilities['create'] ?? false)
                 || (bool) ($capabilities['update'] ?? false)
                 || (bool) ($capabilities['delete'] ?? false);
 
             $instanceId = $existingInstances[$calendarId] ?? 0;
             unset($existingInstances[$calendarId]);
+
+            $configuration = [
+                'CalendarID'         => $calendarId,
+                'ProviderCalendarID' => (string) ($calendar['providerId'] ?? $calendarId),
+                'CalendarURL'        => (string) ($calendar['url'] ?? ''),
+                'CalendarColor'      => (string) ($calendar['color'] ?? ''),
+                'CanWrite'           => $canWrite,
+                'UpdateSchedule'     => (int) ($calendar['updateSchedule'] ?? 0),
+                'UpdateInterval'     => max(1, min(
+                    525600,
+                    (int) ($calendar['updateInterval'] ?? 15)
+                ))
+            ];
+            if ($isLocalCalendar) {
+                $configuration['LocalCalendar'] = true;
+                $configuration['ProviderCalendarID'] = '';
+                $configuration['UpdateSchedule'] = 11;
+            }
 
             $values[] = [
                 'name'       => $name,
@@ -308,18 +327,7 @@ class CalendarConfigurator extends IPSModuleStrict
                     'moduleID'      => self::CALENDAR_MODULE_ID,
                     'name'          => $name,
                     'info'          => (string) ($calendar['description'] ?? ''),
-                    'configuration' => [
-                        'CalendarID'         => $calendarId,
-                        'ProviderCalendarID' => (string) ($calendar['providerId'] ?? $calendarId),
-                        'CalendarURL'        => (string) ($calendar['url'] ?? ''),
-                        'CalendarColor'      => (string) ($calendar['color'] ?? ''),
-                        'CanWrite'           => $canWrite,
-                        'UpdateSchedule'     => (int) ($calendar['updateSchedule'] ?? 0),
-                        'UpdateInterval'     => max(1, min(
-                            525600,
-                            (int) ($calendar['updateInterval'] ?? 15)
-                        ))
-                    ]
+                    'configuration' => $configuration
                 ]
             ];
         }

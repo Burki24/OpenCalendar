@@ -1,6 +1,6 @@
 # Kalender
 
-Das Modul repräsentiert einen einzelnen Online-Kalender oder einen eigenständigen lokalen Kalender.
+Das Modul repräsentiert einen einzelnen Online- oder Symcon-lokalen Kalender.
 
 ## Einrichtung
 
@@ -29,20 +29,22 @@ beliebig verschoben oder vom Benutzer umbenannt werden.
 
 ## Lokaler Kalender
 
-Der empfohlene Weg ist **Kalender Einrichtung → Lokalen Kalender anlegen**:
+Lokale Kalender werden wie alle anderen Kalender über ein **Kalender Konto** und
+den **Kalender Konfigurator** angelegt:
 
-1. Name und Farbe wählen.
-2. Eine neue Kalender Ansicht benennen oder eine vorhandene Ansicht auswählen.
-3. **Lokalen Kalender anlegen** drücken. Kalender und Zuordnung werden angelegt;
-   vorhandene Ansichtszuordnungen bleiben erhalten.
-4. In der Kalender Ansicht Termine erstellen. Für einen weiteren lokalen Kalender
-   die Instanzkonfiguration der Kalender Einrichtung erneut öffnen.
+1. Beim Kalender Konto als Anbieter **Symcon - Kalender** wählen sowie Name und
+   Farbe festlegen.
+2. Das Konto aktivieren und speichern.
+3. Einen damit verbundenen Kalender Konfigurator öffnen und den angebotenen
+   Kalender anlegen. Dabei werden Verbindung, Farbe und Kalenderidentität
+   automatisch übernommen.
 
 Technisch aktiviert die boolesche Eigenschaft `LocalCalendar` den lokalen Betrieb.
-Sie ist bei bestehenden Online-Kalendern standardmäßig `false`. Ein lokaler Kalender
-benötigt kein Kalender Konto und keine externe Kalender-ID oder URL. Online- und
-lokale Kalender sind getrennte Datenbestände: Zum Übernehmen bestehender Termine
-die Verschieben-Funktion benutzen, nicht den Betriebsmodus eines eingerichteten
+Sie wird dabei vom Konfigurator gesetzt und ist kein manuell umzustellender
+Betriebsmodus. Ein lokaler Kalender verwendet eine lokale Kalenderidentität,
+aber keine externe Anbieter-ID oder URL. Online- und lokale Kalender sind
+getrennte Datenbestände: Zum Übernehmen bestehender Termine die
+Verschieben-Funktion benutzen, nicht den Betriebsmodus eines eingerichteten
 Online-Kalenders umstellen.
 
 Die Originaldaten einschließlich Serienregeln, Änderungen einzelner Vorkommnisse
@@ -76,8 +78,8 @@ gelöscht. Schlägt das anschließende Löschen fehl, können beide Kopien exist
 **Datensicherung:** Symcon ist hier der einzige Speicherort der Originale.
 Regelmäßige Symcon-Backups sind erforderlich. Das Löschen der Kalender-Instanz
 entfernt auch den Originalbestand; **Cache leeren** ist ausdrücklich keine
-Terminlöschung. Bereits erstellte Backups werden durch Löschen nicht verändert.
-Ein zusätzlicher ICS-Exportdialog wird durch diese Erweiterung nicht eingeführt.
+Terminlöschung. Zusätzlich kann ein lokaler Kalender ausschließlich über die
+Symcon-Konsole beziehungsweise ein eigenes Skript als ICS-Datei exportiert werden.
 
 ## Funktionsumfang
 
@@ -192,6 +194,7 @@ string IPSKAL_UpdateEvent(int $InstanzID, string $EventJSON);
 bool IPSKAL_DeleteEvent(int $InstanzID, string $EventJSON);
 string IPSKAL_GetCalendarStatus(int $InstanzID);
 void IPSKAL_ClearCache(int $InstanzID);
+string IPSKAL_ExportLocalCalendar(int $InstanzID, string $Dateiname, bool $Überschreiben = false);
 ```
 
 `IPSKAL_GetEvents()` bleibt als kompatibler Direktabruf für kleine Datenmengen
@@ -199,6 +202,17 @@ erhalten. Eigene Integrationen mit potenziell vielen Terminen sollten einen
 Transfer beginnen, die Seiten von `0` bis `PageCount - 1` abrufen und den
 Transfer anschließend auch im Fehlerfall beenden. `StartTimestamp` ist inklusiv,
 `EndTimestamp` exklusiv.
+
+`IPSKAL_ExportLocalCalendar()` ist nur für lokale Kalender vorgesehen und kann
+nicht aus dem Web-Interface oder IPSView aufgerufen werden. Es schreibt die
+originalen iCalendar-Daten nach `<Symcon-Verzeichnis>/media/OpenCalendar/`.
+Der Dateiname darf keinen Pfad enthalten, muss auf `.ics` enden und wird ohne
+den Parameter `true` nicht überschrieben:
+
+```php
+$file = IPSKAL_ExportLocalCalendar(12345, 'lokaler-kalender-backup.ics');
+echo $file;
+```
 
 `IPSKAL_GetAnniversaryList()` liefert die in dieser Kalenderinstanz von OpenCalendar verwalteten Jahresereignisse nach dem nächsten Vorkommnis sortiert. `Days = 0` liefert alle Einträge; jeder positive Wert begrenzt die Ausgabe auf die frei wählbare Anzahl der nächsten Kalendertage. Der optionale Filter `Type` akzeptiert `birthday`, `anniversary`, `wedding` oder `death`; ein leerer Wert liefert alle Typen. Die Datensätze enthalten `name`, `anniversaryType`, `anniversaryDate`, `nextDate`, `years`, `displayName` und `daysUntil`. Für Geburtstage werden zusätzlich `birthDate`, `nextBirthday` und `age` geliefert. `IPSKAL_GetBirthdayList()` bleibt als kompatibler Spezialfall erhalten und entspricht dem Filter `birthday`.
 

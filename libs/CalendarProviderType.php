@@ -11,6 +11,8 @@ final class CalendarProviderType
     public const GOOGLE = 2;
     public const MICROSOFT = 3;
     public const ICS = 4;
+    // This provider is configured through Calendar Account only, not through the discovery wizard.
+    public const LOCAL = 5;
 
     /** @var array<string, int> */
     private const TYPES_BY_KEY = [
@@ -49,6 +51,6 @@ final class CalendarProviderType
      */
     public static function isValid(int $provider): bool
     {
-        return in_array($provider, self::TYPES_BY_KEY, true);
+        return in_array($provider, [...self::TYPES_BY_KEY, self::LOCAL], true);
     }
 }

@@ -70,14 +70,6 @@ class OpenCalendarDiscovery extends IPSModuleStrict
         );
 
         foreach ($form['actions'] as &$action) {
-            if (($action['name'] ?? '') === 'LocalCalendarSetup') {
-                foreach ($action['popup']['items'] as &$localItem) {
-                    if (($localItem['name'] ?? '') === 'LocalExistingViewID') {
-                        $localItem['options'] = $this->calendarViewSelectOptions();
-                    }
-                }
-                unset($localItem);
-            }
             if (($action['name'] ?? '') !== 'SetupWizard') {
                 continue;
             }
@@ -131,10 +123,6 @@ class OpenCalendarDiscovery extends IPSModuleStrict
     public function RequestAction(string $Ident, mixed $Value): void
     {
         switch ($Ident) {
-            case 'CreateLocalCalendar':
-                $this->createLocalCalendar($Value);
-                break;
-
             case 'WizardProvider':
                 $this->resetWizardCompletionState();
                 $providerSelection = $this->decodeWizardProviderSelection($Value);
@@ -2309,64 +2297,4 @@ class OpenCalendarDiscovery extends IPSModuleStrict
         }
     }
 
-    /**
-     * Creates an independent local calendar and assigns it to a new or existing view.
-     *
-     * @param mixed $value JSON form payload containing name, color and view selection.
-     */
-    private function createLocalCalendar(mixed $value): void
-    {
-        if (!is_string($value)) {
-            throw new InvalidArgumentException($this->Translate('The local calendar configuration is invalid.'));
-        }
-        try {
-            $selection = json_decode($value, true, 32, JSON_THROW_ON_ERROR);
-        } catch (JsonException) {
-            throw new InvalidArgumentException($this->Translate('The local calendar configuration is invalid.'));
-        }
-        if (!is_array($selection)) {
-            throw new InvalidArgumentException($this->Translate('The local calendar configuration is invalid.'));
-        }
-        $name = trim((string) ($selection['name'] ?? ''));
-        if ($name === '') {
-            throw new InvalidArgumentException($this->Translate('Please enter a calendar name.'));
-        }
-        $color = (int) ($selection['color'] ?? 0x4FB286);
-        if ($color < 0 || $color > 0xFFFFFF) {
-            throw new InvalidArgumentException($this->Translate('The local calendar configuration is invalid.'));
-        }
-        $viewSelection = $this->decodeWizardCalendarViewSelection($value);
-        $this->assertWizardCalendarViewSelectionValid(
-            $viewSelection['mode'],
-            $viewSelection['existingViewID'],
-            $viewSelection['viewName']
-        );
-        $calendarID = 0;
-        try {
-            $calendarID = IPS_CreateInstance(self::CALENDAR_MODULE_ID);
-            IPS_SetName($calendarID, $name);
-            $parentID = IPS_GetParent($this->InstanceID);
-            if ($parentID > 0) {
-                IPS_SetParent($calendarID, $parentID);
-            }
-            IPS_SetProperty($calendarID, 'LocalCalendar', true);
-            IPS_SetProperty($calendarID, 'CalendarColor', sprintf('#%06X', $color));
-            IPS_SetProperty($calendarID, 'CanWrite', true);
-            IPS_SetProperty($calendarID, 'Active', true);
-            IPS_ApplyChanges($calendarID);
-            $view = $this->prepareCalendarView($calendarID, $viewSelection, [$calendarID]);
-        } catch (Throwable $exception) {
-            if ($calendarID > 0 && IPS_InstanceExists($calendarID)) {
-                IPS_DeleteInstance($calendarID);
-            }
-            throw $exception;
-        }
-        $this->UpdateFormField('LocalCalendarResult', 'caption', sprintf(
-            $this->Translate('Local calendar created: %s (#%d). Calendar View: #%d.'),
-            $name,
-            $calendarID,
-            $view['instanceID']
-        ));
-        $this->UpdateFormField('CreateLocalCalendarButton', 'enabled', false);
-    }
 }

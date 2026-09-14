@@ -95,6 +95,7 @@ class CalendarAccount extends IPSModuleStrict
     private const PROVIDER_GOOGLE = CalendarProviderType::GOOGLE;
     private const PROVIDER_MICROSOFT = CalendarProviderType::MICROSOFT;
     private const PROVIDER_ICS = CalendarProviderType::ICS;
+    private const PROVIDER_LOCAL = CalendarProviderType::LOCAL;
 
     private const STATUS_CONFIGURATION_MISSING = 201;
     private const STATUS_AUTHENTICATION_FAILED = 202;
@@ -115,6 +116,8 @@ class CalendarAccount extends IPSModuleStrict
         $this->RegisterPropertyString('Username', '');
         $this->RegisterPropertyString('Password', '');
         $this->RegisterPropertyString('CalendarName', '');
+        $this->RegisterPropertyString('LocalCalendarName', 'Local Calendar');
+        $this->RegisterPropertyInteger('LocalCalendarColor', 0x4FB286);
         $this->RegisterPropertyInteger('ICalendarAuthenticationMode', ICalendarAuthentication::AUTOMATIC);
         $this->RegisterPropertyInteger('ICalendarTranslationProfile', CalendarEventTranslation::NONE);
         $this->RegisterPropertyString('ICalendarFeeds', '[]');
@@ -153,9 +156,18 @@ class CalendarAccount extends IPSModuleStrict
         $state = $this->currentProviderFormState($this->ReadPropertyInteger('Provider'));
         $state['GoogleStatus']['caption'] = $this->googleStatusText();
         $state['MicrosoftStatus']['caption'] = $this->microsoftStatusText();
-        $state['UpdateInterval']['visible'] = $this->ReadPropertyInteger('UpdateSchedule')
-            === SynchronizationSchedule::CUSTOM;
+        $state['UpdateInterval']['visible'] = $this->ReadPropertyInteger('Provider') !== self::PROVIDER_LOCAL
+            && $this->ReadPropertyInteger('UpdateSchedule') === SynchronizationSchedule::CUSTOM;
         $this->applyProviderFormStateToConfiguration($form, $state);
+        $isLocal = $this->ReadPropertyInteger('Provider') === self::PROVIDER_LOCAL;
+        if (isset($form['actions']) && is_array($form['actions'])) {
+            foreach ($form['actions'] as &$action) {
+                if (($action['name'] ?? '') === 'SynchronizationButton') {
+                    $action['visible'] = !$isLocal;
+                }
+            }
+            unset($action);
+        }
 
         return $this->EncodeConfigurationForm($form);
     }
@@ -168,6 +180,7 @@ class CalendarAccount extends IPSModuleStrict
         $state = $this->currentProviderFormState($provider);
         $state['MicrosoftStatus']['caption'] = $this->microsoftStatusText();
         $this->applyProviderFormStateToOpenForm($state);
+        $this->UpdateFormField('SynchronizationButton', 'visible', $provider !== self::PROVIDER_LOCAL);
 
         if (!in_array($provider, [self::PROVIDER_CALDAV, self::PROVIDER_ICS], true)) {
             return;
@@ -209,7 +222,8 @@ class CalendarAccount extends IPSModuleStrict
      */
     public function MessageSink(int $TimeStamp, int $SenderID, int $Message, array $Data): void
     {
-        if ($SenderID === 0 && $Message === IPS_KERNELSTARTED) {
+        if ($SenderID === 0 && $Message === IPS_KERNELSTARTED
+            && $this->ReadPropertyInteger('Provider') !== self::PROVIDER_LOCAL) {
             $this->scheduleOAuthRegistration();
         }
     }
@@ -279,18 +293,23 @@ class CalendarAccount extends IPSModuleStrict
     {
         parent::ApplyChanges();
 
+        $this->migrateLegacyLocalCalendarColor();
+
         $providerName = $this->getProviderName($this->ReadPropertyInteger('Provider'));
         $username = match ($this->ReadPropertyInteger('Provider')) {
             self::PROVIDER_GOOGLE    => trim($this->ReadAttributeString('GoogleAccount')),
             self::PROVIDER_MICROSOFT => trim($this->ReadAttributeString('MicrosoftAccount')),
             self::PROVIDER_ICS       => $this->iCalendarSummary(),
+            self::PROVIDER_LOCAL     => trim($this->ReadPropertyString('LocalCalendarName')),
             default                  => trim($this->ReadPropertyString('Username'))
         };
         $this->SetSummary($username !== '' ? $providerName . ' – ' . $username : $providerName);
 
         $this->SetTimerInterval('OAuthRegistrationTimer', 0);
         if (IPS_GetKernelRunlevel() === KR_READY) {
-            $this->scheduleOAuthRegistration();
+            if ($this->ReadPropertyInteger('Provider') !== self::PROVIDER_LOCAL) {
+                $this->scheduleOAuthRegistration();
+            }
         }
 
         if (!$this->ReadPropertyBoolean('Active')) {
@@ -309,10 +328,12 @@ class CalendarAccount extends IPSModuleStrict
 
         $this->SetTimerInterval(
             'SynchronizationTimer',
-            SynchronizationSchedule::timerInterval(
-                $this->ReadPropertyInteger('UpdateSchedule'),
-                $this->ReadPropertyInteger('UpdateInterval')
-            )
+            $this->ReadPropertyInteger('Provider') === self::PROVIDER_LOCAL
+                ? 0
+                : SynchronizationSchedule::timerInterval(
+                    $this->ReadPropertyInteger('UpdateSchedule'),
+                    $this->ReadPropertyInteger('UpdateInterval')
+                )
         );
         $this->SetStatus(IS_ACTIVE);
     }
@@ -325,6 +346,9 @@ class CalendarAccount extends IPSModuleStrict
     public function InitializeOAuth(): bool
     {
         $this->SetTimerInterval('OAuthRegistrationTimer', 0);
+        if ($this->ReadPropertyInteger('Provider') === self::PROVIDER_LOCAL) {
+            return true;
+        }
         if (IPS_GetKernelRunlevel() !== KR_READY) {
             return false;
         }
@@ -345,6 +369,9 @@ class CalendarAccount extends IPSModuleStrict
      */
     public function ScheduledSynchronize(): bool
     {
+        if ($this->ReadPropertyInteger('Provider') === self::PROVIDER_LOCAL) {
+            return true;
+        }
         if (!SynchronizationSchedule::isDue(
             $this->ReadPropertyInteger('UpdateSchedule'),
             $this->ReadPropertyInteger('UpdateInterval'),
@@ -375,6 +402,15 @@ class CalendarAccount extends IPSModuleStrict
         }
 
         $providerName = $this->getProviderName($this->ReadPropertyInteger('Provider'));
+        if ($this->ReadPropertyInteger('Provider') === self::PROVIDER_LOCAL) {
+            $this->WriteAttributeString('LastError', '');
+            $this->SetStatus($this->ReadPropertyBoolean('Active') ? IS_ACTIVE : IS_INACTIVE);
+
+            return json_encode(
+                ['success' => true, 'message' => $this->Translate('Local calendar is ready.')],
+                JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR
+            );
+        }
         $startedAt = microtime(true);
         $this->SendSafeDebug('ConnectionTestStart', [
             'provider'       => $providerName,
@@ -462,6 +498,12 @@ class CalendarAccount extends IPSModuleStrict
     {
         $cachedCalendars = $this->ReadAttributeString('CachedCalendars');
         $provider = $this->ReadPropertyInteger('Provider');
+        if ($provider === self::PROVIDER_LOCAL) {
+            return json_encode(
+                [$this->localCalendarDefinition()],
+                JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR
+            );
+        }
         if (!in_array(
             $provider,
             [self::PROVIDER_APPLE, self::PROVIDER_CALDAV, self::PROVIDER_GOOGLE, self::PROVIDER_MICROSOFT],
@@ -504,6 +546,7 @@ class CalendarAccount extends IPSModuleStrict
                     self::PROVIDER_GOOGLE    => $this->ReadAttributeString('GoogleAccount'),
                     self::PROVIDER_MICROSOFT => $this->ReadAttributeString('MicrosoftAccount'),
                     self::PROVIDER_ICS       => $this->iCalendarSummary(),
+                    self::PROVIDER_LOCAL     => trim($this->ReadPropertyString('LocalCalendarName')),
                     default                  => trim($this->ReadPropertyString('Username'))
                 },
                 'lastSynchronization' => $this->ReadAttributeInteger('LastSynchronization'),
@@ -733,6 +776,7 @@ class CalendarAccount extends IPSModuleStrict
         $isGoogle = $provider === self::PROVIDER_GOOGLE;
         $isMicrosoft = $provider === self::PROVIDER_MICROSOFT;
         $isIcs = $provider === self::PROVIDER_ICS;
+        $isLocal = $provider === self::PROVIDER_LOCAL;
         $showCredentials = in_array($provider, [self::PROVIDER_APPLE, self::PROVIDER_CALDAV], true)
             || ($isIcs && $showIcsCredentials);
         $canConfigureTls = in_array($provider, [self::PROVIDER_CALDAV, self::PROVIDER_ICS], true);
@@ -751,20 +795,27 @@ class CalendarAccount extends IPSModuleStrict
             'Username'                    => ['visible' => $showCredentials],
             'Password'                    => ['visible' => $showCredentials],
             'CalendarName'                => ['visible' => $isIcs],
+            'LocalCalendarHint'           => ['visible' => $isLocal],
+            'LocalCalendarName'           => ['visible' => $isLocal],
+            'LocalCalendarColor'          => ['visible' => $isLocal],
             'ICalendarTranslationProfile' => ['visible' => $isIcs],
             'ICalendarSubscriptionsPanel' => ['visible' => $isIcs],
             'ICalendarFilesPanel'         => ['visible' => $isIcs],
             'UpdateSchedule'              => [
+                'visible' => !$isLocal,
                 'caption' => $isIcs
                     ? $this->Translate('Account discovery schedule')
                     : $this->Translate('Synchronization schedule')
             ],
             'UpdateInterval'              => [
+                'visible' => !$isLocal,
                 'caption' => $isIcs
                     ? $this->Translate('Account custom interval')
                     : $this->Translate('Custom interval')
             ],
             'VerifyTLS'                   => ['visible' => $canConfigureTls],
+            'RequestTimeout'              => ['visible' => !$isLocal],
+            'PrivacyNotice'               => ['visible' => !$isLocal],
             'GoogleOAuthHint'             => ['visible' => $isGoogle],
             'GoogleConnectHint'           => ['visible' => $isGoogle],
             'GoogleStatus'                => ['visible' => $isGoogle],
@@ -1030,7 +1081,9 @@ class CalendarAccount extends IPSModuleStrict
         $providerName = $this->getProviderName($this->ReadPropertyInteger('Provider'));
         $startedAt = microtime(true);
         $this->SendSafeDebug('CalendarDiscoveryStart', ['provider' => $providerName]);
-        $calendars = $this->createProvider()->getCalendars();
+        $calendars = $this->ReadPropertyInteger('Provider') === self::PROVIDER_LOCAL
+            ? [$this->localCalendarDefinition()]
+            : $this->createProvider()->getCalendars();
         if ($this->ReadPropertyInteger('Provider') === self::PROVIDER_ICS) {
             $this->pruneICalendarFeedCache(array_map(
                 static fn (array $calendar): string => (string) ($calendar['id'] ?? ''),
@@ -1183,17 +1236,30 @@ class CalendarAccount extends IPSModuleStrict
     private function validateConfiguration(): string
     {
         $provider = $this->ReadPropertyInteger('Provider');
-        if (!SynchronizationSchedule::isValid($this->ReadPropertyInteger('UpdateSchedule'))) {
-            return $this->Translate('The synchronization schedule is invalid.');
-        }
         if (!in_array($provider, [
             self::PROVIDER_APPLE,
             self::PROVIDER_CALDAV,
             self::PROVIDER_GOOGLE,
             self::PROVIDER_MICROSOFT,
-            self::PROVIDER_ICS
+            self::PROVIDER_ICS,
+            self::PROVIDER_LOCAL
         ], true)) {
             return $this->Translate('Unknown calendar provider.');
+        }
+
+        if ($provider === self::PROVIDER_LOCAL) {
+            if (trim($this->ReadPropertyString('LocalCalendarName')) === '') {
+                return $this->Translate('The local calendar name is missing.');
+            }
+            if (!$this->isValidLocalCalendarColor($this->ReadPropertyInteger('LocalCalendarColor'))) {
+                return $this->Translate('The local calendar color is invalid.');
+            }
+
+            return '';
+        }
+
+        if (!SynchronizationSchedule::isValid($this->ReadPropertyInteger('UpdateSchedule'))) {
+            return $this->Translate('The synchronization schedule is invalid.');
         }
 
         if ($provider === self::PROVIDER_APPLE) {
@@ -1347,8 +1413,58 @@ class CalendarAccount extends IPSModuleStrict
             self::PROVIDER_GOOGLE    => 'Google Calendar',
             self::PROVIDER_MICROSOFT => 'Microsoft 365',
             self::PROVIDER_ICS       => 'ICS/Webcal',
+            self::PROVIDER_LOCAL     => 'Symcon - Calendar',
             default                  => 'Unknown'
         });
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function localCalendarDefinition(): array
+    {
+        return [
+            'id'            => 'local:' . $this->InstanceID,
+            'name'          => trim($this->ReadPropertyString('LocalCalendarName')),
+            'color'         => sprintf('#%06X', $this->ReadPropertyInteger('LocalCalendarColor')),
+            'description'   => $this->Translate('Stored only in Symcon without external synchronization.'),
+            'localCalendar' => true,
+            'capabilities'  => [
+                'read'                      => true,
+                'create'                    => true,
+                'update'                    => true,
+                'delete'                    => true,
+                'createRecurrence'          => true,
+                'updateRecurrence'          => true,
+                'updateOccurrence'          => true,
+                'deleteOccurrence'          => true,
+                'updateFollowing'           => true,
+                'updateSeries'              => true,
+                'deleteSeries'              => true,
+                'createWithDefaultReminder' => true
+            ]
+        ];
+    }
+
+    /**
+     * Converts the short-lived hexadecimal color property from the first local-calendar release.
+     */
+    private function migrateLegacyLocalCalendarColor(): void
+    {
+        $configuration = json_decode(IPS_GetConfiguration($this->InstanceID), true);
+        if (!is_array($configuration)) {
+            return;
+        }
+        $legacyColor = $configuration['LocalCalendarColor'] ?? null;
+        if (!is_string($legacyColor) || preg_match('/^#[0-9A-Fa-f]{6}$/', $legacyColor) !== 1) {
+            return;
+        }
+        IPS_SetProperty($this->InstanceID, 'LocalCalendarColor', hexdec(substr($legacyColor, 1)));
+    }
+
+    private function isValidLocalCalendarColor(int $color): bool
+    {
+        return $color >= 0x000000 && $color <= 0xFFFFFF;
     }
 
     private function handleProviderError(Throwable $exception): string

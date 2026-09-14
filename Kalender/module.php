@@ -47,6 +47,7 @@ class Calendar extends IPSModuleStrict
     private const EVENT_TRANSFER_SCOPE = 'CalendarCachedEvents';
     private const LOCAL_EVENT_TRANSFER_SCOPE = 'LocalCalendarEvents';
     private const INITIALIZATION_DELAY_MS = 3_000;
+    private const LOCAL_EXPORT_DIRECTORY = 'media' . DIRECTORY_SEPARATOR . 'OpenCalendar';
 
     private const STATUS_CONFIGURATION_MISSING = 201;
     private const STATUS_SYNCHRONIZATION_FAILED = 202;
@@ -158,6 +159,9 @@ class Calendar extends IPSModuleStrict
             if (($element['name'] ?? '') === 'UpdateSchedule') {
                 $element['visible'] = !$local;
             }
+            if (($element['name'] ?? '') === 'LocalCalendarNotice') {
+                $element['visible'] = $local;
+            }
             if (($element['caption'] ?? '') === 'Calendar identity') {
                 foreach ($element['items'] as &$item) {
                     if (($item['name'] ?? '') === 'CalendarColor') {
@@ -208,14 +212,6 @@ class Calendar extends IPSModuleStrict
     public function RequestAction(string $Ident, mixed $Value): void
     {
         switch ($Ident) {
-            case 'FormLocalMode':
-                $local = (bool) $Value;
-                $this->UpdateFormField('UpdateSchedule', 'visible', !$local);
-                $this->UpdateFormField('UpdateInterval', 'visible', !$local
-                    && $this->ReadPropertyInteger('UpdateSchedule') === SynchronizationSchedule::CUSTOM);
-                $this->UpdateFormField('CalendarColor', 'enabled', $local);
-                break;
-
             case 'FormSynchronize':
                 $this->UpdateFormField(
                     $this->Synchronize() ? 'SynchronizationSuccessPopup' : 'SynchronizationFailurePopup',
@@ -1109,6 +1105,38 @@ class Calendar extends IPSModuleStrict
         $this->WriteAttributeInteger('LastSynchronization', 0);
         $this->SetValue('LastSynchronization', 0);
         $this->WriteAttributeString('LastError', '');
+    }
+
+    /**
+     * Exports the original resources of a local calendar as an ICS backup file.
+     *
+     * @param string $fileName Safe target file name including the .ics extension.
+     * @param bool   $overwrite Whether an existing file may be overwritten.
+     * @return string Absolute path of the exported ICS file.
+     */
+    public function ExportLocalCalendar(string $fileName, bool $overwrite = false): string
+    {
+        if (!$this->ReadPropertyBoolean('LocalCalendar')) {
+            throw new LogicException('Only local calendars can be exported.');
+        }
+        if (!$this->isValidLocalCalendarExportFileName($fileName)) {
+            throw new InvalidArgumentException('The ICS export file name is invalid.');
+        }
+
+        $directory = rtrim(IPS_GetKernelDir(), '/\\') . DIRECTORY_SEPARATOR . self::LOCAL_EXPORT_DIRECTORY;
+        if (!is_dir($directory) && !mkdir($directory, 0775, true) && !is_dir($directory)) {
+            throw new RuntimeException('The local calendar export directory could not be created.');
+        }
+
+        $path = $directory . DIRECTORY_SEPARATOR . $fileName;
+        if (file_exists($path) && !$overwrite) {
+            throw new RuntimeException('The ICS export file already exists.');
+        }
+        if (file_put_contents($path, $this->localCalendarExportContent(), LOCK_EX) === false) {
+            throw new RuntimeException('The local calendar could not be exported.');
+        }
+
+        return $path;
     }
 
     /**
@@ -2861,14 +2889,54 @@ class Calendar extends IPSModuleStrict
         return $data;
     }
 
+    /**
+     * Builds a portable iCalendar stream from the original local resources.
+     */
+    private function localCalendarExportContent(): string
+    {
+        $lock = 'OpenCalendar.LocalCalendar.' . $this->InstanceID;
+        if (!IPS_SemaphoreEnter($lock, 5000)) {
+            throw new RuntimeException('The local calendar is busy. Please try again.');
+        }
+
+        try {
+            $resources = $this->decodeObject(
+                $this->ReadAttributeString('LocalCalendarResources'),
+                'local calendar original data'
+            );
+            $provider = new LocalCalendarProvider($resources, $this->effectiveCalendarId());
+            $calendars = array_values($provider->exportResources());
+            if ($calendars === []) {
+                return "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//OpenCalendar//Symcon//EN\r\nCALSCALE:GREGORIAN\r\nEND:VCALENDAR\r\n";
+            }
+
+            return implode("\r\n", array_map(
+                static fn (string $calendar): string => rtrim($calendar) . "\r\n",
+                $calendars
+            ));
+        } finally {
+            IPS_SemaphoreLeave($lock);
+        }
+    }
+
+    /**
+     * Accepts a single safe file name with the mandatory ICS extension.
+     */
+    private function isValidLocalCalendarExportFileName(string $fileName): bool
+    {
+        return $fileName !== ''
+            && !str_contains($fileName, '/')
+            && !str_contains($fileName, '\\')
+            && !preg_match('/[[:cntrl:]]/', $fileName)
+            && str_ends_with(strtolower($fileName), '.ics');
+    }
+
     private function validateConfiguration(): string
     {
         if ($this->ReadPropertyBoolean('LocalCalendar')) {
-            if ((int) (IPS_GetInstance($this->InstanceID)['ConnectionID'] ?? 0) !== 0
-                || trim($this->ReadPropertyString('CalendarID')) !== ''
-                || trim($this->ReadPropertyString('ProviderCalendarID')) !== ''
+            if (trim($this->ReadPropertyString('ProviderCalendarID')) !== ''
                 || trim($this->ReadPropertyString('CalendarURL')) !== '') {
-                return $this->Translate('A local calendar requires a separate instance without a connected account or external calendar identity.');
+                return $this->Translate('A local calendar must not use an external calendar identity.');
             }
             return '';
         }

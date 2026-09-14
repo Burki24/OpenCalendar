@@ -12,21 +12,6 @@ Einrichtung. Anwender sollen dadurch die Abhängigkeiten zwischen Kalender Konto
 Kalender Konfigurator, Kalender und Kalender Ansicht nicht mehr vorab kennen
 müssen.
 
-## Lokalen Kalender ohne Konto anlegen
-
-Die separate Schaltfläche **Lokalen Kalender anlegen** richtet einen Kalender
-vollständig innerhalb von Symcon ein. Im Dialog werden Name, Farbe und entweder
-eine neue Kalender Ansicht oder eine vorhandene Ansicht gewählt. Anschließend
-wird genau eine lokale Kalender-Instanz angelegt und der Ansicht hinzugefügt.
-Vorhandene Kalenderzuordnungen und deren Aktivierung bleiben erhalten.
-
-Dieser Weg überspringt Anbieterwahl, Konto, OAuth, Verbindungsprüfung und
-Kalender Konfigurator. Der bisherige Online-Einrichtungsassistent bleibt davon
-unverändert. Nach erfolgreicher Erstellung zeigt der Dialog Kalender- und
-Ansichts-ID; zum Anlegen eines weiteren Kalenders die Instanzkonfiguration erneut
-öffnen. Die Originaltermine gehören in ein regelmäßiges Symcon-Backup.
-Weitere Hinweise: [Lokaler Kalender](../Kalender/README.md#lokaler-kalender).
-
 ## Ablauf des Einrichtungsassistenten
 
 Der Assistent führt durch folgende Schritte:

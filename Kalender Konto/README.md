@@ -1,5 +1,18 @@
 # Kalender Konto
 
+## Symcon-lokaler Kalender
+
+Neben externen Anbietern kann ein Kalender Konto den Anbieter **Symcon - Kalender**
+verwenden. Dieser speichert einen beschreibbaren Kalender ausschließlich in
+Symcon und benötigt weder Zugangsdaten noch eine Netzwerkverbindung oder
+Synchronisation. Name und Farbe werden direkt im Konto festgelegt.
+
+Zum Erstellen der eigentlichen Kalenderinstanz wird anschließend ein mit dem
+Konto verbundener **Kalender Konfigurator** verwendet. Er erkennt genau diesen
+lokalen Kalender und trägt dessen Einstellungen automatisch ein. Die Termine
+gehören in reguläre Symcon-Backups; zusätzlich ist ein ICS-Sicherungsexport über
+die Konsolenfunktion des Kalenders möglich.
+
 Das Modul **Kalender Konto** verwaltet die Verbindung zu einem Kalenderanbieter.
 Es findet die verfügbaren Kalender und stellt sie der **Kalender Einrichtung**,
 dem **Kalender Konfigurator** und den erzeugten Kalender-Instanzen zur Verfügung.

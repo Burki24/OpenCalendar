@@ -28,10 +28,11 @@ müssen umfangreiche Kalenderdateien nicht manuell aufgeteilt werden.
 
 ## Lokale Kalender ohne Synchronisierung
 
-Über **Kalender Einrichtung → Lokalen Kalender anlegen** können beliebig mehrere
-eigenständige Kalender mit Name und Farbe eingerichtet und einer vorhandenen
-oder neuen Kalender Ansicht zugeordnet werden. Es wird kein Kalender Konto
-angelegt; OAuth, Zugangsdaten und Internetzugriff sind dafür nicht erforderlich.
+Lokale Kalender werden über ein **Kalender Konto** mit dem Anbieter
+**Symcon - Kalender** angelegt. Dort werden Name und Farbe festgelegt; ein
+verbundener **Kalender Konfigurator** erstellt anschließend die Kalenderinstanz.
+OAuth, Zugangsdaten, Internetzugriff und eine externe Synchronisation sind dafür
+nicht erforderlich.
 
 Einzeltermine, Serien einschließlich Ausnahmen, Aufgabentermine, Erinnerungsangaben,
 Status und Verfügbarkeit werden lokal verarbeitet. Lokale und Online-Kalender
@@ -44,8 +45,9 @@ gewählte Übertragung sendet die Daten des lokalen Termins an den Zielanbieter.
 getrennt vom Anzeige-Cache. Zeitraumänderungen und **Cache leeren** löschen diese
 Originale nicht. Das Löschen der Kalender-Instanz löscht jedoch auch ihren lokalen
 Originalbestand. Bitte regelmäßige Symcon-Backups erstellen und schützen; es gibt
-keine externe Kopie beim Kalenderanbieter. Details stehen in der
-[Kalender-Dokumentation](Kalender/README.md#lokaler-kalender).
+keine externe Kopie beim Kalenderanbieter. Zusätzlich kann der lokale Kalender
+über die Symcon-Konsole oder ein eigenes Skript als ICS-Datei exportiert werden.
+Details stehen in der [Kalender-Dokumentation](Kalender/README.md#lokaler-kalender).
 
 ## Voraussetzungen
 
