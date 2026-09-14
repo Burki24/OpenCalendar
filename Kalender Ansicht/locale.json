@@ -1,6 +1,8 @@
 {
     "translations": {
         "de": {
+            "Unknown provider": "Unbekannter Anbieter",
+            "Synchronization failed for: %s.": "Synchronisation fehlgeschlagen bei: %s.",
             "Task appointment": "Aufgabentermin",
             "Task status": "Aufgabenstatus",
             "Open": "Offen",

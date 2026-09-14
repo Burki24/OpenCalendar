@@ -143,7 +143,8 @@ assertUpgradeRuntimeNotContains(
         "WritePersistentJsonCache('CachedEvents'",
         "WriteAttributeString('CachedEvents'",
         "WriteAttributeString('AnniversaryMetadata'",
-        "WriteAttributeString('BirthdayMetadata'"
+        "WriteAttributeString('BirthdayMetadata'",
+        "WriteAttributeString('PendingTaskSeries'"
     ],
     'Calendar ApplyChanges()'
 );
@@ -163,6 +164,7 @@ assertUpgradeRuntimeNotContains(
         'CachedEvents',
         'AnniversaryMetadata',
         'BirthdayMetadata',
+        'PendingTaskSeries',
         'LastSynchronization'
     ],
     'Calendar incremental reset'

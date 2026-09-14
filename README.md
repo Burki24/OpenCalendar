@@ -280,6 +280,91 @@ Tagen als auch einen Filter nach Ereignistyp. Die vollständige Befehlsreferenz
 befindet sich in der Dokumentation der Module **Kalender** und
 **Kalender Ansicht**.
 
+## Aufgabentermine
+
+OpenCalendar kann einen gewöhnlichen ganztägigen Termin als
+**Aufgabentermin** behandeln. Dafür wird keine Aufgaben-API des Anbieters und
+keine zusätzliche OAuth-Berechtigung benötigt. Der Eintrag bleibt technisch ein
+normaler Kalendertermin und verwendet ausschließlich die bereits vorhandenen
+Schreibrechte des gewählten Kalenders.
+
+Beim Erstellen oder Bearbeiten wird im Termindialog **Aufgabentermin** aktiviert.
+Aufgabentermine sind bewusst ganztägig und dauern genau einen Tag. Sie dürfen
+auch wiederkehrend sein. OpenCalendar
+speichert den Status direkt und providerunabhängig am Anfang des Termintitels:
+
+- `[OC:TODO]` kennzeichnet eine offene Aufgabe.
+- `[OC:DONE]` kennzeichnet eine erledigte Aufgabe.
+- `[OC:TODO:FOLLOW]` beziehungsweise `[OC:DONE:FOLLOW]` kennzeichnet eine Aufgabenserie, deren geplante
+  Folgetermine beim täglichen Nachziehen ebenfalls verschoben werden sollen.
+
+In der Kalenderansicht öffnet ein Klick auf den Eintrag die Termindetails. Dort
+kann die Aufgabe mit **Als erledigt markieren** abgeschlossen und mit
+**Aufgabe wieder öffnen** erneut aktiviert werden. Der eigentliche Titel wird im
+Editor ohne technischen Marker angezeigt. In Google Calendar, Outlook, Apple
+Calendar oder anderen Clients bleibt der ASCII-Marker dagegen sichtbar, sodass der
+Status auch außerhalb von OpenCalendar erkennbar ist. Wird der Marker dort
+manuell entfernt oder geändert, übernimmt OpenCalendar diese Änderung bei der
+nächsten Synchronisation. Die früher verwendeten grafischen Kästchen (`☐`, `☑`)
+werden weiterhin erkannt und bei der nächsten Aufgabenänderung automatisch ersetzt.
+
+Eine offene Aufgabe, deren Datum vor dem aktuellen lokalen Tag liegt, wird beim
+lokalen Tageswechsel und zusätzlich bei jeder Kalendersynchronisation auf den
+aktuellen Tag verschoben. Dadurch bleibt eine nicht erledigte Aufgabe täglich
+sichtbar. Erledigte Aufgaben werden nicht mehr verschoben und verbleiben an ihrem
+zuletzt erreichten Datum. Das Verschieben ändert den echten Termin beim
+Kalenderanbieter; es ist keine rein lokale Anzeige.
+
+Bei einer Aufgabenserie entscheidet die Option **Geplante Folgetermine
+mitverschieben**: Ohne sie bleibt der reguläre Serienplan erhalten und nur das
+älteste überfällige Vorkommnis wird auf heute gezogen. Mit ihr verschiebt
+OpenCalendar den ab diesem Vorkommnis verbleibenden Serienteil gemeinsam. Diese
+Option wird nur bei Kalendern angeboten, die „diesen und alle folgenden Termine“
+sicher bearbeiten können.
+
+Die Option gilt auch beim manuellen Ändern des Datums einer Serienaufgabe:
+Mit Häkchen werden der ausgewählte und alle folgenden Termine gemeinsam
+verschoben. Beim ersten Vorkommnis betrifft das die gesamte Serie. Reines
+Erledigen oder Umbenennen ohne Datumsänderung betrifft weiterhin nur den
+ausgewählten Termin. Beim Verschieben des Serienteils werden bestehende
+Ausnahmen innerhalb dieses Teils zurückgesetzt.
+
+Liegt zwischen dem überfälligen und dem heutigen Datum bereits ein weiterer
+geplanter Serientermin, führt OpenCalendar den nachgezogenen Termin ohne
+Mitverschieben als einzelnen Aufgabentermin weiter. Dadurch bleibt der
+ursprüngliche Serienplan unverändert und Microsoft 365 muss kein Vorkommnis über
+ein anderes Serienelement hinweg verschieben – eine von Microsoft technisch
+abgelehnte Operation.
+
+Aufgabentermine stehen deshalb nur in beschreibbaren Kalendern zur Verfügung.
+ICS-/Webcal-Abonnements und lokale ICS-Dateien bleiben schreibgeschützt. Die
+Funktion ist bewusst keine Anbindung an Google Tasks: Es werden weder
+Google-Aufgabenlisten importiert noch bestehende Einträge aus „Meine Aufgaben“
+synchronisiert.
+
+In Version 3.0 bleiben Aufgabenstatus, Terminstatus und Verfügbarkeit voneinander
+unabhängig. Die ausführliche Bedienung einschließlich Kalenderwechsel und
+Kennzeichnung nachgezogener Aufgaben beschreibt die
+[Kalender Ansicht](Kalender%20Ansicht/README.md#aufgabentermine).
+
+## Upgrade von 2.1 auf 3.0
+
+Version 3.0 benötigt Symcon ab 9.1. Vor dem Upgrade ein vollständiges Symcon-Backup
+erstellen. Bestehende Konten, Kalender und Ansichten werden weiterverwendet;
+der Einrichtungsassistent muss nicht erneut ausgeführt werden. Aufgabenmarker
+und gespeicherte Zuordnungen nachgezogener Aufgaben bleiben erhalten.
+
+Nach dem Update die Initialisierung und Synchronisation abwarten. Native Kacheln
+neu laden; gespeicherte IPSView-Seiten bei Bedarf mit **IPSView-HTML neu generieren**
+aktualisieren und neu laden. Anschließend Aufgabenstatus, Serienverhalten,
+Kalenderauswahl und Terminstatus/Verfügbarkeit prüfen. Ein lokaler Testlauf ist
+kein Ersatz für diese Prüfung mit den tatsächlich verbundenen Providern.
+
+Ein Downgrade auf 2.1 ist kein unterstützter Rückbau der zusätzlichen
+3.0-Funktionen. Für einen vollständigen Rückweg das zuvor erstellte Backup
+verwenden; inzwischen beim Anbieter geänderte Termine werden durch ein lokales
+Backup nicht zurückgesetzt.
+
 ## Bekannte Einschränkungen
 
 - **Diesen und alle folgenden Termine** wird bei Microsoft-Onlinebesprechungen und

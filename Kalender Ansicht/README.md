@@ -7,6 +7,11 @@ verwendet werden.
 
 ## Startverhalten und schmale Kacheln
 
+Schlägt **Kalender synchronisieren** fehl, nennt die Meldung den Provider und
+den Kalender, beispielsweise **Microsoft 365 (Arbeit)**. Bei mehreren Fehlern
+werden die betroffenen Kalender aufgelistet. Die genaue technische Ursache
+steht weiterhin in den Status-/Diagnoseinformationen der Kalender-Instanz.
+
 Die native Kachel lädt zunächst die Oberfläche, Einstellungen und Kalenderdaten
 ohne Terminliste. Anschließend fordert sie den aktuell sichtbaren Zeitraum an.
 Ist die HTML-SDK-Verbindung noch nicht bereit, wird der Abruf begrenzt

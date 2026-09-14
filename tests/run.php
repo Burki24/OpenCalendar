@@ -37,6 +37,7 @@ $commands = [
     ['Verify task series calendar transfers', [PHP_BINARY, 'tests/task-series-transfer.php']],
     ['Verify task UI behavior', ['node', 'tests/task-ui.js']],
     ['Verify calendar startup recovery', [PHP_BINARY, 'tests/calendar-startup.php']],
+    ['Verify synchronization failure labels', [PHP_BINARY, 'tests/sync-failure-labels.php']],
     ['Verify native client startup and layout', ['node', 'tests/startup-client.js']],
     ['Verify task synchronization recovery', [PHP_BINARY, 'tests/calendar-recovery.php']],
     ['Verify pending task provider lookup', [PHP_BINARY, 'tests/task-pending-lookup.php']],
@@ -63,6 +64,7 @@ $commands = [
     ['Verify live provider E2E harness contract', [PHP_BINARY, 'tests/live-provider-e2e-contract.php']],
     ['Audit Symcon 9.1 Rust runtime boundaries', [PHP_BINARY, 'tests/symcon-9.1-runtime.php']],
     ['Verify OpenCalendar 2.0 -> 3.0 upgrade contract', [PHP_BINARY, 'tests/upgrade-migration.php']],
+    ['Verify OpenCalendar 2.1 persisted-state migration', [PHP_BINARY, 'tests/upgrade-2.1.php']],
     ['Verify upgrade ApplyChanges and restart contract', [PHP_BINARY, 'tests/upgrade-runtime-restart.php']],
     ['Run CalDAV provider tests', [PHP_BINARY, 'tests/caldav.php']],
     ['Run CalDAV HTTP integration tests', ['bash', 'tests/run-caldav-http.sh']]

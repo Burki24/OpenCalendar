@@ -219,6 +219,7 @@ assertRegisteredState(
     [
         'AnniversaryMetadata'                     => 'String',
         'BirthdayMetadata'                        => 'String',
+        'PendingTaskSeries'                       => 'String',
         'LastSynchronization'                     => 'Integer',
         'LastError'                               => 'String',
         'IncrementalSyncToken'                    => 'String',
@@ -387,4 +388,12 @@ assertUpgradeMigration(
     'Calendar View migration must not delete properties that belong to the OpenCalendar 2.0 persistence contract.'
 );
 
-fwrite(STDOUT, "OpenCalendar 2.0 -> 3.0 static upgrade contract passed.\n");
+assertRegisteredState(
+    registeredState($viewSource, 'Attribute'),
+    [
+        'InitializationRefreshAttempts' => 'Integer'
+    ],
+    'Calendar View 2.1 startup recovery'
+);
+
+fwrite(STDOUT, "OpenCalendar 2.0/2.1 -> 3.0 static upgrade contract passed.\n");

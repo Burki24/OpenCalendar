@@ -501,7 +501,7 @@ class CalendarView extends IPSModuleStrict
      */
     public function SynchronizeCalendars(): bool
     {
-        $success = $this->synchronizeSelectedCalendars();
+        $success = $this->synchronizeSelectedCalendars() === [];
         $this->broadcastStateInvalidation();
 
         return $success;
@@ -2813,9 +2813,12 @@ class CalendarView extends IPSModuleStrict
                 break;
 
             case 'Refresh':
-                $success = $this->synchronizeSelectedCalendars();
+                $failedCalendars = $this->synchronizeSelectedCalendars();
+                $success = $failedCalendars === [];
                 $level = $success ? 'success' : 'error';
-                $message = $success ? 'Calendars synchronized.' : 'Synchronization failed.';
+                $message = $success
+                    ? 'Calendars synchronized.'
+                    : sprintf($this->Translate('Synchronization failed for: %s.'), implode(', ', $failedCalendars));
                 break;
 
             case 'CreateEvent':
@@ -3145,16 +3148,38 @@ class CalendarView extends IPSModuleStrict
         return $this->Translate($fallbackMessage);
     }
 
-    private function synchronizeSelectedCalendars(): bool
+    /** @return list<string> Labels of calendars whose synchronization failed. */
+    private function synchronizeSelectedCalendars(): array
     {
-        $success = true;
-        foreach ($this->loadSelectedCalendars() as $calendar) {
-            if (!IPSKAL_Synchronize($calendar['instanceId'])) {
+        $failures = [];
+        foreach ($this->loadSelectedCalendars(true) as $calendar) {
+            try {
+                $success = IPSKAL_Synchronize($calendar['instanceId']);
+            } catch (Throwable $exception) {
+                $this->SendDebug('CalendarSynchronization', $exception->getMessage(), 0);
                 $success = false;
+            }
+            if (!$success) {
+                $failures[] = $this->calendarSynchronizationLabel($calendar);
             }
         }
 
-        return $success;
+        return $failures;
+    }
+
+    /** @param array<string, mixed> $calendar */
+    private function calendarSynchronizationLabel(array $calendar): string
+    {
+        $provider = match ((string) ($calendar['provider'] ?? '')) {
+            'apple'     => 'Apple Calendar',
+            'caldav'    => 'CalDAV',
+            'google'    => 'Google Calendar',
+            'microsoft' => 'Microsoft 365',
+            'ics'       => 'ICS/WebCal',
+            default     => $this->Translate('Unknown provider')
+        };
+        $name = trim((string) ($calendar['name'] ?? ''));
+        return $name === '' ? $provider : sprintf('%s (%s)', $provider, $name);
     }
 
     private function ipsViewHookAddress(): string
