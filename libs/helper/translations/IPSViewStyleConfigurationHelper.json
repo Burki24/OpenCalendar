@@ -1,0 +1,88 @@
+{
+    "translations": {
+        "section.native_colors": {
+            "en": "Advanced IPSView colors",
+            "de": "Erweiterte IPSView-Farben"
+        },
+        "description.native_overrides": {
+            "en": "Optional native overrides are derived from the base colors above. Enable only the individual IPSView fields that should use a different color.",
+            "de": "Die nativen Detailfarben werden aus den Basisfarben oben abgeleitet. Aktiviere nur die einzelnen IPSView-Felder, die abweichende Farben verwenden sollen."
+        },
+        "column.override": {
+            "en": "Override",
+            "de": "Abweichend"
+        },
+        "column.field": {
+            "en": "IPSView field",
+            "de": "IPSView-Feld"
+        },
+        "column.derived_from": {
+            "en": "Derived from",
+            "de": "Abgeleitet von"
+        },
+        "column.color": {
+            "en": "Color",
+            "de": "Farbe"
+        },
+        "family.base": {
+            "en": "Base colors",
+            "de": "Basisfarben"
+        },
+        "family.association": {
+            "en": "Associations",
+            "de": "Assoziationen"
+        },
+        "family.tabs": {
+            "en": "Tabs",
+            "de": "Tabs"
+        },
+        "family.switch": {
+            "en": "Switches",
+            "de": "Schalter"
+        },
+        "family.slider": {
+            "en": "Sliders",
+            "de": "Slider"
+        },
+        "family.progressbar": {
+            "en": "Progress bars",
+            "de": "Fortschrittsanzeigen"
+        },
+        "family.circle": {
+            "en": "Circle controls",
+            "de": "Kreis-Steuerelemente"
+        },
+        "family.flow": {
+            "en": "Flow controls",
+            "de": "Flow-Steuerelemente"
+        },
+        "family.gauge": {
+            "en": "Gauges",
+            "de": "Instrumente"
+        },
+        "family.shadowGrid": {
+            "en": "Shadows and grid",
+            "de": "Schatten und Raster"
+        },
+        "family.dialog": {
+            "en": "Dialogs",
+            "de": "Dialoge"
+        },
+        "family.chart": {
+            "en": "Charts",
+            "de": "Diagramme"
+        },
+        "family.schedule": {
+            "en": "Schedules",
+            "de": "Zeitpläne"
+        },
+        "family.event": {
+            "en": "Events",
+            "de": "Ereignisse"
+        },
+        "family.calendar": {
+            "en": "Calendar",
+            "de": "Kalender"
+        }
+    }
+}

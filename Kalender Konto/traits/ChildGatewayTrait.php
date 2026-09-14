@@ -62,6 +62,7 @@ trait KalenderKontoChildGatewayTrait
                 ],
                 'GetEventForEdit'        => $this->getEventForEditForChild($request),
                 'GetEventAfterWrite'     => $this->getEventAfterWriteForChild($request),
+                'CheckPendingTask'       => $this->checkPendingTaskForChild($request),
                 'CheckRecurringSeries'   => $this->checkRecurringSeriesForChild($request),
                 'GetRecurringSeries'     => $this->getRecurringSeriesForChild($request),
                 'GetRecurringFollowing'  => $this->getRecurringFollowingForChild($request),
@@ -406,6 +407,37 @@ trait KalenderKontoChildGatewayTrait
         }
 
         throw new RuntimeException('Direct event lookup is not supported by this calendar provider.');
+    }
+
+    /**
+     * Checks a detached task by identity, independently of the calendar view window.
+     *
+     * @param array<string, mixed> $request
+     * @return array{known: bool, event: array<string, mixed>|null}
+     */
+    private function checkPendingTaskForChild(array $request): array
+    {
+        $calendar = $this->resolveCalendar((string) ($request['CalendarID'] ?? ''));
+        $provider = $this->createProvider();
+        try {
+            $event = $provider instanceof CalDAVProvider
+                ? $provider->getSingleEventByResource(
+                    $this->calendarReference($calendar),
+                    (string) ($request['ResourceURL'] ?? ''),
+                    (string) ($request['UID'] ?? '')
+                )
+                : $this->directEventForEditForChild($calendar, $provider, $request);
+        } catch (Throwable $exception) {
+            $httpStatus = property_exists($exception, 'httpStatus') ? (int) $exception->httpStatus : 0;
+            if (in_array($httpStatus, [404, 410], true)) {
+                return ['known' => true, 'event' => null];
+            }
+            throw $exception;
+        }
+
+        // An unknown or ambiguous identity is not proof of deletion.
+        // Only an explicit 404/410 confirms that the resource is gone.
+        return ['known' => $event !== null, 'event' => $event];
     }
 
     /**

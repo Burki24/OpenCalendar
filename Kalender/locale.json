@@ -40,6 +40,8 @@
             "The synchronization schedule is invalid.": "Der Aktualisierungsplan ist ungültig.",
             "The calendar ID is missing.": "Die Kalender-ID fehlt.",
             "The event changes are invalid.": "Die Terminänderungen sind ungültig.",
+            "The task title is missing.": "Der Titel des Aufgabentermins fehlt.",
+            "Task appointments must be non-recurring one-day all-day events.": "Aufgabentermine müssen eintägige, ganztägige Einzeltermine sein.",
             "No event changes were supplied.": "Es wurden keine Terminänderungen übergeben.",
             "The calendar account did not confirm the deletion.": "Das Kalenderkonto hat das Löschen nicht bestätigt.",
             "The calendar instance is still initializing.": "Die Kalenderinstanz wird noch initialisiert.",

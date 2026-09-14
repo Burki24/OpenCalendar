@@ -130,6 +130,7 @@ $frameworkPublicMethods = [
     'Migrate',
     'ApplyChanges',
     'Initialize',
+    'RefreshInitialization',
     'MessageSink',
     'GetVisualizationTile',
     'RequestAction'
@@ -394,6 +395,15 @@ assertCalendarViewApi(
         && str_contains($moduleSource, "3       => 'microsoft'")
         && str_contains($moduleSource, "4       => 'ics'"),
     'Calendar View must expose selected calendar capabilities and opt-in provider, synchronization, status, and error metadata.'
+);
+
+assertCalendarViewApi(
+    str_contains($moduleSource, '$failedCalendars = $this->synchronizeSelectedCalendars();')
+        && str_contains($moduleSource, 'Synchronization failed for: %s.')
+        && str_contains($moduleSource, 'private function calendarSynchronizationLabel(array $calendar): string')
+        && str_contains($moduleSource, "'google'    => 'Google Calendar'")
+        && str_contains($moduleSource, "'microsoft' => 'Microsoft 365'"),
+    'Calendar View refresh errors must identify the failed provider and calendar.'
 );
 
 require_once __DIR__ . '/stubs/ModuleStrictStubs.php';
@@ -845,7 +855,7 @@ $validateVisualizationActionRangeMethod->invoke(
     [
         '_viewRange' => [
             'start' => $rangeStartTimestamp,
-            'end'   => $rangeStartTimestamp + (370 * 86400)
+            'end'   => $rangeStartTimestamp + (380 * 86400)
         ]
     ]
 );
@@ -871,7 +881,7 @@ assertCalendarViewApiThrows(
         [
             '_viewRange' => [
                 'start' => $rangeStartTimestamp,
-                'end'   => $rangeStartTimestamp + (370 * 86400) + 1
+                'end'   => $rangeStartTimestamp + (380 * 86400) + 1
             ]
         ]
     ),

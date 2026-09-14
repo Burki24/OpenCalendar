@@ -263,6 +263,42 @@
                     "items": [
                         {
                             "type": "Label",
+                            "caption": "Adjacent month days",
+                            "width": "190px"
+                        },
+                        {
+                            "type": "Label",
+                            "caption": "—",
+                            "width": "85px"
+                        },
+                        {
+                            "type": "Label",
+                            "caption": "—",
+                            "width": "85px"
+                        },
+                        {
+                            "type": "Label",
+                            "caption": "—",
+                            "width": "85px"
+                        },
+                        {
+                            "type": "Label",
+                            "caption": "—",
+                            "width": "85px"
+                        },
+                        {
+                            "type": "CheckBox",
+                            "name": "ShowMonthOverflowDays",
+                            "caption": "",
+                            "width": "85px"
+                        }
+                    ]
+                },
+                {
+                    "type": "RowLayout",
+                    "items": [
+                        {
+                            "type": "Label",
                             "caption": "Day of year",
                             "width": "190px"
                         },

@@ -13,6 +13,7 @@ use Throwable;
 require_once __DIR__ . '/CalendarProviderInterface.php';
 require_once __DIR__ . '/CalendarHttpClient.php';
 require_once __DIR__ . '/ICalendarCodec.php';
+require_once __DIR__ . '/ICalendarRecurrence.php';
 
 final class ICalendarFeedProviderException extends RuntimeException
 {
@@ -28,6 +29,9 @@ final class ICalendarFeedProviderException extends RuntimeException
 final class ICalendarFeedProvider implements CalendarProviderInterface
 {
     private const MAX_FEED_SIZE = 16 * 1024 * 1024;
+    private const MAX_PARSED_CACHE_DECODED_SIZE = 32 * 1024 * 1024;
+    private const MAX_PARSED_CACHE_SIZE = 4 * 1024 * 1024;
+    private const PARSED_CACHE_VERSION = 1;
 
     private string $feedUrl;
 
@@ -63,11 +67,7 @@ final class ICalendarFeedProvider implements CalendarProviderInterface
         return [
             'success'       => true,
             'calendarCount' => 1,
-            'eventCount'    => count(ICalendarCodec::parseEvents(
-                $feed['body'],
-                $this->eventResourceReference(),
-                $feed['etag']
-            )),
+            'eventCount'    => count($this->parsedEvents($feed)),
             'message'       => 'Connection successful.'
         ];
     }
@@ -116,13 +116,7 @@ final class ICalendarFeedProvider implements CalendarProviderInterface
         }
 
         $feed = $this->fetchFeed();
-        $events = ICalendarCodec::parseEventsInRange(
-            $feed['body'],
-            $this->eventResourceReference(),
-            $feed['etag'],
-            $start,
-            $end
-        );
+        $events = ICalendarRecurrence::expand($this->parsedEvents($feed), $start, $end);
 
         usort(
             $events,
@@ -248,9 +242,17 @@ final class ICalendarFeedProvider implements CalendarProviderInterface
         if ($previousHash === '' && $this->hasValidCachedBody()) {
             $previousHash = hash('sha256', (string) $this->cacheState['body']);
         }
-        $lastChange = $previousHash !== '' && hash_equals($previousHash, $contentHash)
+        $contentUnchanged = $previousHash !== '' && hash_equals($previousHash, $contentHash);
+        $lastChange = $contentUnchanged
             ? (int) ($this->cacheState['lastChange'] ?? $now)
             : $now;
+
+        // Some feed servers (public webcal shares in particular) never return
+        // 304 even when the content has not changed. Preserve a valid compact
+        // parse cache for byte-identical 200 responses instead of discarding it.
+        $parsedCacheState = $contentUnchanged
+            ? $this->reusableParsedCacheState($contentHash)
+            : [];
 
         $this->cacheState = [
             'body'         => $response->body,
@@ -263,12 +265,195 @@ final class ICalendarFeedProvider implements CalendarProviderInterface
             'lastError'    => '',
             'stale'        => false
         ];
+        foreach ($parsedCacheState as $key => $value) {
+            $this->cacheState[$key] = $value;
+        }
         $this->persistCache();
 
         return [
             'body' => $response->body,
             'etag' => (string) $this->cacheState['etag']
         ];
+    }
+
+    /**
+     * Parses the feed body into normalized events, reusing a compressed
+     * persistent parse result when the feed content has not changed.
+     *
+     * Recurrence expansion deliberately stays outside this cache because the
+     * requested date range changes independently from the feed content.
+     *
+     * @param array{body: string, etag: string} $feed
+     * @return list<array<string, mixed>>
+     */
+    private function parsedEvents(array $feed): array
+    {
+        $contentHash = hash('sha256', $feed['body']);
+        $cachedEvents = $this->cachedParsedEvents($contentHash);
+        if ($cachedEvents !== null) {
+            return $this->withCurrentFeedEtag($cachedEvents, $feed['etag']);
+        }
+
+        $events = ICalendarCodec::parseEvents($feed['body'], $this->eventResourceReference(), $feed['etag']);
+        $this->storeParsedEvents($contentHash, $events);
+
+        return $events;
+    }
+
+    /**
+     * @return list<array<string, mixed>>|null
+     */
+    private function cachedParsedEvents(string $contentHash): ?array
+    {
+        if ((int) ($this->cacheState['parsedCacheVersion'] ?? 0) !== self::PARSED_CACHE_VERSION) {
+            return null;
+        }
+
+        $cachedHash = trim((string) ($this->cacheState['parsedContentHash'] ?? ''));
+        if ($cachedHash === '' || !hash_equals($cachedHash, $contentHash)) {
+            return null;
+        }
+
+        $encoding = (string) ($this->cacheState['parsedEncoding'] ?? '');
+        $encoded = (string) ($this->cacheState['parsedData'] ?? '');
+        if ($encoded === '' || strlen($encoded) > self::MAX_PARSED_CACHE_SIZE) {
+            return null;
+        }
+        $payload = base64_decode($encoded, true);
+        if (!is_string($payload)) {
+            return null;
+        }
+
+        if ($encoding === 'gzip-base64') {
+            if (!function_exists('gzdecode')) {
+                return null;
+            }
+            $decoded = gzdecode($payload, self::MAX_PARSED_CACHE_DECODED_SIZE);
+            if (!is_string($decoded)) {
+                return null;
+            }
+            $payload = $decoded;
+        } elseif ($encoding !== 'base64') {
+            return null;
+        }
+
+        try {
+            $events = json_decode($payload, true, 512, JSON_THROW_ON_ERROR);
+        } catch (Throwable) {
+            return null;
+        }
+        if (!is_array($events) || !array_is_list($events)) {
+            return null;
+        }
+        foreach ($events as $event) {
+            if (!is_array($event)) {
+                return null;
+            }
+        }
+
+        return $events;
+    }
+
+    /**
+     * @param list<array<string, mixed>> $events
+     */
+    private function storeParsedEvents(string $contentHash, array $events): void
+    {
+        try {
+            $payload = json_encode(
+                $events,
+                JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR
+            );
+        } catch (Throwable) {
+            $this->clearParsedCache();
+            $this->persistCache();
+            return;
+        }
+
+        if (strlen($payload) > self::MAX_PARSED_CACHE_DECODED_SIZE) {
+            $this->clearParsedCache();
+            $this->persistCache();
+            return;
+        }
+
+        $encoding = 'base64';
+        if (function_exists('gzencode')) {
+            $compressed = gzencode($payload, 6);
+            if (is_string($compressed) && strlen($compressed) < strlen($payload)) {
+                $encoding = 'gzip-base64';
+                $payload = $compressed;
+            }
+        }
+
+        $encoded = base64_encode($payload);
+        if (strlen($encoded) > self::MAX_PARSED_CACHE_SIZE) {
+            $this->clearParsedCache();
+            $this->persistCache();
+            return;
+        }
+
+        $this->cacheState['parsedCacheVersion'] = self::PARSED_CACHE_VERSION;
+        $this->cacheState['parsedContentHash'] = $contentHash;
+        $this->cacheState['parsedEncoding'] = $encoding;
+        $this->cacheState['parsedData'] = $encoded;
+        $this->persistCache();
+    }
+
+    /**
+     * @return array{}|array{
+     *     parsedCacheVersion: int,
+     *     parsedContentHash: string,
+     *     parsedEncoding: string,
+     *     parsedData: string
+     * }
+     */
+    private function reusableParsedCacheState(string $contentHash): array
+    {
+        if ((int) ($this->cacheState['parsedCacheVersion'] ?? 0) !== self::PARSED_CACHE_VERSION) {
+            return [];
+        }
+
+        $cachedHash = trim((string) ($this->cacheState['parsedContentHash'] ?? ''));
+        $encoding = (string) ($this->cacheState['parsedEncoding'] ?? '');
+        $encoded = (string) ($this->cacheState['parsedData'] ?? '');
+        if ($cachedHash === ''
+            || !hash_equals($cachedHash, $contentHash)
+            || !in_array($encoding, ['base64', 'gzip-base64'], true)
+            || $encoded === ''
+            || strlen($encoded) > self::MAX_PARSED_CACHE_SIZE) {
+            return [];
+        }
+
+        return [
+            'parsedCacheVersion' => self::PARSED_CACHE_VERSION,
+            'parsedContentHash'  => $cachedHash,
+            'parsedEncoding'     => $encoding,
+            'parsedData'         => $encoded
+        ];
+    }
+
+    /**
+     * @param list<array<string, mixed>> $events
+     * @return list<array<string, mixed>>
+     */
+    private function withCurrentFeedEtag(array $events, string $etag): array
+    {
+        foreach ($events as &$event) {
+            $event['etag'] = $etag;
+        }
+        unset($event);
+
+        return $events;
+    }
+
+    private function clearParsedCache(): void
+    {
+        unset(
+            $this->cacheState['parsedCacheVersion'],
+            $this->cacheState['parsedContentHash'],
+            $this->cacheState['parsedEncoding'],
+            $this->cacheState['parsedData']
+        );
     }
 
     private function validateFeedBody(string $body): void

@@ -22,6 +22,9 @@
         "IPSViewHTMLPageHelper": {
             "target": "libs/helper/IPSViewHTMLPageHelper.php"
         },
+        "IPSViewStyleConfigurationHelper": {
+            "target": "libs/helper/IPSViewStyleConfigurationHelper.php"
+        },
         "IPSViewStyleHelper": {
             "target": "libs/helper/IPSViewStyleHelper.php"
         },
@@ -30,6 +33,9 @@
         },
         "PersistentJsonCacheHelper": {
             "target": "libs/helper/PersistentJsonCacheHelper.php"
+        },
+        "ResponsiveVisualizationHelper": {
+            "target": "libs/helper/ResponsiveVisualizationHelper.php"
         },
         "SymconOAuthHelper": {
             "target": "libs/helper/SymconOAuthHelper.php"

@@ -2352,6 +2352,30 @@ assertTrueValue(
     'A first-occurrence following delete must target the series master ID.'
 );
 
+foreach (['2026-10-17', '2026-10-22'] as $movedFirstDate) {
+    $firstMoveClient = new FakeHttpClient([
+        response(200, $msFollowingParent),
+        response(200, $msFirstFollowingTarget),
+        response(200, ['id' => 'series-master'])
+    ]);
+    $firstMoveProvider = new MicrosoftCalendarProvider($firstMoveClient, 'test-token');
+    $firstMoveProvider->updateEvent('AQMk-primary', 'instance-first', '', '', [
+        'summary'    => '[OC:TODO:FOLLOW] Task',
+        'allDay'     => true, 'start' => $movedFirstDate,
+        'end'        => (new DateTimeImmutable($movedFirstDate))->modify('+1 day')->format('Y-m-d'),
+        'recurrence' => ['frequency' => 'DAILY', 'interval' => 10, 'endMode' => 'count', 'count' => 8]
+    ], $msFirstFollowingIdentity);
+    $write = $firstMoveClient->requests[2];
+    $body = json_decode($write['body'], true, 512, JSON_THROW_ON_ERROR);
+    assertTrueValue(
+        $write['method'] === 'PATCH' && str_ends_with($write['url'], '/events/series-master')
+            && $body['recurrence']['range']['startDate'] === $movedFirstDate
+            && $body['recurrence']['range']['numberOfOccurrences'] === 8
+            && $body['recurrence']['pattern']['interval'] === 10,
+        'Moving the first Microsoft task occurrence in either direction must update the master and retain future repetitions.'
+    );
+}
+
 $msOnlineMeetingClient = new FakeHttpClient([
     response(200, ['isOnlineMeeting' => true])
 ]);
@@ -3663,6 +3687,7 @@ assertTrueValue(
         && str_contains($calendarModuleSource, 'RegisterMessage(0, IPS_KERNELSTARTED)')
         && str_contains($calendarModuleSource, "RegisterTimer('InitializationTimer'")
         && str_contains($calendarModuleSource, "RegisterAttributeBoolean('RuntimeReady', false)")
+        && str_contains($calendarModuleSource, "'runtimeReady'                 => \$this->isRuntimeReady()")
         && str_contains($calendarModuleSource, 'IPS_GetKernelRunlevel() !== KR_READY'),
     'The calendar module must defer parent communication until the kernel is ready.'
 );
@@ -3758,9 +3783,13 @@ assertTrueValue(
     is_string($viewModuleSource)
         && str_contains($viewModuleSource, 'RegisterMessage(0, IPS_KERNELSTARTED)')
         && str_contains($viewModuleSource, "RegisterTimer('InitializationTimer'")
+        && str_contains($viewModuleSource, "RegisterTimer('InitializationRefreshTimer'")
         && str_contains($viewModuleSource, "RegisterAttributeBoolean('RuntimeReady', false)")
+        && str_contains($viewModuleSource, 'public function RefreshInitialization(): bool')
+        && str_contains($viewModuleSource, 'private function hasPendingSelectedCalendarInitialization(): bool')
+        && str_contains($viewModuleSource, 'MAX_INITIALIZATION_REFRESH_ATTEMPTS')
         && str_contains($viewModuleSource, 'IPS_GetKernelRunlevel() !== KR_READY'),
-    'The calendar view must defer cross-instance access until the kernel is ready.'
+    'The calendar view must defer cross-instance access until selected calendars are ready after a service restart.'
 );
 assertTrueValue(
     is_string($viewModuleSource)
@@ -3785,6 +3814,15 @@ assertTrueValue(
         && !str_contains($viewModuleSource, "RegisterPropertyBoolean('EnableIPSView'")
         && !str_contains($viewModuleSource, '$this->MaintainVariable('),
     'The calendar view must manage and render its optional IPSView output through IPSViewHTMLPageHelper.'
+);
+assertTrueValue(
+    is_string($viewModuleSource)
+        && is_string($viewStyleSource)
+        && str_contains($viewStyleSource, '#calendar-app')
+        && str_contains($viewStyleSource, 'container-name: symcon-visualization;')
+        && str_contains($viewStyleSource, 'container-type: inline-size;')
+        && str_contains($viewStyleSource, '@container symcon-visualization'),
+    'The native calendar tile must use the shared container-query responsive visualization contract.'
 );
 assertTrueValue(
     is_string($viewModuleSource)
@@ -3888,9 +3926,9 @@ assertTrueValue(
 );
 assertTrueValue(
     is_string($viewModuleSource)
-        && str_contains($viewModuleSource, 'use Burki24\\SymconModuleHelper\\IPSViewStyleHelper;')
-        && str_contains($viewModuleSource, "require_once __DIR__ . '/../libs/helper/IPSViewStyleHelper.php';")
-        && str_contains($viewModuleSource, 'use IPSViewStyleHelper;')
+        && str_contains($viewModuleSource, 'use Burki24\\SymconModuleHelper\\IPSViewStyleConfigurationHelper;')
+        && str_contains($viewModuleSource, "require_once __DIR__ . '/../libs/helper/IPSViewStyleConfigurationHelper.php';")
+        && str_contains($viewModuleSource, 'use IPSViewStyleConfigurationHelper;')
         && str_contains($viewModuleSource, '$this->RegisterIPSViewStyleProperties();')
         && str_contains($viewModuleSource, '$this->InsertIPSViewStyleFormItems(')
         && str_contains($viewModuleSource, '$this->IPSViewStyleRootFontSize()')
@@ -3910,7 +3948,7 @@ assertTrueValue(
         && str_contains($viewStyleSource, '--cal-accent: var(--ipsview-role-accent);')
         && str_contains($viewStyleSource, '--cal-danger: var(--ipsview-role-critical);')
         && str_contains($viewStyleSource, '--cal-popup-shadow: var(--ipsview-role-popup-shadow);'),
-    'The calendar view must consume IPSViewStyleHelper directly without replacing calendar event colors.'
+    'The calendar view must consume IPSViewStyleConfigurationHelper without replacing calendar event colors.'
 );
 assertTrueValue(
     is_string($viewFormSource)

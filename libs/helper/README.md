@@ -13,11 +13,17 @@ The files in this directory are vendored from
 | `IPSViewHTMLPageHelper.php` | 1.3.0 | `8fc9692ccc6143e4bdff1c262dbe138f7507a9c8816ac0326de0bc5c578a4236` |
 | `HelperTranslationHelper.php` | 1.0.0 | `d3deee581eca9f8eb11e9adce060170227a2dc836ee898bd134f93d27604f639` |
 | `VisualizationAssetHelper.php` | 1.0.0 | `1693b2399bcf95d270a6d9a01df6534caad906497bd4ba9489916a951abaffcc` |
-| `IPSViewStyleHelper.php` | 1.4.3 | `d60cf4ba7f4e93fc71642b858658af127e770250f85ffcb364d88c80a13944aa` |
+| `IPSViewStyleConfigurationHelper.php` | 1.0.5 | `b422a23edfa3fc848fb4dd5d92b79c3c71673fd397e90d5e22bf8e2fe82c7c53` |
+| `IPSViewStylePresetHelper.php` | 1.0.1 | `770bfc48051a908b55e931f6d4eba6e8984ba73b4aa78cd987470006c7b3a9e7` |
+| `IPSViewControlThemeHelper.php` | 1.0.3 | `7be5f3300ebf0562f818b050a53cfa67d7631a30e3d62f1ab41525501604fac6` |
+| `IPSViewFontCatalogHelper.php` | 1.0.0 | `8f352af086f4ac98b57e5768d15f538301c54cb41e5f8d1d41c62330592bc660` |
+| `IPSViewStyleProfileHelper.php` | 1.0.1 | `eca6aa486d60b0db11cc7db0b486dc5b1723c49e26c23fe72465a33cf73f453d` |
+| `IPSViewStyleHelper.php` | 1.6.7 | `67ff6608658f2a5c61d56ba4c74673f92af988babf705fe598f0ab4e313288ad` |
 | `ParentConnectionHelper.php` | 1.0.0 | `d4f01dee721aa32e64410979ca15b2795a0fcc59c0232c0ad69e4702d9ff573c` |
 | `PersistentJsonCacheHelper.php` | 1.0.0 | `adbc7680abe814dc6c15a9cda1312cc30023073595052006662716bc0d65f2a4` |
+| `ResponsiveVisualizationHelper.php` | 1.0.0 | `0cebd0f08e6416a6d7d4d5fdbb19bf96d457d3e2d51fcf2a1d3e6adf5e967451` |
 | `SymconOAuthHelper.php` | 1.0.0 | `d9053bfd083a581b96f8526cbb05e8568a6ad24a81cafa3e9b05108343bf2a65` |
 | `VariableHelper.php` | 1.2.0 | `43b205a2ca87553a3a59a9e94f1c5c72fc4643cebedb080a9706139d98b30624` |
-| `VisualizationThemeHelper.php` | 1.0.0 | `81ca4cdeac42ac97cecdb73305e9f68597a6037b1d50b843df11900c96c48dbf` |
+| `VisualizationThemeHelper.php` | 1.1.0 | `29fe61a7eccafeb8b2beb77fe3f7a4896f43b3eaace9ebe428a4fc8250fd9088` |
 
 The copies are shipped with the library deliberately; there is no external runtime dependency.

@@ -33,6 +33,8 @@ beliebig verschoben oder vom Benutzer umbenannt werden.
 - Auflösen wiederkehrender Termine für die lokale Anzeige
 - lokaler JSON-Cache und zyklische Synchronisation
 - Erstellen neuer Termine sowie neuer Google-, Microsoft-, Apple-iCloud- und CalDAV-Serientermine
+- providerneutrale, eintägige ganztägige Aufgabentermine und Aufgabenserien mit
+  offenem oder erledigtem Status und automatischer Fortschreibung überfälliger Aufgaben
 - Ändern und Löschen einzelner Termine sowie einzelner Google-, Microsoft-, Apple-iCloud- und CalDAV-Serienvorkommnisse
 - Bearbeiten einer vollständigen Google-, Microsoft-, Apple-iCloud- oder CalDAV-Terminserie
 - Bearbeiten oder Löschen eines Google-, Microsoft-, Apple-iCloud- oder CalDAV-Serienvorkommnisses **und aller folgenden Termine** durch sicheres Teilen bzw. Kürzen der Serie
@@ -72,7 +74,8 @@ Letzte Synchronisation | Integer | Unix-Zeitpunkt der letzten erfolgreichen Abfr
 
 **Termine heute** berücksichtigt auch ganztägige und mehrtägige Termine. Der
 Wert wird bei jeder Synchronisation und zusätzlich beim lokalen Tageswechsel
-neu berechnet.
+neu berechnet. Beim Tageswechsel werden außerdem offene überfällige
+Aufgabentermine eines beschreibbaren Kalenders auf den neuen Tag verschoben.
 
 Die eigentlichen Termindaten werden bewusst nicht in einer Statusvariable
 gespiegelt, sondern nur im internen Modulcache gehalten. Konto, Kalender und
@@ -80,13 +83,14 @@ Kalenderansicht übertragen große Terminmengen automatisch in begrenzten Seiten
 Dadurch wird weder bei der Synchronisation noch beim Aufbau der Ansicht eine
 einzelne JSON-Antwort mit sämtlichen Terminen benötigt.
 
-Ein Termin enthält unter anderem `id`, `uid`, `resourceUrl`, `etag`, `summary`, `description`, `location`, `start`, `end`, `startTimestamp`, `endTimestamp`, `allDay`, `status`, `recurrenceRule` und `recurrenceId`. Wurde der Titel durch ein ausgewähltes iCalendar-Übersetzungsprofil angepasst, enthält `originalSummary` zusätzlich den unveränderten Originaltitel. Als Jahresereignis markierte Termine erhalten zusätzlich `anniversaryType`, `anniversaryDate`, `years` und `displaySummary`. Unterstützt werden `birthday`, `anniversary`, `wedding` und `death`. Für Geburtstage bleiben zusätzlich die kompatiblen Felder `birthday`, `birthDate` und `age` erhalten. Das Ausgangsdatum wird lokal in OpenCalendar gespeichert; der eigentliche Titel beim Kalenderanbieter bleibt unverändert.
+Ein Termin enthält unter anderem `id`, `uid`, `resourceUrl`, `etag`, `summary`, `description`, `location`, `start`, `end`, `startTimestamp`, `endTimestamp`, `allDay`, `status`, `recurrenceRule` und `recurrenceId`. Wurde der Titel durch ein ausgewähltes iCalendar-Übersetzungsprofil angepasst, enthält `originalSummary` zusätzlich den unveränderten Originaltitel. Aufgabentermine enthalten außerdem `task`, `taskCompleted`, `taskStatus` (`open` oder `completed`), `taskFollowPlanned` und einen von der Statusmarkierung bereinigten `displaySummary`. Als Jahresereignis markierte Termine erhalten zusätzlich `anniversaryType`, `anniversaryDate`, `years` und `displaySummary`. Unterstützt werden `birthday`, `anniversary`, `wedding` und `death`. Für Geburtstage bleiben zusätzlich die kompatiblen Felder `birthday`, `birthDate` und `age` erhalten. Das Ausgangsdatum wird lokal in OpenCalendar gespeichert; der eigentliche Titel beim Kalenderanbieter bleibt unverändert.
 
 ## PHP-Befehlsreferenz
 
 ```php
 bool IPSKAL_Synchronize(int $InstanzID);
 string IPSKAL_GetEvents(int $InstanzID);
+string IPSKAL_GetEventForEdit(int $InstanzID, string $EventJSON);
 string IPSKAL_GetAnniversaryList(int $InstanzID, int $Days = 0, string $Type = '');
 string IPSKAL_GetBirthdayList(int $InstanzID, int $Days = 0);
 bool IPSKAL_SetAnniversary(int $InstanzID, string $EventJSON, string $Type, string $Date);
@@ -107,6 +111,15 @@ erhalten. Eigene Integrationen mit potenziell vielen Terminen sollten einen
 Transfer beginnen, die Seiten von `0` bis `PageCount - 1` abrufen und den
 Transfer anschließend auch im Fehlerfall beenden. `StartTimestamp` ist inklusiv,
 `EndTimestamp` exklusiv.
+
+`IPSKAL_GetEventForEdit()` lädt vor dem Bearbeiten den aktuellen Providerstand
+eines Termins mit seinen schreibrelevanten Identitätsfeldern und dem ETag.
+`EventJSON` enthält den aus `GetEvents()` erhaltenen Termin einschließlich
+`startTimestamp`, `endTimestamp` und seiner Provideridentität. Die Rückgabe ist
+der normalisierte Termin als JSON, kein `success`-Wrapper. Bei einem fehlgeschlagenen
+Providerabruf kann ausschließlich für einen bereits lokal bekannten Aufgabentermin
+der passende Cacheeintrag zurückgegeben werden. Andernfalls wird eine Ausnahme
+ausgelöst und der Fehler im Kalenderstatus gespeichert.
 
 `IPSKAL_GetAnniversaryList()` liefert die in dieser Kalenderinstanz von OpenCalendar verwalteten Jahresereignisse nach dem nächsten Vorkommnis sortiert. `Days = 0` liefert alle Einträge; jeder positive Wert begrenzt die Ausgabe auf die frei wählbare Anzahl der nächsten Kalendertage. Der optionale Filter `Type` akzeptiert `birthday`, `anniversary`, `wedding` oder `death`; ein leerer Wert liefert alle Typen. Die Datensätze enthalten `name`, `anniversaryType`, `anniversaryDate`, `nextDate`, `years`, `displayName` und `daysUntil`. Für Geburtstage werden zusätzlich `birthDate`, `nextBirthday` und `age` geliefert. `IPSKAL_GetBirthdayList()` bleibt als kompatibler Spezialfall erhalten und entspricht dem Filter `birthday`.
 
@@ -144,6 +157,90 @@ $result = IPSKAL_CreateEvent(12345, json_encode([
     'allDay'  => true
 ]));
 ```
+
+### Aufgabentermin erstellen und erledigen
+
+Ein Aufgabentermin ist ein eintägiger, ganztägiger Kalendertermin. Er darf
+wiederkehrend sein.
+`task = true` setzt beim Anbieter automatisch den offenen Marker `[OC:TODO]` vor den
+Titel. `taskCompleted = true` verwendet stattdessen `[OC:DONE]`. Die Steuerfelder werden
+nicht als eigene Providerdaten übertragen; der Titelmarker ist die dauerhafte und
+anbieterübergreifende Kennzeichnung.
+
+```php
+$result = IPSKAL_CreateEvent(12345, json_encode([
+    'summary'       => 'Versicherung prüfen',
+    'task'          => true,
+    'taskCompleted' => false,
+    'allDay'        => true,
+    'start'         => '2026-09-10',
+    'end'           => '2026-09-11'
+]));
+```
+
+Zum Erledigen wird die Identität aus `IPSKAL_GetEvents()` zusammen mit der
+Statusänderung übergeben. Eine erneute Änderung auf `false` öffnet die Aufgabe
+wieder:
+
+```php
+$result = IPSKAL_UpdateEvent(12345, json_encode([
+    'uid'         => 'event-uid@example',
+    'resourceUrl' => 'https://server.example/calendar/task.ics',
+    'etag'        => '"123456"',
+    'changes'     => [
+        'task'          => true,
+        'taskCompleted' => true
+    ]
+]));
+```
+
+Offene Aufgabentermine mit einem Datum vor heute werden beim lokalen
+Tageswechsel und bei jeder Synchronisation auf heute verschoben. Erledigte
+Aufgaben bleiben unverändert. Bei einer Aufgabenserie verschiebt
+`taskFollowPlanned = true` den ab dem überfälligen Termin verbleibenden
+Serienteil; ohne diese Option bleibt der ursprüngliche Serienplan erhalten und
+nur das älteste überfällige Vorkommnis wird nachgezogen. Das Mitverschieben
+erfordert eine Kalenderanbieter-Unterstützung für „diesen und alle folgenden
+Termine“. Da dabei der echte Kalendertermin aktualisiert wird, muss der Kalender
+beschreibbar sein. Zeitgebundene Aufgabentermine werden abgewiesen. Liegt ohne
+Mitverschieben bereits ein weiteres geplantes Vorkommnis zwischen dem alten und
+dem neuen Datum, wird die offene Aufgabe als Einzeltermin weitergeführt. So
+bleibt der Serienplan erhalten und Microsoft 365 kann die Synchronisation nicht
+wegen eines überlappenden Serienelements ablehnen.
+
+Bei `UpdateEvent` gilt `taskFollowPlanned` ebenfalls für eine Änderung des
+Startdatums einer Serienaufgabe: Der ausgewählte und alle folgenden Termine
+werden mit neu verankertem Serienplan verschoben. Beim ersten Vorkommnis ist
+das die ganze Serie. Statusänderungen ohne Datumsänderung bleiben auf das
+einzelne Vorkommnis begrenzt. Bestehende Ausnahmen im verschobenen Serienteil
+werden zurückgesetzt.
+
+Die Zuordnung eines nachgezogenen Einzeltermins zu seiner Ursprungsserie bleibt
+auch außerhalb des eingestellten Synchronisationszeitraums erhalten. Eine
+fehlende Aufgabe wird, soweit der Anbieter dies unterstützt, gezielt anhand
+ihrer Identität geprüft. Nur bestätigte Erledigung, Entfernung der
+Aufgabenkennzeichnung oder Löschung gibt die Serie wieder frei. Bei einem
+vorübergehenden Abfragefehler bleibt die Zuordnung vorsichtshalber bestehen.
+
+### Schreibvorgänge und Synchronisationsfehler
+
+Eine vom Kalenderanbieter bestätigte Erstellung, Änderung oder Löschung bleibt
+erfolgreich, auch wenn das anschließende Aktualisieren des lokalen Caches
+fehlschlägt. `CreateEvent` und `UpdateEvent` liefern dann weiterhin
+`success = true` und den bestätigten Termin; `error` enthält gegebenenfalls die
+nachgelagerte Fehlermeldung. `DeleteEvent` liefert weiterhin `true`.
+Der Aktualisierungsfehler ist außerdem über `GetCalendarStatus().lastError`
+erkennbar. Den Schreibvorgang deshalb nicht erneut ausführen, sondern die
+Synchronisation wiederholen. Beim Wechsel in einen anderen Kalender wird die
+Zielkopie nicht aufgrund eines solchen nachgelagerten Lesefehlers gelöscht.
+
+Erfolgreich empfangene Kalenderdaten werden vor dem zugehörigen
+Synchronisationsmarker gespeichert. Scheitert danach das automatische
+Nachziehen einer Aufgabe, bleiben auch unabhängige neue oder geänderte Termine
+erhalten. Die Synchronisation meldet den Aufgabenfehler und kann erneut
+gestartet werden.
+
+### Serientermine erstellen
 
 Für beschreibbare Google-, Microsoft-, Apple-iCloud- und CalDAV-Kalender können beim Erstellen zusätzlich
 providerneutrale Serienangaben übergeben werden. Bei Google verwendet OpenCalendar
@@ -214,7 +311,10 @@ $success = IPSKAL_DeleteEvent(12345, json_encode([
 ]));
 ```
 
-Nach jeder erfolgreichen Schreiboperation wird der lokale Termincache erneut vom Server geladen.
+Nach einer vom Anbieter bestätigten Schreiboperation wird versucht, den lokalen
+Termincache erneut vom Server zu laden. Schlägt nur dieses Nachladen fehl, bleibt
+der Schreibvorgang erfolgreich; Details und Hinweise zum erneuten Synchronisieren
+stehen unter [Schreibvorgänge und Synchronisationsfehler](#schreibvorgänge-und-synchronisationsfehler).
 
 ## Fehlerbehebung
 

@@ -89,6 +89,18 @@ automatisch den richtigen Kalendernamen und die vollständige Kalenderidentität
 Bei Konten mit mehreren Kalendern wäre anschließend keine eindeutige Zuordnung
 möglich.
 
+## PHP-Befehlsreferenz
+
+```php
+string IPSKALCFG_RefreshCalendars(int $InstanzID);
+```
+
+Lädt die Kalenderliste des aktuell verbundenen Kalender Kontos neu, aktualisiert
+den kontogebundenen Fundcache und die Liste im geöffneten Konfigurationsformular.
+Die Funktion legt keine Kalender-Instanzen an. Die Rückgabe ist eine lokalisierte
+Ergebnis- oder Fehlermeldung als Klartext, kein JSON. Bei einem Fehler werden
+zusätzlich Fehlerzustand und letzte Fehlermeldung des Konfigurators gesetzt.
+
 ## Fehlerbehebung
 
 Problem | Prüfung

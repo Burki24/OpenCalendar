@@ -1,11 +1,12 @@
 # OpenCalendar
 
 [![Symcon](https://img.shields.io/badge/Symcon-PHPModul-555555.svg)](https://www.symcon.de)
-[![Modul Version](https://img.shields.io/badge/Modul%20Version-2.0-blue.svg)](library.json)
+[![Modul Version](https://img.shields.io/badge/Modul%20Version-2.1-blue.svg)](library.json)
 [![Symcon Version](https://img.shields.io/badge/Symcon%20Version-9.0%2B-brightgreen.svg)](https://www.symcon.de)<br>
 [![License](https://img.shields.io/badge/License-PolyForm--Noncommercial--1.0.0-brightgreen.svg)](LICENSE)
 [![Check Style](https://github.com/Burki24/OpenCalendar/actions/workflows/style.yml/badge.svg?branch=main)](https://github.com/Burki24/OpenCalendar/actions/workflows/style.yml?query=branch%3Amain)
 [![Run Tests](https://github.com/Burki24/OpenCalendar/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/Burki24/OpenCalendar/actions/workflows/tests.yml?query=branch%3Amain)
+<img width="1672" height="941" alt="exec-2745150d-8d12-4fbc-acab-0d2c7ff68cf3" src="https://github.com/user-attachments/assets/0acec8d0-4d98-44ed-9c22-24f086832890" />
 
 OpenCalendar ist eine Anwendung für Symcon, mit der Nutzer ihre Online-Kalender verbinden, synchronisieren, anzeigen und bearbeiten können. Unterstützt werden Apple iCloud, Google Calendar, Microsoft 365/Outlook.com, generische CalDAV-Server sowie schreibgeschützte ICS-/Webcal-Abonnements.
 Die gefundenen Kalender können einzeln synchronisiert, in einer gemeinsamen Kachel angezeigt und optional als interaktive HTML-Seite in IPSView verwendet werden.
@@ -39,6 +40,58 @@ müssen umfangreiche Kalenderdateien nicht manuell aufgeteilt werden.
 
 Die ausführlichen Einstellungen der Anbieter sind in der Dokumentation des
 [Kalender Kontos](Kalender%20Konto) beschrieben.
+
+## IPSView-Stile
+<img width="1391" height="1131" alt="image" src="https://github.com/user-attachments/assets/d1b24f92-431e-4842-93ce-8307e7f8110e" />
+
+Die **Kalender Ansicht** verwendet für die optionale IPSView-Ausgabe das zentrale
+IPSView-Stilsystem aus `Symcon_ModuleHelper`. Die Stilquelle wird direkt in der
+Instanzkonfiguration gewählt. Zur Verfügung stehen ein vollständig
+benutzerdefinierter Stil, ein IPSView-Medienobjekt, ein **Stilprofil** (Style Profile V1) sowie
+die festen Vorgaben **Helle Vorgabe**, **Dunkle Vorgabe**, **Hell**, **Dunkel**,
+**Warm**, **Kühl**, **Erdig**, **Wasser** und **Sonnig**.
+
+Bei einer Vorgabe zeigt die Konfiguration die **tatsächlich wirksamen Farben,
+Deckkräfte, Schriftwerte, Rahmen- und Schattenparameter** an. Diese Werte sind
+schreibgeschützt, damit die zuvor gespeicherten benutzerdefinierten Einstellungen
+nicht durch bloßes Ausprobieren eines Stils überschrieben werden. Mit
+**In benutzerdefinierten Stil übernehmen** kann die aktuelle Vorgabe vollständig
+als Ausgangspunkt kopiert und anschließend individuell verändert werden.
+
+Zusätzlich bildet der gemeinsame `IPSViewStyleConfigurationHelper` die **109
+nativen IPSView-Farbfelder in 15 Gruppen** ab: Basis, Assoziationen, Tabs,
+Switch, Slider, Fortschrittsanzeige, Kreis, Flow, Gauge, Schatten/Raster, Dialog,
+Chart, Schedule, Event und Kalender. Die nativen Felder erben standardmäßig aus
+den semantischen Designrollen. Im benutzerdefinierten Stil kann jedes Feld
+einzeln mit **Abweichend** überschrieben werden. Eine manuelle Farbänderung
+aktiviert die Abweichung automatisch; beim Deaktivieren wird der Override entfernt
+und das Feld folgt wieder seinem geerbten Wert. Bei allen anderen Stilquellen
+werden die aufgelösten nativen Farben schreibgeschützt angezeigt.
+
+`ColorView` und `ColorPage` bleiben dabei bewusst getrennt: `ColorView` steuert den
+Hintergrund der gesamten View, `ColorPage` den Seitenhintergrund. Fehlt in einem
+importierten `.ipsView`-Dokument `ColorView`, verwendet OpenCalendar dafür den
+nativen IPSView-Standard `#404040`; `ColorPage` wird nicht als Ersatz verwendet.
+Style Profile V1 kann neben den semantischen Designwerten auch native Overrides
+transportieren.
+
+Die gemeinsame Typografie unterstützt die IPSView-Schriften **Roboto**,
+**Roboto Mono**, **Open Sans**, **PT Sans**, **Dancing Script**, **Bebas Neue**,
+**Indie Flower** und **Segment7**. Verfügbare Schriftschnitte werden abhängig von
+der jeweiligen Schrift angeboten und in der IPSView-Ausgabe einschließlich
+Normal/Fett und Kursiv korrekt angewendet.
+
+OpenCalendar dient als Referenz-Consumer für **Style Profile V1** aus dem
+IPSViewAssistant. Die Tests verwenden ein vom Assistant exportiertes vollständiges
+Referenzprofil und prüfen Farben samt unabhängigen Deckkräften, Typografie mit
+Schriftfamilie, Schriftschnitt, Größe und Skalierung, Rahmen und Linien sowie
+Schatten und Effekte. Das Profil bleibt dabei im zentralen kanonischen Format
+verlustfrei validier- und erneut serialisierbar.
+
+Kalender- und Terminfarben bleiben fachliche Inhaltsfarben von OpenCalendar und
+werden nicht durch die globale IPSView-Stilquelle ersetzt. Die ausführliche
+Einrichtung befindet sich in der
+[Dokumentation der Kalender Ansicht](Kalender%20Ansicht#einrichtung-in-ipsview).
 
 ## Anbieter im Überblick
 
@@ -97,7 +150,7 @@ vollständig im gemeinsamen Dialog-Workflow der Kachelvisualisierung und IPSView
 - Bei zeitgebundenen Serien wird die Zeitzone des Google-Kalenders verwendet,
   damit die lokale Uhrzeit auch über Sommer-/Winterzeitwechsel erhalten bleibt.
 - Einzelne Serienvorkommnisse können bearbeitet und gelöscht werden.
-- **Diesen und alle folgenden Termine** können gemeinsam bearbeitet oder
+- **Diesen und alle folgenden Termine** können gemeinsam bearbeitet und
   gelöscht werden. Beim Bearbeiten wird die Serie am gewählten Vorkommnis
   geteilt; der zurückliegende Teil bleibt unverändert. Beim Löschen endet die
   Serie unmittelbar vor dem gewählten Vorkommnis.
@@ -176,6 +229,68 @@ bestimmte Kalenderinstanz und unterstützt sowohl einen frei wählbaren Zeitraum
 Tagen als auch einen Filter nach Ereignistyp. Die vollständige Befehlsreferenz
 befindet sich in der Dokumentation der Module **Kalender** und
 **Kalender Ansicht**.
+
+## Aufgabentermine
+
+OpenCalendar kann einen gewöhnlichen ganztägigen Termin als
+**Aufgabentermin** behandeln. Dafür wird keine Aufgaben-API des Anbieters und
+keine zusätzliche OAuth-Berechtigung benötigt. Der Eintrag bleibt technisch ein
+normaler Kalendertermin und verwendet ausschließlich die bereits vorhandenen
+Schreibrechte des gewählten Kalenders.
+
+Beim Erstellen oder Bearbeiten wird im Termindialog **Aufgabentermin** aktiviert.
+Aufgabentermine sind bewusst ganztägig und dauern genau einen Tag. Sie dürfen
+auch wiederkehrend sein. OpenCalendar
+speichert den Status direkt und providerunabhängig am Anfang des Termintitels:
+
+- `[OC:TODO]` kennzeichnet eine offene Aufgabe.
+- `[OC:DONE]` kennzeichnet eine erledigte Aufgabe.
+- `[OC:TODO:FOLLOW]` beziehungsweise `[OC:DONE:FOLLOW]` kennzeichnet eine Aufgabenserie, deren geplante
+  Folgetermine beim täglichen Nachziehen ebenfalls verschoben werden sollen.
+
+In der Kalenderansicht öffnet ein Klick auf den Eintrag die Termindetails. Dort
+kann die Aufgabe mit **Als erledigt markieren** abgeschlossen und mit
+**Aufgabe wieder öffnen** erneut aktiviert werden. Der eigentliche Titel wird im
+Editor ohne technischen Marker angezeigt. In Google Calendar, Outlook, Apple
+Calendar oder anderen Clients bleibt der ASCII-Marker dagegen sichtbar, sodass der
+Status auch außerhalb von OpenCalendar erkennbar ist. Wird der Marker dort
+manuell entfernt oder geändert, übernimmt OpenCalendar diese Änderung bei der
+nächsten Synchronisation. Die früher verwendeten grafischen Kästchen (`☐`, `☑`)
+werden weiterhin erkannt und bei der nächsten Aufgabenänderung automatisch ersetzt.
+
+Eine offene Aufgabe, deren Datum vor dem aktuellen lokalen Tag liegt, wird beim
+lokalen Tageswechsel und zusätzlich bei jeder Kalendersynchronisation auf den
+aktuellen Tag verschoben. Dadurch bleibt eine nicht erledigte Aufgabe täglich
+sichtbar. Erledigte Aufgaben werden nicht mehr verschoben und verbleiben an ihrem
+zuletzt erreichten Datum. Das Verschieben ändert den echten Termin beim
+Kalenderanbieter; es ist keine rein lokale Anzeige.
+
+Bei einer Aufgabenserie entscheidet die Option **Geplante Folgetermine
+mitverschieben**: Ohne sie bleibt der reguläre Serienplan erhalten und nur das
+älteste überfällige Vorkommnis wird auf heute gezogen. Mit ihr verschiebt
+OpenCalendar den ab diesem Vorkommnis verbleibenden Serienteil gemeinsam. Diese
+Option wird nur bei Kalendern angeboten, die „diesen und alle folgenden Termine“
+sicher bearbeiten können.
+
+Die Option gilt auch beim manuellen Ändern des Datums einer Serienaufgabe:
+Mit Häkchen werden der ausgewählte und alle folgenden Termine gemeinsam
+verschoben. Beim ersten Vorkommnis betrifft das die gesamte Serie. Reines
+Erledigen oder Umbenennen ohne Datumsänderung betrifft weiterhin nur den
+ausgewählten Termin. Beim Verschieben des Serienteils werden bestehende
+Ausnahmen innerhalb dieses Teils zurückgesetzt.
+
+Liegt zwischen dem überfälligen und dem heutigen Datum bereits ein weiterer
+geplanter Serientermin, führt OpenCalendar den nachgezogenen Termin ohne
+Mitverschieben als einzelnen Aufgabentermin weiter. Dadurch bleibt der
+ursprüngliche Serienplan unverändert und Microsoft 365 muss kein Vorkommnis über
+ein anderes Serienelement hinweg verschieben – eine von Microsoft technisch
+abgelehnte Operation.
+
+Aufgabentermine stehen deshalb nur in beschreibbaren Kalendern zur Verfügung.
+ICS-/Webcal-Abonnements und lokale ICS-Dateien bleiben schreibgeschützt. Die
+Funktion ist bewusst keine Anbindung an Google Tasks: Es werden weder
+Google-Aufgabenlisten importiert noch bestehende Einträge aus „Meine Aufgaben“
+synchronisiert.
 
 ## Bekannte Einschränkungen
 

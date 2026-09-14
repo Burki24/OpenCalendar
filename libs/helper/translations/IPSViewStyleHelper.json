@@ -14,6 +14,22 @@
             "en": "The media source imports the whitelisted standard style from an IPSView media object. Custom values below are used only for the custom source.",
             "de": "Die Medienquelle übernimmt die freigegebenen Standardstil-Werte aus einem IPSView-Medienobjekt. Die nachfolgenden benutzerdefinierten Werte werden nur für die Stilquelle „Benutzerdefinierter Stil“ verwendet."
         },
+        "description.profile_source": {
+            "en": "The style profile source loads a complete validated Style Profile V1 from a media object. Invalid profiles fall back safely to the light preset.",
+            "de": "Die Stilprofilquelle lädt ein vollständig validiertes Style Profile V1 aus einem Medienobjekt. Ungültige Profile fallen sicher auf die helle Vorgabe zurück."
+        },
+        "description.preset_source": {
+            "en": "The centralized IPSView Assistant presets are selected directly from the style source list.",
+            "de": "Die zentralen IPSView-Assistant-Vorgaben werden direkt in der Stilquelle ausgewählt."
+        },
+        "description.custom_values": {
+            "en": "The values below define the custom style and can be edited directly.",
+            "de": "Die folgenden Werte definieren den benutzerdefinierten Stil und können direkt bearbeitet werden."
+        },
+        "description.active_values": {
+            "en": "The values below show the active style source and are read-only. Copy the style to custom to use it as a starting point for individual adjustments.",
+            "de": "Die folgenden Werte zeigen die aktive Stilquelle und sind schreibgeschützt. Über „In benutzerdefinierten Stil übernehmen“ können sie als Ausgangspunkt für eigene Anpassungen verwendet werden."
+        },
         "section.universal_colors": {
             "en": "Universal colors",
             "de": "Universelle Farben"
@@ -34,6 +50,14 @@
             "en": "IPSView media object",
             "de": "IPSView-Medienobjekt"
         },
+        "field.profile_media_object": {
+            "en": "Style profile media object",
+            "de": "Stilprofil-Medienobjekt"
+        },
+        "field.style_preset": {
+            "en": "Shared preset",
+            "de": "Zentrale Vorgabe"
+        },
         "field.transparent_background": {
             "en": "Transparent background",
             "de": "Transparenter Hintergrund"
@@ -41,6 +65,10 @@
         "field.font_scale": {
             "en": "Font scale (%)",
             "de": "Schriftskalierung (%)"
+        },
+        "field.font_style": {
+            "en": "Font style",
+            "de": "Schriftschnitt"
         },
         "option.custom_style": {
             "en": "Custom style",
@@ -57,6 +85,82 @@
         "option.dark_preset": {
             "en": "Dark preset",
             "de": "Dunkle Vorgabe"
+        },
+        "option.style_profile": {
+            "en": "Style profile",
+            "de": "Stilprofil"
+        },
+        "option.shared_preset": {
+            "en": "Shared preset",
+            "de": "Zentrale Vorgabe"
+        },
+        "option.previous_selection": {
+            "en": "previous selection",
+            "de": "bisherige Auswahl"
+        },
+        "option.system_font": {
+            "en": "System default",
+            "de": "Systemstandard"
+        },
+        "option.legacy_font": {
+            "en": "Legacy/custom",
+            "de": "Bisherig/benutzerdefiniert"
+        },
+        "font_style.regular": {
+            "en": "Regular",
+            "de": "Normal"
+        },
+        "font_style.bold": {
+            "en": "Bold",
+            "de": "Fett"
+        },
+        "font_style.italic": {
+            "en": "Italic",
+            "de": "Kursiv"
+        },
+        "font_style.bold_italic": {
+            "en": "Bold italic",
+            "de": "Fett kursiv"
+        },
+        "action.copy_to_custom": {
+            "en": "Copy to custom style",
+            "de": "In benutzerdefinierten Stil übernehmen"
+        },
+        "action.copy_to_custom_confirm": {
+            "en": "Copy the currently active style values to the custom style and switch to it?",
+            "de": "Die aktuell wirksamen Stilwerte als benutzerdefinierten Stil übernehmen und zu diesem wechseln?"
+        },
+        "preset.standard": {
+            "en": "IPSView Standard",
+            "de": "IPSView Standard"
+        },
+        "preset.light": {
+            "en": "Light",
+            "de": "Hell"
+        },
+        "preset.dark": {
+            "en": "Dark",
+            "de": "Dunkel"
+        },
+        "preset.warm": {
+            "en": "Warm",
+            "de": "Warm"
+        },
+        "preset.cool": {
+            "en": "Cool",
+            "de": "Kühl"
+        },
+        "preset.earthy": {
+            "en": "Earthy",
+            "de": "Erdig"
+        },
+        "preset.water": {
+            "en": "Water",
+            "de": "Wasser"
+        },
+        "preset.sunny": {
+            "en": "Sunny",
+            "de": "Sonnig"
         },
         "color.view_background": {
             "en": "View background",

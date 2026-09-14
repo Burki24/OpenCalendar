@@ -99,6 +99,11 @@ const eventAnniversaryType = document.getElementById('event-anniversary-type');
 const eventAnniversaryDateRow = document.getElementById('event-anniversary-date-row');
 const eventAnniversaryDate = document.getElementById('event-anniversary-date');
 const eventAnniversaryDateLabel = document.getElementById('event-anniversary-date-label');
+const eventTask = document.getElementById('event-task');
+const eventTaskCompleted = document.getElementById('event-task-completed');
+const eventTaskCompletedRow = document.getElementById('event-task-completed-row');
+const eventTaskFollowPlanned = document.getElementById('event-task-follow-planned');
+const eventTaskFollowPlannedRow = document.getElementById('event-task-follow-planned-row');
 const eventRecurrenceRow = document.getElementById('event-recurrence-row');
 const eventRecurrenceFrequency = document.getElementById('event-recurrence-frequency');
 const eventRecurrenceOptions = document.getElementById('event-recurrence-options');
@@ -254,6 +259,9 @@ function applyCalendarState(state) {
         persistClientViewState();
     }
     render();
+    if (isNativeVisualization()) {
+        void ensureVisibleRangeLoaded();
+    }
     restoreAgendaScrollPosition(agendaScrollPosition);
     if (releasePreservedAgendaScrollPosition) {
         clearAgendaScrollWorkflow();
@@ -1057,6 +1065,26 @@ function renderMultiDayTimeline(days, showDayOfYear, showEventCount) {
             bindDayOverview(canvas, entry.day, entry.events);
             grid.appendChild(canvas);
         });
+    } else {
+        grid.classList.add('empty-timeline');
+        grid.style.gridTemplateRows = hasAllDayEvents
+            ? 'auto auto minmax(120px, 1fr)'
+            : 'auto minmax(120px, 1fr)';
+
+        const timescale = element('div', 'multi-day-timescale');
+        timescale.style.gridColumn = '1';
+        timescale.style.gridRow = String(timelineRow);
+        grid.appendChild(timescale);
+
+        dayData.forEach((entry, index) => {
+            const currentDay = isToday(entry.day);
+            const canvas = element('div', 'multi-day-timeline-canvas' + (currentDay ? ' today' : ''));
+            canvas.style.gridColumn = String(index + 2);
+            canvas.style.gridRow = String(timelineRow);
+            if (currentDay) emphasizeCurrentDayTimelineSection(canvas);
+            bindDayOverview(canvas, entry.day, entry.events);
+            grid.appendChild(canvas);
+        });
     }
 
     content.appendChild(grid);
@@ -1368,7 +1396,7 @@ function renderMonth() {
     }
 }
 
-function createMonthGrid(month, fillAvailableHeight) {
+function monthGridRange(month) {
     const first = new Date(month.getFullYear(), month.getMonth(), 1);
     const last = new Date(month.getFullYear(), month.getMonth() + 1, 0);
     const showWeekends = calendarState.settings.showWeekends !== false;
@@ -1377,8 +1405,16 @@ function createMonthGrid(month, fillAvailableHeight) {
     while (!showWeekends && isWeekend(firstVisible)) firstVisible = addDays(firstVisible, 1);
     while (!showWeekends && isWeekend(lastVisible)) lastVisible = addDays(lastVisible, -1);
 
-    const gridStart = startOfWeek(firstVisible);
-    const gridEnd = addDays(startOfWeek(lastVisible), 7);
+    return {
+        start: startOfWeek(firstVisible),
+        end: addDays(startOfWeek(lastVisible), 7)
+    };
+}
+
+function createMonthGrid(month, fillAvailableHeight) {
+    const showWeekends = calendarState.settings.showWeekends !== false;
+    const showOverflowDays = calendarState.settings.showMonthOverflowDays === true;
+    const { start: gridStart, end: gridEnd } = monthGridRange(month);
     const days = [];
     for (let day = gridStart; day < gridEnd; day = addDays(day, 1)) {
         days.push(day);
@@ -1403,12 +1439,13 @@ function createMonthGrid(month, fillAvailableHeight) {
     visibleDays.forEach(day => {
         const outside = day.getMonth() !== month.getMonth();
         const cell = element('div', 'month-day');
-        if (outside) {
+        if (outside && !showOverflowDays) {
             cell.classList.add('month-day-empty');
             cell.setAttribute('aria-hidden', 'true');
             grid.appendChild(cell);
             return;
         }
+        if (outside) cell.classList.add('outside');
 
         if (isToday(day)) cell.classList.add('today');
         const dayHeader = element('div', 'month-day-header');
@@ -1711,7 +1748,67 @@ function applyCalendarFilter() {
 
 function eventDisplaySummary(event) {
     const displaySummary = String(event?.displaySummary || '').trim();
-    return displaySummary || String(event?.summary || '').trim();
+    const summary = displaySummary || taskPlainSummary(event?.summary);
+    if (!event?.task) return summary;
+    const continued = event.taskRolledForward ? ' ↻' : '';
+    return `${event.taskCompleted ? '☑' : '☐'}${continued} ${summary}`.trim();
+}
+
+function taskPlainSummary(summary) {
+    return String(summary || '').trim()
+        .replace(/^(?:\[OC:(?:TODO|DONE)(?::FOLLOW)?\]|☐↻|☑↻|☐|☑)\s*/u, '')
+        .trim();
+}
+
+function editableEventSummary(event) {
+    if (!event?.task) return String(event?.summary || '').trim();
+    return String(event?.displaySummary || '').trim() || taskPlainSummary(event?.summary);
+}
+
+function loadTaskEditor(event) {
+    eventTask.checked = Boolean(event?.task);
+    eventTaskCompleted.checked = Boolean(event?.taskCompleted);
+    eventTaskFollowPlanned.checked = Boolean(event?.taskFollowPlanned);
+    updateTaskControls();
+}
+
+function updateTaskControls() {
+    const enabled = eventTask.checked;
+    eventTask.disabled = !eventDialogEditable;
+    eventTaskCompletedRow.classList.toggle('hidden', !enabled);
+    eventTaskCompleted.disabled = !eventDialogEditable || !enabled;
+    const recurring = eventRecurrenceFrequency.value !== 'none' || Boolean(selectedEvent?.recurring);
+    const canFollow = Boolean(selectedCalendarEntry()?.canUpdateFollowing);
+    eventTaskFollowPlannedRow.classList.toggle('hidden', !enabled || !recurring || !canFollow);
+    eventTaskFollowPlanned.disabled = !eventDialogEditable || !enabled || !recurring || !canFollow;
+    if (!recurring || !canFollow) eventTaskFollowPlanned.checked = false;
+    updateTaskMoveNote();
+
+    if (!enabled || !eventDialogEditable) return;
+
+    eventAnniversaryType.value = '';
+    eventAnniversaryDate.value = '';
+    eventAnniversaryDateRow.classList.add('hidden');
+    const allDayInput = document.getElementById('event-all-day');
+    const start = readInputDate(document.getElementById('event-start').value) || new Date();
+    const displayedEnd = readInputDate(document.getElementById('event-end').value);
+    if (!allDayInput.checked || !displayedEnd || dayKey(displayedEnd) !== dayKey(start)) {
+        setDateInputs(start, start, true);
+        allDayInput.checked = true;
+    }
+}
+
+function updateTaskMoveNote() {
+    if (!eventDialogEditable || !eventIsRecurring(selectedEvent)
+        || ['series', 'following'].includes(selectedEvent?.writeScope)) return;
+    const note = document.getElementById('dialog-note');
+    const moving = Number(eventCalendarInput.value) !== Number(selectedEvent?.calendarInstanceId);
+    note.textContent = eventTask.checked && eventTaskFollowPlanned.checked && moving
+        ? t('This and all following tasks will be moved to the selected calendar.')
+        : eventTask.checked && eventTaskFollowPlanned.checked
+        ? t('Changing the date moves this and all following occurrences. Existing following exceptions will be reset.')
+        : t('Only this occurrence of the recurring event will be changed.');
+    note.classList.remove('hidden');
 }
 
 function resetAnniversaryEditor() {
@@ -1754,7 +1851,7 @@ function loadAnniversaryEditor(event) {
 
 function anniversaryEditorEditable() {
     const calendar = selectedCalendarEntry();
-    if (!eventDialogEditable || !calendar?.canWrite) return false;
+    if (!eventDialogEditable || !calendar?.canWrite || eventTask.checked) return false;
     if (selectedEvent === null) return Boolean(calendar.canCreateRecurrence);
     if (!selectedEvent.recurring) {
         const moving = Number(calendar.instanceId || 0) !== Number(selectedEvent.calendarInstanceId || 0);
@@ -1804,7 +1901,7 @@ function updateAnniversaryControls() {
         eventRecurrenceFrequency.disabled = true;
         eventRecurrenceOptions.classList.add('hidden');
     } else {
-        allDayInput.disabled = !eventDialogEditable;
+        allDayInput.disabled = !eventDialogEditable || eventTask.checked;
     }
 }
 
@@ -1858,35 +1955,12 @@ function anniversaryEditorChange() {
 }
 
 const icsImportMaximumBytes = 1024 * 1024;
-const icsImportMessages = {
-    de: {
-        'Import ICS': 'ICS importieren',
-        'ICS event imported.': 'ICS-Termin importiert.',
-        'The ICS file is too large.': 'Die ICS-Datei ist zu groß.',
-        'The selected file is not a valid single-event ICS file.': 'Die ausgewählte Datei ist keine gültige ICS-Datei mit einem einzelnen Termin.',
-        'This ICS file contains multiple events.': 'Diese ICS-Datei enthält mehrere Termine.',
-        'Recurring ICS invitations cannot be imported as a single event.': 'Wiederkehrende ICS-Einladungen können hier nicht als Einzeltermin importiert werden.'
-    }
-};
-
 function icsImportText(value) {
-    const translated = t(value);
-    if (translated !== value) return translated;
-    const language = String(document.documentElement.lang || '').toLowerCase().split('-')[0];
-    return icsImportMessages[language]?.[value] || value;
+    return t(value);
 }
 
-const providerLinkMessages = {
-    de: {
-        'Open in provider': 'Extern öffnen'
-    }
-};
-
 function providerLinkText(value) {
-    const translated = t(value);
-    if (translated !== value) return translated;
-    const language = String(document.documentElement.lang || '').toLowerCase().split('-')[0];
-    return providerLinkMessages[language]?.[value] || value;
+    return t(value);
 }
 
 function providerEventUrl(event) {
@@ -2288,11 +2362,14 @@ function applyImportedIcsEvent(importedEvent) {
     document.getElementById('event-location').value = importedEvent.location;
     document.getElementById('event-description').value = importedEvent.description;
     document.getElementById('event-all-day').checked = importedEvent.allDay;
+    eventTask.checked = false;
+    eventTaskCompleted.checked = false;
     resetAnniversaryEditor();
     setDateInputs(importedEvent.start, importedEvent.end, importedEvent.allDay, importedEvent.allDay);
     resetRecurrenceEditor(importedEvent.start);
     loadReminderEditor({ reminder: importedEvent.reminder });
     updateRecurrenceAvailability();
+    updateTaskControls();
     updateAnniversaryControls();
     updateReminderControls();
 }
@@ -2330,6 +2407,8 @@ function openNewEvent(preferredDay = null) {
     document.getElementById('event-location').value = '';
     document.getElementById('event-description').value = '';
     document.getElementById('event-all-day').checked = false;
+    eventTask.checked = false;
+    eventTaskCompleted.checked = false;
     resetAnniversaryEditor();
     let start;
     if (preferredDay instanceof Date && !Number.isNaN(preferredDay.getTime())) {
@@ -2370,6 +2449,7 @@ function openNewEvent(preferredDay = null) {
         resetReminderEditor();
         setEventDialogLoading();
         setDialogEditable(true);
+        updateTaskControls();
         updateDialogColor();
         updateSaveButtonLabel();
     });
@@ -2397,18 +2477,63 @@ function openEventDetails(event) {
     }
 
     setOptionalDetail('occasion', annualEventLabel(event));
+    setOptionalDetail(
+        'task-status',
+        event.task
+            ? t(event.taskCompleted ? 'Completed' : (event.taskRolledForward ? 'Continued from series' : 'Open'))
+            : ''
+    );
     setOptionalDetail('reminder', reminderDetailText(event));
     setOptionalDetail('location', event.location);
     setOptionalDetail('description', event.description);
     document.getElementById('details-provider-button').classList.toggle('hidden', providerEventUrl(event) === '');
     document.getElementById('details-edit-button').classList.toggle('hidden', !editable);
     document.getElementById('details-delete-button').classList.toggle('hidden', !deletable);
+    const taskToggle = document.getElementById('details-task-toggle-button');
+    taskToggle.textContent = t(event.taskCompleted ? 'Reopen task' : 'Mark completed');
+    taskToggle.classList.toggle('hidden', !event.task || !eventCanUpdateOccurrence(event));
 
     const note = document.getElementById('details-note');
     const reason = eventReadOnlyReason(event);
-    note.textContent = reason ? t(reason) : '';
-    note.classList.toggle('hidden', reason === '');
+    note.textContent = reason
+        ? t(reason)
+        : (event.taskRolledForward ? t('This overdue task was continued from a series.') : '');
+    note.classList.toggle('hidden', note.textContent === '');
     eventDetailsDialog.showModal();
+}
+
+async function toggleSelectedTaskCompletion() {
+    if (!selectedEvent?.task || !eventCanUpdateOccurrence(selectedEvent)) return;
+    const button = document.getElementById('details-task-toggle-button');
+    button.disabled = true;
+    const value = {
+        calendarInstanceId: Number(selectedEvent.calendarInstanceId),
+        event: {
+            uid: selectedEvent.uid,
+            resourceUrl: selectedEvent.resourceUrl,
+            etag: selectedEvent.etag,
+            allDay: Boolean(selectedEvent.allDay),
+            start: selectedEvent.start,
+            end: selectedEvent.end,
+            summary: selectedEvent.summary,
+            taskFollowPlanned: Boolean(selectedEvent.taskFollowPlanned),
+            ...recurrencePayload(selectedEvent),
+            changes: {
+                task: true,
+                taskCompleted: !Boolean(selectedEvent.taskCompleted)
+            }
+        }
+    };
+    releaseAgendaScrollWorkflowAfterState();
+    try {
+        if (await sendAction('UpdateEvent', value)) {
+            eventDetailsDialog.close();
+        } else {
+            cancelAgendaScrollWorkflowRelease();
+        }
+    } finally {
+        button.disabled = false;
+    }
 }
 
 function openPendingEventEditor(event, writeScope = '') {
@@ -2422,10 +2547,11 @@ function openPendingEventEditor(event, writeScope = '') {
     populateCalendarSelect(calendar ? [calendar] : [], selectedEvent.calendarInstanceId);
     setCalendarSelectDisabled(true);
     document.getElementById('dialog-title').textContent = t(scope === 'series' ? 'Edit recurring event' : 'Edit event');
-    document.getElementById('event-summary').value = selectedEvent.summary || '';
+    document.getElementById('event-summary').value = editableEventSummary(selectedEvent);
     document.getElementById('event-location').value = selectedEvent.location || '';
     document.getElementById('event-description').value = selectedEvent.description || '';
     document.getElementById('event-all-day').checked = Boolean(selectedEvent.allDay);
+    loadTaskEditor(selectedEvent);
     loadAnniversaryEditor(selectedEvent);
     setDateInputs(
         eventStart(selectedEvent),
@@ -2447,7 +2573,9 @@ function requestEdit(sourceDialog) {
     const occurrenceAllowed = eventCanUpdateOccurrence(event);
     const followingAllowed = eventCanUpdateFollowing(event);
     const seriesAllowed = eventCanUpdateSeries(event);
-    if (!eventIsRecurring(event) || (!followingAllowed && !seriesAllowed)) {
+    // Task series always edit the selected occurrence. The separate task option
+    // controls only whether overdue follow-up appointments are shifted later.
+    if (Boolean(event.task) || !eventIsRecurring(event) || (!followingAllowed && !seriesAllowed)) {
         beginAgendaScrollWorkflow('edit');
         sourceDialog?.close();
         void prepareEventEdit(event);
@@ -2793,10 +2921,11 @@ function openExistingEvent(event, writeScope = '') {
     populateCalendarSelect(availableCalendars, selectedEvent.calendarInstanceId);
     setCalendarSelectDisabled(!canMove);
     document.getElementById('dialog-title').textContent = t(editingSeries ? 'Edit recurring event' : 'Edit event');
-    document.getElementById('event-summary').value = selectedEvent.summary || '';
+    document.getElementById('event-summary').value = editableEventSummary(selectedEvent);
     document.getElementById('event-location').value = selectedEvent.location || '';
     document.getElementById('event-description').value = selectedEvent.description || '';
     document.getElementById('event-all-day').checked = Boolean(selectedEvent.allDay);
+    loadTaskEditor(selectedEvent);
     loadAnniversaryEditor(selectedEvent);
     setDateInputs(
         eventStart(selectedEvent),
@@ -2838,6 +2967,7 @@ function openExistingEvent(event, writeScope = '') {
     }
     updateDialogColor();
     updateSaveButtonLabel();
+    updateTaskMoveNote();
     showEventDialog();
 }
 
@@ -3404,7 +3534,6 @@ function recurrencePatternControls() {
         };
     }
 
-    const german = document.documentElement.lang.toLowerCase().startsWith('de');
     row = document.createElement('div');
     row.id = 'event-recurrence-pattern-row';
     row.className = 'form-row two hidden';
@@ -3413,14 +3542,14 @@ function recurrencePatternControls() {
     modeRow.className = 'form-row';
     const modeLabel = document.createElement('label');
     modeLabel.htmlFor = 'event-recurrence-pattern-mode';
-    modeLabel.textContent = german ? 'Muster' : 'Pattern';
+    modeLabel.textContent = t('Pattern');
     const mode = document.createElement('select');
     mode.id = 'event-recurrence-pattern-mode';
     const absolute = document.createElement('option');
     absolute.value = 'absolute';
     const relative = document.createElement('option');
     relative.value = 'relative';
-    relative.textContent = german ? 'Wochentagsposition' : 'Weekday position';
+    relative.textContent = t('Weekday position');
     mode.append(absolute, relative);
     modeRow.append(modeLabel, mode);
 
@@ -3429,16 +3558,14 @@ function recurrencePatternControls() {
     indexRow.id = 'event-recurrence-relative-index-row';
     const indexLabel = document.createElement('label');
     indexLabel.htmlFor = 'event-recurrence-relative-index';
-    indexLabel.textContent = german ? 'Position' : 'Position';
+    indexLabel.textContent = t('Position');
     const index = document.createElement('select');
     index.id = 'event-recurrence-relative-index';
-    const labels = german
-        ? { first: 'Erste', second: 'Zweite', third: 'Dritte', fourth: 'Vierte', last: 'Letzte' }
-        : { first: 'First', second: 'Second', third: 'Third', fourth: 'Fourth', last: 'Last' };
+    const labels = { first: 'First', second: 'Second', third: 'Third', fourth: 'Fourth', last: 'Last' };
     Object.entries(labels).forEach(([value, label]) => {
         const option = document.createElement('option');
         option.value = value;
-        option.textContent = label;
+        option.textContent = t(label);
         index.appendChild(option);
     });
     indexRow.append(indexLabel, index);
@@ -3453,11 +3580,8 @@ function recurrencePatternControls() {
 function updateRecurrencePatternLabels(frequency, mode) {
     const controls = recurrencePatternControls();
     const absolute = controls.mode.querySelector('option[value="absolute"]');
-    const german = document.documentElement.lang.toLowerCase().startsWith('de');
     if (absolute) {
-        absolute.textContent = frequency === 'yearly'
-            ? (german ? 'Festes Datum' : 'Fixed date')
-            : (german ? 'Fester Monatstag' : 'Fixed day of month');
+        absolute.textContent = t(frequency === 'yearly' ? 'Fixed date' : 'Fixed day of month');
     }
     controls.index.parentElement.classList.toggle('hidden', mode !== 'relative');
 }
@@ -3631,6 +3755,8 @@ function setDialogEditable(editable, descriptionEditable = editable) {
     });
     document.getElementById('event-description').disabled = !descriptionEditable;
     document.getElementById('save-button').classList.toggle('hidden', !editable);
+    updateTaskControls();
+    updateRecurrenceAvailability();
     updateReminderControls();
     updateAnniversaryControls();
 }
@@ -3704,6 +3830,9 @@ eventForm.addEventListener('submit', async event => {
         summary: document.getElementById('event-summary').value.trim(),
         description: document.getElementById('event-description').value.trim(),
         location: document.getElementById('event-location').value.trim(),
+        task: eventTask.checked,
+        taskCompleted: eventTask.checked && eventTaskCompleted.checked,
+        taskFollowPlanned: eventTask.checked && eventTaskFollowPlanned.checked,
         allDay,
         start: inputDateValue(document.getElementById('event-start').value, allDay),
         end: inputDateValue(document.getElementById('event-end').value, allDay, allDay)
@@ -3825,6 +3954,16 @@ document.getElementById('event-all-day').addEventListener('change', event => {
     }
     setDateInputs(start, end, event.target.checked);
 });
+eventTask.addEventListener('change', () => {
+    if (!eventTask.checked) {
+        eventTaskCompleted.checked = false;
+        eventTaskFollowPlanned.checked = false;
+    }
+    updateTaskControls();
+    updateRecurrenceAvailability();
+    updateAnniversaryControls();
+});
+eventTaskFollowPlanned.addEventListener('change', updateTaskMoveNote);
 eventCalendarInput.addEventListener('change', () => {
     updateDialogColor();
     updateSaveButtonLabel();
@@ -3832,8 +3971,14 @@ eventCalendarInput.addEventListener('change', () => {
     updateAnniversaryControls();
     resolveDefaultReminderForCalendarMove();
     updateReminderControls();
+    updateTaskMoveNote();
 });
 eventAnniversaryType.addEventListener('change', () => {
+    if (eventAnniversaryType.value) {
+        eventTask.checked = false;
+        eventTaskCompleted.checked = false;
+        updateTaskControls();
+    }
     updateRecurrenceAvailability();
     if (eventAnniversaryType.value) {
         if (!eventAnniversaryDate.value) eventAnniversaryDate.value = suggestedAnniversaryDate();
@@ -3889,6 +4034,7 @@ eventRecurrenceFrequency.addEventListener('change', () => {
         controls.index.value = recurrencePatternContext.relativeIndex;
     }
     updateRecurrenceControls();
+    updateTaskControls();
 });
 eventRecurrenceInterval.addEventListener('input', updateRecurrenceControls);
 eventRecurrenceEndMode.addEventListener('change', updateRecurrenceControls);
@@ -3942,6 +4088,7 @@ document.getElementById('details-close').addEventListener('click', () => eventDe
 document.getElementById('details-close-button').addEventListener('click', () => eventDetailsDialog.close());
 document.getElementById('details-provider-button').addEventListener('click', openProviderEvent);
 document.getElementById('details-edit-button').addEventListener('click', () => requestEdit(eventDetailsDialog));
+document.getElementById('details-task-toggle-button').addEventListener('click', toggleSelectedTaskCompletion);
 document.getElementById('edit-scope-close').addEventListener('click', () => editScopeDialog.close());
 document.getElementById('edit-scope-cancel').addEventListener('click', () => editScopeDialog.close());
 editScopeConfirmButton.addEventListener('click', confirmEditScope);
@@ -4130,8 +4277,17 @@ function visibleViewRange() {
     let end;
 
     if (activeView === 'month') {
-        start = new Date(cursorDate.getFullYear(), cursorDate.getMonth(), 1);
-        end = new Date(start.getFullYear(), start.getMonth() + viewPeriod('month'), 1);
+        const firstMonth = new Date(cursorDate.getFullYear(), cursorDate.getMonth(), 1);
+        const monthCount = viewPeriod('month');
+        const monthAfterLast = new Date(firstMonth.getFullYear(), firstMonth.getMonth() + monthCount, 1);
+        if (calendarState.settings.showMonthOverflowDays === true) {
+            const lastMonth = new Date(firstMonth.getFullYear(), firstMonth.getMonth() + monthCount - 1, 1);
+            start = monthGridRange(firstMonth).start;
+            end = monthGridRange(lastMonth).end;
+        } else {
+            start = firstMonth;
+            end = monthAfterLast;
+        }
     } else if (activeView === 'week' || activeView === 'workWeek') {
         const days = weekViewDays(activeView === 'workWeek');
         start = startOfDay(days[0] || startOfWeek(cursorDate));
@@ -4212,7 +4368,12 @@ function loadedRangeCovers(range) {
 }
 
 async function ensureVisibleRangeLoaded(force = false) {
-    if (!initialized || eventEditingActive || document.visibilityState === 'hidden' || !hasActionBridge()) return;
+    if (!initialized || eventEditingActive || document.visibilityState === 'hidden') return;
+    if (!hasActionBridge()) {
+        if (isNativeVisualization()) scheduleVisibleRangeRetry(force);
+
+        return;
+    }
 
     const range = visibleViewRange();
     const signature = visualizationRangeSignature(range);
@@ -4575,6 +4736,7 @@ function applyStaticTranslations() {
         ['cancel-button', 'Cancel'],
         ['save-button', 'Save'],
         ['details-delete-button', 'Delete'],
+        ['details-task-toggle-button', 'Mark completed'],
         ['details-close-button', 'Close'],
         ['details-edit-button', 'Edit'],
         ['edit-scope-cancel', 'Cancel'],
@@ -4598,6 +4760,9 @@ function applyStaticTranslations() {
     icsImportButton.title = icsImportText('Import ICS');
     icsImportFile.setAttribute('aria-label', icsImportText('Import ICS'));
     document.getElementById('all-day-label').textContent = t('All day');
+    document.getElementById('event-task-label').textContent = t('Task appointment');
+    document.getElementById('event-task-completed-label').textContent = t('Completed');
+    document.getElementById('event-task-follow-planned-label').textContent = t('Move planned follow-up appointments');
     document.getElementById('dialog-title').textContent = t('Event');
     document.getElementById('details-dialog-title').textContent = t('Event details');
     document.getElementById('edit-scope-dialog-title').textContent = t('Edit recurring event');
@@ -4609,7 +4774,7 @@ function applyStaticTranslations() {
     updateViewSelectorOptions();
     document.getElementById('calendar-filter-dialog-title').textContent = t('Filter calendars');
     document.getElementById('calendar-filter-note').textContent = t('This filter only changes the current view on this browser or monitor.');
-    ['calendar', 'occasion', 'start', 'end', 'location', 'description'].forEach(name => {
+    ['calendar', 'occasion', 'task-status', 'start', 'end', 'location', 'description'].forEach(name => {
         const label = document.getElementById(`details-${name}-label`);
         label.textContent = t(label.textContent.trim());
     });

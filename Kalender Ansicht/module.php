@@ -4,18 +4,20 @@ declare(strict_types=1);
 
 use Burki24\SymconModuleHelper\ConfigurationFormHelper;
 use Burki24\SymconModuleHelper\IPSViewHTMLPageHelper;
-use Burki24\SymconModuleHelper\IPSViewStyleHelper;
+use Burki24\SymconModuleHelper\IPSViewStyleConfigurationHelper;
 use Burki24\SymconModuleHelper\VariableHelper;
 use Burki24\SymconModuleHelper\VisualizationAssetHelper;
 use Burki24\SymconModuleHelper\VisualizationThemeHelper;
 use IPSKalender\CalendarAppointmentRange;
 use IPSKalender\CalendarEventReminder;
+use IPSKalender\CalendarTaskEvent;
 
 require_once __DIR__ . '/../libs/CalendarAppointmentRange.php';
 require_once __DIR__ . '/../libs/CalendarEventReminder.php';
+require_once __DIR__ . '/../libs/CalendarTaskEvent.php';
 require_once __DIR__ . '/../libs/helper/ConfigurationFormHelper.php';
 require_once __DIR__ . '/../libs/helper/IPSViewHTMLPageHelper.php';
-require_once __DIR__ . '/../libs/helper/IPSViewStyleHelper.php';
+require_once __DIR__ . '/../libs/helper/IPSViewStyleConfigurationHelper.php';
 require_once __DIR__ . '/../libs/helper/VariableHelper.php';
 require_once __DIR__ . '/../libs/helper/VisualizationAssetHelper.php';
 require_once __DIR__ . '/../libs/helper/VisualizationThemeHelper.php';
@@ -24,7 +26,7 @@ class CalendarView extends IPSModuleStrict
 {
     use ConfigurationFormHelper;
     use IPSViewHTMLPageHelper;
-    use IPSViewStyleHelper;
+    use IPSViewStyleConfigurationHelper;
     use VariableHelper;
     use VisualizationAssetHelper;
     use VisualizationThemeHelper;
@@ -32,10 +34,12 @@ class CalendarView extends IPSModuleStrict
     private const CALENDAR_MODULE_ID = '{227B63E4-4223-316B-76E9-FD3849689562}';
     private const CALENDAR_ACCOUNT_MODULE_ID = '{966D6119-7FF3-5CA5-06C3-536FBF8100C4}';
     private const INITIALIZATION_DELAY_MS = 5_000;
+    private const INITIALIZATION_REFRESH_DELAY_MS = 1_000;
+    private const MAX_INITIALIZATION_REFRESH_ATTEMPTS = 30;
     private const APPOINTMENT_LOOKAHEAD_DAYS = 1095;
     private const VISUALIZATION_BOOTSTRAP_PAST_DAYS = 7;
     private const VISUALIZATION_BOOTSTRAP_FUTURE_DAYS = 42;
-    private const VISUALIZATION_MAX_RANGE_DAYS = 370;
+    private const VISUALIZATION_MAX_RANGE_DAYS = 380;
     private const ATTRIBUTE_IPSVIEW_TOKEN_1 = 'IPSViewToken1';
     private const ATTRIBUTE_IPSVIEW_TOKEN_2 = 'IPSViewToken2';
     private const ATTRIBUTE_IPSVIEW_TOKEN_3 = 'IPSViewToken3';
@@ -123,6 +127,7 @@ class CalendarView extends IPSModuleStrict
         $this->RegisterPropertyBoolean('ShowThreeDaysCalendarWeek', false);
         $this->RegisterPropertyBoolean('ShowWeekCalendarWeek', true);
         $this->RegisterPropertyBoolean('ShowMonthCalendarWeek', false);
+        $this->RegisterPropertyBoolean('ShowMonthOverflowDays', false);
         $this->RegisterPropertyBoolean('ShowAgendaDayOfYear', true);
         $this->RegisterPropertyBoolean('ShowListDayOfYear', false);
         $this->RegisterPropertyBoolean('ShowThreeDaysDayOfYear', true);
@@ -147,6 +152,7 @@ class CalendarView extends IPSModuleStrict
         $this->RegisterIPSViewStyleProperties();
         $this->RegisterAttributeBoolean('RuntimeReady', false);
         $this->RegisterAttributeString('CalendarSelectionBackup', '[]');
+        $this->RegisterAttributeInteger('InitializationRefreshAttempts', 0);
         $this->RegisterAttributeInteger(self::ATTRIBUTE_IPSVIEW_TOKEN_1, 0);
         $this->RegisterAttributeInteger(self::ATTRIBUTE_IPSVIEW_TOKEN_2, 0);
         $this->RegisterAttributeInteger(self::ATTRIBUTE_IPSVIEW_TOKEN_3, 0);
@@ -159,6 +165,7 @@ class CalendarView extends IPSModuleStrict
 
         $this->SetVisualizationType(1);
         $this->RegisterTimer('InitializationTimer', 0, 'IPSKALVIEW_Initialize($_IPS[\'TARGET\']);');
+        $this->RegisterTimer('InitializationRefreshTimer', 0, 'IPSKALVIEW_RefreshInitialization($_IPS[\'TARGET\']);');
     }
 
     /**
@@ -311,6 +318,7 @@ class CalendarView extends IPSModuleStrict
     {
         parent::ApplyChanges();
 
+        $this->SetVisualizationType(1);
         $preservedIPSViewHTML = $this->existingIPSViewHTML();
         $this->ensureIPSViewToken();
         $this->WriteAttributeBoolean('RuntimeReady', false);
@@ -321,6 +329,7 @@ class CalendarView extends IPSModuleStrict
         $this->RegisterMessage(0, IPS_KERNELSTARTED);
         $this->RegisterIPSViewStyleMediaMessages();
         $this->SetTimerInterval('InitializationTimer', 0);
+        $this->SetTimerInterval('InitializationRefreshTimer', 0);
         $this->MaintainIPSViewHTMLVariable(
             'IPSViewCalendar',
             $this->Translate('IPSView calendar'),
@@ -377,6 +386,41 @@ class CalendarView extends IPSModuleStrict
         }
 
         $this->broadcastState(null, true);
+        $this->WriteAttributeInteger('InitializationRefreshAttempts', 0);
+        $this->scheduleInitializationRefresh();
+
+        return true;
+    }
+
+    /**
+     * Refreshes the visualization after selected calendar instances completed their own startup.
+     *
+     * @return bool True when no selected active calendar is still initializing.
+     */
+    public function RefreshInitialization(): bool
+    {
+        $this->SetTimerInterval('InitializationRefreshTimer', 0);
+        if (!$this->isRuntimeReady()) {
+            return false;
+        }
+
+        if ($this->hasPendingSelectedCalendarInitialization()) {
+            $attempts = $this->ReadAttributeInteger('InitializationRefreshAttempts') + 1;
+            $this->WriteAttributeInteger('InitializationRefreshAttempts', $attempts);
+            if ($attempts < self::MAX_INITIALIZATION_REFRESH_ATTEMPTS) {
+                $this->scheduleInitializationRefresh();
+
+                return false;
+            }
+
+            $this->SendDebug(
+                'Initialization',
+                'Selected calendar instances did not finish initialization before the refresh limit.',
+                0
+            );
+        }
+
+        $this->broadcastState(null, true);
 
         return true;
     }
@@ -389,6 +433,8 @@ class CalendarView extends IPSModuleStrict
     public function MessageSink(int $TimeStamp, int $SenderID, int $Message, array $Data): void
     {
         if ($SenderID === 0 && $Message === IPS_KERNELSTARTED) {
+            $this->WriteAttributeInteger('InitializationRefreshAttempts', 0);
+            $this->SetTimerInterval('InitializationRefreshTimer', 0);
             $this->scheduleInitialization();
             return;
         }
@@ -413,7 +459,7 @@ class CalendarView extends IPSModuleStrict
      */
     public function GetVisualizationTile(): string
     {
-        return $this->renderCalendarHtml($this->buildState(), false);
+        return $this->renderCalendarHtml($this->buildTileBootstrapState(), false);
     }
 
     /**
@@ -480,7 +526,7 @@ class CalendarView extends IPSModuleStrict
      */
     public function SynchronizeCalendars(): bool
     {
-        $success = $this->synchronizeSelectedCalendars();
+        $success = $this->synchronizeSelectedCalendars() === [];
         $this->broadcastStateInvalidation();
 
         return $success;
@@ -1489,6 +1535,8 @@ class CalendarView extends IPSModuleStrict
             'Recurring event creation is not supported by this calendar.',
             'Recurring occurrences are currently read-only.',
             'Only this occurrence of the recurring event will be changed.',
+            'Changing the date moves this and all following occurrences. Existing following exceptions will be reset.',
+            'This and all following tasks will be moved to the selected calendar.',
             'Changes will apply to this and all following occurrences.',
             'Existing exceptions from this occurrence onward will be reset.',
             'Changes will apply to the entire recurring series.',
@@ -1500,6 +1548,8 @@ class CalendarView extends IPSModuleStrict
             'This calendar is read-only.',
             'Editing events is unavailable because no action bridge is configured.',
             'Action failed.',
+            'Continued from series',
+            'This overdue task was continued from a series.',
             'The description of Microsoft online meetings is protected and cannot be edited here.'
         ];
     }
@@ -1599,6 +1649,31 @@ class CalendarView extends IPSModuleStrict
                 'nextOffset' => $hasMore ? $nextOffset : null,
                 'totalCount' => $totalEventCount
             ],
+            'settings'    => $this->viewSettings()
+        ];
+    }
+
+    /**
+     * Builds the deliberately small initial state for the native HTML-SDK tile.
+     *
+     * The tile document itself already contains the complete UI assets. Embedding
+     * a broad event range as well can exceed the HTML-SDK response limit before
+     * JavaScript is able to render anything. After initialization the client
+     * requests its current visible range through the regular LoadRange action.
+     *
+     * @return array<string, mixed>
+     */
+    private function buildTileBootstrapState(): array
+    {
+        if (!$this->isRuntimeReady()) {
+            return $this->emptyState();
+        }
+
+        return [
+            'events'      => [],
+            'calendars'   => $this->loadSelectedCalendars(),
+            'generatedAt' => time(),
+            'eventRange'  => null,
             'settings'    => $this->viewSettings()
         ];
     }
@@ -2366,6 +2441,7 @@ class CalendarView extends IPSModuleStrict
             'showThreeDaysCalendarWeek' => $this->ReadPropertyBoolean('ShowThreeDaysCalendarWeek'),
             'showWeekCalendarWeek'      => $this->ReadPropertyBoolean('ShowWeekCalendarWeek'),
             'showMonthCalendarWeek'     => $this->ReadPropertyBoolean('ShowMonthCalendarWeek'),
+            'showMonthOverflowDays'     => $this->ReadPropertyBoolean('ShowMonthOverflowDays'),
             'showAgendaDayOfYear'       => $this->ReadPropertyBoolean('ShowAgendaDayOfYear'),
             'showListDayOfYear'         => $this->ReadPropertyBoolean('ShowListDayOfYear'),
             'showThreeDaysDayOfYear'    => $this->ReadPropertyBoolean('ShowThreeDaysDayOfYear'),
@@ -2393,6 +2469,40 @@ class CalendarView extends IPSModuleStrict
         if (IPS_GetKernelRunlevel() === KR_READY) {
             $this->SetTimerInterval('InitializationTimer', self::INITIALIZATION_DELAY_MS);
         }
+    }
+
+    private function scheduleInitializationRefresh(): void
+    {
+        if (IPS_GetKernelRunlevel() === KR_READY && $this->isRuntimeReady()) {
+            $this->SetTimerInterval('InitializationRefreshTimer', self::INITIALIZATION_REFRESH_DELAY_MS);
+        }
+    }
+
+    private function hasPendingSelectedCalendarInitialization(): bool
+    {
+        foreach ($this->effectiveCalendarConfiguration() as $row) {
+            if (!is_array($row) || !($row['Enabled'] ?? true)) {
+                continue;
+            }
+            $instanceId = (int) ($row['InstanceID'] ?? 0);
+            if ($instanceId <= 0 || !IPS_InstanceExists($instanceId)
+                || !IPS_GetProperty($instanceId, 'Active')) {
+                continue;
+            }
+
+            try {
+                $status = json_decode(IPSKAL_GetCalendarStatus($instanceId), true, 512, JSON_THROW_ON_ERROR);
+                if (!is_array($status) || !($status['runtimeReady'] ?? false)) {
+                    return true;
+                }
+            } catch (Throwable $exception) {
+                $this->SendDebug('CalendarInitialization', $exception->getMessage(), 0);
+
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function isRuntimeReady(): bool
@@ -2589,9 +2699,15 @@ class CalendarView extends IPSModuleStrict
                 break;
 
             case 'Refresh':
-                $success = $this->synchronizeSelectedCalendars();
+                $failedCalendars = $this->synchronizeSelectedCalendars();
+                $success = $failedCalendars === [];
                 $level = $success ? 'success' : 'error';
-                $message = $success ? 'Calendars synchronized.' : 'Synchronization failed.';
+                $message = $success
+                    ? 'Calendars synchronized.'
+                    : sprintf(
+                        $this->Translate('Synchronization failed for: %s.'),
+                        implode(', ', $failedCalendars)
+                    );
                 break;
 
             case 'CreateEvent':
@@ -2624,14 +2740,20 @@ class CalendarView extends IPSModuleStrict
                     throw new InvalidArgumentException($this->Translate('The event data is invalid.'));
                 }
 
+                $eventEditJson = IPSKAL_GetEventForEdit(
+                    $instanceId,
+                    json_encode(
+                        $event,
+                        JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR
+                    )
+                );
+                if (!is_string($eventEditJson)) {
+                    throw new RuntimeException(
+                        $this->Translate('The selected event could not be loaded. Synchronize the calendar and try again.')
+                    );
+                }
                 $eventEdit = json_decode(
-                    IPSKAL_GetEventForEdit(
-                        $instanceId,
-                        json_encode(
-                            $event,
-                            JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR
-                        )
-                    ),
+                    $eventEditJson,
                     true,
                     512,
                     JSON_THROW_ON_ERROR
@@ -2766,6 +2888,7 @@ class CalendarView extends IPSModuleStrict
                     || !is_array($event) || array_is_list($event)) {
                     throw new InvalidArgumentException($this->Translate('The event data is invalid.'));
                 }
+                $this->prepareTaskSeriesTransfer($sourceInstanceId, $sourceEvent, $event);
                 $sourceReminder = is_array($sourceEvent['reminder'] ?? null)
                     ? $sourceEvent['reminder']
                     : [];
@@ -2891,16 +3014,37 @@ class CalendarView extends IPSModuleStrict
         ];
     }
 
-    private function synchronizeSelectedCalendars(): bool
+    /**
+     * Synchronizes all selected calendars and returns labels for failed providers.
+     *
+     * @return list<string>
+     */
+    private function synchronizeSelectedCalendars(): array
     {
-        $success = true;
-        foreach ($this->loadSelectedCalendars() as $calendar) {
+        $failures = [];
+        foreach ($this->loadSelectedCalendars(true) as $calendar) {
             if (!IPSKAL_Synchronize($calendar['instanceId'])) {
-                $success = false;
+                $failures[] = $this->calendarSynchronizationLabel($calendar);
             }
         }
 
-        return $success;
+        return $failures;
+    }
+
+    /** @param array<string, mixed> $calendar */
+    private function calendarSynchronizationLabel(array $calendar): string
+    {
+        $provider = match ((string) ($calendar['provider'] ?? '')) {
+            'apple'     => 'Apple Calendar',
+            'caldav'    => 'CalDAV',
+            'google'    => 'Google Calendar',
+            'microsoft' => 'Microsoft 365',
+            'ics'       => 'ICS/WebCal',
+            default     => 'Unknown provider'
+        };
+        $name = trim((string) ($calendar['name'] ?? ''));
+
+        return $name === '' ? $provider : sprintf('%s (%s)', $provider, $name);
     }
 
     private function ipsViewHookAddress(): string
@@ -3150,6 +3294,47 @@ class CalendarView extends IPSModuleStrict
         throw new RuntimeException(
             $this->Translate('Events with complex reminder settings cannot be moved safely.')
         );
+    }
+
+    /**
+     * Resolves the source series tail before creating a task in another calendar.
+     *
+     * @param array<string, mixed> $sourceEvent Receives the verified deletion scope.
+     * @param array<string, mixed> $event Receives the target recurrence settings.
+     */
+    private function prepareTaskSeriesTransfer(int $sourceInstanceId, array &$sourceEvent, array &$event): void
+    {
+        if (!(bool) ($event['task'] ?? false)
+            || !(bool) ($event['taskFollowPlanned'] ?? false)
+            || !(bool) ($sourceEvent['recurring'] ?? false)
+            || ($sourceEvent['writeScope'] ?? '') !== 'occurrence') {
+            return;
+        }
+
+        $following = json_decode(IPSKAL_GetRecurringFollowing(
+            $sourceInstanceId,
+            (string) ($sourceEvent['seriesId'] ?? ''),
+            (string) ($sourceEvent['occurrenceId'] ?? ''),
+            (string) ($sourceEvent['originalStart'] ?? ''),
+            (string) ($sourceEvent['resourceUrl'] ?? '')
+        ), true, 512, JSON_THROW_ON_ERROR);
+        if (!is_array($following)
+            || !(bool) ($following['canUpdateFollowing'] ?? false)
+            || !(bool) ($following['canDeleteSeries'] ?? false)
+            || !is_array($following['recurrenceSettings'] ?? null)
+            || $following['recurrenceSettings'] === []) {
+            throw new RuntimeException($this->Translate('The recurrence pattern cannot be split safely.'));
+        }
+        $event['recurrence'] = CalendarTaskEvent::shiftPlannedRecurrence(
+            $following['recurrenceSettings'],
+            (string) ($following['originalStart'] ?? ''),
+            (string) ($event['start'] ?? '')
+        );
+        if (trim((string) ($event['timezone'] ?? '')) === '') {
+            $event['timezone'] = (string) ($following['timezone'] ?? '');
+        }
+        $sourceEvent = $following;
+        $sourceEvent['writeScope'] = 'following';
     }
 
     /** @param array<string, mixed> $creationResult */

@@ -203,6 +203,45 @@ final class CalDAVProvider implements CalendarProviderInterface, RecurringCalend
         );
     }
 
+    /**
+     * Reads a detached single event by resource and UID without a date-window filter.
+     *
+     * Recurring masters, exceptions and ambiguous identities remain unknown. This
+     * lookup never expands a series and retains the normal CalDAV origin checks.
+     *
+     * @param string $calendarUrl Configured calendar collection URL.
+     * @param string $resourceUrl Previously recorded event resource URL.
+     * @param string $uid Expected detached event UID.
+     * @return array<string, mixed>|null Unique matching single event, or null when unconfirmed.
+     */
+    public function getSingleEventByResource(string $calendarUrl, string $resourceUrl, string $uid): ?array
+    {
+        $uid = trim($uid);
+        if ($uid === '' || trim($resourceUrl) === '') {
+            return null;
+        }
+        $calendarUrl = $this->normalizeAbsoluteUrl($calendarUrl);
+        $resourceUrl = $this->normalizeAbsoluteUrl($resourceUrl);
+        $this->assertResourceBelongsToCalendar($calendarUrl, $resourceUrl);
+        $response = $this->httpClient->request('GET', $resourceUrl, ['Accept' => 'text/calendar']);
+        $this->assertResponseStatus($response, [200], 'event retrieval');
+        $effectiveResourceUrl = $this->trustedEffectiveUrl($response, $resourceUrl);
+        $this->assertResourceBelongsToCalendar($calendarUrl, $effectiveResourceUrl);
+        $events = array_values(array_filter(
+            ICalendarCodec::parseEvents(
+                $response->body,
+                $effectiveResourceUrl,
+                trim((string) ($response->headers['etag'] ?? ''))
+            ),
+            static fn (array $event): bool => hash_equals($uid, (string) ($event['uid'] ?? ''))
+        ));
+        if (count($events) !== 1
+            || ($events[0]['recurrenceType'] ?? '') !== CalendarEventRecurrence::SINGLE) {
+            return null;
+        }
+        return $events[0];
+    }
+
     /** @inheritDoc */
     public function getRecurringSeries(
         string $calendarUrl,

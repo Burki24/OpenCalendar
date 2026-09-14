@@ -62,6 +62,9 @@ Sicherung wiederhergestellt, soweit diese verfügbar ist.
 - Navigation innerhalb des dargestellten Zeitraums; passt die Tage-, Wochen- oder Monatsansicht vollständig in die verfügbare Breite, kann auf Touch-Geräten zusätzlich horizontal gewischt werden (links = weiter, rechts = zurück). Muss das Raster auf einer schmalen Anzeige horizontal scrollen, verschiebt die Wischgeste stattdessen das Raster; die Zeitraum-Navigation bleibt über die Pfeilschaltflächen erreichbar
 - manuelle Synchronisation aller ausgewählten Kalender
 - Erstellen, Bearbeiten, Verschieben und Löschen von Terminen in beschreibbaren Kalendern
+- Erstellen ganztägiger Aufgabentermine und Aufgabenserien, direktes Erledigen
+  oder Wiederöffnen in den Termindetails und tägliches Weiterschieben offener
+  überfälliger Aufgaben
 - Komfortable Zeiteingabe: Wird beim Beginn nur das Datum geändert, folgt das Enddatum automatisch auf denselben Tag und behält seine Uhrzeit bei. Bei einer geänderten Beginn-Uhrzeit wird das Ende automatisch auf eine Stunde später gesetzt; Ganztagstermine bleiben auf demselben sichtbaren Tag.
 - automatische Aktualisierung nach einer Kalendersynchronisation, ohne die am jeweiligen Client gewählte Ansicht oder das Bezugsdatum zurückzusetzen
 - responsive Bedienung auf großen Kacheln und schmalen Mobilansichten
@@ -90,6 +93,73 @@ Google → Microsoft oder CalDAV → Google, ist damit möglich. Provider-spezif
 Zusatzdaten, die OpenCalendar nicht im gemeinsamen Terminmodell führt, werden
 dabei nicht übertragen.
 
+### Aufgabentermine bedienen
+
+Im Dialog **Termin erstellen** beziehungsweise **Termin bearbeiten** aktiviert
+**Aufgabentermin** die Aufgabenfunktion. Das Datum bleibt frei wählbar;
+OpenCalendar setzt den Termin automatisch auf ganztägig und deaktiviert
+Jahresereignisse. Ein Aufgabentermin dauert genau einen Tag und kann auch eine
+Wiederholung erhalten. Im Kalender kennzeichnet `[OC:TODO]` eine offene und
+`[OC:DONE]` eine erledigte Aufgabe. Die Kalenderansicht stellt sie weiterhin
+mit einem Kästchen dar; beim Kalenderanbieter wird bewusst nur die
+ASCII-kompatible Kennzeichnung gespeichert.
+
+In den Termindetails steht für offene Aufgaben **Als erledigt markieren** zur
+Verfügung. Bei erledigten Aufgaben wird daraus **Aufgabe wieder öffnen**. Eine
+offene Aufgabe mit einem Datum vor heute wird beim lokalen Tageswechsel oder bei
+der nächsten Synchronisation als echter Kalendertermin auf heute verschoben.
+Erledigte Aufgaben verbleiben an ihrem Datum. Bei Aufgabenserien legt die
+Option **Geplante Folgetermine mitverschieben** fest, ob der restliche Serienplan
+beim Nachziehen unverändert bleibt oder ab dem überfälligen Vorkommnis gemeinsam
+verschoben wird. Die Option steht nur bei Kalendern mit Unterstützung für
+**Diesen und alle folgenden Termine** bereit. Damit funktionieren
+Aufgabentermine auch im IPSView-Client und ohne eine zusätzliche Aufgaben-API
+oder weitere OAuth-Berechtigungen.
+
+Auch beim manuellen Ändern des Datums gilt diese Auswahl: Mit Häkchen werden
+der ausgewählte und alle folgenden Termine verschoben, beim ersten Termin also
+die gesamte Serie. Bereits einzeln angepasste folgende Vorkommnisse werden dabei
+zurückgesetzt. Der Hinweis im Bearbeitungsdialog folgt der Auswahl. Das reine
+Erledigen ohne Datumsänderung betrifft weiterhin nur die ausgewählte Aufgabe.
+
+Die Auswahl gilt auch beim Wechsel in einen anderen Kalender: Mit **Geplante
+Folgetermine mitverschieben** werden das ausgewählte und alle folgenden
+Vorkommnisse als Serie übertragen, beim ersten Termin also die gesamte Serie.
+Ohne Häkchen wird nur das geöffnete Vorkommnis als Einzeltermin übertragen.
+Das Ziel muss Serien anlegen können. Erst nach erfolgreicher Erstellung im
+Ziel wird der übertragene Serienteil an der Quelle entfernt; bei einem Fehler
+greift die bestehende Rücknahme des Zieltermins. Offene Aufgaben bleiben offen.
+
+Das Datum darf auch nach hinten verschoben werden. Liegt eine offene Aufgabe
+danach in der Vergangenheit, greift bei der nächsten Synchronisation wieder
+das automatische Nachziehen auf heute; mit aktiviertem Häkchen wird dabei auch
+der verbleibende Serienteil mitverschoben.
+
+Soll ein überfälliges Vorkommnis ohne Mitverschieben auf heute nachgezogen
+werden, während zwischen beiden Daten bereits weitere Serientermine liegen,
+wird dieses Vorkommnis als einzelner offener Aufgabentermin weitergeführt. Der
+verbleibende Serienplan bleibt dadurch exakt erhalten; insbesondere Microsoft
+365 muss kein Vorkommnis über ein anderes Serienelement verschieben. In der
+OpenCalendar-Ansicht kennzeichnet ein zusätzlicher Pfeil (`☐ ↻`) diesen
+nachgezogenen Einzeltermin; in den Termindetails wird er als **Aus Serie
+nachgezogen** bezeichnet.
+
+Diese Serienzuordnung bleibt erhalten, wenn die offene Aufgabe zeitweise
+außerhalb des geladenen Datumsbereichs liegt. Erst eine bestätigte Erledigung
+oder Löschung (beziehungsweise das Entfernen der Aufgabenkennzeichnung) gibt
+die Ursprungsserie wieder frei. Vorübergehende Abfragefehler lösen diese
+Zuordnung nicht auf.
+
+Beim Kalenderwechsel bleibt eine erfolgreich übertragene Aufgabe auch dann
+im Ziel erhalten, wenn das Nachladen der Quelle nach ihrer bestätigten Löschung
+fehlschlägt. In diesem Fall die Synchronisation wiederholen, nicht den Termin
+erneut verschieben.
+
+Die Funktion setzt einen beschreibbaren Kalender voraus und unterstützt bewusst
+nur eintägige ganztägige Termine. In externen Kalenderprogrammen bleiben die Marker
+im Titel sichtbar. Google Tasks und andere Aufgabenlisten werden nicht importiert
+oder synchronisiert.
+
 ## Einstellungen
 
 Eigenschaft | Beschreibung
@@ -105,6 +175,10 @@ Anzeigeoptionen → Tageszahl | Je Ansicht separat für Agenda, Liste, Tage, Woc
 Anzeigeoptionen → Listenansicht | Bedienelemente der Listenansicht ein-/ausblenden; Zeitraum und Ansichtswechsel bleiben sichtbar
 Anzeigeoptionen → Listenspalten | Legt fest, welche Datenfelder in der Listenansicht als Spalten erscheinen; der Anlass von Jahresereignissen kann als eigene Spalte eingeblendet werden
 Ansichtszeiträume | Sichtbare Länge jeder Ansicht im aufklappbaren Bereich; Agenda/Liste/Tage in Tagen, Woche in Wochen und Monat in Monaten
+IPSView → Stilquelle | Gemeinsame Stilquelle für die IPSView-Ausgabe: Benutzerdefiniert, IPSView-Medium, Style Profile V1 oder eine der festen Vorgaben
+IPSView → Transparenter Hintergrund | Macht ausschließlich den äußeren View-Hintergrund transparent; die übrigen Flächen behalten ihre Stilwerte
+IPSView → Schrift-/Stilwerte | Schriftfamilie, Schriftschnitt, Größe, Skalierung, Farben, Transparenzen, Rahmen, Schatten und Effekte; bei Vorgaben als wirksame schreibgeschützte Vorschau
+IPSView → Native Farben | 109 native IPSView-Farbfelder in 15 Gruppen; im benutzerdefinierten Stil einzeln über **Abweichend** überschreibbar, bei anderen Stilquellen als aufgelöste Werte schreibgeschützt
 
 Die Kalenderwoche erscheint in der Wochenansicht in der Zeitraumüberschrift.
 In der Tage-Ansicht werden bei einem Wochenwechsel beide Kalenderwochen
@@ -162,24 +236,93 @@ Ansicht, ohne Symcons Größenlimit für einzelne PHP-Rückgaben zu überschreit
 
 1. Den Bereich **IPSView** in der Instanzkonfiguration öffnen.
 2. **IPSView-HTML-Ausgabe bereitstellen** aktivieren.
-3. Unter **Stilquelle** zwischen **Benutzerdefinierter Stil**,
-   **IPSView-Standardstil**, **Helle Vorgabe** und **Dunkle Vorgabe** wählen.
-4. Für **IPSView-Standardstil** das Medienobjekt auswählen, das die gewünschte
-   `.ipsView`-Datei enthält. Aus der Datei werden ausschließlich freigegebene
-   Standardstilwerte wie Farben, Schrift, Rahmen, Schatten und Rundungen
-   übernommen.
-5. Beim benutzerdefinierten Stil die benötigten Flächen-, Text-, Icon-, Rahmen-,
-   Popup- und Statusfarben sowie Typografie und Effekte einstellen.
-6. Mit **Transparenter Hintergrund** festlegen, ob die umgebende IPSView sichtbar
-   bleiben soll.
-7. Farbbalkenbreite einstellen und die Konfiguration übernehmen.
-8. Unterhalb der Instanz wird die String-Variable **IPSView-Kalender** mit der
-   Darstellung **Webinhalt** angelegt.
-9. Im IPSView Designer ein Steuerelement vom Typ **HTML-Box** einfügen und die
-   Variable **IPSView-Kalender** als ID auswählen.
-10. Als HTML-Renderer **Browser des Clients** oder **Automatisch** verwenden. Der
+3. Unter **Stilquelle** direkt den gewünschten Stil wählen:
+   - **Benutzerdefinierter Stil**,
+   - **IPSView-Standardstil** aus einem `.ipsView`-Medienobjekt,
+   - **Helle Vorgabe** oder **Dunkle Vorgabe** als kompatible Standardquellen,
+   - **Stilprofil** aus einem Style-Profile-V1-Medienobjekt,
+   - **Hell**, **Dunkel**, **Warm**, **Kühl**, **Erdig**, **Wasser** oder **Sonnig**
+     als zentrale IPSView-Vorgaben.
+4. Bei **IPSView-Standardstil** das Medienobjekt mit der gewünschten
+   `.ipsView`-Datei auswählen. Bei **Stilprofil** das Medienobjekt mit dem
+   vollständigen validierten Style Profile V1 auswählen.
+5. Bei allen nicht benutzerdefinierten Quellen werden darunter die **aktuell
+   wirksamen** Farben, Deckkräfte, Schriftwerte, Rahmen, Schatten, Effekte und
+   nativen IPSView-Farben schreibgeschützt angezeigt. Dadurch bleiben vorhandene
+   eigene Einstellungen beim Ausprobieren einer Vorgabe unverändert.
+6. Soll eine Vorgabe angepasst werden, **In benutzerdefinierten Stil übernehmen**
+   wählen. Die aktuell wirksamen Werte werden vollständig in die
+   benutzerdefinierten Felder kopiert und die Stilquelle wechselt auf
+   **Benutzerdefinierter Stil**. Anschließend können die Werte frei verändert
+   werden.
+7. Im benutzerdefinierten Stil stehen die zentralen IPSView-Schriften
+   **Roboto**, **Roboto Mono**, **Open Sans**, **PT Sans**, **Dancing Script**,
+   **Bebas Neue**, **Indie Flower** und **Segment7** zur Verfügung. Der
+   Schriftschnitt wird passend zur gewählten Schrift angeboten und ebenfalls
+   beim Übernehmen einer Vorgabe kopiert.
+8. Mit **Transparenter Hintergrund** festlegen, ob die umgebende IPSView sichtbar
+   bleiben soll. Diese Einstellung ist global und wird beim Kopieren eines Stils
+   nicht verändert.
+9. Farbbalkenbreite einstellen und die Konfiguration übernehmen.
+10. Unterhalb der Instanz wird die String-Variable **IPSView-Kalender** mit der
+    Darstellung **Webinhalt** angelegt.
+11. Im IPSView Designer ein Steuerelement vom Typ **HTML-Box** einfügen und die
+    Variable **IPSView-Kalender** als ID auswählen.
+12. Als HTML-Renderer **Browser des Clients** oder **Automatisch** verwenden. Der
     einfache native HTML-Renderer genügt nicht, weil Navigation, Ansichtswechsel
     und Terminbearbeitung JavaScript verwenden.
+
+### Native IPSView-Farben und Vererbung
+
+Der gemeinsame `IPSViewStyleConfigurationHelper` bildet die **109 bekannten
+nativen IPSView-Farbfelder in 15 Gruppen** ab: Basis, Assoziationen, Tabs, Switch,
+Slider, Fortschrittsanzeige, Kreis, Flow, Gauge, Schatten/Raster, Dialog, Chart,
+Schedule, Event und Kalender. Diese nativen Felder werden nicht als zweiter,
+unabhängiger Stil gepflegt. Sie erben standardmäßig aus den semantischen
+Designrollen und folgen dadurch automatisch einer geänderten Grundfarbe oder
+Vorgabe.
+
+Im **benutzerdefinierten Stil** kann ein einzelnes natives Feld mit **Abweichend**
+von dieser Vererbung gelöst und mit einer eigenen Farbe versehen werden. Wird die
+Farbe eines bisher geerbten Feldes manuell geändert, aktiviert OpenCalendar die
+Abweichung automatisch. Wird **Abweichend** wieder deaktiviert, wird der gespeicherte
+Override entfernt und das Feld übernimmt wieder den aus der semantischen Rolle
+abgeleiteten Wert. Bei IPSView-Medium, Stilprofil und festen Vorgaben zeigt die
+Konfiguration die vollständig aufgelösten nativen Werte nur lesend an.
+
+`ColorView` und `ColorPage` haben unterschiedliche Aufgaben. `ColorView` ist der
+Hintergrund der gesamten View, `ColorPage` der Seitenhintergrund. Enthält ein als
+Stilquelle gewähltes `.ipsView`-Dokument kein `ColorView`, verwendet OpenCalendar
+für den View-Hintergrund den IPSView-Standard `#404040`; `ColorPage` wird nicht
+als Ersatz herangezogen. Der optionale **Transparente Hintergrund** betrifft
+ausschließlich den äußeren View-Hintergrund und ändert diese Farblogik nicht.
+
+### Style-Profile-Kompatibilität
+
+Die Kalender Ansicht ist Referenz-Consumer für **Style Profile V1** des
+IPSViewAssistant. Ein dort exportiertes Profil kann als Symcon-Dokumentmedium
+hinterlegt und anschließend direkt über **Stilprofil** ausgewählt werden. Der
+zentrale `IPSViewStyleConfigurationHelper` übernimmt den vollständigen portablen
+Snapshot einschließlich der nativen IPSView-Theme-Daten.
+
+OpenCalendar berücksichtigt dabei Farben und ihre jeweils unabhängigen
+Deckkräfte, Schriftfamilie, Schriftschnitt, Basisschriftgröße und Skalierung,
+Eckenradius, Rahmen- und Linienstärke, Schattenparameter, Inaktivitätsdeckkraft
+und Verlaufsstärke. **Fett**, **Kursiv** und **Fett kursiv** werden in der
+IPSView-Ausgabe ebenfalls angewendet. Popups verwenden die Profilwerte für
+Hintergrund, Rahmen und Schatten; die responsive Darstellung bleibt davon
+unabhängig erhalten.
+
+Ein vollständiges, unverändert aus dem IPSViewAssistant exportiertes Referenzprofil
+liegt unter `tests/fixtures/ipsview-assistant-style-profile-v1.json`. Der
+Ende-zu-Ende-Test prüft, dass dieses Profil über den tatsächlich vendorten
+Style-Helper aufgelöst wird und danach weiterhin verlustfrei als kanonisches
+Style Profile V1 validiert und serialisiert werden kann.
+
+Kalender- und Terminfarben bleiben von der globalen Stilquelle unabhängig. Die
+Stilquelle steuert das gemeinsame Erscheinungsbild der View – Hintergründe,
+Bedienelemente, Texte, Rahmen, Popups, Schatten und semantische Statusfarben –
+aber nicht die fachlichen Farben der einzelnen Kalender.
 
 Agenda, Listen-, Tage-, Wochen- und Monatsansicht funktionieren direkt in der
 IPSView-HTML-Box. In beschreibbaren Kalendern lassen sich dort außerdem Termine
@@ -216,6 +359,7 @@ Synchronisation schlägt fehl | Jede ausgewählte Kalender-Instanz einzeln synch
 Schaltfläche „＋ Termin“ ist deaktiviert | Mindestens einen ausgewählten Kalender mit Schreibrechten verwenden; ICS/Webcal ist immer schreibgeschützt
 IPSView zeigt nur statisches oder unvollständiges HTML | Im IPSView-Steuerelement **Browser des Clients** oder **Automatisch** als Renderer wählen
 IPSView-Inhalt ist veraltet | **IPSView-HTML neu generieren** ausführen und prüfen, ob die Ausgabe aktiviert ist
+IPSView-Stil zeigt andere Werte als erwartet | Prüfen, welche **Stilquelle** aktiv ist. Bei einer Vorgabe zeigen die Felder die wirksamen Werte schreibgeschützt; eigene Änderungen sind erst nach **In benutzerdefinierten Stil übernehmen** möglich. Bei einem einzelnen nativen Farbfeld zusätzlich prüfen, ob **Abweichend** aktiv ist oder das Feld noch dem geerbten semantischen Wert folgt
 Kalenderauswahl ist leer oder unvollständig | **Alle Kalenderinstanzen auswählen** verwenden, die gewünschte Auswahl anpassen und anschließend **Übernehmen**
 
 ## PHP-Befehlsreferenz
@@ -465,10 +609,14 @@ konnte.
 
 Kachel und IPSView-Seite werden aus derselben Asset-Struktur unter
 `visualization/` erzeugt. Die vendorten Helper `VisualizationThemeHelper`,
-`IPSViewStyleHelper` und `IPSViewHTMLPageHelper` sorgen für gemeinsame
-Symcon-Designvariablen, IPSView-Stilrollen und die kontrollierte Verwaltung der
-WebContent-Variable. Kalender- und Terminfarben bleiben davon unabhängige
-fachliche Inhaltsfarben.
+`IPSViewFontCatalogHelper`, `IPSViewStylePresetHelper`,
+`IPSViewStyleProfileHelper`, `IPSViewStyleHelper` und `IPSViewHTMLPageHelper`
+sorgen für gemeinsame Symcon-Designvariablen, Schriftkatalog, Presets,
+Style-Profile, IPSView-Stilrollen und die kontrollierte Verwaltung der
+WebContent-Variable. `IPSViewControlThemeHelper` und
+`IPSViewStyleConfigurationHelper` ergänzen den vollständigen nativen
+109-Farben-Katalog samt Vererbung und gezielten Overrides. Kalender- und
+Terminfarben bleiben davon unabhängige fachliche Inhaltsfarben.
 
 ### Tagesübersicht der Kalenderansichten
 

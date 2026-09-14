@@ -37,6 +37,7 @@ final class CalendarVisualizationRenderer
                     'showThreeDaysCalendarWeek' => false,
                     'showWeekCalendarWeek'      => true,
                     'showMonthCalendarWeek'     => true,
+                    'showMonthOverflowDays'     => true,
                     'showAgendaDayOfYear'       => false,
                     'showListDayOfYear'         => true,
                     'showThreeDaysDayOfYear'    => true,
@@ -348,7 +349,8 @@ assertVisualization(
         && str_contains($script, 'eventCanDeleteFollowing(event)')
         && str_contains($script, '...recurrencePayload(selectedEvent)')
         && str_contains($script, "t('Only this occurrence of the recurring event will be changed.')")
-        && str_contains($script, "'Open in provider': 'Extern öffnen'"),
+        && str_contains($script, "function providerLinkText(value) {\n    return t(value);\n}")
+        && ($germanTranslations['Open in provider'] ?? '') === 'Extern öffnen',
     'Event clicks must open a read-first details modal and route editable events to the existing editor only on request.'
 );
 
@@ -490,11 +492,12 @@ assertVisualization(
         && str_contains($indexSource, 'name="edit-scope" value="following"')
         && str_contains($indexSource, 'name="edit-scope" value="series"')
         && str_contains($script, 'function requestEdit(sourceDialog)')
+        && str_contains($script, 'Boolean(event.task) || !eventIsRecurring(event)')
         && str_contains($script, 'function confirmEditScope()')
         && str_contains($script, 'function eventCanUpdateFollowing(event)')
         && str_contains($script, "resourceUrl: String(event.resourceUrl || '')")
         && str_contains($script, "sendAction('PrepareSeriesEdit', pendingSeriesEdit)")
-        && str_contains($script, 'if (!eventIsRecurring(event) || (!followingAllowed && !seriesAllowed))')
+        && str_contains($script, 'if (Boolean(event.task) || !eventIsRecurring(event) || (!followingAllowed && !seriesAllowed))')
         && str_contains($script, "eventWriteCapability(event, 'canUpdateOccurrence')")
         && str_contains($script, "eventWriteCapability(event, 'canUpdateFollowing')")
         && str_contains($script, "eventWriteCapability(event, 'canUpdateSeries')")
@@ -554,6 +557,26 @@ assertVisualization(
         && str_contains($script, "return ['following', 'series'].includes(selected?.value) ? selected.value : 'occurrence';"),
     'Recurring Google, Microsoft and CalDAV events must offer deleting the selected occurrence and all following occurrences when splitting is supported.'
 );
+$applyChangesStart = strpos($moduleSource, 'public function ApplyChanges(): void');
+$initializeStart = strpos($moduleSource, 'public function Initialize(): bool', $applyChangesStart ?: 0);
+$applyChangesSource = $applyChangesStart !== false && $initializeStart !== false
+    ? substr($moduleSource, $applyChangesStart, $initializeStart - $applyChangesStart)
+    : '';
+assertVisualization(
+    str_contains($applyChangesSource, '$this->SetVisualizationType(1);'),
+    'Applying Calendar View configuration must re-register the native HTML visualization so updated tile assets are loaded.'
+);
+
+assertVisualization(
+    str_contains($moduleSource, 'return $this->renderCalendarHtml($this->buildTileBootstrapState(), false);')
+        && str_contains($moduleSource, 'private function buildTileBootstrapState(): array')
+        && str_contains($moduleSource, "'events'      => []")
+        && str_contains($script, 'void ensureVisibleRangeLoaded();')
+        && str_contains($script, 'if (!hasActionBridge()) {')
+        && str_contains($script, 'if (isNativeVisualization()) scheduleVisibleRangeRetry(force);'),
+    'The native tile must bootstrap without a broad event payload and load only its visible range through the action bridge.'
+);
+
 assertVisualization(
     str_contains($moduleSource, 'private function getFullUpdateMessage(?array $state = null, ?array $toast = null): string')
         && str_contains($moduleSource, '$message[\'toast\'] = $toast;')
@@ -613,6 +636,13 @@ foreach ([
         sprintf('The %s setting must be configurable, persisted and exposed to the visualization.', $property)
     );
 }
+assertVisualization(
+    str_contains($formSource, '"name": "ShowMonthOverflowDays"')
+        && str_contains($formSource, '"caption": "Adjacent month days"')
+        && str_contains($moduleSource, "RegisterPropertyBoolean('ShowMonthOverflowDays', false)")
+        && str_contains($moduleSource, "'showMonthOverflowDays'     => \$this->ReadPropertyBoolean('ShowMonthOverflowDays')"),
+    'The month overflow-day setting must be configurable, disabled by default and exposed to the visualization.'
+);
 foreach (['ShowAgendaDayOfYear', 'ShowThreeDaysDayOfYear', 'ShowWeekDayOfYear', 'ShowMonthDayOfYear'] as $property) {
     assertVisualization(
         str_contains($formSource, '"name": "' . $property . '"')
@@ -927,20 +957,27 @@ assertVisualization(
         && str_contains($style, '.month-section:only-child .calendar-grid {')
         && str_contains($style, 'grid-template-rows: auto repeat(6, minmax(0, 1fr));')
         && str_contains($style, '.month-events { flex: 1 1 auto; min-height: 0; overflow: hidden; }')
+        && str_contains($style, '.month-day.outside { opacity: var(--cal-disabled-opacity); }')
+        && str_contains($script, 'function monthGridRange(month)')
         && str_contains($script, 'function createMonthGrid(month, fillAvailableHeight)')
         && str_contains($script, 'const last = new Date(month.getFullYear(), month.getMonth() + 1, 0);')
         && str_contains($script, 'while (!showWeekends && isWeekend(firstVisible)) firstVisible = addDays(firstVisible, 1);')
         && str_contains($script, 'while (!showWeekends && isWeekend(lastVisible)) lastVisible = addDays(lastVisible, -1);')
-        && str_contains($script, 'const gridEnd = addDays(startOfWeek(lastVisible), 7);')
+        && str_contains($script, 'end: addDays(startOfWeek(lastVisible), 7)')
+        && str_contains($script, 'const showOverflowDays = calendarState.settings.showMonthOverflowDays === true;')
+        && str_contains($script, 'const { start: gridStart, end: gridEnd } = monthGridRange(month);')
         && str_contains($script, 'const rowCount = Math.max(1, Math.ceil(visibleDays.length / columnCount));')
         && str_contains($script, 'grid.style.gridTemplateRows = fillAvailableHeight')
+        && str_contains($script, 'if (outside && !showOverflowDays) {')
         && str_contains($script, "cell.classList.add('month-day-empty');")
         && str_contains($script, "cell.setAttribute('aria-hidden', 'true');")
+        && str_contains($script, "if (outside) cell.classList.add('outside');")
+        && str_contains($script, 'start = monthGridRange(firstMonth).start;')
+        && str_contains($script, 'end = monthGridRange(lastMonth).end;')
         && str_contains($script, '&& (day.getDay() === 1 || day.getDate() === 1)')
         && !str_contains($script, 'Array.from({ length: 42 }, (_, index) => addDays(gridStart, index))')
-        && !str_contains($script, 'showOutsideDetails')
-        && !str_contains($script, "cell.classList.add('outside');"),
-    'Month view must show only dates from the displayed month, preserve calendar-week labels, and size the grid to the occupied calendar weeks.'
+        && !str_contains($script, 'showOutsideDetails'),
+    'Month view must optionally render adjacent-month days with events while preserving empty overflow cells by default and loading the complete visible range.'
 );
 assertVisualization(
     str_contains($style, '.list-table {')
@@ -1027,6 +1064,18 @@ assertVisualization(
 );
 
 assertVisualization(
+    str_contains($script, "grid.classList.add('empty-timeline');")
+        && str_contains($script, "? 'auto auto minmax(120px, 1fr)'")
+        && str_contains($script, ": 'auto minmax(120px, 1fr)';")
+        && str_contains($script, "const timescale = element('div', 'multi-day-timescale');")
+        && str_contains($script, "const canvas = element('div', 'multi-day-timeline-canvas' + (currentDay ? ' today' : ''));")
+        && str_contains($script, 'bindDayOverview(canvas, entry.day, entry.events);')
+        && str_contains($style, '.multi-day-timeline-grid.empty-timeline {')
+        && str_contains($style, 'min-height: calc(100% - 8px);'),
+    'Empty multi-day views must keep full-height day columns visible so days remain clearly separated in native and IPSView modes.'
+);
+
+assertVisualization(
     str_contains($style, 'grid-template-columns: var(--agenda-color-bar-width) var(--calendar-time-column-width) minmax(0, 1fr);')
         && str_contains($style, '.event-time { min-width: 0;')
         && str_contains($style, 'grid-template-columns: var(--calendar-time-column-width) minmax(0, 1fr);')
@@ -1068,7 +1117,7 @@ assertVisualization(
 
 assertVisualization(
     str_contains($moduleSource, 'private const VISUALIZATION_BOOTSTRAP_FUTURE_DAYS = 42;')
-        && str_contains($moduleSource, 'private const VISUALIZATION_MAX_RANGE_DAYS = 370;')
+        && str_contains($moduleSource, 'private const VISUALIZATION_MAX_RANGE_DAYS = 380;')
         && str_contains($moduleSource, 'private function buildState(?int $requestedRangeStart = null, ?int $requestedRangeEnd = null, int $eventOffset = 0): array')
         && str_contains($moduleSource, "'eventRange'  => [")
         && str_contains($moduleSource, "case 'LoadRange':")
@@ -1141,6 +1190,7 @@ foreach ([$native, $ipsView] as $html) {
     assertVisualization(str_contains($html, '"showThreeDaysCalendarWeek":false'), 'The three-day calendar-week setting must be serialized.');
     assertVisualization(str_contains($html, '"showWeekCalendarWeek":true'), 'The week calendar-week setting must be serialized.');
     assertVisualization(str_contains($html, '"showMonthCalendarWeek":true'), 'The month calendar-week setting must be serialized.');
+    assertVisualization(str_contains($html, '"showMonthOverflowDays":true'), 'The month overflow-day setting must be serialized.');
     assertVisualization(str_contains($html, '"showAgendaDayOfYear":false'), 'The agenda day-of-year setting must be serialized.');
     assertVisualization(str_contains($html, '"showThreeDaysDayOfYear":true'), 'The three-day day-of-year setting must be serialized.');
     assertVisualization(str_contains($html, '"showWeekDayOfYear":false'), 'The week day-of-year setting must be serialized.');
@@ -1176,6 +1226,19 @@ foreach ([$native, $ipsView] as $html) {
         str_contains($html, 'id="delete-confirm-dialog"')
             && str_contains($html, 'id="delete-confirm-button"'),
         'The rendered visualization must include the styled delete-confirmation modal.'
+    );
+    assertVisualization(
+        str_contains($html, 'id="event-task"')
+            && str_contains($html, 'id="event-task-completed"')
+            && str_contains($html, 'id="details-task-toggle-button"')
+            && str_contains($html, "sendAction('UpdateEvent', value)"),
+        'Task appointments must be editable and directly completable in both visualization modes.'
+    );
+    assertVisualization(
+        str_contains($script, "event.taskRolledForward ? ' ↻' : ''")
+            && str_contains($script, "'Continued from series'")
+            && str_contains($script, "t('This overdue task was continued from a series.')"),
+        'Rolled-forward task occurrences must be visibly distinguished in the calendar and event details.'
     );
     assertVisualization(
         str_contains($html, 'id="event-calendar-options" role="listbox"')
