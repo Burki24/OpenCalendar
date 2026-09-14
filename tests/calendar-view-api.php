@@ -173,6 +173,7 @@ $frameworkPublicMethods = [
     'Migrate',
     'ApplyChanges',
     'Initialize',
+    'RefreshInitialization',
     'MessageSink',
     'GetVisualizationTile',
     'RequestAction'

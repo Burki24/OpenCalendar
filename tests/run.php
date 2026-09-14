@@ -36,6 +36,8 @@ $commands = [
     ['Verify task appointment backend', [PHP_BINARY, 'tests/task-appointments.php']],
     ['Verify task series calendar transfers', [PHP_BINARY, 'tests/task-series-transfer.php']],
     ['Verify task UI behavior', ['node', 'tests/task-ui.js']],
+    ['Verify calendar startup recovery', [PHP_BINARY, 'tests/calendar-startup.php']],
+    ['Verify native client startup and layout', ['node', 'tests/startup-client.js']],
     ['Verify task synchronization recovery', [PHP_BINARY, 'tests/calendar-recovery.php']],
     ['Verify pending task provider lookup', [PHP_BINARY, 'tests/task-pending-lookup.php']],
     ['Verify provider-neutral error contract', [PHP_BINARY, 'tests/provider-error-contract.php']],

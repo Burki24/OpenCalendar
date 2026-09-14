@@ -5,6 +5,25 @@ gemeinsamen responsiven Darstellung zusammen. Sie kann direkt in der
 Symcon-Kachelvisualisierung oder über eine WebContent-Variable in IPSView
 verwendet werden.
 
+## Startverhalten und schmale Kacheln
+
+Die native Kachel lädt zunächst die Oberfläche, Einstellungen und Kalenderdaten
+ohne Terminliste. Anschließend fordert sie den aktuell sichtbaren Zeitraum an.
+Ist die HTML-SDK-Verbindung noch nicht bereit, wird der Abruf begrenzt
+wiederholt. Dadurch bleibt die erste Kachelantwort auch bei großen Kalendern
+klein; vorhandene IPSView-Seiten behalten ihren bisherigen Startweg.
+
+Nach der Initialisierung prüft die Ansicht bis zu 30-mal im Abstand von einer
+Sekunde, ob die ausgewählten aktiven Kalender ihre eigene Initialisierung
+abgeschlossen haben. Danach wird die Ansicht erneut aktualisiert. Bleiben
+Kalender nicht startbereit, endet die Wiederholung mit einem Debug-Hinweis;
+eine erfolgreiche Provider-Synchronisation wird dadurch nicht garantiert.
+
+Das Layout berücksichtigt zusätzlich zur Fensterbreite die tatsächliche Breite
+der Kalenderkachel. Schmale Kacheln erhalten kompaktere Bedienelemente und
+umgebrochene Wochenraster. Die nativen 9.1-Optionen für Kacheltitel und
+Maximieren bleiben erhalten.
+
 ## Aufgabentermine
 
 Aufgaben werden als gewöhnliche ganztägige Kalendertermine gespeichert; eine
