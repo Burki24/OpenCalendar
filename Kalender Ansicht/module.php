@@ -107,6 +107,7 @@ class CalendarView extends IPSModuleStrict
 
         $this->RegisterMessage(0, IPS_KERNELSTARTED);
         $this->RegisterPropertyString('Calendars', '[]');
+        $this->RegisterPropertyInteger('DefaultCalendarInstanceID', 0);
         $this->RegisterPropertyInteger('DefaultView', 0);
         $this->RegisterPropertyInteger('TileWeekOrientation', 0);
         $this->RegisterPropertyInteger('TileFontScale', 100);
@@ -177,9 +178,11 @@ class CalendarView extends IPSModuleStrict
     {
         $form = $this->LoadConfigurationForm();
         $configured = $this->decodeCalendarConfiguration($this->ReadPropertyString('Calendars'));
+        $calendarConfiguration = $configured;
         if ($configured === []) {
             $backup = $this->decodeCalendarConfiguration($this->ReadAttributeString('CalendarSelectionBackup'));
             if ($backup !== []) {
+                $calendarConfiguration = $backup;
                 foreach ($form['elements'] as &$element) {
                     if (($element['name'] ?? '') === 'Calendars') {
                         $element['values'] = $backup;
@@ -190,6 +193,13 @@ class CalendarView extends IPSModuleStrict
             }
         }
         if (isset($form['elements']) && is_array($form['elements'])) {
+            foreach ($form['elements'] as &$element) {
+                if (($element['name'] ?? '') === 'DefaultCalendarInstanceID') {
+                    $element['options'] = $this->defaultCalendarOptions($calendarConfiguration);
+                    break;
+                }
+            }
+            unset($element);
             $this->InsertIPSViewHTMLPageFormItems($form['elements']);
             $this->InsertIPSViewStyleFormItems($form['elements'], colorWidth: '220px');
         }
@@ -2417,7 +2427,8 @@ class CalendarView extends IPSModuleStrict
     private function viewSettings(): array
     {
         return [
-            'defaultView'             => match ($this->ReadPropertyInteger('DefaultView')) {
+            'defaultCalendarInstanceId' => max(0, $this->ReadPropertyInteger('DefaultCalendarInstanceID')),
+            'defaultView'               => match ($this->ReadPropertyInteger('DefaultView')) {
                 1       => 'week',
                 2       => 'month',
                 3       => 'threeDays',
@@ -2462,6 +2473,42 @@ class CalendarView extends IPSModuleStrict
             'showDescription'           => $this->ReadPropertyBoolean('ShowDescription'),
             'tileFontScale'             => max(50, min(200, $this->ReadPropertyInteger('TileFontScale')))
         ];
+    }
+
+    /**
+     * Builds the selectable defaults from enabled, writable calendar instances in this view.
+     *
+     * @param list<array<string, mixed>> $configuration Calendar-view configuration rows.
+     * @return list<array{caption: string, value: int}>
+     */
+    private function defaultCalendarOptions(array $configuration): array
+    {
+        $options = [[
+            'caption' => $this->Translate('Automatic (first writable calendar)'),
+            'value'   => 0
+        ]];
+        $usedIds = [];
+        foreach ($configuration as $row) {
+            if (!($row['Enabled'] ?? true)) {
+                continue;
+            }
+            $instanceId = (int) ($row['InstanceID'] ?? 0);
+            if ($instanceId <= 0 || isset($usedIds[$instanceId]) || !IPS_InstanceExists($instanceId)) {
+                continue;
+            }
+            $instance = IPS_GetInstance($instanceId);
+            if (($instance['ModuleInfo']['ModuleID'] ?? '') !== self::CALENDAR_MODULE_ID
+                || !IPS_GetProperty($instanceId, 'CanWrite')) {
+                continue;
+            }
+            $usedIds[$instanceId] = true;
+            $options[] = [
+                'caption' => IPS_GetName($instanceId),
+                'value'   => $instanceId
+            ];
+        }
+
+        return $options;
     }
 
     private function scheduleInitialization(): void

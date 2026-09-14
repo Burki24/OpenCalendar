@@ -16,8 +16,11 @@ verwendet werden.
 1. Über **Instanz hinzufügen** eine Instanz **Kalender Ansicht** erstellen.
 2. In der Liste **Kalender** für jede gewünschte Zeile eine Kalender-Instanz
    auswählen und **Aktiviert** einschalten.
-3. Standardansicht, Kachel-Schriftgröße, geladenen Terminzeitraum und
-   maximale Terminanzahl festlegen. Die Kachel-Schriftgröße
+3. Standardansicht, **Standardkalender für neue Termine**, Kachel-Schriftgröße,
+   geladenen Terminzeitraum und maximale Terminanzahl festlegen. Der
+   Standardkalender kann aus den aktivierten, beschreibbaren Kalendern gewählt
+   werden. Ist er später nicht mehr verfügbar oder schreibgeschützt, verwendet
+   OpenCalendar automatisch den ersten beschreibbaren Kalender. Die Kachel-Schriftgröße
    kann zwischen 50 und 200 Prozent eingestellt werden; 100 Prozent entspricht
    der bisherigen Darstellung.
 4. Den aufklappbaren Bereich **Anzeigeoptionen** öffnen. Dort sind die
@@ -56,6 +59,7 @@ Sicherung wiederhergestellt, soweit diese verfügbar ist.
 - optional und je Darstellung separat einblendbare Terminanzahl pro Tag in
   Agenda-, Tage- und Wochenansicht
 - Zusammenführen beliebig vieler ausgewählter Kalender
+- pro Kalenderansicht wählbarer Standardkalender für neu erstellte Termine
 - Farben der einzelnen Kalender und Termine
 - optionale Anzeige von Kalendername, Anlass bei Jahresereignissen, Ort und Beschreibung
 - Navigation innerhalb des dargestellten Zeitraums; passt die Tage-, Wochen- oder Monatsansicht vollständig in die verfügbare Breite, kann auf Touch-Geräten zusätzlich horizontal gewischt werden (links = weiter, rechts = zurück). Muss das Raster auf einer schmalen Anzeige horizontal scrollen, verschiebt die Wischgeste stattdessen das Raster; die Zeitraum-Navigation bleibt über die Pfeilschaltflächen erreichbar

@@ -879,6 +879,18 @@ assertVisualization(
 );
 
 assertVisualization(
+    str_contains($moduleSource, "RegisterPropertyInteger('DefaultCalendarInstanceID', 0)")
+        && str_contains($moduleSource, "'defaultCalendarInstanceId' => max(0, \$this->ReadPropertyInteger('DefaultCalendarInstanceID'))")
+        && str_contains($moduleSource, 'private function defaultCalendarOptions(array $configuration): array')
+        && str_contains($formSource, '"name": "DefaultCalendarInstanceID"')
+        && str_contains($formSource, '"caption": "Default calendar for new events"')
+        && str_contains($script, 'const defaultCalendarInstanceId = Number(calendarState.settings.defaultCalendarInstanceId) || 0;')
+        && str_contains($script, 'const defaultCalendar = writable.find(calendar => calendar.instanceId === defaultCalendarInstanceId)')
+        && str_contains($script, '|| writable[0];'),
+    'New events must prefer the configured writable default calendar and fall back to the first writable calendar.'
+);
+
+assertVisualization(
     str_contains($script, "activeView === 'list'")
         && str_contains($script, "list: 'List'")
         && str_contains($formSource, '"caption": "List"')

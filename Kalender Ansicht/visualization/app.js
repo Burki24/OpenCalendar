@@ -2401,7 +2401,10 @@ function openNewEvent(preferredDay = null) {
     icsImportFile.value = '';
     icsImportFile.disabled = !calendarCanImportIcsFile;
     icsImportButton.classList.toggle('hidden', !calendarCanImportIcsFile);
-    populateCalendarSelect(writable, writable[0].instanceId);
+    const defaultCalendarInstanceId = Number(calendarState.settings.defaultCalendarInstanceId) || 0;
+    const defaultCalendar = writable.find(calendar => calendar.instanceId === defaultCalendarInstanceId)
+        || writable[0];
+    populateCalendarSelect(writable, defaultCalendar.instanceId);
     document.getElementById('dialog-title').textContent = t('Create event');
     document.getElementById('event-summary').value = '';
     document.getElementById('event-location').value = '';

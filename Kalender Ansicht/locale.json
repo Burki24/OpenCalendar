@@ -5,6 +5,8 @@
             "Calendars": "Kalender",
             "Calendar instance": "Kalenderinstanz",
             "Enabled": "Aktiviert",
+            "Default calendar for new events": "Standardkalender für neue Termine",
+            "Automatic (first writable calendar)": "Automatisch (erster beschreibbarer Kalender)",
             "Default view": "Standardansicht",
             "Agenda": "Agenda",
             "Week": "Woche",

@@ -34,6 +34,17 @@
         },
         {
             "type": "Select",
+            "name": "DefaultCalendarInstanceID",
+            "caption": "Default calendar for new events",
+            "options": [
+                {
+                    "caption": "Automatic (first writable calendar)",
+                    "value": 0
+                }
+            ]
+        },
+        {
+            "type": "Select",
             "name": "DefaultView",
             "caption": "Default view",
             "options": [
