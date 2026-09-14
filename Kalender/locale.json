@@ -50,7 +50,7 @@
             "The calendar account did not confirm the deletion.": "Das Kalenderkonto hat das Löschen nicht bestätigt.",
             "The calendar instance is still initializing.": "Die Kalenderinstanz wird noch initialisiert.",
             "No active calendar account is connected.": "Es ist kein aktives Kalenderkonto verbunden.",
-            "A local calendar requires a connected local calendar account and no external calendar identity.": "Ein lokaler Kalender benötigt ein verbundenes lokales Kalenderkonto und keine externe Kalenderidentität.",
+            "A local calendar must not use an external calendar identity.": "Ein lokaler Kalender darf keine externe Kalenderidentität verwenden.",
             "This instance contains local original events. Keep local calendar mode enabled.": "Diese Instanz enthält lokale Originaltermine. Lassen Sie den lokalen Kalendermodus aktiviert.",
             "The local calendar is busy. Please try again.": "Der lokale Kalender ist gerade belegt. Bitte versuchen Sie es erneut.",
             "The local calendar original data is invalid. Restore a backup; do not clear it.": "Die Originaldaten des lokalen Kalenders sind ungültig. Stellen Sie ein Backup wieder her; löschen Sie die Daten nicht.",

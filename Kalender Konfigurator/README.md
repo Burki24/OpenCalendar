@@ -16,7 +16,7 @@ Schreibberechtigung.
 
 1. Zuerst das gewünschte **Kalender Konto** vollständig konfigurieren.
 2. Bei externen Konten im Konto **Verbindung testen** und anschließend **Jetzt
-   synchronisieren** ausführen. Bei **Lokaler Symcon-Kalender** reicht es, das
+   synchronisieren** ausführen. Bei **Symcon - Kalender** reicht es, das
    Konto zu aktivieren und die Konfiguration zu übernehmen.
 3. Über **Instanz hinzufügen** einen **Kalender Konfigurator** erstellen und das
    Kalender Konto als übergeordnete Instanz auswählen.

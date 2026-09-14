@@ -34,14 +34,14 @@ Synchronisation und gegebenenfalls bereinigte Fehlermeldungen kontrollieren.
 
 ## Anbieter einrichten
 
-### Lokaler Symcon-Kalender
+### Symcon-Kalender
 
 Ein lokales Konto erstellt genau einen beschreibbaren Kalender, dessen Termine
 nur in Symcon gespeichert werden. Es werden keine Zugangsdaten, keine OAuth-
 Berechtigungen und keine Netzwerkverbindungen verwendet.
 
-1. Als Anbieter **Lokaler Symcon-Kalender** wählen.
-2. Einen Kalendernamen und eine Farbe im Format `#RRGGBB` eintragen.
+1. Als Anbieter **Symcon - Kalender** wählen.
+2. Einen Kalendernamen und eine Farbe über den Farbwähler festlegen.
 3. Das Konto aktivieren und die Konfiguration übernehmen.
 4. Einen damit verbundenen **Kalender Konfigurator** öffnen und den angebotenen
    lokalen Kalender über **Erstellen** anlegen.
@@ -269,7 +269,7 @@ Versionen. Anschließend muss erneut synchronisiert werden.
 Eigenschaft | Beschreibung
 --- | ---
 Aktiv | Aktiviert die regelmäßige Kontosynchronisation; bei lokalen Konten aktiviert es die Bereitstellung für den Konfigurator
-Anbieter | Apple iCloud, Google Calendar, Microsoft 365, CalDAV, ICS/Webcal oder Lokaler Symcon-Kalender
+Anbieter | Apple iCloud, Google Calendar, Microsoft 365, CalDAV, ICS/Webcal oder Symcon - Kalender
 Lokaler Kalendername | Name des einen lokalen Kalenders dieses Kontos
 Kalenderfarbe | Farbe des lokalen Kalenders im Format `#RRGGBB`
 Server-URL | CalDAV-Basisadresse beziehungsweise bei älteren ICS-Konfigurationen eine einzelne Feed-URL

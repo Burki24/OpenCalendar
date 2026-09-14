@@ -40,7 +40,6 @@ class Calendar extends IPSModuleStrict
     private const EVENT_TRANSFER_SCOPE = 'CalendarCachedEvents';
     private const LOCAL_EVENT_TRANSFER_SCOPE = 'LocalCalendarEvents';
     private const INITIALIZATION_DELAY_MS = 3_000;
-    private const LOCAL_ACCOUNT_PROVIDER = 5;
 
     private const STATUS_CONFIGURATION_MISSING = 201;
     private const STATUS_SYNCHRONIZATION_FAILED = 202;
@@ -3221,12 +3220,9 @@ class Calendar extends IPSModuleStrict
     private function validateConfiguration(): string
     {
         if ($this->ReadPropertyBoolean('LocalCalendar')) {
-            $connectionId = (int) (IPS_GetInstance($this->InstanceID)['ConnectionID'] ?? 0);
-            if ($connectionId <= 0
-                || (int) IPS_GetProperty($connectionId, 'Provider') !== self::LOCAL_ACCOUNT_PROVIDER
-                || trim($this->ReadPropertyString('ProviderCalendarID')) !== ''
+            if (trim($this->ReadPropertyString('ProviderCalendarID')) !== ''
                 || trim($this->ReadPropertyString('CalendarURL')) !== '') {
-                return $this->Translate('A local calendar requires a connected local calendar account and no external calendar identity.');
+                return $this->Translate('A local calendar must not use an external calendar identity.');
             }
             return '';
         }

@@ -4,7 +4,7 @@
             "Calendar Account": "Kalender Konto",
             "Active": "Aktiv",
             "Provider": "Anbieter",
-            "Local Symcon calendar": "Lokaler Symcon-Kalender",
+            "Symcon - Calendar": "Symcon - Kalender",
             "Create one calendar stored only in Symcon. It has no external connection or synchronization. Its events are kept permanently in the calendar instance and must be included in backups.": "Erstellt einen Kalender, der ausschließlich in Symcon gespeichert wird. Er hat keine externe Verbindung und keine Synchronisierung. Seine Termine werden dauerhaft in der Kalenderinstanz gespeichert und müssen in Backups berücksichtigt werden.",
             "Local calendar name": "Name des lokalen Kalenders",
             "Calendar color": "Kalenderfarbe",

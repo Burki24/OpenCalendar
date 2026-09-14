@@ -40,7 +40,7 @@ müssen umfangreiche Kalenderdateien nicht manuell aufgeteilt werden.
 
 ### Lokalen Kalender anlegen
 
-Für Termine ohne externen Anbieter oder Synchronisierung über **Instanz hinzufügen** ein **Kalender Konto** anlegen und als Anbieter **Lokaler Symcon-Kalender** wählen. Name und Farbe festlegen, das Konto aktivieren und anschließend einen damit verbundenen **Kalender Konfigurator** öffnen. Dort den angebotenen lokalen Kalender über **Erstellen** anlegen. Der Kalender wird dauerhaft in Symcon gespeichert; Cache leeren entfernt nur die Anzeige-Daten, nicht die Originaltermine. Daher gehören Konto und Kalenderinstanz in die Symcon-Backups.
+Für Termine ohne externen Anbieter oder Synchronisierung über **Instanz hinzufügen** ein **Kalender Konto** anlegen und als Anbieter **Symcon - Kalender** wählen. Name und Farbe festlegen, das Konto aktivieren und anschließend einen damit verbundenen **Kalender Konfigurator** öffnen. Dort den angebotenen lokalen Kalender über **Erstellen** anlegen. Der Kalender wird dauerhaft in Symcon gespeichert; Cache leeren entfernt nur die Anzeige-Daten, nicht die Originaltermine. Daher gehören Konto und Kalenderinstanz in die Symcon-Backups.
 
 Die ausführlichen Einstellungen der Anbieter sind in der Dokumentation des
 [Kalender Kontos](Kalender%20Konto) beschrieben.

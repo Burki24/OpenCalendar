@@ -24,7 +24,7 @@ Nach der Erstellung:
 > Schreibrechte und die korrekte Kontoverbindung vollständig ein. Das ist
 > besonders bei Konten mit mehreren Kalendern erforderlich.
 
-Lokale Kalender werden aus einem **Kalender Konto** mit dem Anbieter **Lokaler Symcon-Kalender** erstellt. Der damit verbundene Konfigurator bietet genau den im Kontoformular benannten Kalender an. Er hat keine technische Anbieteridentität und keine Netzwerksynchronisierung. Seine Original-`VCALENDAR`-Objekte werden dauerhaft als Instanzdaten in Symcon gespeichert; der Anzeigecache ist davon getrennt. Das Leeren des Caches und ein Neustart löschen keine lokalen Termine. Nehmen Sie Konto und Kalenderinstanz in Ihre Backups auf. Die Summe der gespeicherten Originaldaten ist auf 16 MiB begrenzt.
+Lokale Kalender werden aus einem **Kalender Konto** mit dem Anbieter **Symcon - Kalender** erstellt. Der damit verbundene Konfigurator bietet genau den im Kontoformular benannten Kalender an. Er hat keine technische Anbieteridentität und keine Netzwerksynchronisierung. Seine Original-`VCALENDAR`-Objekte werden dauerhaft als Instanzdaten in Symcon gespeichert; der Anzeigecache ist davon getrennt. Das Leeren des Caches und ein Neustart löschen keine lokalen Termine. Nehmen Sie Konto und Kalenderinstanz in Ihre Backups auf. Die Summe der gespeicherten Originaldaten ist auf 16 MiB begrenzt.
 
 Nach der Erstellung durch den Konfigurator darf die Instanz im Objektbaum
 beliebig verschoben oder vom Benutzer umbenannt werden.
@@ -52,7 +52,7 @@ Google-, Microsoft-, Apple-iCloud- und CalDAV-Serien können als einzelnes Vorko
 
 - Symcon ab Version 9.0
 - für Online-Kalender eine verbundene Instanz **Kalender Konto** und eine über den Konfigurator zugewiesene Kalender-ID
-- für lokale Kalender ein verbundenes **Kalender Konto** mit dem Anbieter **Lokaler Symcon-Kalender**
+- für lokale Kalender ein verbundenes **Kalender Konto** mit dem Anbieter **Symcon - Kalender**
 
 ## Konfiguration
 

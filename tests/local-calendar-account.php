@@ -74,8 +74,14 @@ function IPS_SetProperty(int $instanceID, string $name, mixed $value): bool
     return true;
 }
 
+function IPS_GetProperty(int $instanceID, string $name): mixed
+{
+    return null;
+}
+
 require_once __DIR__ . '/../Kalender Konto/module.php';
 require_once __DIR__ . '/../Kalender Konfigurator/module.php';
+require_once __DIR__ . '/../Kalender/module.php';
 
 function localAccountExpect(bool $condition, string $message): void
 {
@@ -87,7 +93,7 @@ function localAccountExpect(bool $condition, string $message): void
 $form = json_decode((string) file_get_contents(__DIR__ . '/../Kalender Konto/form.json'), true, 512, JSON_THROW_ON_ERROR);
 $providerOptions = $form['elements'][1]['options'] ?? [];
 localAccountExpect(
-    in_array(['caption' => 'Local Symcon calendar', 'value' => 5], $providerOptions, true),
+    in_array(['caption' => 'Symcon - Calendar', 'value' => 5], $providerOptions, true),
     'Calendar Account must offer the local provider.'
 );
 localAccountExpect(
@@ -158,6 +164,15 @@ localAccountExpect(
         && ($configuration['ProviderCalendarID'] ?? 'unexpected') === ''
         && ($configuration['UpdateSchedule'] ?? -1) === 11,
     'The configurator must create a local calendar child with no external provider identity or schedule.'
+);
+$localCalendar = new Calendar(100);
+$localCalendar->SetTestProperty('LocalCalendar', true);
+$localCalendar->SetTestProperty('ProviderCalendarID', '');
+$localCalendar->SetTestProperty('CalendarURL', '');
+$validateLocalCalendar = new ReflectionMethod(Calendar::class, 'validateConfiguration');
+localAccountExpect(
+    $validateLocalCalendar->invoke($localCalendar) === '',
+    'A local calendar must not require a gateway connection after configurator creation.'
 );
 localAccountExpect(
     !is_file(__DIR__ . '/../Kalender Einrichtung/module.json'),

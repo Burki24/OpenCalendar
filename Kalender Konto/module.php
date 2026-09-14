@@ -1402,7 +1402,7 @@ class CalendarAccount extends IPSModuleStrict
             self::PROVIDER_GOOGLE    => 'Google Calendar',
             self::PROVIDER_MICROSOFT => 'Microsoft 365',
             self::PROVIDER_ICS       => 'ICS/Webcal',
-            self::PROVIDER_LOCAL     => 'Local Symcon calendar',
+            self::PROVIDER_LOCAL     => 'Symcon - Calendar',
             default                  => 'Unknown'
         });
     }
