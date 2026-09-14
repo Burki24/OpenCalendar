@@ -40,6 +40,7 @@ class Calendar extends IPSModuleStrict
     private const EVENT_TRANSFER_SCOPE = 'CalendarCachedEvents';
     private const LOCAL_EVENT_TRANSFER_SCOPE = 'LocalCalendarEvents';
     private const INITIALIZATION_DELAY_MS = 3_000;
+    private const LOCAL_EXPORT_DIRECTORY = 'media' . DIRECTORY_SEPARATOR . 'OpenCalendar';
 
     private const STATUS_CONFIGURATION_MISSING = 201;
     private const STATUS_SYNCHRONIZATION_FAILED = 202;
@@ -1094,6 +1095,42 @@ class Calendar extends IPSModuleStrict
     }
 
     /**
+     * Exports all original iCalendar resources of a local calendar to an ICS file in Symcon's media directory.
+     *
+     * This PHP API is intentionally not exposed through the configuration form, web interface, or IPSView.
+     * Existing files are retained unless overwrite is explicitly enabled.
+     *
+     * @param string $fileName Name of the new .ics file without a directory path.
+     * @param bool   $overwrite Whether an existing export file may be replaced.
+     *
+     * @return string Absolute path of the exported ICS file.
+     */
+    public function ExportLocalCalendar(string $fileName, bool $overwrite = false): string
+    {
+        if (!$this->ReadPropertyBoolean('LocalCalendar')) {
+            throw new LogicException('Only local calendars can be exported.');
+        }
+        if (!$this->isValidLocalCalendarExportFileName($fileName)) {
+            throw new InvalidArgumentException('The ICS export file name is invalid.');
+        }
+
+        $directory = rtrim(IPS_GetKernelDir(), '/\\') . DIRECTORY_SEPARATOR . self::LOCAL_EXPORT_DIRECTORY;
+        if (!is_dir($directory) && !mkdir($directory, 0775, true) && !is_dir($directory)) {
+            throw new RuntimeException('The local calendar export directory could not be created.');
+        }
+
+        $path = $directory . DIRECTORY_SEPARATOR . $fileName;
+        if (file_exists($path) && !$overwrite) {
+            throw new RuntimeException('The ICS export file already exists.');
+        }
+        if (file_put_contents($path, $this->localCalendarExportContent(), LOCK_EX) === false) {
+            throw new RuntimeException('The local calendar could not be exported.');
+        }
+
+        return $path;
+    }
+
+    /**
      * Returns runtime metadata and synchronization status for this calendar.
      *
      * @return string JSON-encoded calendar status.
@@ -1726,6 +1763,48 @@ class Calendar extends IPSModuleStrict
         } finally {
             IPS_SemaphoreLeave($lock);
         }
+    }
+
+    /**
+     * Builds a portable iCalendar stream from the original local resources.
+     */
+    private function localCalendarExportContent(): string
+    {
+        $lock = 'OpenCalendar.LocalCalendar.' . $this->InstanceID;
+        if (!IPS_SemaphoreEnter($lock, 5000)) {
+            throw new RuntimeException('The local calendar is busy. Please try again.');
+        }
+
+        try {
+            $resources = $this->decodeObject(
+                $this->ReadAttributeString('LocalCalendarResources'),
+                'local calendar original data'
+            );
+            $provider = new LocalCalendarProvider($resources, $this->effectiveCalendarId());
+            $calendars = array_values($provider->exportResources());
+            if ($calendars === []) {
+                return "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//OpenCalendar//Symcon//EN\r\nCALSCALE:GREGORIAN\r\nEND:VCALENDAR\r\n";
+            }
+
+            return implode("\r\n", array_map(
+                static fn (string $calendar): string => rtrim($calendar) . "\r\n",
+                $calendars
+            ));
+        } finally {
+            IPS_SemaphoreLeave($lock);
+        }
+    }
+
+    /**
+     * Accepts a single safe file name with the mandatory ICS extension.
+     */
+    private function isValidLocalCalendarExportFileName(string $fileName): bool
+    {
+        return $fileName !== ''
+            && !str_contains($fileName, '/')
+            && !str_contains($fileName, '\\')
+            && !preg_match('/[[:cntrl:]]/', $fileName)
+            && str_ends_with(strtolower($fileName), '.ics');
     }
 
     /**

@@ -6,6 +6,8 @@ class IPSModuleStrict
 {
     /** @var array<string, int|string|bool> */
     private array $properties = [];
+    /** @var array<string, string> */
+    private array $attributes = [];
 
     public function __construct(public int $InstanceID)
     {
@@ -15,6 +17,11 @@ class IPSModuleStrict
     public function SetTestProperty(string $name, int|string|bool $value): void
     {
         $this->properties[$name] = $value;
+    }
+
+    public function SetTestAttribute(string $name, string $value): void
+    {
+        $this->attributes[$name] = $value;
     }
 
     protected function ReadPropertyInteger(string $name): int
@@ -34,7 +41,7 @@ class IPSModuleStrict
 
     protected function ReadAttributeString(string $name): string
     {
-        return '';
+        return $this->attributes[$name] ?? '';
     }
 
     protected function Translate(string $text): string
@@ -77,6 +84,26 @@ function IPS_SetProperty(int $instanceID, string $name, mixed $value): bool
 function IPS_GetProperty(int $instanceID, string $name): mixed
 {
     return null;
+}
+
+/** @var string */
+$localCalendarExportKernelDirectory = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'opencalendar-local-export-' . getmypid();
+
+function IPS_GetKernelDir(): string
+{
+    global $localCalendarExportKernelDirectory;
+
+    return $localCalendarExportKernelDirectory;
+}
+
+function IPS_SemaphoreEnter(string $name, int $milliseconds): bool
+{
+    return true;
+}
+
+function IPS_SemaphoreLeave(string $name): bool
+{
+    return true;
 }
 
 require_once __DIR__ . '/../Kalender Konto/module.php';
@@ -174,6 +201,49 @@ localAccountExpect(
     $validateLocalCalendar->invoke($localCalendar) === '',
     'A local calendar must not require a gateway connection after configurator creation.'
 );
+$nonLocalCalendar = new Calendar(100);
+$nonLocalExportRejected = false;
+try {
+    $nonLocalCalendar->ExportLocalCalendar('external.ics');
+} catch (LogicException) {
+    $nonLocalExportRejected = true;
+}
+localAccountExpect($nonLocalExportRejected, 'ICS export must be limited to local calendar instances.');
+$localCalendar->SetTestAttribute(
+    'LocalCalendarResources',
+    json_encode((object) [
+        'https://opencalendar.invalid/local/100/export.ics' => "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nBEGIN:VEVENT\r\nUID:export-test\r\nDTSTART;VALUE=DATE:20260914\r\nDTEND;VALUE=DATE:20260915\r\nSUMMARY:Export test\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n"
+    ], JSON_THROW_ON_ERROR)
+);
+$exportPath = $localCalendar->ExportLocalCalendar('local-backup.ics');
+localAccountExpect(
+    $exportPath === $localCalendarExportKernelDirectory . DIRECTORY_SEPARATOR . 'media' . DIRECTORY_SEPARATOR . 'OpenCalendar' . DIRECTORY_SEPARATOR . 'local-backup.ics'
+        && is_file($exportPath)
+        && str_contains((string) file_get_contents($exportPath), 'UID:export-test'),
+    'A local calendar must export its original events to a new ICS file in the Symcon media directory.'
+);
+$existingFilePreserved = false;
+try {
+    $localCalendar->ExportLocalCalendar('local-backup.ics');
+} catch (RuntimeException) {
+    $existingFilePreserved = true;
+}
+localAccountExpect($existingFilePreserved, 'Local calendar export must preserve existing files by default.');
+localAccountExpect(
+    $localCalendar->ExportLocalCalendar('local-backup.ics', true) === $exportPath,
+    'Local calendar export must only overwrite a file when requested explicitly.'
+);
+$filePathRejected = false;
+try {
+    $localCalendar->ExportLocalCalendar('../outside.ics');
+} catch (InvalidArgumentException) {
+    $filePathRejected = true;
+}
+localAccountExpect($filePathRejected, 'Local calendar export must reject file paths.');
+unlink($exportPath);
+rmdir(dirname($exportPath));
+rmdir(dirname(dirname($exportPath)));
+rmdir($localCalendarExportKernelDirectory);
 localAccountExpect(
     !is_file(__DIR__ . '/../Kalender Einrichtung/module.json'),
     'The separate local-calendar setup module must not remain.'

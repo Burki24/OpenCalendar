@@ -107,6 +107,7 @@ string IPSKAL_UpdateEvent(int $InstanzID, string $EventJSON);
 bool IPSKAL_DeleteEvent(int $InstanzID, string $EventJSON);
 string IPSKAL_GetCalendarStatus(int $InstanzID);
 void IPSKAL_ClearCache(int $InstanzID);
+string IPSKAL_ExportLocalCalendar(int $InstanzID, string $Dateiname, bool $Überschreiben = false);
 ```
 
 `IPSKAL_GetEvents()` bleibt als kompatibler Direktabruf für kleine Datenmengen
@@ -137,6 +138,21 @@ IPSKAL_SetAnniversary(12345, $series, 'birthday', '1993-07-20');
 auch `calendarColor`, `canWrite`, `timezone`, `canCreateRecurrence`, `canUpdateFollowing`,
 `canUpdateSeries` und `canDeleteSeries`. Die Serienfähigkeiten und die Zeitzone werden aus den vom
 Provider erkannten Kalender-Metadaten übernommen.
+
+`IPSKAL_ExportLocalCalendar()` ist ausschließlich für lokale Kalender vorgesehen
+und nur über die Symcon-Konsole beziehungsweise ein eigenes Skript nutzbar. Es
+schreibt die originalen iCalendar-Daten als ICS-Datei nach
+`<Symcon-Verzeichnis>/media/OpenCalendar/`. Der Dateiname darf keinen Pfad
+enthalten und muss auf `.ics` enden. Vorhandene Dateien werden standardmäßig
+nicht überschrieben.
+
+```php
+$file = IPSKAL_ExportLocalCalendar(12345, 'lokaler-kalender-backup.ics');
+echo $file;
+```
+
+Für ein bewusstes Überschreiben eines vorhandenen Sicherungsexports muss der
+dritte Parameter `true` sein.
 
 ### Termin erstellen
 
