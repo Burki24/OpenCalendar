@@ -6,6 +6,12 @@
             "caption": "Active"
         },
         {
+            "type": "Label",
+            "name": "LocalCalendarNotice",
+            "caption": "This is a local Symcon calendar. It has no external connection or synchronization. Events are stored permanently in this instance and must be included in backups.",
+            "visible": false
+        },
+        {
             "type": "Select",
             "name": "UpdateSchedule",
             "caption": "Synchronization schedule",

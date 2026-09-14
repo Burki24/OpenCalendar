@@ -8,8 +8,7 @@ verwendet werden.
 ## Voraussetzungen
 
 - Symcon ab Version 9.0 mit Kachelvisualisierung und HTML-SDK
-- mindestens eine über den Kalender Konfigurator angelegte und synchronisierte
-  **Kalender**-Instanz
+- mindestens eine über den Kalender Konfigurator angelegte **Kalender**-Instanz
 - für IPSView ein HTML-Box-Steuerelement mit Browser-Renderer
 
 ## Schnellstart für die Kachelvisualisierung
@@ -60,7 +59,8 @@ Sicherung wiederhergestellt, soweit diese verfügbar ist.
 - Farben der einzelnen Kalender und Termine
 - optionale Anzeige von Kalendername, Anlass bei Jahresereignissen, Ort und Beschreibung
 - Navigation innerhalb des dargestellten Zeitraums; passt die Tage-, Wochen- oder Monatsansicht vollständig in die verfügbare Breite, kann auf Touch-Geräten zusätzlich horizontal gewischt werden (links = weiter, rechts = zurück). Muss das Raster auf einer schmalen Anzeige horizontal scrollen, verschiebt die Wischgeste stattdessen das Raster; die Zeitraum-Navigation bleibt über die Pfeilschaltflächen erreichbar
-- manuelle Synchronisation aller ausgewählten Kalender
+- manuelle Synchronisation aller ausgewählten Kalender; bei lokalen Kalendern wird
+  ausschließlich deren Anzeige-Cache aus den in Symcon gespeicherten Originalterminen neu aufgebaut
 - Erstellen, Bearbeiten, Verschieben und Löschen von Terminen in beschreibbaren Kalendern
 - Erstellen ganztägiger Aufgabentermine und Aufgabenserien, direktes Erledigen
   oder Wiederöffnen in den Termindetails und tägliches Weiterschieben offener

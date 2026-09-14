@@ -42,6 +42,11 @@ final class TaskSeriesWriteCalendar extends Calendar
         return true;
     }
 
+    protected function ReadPropertyBoolean(string $Name): bool
+    {
+        return $Name !== 'LocalCalendar';
+    }
+
     protected function ReadAttributeString(string $Name): string
     {
         return $Name === 'CachedEvents' && $this->cacheAvailable ? json_encode([$this->source], JSON_THROW_ON_ERROR) : '[]';

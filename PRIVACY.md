@@ -17,6 +17,8 @@ Je nach gewähltem Anbieter verarbeitet OpenCalendar insbesondere:
 
 Kalender- und Termindaten werden lokal in Symcon zwischengespeichert, soweit dies für Synchronisation, Darstellung und Bearbeitung erforderlich ist. Dadurch können diese Daten auch Bestandteil eines vom Anwender erstellten Symcon-Backups werden.
 
+Ein vom Anwender über ein **lokales Kalenderkonto** angelegter **lokaler Kalender** speichert seine Originaltermine ausschließlich in der eigenen Symcon-Installation. Er benötigt keinen externen Anbieter, kein OAuth und keine Netzwerkverbindung. Erst wenn der Anwender einen solchen Termin bewusst in einen externen Kalender verschiebt, werden die dafür notwendigen Termindaten an diesen ausgewählten Anbieter übertragen.
+
 Wenn der Anwender einen Termin als **Aufgabentermin** kennzeichnet, verarbeitet OpenCalendar zusätzlich den Aufgabenstatus und gegebenenfalls die Zuordnung zu einer Ursprungsserie. Bei späteren Synchronisationen werden überfällige offene Aufgaben automatisch nachgezogen, bis sie erledigt sind oder die Aufgabenkennzeichnung entfernt wird. Dazu können beim Kalenderanbieter Termine geändert und bei Serien Einzeltermine angelegt sowie die zugehörigen ursprünglichen Vorkommnisse entfernt werden. Die vom Anwender gewählte Option **Geplante Folgetermine mitverschieben** bestimmt, ob der folgende Serienplan mit angepasst wird. Diese Verarbeitung verwendet normale Kalendertermine, keine Google-Tasks- oder Microsoft-To-Do-Anbindung.
 
 Wählt der Anwender beim Verschieben eines Termins oder einer unterstützten Serie einen anderen Kalenderanbieter als Ziel, überträgt die Symcon-Installation die hierfür erforderlichen Termindaten an diesen Zielanbieter. Erst nach bestätigter Erstellung im Ziel wird versucht, die entsprechende Quelle zu löschen. Eine solche providerübergreifende Übertragung erfolgt auf Veranlassung des Anwenders, nicht automatisch an beliebige Anbieter.
@@ -247,6 +249,8 @@ Depending on the selected provider, OpenCalendar processes in particular:
 - synchronization timestamps, ETags and technical error states.
 
 Calendar and event data is cached locally in Symcon where required for synchronization, display and editing. This data may therefore also be included in Symcon backups created by the user.
+
+A **local calendar** created through a local calendar account stores its original events exclusively in the local Symcon installation. It requires no external provider, OAuth access or network connection. Event data is only transferred to an external provider if the user explicitly moves such an event to a selected external calendar.
 
 When the user marks an event as a **task appointment**, OpenCalendar additionally processes its task status and, where applicable, its association with an original series. During subsequent synchronizations, overdue open tasks are automatically moved forward until completed or no longer marked as tasks. This can update provider events and, for recurring tasks, create individual events and remove the corresponding original occurrences. The user's **Move planned following events as well** option determines whether the following series schedule is adjusted. This uses regular calendar events, not a Google Tasks or Microsoft To Do integration.
 

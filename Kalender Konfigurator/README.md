@@ -9,13 +9,15 @@ Schreibberechtigung.
 
 - Symcon ab Version 9.0
 - ein eingerichtetes und aktives **Kalender Konto**
-- eine erfolgreiche Kontosynchronisation
+- bei externen Konten eine erfolgreiche Kontosynchronisation; lokale Konten
+  stellen ihren einen lokalen Kalender unmittelbar bereit
 
 ## Einrichtung
 
 1. Zuerst das gewünschte **Kalender Konto** vollständig konfigurieren.
-2. Im Konto **Verbindung testen** und anschließend **Jetzt synchronisieren**
-   ausführen.
+2. Bei externen Konten im Konto **Verbindung testen** und anschließend **Jetzt
+   synchronisieren** ausführen. Bei **Lokaler Symcon-Kalender** reicht es, das
+   Konto zu aktivieren und die Konfiguration zu übernehmen.
 3. Über **Instanz hinzufügen** einen **Kalender Konfigurator** erstellen und das
    Kalender Konto als übergeordnete Instanz auswählen.
 4. Falls der Konfigurator bereits vorhanden ist, über das Zahnrad prüfen, welches
@@ -34,7 +36,8 @@ erhalten.
 - lädt ausschließlich die Kalender des aktuell verbundenen Kontos
 - zeigt Kalendername, Farbe, Zugriffsart und vorhandene Instanz an
 - erstellt einzelne oder alle noch nicht angelegten Kalender
-- übernimmt Kalender-ID, Anbieter-ID, Farbe und Schreibrechte
+- übernimmt Kalender-ID, Anbieter-ID, Farbe und Schreibrechte; lokale Kalender
+  werden als solche markiert und ohne externe Anbieter-ID angelegt
 - übernimmt bei ICS/Webcal den voreingestellten Aktualisierungsplan
 - verbindet neue Kalender-Instanzen mit dem aktuellen Kalender Konto
 - erkennt nur bestehende Kalender-Instanzen, die mit demselben Konto verbunden
@@ -54,7 +57,7 @@ beispielsweise „Kalender – Privat“ oder „Kalender – Firma“.
 Ein eigener Konfigurator je Konto ist keine technische Pflicht. Ein vorhandener
 Konfigurator kann nacheinander für mehrere Konten verwendet werden:
 
-1. Das Zielkonto vollständig konfigurieren und synchronisieren.
+1. Das Zielkonto vollständig konfigurieren; bei lokalen Konten ist keine Synchronisation erforderlich.
 2. Im Kalender Konfigurator über das Zahnrad **Gateway ändern** wählen.
 3. Das gewünschte **Kalender Konto** als übergeordnete Instanz auswählen.
 4. Die Änderung übernehmen und den Konfigurator erneut öffnen.
@@ -105,7 +108,7 @@ zusätzlich Fehlerzustand und letzte Fehlermeldung des Konfigurators gesetzt.
 
 Problem | Prüfung
 --- | ---
-Es werden keine Kalender angezeigt | Im Kalender Konto zuerst **Verbindung testen** und **Jetzt synchronisieren** ausführen, danach im Konfigurator **Kalender aktualisieren**
+Es werden keine Kalender angezeigt | Bei externen Konten zuerst **Verbindung testen** und **Jetzt synchronisieren** ausführen; bei lokalen Konten das Konto aktivieren und den Namen prüfen. Danach im Konfigurator **Kalender aktualisieren**
 Der Konfigurator meldet eine fehlende Kontoverbindung | Über das Zahnrad und **Gateway ändern** ein aktives Kalender Konto auswählen
 Nach einem Gatewaywechsel ist die Liste leer | Das neue Konto synchronisieren und anschließend **Kalender aktualisieren**
 Ein bereits angelegter Kalender fehlt in der Liste | Prüfen, ob der Konfigurator aktuell mit demselben Kalender Konto wie die Kalender-Instanz verbunden ist

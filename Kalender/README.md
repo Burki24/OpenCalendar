@@ -1,6 +1,6 @@
 # Kalender
 
-Das Modul repräsentiert einen einzelnen Online-Kalender.
+Das Modul repräsentiert einen einzelnen Online- oder lokalen Kalender.
 
 ## Einrichtung
 
@@ -24,6 +24,8 @@ Nach der Erstellung:
 > Schreibrechte und die korrekte Kontoverbindung vollständig ein. Das ist
 > besonders bei Konten mit mehreren Kalendern erforderlich.
 
+Lokale Kalender werden aus einem **Kalender Konto** mit dem Anbieter **Lokaler Symcon-Kalender** erstellt. Der damit verbundene Konfigurator bietet genau den im Kontoformular benannten Kalender an. Er hat keine technische Anbieteridentität und keine Netzwerksynchronisierung. Seine Original-`VCALENDAR`-Objekte werden dauerhaft als Instanzdaten in Symcon gespeichert; der Anzeigecache ist davon getrennt. Das Leeren des Caches und ein Neustart löschen keine lokalen Termine. Nehmen Sie Konto und Kalenderinstanz in Ihre Backups auf. Die Summe der gespeicherten Originaldaten ist auf 16 MiB begrenzt.
+
 Nach der Erstellung durch den Konfigurator darf die Instanz im Objektbaum
 beliebig verschoben oder vom Benutzer umbenannt werden.
 
@@ -31,7 +33,8 @@ beliebig verschoben oder vom Benutzer umbenannt werden.
 
 - Abruf von CalDAV-Terminen über einen konfigurierbaren Zeitraum
 - Auflösen wiederkehrender Termine für die lokale Anzeige
-- lokaler JSON-Cache und zyklische Synchronisation
+- lokaler JSON-Cache und zyklische Synchronisation für Online-Kalender
+- lokale Kalender ohne Anbieter, OAuth oder Netzwerksynchronisierung
 - Erstellen neuer Termine sowie neuer Google-, Microsoft-, Apple-iCloud- und CalDAV-Serientermine
 - providerneutrale, eintägige ganztägige Aufgabentermine und Aufgabenserien mit
   offenem oder erledigtem Status und automatischer Fortschreibung überfälliger Aufgaben
@@ -48,19 +51,19 @@ Google-, Microsoft-, Apple-iCloud- und CalDAV-Serien können als einzelnes Vorko
 ## Voraussetzungen
 
 - Symcon ab Version 9.0
-- eine verbundene Instanz **Kalender Konto**
-- eine über den Konfigurator zugewiesene Kalender-ID
+- für Online-Kalender eine verbundene Instanz **Kalender Konto** und eine über den Konfigurator zugewiesene Kalender-ID
+- für lokale Kalender ein verbundenes **Kalender Konto** mit dem Anbieter **Lokaler Symcon-Kalender**
 
 ## Konfiguration
 
 Eigenschaft | Beschreibung
 --- | ---
-Aktiv | Aktiviert die regelmäßige Synchronisation
+Aktiv | Aktiviert die regelmäßige Synchronisation beziehungsweise die lokale Kalenderverarbeitung
 Aktualisierungsplan | Vorgegebener Rhythmus von fünf Minuten bis jährlich oder ausschließlich manuelle Synchronisation
 Benutzerdefiniertes Intervall | Eigener Abstand in Minuten; wird nur beim Zeitplan „Benutzerdefiniertes Intervall“ angezeigt
 Vergangene Termine laden | Anzahl der Tage vor dem aktuellen Datum
 Zukünftige Termine laden | Anzahl der Tage nach dem aktuellen Datum
-Kalenderidentität | Vom Konfigurator gesetzte, schreibgeschützte Anbieterinformationen
+Kalenderidentität | Vom Konfigurator gesetzte, schreibgeschützte Anbieterinformationen; bei lokalen Kalendern ist nur die Kalenderfarbe bearbeitbar
 
 Bestehende Instanzen behalten ihren bisherigen Minutenwert als benutzerdefiniertes Intervall. Monatliche und jährliche Zeitpläne werden intern täglich auf Fälligkeit geprüft, damit keine für lange Zeiträume ungeeigneten Millisekunden-Timer verwendet werden. **Jetzt synchronisieren** bleibt unabhängig vom Zeitplan jederzeit verfügbar.
 

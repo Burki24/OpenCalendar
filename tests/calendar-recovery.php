@@ -68,7 +68,7 @@ final class RecoveryCalendar extends Calendar
 
     protected function ReadPropertyBoolean(string $Name): bool
     {
-        return true;
+        return $Name !== 'LocalCalendar';
     }
 
     protected function ReadPropertyInteger(string $Name): int
