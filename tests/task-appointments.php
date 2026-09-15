@@ -418,6 +418,42 @@ assertTaskAppointment(
     'A delayed provider response must not overwrite or repeat a task-series shift already completed today.'
 );
 
+$mergeIncrementalEvents = new ReflectionMethod(Calendar::class, 'mergeIncrementalEvents');
+$cachedMicrosoftException = array_merge(
+    IPSKalender\CalendarEventRecurrence::occurrence(
+        'microsoft-series',
+        'microsoft-exception',
+        '2026-09-12',
+        '',
+        true,
+        true,
+        true,
+        true,
+        true
+    ),
+    [
+        'eventReference' => 'microsoft-exception',
+        'summary'        => '[OC:TODO:FOLLOW] Microsoft task',
+        'allDay'         => true,
+        'start'          => '2026-09-12',
+        'end'            => '2026-09-13'
+    ]
+);
+$deltaMicrosoftException = $cachedMicrosoftException;
+$deltaMicrosoftException['originalStart'] = '';
+$deltaMicrosoftException['canUpdateFollowing'] = false;
+$mergedMicrosoftExceptions = $mergeIncrementalEvents->invoke(
+    $manualCalendar,
+    [$cachedMicrosoftException],
+    [$deltaMicrosoftException]
+);
+assertTaskAppointment(
+    count($mergedMicrosoftExceptions) === 1
+        && ($mergedMicrosoftExceptions[0]['originalStart'] ?? '') === '2026-09-12'
+        && ($mergedMicrosoftExceptions[0]['canUpdateFollowing'] ?? false) === true,
+    'A Microsoft delta exception without originalStart must retain the cached occurrence identity for following moves.'
+);
+
 foreach ([
     ['allDay' => false, 'recurrence' => null],
     ['allDay' => true, 'recurrence' => null, 'start' => '2026-09-08', 'end' => '2026-09-10']

@@ -1502,6 +1502,7 @@ class Calendar extends IPSModuleStrict
      */
     private function mergeIncrementalEvents(array $events, array $changes): array
     {
+        $cachedOccurrenceIdentities = $this->cachedOccurrenceIdentities($events);
         $replacedResources = [];
         foreach ($changes as $change) {
             if ((bool) ($change['_syncDeleted'] ?? false)
@@ -1525,6 +1526,7 @@ class Calendar extends IPSModuleStrict
         }
 
         foreach ($changes as $change) {
+            $change = $this->restoreMissingOccurrenceIdentity($change, $cachedOccurrenceIdentities);
             $eventReference = trim((string) ($change['eventReference'] ?? ''));
             $resourceUrl = trim((string) ($change['resourceUrl'] ?? ''));
             if ((bool) ($change['_syncDeleted'] ?? false)) {
@@ -1605,6 +1607,71 @@ class Calendar extends IPSModuleStrict
         );
 
         return $events;
+    }
+
+    /**
+     * Retains immutable occurrence anchors when a provider omits them in a delta response.
+     *
+     * @param list<array<string, mixed>> $events
+     * @return array<string, array{originalStart:string, canUpdateFollowing:bool}>
+     */
+    private function cachedOccurrenceIdentities(array $events): array
+    {
+        $identities = [];
+        foreach ($events as $event) {
+            if (!CalendarEventRecurrence::isOccurrence($event)) {
+                continue;
+            }
+            $seriesId = trim((string) ($event['seriesId'] ?? ''));
+            $originalStart = trim((string) ($event['originalStart'] ?? ''));
+            if ($seriesId === '' || $originalStart === '') {
+                continue;
+            }
+            foreach (['eventReference', 'occurrenceId'] as $key) {
+                $reference = trim((string) ($event[$key] ?? ''));
+                if ($reference !== '') {
+                    $identities[$seriesId . '|' . $reference] = [
+                        'originalStart'      => $originalStart,
+                        'canUpdateFollowing' => (bool) ($event['canUpdateFollowing'] ?? false)
+                    ];
+                }
+            }
+        }
+
+        return $identities;
+    }
+
+    /**
+     * @param array<string, mixed> $change
+     * @param array<string, array{originalStart:string, canUpdateFollowing:bool}> $cachedIdentities
+     * @return array<string, mixed>
+     */
+    private function restoreMissingOccurrenceIdentity(array $change, array $cachedIdentities): array
+    {
+        if ((bool) ($change['_syncDeleted'] ?? false)
+            || !CalendarEventRecurrence::isOccurrence($change)
+            || trim((string) ($change['originalStart'] ?? '')) !== '') {
+            return $change;
+        }
+
+        $seriesId = trim((string) ($change['seriesId'] ?? ''));
+        if ($seriesId === '') {
+            return $change;
+        }
+        foreach (['eventReference', 'occurrenceId'] as $key) {
+            $reference = trim((string) ($change[$key] ?? ''));
+            $identity = $reference !== '' ? ($cachedIdentities[$seriesId . '|' . $reference] ?? null) : null;
+            if ($identity === null) {
+                continue;
+            }
+            $change['originalStart'] = $identity['originalStart'];
+            if ($identity['canUpdateFollowing']) {
+                $change['canUpdateFollowing'] = true;
+            }
+            break;
+        }
+
+        return $change;
     }
 
     private function finishEventTransfer(string $token): void
