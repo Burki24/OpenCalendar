@@ -643,7 +643,9 @@ final class ICalendarCodec
     ): array {
         $recurrence = $data['recurrence'] ?? null;
         if (!is_array($recurrence) || $recurrence === [] || array_is_list($recurrence)) {
-            throw new InvalidArgumentException('The recurrence settings are required when splitting a recurring event.');
+            throw new InvalidArgumentException(
+                'The recurrence settings are required when splitting a recurring event.'
+            );
         }
 
         $context = self::recurringSplitContext($ical, $uid, $originalStart);
@@ -693,6 +695,139 @@ final class ICalendarCodec
 
         return [
             'originalIcal' => $originalIcal,
+            'newIcal'      => self::foldLines($newLines),
+            'newUid'       => $newUid
+        ];
+    }
+
+    /**
+     * Separates a new recurring tail after a completed first occurrence.
+     *
+     * The completed detached first occurrence remains part of a one-occurrence
+     * historical series. The requested recurring data becomes a separate open
+     * series, so moving planned follow-up tasks never reopens that completion.
+     *
+     * @param array<string, mixed> $data Changes and recurrence settings for the new future series.
+     * @return array{originalIcal: string, newIcal: string, newUid: string}
+     */
+    public static function splitCompletedFirstRecurringSeries(
+        string $ical,
+        string $uid,
+        string $originalStart,
+        array $data
+    ): array {
+        $recurrence = $data['recurrence'] ?? null;
+        if (!is_array($recurrence) || $recurrence === [] || array_is_list($recurrence)) {
+            throw new InvalidArgumentException('The recurrence settings are required when splitting a recurring event.');
+        }
+
+        $context = self::recurringSplitContext($ical, $uid, $originalStart);
+        if ($context['position'] !== 1) {
+            throw new RuntimeException('Only the first recurring occurrence can retain a completed override.');
+        }
+
+        $retainedSettings = $context['settings'];
+        $retainedSettings['endMode'] = 'count';
+        $retainedSettings['count'] = 1;
+        unset($retainedSettings['until']);
+        $retainedMaster = $context['master']['lines'];
+        self::replaceProperty(
+            $retainedMaster,
+            'RRULE',
+            CalendarRecurrenceRule::toICalendarRule(
+                $retainedSettings,
+                $context['masterStart'],
+                $context['allDay'],
+                $context['timezone']
+            )
+        );
+        self::touchEventBlock($retainedMaster);
+
+        $originalLines = $context['lines'];
+        $operations = [[
+            'start'       => $context['master']['start'],
+            'length'      => $context['master']['end'] - $context['master']['start'] + 1,
+            'replacement' => $retainedMaster
+        ]];
+        foreach ($context['blocks'] as $block) {
+            $properties = self::readTopLevelProperties($block['lines']);
+            if (!hash_equals($context['uid'], self::propertyValue($properties, 'UID'))) {
+                continue;
+            }
+            $recurrenceId = self::firstProperty($properties, 'RECURRENCE-ID');
+            if ($recurrenceId === null) {
+                continue;
+            }
+            try {
+                $timestamp = self::parseDateProperty($recurrenceId)['timestamp'];
+            } catch (Throwable) {
+                continue;
+            }
+            if ($timestamp <= $context['masterStart']->getTimestamp()) {
+                continue;
+            }
+            $operations[] = [
+                'start'       => $block['start'],
+                'length'      => $block['end'] - $block['start'] + 1,
+                'replacement' => []
+            ];
+        }
+        usort(
+            $operations,
+            static fn (array $left, array $right): int => $right['start'] <=> $left['start']
+        );
+        foreach ($operations as $operation) {
+            array_splice(
+                $originalLines,
+                $operation['start'],
+                $operation['length'],
+                $operation['replacement']
+            );
+        }
+
+        $newBlock = self::createOccurrenceOverrideBlock(
+            $context['master']['lines'],
+            $context['masterStart']
+        );
+        self::replaceProperty($newBlock, 'RECURRENCE-ID', null);
+        $newUid = bin2hex(random_bytes(16)) . '@ips-kalender';
+        self::replaceProperty($newBlock, 'UID', 'UID:' . $newUid);
+        self::applyEventChangesToBlock($newBlock, $data);
+
+        $updatedProperties = self::readTopLevelProperties($newBlock);
+        $updatedStartProperty = self::firstProperty($updatedProperties, 'DTSTART');
+        if ($updatedStartProperty === null) {
+            throw new RuntimeException('The split recurring event has no start.');
+        }
+        $updatedStart = self::parseDateProperty($updatedStartProperty);
+        $updatedTimezone = self::timezone($updatedStart['timezone']);
+        $updatedStartDate = (new DateTimeImmutable('@' . $updatedStart['timestamp']))
+            ->setTimezone($updatedTimezone);
+        self::replaceProperty(
+            $newBlock,
+            'RRULE',
+            CalendarRecurrenceRule::toICalendarRule(
+                $recurrence,
+                $updatedStartDate,
+                $updatedStart['allDay'],
+                $updatedStart['timezone']
+            )
+        );
+
+        $now = gmdate('Ymd\\THis\\Z');
+        self::replaceProperty($newBlock, 'SEQUENCE', 'SEQUENCE:0');
+        self::replaceProperty($newBlock, 'CREATED', 'CREATED:' . $now);
+        self::replaceProperty($newBlock, 'DTSTAMP', 'DTSTAMP:' . $now);
+        self::replaceProperty($newBlock, 'LAST-MODIFIED', 'LAST-MODIFIED:' . $now);
+
+        $newLines = $context['lines'];
+        foreach (array_reverse($context['blocks']) as $block) {
+            array_splice($newLines, $block['start'], $block['end'] - $block['start'] + 1);
+        }
+        self::insertEventBlock($newLines, $newBlock);
+
+        return [
+            'originalIcal' => self::foldLines($originalLines),
             'newIcal'      => self::foldLines($newLines),
             'newUid'       => $newUid
         ];

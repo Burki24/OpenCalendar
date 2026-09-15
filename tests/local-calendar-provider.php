@@ -143,6 +143,59 @@ localExpect(
     'Removing the completed former first occurrence must not complete the reanchored local series.'
 );
 
+$completedFirstProvider = new LocalCalendarProvider([], $reference);
+$completedFirstTask = CalendarTaskEvent::prepareWrite([
+    'summary'    => 'Keep completed first task', 'task' => true, 'taskCompleted' => false,
+    'taskFollowPlanned' => true, 'allDay' => true,
+    'start'      => '2026-09-01', 'end' => '2026-09-02',
+    'recurrence' => ['frequency' => 'DAILY', 'interval' => 1, 'endMode' => 'count', 'count' => 3]
+]);
+$completedFirstSeries = $completedFirstProvider->createEvent($reference, $completedFirstTask);
+$events = $completedFirstProvider->getEvents($reference, $start, $end);
+$completedFirst = $completedFirstProvider->getEventForIdentity($reference, $events[0]);
+$completedFirstProvider->updateEvent(
+    $reference,
+    $completedFirst['resourceUrl'],
+    $completedFirst['etag'],
+    $completedFirst['uid'],
+    CalendarTaskEvent::prepareWrite(['task' => true, 'taskCompleted' => true], $completedFirst),
+    $completedFirst
+);
+$events = $completedFirstProvider->getEvents($reference, $start, $end);
+$completedFirst = $completedFirstProvider->getEventForIdentity($reference, $events[0]);
+$following = $completedFirstProvider->getRecurringFollowing(
+    $reference,
+    $completedFirstSeries['uid'],
+    $completedFirst['occurrenceId'],
+    $completedFirst['originalStart'],
+    $completedFirstSeries['resourceUrl']
+);
+$completedFirstProvider->updateEvent($reference, $following['resourceUrl'], $following['etag'], $following['uid'], [
+    'summary'    => '[OC:TODO:FOLLOW] Keep completed first task',
+    'start'      => '2026-09-02', 'end' => '2026-09-03', 'allDay' => true,
+    'recurrence' => CalendarTaskEvent::shiftPlannedRecurrence(
+        $following['recurrenceSettings'],
+        $following['originalStart'],
+        '2026-09-02'
+    )
+], $following);
+$events = array_map(
+    CalendarTaskEvent::enrich(...),
+    $completedFirstProvider->getEvents($reference, $start, $end)
+);
+localExpect(
+    array_column($events, 'start') === ['2026-09-01', '2026-09-02', '2026-09-03', '2026-09-04'],
+    'Moving a task series after completing its first occurrence must retain the completion and move the open series.'
+);
+localExpect(
+    $events[0]['taskCompleted'] === true
+        && array_filter(
+            array_slice($events, 1),
+            static fn (array $event): bool => $event['taskCompleted']
+        ) === [],
+    'Moving a task series must retain the completion without reopening it or completing the new series.'
+);
+
 $beforeLimit = $provider->exportResources();
 localFails(fn () => $provider->createEvent($reference, ['summary' => 'Too large', 'start' => '2026-10-18', 'end' => '2026-10-19', 'allDay' => true, 'description' => str_repeat('a', 16_777_216)]), 'Storage limit must reject oversized originals.');
 localExpect($provider->exportResources() === $beforeLimit, 'Storage rejection must preserve originals.');

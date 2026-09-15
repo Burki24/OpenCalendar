@@ -18,6 +18,7 @@ require_once __DIR__ . '/RecurringCalendarProviderInterface.php';
 require_once __DIR__ . '/CalendarEventRecurrence.php';
 require_once __DIR__ . '/CalendarEventReminder.php';
 require_once __DIR__ . '/CalendarRecurrenceRule.php';
+require_once __DIR__ . '/CalendarTaskEvent.php';
 require_once __DIR__ . '/CalendarHttpClient.php';
 require_once __DIR__ . '/CalDAVOriginPolicy.php';
 require_once __DIR__ . '/ICalendarCodec.php';
@@ -721,6 +722,81 @@ final class CalDAVProvider implements CalendarProviderInterface, RecurringCalend
             $position = $this->recurringOccurrencePosition($master, $settings, $targetStart);
 
             if ($position === 1) {
+                $target = $this->recurringTargetEvent(
+                    $getResponse->body,
+                    $effectiveResourceUrl,
+                    $currentEtag,
+                    ICalendarCodec::parseEvents($getResponse->body, $effectiveResourceUrl, $currentEtag),
+                    $seriesId,
+                    $targetStart
+                );
+                if (($target['recurrenceType'] ?? '') === CalendarEventRecurrence::EXCEPTION
+                    && (bool) (CalendarTaskEvent::enrich($target)['taskCompleted'] ?? false)) {
+                    $split = ICalendarCodec::splitCompletedFirstRecurringSeries(
+                        $getResponse->body,
+                        $seriesId,
+                        $originalStart,
+                        $event
+                    );
+                    $newResourceUrl = rtrim($calendarUrl, '/') . '/' . rawurlencode($split['newUid']) . '.ics';
+                    $createResponse = $this->httpClient->request(
+                        'PUT',
+                        $newResourceUrl,
+                        [
+                            'Content-Type'  => 'text/calendar; charset=utf-8',
+                            'If-None-Match' => '*'
+                        ],
+                        $split['newIcal']
+                    );
+                    $this->assertResponseStatus(
+                        $createResponse,
+                        [200, 201, 204],
+                        'completed task-series split creation'
+                    );
+                    $createdResourceUrl = $this->trustedEffectiveUrl($createResponse, $newResourceUrl);
+                    $this->assertResourceBelongsToCalendar($calendarUrl, $createdResourceUrl);
+                    $createdEtag = trim((string) ($createResponse->headers['etag'] ?? ''));
+
+                    $headers = ['Content-Type' => 'text/calendar; charset=utf-8'];
+                    if ($currentEtag !== '') {
+                        $headers['If-Match'] = $currentEtag;
+                    }
+                    $trimResponse = $this->httpClient->request(
+                        'PUT',
+                        $effectiveResourceUrl,
+                        $headers,
+                        $split['originalIcal']
+                    );
+                    if (!in_array($trimResponse->statusCode, [200, 201, 204], true)) {
+                        try {
+                            $this->deleteResource(
+                                $calendarUrl,
+                                $createdResourceUrl,
+                                $createdEtag,
+                                'completed task-series split rollback'
+                            );
+                        } catch (Throwable) {
+                            throw new CalDAVProviderException(
+                                'The completed task-series split could not be rolled back after retaining its first occurrence failed.'
+                            );
+                        }
+                        if ($trimResponse->statusCode === 412 && $attempt === 0) {
+                            $resourceUrl = $effectiveResourceUrl;
+                            continue;
+                        }
+                        $this->assertResponseStatus(
+                            $trimResponse,
+                            [200, 201, 204],
+                            'completed task-series retention'
+                        );
+                    }
+
+                    return [
+                        'uid'         => $split['newUid'],
+                        'resourceUrl' => $createdResourceUrl,
+                        'etag'        => $createdEtag
+                    ];
+                }
                 $updatedIcal = ICalendarCodec::updateRecurringSeries(
                     $getResponse->body,
                     $seriesId,
