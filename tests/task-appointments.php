@@ -32,6 +32,7 @@ final class TaskSeriesWriteCalendar extends Calendar
     public array $following = [];
     public bool $cacheAvailable = true;
     public bool $followingAvailable = true;
+    public bool $localCalendar = false;
 
     protected function HasActiveParent(): bool
     {
@@ -45,7 +46,7 @@ final class TaskSeriesWriteCalendar extends Calendar
 
     protected function ReadPropertyBoolean(string $Name): bool
     {
-        return $Name !== 'LocalCalendar';
+        return $Name === 'LocalCalendar' ? $this->localCalendar : true;
     }
 
     protected function ReadAttributeString(string $Name): string
@@ -406,6 +407,37 @@ assertTaskAppointment(
 assertTaskAppointment(
     !CalendarTaskEvent::requiresOccurrenceDetachment($seriesEvents, $seriesEvents[0], '2026-09-18'),
     'A task occurrence must remain part of its series when its new date precedes the next planned occurrence.'
+);
+$mustDetachRolledForwardTask = new ReflectionMethod(Calendar::class, 'mustDetachRolledForwardTaskOccurrence');
+$manualCalendar->localCalendar = false;
+assertTaskAppointment(
+    !$mustDetachRolledForwardTask->invoke($manualCalendar, $seriesEvents, $seriesEvents[0], '2026-09-18'),
+    'External calendars must retain their series occurrence when the moved task does not cross a planned occurrence.'
+);
+$manualCalendar->localCalendar = true;
+assertTaskAppointment(
+    $mustDetachRolledForwardTask->invoke($manualCalendar, $seriesEvents, $seriesEvents[0], '2026-09-18'),
+    'A locally stored overdue task occurrence must detach from its series when it is rolled forward.'
+);
+$manualCalendar->localCalendar = false;
+$detachedTaskWrite = CalendarTaskEvent::prepareWrite([
+    'summary'           => 'Serienaufgabe',
+    'allDay'            => true,
+    'start'             => '2026-09-18',
+    'end'               => '2026-09-19',
+    'task'              => true,
+    'taskCompleted'     => false,
+    'taskFollowPlanned' => false
+], [
+    'summary' => '[OC:TODO:FOLLOW] Serienaufgabe',
+    'allDay'  => true,
+    'start'   => '2026-09-12',
+    'end'     => '2026-09-13'
+]);
+assertTaskAppointment(
+    $detachedTaskWrite['summary'] === '[OC:TODO] Serienaufgabe'
+        && !array_key_exists('taskFollowPlanned', $detachedTaskWrite),
+    'A rolled-forward detached task must be persisted as a standalone task without the series-follow marker.'
 );
 $shiftedEvents = CalendarTaskEvent::shiftFollowingEvents(
     $seriesEvents,
