@@ -710,6 +710,10 @@ html.ipsview-mode .danger-button { min-height: 48px; padding-inline: 18px; }
 .oc-dialog-large { --dialog-width: var(--cal-dialog-large-width); }
 .oc-dialog-extra-large { --dialog-width: var(--cal-dialog-extra-large-width); }
 .oc-dialog[open] { display: flex; flex-direction: column; }
+#event-dialog {
+    height: calc(100vh - var(--tile-title-clearance) - 24px);
+    height: calc(100dvh - var(--tile-title-clearance) - 24px);
+}
 .oc-dialog > .dialog-layout {
     display: flex;
     flex: 1 1 auto;
@@ -719,34 +723,6 @@ html.ipsview-mode .danger-button { min-height: 48px; padding-inline: 18px; }
     min-height: 0;
     max-height: inherit;
     overflow: hidden;
-}
-#event-dialog > .dialog-layout {
-    overflow-x: hidden;
-    overflow-y: auto;
-    overscroll-behavior: contain;
-    -webkit-overflow-scrolling: touch;
-    touch-action: pan-y;
-}
-#event-dialog .dialog-body {
-    flex: 0 0 auto;
-    min-height: auto;
-    overflow: visible;
-    overscroll-behavior: auto;
-    touch-action: auto;
-}
-#event-dialog .dialog-header {
-    position: sticky;
-    top: 0;
-    z-index: 6;
-    background: var(--cal-dialog);
-    box-shadow: 0 1px 0 var(--cal-line, var(--cal-border));
-}
-#event-dialog .dialog-actions {
-    position: sticky;
-    bottom: 0;
-    z-index: 6;
-    background: var(--cal-dialog);
-    box-shadow: 0 -1px 0 var(--cal-line, var(--cal-border));
 }
 .oc-dialog::backdrop {
     background: color-mix(in srgb, var(--cal-text) 42%, transparent);
@@ -1095,6 +1071,10 @@ html.ipsview-mode .view-selector-option { min-height: 48px; padding: 10px 13px; 
         max-height: calc(100vh - var(--tile-title-clearance) - 16px);
         max-height: calc(100dvh - var(--tile-title-clearance) - 16px);
         margin: calc(var(--tile-title-clearance) + 8px) auto 8px;
+    }
+    #event-dialog {
+        height: calc(100vh - var(--tile-title-clearance) - 16px);
+        height: calc(100dvh - var(--tile-title-clearance) - 16px);
     }
     .dialog-header { min-height: 50px; padding: 8px 9px 8px 12px; }
     .dialog-body { padding: 12px; }
