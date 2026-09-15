@@ -45,8 +45,7 @@ final class MicrosoftCalendarIncrementalSync
         string $calendarReference,
         string $eventReference,
         string $originalStartFallback = ''
-    ): array
-    {
+    ): array {
         $calendarId = $this->calendarId($calendarReference);
         $eventReference = trim($eventReference);
         if ($eventReference === '') {
