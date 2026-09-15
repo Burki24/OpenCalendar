@@ -145,10 +145,10 @@ localExpect(
 
 $completedFirstProvider = new LocalCalendarProvider([], $reference);
 $completedFirstTask = CalendarTaskEvent::prepareWrite([
-    'summary'    => 'Keep completed first task', 'task' => true, 'taskCompleted' => false,
+    'summary'           => 'Keep completed first task', 'task' => true, 'taskCompleted' => false,
     'taskFollowPlanned' => true, 'allDay' => true,
-    'start'      => '2026-09-01', 'end' => '2026-09-02',
-    'recurrence' => ['frequency' => 'DAILY', 'interval' => 1, 'endMode' => 'count', 'count' => 3]
+    'start'             => '2026-09-01', 'end' => '2026-09-02',
+    'recurrence'        => ['frequency' => 'DAILY', 'interval' => 1, 'endMode' => 'count', 'count' => 3]
 ]);
 $completedFirstSeries = $completedFirstProvider->createEvent($reference, $completedFirstTask);
 $events = $completedFirstProvider->getEvents($reference, $start, $end);
