@@ -87,16 +87,6 @@ $firstOccurrenceProvider->updateEvent(
     $first
 );
 $events = $firstOccurrenceProvider->getEvents($reference, $start, $end);
-$first = $firstOccurrenceProvider->getEventForIdentity($reference, $events[0]);
-$firstOccurrenceProvider->updateEvent(
-    $reference,
-    $first['resourceUrl'],
-    $first['etag'],
-    $first['uid'],
-    ['summary' => '[OC:TODO] Move first task'],
-    $first
-);
-$events = $firstOccurrenceProvider->getEvents($reference, $start, $end);
 $following = $firstOccurrenceProvider->getRecurringFollowing(
     $reference,
     $firstOccurrenceSeries['uid'],
@@ -115,7 +105,11 @@ $firstOccurrenceProvider->updateEvent($reference, $following['resourceUrl'], $fo
 $events = $firstOccurrenceProvider->getEvents($reference, $start, $end);
 localExpect(
     array_column($events, 'start') === ['2026-09-02', '2026-09-03', '2026-09-04'],
-    'Moving a reopened first task occurrence must move the complete local series without retaining its former exception.'
+    'Moving a completed first task occurrence must move the complete local series without retaining its former exception.'
+);
+localExpect(
+    array_filter(array_map(CalendarTaskEvent::enrich(...), $events), static fn (array $event): bool => $event['taskCompleted']) === [],
+    'Removing the completed former first occurrence must not complete the reanchored local series.'
 );
 
 $beforeLimit = $provider->exportResources();

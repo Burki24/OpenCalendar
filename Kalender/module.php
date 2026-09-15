@@ -902,6 +902,18 @@ class Calendar extends IPSModuleStrict
                 }
                 $followingChanges = $changes;
                 $following = $this->prepareTaskFollowingMove(array_merge($taskSource, $recurrence), $followingChanges);
+                $followingTask = CalendarTaskEvent::enrich($following);
+                if ((bool) ($taskAfterWrite['task'] ?? false)
+                    && (bool) ($followingTask['task'] ?? false)
+                    && (bool) ($taskAfterWrite['taskCompleted'] ?? false) !== (bool) ($followingTask['taskCompleted'] ?? false)) {
+                    // A completed first occurrence is a detached task-state override.
+                    // Reanchoring the series must not turn every following task into a
+                    // completed task when that override is removed with the former start.
+                    $followingChanges['task'] = true;
+                    $followingChanges['taskCompleted'] = (bool) $followingTask['taskCompleted'];
+                    $followingChanges['taskFollowPlanned'] = (bool) ($followingTask['taskFollowPlanned'] ?? false);
+                    $followingChanges = CalendarTaskEvent::prepareWrite($followingChanges, $following);
+                }
                 $providerStart = $this->taskEventDate($following, 'start');
                 if ($providerStart === null) {
                     throw new InvalidArgumentException('The task series contains an invalid occurrence date.');
