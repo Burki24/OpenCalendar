@@ -2596,7 +2596,7 @@ class Calendar extends IPSModuleStrict
                 $cachedEvent['writeScope'] = (string) ($event['writeScope'] ?? '');
                 if (trim((string) ($cachedEvent['originalStart'] ?? '')) === ''
                     && trim((string) ($event['originalStart'] ?? '')) !== ''
-                    && ($cachedEvent['recurrenceType'] ?? '') === CalendarEventRecurrence::OCCURRENCE) {
+                    && CalendarEventRecurrence::isOccurrence($cachedEvent)) {
                     $cachedEvent['originalStart'] = trim((string) $event['originalStart']);
                 }
                 if ((bool) ($cachedEvent['recurring'] ?? false)

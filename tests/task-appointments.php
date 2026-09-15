@@ -454,6 +454,40 @@ assertTaskAppointment(
     'A Microsoft delta exception without originalStart must retain the cached occurrence identity for following moves.'
 );
 
+$manualCalendar->cacheAvailable = true;
+$manualCalendar->source = array_merge(
+    IPSKalender\CalendarEventRecurrence::occurrence(
+        'microsoft-series',
+        'microsoft-exception',
+        '',
+        '',
+        true,
+        true,
+        true,
+        true,
+        false
+    ),
+    [
+        'uid'         => 'microsoft-exception',
+        'resourceUrl' => 'microsoft-exception',
+        'summary'     => '[OC:TODO:FOLLOW] Microsoft task',
+        'allDay'      => true,
+        'start'       => '2026-09-12',
+        'end'         => '2026-09-13'
+    ]
+);
+$resolveWriteRecurrence = new ReflectionMethod(Calendar::class, 'resolveWriteRecurrence');
+$resolvedExceptionRecurrence = $resolveWriteRecurrence->invoke(
+    $manualCalendar,
+    array_merge($manualCalendar->source, ['originalStart' => '2026-09-12']),
+    true
+);
+assertTaskAppointment(
+    ($resolvedExceptionRecurrence['originalStart'] ?? '') === '2026-09-12'
+        && ($resolvedExceptionRecurrence['canUpdateFollowing'] ?? false) === true,
+    'A Microsoft exception must retain a supplied original-start fallback for following task moves.'
+);
+
 foreach ([
     ['allDay' => false, 'recurrence' => null],
     ['allDay' => true, 'recurrence' => null, 'start' => '2026-09-08', 'end' => '2026-09-10']

@@ -436,7 +436,8 @@ assertVisualization(
 );
 
 assertVisualization(
-    substr_count($moduleSource, "if ((\$event['recurrenceType'] ?? '') === 'occurrence'") === 2
+    substr_count($moduleSource, 'CalendarEventRecurrence::isOccurrence($event)') === 2
+        && str_contains($moduleSource, 'CalendarEventRecurrence::isOccurrence($eventEdit)')
         && substr_count($moduleSource, "\$event['originalStart'] = trim((string) (\$event['start'] ?? ''));") === 2
         && substr_count($moduleSource, "\$recurringOccurrence = (bool) (\$event['recurring'] ?? false)") === 2
         && substr_count($moduleSource, "trim((string) (\$event['occurrenceId'] ?? '')) !== ''") >= 2
