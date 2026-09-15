@@ -87,6 +87,37 @@ $firstOccurrenceProvider->updateEvent(
     $first
 );
 $events = $firstOccurrenceProvider->getEvents($reference, $start, $end);
+$reopened = $firstOccurrenceProvider->getEventForIdentity($reference, $events[0]);
+$reopenChanges = CalendarTaskEvent::prepareWrite([
+    'task'          => true,
+    'taskCompleted' => false
+], $reopened);
+$firstOccurrenceProvider->updateEvent(
+    $reference,
+    $reopened['resourceUrl'],
+    $reopened['etag'],
+    $reopened['uid'],
+    $reopenChanges,
+    $reopened
+);
+$events = $firstOccurrenceProvider->getEvents($reference, $start, $end);
+localExpect(
+    $events[0]['recurring']
+        && $events[0]['canUpdateOccurrence']
+        && $events[0]['canUpdateFollowing']
+        && $events[0]['occurrenceId'] !== ''
+        && $events[0]['seriesId'] !== '',
+    'Reopening the first local task occurrence must retain its writable recurrence identity.'
+);
+$reopened = $firstOccurrenceProvider->getEventForIdentity($reference, $events[0]);
+localExpect(
+    $reopened['recurring']
+        && $reopened['canUpdateOccurrence']
+        && $reopened['canUpdateFollowing']
+        && $reopened['occurrenceId'] !== ''
+        && $reopened['seriesId'] !== '',
+    'The local editor lookup must preserve the writable recurrence identity after reopening a task.'
+);
 $following = $firstOccurrenceProvider->getRecurringFollowing(
     $reference,
     $firstOccurrenceSeries['uid'],
