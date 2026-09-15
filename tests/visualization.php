@@ -941,6 +941,8 @@ assertVisualization(
         && str_contains($style, 'height: calc(100dvh - var(--tile-title-clearance) - 24px);')
         && str_contains($style, '.oc-dialog > .dialog-layout {')
         && str_contains($style, 'flex: 1 1 auto;')
+        && str_contains($style, '#event-dialog > .dialog-layout {')
+        && str_contains($style, 'height: 100%;')
         && str_contains($style, 'scrollbar-gutter: stable;')
         && str_contains($style, '.dialog-actions-start, .dialog-actions-end {')
         && str_contains($style, '.event-details-dialog { --dialog-width: 720px; }')
