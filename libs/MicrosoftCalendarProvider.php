@@ -395,6 +395,9 @@ final class MicrosoftCalendarProvider implements CalendarProviderInterface, Recu
         $parentHeaders = $parentEtag !== '' ? ['If-Match' => $parentEtag] : [];
 
         if ($position === 1) {
+            if (($target['recurrenceType'] ?? '') === CalendarEventRecurrence::EXCEPTION) {
+                return $this->replaceFirstExceptionSeries($calendarId, $seriesId, $parentItem, $event, $parentHeaders);
+            }
             if (array_key_exists('description', $event)) {
                 $this->assertDescriptionEditable($calendarId, $seriesId);
             }
@@ -447,6 +450,75 @@ final class MicrosoftCalendarProvider implements CalendarProviderInterface, Recu
             } catch (Throwable) {
                 throw new MicrosoftCalendarProviderException(
                     'The new recurring series could not be created and the original series could not be restored automatically.'
+                );
+            }
+
+            throw $exception;
+        }
+
+        return $this->writeResult($calendarId, $created);
+    }
+
+    /**
+     * Replaces a series whose first occurrence is already a Microsoft exception.
+     *
+     * Microsoft Graph retains an exception after a per-occurrence task state was
+     * restored. Moving the master afterwards leaves that stale exception bound to
+     * its former start. Creating the replacement before deleting the old master
+     * avoids both the broken master/exception pair and data loss if creation fails.
+     *
+     * @param array<string, mixed> $parentItem
+     * @param array<string, mixed> $event
+     * @param array<string, string> $parentHeaders
+     * @return array<string, mixed>
+     */
+    private function replaceFirstExceptionSeries(
+        string $calendarId,
+        string $seriesId,
+        array $parentItem,
+        array $event,
+        array $parentHeaders
+    ): array {
+        if (array_key_exists('description', $event)) {
+            $this->assertDescriptionEditable($calendarId, $seriesId);
+        }
+        $created = $this->requestJson(
+            'POST',
+            '/me/calendars/' . rawurlencode($calendarId) . '/events',
+            array_replace(
+                $this->splitEventBasePayload($parentItem),
+                $this->buildEventPayload($event, true)
+            ),
+            [],
+            [201]
+        );
+        $createdId = trim((string) ($created['id'] ?? ''));
+        if ($createdId === '') {
+            throw new MicrosoftCalendarProviderException(
+                'Microsoft Calendar did not return the replacement recurring series ID.'
+            );
+        }
+
+        try {
+            $this->requestJson(
+                'DELETE',
+                '/me/calendars/' . rawurlencode($calendarId) . '/events/' . rawurlencode($seriesId),
+                null,
+                $parentHeaders,
+                [204]
+            );
+        } catch (Throwable $exception) {
+            try {
+                $this->requestJson(
+                    'DELETE',
+                    '/me/calendars/' . rawurlencode($calendarId) . '/events/' . rawurlencode($createdId),
+                    null,
+                    [],
+                    [204]
+                );
+            } catch (Throwable) {
+                throw new MicrosoftCalendarProviderException(
+                    'The replacement series could not be rolled back after the original series could not be removed.'
                 );
             }
 

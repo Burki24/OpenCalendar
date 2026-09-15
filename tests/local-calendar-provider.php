@@ -69,6 +69,55 @@ $provider->updateEvent($reference, $following['resourceUrl'], $following['etag']
 $events = $provider->getEvents($reference, $start, $end);
 localExpect(array_column($events, 'start') === ['2026-09-11', '2026-09-23', '2026-10-03', '2026-10-13'], 'Following shift must retain remaining series length.');
 
+$firstOccurrenceProvider = new LocalCalendarProvider([], $reference);
+$firstOccurrenceTask = CalendarTaskEvent::prepareWrite([
+    'summary'    => 'Move first task', 'task' => true, 'taskCompleted' => false, 'allDay' => true,
+    'start'      => '2026-09-01', 'end' => '2026-09-02',
+    'recurrence' => ['frequency' => 'DAILY', 'interval' => 1, 'endMode' => 'count', 'count' => 3]
+]);
+$firstOccurrenceSeries = $firstOccurrenceProvider->createEvent($reference, $firstOccurrenceTask);
+$events = $firstOccurrenceProvider->getEvents($reference, $start, $end);
+$first = $firstOccurrenceProvider->getEventForIdentity($reference, $events[0]);
+$firstOccurrenceProvider->updateEvent(
+    $reference,
+    $first['resourceUrl'],
+    $first['etag'],
+    $first['uid'],
+    ['summary' => '[OC:DONE] Move first task'],
+    $first
+);
+$events = $firstOccurrenceProvider->getEvents($reference, $start, $end);
+$first = $firstOccurrenceProvider->getEventForIdentity($reference, $events[0]);
+$firstOccurrenceProvider->updateEvent(
+    $reference,
+    $first['resourceUrl'],
+    $first['etag'],
+    $first['uid'],
+    ['summary' => '[OC:TODO] Move first task'],
+    $first
+);
+$events = $firstOccurrenceProvider->getEvents($reference, $start, $end);
+$following = $firstOccurrenceProvider->getRecurringFollowing(
+    $reference,
+    $firstOccurrenceSeries['uid'],
+    $events[0]['occurrenceId'],
+    $events[0]['originalStart'],
+    $firstOccurrenceSeries['resourceUrl']
+);
+$firstOccurrenceProvider->updateEvent($reference, $following['resourceUrl'], $following['etag'], $following['uid'], [
+    'start'      => '2026-09-02', 'end' => '2026-09-03', 'allDay' => true,
+    'recurrence' => CalendarTaskEvent::shiftPlannedRecurrence(
+        $following['recurrenceSettings'],
+        $following['originalStart'],
+        '2026-09-02'
+    )
+], $following);
+$events = $firstOccurrenceProvider->getEvents($reference, $start, $end);
+localExpect(
+    array_column($events, 'start') === ['2026-09-02', '2026-09-03', '2026-09-04'],
+    'Moving a reopened first task occurrence must move the complete local series without retaining its former exception.'
+);
+
 $beforeLimit = $provider->exportResources();
 localFails(fn () => $provider->createEvent($reference, ['summary' => 'Too large', 'start' => '2026-10-18', 'end' => '2026-10-19', 'allDay' => true, 'description' => str_repeat('a', 16_777_216)]), 'Storage limit must reject oversized originals.');
 localExpect($provider->exportResources() === $beforeLimit, 'Storage rejection must preserve originals.');

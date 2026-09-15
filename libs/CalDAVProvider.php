@@ -721,7 +721,12 @@ final class CalDAVProvider implements CalendarProviderInterface, RecurringCalend
             $position = $this->recurringOccurrencePosition($master, $settings, $targetStart);
 
             if ($position === 1) {
-                $updatedIcal = ICalendarCodec::updateRecurringSeries($getResponse->body, $seriesId, $event);
+                $updatedIcal = ICalendarCodec::updateRecurringSeries(
+                    $getResponse->body,
+                    $seriesId,
+                    $event,
+                    true
+                );
                 $headers = ['Content-Type' => 'text/calendar; charset=utf-8'];
                 if ($currentEtag !== '') {
                     $headers['If-Match'] = $currentEtag;
