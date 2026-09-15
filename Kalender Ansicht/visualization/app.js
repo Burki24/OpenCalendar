@@ -408,9 +408,76 @@ function setEventDialogLoading(mode = '') {
     eventReminderRow.classList.remove('hidden');
 }
 
+function eventDialogHostViewport() {
+    if (calendarVisualization.mode !== 'symcon' || window.parent === window || !window.frameElement) return null;
+
+    try {
+        const hostWindow = window.parent;
+        const hostViewport = hostWindow.visualViewport || hostWindow;
+        const viewportLeft = Number(hostViewport.offsetLeft || 0);
+        const viewportTop = Number(hostViewport.offsetTop || 0);
+        const viewportWidth = Number(hostViewport.width || hostWindow.innerWidth);
+        const viewportHeight = Number(hostViewport.height || hostWindow.innerHeight);
+        const frameBounds = window.frameElement.getBoundingClientRect();
+        const horizontalScale = frameBounds.width / window.innerWidth;
+        const verticalScale = frameBounds.height / window.innerHeight;
+        if (!Number.isFinite(viewportWidth)
+            || !Number.isFinite(viewportHeight)
+            || !Number.isFinite(horizontalScale)
+            || !Number.isFinite(verticalScale)
+            || horizontalScale <= 0
+            || verticalScale <= 0) {
+            return null;
+        }
+
+        const viewportRight = viewportLeft + viewportWidth;
+        const viewportBottom = viewportTop + viewportHeight;
+        const visibleLeft = Math.max(viewportLeft, frameBounds.left);
+        const visibleTop = Math.max(viewportTop, frameBounds.top);
+        const visibleRight = Math.min(viewportRight, frameBounds.right);
+        const visibleBottom = Math.min(viewportBottom, frameBounds.bottom);
+        if (visibleRight <= visibleLeft || visibleBottom <= visibleTop) return null;
+
+        return {
+            left: (visibleLeft - frameBounds.left) / horizontalScale,
+            top: (visibleTop - frameBounds.top) / verticalScale,
+            right: window.innerWidth - ((visibleRight - frameBounds.left) / horizontalScale),
+            bottom: window.innerHeight - ((visibleBottom - frameBounds.top) / verticalScale)
+        };
+    } catch (_) {
+        // Standalone mode and cross-origin hosts use the CSS viewport fallback.
+        return null;
+    }
+}
+
+function updateEventDialogViewportBounds() {
+    const hostViewport = eventDialogHostViewport();
+    if (!hostViewport) {
+        eventDialog.style.removeProperty('--event-dialog-visible-left');
+        eventDialog.style.removeProperty('--event-dialog-visible-top');
+        eventDialog.style.removeProperty('--event-dialog-visible-right');
+        eventDialog.style.removeProperty('--event-dialog-visible-bottom');
+        return;
+    }
+
+    const titleClearance = Number.parseFloat(getComputedStyle(document.documentElement)
+        .getPropertyValue('--tile-title-clearance')) || 0;
+    const edge = window.innerWidth <= 560 ? 8 : 12;
+    const left = Math.max(edge, hostViewport.left + edge);
+    const top = Math.max(titleClearance + edge, hostViewport.top + edge);
+    const right = Math.max(edge, hostViewport.right + edge);
+    const bottom = Math.max(edge, hostViewport.bottom + edge);
+    eventDialog.style.setProperty('--event-dialog-visible-left', `${left}px`);
+    eventDialog.style.setProperty('--event-dialog-visible-top', `${top}px`);
+    eventDialog.style.setProperty('--event-dialog-visible-right', `${right}px`);
+    eventDialog.style.setProperty('--event-dialog-visible-bottom', `${bottom}px`);
+}
+
 function showEventDialog() {
     if (!eventEditingActive) beginEventEditing();
+    updateEventDialogViewportBounds();
     if (!eventDialog.open) eventDialog.showModal();
+    requestAnimationFrame(updateEventDialogViewportBounds);
 }
 
 function deferEventDialogSetup(callback) {
@@ -4162,6 +4229,7 @@ document.querySelectorAll('.view-selector-option').forEach(button => button.addE
     render();
 }));
 window.addEventListener('resize', () => {
+    updateEventDialogViewportBounds();
     if (activeView === 'month') {
         scheduleMonthEventLayout();
     } else if (activeView === 'week' || activeView === 'workWeek') {
@@ -4170,6 +4238,14 @@ window.addEventListener('resize', () => {
     }
     updateSwipeNavigationMode();
 });
+try {
+    window.parent?.addEventListener('resize', updateEventDialogViewportBounds);
+    window.parent?.addEventListener('scroll', updateEventDialogViewportBounds, true);
+    window.parent?.visualViewport?.addEventListener('resize', updateEventDialogViewportBounds);
+    window.parent?.visualViewport?.addEventListener('scroll', updateEventDialogViewportBounds);
+} catch (_) {
+    // Standalone mode and cross-origin hosts use the CSS viewport fallback.
+}
 document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'hidden') return;
     void ensureVisibleRangeLoaded();

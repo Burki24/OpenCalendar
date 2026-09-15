@@ -712,10 +712,10 @@ html.ipsview-mode .danger-button { min-height: 48px; padding-inline: 18px; }
 .oc-dialog[open] { display: flex; flex-direction: column; }
 #event-dialog {
     position: fixed;
-    top: calc(var(--tile-title-clearance) + 12px);
-    right: 12px;
-    bottom: 12px;
-    left: 12px;
+    top: var(--event-dialog-visible-top, calc(var(--tile-title-clearance) + 12px));
+    right: var(--event-dialog-visible-right, 12px);
+    bottom: var(--event-dialog-visible-bottom, 12px);
+    left: var(--event-dialog-visible-left, 12px);
     width: min(var(--dialog-width), calc(100% - 24px));
     height: auto;
     max-height: none;
@@ -1111,10 +1111,10 @@ html.ipsview-mode .view-selector-option { min-height: 48px; padding: 10px 13px; 
         margin: calc(var(--tile-title-clearance) + 8px) auto 8px;
     }
     #event-dialog {
-        top: calc(var(--tile-title-clearance) + 8px);
-        right: 8px;
-        bottom: 8px;
-        left: 8px;
+        top: var(--event-dialog-visible-top, calc(var(--tile-title-clearance) + 8px));
+        right: var(--event-dialog-visible-right, 8px);
+        bottom: var(--event-dialog-visible-bottom, 8px);
+        left: var(--event-dialog-visible-left, 8px);
         width: calc(100% - 16px);
     }
     .dialog-header { min-height: 50px; padding: 8px 9px 8px 12px; }

@@ -939,8 +939,10 @@ assertVisualization(
         && str_contains($style, '.oc-dialog[open] { display: flex; flex-direction: column; }')
         && str_contains($style, '#event-dialog {')
         && str_contains($style, 'position: fixed;')
-        && str_contains($style, 'top: calc(var(--tile-title-clearance) + 12px);')
-        && str_contains($style, 'bottom: 12px;')
+        && str_contains($style, 'top: var(--event-dialog-visible-top, calc(var(--tile-title-clearance) + 12px));')
+        && str_contains($style, 'right: var(--event-dialog-visible-right, 12px);')
+        && str_contains($style, 'bottom: var(--event-dialog-visible-bottom, 12px);')
+        && str_contains($style, 'left: var(--event-dialog-visible-left, 12px);')
         && str_contains($style, '.oc-dialog > .dialog-layout {')
         && str_contains($style, 'flex: 1 1 auto;')
         && str_contains($style, '#event-dialog > .dialog-layout {')
@@ -1265,6 +1267,15 @@ foreach ([$native, $ipsView] as $html) {
     assertVisualization(
         str_contains($script, "openDialog?.querySelector('.dialog-layout, .dialog-body')"),
         'Wheel handling must target the event editor form, which owns its viewport-bounded scroll area.'
+    );
+    assertVisualization(
+        str_contains($script, 'function eventDialogHostViewport()')
+            && str_contains($script, 'window.frameElement.getBoundingClientRect()')
+            && str_contains($script, "--event-dialog-visible-left")
+            && str_contains($script, "--event-dialog-visible-top")
+            && str_contains($script, "--event-dialog-visible-right")
+            && str_contains($script, "--event-dialog-visible-bottom"),
+        'The Symcon editor must limit itself to the visible portion of an oversized HTML-SDK tile.'
     );
     assertVisualization(
         str_contains($script, "event.taskRolledForward ? ' ↻' : ''")
