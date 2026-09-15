@@ -19,6 +19,7 @@ final class TaskSeriesWriteCalendar extends Calendar
 {
     public array $requests = [];
     public array $source = [];
+    public array $following = [];
     public bool $cacheAvailable = true;
     public bool $followingAvailable = true;
 
@@ -70,7 +71,7 @@ final class TaskSeriesWriteCalendar extends Calendar
             return json_encode(['Success' => false, 'Error' => 'Series lookup unavailable.'], JSON_THROW_ON_ERROR);
         }
         $payload = match ($request['Operation']) {
-            'GetRecurringFollowing' => array_merge($this->source, [
+            'GetRecurringFollowing' => array_merge($this->following !== [] ? $this->following : $this->source, [
                 'etag'               => 'fresh-etag',
                 'writeScope'         => 'following',
                 'recurrenceSettings' => [
@@ -127,6 +128,23 @@ assertTaskAppointment(
     'Completing a task with follow-up enabled must still affect only that occurrence.'
 );
 
+$manualCalendar->source['summary'] = '[OC:DONE:FOLLOW] Task';
+$manualCalendar->following = array_merge($manualCalendar->source, ['summary' => '[OC:TODO:FOLLOW] Task']);
+$manualCalendar->requests = [];
+$manualCalendar->UpdateEvent(json_encode(array_merge($manualCalendar->source, ['changes' => [
+    'task'  => true, 'taskCompleted' => true, 'taskFollowPlanned' => true,
+    'start' => '2026-09-13', 'end' => '2026-09-14'
+]]), JSON_THROW_ON_ERROR));
+$writes = array_values(array_filter($manualCalendar->requests, static fn (array $r): bool => $r['Operation'] === 'UpdateEvent'));
+assertTaskAppointment(
+    count($writes) === 1
+        && $writes[0]['Recurrence']['writeScope'] === 'following'
+        && $writes[0]['Event']['summary'] === '[OC:TODO:FOLLOW] Task',
+    'Moving a completed first task occurrence must not mark the reanchored series as completed.'
+);
+$manualCalendar->following = [];
+$manualCalendar->source['summary'] = '[OC:TODO:FOLLOW] Task';
+
 $manualCalendar->cacheAvailable = false;
 foreach (['2026-09-10' => '2026-10-10', '2026-09-17' => '2026-10-17', '2026-09-12' => null] as $newDate => $expectedUntil) {
     $manualCalendar->requests = [];
@@ -155,6 +173,42 @@ $manualCalendar->UpdateEvent(json_encode(array_merge($manualCalendar->source, ['
 assertTaskAppointment(
     array_filter($manualCalendar->requests, static fn (array $r): bool => $r['Operation'] === 'UpdateEvent') === [],
     'A failed series lookup must never silently fall back to writing a single occurrence.'
+);
+
+$mergeIncrementalEvents = new ReflectionMethod(Calendar::class, 'mergeIncrementalEvents');
+$cachedMicrosoftException = array_merge(
+    IPSKalender\CalendarEventRecurrence::occurrence(
+        'microsoft-series',
+        'microsoft-exception',
+        '2026-09-12',
+        '',
+        true,
+        true,
+        true,
+        true,
+        true
+    ),
+    [
+        'eventReference' => 'microsoft-exception',
+        'summary'        => '[OC:TODO:FOLLOW] Microsoft task',
+        'allDay'         => true,
+        'start'          => '2026-09-12',
+        'end'            => '2026-09-13'
+    ]
+);
+$deltaMicrosoftException = $cachedMicrosoftException;
+$deltaMicrosoftException['originalStart'] = '';
+$deltaMicrosoftException['canUpdateFollowing'] = false;
+$mergedMicrosoftExceptions = $mergeIncrementalEvents->invoke(
+    $manualCalendar,
+    [$cachedMicrosoftException],
+    [$deltaMicrosoftException]
+);
+assertTaskAppointment(
+    count($mergedMicrosoftExceptions) === 1
+        && ($mergedMicrosoftExceptions[0]['originalStart'] ?? '') === '2026-09-12'
+        && ($mergedMicrosoftExceptions[0]['canUpdateFollowing'] ?? false) === true,
+    'A Microsoft delta exception without originalStart must retain the cached occurrence identity for following moves.'
 );
 
 $created = CalendarTaskEvent::prepareWrite([

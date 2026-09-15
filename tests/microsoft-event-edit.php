@@ -51,7 +51,9 @@ assertMicrosoftEventEdit(
             'private function eventMatchesLookupIdentity(array $event, array $identity): bool'
         )
         && str_contains($providerSource, '$this->eventMatchesLookupIdentity($event, $identity)')
-        && str_contains($providerSource, '$this->eventLookupRange($identity)'),
+        && str_contains($providerSource, '$this->eventLookupRange($identity)')
+        && str_contains($providerSource, "trim((string) (\$identity['originalStart'] ?? '')) !== ''")
+        && str_contains($providerSource, "\$event['canUpdateFollowing'] = trim((string) (\$event['seriesId'] ?? '')) !== '';"),
     'Microsoft event-edit lookup must use the provider-neutral direct lookup and provider-owned stale-ID fallback.'
 );
 

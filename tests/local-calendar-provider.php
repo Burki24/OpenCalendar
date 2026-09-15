@@ -82,6 +82,77 @@ $master['writeScope'] = 'series';
 $provider->deleteEvent($reference, $master['resourceUrl'], $master['etag'], '', $master);
 localExpect(array_column($provider->getEvents($reference, $start, new DateTimeImmutable('2026-11-01')), 'start') === ['2026-09-11'], 'Full series deletion must leave unrelated original series data intact.');
 
+$firstOccurrenceProvider = new LocalCalendarProvider([], $reference);
+$firstOccurrenceTask = CalendarTaskEvent::prepareWrite([
+    'summary'           => 'Move first task', 'task' => true, 'taskCompleted' => false,
+    'taskFollowPlanned' => true, 'allDay' => true,
+    'start'             => '2026-09-01', 'end' => '2026-09-02',
+    'recurrence'        => ['frequency' => 'DAILY', 'interval' => 1, 'endMode' => 'count', 'count' => 3]
+]);
+$firstOccurrenceSeries = $firstOccurrenceProvider->createEvent($reference, $firstOccurrenceTask);
+$events = $firstOccurrenceProvider->getEvents($reference, $start, $end);
+$first = $firstOccurrenceProvider->getEventForEdit($reference, $events[0]);
+$firstOccurrenceProvider->updateEvent(
+    $reference,
+    $first['resourceUrl'],
+    $first['etag'],
+    $first['uid'],
+    CalendarTaskEvent::prepareWrite(['task' => true, 'taskCompleted' => true], $first),
+    $first
+);
+$events = $firstOccurrenceProvider->getEvents($reference, $start, $end);
+$reopened = $firstOccurrenceProvider->getEventForEdit($reference, $events[0]);
+$firstOccurrenceProvider->updateEvent(
+    $reference,
+    $reopened['resourceUrl'],
+    $reopened['etag'],
+    $reopened['uid'],
+    CalendarTaskEvent::prepareWrite(['task' => true, 'taskCompleted' => false], $reopened),
+    $reopened
+);
+$events = $firstOccurrenceProvider->getEvents($reference, $start, $end);
+localExpect(
+    $events[0]['recurring']
+        && $events[0]['canUpdateOccurrence']
+        && $events[0]['canUpdateFollowing']
+        && $events[0]['occurrenceId'] !== ''
+        && $events[0]['seriesId'] !== '',
+    'Reopening the first local task occurrence must retain its writable recurrence identity.'
+);
+$reopened = $firstOccurrenceProvider->getEventForEdit($reference, $events[0]);
+localExpect(
+    $reopened['recurring']
+        && $reopened['canUpdateOccurrence']
+        && $reopened['canUpdateFollowing']
+        && $reopened['occurrenceId'] !== ''
+        && $reopened['seriesId'] !== '',
+    'The local editor lookup must preserve the writable recurrence identity after reopening a task.'
+);
+$following = $firstOccurrenceProvider->getRecurringFollowing(
+    $reference,
+    $firstOccurrenceSeries['uid'],
+    $reopened['occurrenceId'],
+    $reopened['originalStart'],
+    $firstOccurrenceSeries['resourceUrl']
+);
+$firstOccurrenceProvider->updateEvent($reference, $following['resourceUrl'], $following['etag'], $following['uid'], [
+    'start'      => '2026-09-02', 'end' => '2026-09-03', 'allDay' => true,
+    'recurrence' => CalendarTaskEvent::shiftPlannedRecurrence(
+        $following['recurrenceSettings'],
+        $following['originalStart'],
+        '2026-09-02'
+    )
+], $following);
+$events = $firstOccurrenceProvider->getEvents($reference, $start, $end);
+localExpect(
+    array_column($events, 'start') === ['2026-09-02', '2026-09-03', '2026-09-04'],
+    'Moving a reopened first task occurrence must move the complete local series without retaining its former exception.'
+);
+localExpect(
+    array_filter(array_map(CalendarTaskEvent::enrich(...), $events), static fn (array $event): bool => $event['taskCompleted']) === [],
+    'Removing a completed former first occurrence must not complete the reanchored local series.'
+);
+
 $dst = new LocalCalendarProvider([], $reference);
 $dst->createEvent($reference, [
     'summary'  => 'Weekly review', 'start' => '2026-10-18T09:00:00+02:00', 'end' => '2026-10-18T10:00:00+02:00',

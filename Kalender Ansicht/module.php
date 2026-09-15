@@ -9,11 +9,13 @@ use Burki24\SymconModuleHelper\VariableHelper;
 use Burki24\SymconModuleHelper\VisualizationAssetHelper;
 use Burki24\SymconModuleHelper\VisualizationThemeHelper;
 use IPSKalender\CalendarAppointmentRange;
+use IPSKalender\CalendarEventRecurrence;
 use IPSKalender\CalendarEventReminder;
 use IPSKalender\CalendarEventState;
 use IPSKalender\CalendarTaskEvent;
 
 require_once __DIR__ . '/../libs/CalendarAppointmentRange.php';
+require_once __DIR__ . '/../libs/CalendarEventRecurrence.php';
 require_once __DIR__ . '/../libs/CalendarEventReminder.php';
 require_once __DIR__ . '/../libs/CalendarEventState.php';
 require_once __DIR__ . '/../libs/CalendarTaskEvent.php';
@@ -1693,7 +1695,7 @@ class CalendarView extends IPSModuleStrict
                     $event['calendarName'] = $calendar['name'];
                     $event['calendarColor'] = $calendar['color'];
                     $event['canWrite'] = $calendar['canWrite'];
-                    if (($event['recurrenceType'] ?? '') === 'occurrence'
+                    if (CalendarEventRecurrence::isOccurrence($event)
                         && trim((string) ($event['originalStart'] ?? '')) === '') {
                         $event['originalStart'] = trim((string) ($event['start'] ?? ''));
                     }
@@ -1834,7 +1836,7 @@ class CalendarView extends IPSModuleStrict
                 $event['calendarName'] = $calendar['name'];
                 $event['calendarColor'] = $calendar['color'];
                 $event['canWrite'] = $calendar['canWrite'];
-                if (($event['recurrenceType'] ?? '') === 'occurrence'
+                if (CalendarEventRecurrence::isOccurrence($event)
                     && trim((string) ($event['originalStart'] ?? '')) === '') {
                     $event['originalStart'] = trim((string) ($event['start'] ?? ''));
                 }
@@ -2882,7 +2884,7 @@ class CalendarView extends IPSModuleStrict
                 $eventEdit['calendarName'] = $calendar['name'];
                 $eventEdit['calendarColor'] = $calendar['color'];
                 $eventEdit['canWrite'] = true;
-                if (($eventEdit['recurrenceType'] ?? '') === 'occurrence'
+                if (CalendarEventRecurrence::isOccurrence($eventEdit)
                     && trim((string) ($eventEdit['originalStart'] ?? '')) === '') {
                     $eventEdit['originalStart'] = trim((string) ($eventEdit['start'] ?? ''));
                 }

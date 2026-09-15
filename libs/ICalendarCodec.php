@@ -421,8 +421,15 @@ final class ICalendarCodec
      * represented losslessly by the common OpenCalendar recurrence editor.
      *
      * @param array<string, mixed> $data
+     * @param bool $removeFormerFirstOccurrenceOverride Removes a detached override
+     *        at the old master start when a first-occurrence following update reanchors it.
      */
-    public static function updateRecurringSeries(string $ical, string $uid, array $data): string
+    public static function updateRecurringSeries(
+        string $ical,
+        string $uid,
+        array $data,
+        bool $removeFormerFirstOccurrenceOverride = false
+    ): string
     {
         $uid = trim($uid);
         if ($uid === '') {
@@ -434,6 +441,16 @@ final class ICalendarCodec
         $master = self::recurringMaster($blocks, $uid);
         $block = $master['lines'];
         $properties = $master['properties'];
+        $formerFirstOccurrence = null;
+        if ($removeFormerFirstOccurrenceOverride) {
+            $startProperty = self::firstProperty($properties, 'DTSTART');
+            if ($startProperty === null) {
+                throw new RuntimeException('The recurring event master has no start.');
+            }
+            $formerFirstOccurrence = new DateTimeImmutable(
+                '@' . self::parseDateProperty($startProperty)['timestamp']
+            );
+        }
         $recurrenceProvided = array_key_exists('recurrence', $data);
         $recurrence = $data['recurrence'] ?? null;
         $removeRecurrence = $recurrenceProvided
@@ -523,7 +540,32 @@ final class ICalendarCodec
             );
         }
 
-        array_splice($lines, $master['start'], $master['end'] - $master['start'] + 1, $block);
+        $operations = [[
+            'start'       => $master['start'],
+            'length'      => $master['end'] - $master['start'] + 1,
+            'replacement' => $block
+        ]];
+        if ($formerFirstOccurrence !== null) {
+            foreach (self::recurrenceOverrides($blocks, $uid, $formerFirstOccurrence) as $override) {
+                $operations[] = [
+                    'start'       => $override['start'],
+                    'length'      => $override['end'] - $override['start'] + 1,
+                    'replacement' => []
+                ];
+            }
+        }
+        usort(
+            $operations,
+            static fn (array $left, array $right): int => $right['start'] <=> $left['start']
+        );
+        foreach ($operations as $operation) {
+            array_splice(
+                $lines,
+                $operation['start'],
+                $operation['length'],
+                $operation['replacement']
+            );
+        }
 
         return self::foldLines($lines);
     }

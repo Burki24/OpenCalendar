@@ -919,6 +919,18 @@ class Calendar extends IPSModuleStrict
                 }
                 $followingChanges = $changes;
                 $following = $this->prepareTaskFollowingMove(array_merge($taskSource, $recurrence), $followingChanges);
+                $followingTask = CalendarTaskEvent::enrich($following);
+                if ((bool) ($taskAfterWrite['task'] ?? false)
+                    && (bool) ($followingTask['task'] ?? false)
+                    && (bool) ($taskAfterWrite['taskCompleted'] ?? false) !== (bool) ($followingTask['taskCompleted'] ?? false)) {
+                    // A completed first occurrence is a detached task-state override.
+                    // Reanchoring the series must not turn every following task into a
+                    // completed task when that override is removed with the former start.
+                    $followingChanges['task'] = true;
+                    $followingChanges['taskCompleted'] = (bool) $followingTask['taskCompleted'];
+                    $followingChanges['taskFollowPlanned'] = (bool) ($followingTask['taskFollowPlanned'] ?? false);
+                    $followingChanges = CalendarTaskEvent::prepareWrite($followingChanges, $following);
+                }
                 $providerStart = $this->taskEventDate($following, 'start');
                 if ($providerStart === null) {
                     throw new InvalidArgumentException('The task series contains an invalid occurrence date.');
@@ -1620,6 +1632,7 @@ class Calendar extends IPSModuleStrict
      */
     private function mergeIncrementalEvents(array $events, array $changes): array
     {
+        $cachedOccurrenceIdentities = $this->cachedOccurrenceIdentities($events);
         $replacedResources = [];
         foreach ($changes as $change) {
             if ((bool) ($change['_syncDeleted'] ?? false)
@@ -1643,6 +1656,7 @@ class Calendar extends IPSModuleStrict
         }
 
         foreach ($changes as $change) {
+            $change = $this->restoreMissingOccurrenceIdentity($change, $cachedOccurrenceIdentities);
             $eventReference = trim((string) ($change['eventReference'] ?? ''));
             $resourceUrl = trim((string) ($change['resourceUrl'] ?? ''));
             if ((bool) ($change['_syncDeleted'] ?? false)) {
@@ -1723,6 +1737,71 @@ class Calendar extends IPSModuleStrict
         );
 
         return $events;
+    }
+
+    /**
+     * Retains immutable occurrence anchors when a provider omits them in a delta response.
+     *
+     * @param list<array<string, mixed>> $events
+     * @return array<string, array{originalStart:string, canUpdateFollowing:bool}>
+     */
+    private function cachedOccurrenceIdentities(array $events): array
+    {
+        $identities = [];
+        foreach ($events as $event) {
+            if (!CalendarEventRecurrence::isOccurrence($event)) {
+                continue;
+            }
+            $seriesId = trim((string) ($event['seriesId'] ?? ''));
+            $originalStart = trim((string) ($event['originalStart'] ?? ''));
+            if ($seriesId === '' || $originalStart === '') {
+                continue;
+            }
+            foreach (['eventReference', 'occurrenceId'] as $key) {
+                $reference = trim((string) ($event[$key] ?? ''));
+                if ($reference !== '') {
+                    $identities[$seriesId . '|' . $reference] = [
+                        'originalStart'      => $originalStart,
+                        'canUpdateFollowing' => (bool) ($event['canUpdateFollowing'] ?? false)
+                    ];
+                }
+            }
+        }
+
+        return $identities;
+    }
+
+    /**
+     * @param array<string, mixed> $change
+     * @param array<string, array{originalStart:string, canUpdateFollowing:bool}> $cachedIdentities
+     * @return array<string, mixed>
+     */
+    private function restoreMissingOccurrenceIdentity(array $change, array $cachedIdentities): array
+    {
+        if ((bool) ($change['_syncDeleted'] ?? false)
+            || !CalendarEventRecurrence::isOccurrence($change)
+            || trim((string) ($change['originalStart'] ?? '')) !== '') {
+            return $change;
+        }
+
+        $seriesId = trim((string) ($change['seriesId'] ?? ''));
+        if ($seriesId === '') {
+            return $change;
+        }
+        foreach (['eventReference', 'occurrenceId'] as $key) {
+            $reference = trim((string) ($change[$key] ?? ''));
+            $identity = $reference !== '' ? ($cachedIdentities[$seriesId . '|' . $reference] ?? null) : null;
+            if ($identity === null) {
+                continue;
+            }
+            $change['originalStart'] = $identity['originalStart'];
+            if ($identity['canUpdateFollowing']) {
+                $change['canUpdateFollowing'] = true;
+            }
+            break;
+        }
+
+        return $change;
     }
 
     private function finishEventTransfer(string $token): void
@@ -2621,7 +2700,7 @@ class Calendar extends IPSModuleStrict
                 $cachedEvent['writeScope'] = (string) ($event['writeScope'] ?? '');
                 if (trim((string) ($cachedEvent['originalStart'] ?? '')) === ''
                     && trim((string) ($event['originalStart'] ?? '')) !== ''
-                    && ($cachedEvent['recurrenceType'] ?? '') === CalendarEventRecurrence::OCCURRENCE) {
+                    && CalendarEventRecurrence::isOccurrence($cachedEvent)) {
                     $cachedEvent['originalStart'] = trim((string) $event['originalStart']);
                 }
                 if ((bool) ($cachedEvent['recurring'] ?? false)

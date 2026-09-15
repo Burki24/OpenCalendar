@@ -2582,6 +2582,98 @@ assertTrueValue(
     'A first-occurrence following delete must target the series master ID.'
 );
 
+$msFirstExceptionTarget = $msFirstFollowingTarget;
+$msFirstExceptionTarget['id'] = 'exception-first';
+$msFirstExceptionTarget['type'] = 'exception';
+$msFirstExceptionTarget['originalStart'] = '';
+$msFirstExceptionReplacementClient = new FakeHttpClient([
+    response(200, $msFollowingParent),
+    response(200, $msFirstExceptionTarget),
+    response(201, [
+        'id'          => 'replacement-series-master',
+        'iCalUId'     => 'replacement-series@example.com',
+        '@odata.etag' => 'W/"replacement-series"'
+    ]),
+    response(204)
+]);
+$msFirstExceptionReplacementProvider = new MicrosoftCalendarProvider($msFirstExceptionReplacementClient, 'ms-access-token');
+$msFirstExceptionIdentity = $msFirstFollowingIdentity;
+$msFirstExceptionIdentity['recurrenceType'] = 'exception';
+$msFirstExceptionIdentity['occurrenceId'] = 'exception-first';
+$msFirstExceptionReplacement = $msFirstExceptionReplacementProvider->updateEvent(
+    'AQMk-primary',
+    'exception-first',
+    '',
+    '',
+    [
+        'summary'    => '[OC:TODO:FOLLOW] Reopened task',
+        'allDay'     => true, 'start' => '2026-10-22', 'end' => '2026-10-23',
+        'recurrence' => ['frequency' => 'DAILY', 'interval' => 1, 'endMode' => 'count', 'count' => 8]
+    ],
+    $msFirstExceptionIdentity
+);
+assertSameValue(
+    'replacement-series-master',
+    $msFirstExceptionReplacement['eventReference'],
+    'A first Microsoft exception must be replaced by a clean recurring series when moving following tasks.'
+);
+assertSameValue(
+    'POST',
+    $msFirstExceptionReplacementClient->requests[2]['method'],
+    'A first Microsoft exception must create its replacement before the old master is removed.'
+);
+$msFirstExceptionCreateBody = json_decode(
+    $msFirstExceptionReplacementClient->requests[2]['body'],
+    true,
+    512,
+    JSON_THROW_ON_ERROR
+);
+assertSameValue(
+    '2026-10-22',
+    $msFirstExceptionCreateBody['recurrence']['range']['startDate'],
+    'The replacement Microsoft series must use the moved first occurrence as its start.'
+);
+assertSameValue(
+    8,
+    $msFirstExceptionCreateBody['recurrence']['range']['numberOfOccurrences'],
+    'The replacement Microsoft series must retain all planned following occurrences.'
+);
+assertTrueValue(
+    $msFirstExceptionReplacementClient->requests[3]['method'] === 'DELETE'
+        && str_ends_with($msFirstExceptionReplacementClient->requests[3]['url'], '/events/series-master')
+        && ($msFirstExceptionReplacementClient->requests[3]['headers']['If-Match'] ?? '') === 'W/"series-following"',
+    'The old Microsoft master and its stale first exception must be removed only after replacement creation succeeds.'
+);
+
+$msFirstExceptionRollbackClient = new FakeHttpClient([
+    response(200, $msFollowingParent),
+    response(200, $msFirstExceptionTarget),
+    response(201, ['id' => 'replacement-series-master']),
+    response(500, ['error' => ['message' => 'Cannot remove original series']]),
+    response(204)
+]);
+try {
+    (new MicrosoftCalendarProvider($msFirstExceptionRollbackClient, 'ms-access-token'))->updateEvent(
+        'AQMk-primary',
+        'exception-first',
+        '',
+        '',
+        [
+            'summary'    => '[OC:TODO:FOLLOW] Reopened task',
+            'allDay'     => true, 'start' => '2026-10-22', 'end' => '2026-10-23',
+            'recurrence' => ['frequency' => 'DAILY', 'interval' => 1, 'endMode' => 'count', 'count' => 8]
+        ],
+        $msFirstExceptionIdentity
+    );
+    throw new RuntimeException('A failed first-exception replacement was reported as successful.');
+} catch (MicrosoftCalendarProviderException) {
+    assertTrueValue(
+        $msFirstExceptionRollbackClient->requests[4]['method'] === 'DELETE'
+            && str_ends_with($msFirstExceptionRollbackClient->requests[4]['url'], '/events/replacement-series-master'),
+        'A failed first-exception replacement must remove its newly created series before reporting the error.'
+    );
+}
+
 $msOnlineMeetingClient = new FakeHttpClient([
     response(200, ['isOnlineMeeting' => true])
 ]);
