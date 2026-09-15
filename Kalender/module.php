@@ -885,7 +885,8 @@ class Calendar extends IPSModuleStrict
             if (array_key_exists('task', $changes)
                 || array_key_exists('taskCompleted', $changes)
                 || array_key_exists('taskStatus', $changes)
-                || array_key_exists('taskFollowPlanned', $changes)) {
+                || array_key_exists('taskFollowPlanned', $changes)
+                || array_key_exists('taskRollForwardScope', $changes)) {
                 $cachedEvent = $this->cachedEventForIdentity($event);
                 if ($cachedEvent !== null) {
                     $taskSource = array_merge($cachedEvent, $event);
@@ -912,6 +913,9 @@ class Calendar extends IPSModuleStrict
                     $followingChanges['task'] = true;
                     $followingChanges['taskCompleted'] = (bool) $followingTask['taskCompleted'];
                     $followingChanges['taskFollowPlanned'] = (bool) ($followingTask['taskFollowPlanned'] ?? false);
+                    $followingChanges['taskRollForwardScope'] = (string) (
+                        $followingTask['taskRollForwardScope'] ?? CalendarTaskEvent::ROLL_FORWARD_SCOPE_OCCURRENCE
+                    );
                     $followingChanges = CalendarTaskEvent::prepareWrite($followingChanges, $following);
                 }
                 $providerStart = $this->taskEventDate($following, 'start');
@@ -3117,9 +3121,9 @@ class Calendar extends IPSModuleStrict
         $detachedEvent = array_merge($detachedEvent, $changes);
         $detachedEvent = CalendarTaskEvent::prepareWrite([
             ...$detachedEvent,
-            'task'              => true,
-            'taskCompleted'     => false,
-            'taskFollowPlanned' => false
+            'task'                 => true,
+            'taskCompleted'        => false,
+            'taskRollForwardScope' => CalendarTaskEvent::ROLL_FORWARD_SCOPE_OCCURRENCE
         ], $event);
         $created = $this->sendRequest('CreateEvent', ['Event' => $detachedEvent]);
 

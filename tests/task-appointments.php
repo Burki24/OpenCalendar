@@ -241,9 +241,40 @@ $followPlanned = CalendarTaskEvent::prepareWrite(
 );
 assertTaskAppointment(
     $followPlanned['summary'] === '[OC:TODO:FOLLOW] Versicherung prüfen'
-        && (CalendarTaskEvent::enrich($followPlanned)['taskFollowPlanned'] ?? false) === true,
-    'A task series must persist the choice to move planned follow-up appointments.'
+        && (CalendarTaskEvent::enrich($followPlanned)['taskFollowPlanned'] ?? false) === true
+        && (CalendarTaskEvent::enrich($followPlanned)['taskRollForwardScope'] ?? '')
+            === CalendarTaskEvent::ROLL_FORWARD_SCOPE_FOLLOWING
+        && ($enriched['taskRollForwardScope'] ?? '') === CalendarTaskEvent::ROLL_FORWARD_SCOPE_OCCURRENCE,
+    'Existing task markers must map to their compatible explicit roll-forward policies.'
 );
+
+$rollForwardDisabled = CalendarTaskEvent::prepareWrite(
+    ['task' => true, 'taskRollForwardScope' => CalendarTaskEvent::ROLL_FORWARD_SCOPE_DISABLED],
+    $enriched + ['allDay' => true, 'recurring' => true, 'start' => '2026-09-08', 'end' => '2026-09-09']
+);
+$disabledTask = CalendarTaskEvent::enrich($rollForwardDisabled);
+assertTaskAppointment(
+    $rollForwardDisabled['summary'] === '[OC:TODO:KEEP] Versicherung prüfen'
+        && ($disabledTask['taskRollForwardScope'] ?? '') === CalendarTaskEvent::ROLL_FORWARD_SCOPE_DISABLED
+        && ($disabledTask['taskFollowPlanned'] ?? true) === false,
+    'The disabled roll-forward scope must persist independently of the legacy follow-up flag.'
+);
+assertTaskAppointment(
+    CalendarTaskEvent::rollForwardChanges(
+        $disabledTask + ['allDay' => true, 'start' => '2026-09-08', 'end' => '2026-09-09'],
+        new DateTimeImmutable('2026-09-10')
+    ) === null,
+    'A task with disabled roll-forward must remain on its planned date while overdue.'
+);
+try {
+    CalendarTaskEvent::prepareWrite(
+        ['task' => true, 'taskRollForwardScope' => 'invalid'],
+        $enriched + ['allDay' => true, 'start' => '2026-09-08', 'end' => '2026-09-09']
+    );
+    throw new RuntimeException('An invalid task roll-forward scope must be rejected.');
+} catch (InvalidArgumentException) {
+    // Expected: public visualization input must not introduce arbitrary title markers.
+}
 
 $renamed = CalendarTaskEvent::prepareWrite(
     ['summary' => 'Versicherung wechseln'],

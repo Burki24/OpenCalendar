@@ -86,7 +86,7 @@ Kalenderansicht übertragen große Terminmengen automatisch in begrenzten Seiten
 Dadurch wird weder bei der Synchronisation noch beim Aufbau der Ansicht eine
 einzelne JSON-Antwort mit sämtlichen Terminen benötigt.
 
-Ein Termin enthält unter anderem `id`, `uid`, `resourceUrl`, `etag`, `summary`, `description`, `location`, `start`, `end`, `startTimestamp`, `endTimestamp`, `allDay`, `status`, `recurrenceRule` und `recurrenceId`. Wurde der Titel durch ein ausgewähltes iCalendar-Übersetzungsprofil angepasst, enthält `originalSummary` zusätzlich den unveränderten Originaltitel. Aufgabentermine enthalten außerdem `task`, `taskCompleted`, `taskStatus` (`open` oder `completed`), `taskFollowPlanned` und einen von der Statusmarkierung bereinigten `displaySummary`. Als Jahresereignis markierte Termine erhalten zusätzlich `anniversaryType`, `anniversaryDate`, `years` und `displaySummary`. Unterstützt werden `birthday`, `anniversary`, `wedding` und `death`. Für Geburtstage bleiben zusätzlich die kompatiblen Felder `birthday`, `birthDate` und `age` erhalten. Das Ausgangsdatum wird lokal in OpenCalendar gespeichert; der eigentliche Titel beim Kalenderanbieter bleibt unverändert.
+Ein Termin enthält unter anderem `id`, `uid`, `resourceUrl`, `etag`, `summary`, `description`, `location`, `start`, `end`, `startTimestamp`, `endTimestamp`, `allDay`, `status`, `recurrenceRule` und `recurrenceId`. Wurde der Titel durch ein ausgewähltes iCalendar-Übersetzungsprofil angepasst, enthält `originalSummary` zusätzlich den unveränderten Originaltitel. Aufgabentermine enthalten außerdem `task`, `taskCompleted`, `taskStatus` (`open` oder `completed`), `taskRollForwardScope` (`occurrence`, `following` oder `disabled`), das kompatible abgeleitete Feld `taskFollowPlanned` und einen von der Statusmarkierung bereinigten `displaySummary`. Als Jahresereignis markierte Termine erhalten zusätzlich `anniversaryType`, `anniversaryDate`, `years` und `displaySummary`. Unterstützt werden `birthday`, `anniversary`, `wedding` und `death`. Für Geburtstage bleiben zusätzlich die kompatiblen Felder `birthday`, `birthDate` und `age` erhalten. Das Ausgangsdatum wird lokal in OpenCalendar gespeichert; der eigentliche Titel beim Kalenderanbieter bleibt unverändert.
 
 ## PHP-Befehlsreferenz
 
@@ -214,20 +214,21 @@ $result = IPSKAL_UpdateEvent(12345, json_encode([
 ```
 
 Offene Aufgabentermine mit einem Datum vor heute werden beim lokalen
-Tageswechsel und bei jeder Synchronisation auf heute verschoben. Erledigte
-Aufgaben bleiben unverändert. Bei einer Aufgabenserie verschiebt
-`taskFollowPlanned = true` den ab dem überfälligen Termin verbleibenden
-Serienteil; ohne diese Option bleibt der ursprüngliche Serienplan erhalten und
-nur das älteste überfällige Vorkommnis wird nachgezogen. Das Mitverschieben
-erfordert eine Kalenderanbieter-Unterstützung für „diesen und alle folgenden
-Termine“. Da dabei der echte Kalendertermin aktualisiert wird, muss der Kalender
-beschreibbar sein. Zeitgebundene Aufgabentermine werden abgewiesen. Liegt ohne
+Tageswechsel und bei jeder Synchronisation gemäß `taskRollForwardScope`
+behandelt. `occurrence` zieht nur das älteste offene Vorkommnis auf heute,
+`following` verschiebt den ab diesem Vorkommnis verbleibenden Serienteil und
+`disabled` lässt überfällige Aufgaben unverändert. Erledigte Aufgaben bleiben
+in allen Fällen unverändert. `taskFollowPlanned = true` bleibt als kompatible
+Abbildung von `following` erhalten. Das Mitverschieben erfordert eine
+Kalenderanbieter-Unterstützung für „diesen und alle folgenden Termine“. Da dabei
+der echte Kalendertermin aktualisiert wird, muss der Kalender beschreibbar sein.
+Zeitgebundene Aufgabentermine werden abgewiesen. Liegt ohne
 Mitverschieben bereits ein weiteres geplantes Vorkommnis zwischen dem alten und
 dem neuen Datum, wird die offene Aufgabe als Einzeltermin weitergeführt. So
 bleibt der Serienplan erhalten und Microsoft 365 kann die Synchronisation nicht
 wegen eines überlappenden Serienelements ablehnen.
 
-Bei `UpdateEvent` gilt `taskFollowPlanned` ebenfalls für eine Änderung des
+Bei `UpdateEvent` gilt `taskRollForwardScope = following` ebenfalls für eine Änderung des
 Startdatums einer Serienaufgabe: Der ausgewählte und alle folgenden Termine
 werden mit neu verankertem Serienplan verschoben. Beim ersten Vorkommnis ist
 das die ganze Serie. Statusänderungen ohne Datumsänderung bleiben auf das

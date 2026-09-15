@@ -1547,6 +1547,11 @@ class CalendarView extends IPSModuleStrict
             'Recurring event creation is not supported by this calendar.',
             'Recurring occurrences are currently read-only.',
             'Only this occurrence of the recurring event will be changed.',
+            'When this task becomes overdue',
+            'Continue only this occurrence',
+            'Move this and all following occurrences',
+            'Do not automatically reschedule',
+            'Overdue tasks will remain on their original date until you move them manually.',
             'Changing the date moves this and all following occurrences. Existing following exceptions will be reset.',
             'This and all following tasks will be moved to the selected calendar.',
             'Changes will apply to this and all following occurrences.',
@@ -3357,7 +3362,8 @@ class CalendarView extends IPSModuleStrict
     private function prepareTaskSeriesTransfer(int $sourceInstanceId, array &$sourceEvent, array &$event): void
     {
         if (!(bool) ($event['task'] ?? false)
-            || !(bool) ($event['taskFollowPlanned'] ?? false)
+            || ((string) ($event['taskRollForwardScope'] ?? '') !== CalendarTaskEvent::ROLL_FORWARD_SCOPE_FOLLOWING
+                && !(bool) ($event['taskFollowPlanned'] ?? false))
             || !(bool) ($sourceEvent['recurring'] ?? false)
             || ($sourceEvent['writeScope'] ?? '') !== 'occurrence') {
             return;

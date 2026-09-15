@@ -251,6 +251,8 @@ speichert den Status direkt und providerunabhängig am Anfang des Termintitels:
 - `[OC:DONE]` kennzeichnet eine erledigte Aufgabe.
 - `[OC:TODO:FOLLOW]` beziehungsweise `[OC:DONE:FOLLOW]` kennzeichnet eine Aufgabenserie, deren geplante
   Folgetermine beim täglichen Nachziehen ebenfalls verschoben werden sollen.
+- `[OC:TODO:KEEP]` beziehungsweise `[OC:DONE:KEEP]` kennzeichnet eine Aufgabe, die bei Überfälligkeit
+  nicht automatisch nachgezogen wird.
 
 In der Kalenderansicht öffnet ein Klick auf den Eintrag die Termindetails. Dort
 kann die Aufgabe mit **Als erledigt markieren** abgeschlossen und mit
@@ -269,16 +271,20 @@ sichtbar. Erledigte Aufgaben werden nicht mehr verschoben und verbleiben an ihre
 zuletzt erreichten Datum. Das Verschieben ändert den echten Termin beim
 Kalenderanbieter; es ist keine rein lokale Anzeige.
 
-Bei einer Aufgabenserie entscheidet die Option **Geplante Folgetermine
-mitverschieben**: Ohne sie bleibt der reguläre Serienplan erhalten und nur das
-älteste überfällige Vorkommnis wird auf heute gezogen. Mit ihr verschiebt
-OpenCalendar den ab diesem Vorkommnis verbleibenden Serienteil gemeinsam. Diese
-Option wird nur bei Kalendern angeboten, die „diesen und alle folgenden Termine“
-sicher bearbeiten können.
+Bei einer Aufgabenserie legt **Wenn diese Aufgabe überfällig wird** die
+providerunabhängige Regel fest: **Nur diesen Termin nachziehen** verschiebt nur
+das offene Vorkommnis auf heute und kennzeichnet es bei Bedarf als Einzeltermin.
+**Diesen und alle folgenden Termine verschieben** verschiebt den verbleibenden
+Serienteil gemeinsam. **Nicht automatisch nachziehen** lässt die Aufgabe auf
+ihrem geplanten Datum, bis sie manuell bearbeitet wird. Die zweite Option wird
+nur bei Kalendern angeboten, die „diesen und alle folgenden Termine“ sicher
+bearbeiten können. Bereits erledigte Vorkommnisse bleiben in allen Fällen
+unverändert.
 
-Die Option gilt auch beim manuellen Ändern des Datums einer Serienaufgabe:
-Mit Häkchen werden der ausgewählte und alle folgenden Termine gemeinsam
-verschoben. Beim ersten Vorkommnis betrifft das die gesamte Serie. Reines
+Die Auswahl **Diesen und alle folgenden Termine verschieben** gilt auch beim
+manuellen Ändern des Datums einer Serienaufgabe: Der ausgewählte und alle
+folgenden Termine werden gemeinsam verschoben. Beim ersten Vorkommnis betrifft
+das die gesamte Serie. Reines
 Erledigen oder Umbenennen ohne Datumsänderung betrifft weiterhin nur den
 ausgewählten Termin. Beim Verschieben des Serienteils werden bestehende
 Ausnahmen innerhalb dieses Teils zurückgesetzt.

@@ -1243,9 +1243,16 @@ foreach ([$native, $ipsView] as $html) {
     assertVisualization(
         str_contains($html, 'id="event-task"')
             && str_contains($html, 'id="event-task-completed"')
+            && str_contains($html, 'id="event-task-roll-forward"')
             && str_contains($html, 'id="details-task-toggle-button"')
             && str_contains($html, "sendAction('UpdateEvent', value)"),
-        'Task appointments must be editable and directly completable in both visualization modes.'
+        'Task appointments must expose a roll-forward policy and be directly completable in both visualization modes.'
+    );
+    assertVisualization(
+        str_contains($script, "['occurrence', 'following', 'disabled'].includes(scope)")
+            && str_contains($script, "taskRollForwardScope: eventTask.checked ? eventTaskRollForwardScope.value : 'occurrence'")
+            && str_contains($script, "'Overdue tasks will remain on their original date until you move them manually.'"),
+        'The visualization must submit one explicit provider-neutral roll-forward policy for each task series.'
     );
     assertVisualization(
         str_contains($script, "event.taskRolledForward ? ' ↻' : ''")

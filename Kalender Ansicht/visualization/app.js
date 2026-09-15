@@ -102,8 +102,8 @@ const eventAnniversaryDateLabel = document.getElementById('event-anniversary-dat
 const eventTask = document.getElementById('event-task');
 const eventTaskCompleted = document.getElementById('event-task-completed');
 const eventTaskCompletedRow = document.getElementById('event-task-completed-row');
-const eventTaskFollowPlanned = document.getElementById('event-task-follow-planned');
-const eventTaskFollowPlannedRow = document.getElementById('event-task-follow-planned-row');
+const eventTaskRollForwardScope = document.getElementById('event-task-roll-forward');
+const eventTaskRollForwardScopeRow = document.getElementById('event-task-roll-forward-row');
 const eventRecurrenceRow = document.getElementById('event-recurrence-row');
 const eventRecurrenceFrequency = document.getElementById('event-recurrence-frequency');
 const eventRecurrenceOptions = document.getElementById('event-recurrence-options');
@@ -1756,8 +1756,14 @@ function eventDisplaySummary(event) {
 
 function taskPlainSummary(summary) {
     return String(summary || '').trim()
-        .replace(/^(?:\[OC:(?:TODO|DONE)(?::FOLLOW)?\]|☐↻|☑↻|☐|☑)\s*/u, '')
+        .replace(/^(?:\[OC:(?:TODO|DONE)(?::(?:FOLLOW|KEEP))?\]|☐↻|☑↻|☐|☑)\s*/u, '')
         .trim();
+}
+
+function taskRollForwardScope(event) {
+    const scope = String(event?.taskRollForwardScope || '').trim().toLowerCase();
+    if (['occurrence', 'following', 'disabled'].includes(scope)) return scope;
+    return event?.taskFollowPlanned ? 'following' : 'occurrence';
 }
 
 function editableEventSummary(event) {
@@ -1768,7 +1774,7 @@ function editableEventSummary(event) {
 function loadTaskEditor(event) {
     eventTask.checked = Boolean(event?.task);
     eventTaskCompleted.checked = Boolean(event?.taskCompleted);
-    eventTaskFollowPlanned.checked = Boolean(event?.taskFollowPlanned);
+    eventTaskRollForwardScope.value = taskRollForwardScope(event);
     updateTaskControls();
 }
 
@@ -1779,9 +1785,13 @@ function updateTaskControls() {
     eventTaskCompleted.disabled = !eventDialogEditable || !enabled;
     const recurring = eventRecurrenceFrequency.value !== 'none' || Boolean(selectedEvent?.recurring);
     const canFollow = Boolean(selectedCalendarEntry()?.canUpdateFollowing);
-    eventTaskFollowPlannedRow.classList.toggle('hidden', !enabled || !recurring || !canFollow);
-    eventTaskFollowPlanned.disabled = !eventDialogEditable || !enabled || !recurring || !canFollow;
-    if (!recurring || !canFollow) eventTaskFollowPlanned.checked = false;
+    eventTaskRollForwardScopeRow.classList.toggle('hidden', !enabled || !recurring);
+    eventTaskRollForwardScope.disabled = !eventDialogEditable || !enabled || !recurring;
+    const followingOption = eventTaskRollForwardScope.querySelector('option[value="following"]');
+    followingOption.disabled = !canFollow;
+    if (!recurring || (!canFollow && eventTaskRollForwardScope.value === 'following')) {
+        eventTaskRollForwardScope.value = 'occurrence';
+    }
     updateTaskMoveNote();
 
     if (!enabled || !eventDialogEditable) return;
@@ -1803,10 +1813,13 @@ function updateTaskMoveNote() {
         || ['series', 'following'].includes(selectedEvent?.writeScope)) return;
     const note = document.getElementById('dialog-note');
     const moving = Number(eventCalendarInput.value) !== Number(selectedEvent?.calendarInstanceId);
-    note.textContent = eventTask.checked && eventTaskFollowPlanned.checked && moving
+    const scope = eventTaskRollForwardScope.value;
+    note.textContent = eventTask.checked && scope === 'following' && moving
         ? t('This and all following tasks will be moved to the selected calendar.')
-        : eventTask.checked && eventTaskFollowPlanned.checked
+        : eventTask.checked && scope === 'following'
         ? t('Changing the date moves this and all following occurrences. Existing following exceptions will be reset.')
+        : eventTask.checked && scope === 'disabled'
+        ? t('Overdue tasks will remain on their original date until you move them manually.')
         : t('Only this occurrence of the recurring event will be changed.');
     note.classList.remove('hidden');
 }
@@ -2520,6 +2533,7 @@ async function toggleSelectedTaskCompletion() {
             end: selectedEvent.end,
             summary: selectedEvent.summary,
             taskFollowPlanned: Boolean(selectedEvent.taskFollowPlanned),
+            taskRollForwardScope: taskRollForwardScope(selectedEvent),
             ...recurrencePayload(selectedEvent),
             changes: {
                 task: true,
@@ -3835,7 +3849,8 @@ eventForm.addEventListener('submit', async event => {
         location: document.getElementById('event-location').value.trim(),
         task: eventTask.checked,
         taskCompleted: eventTask.checked && eventTaskCompleted.checked,
-        taskFollowPlanned: eventTask.checked && eventTaskFollowPlanned.checked,
+        taskRollForwardScope: eventTask.checked ? eventTaskRollForwardScope.value : 'occurrence',
+        taskFollowPlanned: eventTask.checked && eventTaskRollForwardScope.value === 'following',
         allDay,
         start: inputDateValue(document.getElementById('event-start').value, allDay),
         end: inputDateValue(document.getElementById('event-end').value, allDay, allDay)
@@ -3960,16 +3975,17 @@ document.getElementById('event-all-day').addEventListener('change', event => {
 eventTask.addEventListener('change', () => {
     if (!eventTask.checked) {
         eventTaskCompleted.checked = false;
-        eventTaskFollowPlanned.checked = false;
+        eventTaskRollForwardScope.value = 'occurrence';
     }
     updateTaskControls();
     updateRecurrenceAvailability();
     updateAnniversaryControls();
 });
-eventTaskFollowPlanned.addEventListener('change', updateTaskMoveNote);
+eventTaskRollForwardScope.addEventListener('change', updateTaskMoveNote);
 eventCalendarInput.addEventListener('change', () => {
     updateDialogColor();
     updateSaveButtonLabel();
+    updateTaskControls();
     updateRecurrenceAvailability();
     updateAnniversaryControls();
     resolveDefaultReminderForCalendarMove();
@@ -4765,7 +4781,6 @@ function applyStaticTranslations() {
     document.getElementById('all-day-label').textContent = t('All day');
     document.getElementById('event-task-label').textContent = t('Task appointment');
     document.getElementById('event-task-completed-label').textContent = t('Completed');
-    document.getElementById('event-task-follow-planned-label').textContent = t('Move planned follow-up appointments');
     document.getElementById('dialog-title').textContent = t('Event');
     document.getElementById('details-dialog-title').textContent = t('Event details');
     document.getElementById('edit-scope-dialog-title').textContent = t('Edit recurring event');
