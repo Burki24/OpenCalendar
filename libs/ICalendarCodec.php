@@ -429,8 +429,7 @@ final class ICalendarCodec
         string $uid,
         array $data,
         bool $removeFormerFirstOccurrenceOverride = false
-    ): string
-    {
+    ): string {
         $uid = trim($uid);
         if ($uid === '') {
             throw new InvalidArgumentException('The recurring event UID is missing.');
