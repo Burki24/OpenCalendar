@@ -524,7 +524,11 @@ trait KalenderKontoChildGatewayTrait
                 $this->getMicrosoftAccessToken()
             );
 
-            return $synchronizer->getEventByReference($calendarReference, $eventReference);
+            return $synchronizer->getEventByReference(
+                $calendarReference,
+                $eventReference,
+                trim((string) ($request['OriginalStart'] ?? ''))
+            );
         }
 
         if ($provider instanceof CalDAVProvider) {

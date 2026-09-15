@@ -644,6 +644,17 @@ final class MicrosoftCalendarProvider implements CalendarProviderInterface, Recu
             ['Prefer' => 'outlook.body-content-type="text", outlook.timezone="UTC"']
         );
         $mapped = $this->mapEvent($calendarId, $item);
+        // Some Graph exception responses omit originalStart even when the
+        // stable exception and series IDs are present. The requested original
+        // start came from the selected cached occurrence and remains the only
+        // immutable anchor for splitting the series at this exception.
+        if ($mapped !== null
+            && ($mapped['recurrenceType'] ?? '') === CalendarEventRecurrence::EXCEPTION
+            && trim((string) ($mapped['originalStart'] ?? '')) === ''
+            && trim($originalStart) !== '') {
+            $mapped['originalStart'] = trim($originalStart);
+            $mapped['canUpdateFollowing'] = trim((string) ($mapped['seriesId'] ?? '')) !== '';
+        }
         if ($mapped === null
             || !CalendarEventRecurrence::isOccurrence($mapped)
             || !hash_equals($seriesId, (string) ($mapped['seriesId'] ?? ''))

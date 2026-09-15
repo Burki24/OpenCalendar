@@ -2217,6 +2217,25 @@ assertSameValue(
     'Microsoft following preparation must retain a stable original occurrence start.'
 );
 
+$msExceptionWithoutOriginalStart = $msFollowingTarget;
+$msExceptionWithoutOriginalStart['type'] = 'exception';
+$msExceptionFollowingClient = new FakeHttpClient([
+    response(200, $msFollowingParent),
+    response(200, $msExceptionWithoutOriginalStart)
+]);
+$msExceptionFollowingProvider = new MicrosoftCalendarProvider($msExceptionFollowingClient, 'ms-access-token');
+$msExceptionFollowing = $msExceptionFollowingProvider->getRecurringFollowing(
+    'AQMk-primary',
+    'series-master',
+    'instance-following',
+    '2026-10-29T08:00:00+00:00'
+);
+assertSameValue(
+    '2026-10-29T08:00:00+00:00',
+    $msExceptionFollowing['originalStart'],
+    'A Microsoft exception without Graph originalStart must retain the requested occurrence anchor.'
+);
+
 $msFollowingUpdateClient = new FakeHttpClient([
     response(200, $msFollowingParent),
     response(200, $msFollowingTarget),

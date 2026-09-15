@@ -41,7 +41,11 @@ final class MicrosoftCalendarIncrementalSync
      *
      * @return array<string, mixed>
      */
-    public function getEventByReference(string $calendarReference, string $eventReference): array
+    public function getEventByReference(
+        string $calendarReference,
+        string $eventReference,
+        string $originalStartFallback = ''
+    ): array
     {
         $calendarId = $this->calendarId($calendarReference);
         $eventReference = trim($eventReference);
@@ -57,6 +61,16 @@ final class MicrosoftCalendarIncrementalSync
         );
         if ($event === null) {
             throw new MicrosoftCalendarProviderException('Microsoft Calendar did not return complete event data.');
+        }
+
+        // Graph exceptions can omit originalStart when they are fetched directly
+        // by ID. The caller's cached occurrence identity is still authoritative
+        // for that one stable event ID and is required for a following-series move.
+        if (($event['recurrenceType'] ?? '') === CalendarEventRecurrence::EXCEPTION
+            && trim((string) ($event['originalStart'] ?? '')) === ''
+            && trim($originalStartFallback) !== '') {
+            $event['originalStart'] = trim($originalStartFallback);
+            $event['canUpdateFollowing'] = trim((string) ($event['seriesId'] ?? '')) !== '';
         }
 
         return $event;
