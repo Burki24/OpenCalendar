@@ -1263,6 +1263,10 @@ foreach ([$native, $ipsView] as $html) {
         'The visualization must submit one explicit provider-neutral roll-forward policy for each task series.'
     );
     assertVisualization(
+        str_contains($script, "openDialog?.querySelector('.dialog-layout, .dialog-body')"),
+        'Wheel handling must target the event editor form, which owns its viewport-bounded scroll area.'
+    );
+    assertVisualization(
         str_contains($script, "event.taskRolledForward ? ' ↻' : ''")
             && str_contains($script, "'Continued from series'")
             && str_contains($script, "t('This overdue task was continued from a series.')"),

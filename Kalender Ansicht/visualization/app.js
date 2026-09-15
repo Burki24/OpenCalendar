@@ -4273,7 +4273,9 @@ function containWheelInsideTile(event) {
         : null;
     const openDialog = [eventDialog, eventDetailsDialog, editScopeDialog, deleteConfirmDialog, dayEventsDialog, viewSelectorDialog, calendarFilterDialog]
         .find(dialog => dialog.open);
-    const scrollTarget = calendarOptionList || openDialog?.querySelector('.dialog-body') || content;
+    const scrollTarget = calendarOptionList
+        || openDialog?.querySelector('.dialog-layout, .dialog-body')
+        || content;
     const factor = event.deltaMode === WheelEvent.DOM_DELTA_LINE
         ? 16
         : (event.deltaMode === WheelEvent.DOM_DELTA_PAGE ? scrollTarget.clientHeight : 1);
