@@ -3115,6 +3115,9 @@ class Calendar extends IPSModuleStrict
                     );
                 }
                 $events[$index] = array_merge($event, $candidate['changes'], $updated);
+                if ($detached) {
+                    $events[$index]['taskRolledForward'] = true;
+                }
                 if ($detached && $seriesKey !== '') {
                     $this->rememberPendingTaskSeries($seriesKey, $events[$index]);
                 }
@@ -3170,7 +3173,7 @@ class Calendar extends IPSModuleStrict
 
         if (!$followPlanned
             && CalendarEventRecurrence::isOccurrence($event)
-            && CalendarTaskEvent::requiresOccurrenceDetachment($events, $event, (string) ($changes['start'] ?? ''))) {
+            && $this->mustDetachRolledForwardTaskOccurrence($events, $event, (string) ($changes['start'] ?? ''))) {
             $detached = true;
             return $this->detachOverdueTaskOccurrence($event, $changes, $recurrence);
         }
@@ -3182,6 +3185,22 @@ class Calendar extends IPSModuleStrict
             'Event'       => $changes,
             'Recurrence'  => $recurrence
         ]);
+    }
+
+    /**
+     * Decides whether moving one overdue task occurrence must create a standalone task.
+     *
+     * Local calendars always detach the moved occurrence so it cannot be merged back into
+     * its source series during the next synchronization. External providers only need this
+     * safeguard when the moved date would cross a later planned occurrence.
+     *
+     * @param list<array<string, mixed>> $events
+     * @param array<string, mixed> $event
+     */
+    private function mustDetachRolledForwardTaskOccurrence(array $events, array $event, string $newStart): bool
+    {
+        return $this->ReadPropertyBoolean('LocalCalendar')
+            || CalendarTaskEvent::requiresOccurrenceDetachment($events, $event, $newStart);
     }
 
     /**
@@ -3232,6 +3251,12 @@ class Calendar extends IPSModuleStrict
             }
         }
         $detachedEvent = array_merge($detachedEvent, $changes);
+        $detachedEvent = CalendarTaskEvent::prepareWrite([
+            ...$detachedEvent,
+            'task'              => true,
+            'taskCompleted'     => false,
+            'taskFollowPlanned' => false
+        ], $event);
         $created = $this->sendRequest('CreateEvent', ['Event' => $detachedEvent]);
 
         try {
