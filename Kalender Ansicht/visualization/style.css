@@ -711,8 +711,15 @@ html.ipsview-mode .danger-button { min-height: 48px; padding-inline: 18px; }
 .oc-dialog-extra-large { --dialog-width: var(--cal-dialog-extra-large-width); }
 .oc-dialog[open] { display: flex; flex-direction: column; }
 #event-dialog {
-    height: calc(100vh - var(--tile-title-clearance) - 24px);
-    height: calc(100dvh - var(--tile-title-clearance) - 24px);
+    position: fixed;
+    top: calc(var(--tile-title-clearance) + 12px);
+    right: 12px;
+    bottom: 12px;
+    left: 12px;
+    width: min(var(--dialog-width), calc(100% - 24px));
+    height: auto;
+    max-height: none;
+    margin: auto;
 }
 .oc-dialog > .dialog-layout {
     display: flex;
@@ -727,6 +734,33 @@ html.ipsview-mode .danger-button { min-height: 48px; padding-inline: 18px; }
 #event-dialog > .dialog-layout {
     height: 100%;
     max-height: 100%;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-y;
+    scrollbar-gutter: stable;
+}
+#event-dialog .dialog-body {
+    flex: 0 0 auto;
+    min-height: auto;
+    overflow: visible;
+    overscroll-behavior: auto;
+    touch-action: auto;
+}
+#event-dialog .dialog-header {
+    position: sticky;
+    top: 0;
+    z-index: 6;
+    background: var(--cal-dialog);
+    box-shadow: 0 1px 0 var(--cal-line, var(--cal-border));
+}
+#event-dialog .dialog-actions {
+    position: sticky;
+    bottom: 0;
+    z-index: 6;
+    background: var(--cal-dialog);
+    box-shadow: 0 -1px 0 var(--cal-line, var(--cal-border));
 }
 .oc-dialog::backdrop {
     background: color-mix(in srgb, var(--cal-text) 42%, transparent);
@@ -1077,8 +1111,11 @@ html.ipsview-mode .view-selector-option { min-height: 48px; padding: 10px 13px; 
         margin: calc(var(--tile-title-clearance) + 8px) auto 8px;
     }
     #event-dialog {
-        height: calc(100vh - var(--tile-title-clearance) - 16px);
-        height: calc(100dvh - var(--tile-title-clearance) - 16px);
+        top: calc(var(--tile-title-clearance) + 8px);
+        right: 8px;
+        bottom: 8px;
+        left: 8px;
+        width: calc(100% - 16px);
     }
     .dialog-header { min-height: 50px; padding: 8px 9px 8px 12px; }
     .dialog-body { padding: 12px; }
