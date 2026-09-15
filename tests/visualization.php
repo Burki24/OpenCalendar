@@ -939,6 +939,9 @@ assertVisualization(
         && str_contains($style, '.oc-dialog[open] { display: flex; flex-direction: column; }')
         && str_contains($style, '.oc-dialog > .dialog-layout {')
         && str_contains($style, 'flex: 1 1 auto;')
+        && str_contains($style, '#event-dialog > .dialog-layout {')
+        && str_contains($style, '#event-dialog .dialog-header {')
+        && str_contains($style, '#event-dialog .dialog-actions {')
         && str_contains($style, 'scrollbar-gutter: stable;')
         && str_contains($style, '.dialog-actions-start, .dialog-actions-end {')
         && str_contains($style, '.event-details-dialog { --dialog-width: 720px; }')
@@ -953,7 +956,7 @@ assertVisualization(
         && str_contains($style, '.delete-scope-option:hover,')
         && str_contains($style, '.edit-scope-option:hover { background: var(--cal-surface-hover); }')
         && str_contains($style, '@media (max-width: 420px) {'),
-    'All OpenCalendar modals must share responsive size classes, fixed header/footer layout and a scrollable content area.'
+    'All OpenCalendar modals must share responsive size classes, while the event editor keeps its header and footer fixed around a scrollable form.'
 );
 
 assertVisualization(

@@ -720,6 +720,34 @@ html.ipsview-mode .danger-button { min-height: 48px; padding-inline: 18px; }
     max-height: inherit;
     overflow: hidden;
 }
+#event-dialog > .dialog-layout {
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-y;
+}
+#event-dialog .dialog-body {
+    flex: 0 0 auto;
+    min-height: auto;
+    overflow: visible;
+    overscroll-behavior: auto;
+    touch-action: auto;
+}
+#event-dialog .dialog-header {
+    position: sticky;
+    top: 0;
+    z-index: 6;
+    background: var(--cal-dialog);
+    box-shadow: 0 1px 0 var(--cal-line, var(--cal-border));
+}
+#event-dialog .dialog-actions {
+    position: sticky;
+    bottom: 0;
+    z-index: 6;
+    background: var(--cal-dialog);
+    box-shadow: 0 -1px 0 var(--cal-line, var(--cal-border));
+}
 .oc-dialog::backdrop {
     background: color-mix(in srgb, var(--cal-text) 42%, transparent);
     backdrop-filter: blur(3px);
