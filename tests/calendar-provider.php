@@ -2307,6 +2307,91 @@ assertSameValue(
     'Microsoft series splitting must preserve writable attendee identity without copying response state.'
 );
 
+$msCancelledPrefixParent = $msFollowingParent;
+$msCancelledPrefixParent['recurrence'] = [
+    'pattern' => ['type' => 'daily', 'interval' => 1],
+    'range'   => ['type' => 'numbered', 'startDate' => '2026-10-19', 'numberOfOccurrences' => 3]
+];
+$msCancelledPrefixTarget = $msFollowingTarget;
+$msCancelledPrefixTarget['id'] = 'instance-after-deleted-first';
+$msCancelledPrefixTarget['start']['dateTime'] = '2026-10-20T08:00:00';
+$msCancelledPrefixTarget['end']['dateTime'] = '2026-10-20T09:00:00';
+$msCancelledPrefixClient = new FakeHttpClient([
+    response(200, $msCancelledPrefixParent),
+    response(200, $msCancelledPrefixTarget),
+    response(400, ['error' => ['code' => 'ErrorInvalidRequest', 'message' => 'The specified range is invalid.']]),
+    response(200, ['cancelledOccurrences' => ['OID.series-master.2026-10-19']]),
+    response(200, ['value' => []]),
+    response(201, ['id' => 'replacement-after-deleted-first', 'iCalUId' => 'replacement@example.com']),
+    response(204)
+]);
+$msCancelledPrefixProvider = new MicrosoftCalendarProvider($msCancelledPrefixClient, 'ms-access-token');
+$msCancelledPrefixIdentity = $msFollowingIdentity;
+$msCancelledPrefixIdentity['occurrenceId'] = 'instance-after-deleted-first';
+$msCancelledPrefixIdentity['originalStart'] = '2026-10-20T08:00:00+00:00';
+$msCancelledPrefixProvider->updateEvent(
+    'AQMk-primary',
+    'instance-after-deleted-first',
+    '',
+    '',
+    [
+        'summary'    => 'Continue after deleted first occurrence',
+        'allDay'     => true,
+        'start'      => '2026-10-20',
+        'end'        => '2026-10-21',
+        'recurrence' => ['frequency' => 'DAILY', 'interval' => 1, 'endMode' => 'count', 'count' => 2]
+    ],
+    $msCancelledPrefixIdentity
+);
+assertSameValue(
+    'GET',
+    $msCancelledPrefixClient->requests[3]['method'],
+    'A rejected Microsoft trim must verify that the parent contains cancelled occurrences.'
+);
+assertTrueValue(
+    str_contains($msCancelledPrefixClient->requests[4]['url'], '/instances?')
+        && str_contains($msCancelledPrefixClient->requests[4]['url'], 'startDateTime=2026-10-19T00%3A00%3A00Z')
+        && str_contains($msCancelledPrefixClient->requests[4]['url'], 'endDateTime=2026-10-20T00%3A00%3A00Z'),
+    'A cancelled Microsoft prefix must be checked for active appointments before the old master is removed.'
+);
+assertTrueValue(
+    $msCancelledPrefixClient->requests[5]['method'] === 'POST'
+        && $msCancelledPrefixClient->requests[6]['method'] === 'DELETE'
+        && str_ends_with($msCancelledPrefixClient->requests[6]['url'], '/events/series-master'),
+    'An empty cancelled Microsoft prefix must be replaced by the requested future series instead of keeping an invalid range.'
+);
+
+$msActivePrefixClient = new FakeHttpClient([
+    response(200, $msCancelledPrefixParent),
+    response(200, $msCancelledPrefixTarget),
+    response(400, ['error' => ['code' => 'ErrorInvalidRequest', 'message' => 'The specified range is invalid.']]),
+    response(200, ['cancelledOccurrences' => ['OID.series-master.2026-10-19']]),
+    response(200, ['value' => [['id' => 'active-before-target']]])
+]);
+try {
+    (new MicrosoftCalendarProvider($msActivePrefixClient, 'ms-access-token'))->updateEvent(
+        'AQMk-primary',
+        'instance-after-deleted-first',
+        '',
+        '',
+        [
+            'summary'    => 'Do not replace active prefix',
+            'allDay'     => true,
+            'start'      => '2026-10-20',
+            'end'        => '2026-10-21',
+            'recurrence' => ['frequency' => 'DAILY', 'interval' => 1, 'endMode' => 'count', 'count' => 2]
+        ],
+        $msCancelledPrefixIdentity
+    );
+    throw new RuntimeException('A Microsoft series with an active prefix was replaced.');
+} catch (MicrosoftCalendarProviderException $exception) {
+    assertSameValue(
+        5,
+        count($msActivePrefixClient->requests),
+        'A Microsoft series with an active prefix must retain its original failed trim instead of deleting prior appointments.'
+    );
+}
+
 $msFollowingDeleteClient = new FakeHttpClient([
     response(200, $msFollowingParent),
     response(200, $msFollowingTarget),
