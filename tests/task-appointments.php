@@ -306,13 +306,30 @@ $normal = CalendarTaskEvent::prepareWrite(
     $enriched
 );
 assertTaskAppointment(
-    $normal['summary'] === 'Versicherung prüfen',
+    $normal['summary'] === 'Versicherung prüfen'
+        && array_key_exists('task', $normal)
+        && $normal['task'] === false,
     'Converting a task back to a normal event must remove its marker.'
 );
 $normalEnriched = CalendarTaskEvent::enrich(array_merge($enriched, $normal));
 assertTaskAppointment(
     !array_key_exists('task', $normalEnriched) && !array_key_exists('displaySummary', $normalEnriched),
     'Converting a task back to a normal event must remove stale task display metadata.'
+);
+
+$ordinary = CalendarTaskEvent::prepareWrite([
+    'summary'              => 'Normaler Termin',
+    'task'                 => false,
+    'taskCompleted'        => false,
+    'taskRollForwardScope' => CalendarTaskEvent::ROLL_FORWARD_SCOPE_OCCURRENCE,
+    'taskFollowPlanned'    => false
+], ['summary' => 'Normaler Termin']);
+assertTaskAppointment(
+    !array_key_exists('task', $ordinary)
+        && !array_key_exists('taskCompleted', $ordinary)
+        && !array_key_exists('taskRollForwardScope', $ordinary)
+        && !array_key_exists('taskFollowPlanned', $ordinary),
+    'Task controls submitted for a normal event must not reach calendar providers.'
 );
 
 $calendar = new Calendar(9012);

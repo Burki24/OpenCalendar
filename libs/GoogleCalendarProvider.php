@@ -995,15 +995,23 @@ final class GoogleCalendarProvider implements CalendarEventLookupProviderInterfa
         }
         if ($taskSupplied) {
             $isTask = (bool) ($taskMetadata['task'] ?? false);
-            $payload['extendedProperties'] = ['private' => [
-                self::TASK_PROPERTY        => $isTask ? 'true' : null,
-                self::TASK_STATUS_PROPERTY => $isTask
-                    ? ((bool) ($taskMetadata['taskCompleted'] ?? false) ? 'completed' : 'open')
-                    : null,
-                self::TASK_ROLL_FORWARD_PROPERTY => $isTask
-                    ? (string) ($taskMetadata['taskRollForwardScope'] ?? CalendarTaskEvent::ROLL_FORWARD_SCOPE_OCCURRENCE)
-                    : null
-            ]];
+            if ($isTask) {
+                $payload['extendedProperties'] = ['private' => [
+                    self::TASK_PROPERTY        => 'true',
+                    self::TASK_STATUS_PROPERTY => (bool) ($taskMetadata['taskCompleted'] ?? false)
+                        ? 'completed'
+                        : 'open',
+                    self::TASK_ROLL_FORWARD_PROPERTY => (string) (
+                        $taskMetadata['taskRollForwardScope'] ?? CalendarTaskEvent::ROLL_FORWARD_SCOPE_OCCURRENCE
+                    )
+                ]];
+            } elseif (!$creating) {
+                $payload['extendedProperties'] = ['private' => [
+                    self::TASK_PROPERTY              => null,
+                    self::TASK_STATUS_PROPERTY       => null,
+                    self::TASK_ROLL_FORWARD_PROPERTY => null
+                ]];
+            }
         }
         foreach (['description', 'location'] as $property) {
             if (array_key_exists($property, $data)) {

@@ -110,6 +110,34 @@ assertTaskMetadata(
     'Google tasks must use private extended properties and keep the visible title clean.'
 );
 
+$googleClearClient = new TaskMetadataHttpClient([
+    new CalendarHttpResponse(
+        200,
+        [],
+        json_encode(['id' => 'google-task', 'iCalUID' => 'google-task@example.com'], JSON_THROW_ON_ERROR),
+        'https://www.googleapis.com/calendar/v3/calendars/cal/events/google-task'
+    )
+]);
+$googleClear = new GoogleCalendarProvider($googleClearClient, 'token');
+$googleClear->updateEvent(
+    'cal',
+    'google-task',
+    '',
+    'google-task@example.com',
+    ['summary' => 'Versicherung prüfen', 'task' => false]
+);
+$googleClearPayload = json_decode($googleClearClient->requests[0]['body'], true, 512, JSON_THROW_ON_ERROR);
+$googleClearProperties = $googleClearPayload['extendedProperties']['private'] ?? [];
+assertTaskMetadata(
+    array_key_exists('opencalendarTask', $googleClearProperties)
+        && $googleClearProperties['opencalendarTask'] === null
+        && array_key_exists('opencalendarTaskStatus', $googleClearProperties)
+        && $googleClearProperties['opencalendarTaskStatus'] === null
+        && array_key_exists('opencalendarRollForward', $googleClearProperties)
+        && $googleClearProperties['opencalendarRollForward'] === null,
+    'Converting a Google task to a normal event must explicitly delete its private task properties.'
+);
+
 $googleReadClient = new TaskMetadataHttpClient([
     new CalendarHttpResponse(
         200,

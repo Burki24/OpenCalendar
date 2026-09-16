@@ -340,12 +340,16 @@ $writeClient = new FakeHttpClient([
 ]);
 $provider = new GoogleCalendarProvider($writeClient, 'access-token');
 $created = $provider->createEvent('owner@example.com', [
-    'summary'  => 'Test',
-    'allDay'   => false,
-    'start'    => '2026-07-20T10:00:00+02:00',
-    'end'      => '2026-07-20T11:00:00+02:00',
-    'location' => 'Berlin',
-    'reminder' => [
+    'summary'              => 'Test',
+    'allDay'               => false,
+    'start'                => '2026-07-20T10:00:00+02:00',
+    'end'                  => '2026-07-20T11:00:00+02:00',
+    'location'             => 'Berlin',
+    'task'                 => false,
+    'taskCompleted'        => false,
+    'taskRollForwardScope' => 'occurrence',
+    'taskFollowPlanned'    => false,
+    'reminder'             => [
         'mode'               => 'custom',
         'minutesBeforeStart' => 30
     ]
@@ -354,6 +358,10 @@ assertSameValue('created-id', $created['eventReference'], 'The created Google ev
 assertSameValue('POST', $writeClient->requests[0]['method'], 'Events must be created via POST.');
 $createBody = json_decode($writeClient->requests[0]['body'], true, 512, JSON_THROW_ON_ERROR);
 assertSameValue('Test', $createBody['summary'], 'The event summary must be sent.');
+assertTrueValue(
+    !array_key_exists('extendedProperties', $createBody),
+    'Creating a normal Google event must not submit null task properties.'
+);
 assertSameValue(false, $createBody['reminders']['useDefault'], 'Custom Google reminders must override calendar defaults.');
 assertSameValue(
     [['method' => 'popup', 'minutes' => 30]],

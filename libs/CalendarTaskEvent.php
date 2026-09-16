@@ -113,7 +113,23 @@ final class CalendarTaskEvent
             $event['taskFollowPlanned'] = $rollForwardScope === self::ROLL_FORWARD_SCOPE_FOLLOWING;
         } elseif ($taskWasSupplied) {
             $event['summary'] = self::plainSummary((string) ($event['summary'] ?? $sourceEvent['summary'] ?? ''));
-            $event['task'] = false;
+            if ((bool) ($source['task'] ?? false)) {
+                $event['task'] = false;
+                unset(
+                    $event['taskCompleted'],
+                    $event['taskStatus'],
+                    $event['taskFollowPlanned'],
+                    $event['taskRollForwardScope']
+                );
+            } else {
+                unset(
+                    $event['task'],
+                    $event['taskCompleted'],
+                    $event['taskStatus'],
+                    $event['taskFollowPlanned'],
+                    $event['taskRollForwardScope']
+                );
+            }
         }
 
         unset($event['displaySummary']);
