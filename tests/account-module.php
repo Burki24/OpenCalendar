@@ -252,6 +252,7 @@ foreach ([
     'TestConnection',
     'Synchronize',
     'GetCalendars',
+    'GetTaskLists',
     'GetAccountStatus',
     'ClearCache'
 ] as $method) {

@@ -17,12 +17,15 @@ use IPSKalender\MicrosoftCalendarDebugHttpClient;
 use IPSKalender\MicrosoftCalendarIncrementalSync;
 use IPSKalender\MicrosoftCalendarProvider;
 use IPSKalender\MicrosoftGraphOriginPolicy;
+use IPSKalender\MicrosoftTodoProvider;
 use IPSKalender\RecurringCalendarProviderInterface;
 
 require_once __DIR__ . '/../../libs/CalDAVIncrementalSync.php';
 require_once __DIR__ . '/../../libs/GoogleCalendarIncrementalSync.php';
 require_once __DIR__ . '/../../libs/MicrosoftCalendarDebugHttpClient.php';
 require_once __DIR__ . '/../../libs/MicrosoftCalendarIncrementalSync.php';
+require_once __DIR__ . '/../../libs/MicrosoftGraphOriginPolicy.php';
+require_once __DIR__ . '/../../libs/MicrosoftTodoProvider.php';
 
 trait KalenderKontoChildGatewayTrait
 {
@@ -53,6 +56,7 @@ trait KalenderKontoChildGatewayTrait
 
             $payload = match ($operation) {
                 'GetCalendars'           => json_decode($this->GetCalendars(), true, 512, JSON_THROW_ON_ERROR),
+                'GetTaskLists'           => json_decode($this->GetTaskLists(), true, 512, JSON_THROW_ON_ERROR),
                 'DiscoverCalendars'      => $this->discoverCalendars(),
                 'GetEvents'              => $this->getEventsForChild($request),
                 'BeginEventsTransfer'    => $this->beginEventsTransferForChild($request),
@@ -69,6 +73,10 @@ trait KalenderKontoChildGatewayTrait
                 'CreateEvent'            => $this->createEventForChild($request),
                 'UpdateEvent'            => $this->updateEventForChild($request),
                 'DeleteEvent'            => ['success' => $this->deleteEventForChild($request)],
+                'SynchronizeTasks'       => $this->synchronizeTasksForChild($request),
+                'CreateTask'             => $this->createTaskForChild($request),
+                'UpdateTask'             => $this->updateTaskForChild($request),
+                'DeleteTask'             => ['success' => $this->deleteTaskForChild($request)],
                 'Synchronize'            => ['success' => $this->Synchronize()],
                 'TestConnection'         => json_decode($this->TestConnection(), true, 512, JSON_THROW_ON_ERROR),
                 default                  => throw new InvalidArgumentException('Unsupported operation: ' . $operation)
@@ -155,6 +163,70 @@ trait KalenderKontoChildGatewayTrait
         }
 
         return $events;
+    }
+
+    /** @param array<string, mixed> $request @return array{tasks:list<array<string,mixed>>,deltaLink:string} */
+    private function synchronizeTasksForChild(array $request): array
+    {
+        $this->assertMicrosoftTaskOperation();
+        return $this->microsoftTodoProvider()->getTasks(
+            trim((string) ($request['TaskListID'] ?? '')),
+            trim((string) ($request['DeltaLink'] ?? ''))
+        );
+    }
+
+    /** @param array<string, mixed> $request @return array<string, mixed> */
+    private function createTaskForChild(array $request): array
+    {
+        $this->assertMicrosoftTaskOperation();
+        $task = $request['Task'] ?? null;
+        if (!is_array($task) || array_is_list($task)) {
+            throw new InvalidArgumentException('The Microsoft task data is invalid.');
+        }
+        return $this->microsoftTodoProvider()->createTask(
+            trim((string) ($request['TaskListID'] ?? '')),
+            $task
+        );
+    }
+
+    /** @param array<string, mixed> $request @return array<string, mixed> */
+    private function updateTaskForChild(array $request): array
+    {
+        $this->assertMicrosoftTaskOperation();
+        $changes = $request['Changes'] ?? null;
+        if (!is_array($changes) || array_is_list($changes)) {
+            throw new InvalidArgumentException('The Microsoft task changes are invalid.');
+        }
+        return $this->microsoftTodoProvider()->updateTask(
+            trim((string) ($request['TaskListID'] ?? '')),
+            trim((string) ($request['TaskID'] ?? '')),
+            $changes
+        );
+    }
+
+    /** @param array<string, mixed> $request */
+    private function deleteTaskForChild(array $request): bool
+    {
+        $this->assertMicrosoftTaskOperation();
+        return $this->microsoftTodoProvider()->deleteTask(
+            trim((string) ($request['TaskListID'] ?? '')),
+            trim((string) ($request['TaskID'] ?? ''))
+        );
+    }
+
+    private function assertMicrosoftTaskOperation(): void
+    {
+        if ($this->ReadPropertyInteger('Provider') !== self::PROVIDER_MICROSOFT) {
+            throw new InvalidArgumentException('Microsoft To Do is only available for Microsoft accounts.');
+        }
+    }
+
+    private function microsoftTodoProvider(): MicrosoftTodoProvider
+    {
+        return new MicrosoftTodoProvider(
+            $this->createTrustedCloudHttpClient(new MicrosoftGraphOriginPolicy()),
+            $this->getMicrosoftAccessToken()
+        );
     }
 
     /**
