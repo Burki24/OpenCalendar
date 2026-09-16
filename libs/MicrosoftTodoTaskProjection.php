@@ -6,6 +6,7 @@ namespace IPSKalender;
 
 use DateTimeImmutable;
 use DateTimeZone;
+use Throwable;
 
 require_once __DIR__ . '/CalendarEventRecurrence.php';
 require_once __DIR__ . '/CalendarTaskEvent.php';
@@ -40,7 +41,7 @@ final class MicrosoftTodoTaskProjection
     {
         $id = trim((string) ($task['id'] ?? ''));
         $due = is_array($task['dueDateTime'] ?? null) ? $task['dueDateTime'] : [];
-        $dueDate = self::date(trim((string) ($due['dateTime'] ?? '')));
+        $dueDate = self::date($due);
         if ($id === '' || $dueDate === null || (bool) ($task['deleted'] ?? false)) {
             return null;
         }
@@ -104,13 +105,64 @@ final class MicrosoftTodoTaskProjection
         ];
     }
 
-    private static function date(string $value): ?DateTimeImmutable
+    /** @param array<string, mixed> $value */
+    private static function date(array $value): ?DateTimeImmutable
     {
-        $dateValue = substr($value, 0, 10);
-        if (preg_match('/^\d{4}-\d{2}-\d{2}$/D', $dateValue) !== 1) {
+        $rawDateTime = trim((string) ($value['dateTime'] ?? ''));
+        if ($rawDateTime === '') {
             return null;
         }
-        $date = DateTimeImmutable::createFromFormat('!Y-m-d', $dateValue, new DateTimeZone('UTC'));
-        return $date !== false && $date->format('Y-m-d') === $dateValue ? $date : null;
+
+        try {
+            $rawDateTime = preg_replace(
+                '/(\.\d{6})\d+(?=(?:Z|[+-]\d{2}:\d{2})?$)/',
+                '$1',
+                $rawDateTime
+            ) ?? $rawDateTime;
+            $sourceTimezone = self::timezone(trim((string) ($value['timeZone'] ?? 'UTC')));
+            $displayTimezone = new DateTimeZone(date_default_timezone_get());
+            $sourceDate = new DateTimeImmutable($rawDateTime, $sourceTimezone);
+            $errors = DateTimeImmutable::getLastErrors();
+            if ($errors !== false && ($errors['warning_count'] > 0 || $errors['error_count'] > 0)) {
+                return null;
+            }
+            $dateValue = $sourceDate
+                ->setTimezone($displayTimezone)
+                ->format('Y-m-d');
+            $date = DateTimeImmutable::createFromFormat('!Y-m-d', $dateValue, $displayTimezone);
+            return $date !== false && $date->format('Y-m-d') === $dateValue ? $date : null;
+        } catch (Throwable) {
+            return null;
+        }
+    }
+
+    private static function timezone(string $name): DateTimeZone
+    {
+        try {
+            return new DateTimeZone($name !== '' ? $name : 'UTC');
+        } catch (Throwable) {
+            $ianaName = match ($name) {
+                'GMT Standard Time'              => 'Europe/London',
+                'W. Europe Standard Time'        => 'Europe/Berlin',
+                'Central Europe Standard Time'   => 'Europe/Budapest',
+                'Romance Standard Time'          => 'Europe/Paris',
+                'Central European Standard Time' => 'Europe/Warsaw',
+                'GTB Standard Time'              => 'Europe/Bucharest',
+                'FLE Standard Time'              => 'Europe/Kyiv',
+                'Turkey Standard Time'           => 'Europe/Istanbul',
+                'Russian Standard Time'          => 'Europe/Moscow',
+                'Eastern Standard Time'          => 'America/New_York',
+                'Central Standard Time'          => 'America/Chicago',
+                'Mountain Standard Time'         => 'America/Denver',
+                'Pacific Standard Time'          => 'America/Los_Angeles',
+                'Tokyo Standard Time'            => 'Asia/Tokyo',
+                'China Standard Time'            => 'Asia/Shanghai',
+                'India Standard Time'            => 'Asia/Kolkata',
+                'AUS Eastern Standard Time'      => 'Australia/Sydney',
+                'New Zealand Standard Time'      => 'Pacific/Auckland',
+                default                          => 'UTC'
+            };
+            return new DateTimeZone($ianaName);
+        }
     }
 }

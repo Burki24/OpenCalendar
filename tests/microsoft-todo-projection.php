@@ -8,6 +8,9 @@ require_once __DIR__ . '/../libs/MicrosoftTodoTaskProjection.php';
 require_once __DIR__ . '/stubs/autoload.php';
 require_once __DIR__ . '/../Kalender/module.php';
 
+$previousTimezone = date_default_timezone_get();
+date_default_timezone_set('Europe/Berlin');
+
 function assertTodoProjection(bool $condition, string $message): void
 {
     if (!$condition) {
@@ -34,7 +37,7 @@ $tasks = [
         'listId'        => 'list-1',
         'title'         => 'Completed task',
         'status'        => 'completed',
-        'dueDateTime'   => ['dateTime' => '2026-09-15T17:30:00', 'timeZone' => 'Europe/Berlin'],
+        'dueDateTime'   => ['dateTime' => '2026-09-16T22:00:00.0000000', 'timeZone' => 'UTC'],
         'deleted'       => false
     ],
     ['id' => 'without-due', 'title' => 'Backlog', 'status' => 'notStarted', 'dueDateTime' => null, 'deleted' => false],
@@ -60,8 +63,10 @@ assertTodoProjection(
 assertTodoProjection(
     $events[0]['taskNativeRecurrence']['pattern']['type'] === 'weekly'
         && $events[0]['timezone'] === 'W. Europe Standard Time'
+        && $events[1]['start'] === '2026-09-17'
+        && $events[1]['end'] === '2026-09-18'
         && $events[1]['taskCompleted'] === true,
-    'The projection must retain native recurrence, timezone, and completion metadata.'
+    'The projection must retain native metadata and convert UTC instants to the local due date.'
 );
 
 final class MicrosoftTodoProjectionCalendarHarness extends Calendar
@@ -108,7 +113,7 @@ $calendarEvent = [
 ];
 $calendar = new MicrosoftTodoProjectionCalendarHarness([$calendarEvent], $tasks);
 $rangeStart = (new DateTimeImmutable('2026-09-09T00:00:00Z'))->getTimestamp();
-$rangeEnd = (new DateTimeImmutable('2026-09-17T00:00:00Z'))->getTimestamp();
+$rangeEnd = (new DateTimeImmutable('2026-09-18T00:00:00Z'))->getTimestamp();
 $metadata = json_decode($calendar->BeginEventsTransfer($rangeStart, $rangeEnd), true, 512, JSON_THROW_ON_ERROR);
 $page = json_decode($calendar->ReadEventsTransferPage($metadata['Token'], 0), true, 512, JSON_THROW_ON_ERROR);
 assertTodoProjection(
@@ -121,5 +126,6 @@ assertTodoProjection(
     'The provider event API must remain separate from virtual Microsoft task projections.'
 );
 $calendar->FinishEventsTransfer($metadata['Token']);
+date_default_timezone_set($previousTimezone);
 
 fwrite(STDOUT, "Microsoft To Do task projection tests passed.\n");
