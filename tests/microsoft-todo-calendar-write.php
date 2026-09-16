@@ -143,6 +143,86 @@ function todoWriteSuccess(array $payload): array
     return ['Success' => true, 'Payload' => $payload];
 }
 
+$createdNativeTask = todoWriteTask('notStarted', 'Native created task', '2026-09-25T00:00:00');
+$createdNativeTask['id'] = 'task-created';
+$createdNativeTask['description'] = 'Created in OpenCalendar';
+$createdNativeTask['dueDateTime']['timeZone'] = 'Europe/Berlin';
+$createdNativeTask['recurrence'] = [
+    'pattern' => [
+        'type'           => 'weekly',
+        'interval'       => 2,
+        'daysOfWeek'     => ['friday'],
+        'firstDayOfWeek' => 'monday'
+    ],
+    'range' => [
+        'type'                => 'numbered',
+        'startDate'           => '2026-09-25',
+        'recurrenceTimeZone'  => 'Europe/Berlin',
+        'numberOfOccurrences' => 4
+    ]
+];
+$creationCalendar = new MicrosoftTodoCalendarWriteHarness(todoWriteTask());
+$creationCalendar->responses[] = todoWriteSuccess($createdNativeTask);
+$creationResult = json_decode($creationCalendar->CreateEvent(json_encode([
+    'summary'       => 'Native created task',
+    'description'   => 'Created in OpenCalendar',
+    'task'          => true,
+    'taskCompleted' => false,
+    'allDay'        => true,
+    'start'         => '2026-09-25',
+    'end'           => '2026-09-26',
+    'timezone'      => 'Europe/Berlin',
+    'recurrence'    => [
+        'frequency'  => 'WEEKLY',
+        'interval'   => 2,
+        'byDay'      => ['FR'],
+        'weekStart'  => 'MO',
+        'endMode'    => 'count',
+        'count'      => 4
+    ]
+], JSON_THROW_ON_ERROR)), true, 512, JSON_THROW_ON_ERROR);
+$creationRequest = $creationCalendar->requests[0] ?? [];
+assertTodoWrite(
+    $creationResult['success'] === true
+        && ($creationResult['event']['sourceType'] ?? '') === 'microsoft-todo'
+        && ($creationResult['event']['taskId'] ?? '') === 'task-created'
+        && ($creationRequest['Operation'] ?? '') === 'CreateTask'
+        && ($creationRequest['TaskListID'] ?? '') === 'list-1'
+        && ($creationRequest['Task']['title'] ?? '') === 'Native created task'
+        && ($creationRequest['Task']['description'] ?? '') === 'Created in OpenCalendar'
+        && ($creationRequest['Task']['status'] ?? '') === 'notStarted'
+        && ($creationRequest['Task']['dueDateTime'] ?? null) === [
+            'dateTime' => '2026-09-25T00:00:00',
+            'timeZone' => 'Europe/Berlin'
+        ]
+        && ($creationRequest['Task']['recurrence'] ?? null) === $createdNativeTask['recurrence']
+        && count(json_decode($creationCalendar->GetMicrosoftTasks(), true, 512, JSON_THROW_ON_ERROR)) === 2,
+    'Creating a task in a calendar with a selected Microsoft To Do list must create and cache a native task.'
+);
+
+$ordinaryCalendar = new MicrosoftTodoCalendarWriteHarness(todoWriteTask());
+$ordinaryCalendar->responses[] = todoWriteSuccess([
+    'uid'            => 'calendar-event',
+    'eventReference' => 'calendar-event',
+    'summary'        => 'Ordinary appointment',
+    'allDay'         => true,
+    'start'          => '2026-09-25',
+    'end'            => '2026-09-26'
+]);
+$ordinaryResult = json_decode($ordinaryCalendar->CreateEvent(json_encode([
+    'summary'       => 'Ordinary appointment',
+    'task'          => false,
+    'taskCompleted' => false,
+    'allDay'        => true,
+    'start'         => '2026-09-25',
+    'end'           => '2026-09-26'
+], JSON_THROW_ON_ERROR)), true, 512, JSON_THROW_ON_ERROR);
+assertTodoWrite(
+    $ordinaryResult['success'] === true
+        && ($ordinaryCalendar->requests[0]['Operation'] ?? '') === 'CreateEvent',
+    'A selected Microsoft To Do list must not redirect ordinary calendar appointments.'
+);
+
 $calendar = new MicrosoftTodoCalendarWriteHarness(todoWriteTask());
 $editable = json_decode(
     $calendar->GetEventForEdit(json_encode(todoWriteIdentity(), JSON_THROW_ON_ERROR)),

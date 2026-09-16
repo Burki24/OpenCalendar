@@ -242,6 +242,21 @@ Aufgabenfelder als RFC-konforme `X-OPENCALENDAR-*`-Eigenschaften gespeichert.
 Google Calendar verwendet private `extendedProperties`. Der sichtbare Titel
 bleibt bei diesen Anbietern unverändert.
 
+Ist in einer Microsoft-365-Kalenderinstanz eine
+**Microsoft-To-Do-Aufgabenliste** ausgewählt, werden neu angelegte
+Aufgabentermine dagegen als native Microsoft-To-Do-Aufgaben über Microsoft
+Graph gespeichert. Sie erscheinen dadurch sowohl in OpenCalendar als auch in
+Microsoft To Do. Normale Termine werden weiterhin ausschließlich im
+Outlook-Kalender angelegt. Bereits vorhandene kalenderbasierte Aufgabentermine
+bleiben unverändert und werden nicht automatisch in Microsoft To Do migriert.
+
+Wiederholungen nativer Microsoft-To-Do-Aufgaben werden vollständig von
+Microsoft verwaltet. OpenCalendar zeigt die von Graph gelieferte aktuelle
+Aufgabe an. Microsoft stellt die nächste offene Aufgabe einer Serie nach dem
+Erledigen der aktuellen Aufgabe bereit; OpenCalendar übernimmt sie mit der
+nächsten Synchronisation. Zukünftige Instanzen werden nicht vorab lokal
+erzeugt.
+
 Beim Erstellen oder Bearbeiten wird im Termindialog **Aufgabentermin** aktiviert.
 Aufgabentermine sind bewusst ganztägig und dauern genau einen Tag. Sie dürfen
 auch wiederkehrend sein. Intern unterscheidet OpenCalendar den Aufgabenstatus
@@ -260,12 +275,14 @@ grafischen Kästchen (`☐`, `☑`) werden weiterhin gelesen. Bei der nächsten
 Aufgabenänderung migrieren CalDAV, lokale Kalender und Google Calendar den
 Eintrag auf die strukturierte Speicherung und entfernen den Marker aus dem Titel.
 
-Eine offene Aufgabe, deren Datum vor dem aktuellen lokalen Tag liegt, wird beim
-lokalen Tageswechsel und zusätzlich bei jeder Kalendersynchronisation auf den
-aktuellen Tag verschoben. Dadurch bleibt eine nicht erledigte Aufgabe täglich
-sichtbar. Erledigte Aufgaben werden nicht mehr verschoben und verbleiben an ihrem
-zuletzt erreichten Datum. Das Verschieben ändert den echten Termin beim
-Kalenderanbieter; es ist keine rein lokale Anzeige.
+Bei kalenderbasierten Aufgabenterminen wird eine offene Aufgabe, deren Datum vor
+dem aktuellen lokalen Tag liegt, beim lokalen Tageswechsel und zusätzlich bei
+jeder Kalendersynchronisation auf den aktuellen Tag verschoben. Dadurch bleibt
+eine nicht erledigte Aufgabe täglich sichtbar. Erledigte Aufgaben werden nicht
+mehr verschoben und verbleiben an ihrem zuletzt erreichten Datum. Das
+Verschieben ändert den echten Termin beim Kalenderanbieter; es ist keine rein
+lokale Anzeige. Native Microsoft-To-Do-Aufgaben behalten dagegen die von
+Microsoft verwaltete Fälligkeit und Serienlogik.
 
 Bei einer Aufgabenserie legt **Wenn diese Aufgabe überfällig wird** die
 providerunabhängige Regel fest: **Nur diesen Termin nachziehen** verschiebt nur

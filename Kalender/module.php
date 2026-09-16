@@ -10,6 +10,7 @@ use Burki24\SymconModuleHelper\PersistentJsonCacheHelper;
 use Burki24\SymconModuleHelper\VariableHelper;
 use IPSKalender\CalendarEventCounter;
 use IPSKalender\CalendarEventRecurrence;
+use IPSKalender\CalendarRecurrenceRule;
 use IPSKalender\CalendarTaskEvent;
 use IPSKalender\LocalCalendarProvider;
 use IPSKalender\MicrosoftTodoTaskProjection;
@@ -23,6 +24,7 @@ require_once __DIR__ . '/../libs/helper/PersistentJsonCacheHelper.php';
 require_once __DIR__ . '/../libs/helper/VariableHelper.php';
 require_once __DIR__ . '/../libs/CalendarEventCounter.php';
 require_once __DIR__ . '/../libs/CalendarEventRecurrence.php';
+require_once __DIR__ . '/../libs/CalendarRecurrenceRule.php';
 require_once __DIR__ . '/../libs/CalendarTaskEvent.php';
 require_once __DIR__ . '/../libs/LocalCalendarProvider.php';
 require_once __DIR__ . '/../libs/MicrosoftTodoTaskProjection.php';
@@ -823,6 +825,17 @@ class Calendar extends IPSModuleStrict
         $created = [];
         try {
             $event = $this->decodeObject($EventJSON, 'event');
+            if ($this->mustCreateMicrosoftTodoTask($event)) {
+                $created = $this->createMicrosoftTodoTask($event);
+                $writeConfirmed = true;
+                $this->storeMicrosoftTaskAfterWrite($created);
+                $projected = MicrosoftTodoTaskProjection::project([$created]);
+                if ($projected === []) {
+                    throw new UnexpectedValueException('The calendar account returned invalid Microsoft task data.');
+                }
+
+                return $this->encodeResult(true, $projected[0]);
+            }
             $anniversary = $this->anniversaryInput($event);
             if ($anniversary !== null && $anniversary['enabled']) {
                 $recurrenceInput = $event['recurrence'] ?? null;
@@ -1707,6 +1720,68 @@ class Calendar extends IPSModuleStrict
     {
         return strtolower(trim((string) ($event['sourceType'] ?? ''))) === 'microsoft-todo'
             || strtolower(trim((string) ($event['taskProvider'] ?? ''))) === 'microsoft-todo';
+    }
+
+    /** @param array<string, mixed> $event */
+    private function mustCreateMicrosoftTodoTask(array $event): bool
+    {
+        return !$this->ReadPropertyBoolean('LocalCalendar')
+            && trim($this->ReadPropertyString('MicrosoftTaskListID')) !== ''
+            && (bool) ($event['task'] ?? false);
+    }
+
+    /**
+     * @param array<string, mixed> $event
+     * @return array<string, mixed>
+     */
+    private function createMicrosoftTodoTask(array $event): array
+    {
+        // Reuse the shared task validation without persisting its calendar title marker.
+        CalendarTaskEvent::prepareWrite($event);
+
+        $listId = trim($this->ReadPropertyString('MicrosoftTaskListID'));
+        $title = trim((string) ($event['summary'] ?? ''));
+        $timezone = trim((string) ($event['timezone'] ?? ''));
+        if ($timezone === '') {
+            $timezone = trim($this->ReadAttributeString('DetectedCalendarTimezone'));
+        }
+        if ($timezone === '') {
+            $timezone = date_default_timezone_get();
+        }
+
+        $task = [
+            'title'       => $title,
+            'description' => (string) ($event['description'] ?? ''),
+            'status'      => (bool) ($event['taskCompleted'] ?? false) ? 'completed' : 'notStarted',
+            'dueDateTime' => $this->microsoftTodoDueDateTime(
+                (string) ($event['start'] ?? ''),
+                ['timeZone' => $timezone]
+            )
+        ];
+
+        $recurrence = $event['recurrence'] ?? null;
+        if ($recurrence !== null && $recurrence !== []) {
+            if (!is_array($recurrence) || array_is_list($recurrence)) {
+                throw new InvalidArgumentException('The recurrence settings are invalid.');
+            }
+            if (trim((string) ($recurrence['recurrenceTimeZone'] ?? '')) === '') {
+                $recurrence['recurrenceTimeZone'] = $timezone;
+            }
+            $startDate = DateTimeImmutable::createFromFormat(
+                '!Y-m-d',
+                substr(trim((string) ($event['start'] ?? '')), 0, 10),
+                new DateTimeZone('UTC')
+            );
+            if ($startDate === false) {
+                throw new InvalidArgumentException('The Microsoft To Do due date is invalid.');
+            }
+            $task['recurrence'] = CalendarRecurrenceRule::toMicrosoftRecurrence($recurrence, $startDate);
+        }
+
+        return $this->sendRequest('CreateTask', [
+            'TaskListID' => $listId,
+            'Task'       => $task
+        ]);
     }
 
     /**

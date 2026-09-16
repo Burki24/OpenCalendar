@@ -179,12 +179,18 @@ $result = IPSKAL_CreateEvent(12345, json_encode([
 
 ### Aufgabentermin erstellen und erledigen
 
-Ein Aufgabentermin ist ein eintägiger, ganztägiger Kalendertermin. Er darf
-wiederkehrend sein.
-`task = true` setzt beim Anbieter automatisch den offenen Marker `[OC:TODO]` vor den
-Titel. `taskCompleted = true` verwendet stattdessen `[OC:DONE]`. Die Steuerfelder werden
-nicht als eigene Providerdaten übertragen; der Titelmarker ist die dauerhafte und
-anbieterübergreifende Kennzeichnung.
+Ein Aufgabentermin ist eintägig und ganztägig. Er darf wiederkehrend sein. Bei
+CalDAV und lokalen Kalendern werden die Aufgabenfelder als
+`X-OPENCALENDAR-*`-Eigenschaften, bei Google Calendar als private
+`extendedProperties` gespeichert. Ältere Titelmarker wie `[OC:TODO]` und
+`[OC:DONE]` werden weiterhin gelesen und beim nächsten Schreiben migriert.
+
+Ist für diese Kalenderinstanz eine Microsoft-To-Do-Aufgabenliste ausgewählt,
+legt `task = true` stattdessen eine native Aufgabe in dieser Liste an. Titel,
+Beschreibung, Fälligkeit, Status und eine optionale Wiederholung werden dabei
+über Microsoft Graph gespeichert. Das Ergebnis enthält die native
+`taskId`/`taskListId`-Identität und `sourceType = microsoft-todo`. Ein Aufruf
+ohne `task = true` erstellt weiterhin einen normalen Outlook-Kalendertermin.
 
 ```php
 $result = IPSKAL_CreateEvent(12345, json_encode([
@@ -213,7 +219,7 @@ $result = IPSKAL_UpdateEvent(12345, json_encode([
 ]));
 ```
 
-Offene Aufgabentermine mit einem Datum vor heute werden beim lokalen
+Offene kalenderbasierte Aufgabentermine mit einem Datum vor heute werden beim lokalen
 Tageswechsel und bei jeder Synchronisation gemäß `taskRollForwardScope`
 behandelt. `occurrence` zieht nur das älteste offene Vorkommnis auf heute,
 `following` verschiebt den ab diesem Vorkommnis verbleibenden Serienteil und
@@ -227,6 +233,12 @@ Mitverschieben bereits ein weiteres geplantes Vorkommnis zwischen dem alten und
 dem neuen Datum, wird die offene Aufgabe als Einzeltermin weitergeführt. So
 bleibt der Serienplan erhalten und Microsoft 365 kann die Synchronisation nicht
 wegen eines überlappenden Serienelements ablehnen.
+
+Native Microsoft-To-Do-Aufgaben werden nicht durch OpenCalendar nachgezogen.
+Ihre Fälligkeit und Serienfolge bleiben vollständig unter der Verwaltung von
+Microsoft. Bei einer Serienaufgabe zeigt OpenCalendar die aktuell von Graph
+gelieferte Aufgabe; die nächste offene Aufgabe erscheint nach dem Erledigen und
+der folgenden Synchronisation.
 
 Bei `UpdateEvent` gilt `taskRollForwardScope = following` ebenfalls für eine Änderung des
 Startdatums einer Serienaufgabe: Der ausgewählte und alle folgenden Termine
