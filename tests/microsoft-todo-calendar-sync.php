@@ -156,6 +156,33 @@ assertTodoCalendarSync(
     'Disabling Microsoft To Do must clear its disposable cache and synchronization state.'
 );
 
+$calendar->taskListId = 'full-snapshot-list';
+$fullSnapshotLink = 'https://graph.microsoft.com/v1.0/me/todo/lists/full-snapshot-list/tasks?$top=100';
+$calendar->responses[] = todoCalendarSuccess([
+    'tasks' => [
+        ['id' => 'full-1', 'title' => 'First', 'deleted' => false],
+        ['id' => 'full-2', 'title' => 'Second', 'deleted' => false]
+    ],
+    'deltaLink'    => $fullSnapshotLink,
+    'fullSnapshot' => true
+]);
+assertTodoCalendarSync($synchronize->invoke($calendar) === 2, 'A full-snapshot fallback must cache all returned tasks.');
+$calendar->responses[] = todoCalendarSuccess([
+    'tasks' => [
+        ['id' => 'full-1', 'title' => 'First updated', 'deleted' => false]
+    ],
+    'deltaLink'    => $fullSnapshotLink,
+    'fullSnapshot' => true
+]);
+assertTodoCalendarSync($synchronize->invoke($calendar) === 1, 'A later full snapshot must replace the previous task cache.');
+$tasks = json_decode($calendar->GetMicrosoftTasks(), true, 512, JSON_THROW_ON_ERROR);
+assertTodoCalendarSync(
+    array_column($tasks, 'id') === ['full-1']
+        && $tasks[0]['title'] === 'First updated'
+        && ($calendar->requests[5]['DeltaLink'] ?? '') === $fullSnapshotLink,
+    'Full-snapshot synchronization must remove tasks that are no longer returned without retrying delta.'
+);
+
 $calendar->taskListId = 'configured-list';
 $calendar->responses[] = todoCalendarSuccess([
     ['id' => 'default-list', 'name' => 'Tasks'],

@@ -84,39 +84,29 @@ final class MicrosoftTodoProvider
     }
 
     /**
-     * @return array{tasks:list<array<string, mixed>>, deltaLink:string}
+     * @return array{tasks:list<array<string, mixed>>, deltaLink:string, fullSnapshot:bool}
      */
     public function getTasks(string $listId, string $deltaLink = ''): array
     {
         $listId = $this->requiredId($listId, 'task list');
         $url = trim($deltaLink);
+        if ($url !== '' && !$this->isDeltaQueryUrl($url)) {
+            return $this->readTasks($listId, $url, true, $this->taskCollectionUrl($listId));
+        }
         if ($url === '') {
-            $url = self::API_URL . '/me/todo/lists/' . rawurlencode($listId) . '/tasks/delta?$top=100';
+            $url = $this->taskDeltaUrl($listId);
         }
 
-        $tasks = [];
-        $seen = [];
-        $finalDeltaLink = '';
-        while ($url !== '') {
-            $this->assertNextLink($url, $seen);
-            $data = $this->requestJsonUrl('GET', $url);
-            foreach (($data['value'] ?? []) as $item) {
-                if (!is_array($item)) {
-                    continue;
-                }
-                $mapped = $this->mapTask($listId, $item);
-                if ($mapped !== null) {
-                    $tasks[] = $mapped;
-                }
-                if (count($tasks) > self::MAX_ITEMS) {
-                    throw new MicrosoftTodoProviderException('Microsoft To Do returned too many tasks.');
-                }
+        try {
+            return $this->readTasks($listId, $url, false);
+        } catch (MicrosoftTodoProviderException $exception) {
+            if (!$this->isUnsupportedDeltaQuery($exception)) {
+                throw $exception;
             }
-            $finalDeltaLink = trim((string) ($data['@odata.deltaLink'] ?? $finalDeltaLink));
-            $url = trim((string) ($data['@odata.nextLink'] ?? ''));
-        }
 
-        return ['tasks' => $tasks, 'deltaLink' => $finalDeltaLink];
+            $snapshotUrl = $this->taskCollectionUrl($listId);
+            return $this->readTasks($listId, $snapshotUrl, true, $snapshotUrl);
+        }
     }
 
     /** @param array<string, mixed> $task @return array<string, mixed> */
@@ -168,6 +158,44 @@ final class MicrosoftTodoProvider
             [204]
         );
         return true;
+    }
+
+    /**
+     * @return array{tasks:list<array<string, mixed>>, deltaLink:string, fullSnapshot:bool}
+     */
+    private function readTasks(
+        string $listId,
+        string $url,
+        bool $fullSnapshot,
+        string $nextSynchronizationUrl = ''
+    ): array {
+        $tasks = [];
+        $seen = [];
+        $finalDeltaLink = '';
+        while ($url !== '') {
+            $this->assertNextLink($url, $seen);
+            $data = $this->requestJsonUrl('GET', $url);
+            foreach (($data['value'] ?? []) as $item) {
+                if (!is_array($item)) {
+                    continue;
+                }
+                $mapped = $this->mapTask($listId, $item);
+                if ($mapped !== null) {
+                    $tasks[] = $mapped;
+                }
+                if (count($tasks) > self::MAX_ITEMS) {
+                    throw new MicrosoftTodoProviderException('Microsoft To Do returned too many tasks.');
+                }
+            }
+            $finalDeltaLink = trim((string) ($data['@odata.deltaLink'] ?? $finalDeltaLink));
+            $url = trim((string) ($data['@odata.nextLink'] ?? ''));
+        }
+
+        return [
+            'tasks'        => $tasks,
+            'deltaLink'    => $fullSnapshot ? $nextSynchronizationUrl : $finalDeltaLink,
+            'fullSnapshot' => $fullSnapshot
+        ];
     }
 
     /** @param array<string, mixed> $item @return array<string, mixed>|null */
@@ -280,6 +308,27 @@ final class MicrosoftTodoProvider
             throw new InvalidArgumentException('The Microsoft ' . $type . ' ID is missing.');
         }
         return $id;
+    }
+
+    private function taskCollectionUrl(string $listId): string
+    {
+        return self::API_URL . '/me/todo/lists/' . rawurlencode($listId) . '/tasks?$top=100';
+    }
+
+    private function taskDeltaUrl(string $listId): string
+    {
+        return self::API_URL . '/me/todo/lists/' . rawurlencode($listId) . '/tasks/delta?$top=100';
+    }
+
+    private function isDeltaQueryUrl(string $url): bool
+    {
+        return str_ends_with((string) parse_url($url, PHP_URL_PATH), '/tasks/delta');
+    }
+
+    private function isUnsupportedDeltaQuery(MicrosoftTodoProviderException $exception): bool
+    {
+        return $exception->httpStatus === 400
+            && str_contains(strtolower($exception->getMessage()), 'delta query is not supported');
     }
 
     /** @param array<string, bool> $seen */

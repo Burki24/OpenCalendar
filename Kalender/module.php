@@ -1624,6 +1624,7 @@ class Calendar extends IPSModuleStrict
         if ($nextDeltaLink === '') {
             throw new UnexpectedValueException('The calendar account returned no Microsoft task delta link.');
         }
+        $fullSnapshot = (bool) ($result['fullSnapshot'] ?? false);
 
         $changes = [];
         foreach ($result['tasks'] as $task) {
@@ -1633,7 +1634,7 @@ class Calendar extends IPSModuleStrict
             $changes[] = $task;
         }
 
-        $tasks = $deltaLink === '' ? $this->activeMicrosoftTasks($changes) : $this->mergeMicrosoftTaskChanges(
+        $tasks = $deltaLink === '' || $fullSnapshot ? $this->activeMicrosoftTasks($changes) : $this->mergeMicrosoftTaskChanges(
             $sameList ? $this->readMicrosoftTasks() : [],
             $changes
         );

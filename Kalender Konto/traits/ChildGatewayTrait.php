@@ -165,7 +165,7 @@ trait KalenderKontoChildGatewayTrait
         return $events;
     }
 
-    /** @param array<string, mixed> $request @return array{tasks:list<array<string,mixed>>,deltaLink:string} */
+    /** @param array<string, mixed> $request @return array{tasks:list<array<string,mixed>>,deltaLink:string,fullSnapshot:bool} */
     private function synchronizeTasksForChild(array $request): array
     {
         $this->assertMicrosoftTaskOperation();

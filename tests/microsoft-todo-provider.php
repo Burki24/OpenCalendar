@@ -84,8 +84,52 @@ assertMicrosoftTodo(
     count($sync['tasks']) === 1
         && $sync['tasks'][0]['title'] === 'Versicherung prüfen'
         && $sync['tasks'][0]['dueDateTime']['timeZone'] === 'Europe/Berlin'
+        && ($sync['fullSnapshot'] ?? true) === false
         && str_contains($sync['deltaLink'], '$deltatoken=abc'),
     'Native tasks and their delta link must be mapped without calendar title markers.'
+);
+
+$fallbackClient = new MicrosoftTodoTestHttpClient([
+    todoResponse(400, [
+        'error' => [
+            'code'    => 'ErrorInvalidRequest',
+            'message' => 'Invalid request. Delta query is not supported by this resource.'
+        ]
+    ]),
+    todoResponse(200, [
+        'value' => [[
+            'id' => 'fallback-1', 'title' => 'First fallback task', 'status' => 'notStarted'
+        ]],
+        '@odata.nextLink' => 'https://graph.microsoft.com/v1.0/me/todo/lists/list-1/tasks?$skiptoken=next'
+    ]),
+    todoResponse(200, [
+        'value' => [[
+            'id' => 'fallback-2', 'title' => 'Second fallback task', 'status' => 'notStarted'
+        ]]
+    ]),
+    todoResponse(200, [
+        'value' => [[
+            'id' => 'fallback-1', 'title' => 'First fallback task', 'status' => 'notStarted'
+        ]]
+    ])
+]);
+$fallbackProvider = new MicrosoftTodoProvider($fallbackClient, 'access-token');
+$fallbackSync = $fallbackProvider->getTasks('list-1');
+assertMicrosoftTodo(
+    array_column($fallbackSync['tasks'], 'id') === ['fallback-1', 'fallback-2']
+        && ($fallbackSync['fullSnapshot'] ?? false) === true
+        && $fallbackSync['deltaLink'] === 'https://graph.microsoft.com/v1.0/me/todo/lists/list-1/tasks?$top=100'
+        && str_contains($fallbackClient->requests[0]['url'], '/tasks/delta')
+        && $fallbackClient->requests[1]['url'] === $fallbackSync['deltaLink']
+        && str_contains($fallbackClient->requests[2]['url'], '$skiptoken=next'),
+    'An unsupported delta query must fall back to a complete paginated task-list request.'
+);
+$repeatedFallbackSync = $fallbackProvider->getTasks('list-1', $fallbackSync['deltaLink']);
+assertMicrosoftTodo(
+    array_column($repeatedFallbackSync['tasks'], 'id') === ['fallback-1']
+        && ($repeatedFallbackSync['fullSnapshot'] ?? false) === true
+        && !str_contains($fallbackClient->requests[3]['url'], '/delta'),
+    'A saved full-snapshot cursor must avoid retrying an unsupported delta query on every synchronization.'
 );
 
 $created = $provider->createTask('list-1', [
