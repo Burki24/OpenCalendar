@@ -66,12 +66,12 @@ final class MicrosoftTodoProvider
                     continue;
                 }
                 $lists[] = [
-                    'id'           => $id,
-                    'name'         => trim((string) ($item['displayName'] ?? $id)),
+                    'id'            => $id,
+                    'name'          => trim((string) ($item['displayName'] ?? $id)),
                     'wellknownName' => trim((string) ($item['wellknownListName'] ?? 'none')),
-                    'shared'       => (bool) ($item['isShared'] ?? false),
-                    'owner'        => (bool) ($item['isOwner'] ?? true),
-                    'etag'         => trim((string) ($item['@odata.etag'] ?? ''))
+                    'shared'        => (bool) ($item['isShared'] ?? false),
+                    'owner'         => (bool) ($item['isOwner'] ?? true),
+                    'etag'          => trim((string) ($item['@odata.etag'] ?? ''))
                 ];
                 if (count($lists) > self::MAX_ITEMS) {
                     throw new MicrosoftTodoProviderException('Microsoft To Do returned too many task lists.');

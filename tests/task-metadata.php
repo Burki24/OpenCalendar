@@ -42,13 +42,13 @@ function assertTaskMetadata(bool $condition, string $message): void
 }
 
 $task = CalendarTaskEvent::prepareWrite([
-    'summary' => 'Versicherung prüfen',
-    'task' => true,
-    'taskCompleted' => false,
+    'summary'              => 'Versicherung prüfen',
+    'task'                 => true,
+    'taskCompleted'        => false,
     'taskRollForwardScope' => CalendarTaskEvent::ROLL_FORWARD_SCOPE_FOLLOWING,
-    'allDay' => true,
-    'start' => '2026-09-20',
-    'end' => '2026-09-21'
+    'allDay'               => true,
+    'start'                => '2026-09-20',
+    'end'                  => '2026-09-21'
 ]);
 
 $created = ICalendarCodec::createEvent($task);
@@ -70,10 +70,10 @@ assertTaskMetadata(
 );
 
 $updatedIcal = ICalendarCodec::updateEvent($created['ical'], $created['uid'], [
-    'summary' => '[OC:DONE:KEEP] Versicherung prüfen',
-    'task' => true,
-    'taskCompleted' => true,
-    'taskStatus' => 'completed',
+    'summary'              => '[OC:DONE:KEEP] Versicherung prüfen',
+    'task'                 => true,
+    'taskCompleted'        => true,
+    'taskStatus'           => 'completed',
     'taskRollForwardScope' => 'disabled'
 ]);
 assertTaskMetadata(
@@ -84,15 +84,15 @@ assertTaskMetadata(
 );
 
 $googleResponse = [
-    'id' => 'google-task',
-    'iCalUID' => 'google-task@example.com',
-    'summary' => 'Versicherung prüfen',
-    'status' => 'confirmed',
-    'start' => ['date' => '2026-09-20'],
-    'end' => ['date' => '2026-09-21'],
+    'id'                 => 'google-task',
+    'iCalUID'            => 'google-task@example.com',
+    'summary'            => 'Versicherung prüfen',
+    'status'             => 'confirmed',
+    'start'              => ['date' => '2026-09-20'],
+    'end'                => ['date' => '2026-09-21'],
     'extendedProperties' => ['private' => [
-        'opencalendarTask' => 'true',
-        'opencalendarTaskStatus' => 'open',
+        'opencalendarTask'        => 'true',
+        'opencalendarTaskStatus'  => 'open',
         'opencalendarRollForward' => 'following'
     ]]
 ];

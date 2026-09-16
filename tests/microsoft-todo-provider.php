@@ -55,13 +55,13 @@ $client = new MicrosoftTodoTestHttpClient([
     ]]]),
     todoResponse(200, [
         'value' => [[
-            'id' => 'task-1',
-            '@odata.etag' => 'etag-1',
-            'title' => 'Versicherung prüfen',
-            'status' => 'notStarted',
-            'importance' => 'high',
-            'body' => ['contentType' => 'text', 'content' => 'Unterlagen suchen'],
-            'dueDateTime' => ['dateTime' => '2026-09-20T00:00:00.0000000', 'timeZone' => 'Europe/Berlin'],
+            'id'           => 'task-1',
+            '@odata.etag'  => 'etag-1',
+            'title'        => 'Versicherung prüfen',
+            'status'       => 'notStarted',
+            'importance'   => 'high',
+            'body'         => ['contentType' => 'text', 'content' => 'Unterlagen suchen'],
+            'dueDateTime'  => ['dateTime' => '2026-09-20T00:00:00.0000000', 'timeZone' => 'Europe/Berlin'],
             'isReminderOn' => false
         ]],
         '@odata.deltaLink' => 'https://graph.microsoft.com/v1.0/me/todo/lists/list-1/tasks/delta?$deltatoken=abc'
@@ -89,7 +89,7 @@ assertMicrosoftTodo(
 );
 
 $created = $provider->createTask('list-1', [
-    'title' => 'Neue Aufgabe',
+    'title'       => 'Neue Aufgabe',
     'description' => 'Beschreibung',
     'dueDateTime' => ['dateTime' => '2026-09-21T00:00:00', 'timeZone' => 'Europe/Berlin']
 ]);

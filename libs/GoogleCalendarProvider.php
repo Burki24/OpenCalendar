@@ -996,7 +996,7 @@ final class GoogleCalendarProvider implements CalendarEventLookupProviderInterfa
         if ($taskSupplied) {
             $isTask = (bool) ($taskMetadata['task'] ?? false);
             $payload['extendedProperties'] = ['private' => [
-                self::TASK_PROPERTY => $isTask ? 'true' : null,
+                self::TASK_PROPERTY        => $isTask ? 'true' : null,
                 self::TASK_STATUS_PROPERTY => $isTask
                     ? ((bool) ($taskMetadata['taskCompleted'] ?? false) ? 'completed' : 'open')
                     : null,
@@ -1142,11 +1142,11 @@ final class GoogleCalendarProvider implements CalendarEventLookupProviderInterfa
             $scope = CalendarTaskEvent::ROLL_FORWARD_SCOPE_OCCURRENCE;
         }
         return [
-            'task' => true,
-            'taskCompleted' => $completed,
-            'taskStatus' => $completed ? 'completed' : 'open',
+            'task'                 => true,
+            'taskCompleted'        => $completed,
+            'taskStatus'           => $completed ? 'completed' : 'open',
             'taskRollForwardScope' => $scope,
-            'taskFollowPlanned' => $scope === CalendarTaskEvent::ROLL_FORWARD_SCOPE_FOLLOWING
+            'taskFollowPlanned'    => $scope === CalendarTaskEvent::ROLL_FORWARD_SCOPE_FOLLOWING
         ];
     }
 

@@ -1271,10 +1271,10 @@ foreach ([$native, $ipsView] as $html) {
     assertVisualization(
         str_contains($script, 'function eventDialogHostViewport()')
             && str_contains($script, 'window.frameElement.getBoundingClientRect()')
-            && str_contains($script, "--event-dialog-visible-left")
-            && str_contains($script, "--event-dialog-visible-top")
-            && str_contains($script, "--event-dialog-visible-right")
-            && str_contains($script, "--event-dialog-visible-bottom"),
+            && str_contains($script, '--event-dialog-visible-left')
+            && str_contains($script, '--event-dialog-visible-top')
+            && str_contains($script, '--event-dialog-visible-right')
+            && str_contains($script, '--event-dialog-visible-bottom'),
         'The Symcon editor must limit itself to the visible portion of an oversized HTML-SDK tile.'
     );
     assertVisualization(

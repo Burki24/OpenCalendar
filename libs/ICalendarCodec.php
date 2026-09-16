@@ -1979,11 +1979,11 @@ final class ICalendarCodec
         }
         $completed = $status === 'completed';
         return [
-            'task' => true,
-            'taskCompleted' => $completed,
-            'taskStatus' => $completed ? 'completed' : 'open',
+            'task'                 => true,
+            'taskCompleted'        => $completed,
+            'taskStatus'           => $completed ? 'completed' : 'open',
             'taskRollForwardScope' => $scope,
-            'taskFollowPlanned' => $scope === CalendarTaskEvent::ROLL_FORWARD_SCOPE_FOLLOWING
+            'taskFollowPlanned'    => $scope === CalendarTaskEvent::ROLL_FORWARD_SCOPE_FOLLOWING
         ];
     }
 
@@ -2006,7 +2006,7 @@ final class ICalendarCodec
         }
         return [
             'status' => (bool) ($normalized['taskCompleted'] ?? false) ? 'completed' : 'open',
-            'scope' => (string) ($normalized['taskRollForwardScope'] ?? CalendarTaskEvent::ROLL_FORWARD_SCOPE_OCCURRENCE)
+            'scope'  => (string) ($normalized['taskRollForwardScope'] ?? CalendarTaskEvent::ROLL_FORWARD_SCOPE_OCCURRENCE)
         ];
     }
 
