@@ -1567,7 +1567,8 @@ class CalendarView extends IPSModuleStrict
             'Action failed.',
             'Continued from series',
             'This overdue task was continued from a series.',
-            'The description of Microsoft online meetings is protected and cannot be edited here.'
+            'The description of Microsoft online meetings is protected and cannot be edited here.',
+            'Microsoft To Do task editing is not available yet.'
         ];
     }
 
@@ -1610,7 +1611,8 @@ class CalendarView extends IPSModuleStrict
                     $event['calendarInstanceId'] = $calendar['instanceId'];
                     $event['calendarName'] = $calendar['name'];
                     $event['calendarColor'] = $calendar['color'];
-                    $event['canWrite'] = $calendar['canWrite'];
+                    $event['canWrite'] = $calendar['canWrite']
+                        && (!array_key_exists('canWrite', $event) || (bool) $event['canWrite']);
                     if (CalendarEventRecurrence::isOccurrence($event)
                         && trim((string) ($event['originalStart'] ?? '')) === '') {
                         $event['originalStart'] = trim((string) ($event['start'] ?? ''));
@@ -1776,7 +1778,8 @@ class CalendarView extends IPSModuleStrict
                 $event['calendarInstanceId'] = $calendar['instanceId'];
                 $event['calendarName'] = $calendar['name'];
                 $event['calendarColor'] = $calendar['color'];
-                $event['canWrite'] = $calendar['canWrite'];
+                $event['canWrite'] = $calendar['canWrite']
+                    && (!array_key_exists('canWrite', $event) || (bool) $event['canWrite']);
                 if (CalendarEventRecurrence::isOccurrence($event)
                     && trim((string) ($event['originalStart'] ?? '')) === '') {
                     $event['originalStart'] = trim((string) ($event['start'] ?? ''));

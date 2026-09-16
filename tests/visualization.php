@@ -524,6 +524,11 @@ assertVisualization(
         && str_contains($moduleSource, "'Changes will apply to the entire recurring series.'"),
     'Recurring Google, Microsoft and CalDAV events must offer supported write scopes with verified provider data.'
 );
+assertVisualization(
+    str_contains($script, "const explicitReason = String(event?.readOnlyReason || '').trim();")
+        && str_contains($moduleSource, "!array_key_exists('canWrite', \$event)"),
+    'Virtual provider items must retain explicit write restrictions and explain why they are read-only.'
+);
 $seriesWriteScopePosition = strpos(
     $calendarModuleSource,
     'if ($writeScope === CalendarEventRecurrence::WRITE_SCOPE_SERIES) {'

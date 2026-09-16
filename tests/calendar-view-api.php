@@ -254,8 +254,8 @@ assertCalendarViewApi(
     str_contains($moduleSource, '$event[\'calendarInstanceId\'] = $calendar[\'instanceId\'];')
         && str_contains($moduleSource, '$event[\'calendarName\'] = $calendar[\'name\'];')
         && str_contains($moduleSource, '$event[\'calendarColor\'] = $calendar[\'color\'];')
-        && str_contains($moduleSource, '$event[\'canWrite\'] = $calendar[\'canWrite\'];'),
-    'Calendar View appointment results must identify their source calendar.'
+        && str_contains($moduleSource, "!array_key_exists('canWrite', \$event)"),
+    'Calendar View appointment results must identify their source calendar and retain explicit item write restrictions.'
 );
 
 assertCalendarViewApi(

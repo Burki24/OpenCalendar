@@ -2958,6 +2958,8 @@ function recurrencePayload(event, writeScope = '') {
 
 function eventReadOnlyReason(event) {
     if (eventCanUpdate(event) || eventCanDelete(event)) return '';
+    const explicitReason = String(event?.readOnlyReason || '').trim();
+    if (explicitReason) return explicitReason;
     if (!hasActionBridge()) return 'Editing events is unavailable because no action bridge is configured.';
     if (event.recurring || event.recurrenceId) return 'Recurring occurrences are currently read-only.';
     return 'This calendar is read-only.';

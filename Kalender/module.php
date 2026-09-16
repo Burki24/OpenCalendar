@@ -12,6 +12,7 @@ use IPSKalender\CalendarEventCounter;
 use IPSKalender\CalendarEventRecurrence;
 use IPSKalender\CalendarTaskEvent;
 use IPSKalender\LocalCalendarProvider;
+use IPSKalender\MicrosoftTodoTaskProjection;
 use IPSKalender\SynchronizationSchedule;
 
 require_once __DIR__ . '/../libs/helper/ChunkedJsonTransferHelper.php';
@@ -24,6 +25,7 @@ require_once __DIR__ . '/../libs/CalendarEventCounter.php';
 require_once __DIR__ . '/../libs/CalendarEventRecurrence.php';
 require_once __DIR__ . '/../libs/CalendarTaskEvent.php';
 require_once __DIR__ . '/../libs/LocalCalendarProvider.php';
+require_once __DIR__ . '/../libs/MicrosoftTodoTaskProjection.php';
 require_once __DIR__ . '/../libs/SynchronizationSchedule.php';
 
 class Calendar extends IPSModuleStrict
@@ -746,7 +748,10 @@ class Calendar extends IPSModuleStrict
         }
 
         $events = array_values(array_filter(
-            $this->readEvents(),
+            array_merge(
+                $this->readEvents(),
+                MicrosoftTodoTaskProjection::project($this->readMicrosoftTasks())
+            ),
             static function (array $event) use ($StartTimestamp, $EndTimestamp): bool
             {
                 $startTimestamp = (int) ($event['startTimestamp'] ?? 0);
