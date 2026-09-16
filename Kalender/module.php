@@ -596,6 +596,15 @@ class Calendar extends IPSModuleStrict
     {
         try {
             $event = $this->decodeObject($EventJSON, 'event');
+            if ($this->isMicrosoftTodoEvent($event)) {
+                return json_encode(
+                    $this->microsoftTodoEventForEdit($event),
+                    JSON_UNESCAPED_SLASHES
+                        | JSON_UNESCAPED_UNICODE
+                        | JSON_PRESERVE_ZERO_FRACTION
+                        | JSON_THROW_ON_ERROR
+                );
+            }
             $startTimestamp = (int) ($event['startTimestamp'] ?? 0);
             $endTimestamp = (int) ($event['endTimestamp'] ?? 0);
             if ($startTimestamp <= 0) {
@@ -901,6 +910,12 @@ class Calendar extends IPSModuleStrict
             if (!is_array($changes)) {
                 throw new InvalidArgumentException('The event changes are invalid.');
             }
+            if ($this->isMicrosoftTodoEvent($event)) {
+                $updated = $this->updateMicrosoftTodoEvent($event, $changes);
+                $writeConfirmed = true;
+                $this->storeMicrosoftTaskAfterWrite($updated);
+                return $this->encodeResult(true, MicrosoftTodoTaskProjection::project([$updated])[0] ?? $updated);
+            }
             $recurrence = $this->resolveWriteRecurrence($event, true);
             $anniversary = $this->anniversaryInput($changes);
             $existingAnniversary = $this->anniversaryMetadataForEvent($event);
@@ -1092,6 +1107,19 @@ class Calendar extends IPSModuleStrict
         $writeConfirmed = false;
         try {
             $event = $this->decodeObject($EventJSON, 'event');
+            if ($this->isMicrosoftTodoEvent($event)) {
+                [$listId, $taskId] = $this->microsoftTodoIdentity($event);
+                $result = $this->sendRequest('DeleteTask', [
+                    'TaskListID' => $listId,
+                    'TaskID'     => $taskId
+                ]);
+                if (!(bool) ($result['success'] ?? false)) {
+                    throw new RuntimeException('The calendar account did not confirm the Microsoft task deletion.');
+                }
+                $writeConfirmed = true;
+                $this->removeMicrosoftTaskFromCache($listId, $taskId);
+                return true;
+            }
             $recurrence = $this->resolveWriteRecurrence($event, false);
             $writeScope = (string) ($recurrence['writeScope'] ?? '');
             $recurrenceType = (string) ($recurrence['recurrenceType'] ?? CalendarEventRecurrence::SINGLE);
@@ -1671,6 +1699,189 @@ class Calendar extends IPSModuleStrict
         $this->WriteAttributeString('MicrosoftTaskDeltaLink', '');
         $this->WriteAttributeString('MicrosoftTaskSyncListID', '');
         $this->WriteAttributeString('MicrosoftTaskLastError', '');
+    }
+
+    /** @param array<string, mixed> $event */
+    private function isMicrosoftTodoEvent(array $event): bool
+    {
+        return strtolower(trim((string) ($event['sourceType'] ?? ''))) === 'microsoft-todo'
+            || strtolower(trim((string) ($event['taskProvider'] ?? ''))) === 'microsoft-todo';
+    }
+
+    /**
+     * @param array<string, mixed> $event
+     * @return array{0:string,1:string}
+     */
+    private function microsoftTodoIdentity(array $event): array
+    {
+        if (!$this->isMicrosoftTodoEvent($event)) {
+            throw new InvalidArgumentException('The selected item is not a Microsoft To Do task.');
+        }
+        $listId = trim((string) ($event['taskListId'] ?? ''));
+        $taskId = trim((string) ($event['taskId'] ?? ''));
+        $configuredListId = trim($this->ReadPropertyString('MicrosoftTaskListID'));
+        if ($listId === '' || $taskId === '' || $configuredListId === '' || !hash_equals($configuredListId, $listId)) {
+            throw new InvalidArgumentException('The Microsoft To Do task identity is invalid.');
+        }
+        foreach ($this->readMicrosoftTasks() as $task) {
+            if (hash_equals($taskId, trim((string) ($task['id'] ?? '')))
+                && hash_equals($listId, trim((string) ($task['listId'] ?? '')))) {
+                return [$listId, $taskId];
+            }
+        }
+        throw new RuntimeException('The Microsoft To Do task is no longer available. Synchronize the calendar and try again.');
+    }
+
+    /**
+     * @param array<string, mixed> $event
+     * @return array<string, mixed>
+     */
+    private function microsoftTodoEventForEdit(array $event): array
+    {
+        [$listId, $taskId] = $this->microsoftTodoIdentity($event);
+        foreach ($this->readMicrosoftTasks() as $task) {
+            if (hash_equals($taskId, trim((string) ($task['id'] ?? '')))
+                && hash_equals($listId, trim((string) ($task['listId'] ?? '')))) {
+                $projected = MicrosoftTodoTaskProjection::project([$task]);
+                if ($projected !== []) {
+                    return $projected[0];
+                }
+                throw new RuntimeException('The Microsoft To Do task has no valid due date.');
+            }
+        }
+        throw new RuntimeException('The Microsoft To Do task is no longer available. Synchronize the calendar and try again.');
+    }
+
+    /**
+     * @param array<string, mixed> $event
+     * @param array<string, mixed> $changes
+     * @return array<string, mixed>
+     */
+    private function updateMicrosoftTodoEvent(array $event, array $changes): array
+    {
+        [$listId, $taskId] = $this->microsoftTodoIdentity($event);
+        $sourceTask = null;
+        foreach ($this->readMicrosoftTasks() as $task) {
+            if (hash_equals($taskId, trim((string) ($task['id'] ?? '')))
+                && hash_equals($listId, trim((string) ($task['listId'] ?? '')))) {
+                $sourceTask = $task;
+                break;
+            }
+        }
+        if ($sourceTask === null) {
+            throw new RuntimeException('The Microsoft To Do task is no longer available. Synchronize the calendar and try again.');
+        }
+        if (array_key_exists('task', $changes) && !(bool) $changes['task']) {
+            throw new InvalidArgumentException('A Microsoft To Do task cannot be converted into a calendar event.');
+        }
+        if (array_key_exists('recurrence', $changes)) {
+            throw new InvalidArgumentException('Microsoft To Do recurrence editing is not supported yet.');
+        }
+
+        $taskChanges = [];
+        if (array_key_exists('summary', $changes)) {
+            $taskChanges['title'] = trim((string) $changes['summary']);
+        }
+        if (array_key_exists('description', $changes)) {
+            $taskChanges['description'] = (string) $changes['description'];
+        }
+        if (array_key_exists('start', $changes)) {
+            $taskChanges['dueDateTime'] = $this->microsoftTodoDueDateTime(
+                (string) $changes['start'],
+                is_array($sourceTask['dueDateTime'] ?? null) ? $sourceTask['dueDateTime'] : []
+            );
+        }
+        if (array_key_exists('taskCompleted', $changes) || array_key_exists('taskStatus', $changes)) {
+            $requestedCompleted = array_key_exists('taskStatus', $changes)
+                ? strtolower(trim((string) $changes['taskStatus'])) === 'completed'
+                : (bool) ($changes['taskCompleted'] ?? false);
+            $currentlyCompleted = strcasecmp(trim((string) ($sourceTask['status'] ?? '')), 'completed') === 0;
+            if ($requestedCompleted !== $currentlyCompleted) {
+                $taskChanges['status'] = $requestedCompleted ? 'completed' : 'notStarted';
+            }
+        }
+        if ($taskChanges === []) {
+            throw new InvalidArgumentException('No Microsoft To Do task changes were supplied.');
+        }
+
+        return $this->sendRequest('UpdateTask', [
+            'TaskListID' => $listId,
+            'TaskID'     => $taskId,
+            'Changes'    => $taskChanges
+        ]);
+    }
+
+    /**
+     * @param array<string, mixed> $currentDueDateTime
+     * @return array{dateTime:string,timeZone:string}
+     */
+    private function microsoftTodoDueDateTime(string $value, array $currentDueDateTime): array
+    {
+        $date = substr(trim($value), 0, 10);
+        $parsed = DateTimeImmutable::createFromFormat('!Y-m-d', $date);
+        if ($parsed === false || $parsed->format('Y-m-d') !== $date) {
+            throw new InvalidArgumentException('The Microsoft To Do due date is invalid.');
+        }
+        $currentValue = trim((string) ($currentDueDateTime['dateTime'] ?? ''));
+        $time = preg_match(
+            '/^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}:\d{2}(?:\.\d+)?)(?:Z|[+-]\d{2}:\d{2})?$/D',
+            $currentValue,
+            $matches
+        ) === 1
+            ? $matches[1]
+            : 'T00:00:00';
+        $timezone = trim((string) ($currentDueDateTime['timeZone'] ?? ''));
+        return [
+            'dateTime' => $date . $time,
+            'timeZone' => $timezone !== '' ? $timezone : date_default_timezone_get()
+        ];
+    }
+
+    /** @param array<string, mixed> $updatedTask */
+    private function storeMicrosoftTaskAfterWrite(array $updatedTask): void
+    {
+        $taskId = trim((string) ($updatedTask['id'] ?? ''));
+        $listId = trim((string) ($updatedTask['listId'] ?? ''));
+        if ($taskId === '' || $listId === '') {
+            throw new UnexpectedValueException('The calendar account returned invalid Microsoft task data.');
+        }
+        $tasks = $this->readMicrosoftTasks();
+        $replaced = false;
+        foreach ($tasks as &$task) {
+            if (hash_equals($taskId, trim((string) ($task['id'] ?? '')))
+                && hash_equals($listId, trim((string) ($task['listId'] ?? '')))) {
+                $task = $updatedTask;
+                $replaced = true;
+                break;
+            }
+        }
+        unset($task);
+        if (!$replaced) {
+            $tasks[] = $updatedTask;
+        }
+        $this->WritePersistentJsonCache('CachedMicrosoftTasks', $tasks);
+        $this->afterMicrosoftTaskWrite();
+    }
+
+    private function removeMicrosoftTaskFromCache(string $listId, string $taskId): void
+    {
+        $tasks = array_values(array_filter(
+            $this->readMicrosoftTasks(),
+            static fn (array $task): bool => !(
+                hash_equals($taskId, trim((string) ($task['id'] ?? '')))
+                && hash_equals($listId, trim((string) ($task['listId'] ?? '')))
+            )
+        ));
+        $this->WritePersistentJsonCache('CachedMicrosoftTasks', $tasks);
+        $this->afterMicrosoftTaskWrite();
+    }
+
+    private function afterMicrosoftTaskWrite(): void
+    {
+        $this->WriteAttributeString('MicrosoftTaskLastError', '');
+        $this->WriteAttributeString('LastError', '');
+        $this->SetStatus($this->ReadPropertyBoolean('Active') ? IS_ACTIVE : IS_INACTIVE);
+        $this->SetValue('LastSynchronization', $this->ReadAttributeInteger('LastSynchronization'));
     }
 
     /**

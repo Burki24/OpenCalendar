@@ -97,7 +97,6 @@
             "Recurring occurrences are currently read-only.": "Dieses Serienvorkommnis kann derzeit nur gelesen werden.",
             "Only this occurrence of the recurring event will be changed.": "Es wird nur dieses einzelne Vorkommnis des Serientermins geändert.",
             "This calendar is read-only.": "Dieser Kalender ist schreibgeschützt.",
-            "Microsoft To Do task editing is not available yet.": "Das Bearbeiten von Microsoft-To-Do-Aufgaben ist noch nicht verfügbar.",
             "Editing events is unavailable because no action bridge is configured.": "Termine können nicht bearbeitet werden, weil keine Aktionsverbindung verfügbar ist.",
             "Action failed.": "Aktion fehlgeschlagen.",
             "The event data is invalid.": "Die Termindaten sind ungültig.",

@@ -1833,6 +1833,16 @@ function taskRollForwardScope(event) {
     return event?.taskFollowPlanned ? 'following' : 'occurrence';
 }
 
+function microsoftTodoIdentity(event) {
+    if (String(event?.sourceType || '').trim().toLowerCase() !== 'microsoft-todo') return {};
+    return {
+        sourceType: 'microsoft-todo',
+        taskProvider: 'microsoft-todo',
+        taskId: String(event?.taskId || ''),
+        taskListId: String(event?.taskListId || '')
+    };
+}
+
 function editableEventSummary(event) {
     if (!event?.task) return String(event?.summary || '').trim();
     return String(event?.displaySummary || '').trim() || taskPlainSummary(event?.summary);
@@ -2601,6 +2611,7 @@ async function toggleSelectedTaskCompletion() {
             summary: selectedEvent.summary,
             taskFollowPlanned: Boolean(selectedEvent.taskFollowPlanned),
             taskRollForwardScope: taskRollForwardScope(selectedEvent),
+            ...microsoftTodoIdentity(selectedEvent),
             ...recurrencePayload(selectedEvent),
             changes: {
                 task: true,
@@ -2748,6 +2759,7 @@ async function prepareEventEdit(event) {
             uid,
             resourceUrl: String(event?.resourceUrl || ''),
             eventReference,
+            ...microsoftTodoIdentity(event),
             seriesId,
             occurrenceId,
             originalStart,
@@ -2837,6 +2849,7 @@ async function confirmDeleteEvent() {
             event: {
                 resourceUrl: event.resourceUrl,
                 etag: event.etag,
+                ...microsoftTodoIdentity(event),
                 ...recurrencePayload(event, selectedDeleteScope(event))
             }
         });
@@ -2893,6 +2906,7 @@ function eventCanUpdate(event) {
 
 function eventCanMove(event, writeScope = '') {
     if (!hasActionBridge() || !Boolean(event?.canWrite)) return false;
+    if (String(event?.sourceType || '').trim().toLowerCase() === 'microsoft-todo') return false;
     const reminder = eventReminderState(event);
     if (reminder.mode === 'complex') return false;
     if (reminder.mode === 'default') {
@@ -3693,6 +3707,7 @@ function updateRecurrenceAvailability() {
         : selectedEvent === null
             ? Boolean(calendar?.canWrite) && Boolean(calendar?.canCreateRecurrence)
             : editingSingle
+                && selectedEvent?.recurrenceEditable !== false
                 && eventCanUpdateOccurrence(selectedEvent)
                 && Boolean(calendar?.canWrite)
                 && Boolean(movingSingle ? calendar?.canCreateRecurrence : calendar?.canUpdateRecurrence);
@@ -3845,6 +3860,13 @@ function setDialogEditable(editable, descriptionEditable = editable) {
     updateRecurrenceAvailability();
     updateReminderControls();
     updateAnniversaryControls();
+    if (String(selectedEvent?.sourceType || '').trim().toLowerCase() === 'microsoft-todo') {
+        ['event-all-day', 'event-end', 'event-location'].forEach(id => {
+            document.getElementById(id).disabled = true;
+        });
+        eventTask.disabled = true;
+        eventTaskRollForwardScope.disabled = true;
+    }
 }
 
 function setDateInputs(start, end, allDay, allDayEndExclusive = false) {
@@ -3993,6 +4015,7 @@ eventForm.addEventListener('submit', async event => {
                     uid: selectedEvent.uid,
                     resourceUrl: selectedEvent.resourceUrl,
                     etag: selectedEvent.etag,
+                    ...microsoftTodoIdentity(selectedEvent),
                     ...recurrencePayload(selectedEvent),
                     changes: eventData
                 }

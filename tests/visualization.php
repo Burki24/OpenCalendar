@@ -529,6 +529,13 @@ assertVisualization(
         && str_contains($moduleSource, "!array_key_exists('canWrite', \$event)"),
     'Virtual provider items must retain explicit write restrictions and explain why they are read-only.'
 );
+assertVisualization(
+    str_contains($script, 'function microsoftTodoIdentity(event)')
+        && substr_count($script, '...microsoftTodoIdentity(') >= 4
+        && str_contains($script, "if (String(event?.sourceType || '').trim().toLowerCase() === 'microsoft-todo') return false;")
+        && str_contains($script, 'selectedEvent?.recurrenceEditable !== false'),
+    'Microsoft To Do edits, completion changes, and deletes must retain native identity while moves and recurrence edits stay disabled.'
+);
 $seriesWriteScopePosition = strpos(
     $calendarModuleSource,
     'if ($writeScope === CalendarEventRecurrence::WRITE_SCOPE_SERIES) {'

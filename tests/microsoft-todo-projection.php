@@ -51,8 +51,11 @@ assertTodoProjection(
         && $events[0]['microsoftTaskStatus'] === 'inProgress'
         && $events[0]['taskRollForwardScope'] === 'disabled'
         && $events[0]['sourceType'] === 'microsoft-todo'
-        && $events[0]['canWrite'] === false,
-    'Open and overdue Microsoft tasks must stay on their original due date and remain explicitly read-only.'
+        && $events[0]['canWrite'] === true
+        && $events[0]['canUpdateOccurrence'] === true
+        && $events[0]['canDeleteOccurrence'] === true
+        && $events[0]['recurrenceEditable'] === false,
+    'Open and overdue Microsoft tasks must stay on their original due date and expose only supported write capabilities.'
 );
 assertTodoProjection(
     $events[0]['taskNativeRecurrence']['pattern']['type'] === 'weekly'

@@ -37,6 +37,7 @@ $commands = [
     ['Verify Microsoft To Do account gateway', [PHP_BINARY, 'tests/microsoft-todo-gateway.php']],
     ['Verify Microsoft To Do calendar synchronization', [PHP_BINARY, 'tests/microsoft-todo-calendar-sync.php']],
     ['Verify Microsoft To Do task projection', [PHP_BINARY, 'tests/microsoft-todo-projection.php']],
+    ['Verify Microsoft To Do calendar writes', [PHP_BINARY, 'tests/microsoft-todo-calendar-write.php']],
     ['Verify CalDAV incremental synchronization', [PHP_BINARY, 'tests/caldav-incremental-sync.php']],
     ['Verify iCalendar parsed feed cache', [PHP_BINARY, 'tests/icalendar-parse-cache.php']],
     ['Run OpenCalendar provider and integration tests', [PHP_BINARY, 'tests/calendar-provider.php']],

@@ -1567,8 +1567,7 @@ class CalendarView extends IPSModuleStrict
             'Action failed.',
             'Continued from series',
             'This overdue task was continued from a series.',
-            'The description of Microsoft online meetings is protected and cannot be edited here.',
-            'Microsoft To Do task editing is not available yet.'
+            'The description of Microsoft online meetings is protected and cannot be edited here.'
         ];
     }
 

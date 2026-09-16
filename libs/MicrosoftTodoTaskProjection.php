@@ -87,16 +87,20 @@ final class MicrosoftTodoTaskProjection
             'taskCompletedDateTime'  => is_array($task['completedDateTime'] ?? null) ? $task['completedDateTime'] : null,
             'taskReminderDateTime'   => is_array($task['reminderDateTime'] ?? null) ? $task['reminderDateTime'] : null,
             'taskReminder'           => (bool) ($task['reminder'] ?? false),
+            'reminder'               => [
+                'mode'     => (bool) ($task['reminder'] ?? false) ? 'complex' : 'none',
+                'editable' => false
+            ],
             'taskNativeRecurrence'   => is_array($task['recurrence'] ?? null) ? $task['recurrence'] : null,
             'etag'                   => trim((string) ($task['etag'] ?? '')),
             'lastModified'           => trim((string) ($task['lastModified'] ?? '')),
-            'canWrite'               => false,
-            'canUpdateOccurrence'    => false,
-            'canDeleteOccurrence'    => false,
+            'canWrite'               => true,
+            'canUpdateOccurrence'    => true,
+            'canDeleteOccurrence'    => true,
             'canUpdateFollowing'     => false,
             'canUpdateSeries'        => false,
             'canDeleteSeries'        => false,
-            'readOnlyReason'         => 'Microsoft To Do task editing is not available yet.'
+            'recurrenceEditable'     => false
         ];
     }
 
