@@ -17,6 +17,7 @@ $commands = [
     ['Verify chunked event transfers', [PHP_BINARY, 'tests/chunked-event-transfer.php']],
     ['Verify current-day event counting', [PHP_BINARY, 'tests/calendar-event-counter.php']],
     ['Verify task appointment behavior', [PHP_BINARY, 'tests/task-appointments.php']],
+    ['Verify provider task metadata', [PHP_BINARY, 'tests/task-metadata.php']],
     ['Verify standalone local calendar provider', [PHP_BINARY, 'tests/local-calendar-provider.php']],
     ['Verify local calendar account integration', [PHP_BINARY, 'tests/local-calendar-account.php']],
     ['Verify calendar failure recovery', [PHP_BINARY, 'tests/calendar-recovery.php']],

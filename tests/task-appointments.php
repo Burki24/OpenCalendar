@@ -212,9 +212,9 @@ $created = CalendarTaskEvent::prepareWrite([
 ]);
 assertTaskAppointment(
     $created['summary'] === '[OC:TODO] Versicherung prüfen'
-        && !array_key_exists('task', $created)
-        && !array_key_exists('taskCompleted', $created),
-    'Creating a task appointment must persist only the open title marker.'
+        && ($created['task'] ?? false) === true
+        && ($created['taskCompleted'] ?? true) === false,
+    'Creating a task appointment must retain structured metadata for provider-specific persistence.'
 );
 
 $enriched = CalendarTaskEvent::enrich($created);
@@ -467,7 +467,7 @@ $detachedTaskWrite = CalendarTaskEvent::prepareWrite([
 ]);
 assertTaskAppointment(
     $detachedTaskWrite['summary'] === '[OC:TODO] Serienaufgabe'
-        && !array_key_exists('taskFollowPlanned', $detachedTaskWrite),
+        && ($detachedTaskWrite['taskFollowPlanned'] ?? true) === false,
     'A rolled-forward detached task must be persisted as a standalone task without the series-follow marker.'
 );
 $shiftedEvents = CalendarTaskEvent::shiftFollowingEvents(

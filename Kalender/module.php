@@ -912,6 +912,7 @@ class Calendar extends IPSModuleStrict
                     // completed task when that override is removed with the former start.
                     $followingChanges['task'] = true;
                     $followingChanges['taskCompleted'] = (bool) $followingTask['taskCompleted'];
+                    $followingChanges['taskStatus'] = (bool) $followingTask['taskCompleted'] ? 'completed' : 'open';
                     $followingChanges['taskFollowPlanned'] = (bool) ($followingTask['taskFollowPlanned'] ?? false);
                     $followingChanges['taskRollForwardScope'] = (string) (
                         $followingTask['taskRollForwardScope'] ?? CalendarTaskEvent::ROLL_FORWARD_SCOPE_OCCURRENCE

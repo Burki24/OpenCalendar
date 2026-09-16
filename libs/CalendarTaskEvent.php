@@ -35,16 +35,26 @@ final class CalendarTaskEvent
     {
         $marker = self::marker((string) ($event['summary'] ?? ''));
         if ($marker === '') {
-            if ((bool) ($event['task'] ?? false)) {
-                unset($event['displaySummary']);
+            if (!(bool) ($event['task'] ?? false)) {
+                unset(
+                    $event['task'],
+                    $event['taskCompleted'],
+                    $event['taskStatus'],
+                    $event['taskFollowPlanned'],
+                    $event['taskRollForwardScope'],
+                    $event['displaySummary']
+                );
+                return $event;
             }
-            unset(
-                $event['task'],
-                $event['taskCompleted'],
-                $event['taskStatus'],
-                $event['taskFollowPlanned'],
-                $event['taskRollForwardScope']
-            );
+
+            $completed = self::requestedCompletion($event, []);
+            $scope = self::requestedRollForwardScope($event, []);
+            $event['task'] = true;
+            $event['taskCompleted'] = $completed;
+            $event['taskStatus'] = $completed ? 'completed' : 'open';
+            $event['taskRollForwardScope'] = $scope;
+            $event['taskFollowPlanned'] = $scope === self::ROLL_FORWARD_SCOPE_FOLLOWING;
+            $event['displaySummary'] = trim((string) ($event['summary'] ?? ''));
             return $event;
         }
 
@@ -96,18 +106,17 @@ final class CalendarTaskEvent
                 throw new InvalidArgumentException('The task title is missing.');
             }
             $event['summary'] = self::markerFor($completed, $rollForwardScope) . ' ' . $summary;
-        } elseif ($taskWasSupplied && array_key_exists('summary', $event)) {
-            $event['summary'] = self::plainSummary((string) $event['summary']);
+            $event['task'] = true;
+            $event['taskCompleted'] = $completed;
+            $event['taskStatus'] = $completed ? 'completed' : 'open';
+            $event['taskRollForwardScope'] = $rollForwardScope;
+            $event['taskFollowPlanned'] = $rollForwardScope === self::ROLL_FORWARD_SCOPE_FOLLOWING;
+        } elseif ($taskWasSupplied) {
+            $event['summary'] = self::plainSummary((string) ($event['summary'] ?? $sourceEvent['summary'] ?? ''));
+            $event['task'] = false;
         }
 
-        unset(
-            $event['task'],
-            $event['taskCompleted'],
-            $event['taskStatus'],
-            $event['taskFollowPlanned'],
-            $event['taskRollForwardScope'],
-            $event['displaySummary']
-        );
+        unset($event['displaySummary']);
         return $event;
     }
 

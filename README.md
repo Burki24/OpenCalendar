@@ -237,32 +237,28 @@ befindet sich in der Dokumentation der Module **Kalender** und
 ## Aufgabentermine
 
 OpenCalendar kann einen gewöhnlichen ganztägigen Termin als
-**Aufgabentermin** behandeln. Dafür wird keine Aufgaben-API des Anbieters und
-keine zusätzliche OAuth-Berechtigung benötigt. Der Eintrag bleibt technisch ein
-normaler Kalendertermin und verwendet ausschließlich die bereits vorhandenen
-Schreibrechte des gewählten Kalenders.
+**Aufgabentermin** behandeln. Bei CalDAV und lokalen Kalendern werden die
+Aufgabenfelder als RFC-konforme `X-OPENCALENDAR-*`-Eigenschaften gespeichert.
+Google Calendar verwendet private `extendedProperties`. Der sichtbare Titel
+bleibt bei diesen Anbietern unverändert.
 
 Beim Erstellen oder Bearbeiten wird im Termindialog **Aufgabentermin** aktiviert.
 Aufgabentermine sind bewusst ganztägig und dauern genau einen Tag. Sie dürfen
-auch wiederkehrend sein. OpenCalendar
-speichert den Status direkt und providerunabhängig am Anfang des Termintitels:
+auch wiederkehrend sein. Intern unterscheidet OpenCalendar den Aufgabenstatus
+und die Nachziehstrategie. In iCalendar werden diese Felder so abgelegt:
 
-- `[OC:TODO]` kennzeichnet eine offene Aufgabe.
-- `[OC:DONE]` kennzeichnet eine erledigte Aufgabe.
-- `[OC:TODO:FOLLOW]` beziehungsweise `[OC:DONE:FOLLOW]` kennzeichnet eine Aufgabenserie, deren geplante
-  Folgetermine beim täglichen Nachziehen ebenfalls verschoben werden sollen.
-- `[OC:TODO:KEEP]` beziehungsweise `[OC:DONE:KEEP]` kennzeichnet eine Aufgabe, die bei Überfälligkeit
-  nicht automatisch nachgezogen wird.
+- `X-OPENCALENDAR-TASK:TRUE`
+- `X-OPENCALENDAR-TASK-STATUS:OPEN` beziehungsweise `COMPLETED`
+- `X-OPENCALENDAR-ROLL-FORWARD:OCCURRENCE`, `FOLLOWING` oder `DISABLED`
 
 In der Kalenderansicht öffnet ein Klick auf den Eintrag die Termindetails. Dort
 kann die Aufgabe mit **Als erledigt markieren** abgeschlossen und mit
 **Aufgabe wieder öffnen** erneut aktiviert werden. Der eigentliche Titel wird im
-Editor ohne technischen Marker angezeigt. In Google Calendar, Outlook, Apple
-Calendar oder anderen Clients bleibt der ASCII-Marker dagegen sichtbar, sodass der
-Status auch außerhalb von OpenCalendar erkennbar ist. Wird der Marker dort
-manuell entfernt oder geändert, übernimmt OpenCalendar diese Änderung bei der
-nächsten Synchronisation. Die früher verwendeten grafischen Kästchen (`☐`, `☑`)
-werden weiterhin erkannt und bei der nächsten Aufgabenänderung automatisch ersetzt.
+Editor ohne technische Metadaten angezeigt. Bestehende ASCII-Marker
+(`[OC:TODO]`, `[OC:DONE]`, `FOLLOW`, `KEEP`) und die früher verwendeten
+grafischen Kästchen (`☐`, `☑`) werden weiterhin gelesen. Bei der nächsten
+Aufgabenänderung migrieren CalDAV, lokale Kalender und Google Calendar den
+Eintrag auf die strukturierte Speicherung und entfernen den Marker aus dem Titel.
 
 Eine offene Aufgabe, deren Datum vor dem aktuellen lokalen Tag liegt, wird beim
 lokalen Tageswechsel und zusätzlich bei jeder Kalendersynchronisation auf den

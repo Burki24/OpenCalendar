@@ -15,6 +15,7 @@ require_once __DIR__ . '/ICalendarRecurrence.php';
 require_once __DIR__ . '/ICalendarTimezoneResolver.php';
 require_once __DIR__ . '/CalendarEventRecurrence.php';
 require_once __DIR__ . '/CalendarEventReminder.php';
+require_once __DIR__ . '/CalendarTaskEvent.php';
 require_once __DIR__ . '/CalendarRecurrenceRule.php';
 
 final class ICalendarCodec
@@ -66,6 +67,7 @@ final class ICalendarCodec
                     ? CalendarEventRecurrence::master($uid)
                     : CalendarEventRecurrence::single());
 
+            $taskMetadata = self::taskMetadataFromProperties($properties);
             $events[] = array_merge([
                 'id'                          => hash('sha256', $resourceUrl . '|' . $uid . '|' . $recurrenceId . '|' . $start['value']),
                 'uid'                         => $uid,
@@ -103,7 +105,7 @@ final class ICalendarCodec
                 ),
                 'url'                         => self::propertyValue($properties, 'URL'),
                 'reminder'                    => self::reminderState($block)
-            ], $recurrenceIdentity);
+            ], $recurrenceIdentity, $taskMetadata);
         }
 
         return $events;
@@ -193,7 +195,11 @@ final class ICalendarCodec
         $lines[] = 'SEQUENCE:0';
         $lines[] = self::formatEventDateLine('DTSTART', $start, $allDay, $useTimezoneReference ? $timezoneName : '');
         $lines[] = self::formatEventDateLine('DTEND', $end, $allDay, $useTimezoneReference ? $timezoneName : '');
-        $lines[] = 'SUMMARY:' . self::escapeText($summary);
+        $taskMetadata = self::taskMetadataForWrite($data);
+        $lines[] = 'SUMMARY:' . self::escapeText(
+            $taskMetadata !== [] ? CalendarTaskEvent::plainSummary($summary) : $summary
+        );
+        array_push($lines, ...self::taskMetadataLines($taskMetadata));
 
         if ($recurring) {
             $lines[] = CalendarRecurrenceRule::toICalendarRule(
@@ -1238,12 +1244,31 @@ final class ICalendarCodec
      */
     private static function applyEventChangesToBlock(array &$block, array $data): void
     {
+        $taskSupplied = self::taskFieldsSupplied($data);
+        $taskMetadata = $taskSupplied ? self::taskMetadataForWrite($data) : [];
         if (array_key_exists('summary', $data)) {
             $summary = trim((string) $data['summary']);
             if ($summary === '') {
                 throw new InvalidArgumentException('The event summary must not be empty.');
             }
-            self::replaceProperty($block, 'SUMMARY', 'SUMMARY:' . self::escapeText($summary));
+            self::replaceProperty(
+                $block,
+                'SUMMARY',
+                'SUMMARY:' . self::escapeText($taskSupplied ? CalendarTaskEvent::plainSummary($summary) : $summary)
+            );
+        }
+        if ($taskSupplied) {
+            foreach ([
+                'X-OPENCALENDAR-TASK',
+                'X-OPENCALENDAR-TASK-STATUS',
+                'X-OPENCALENDAR-ROLL-FORWARD'
+            ] as $property) {
+                self::replaceProperty($block, $property, null);
+            }
+            foreach (self::taskMetadataLines($taskMetadata) as $line) {
+                $property = substr($line, 0, (int) strpos($line, ':'));
+                self::replaceProperty($block, $property, $line);
+            }
         }
         foreach (['description' => 'DESCRIPTION', 'location' => 'LOCATION'] as $key => $property) {
             if (array_key_exists($key, $data)) {
@@ -1935,6 +1960,67 @@ final class ICalendarCodec
     private static function propertyValue(array $properties, string $name): string
     {
         return (string) (self::firstProperty($properties, $name)['value'] ?? '');
+    }
+
+    /** @param array<string, list<array{value:string, params:array<string,string>}>> $properties */
+    private static function taskMetadataFromProperties(array $properties): array
+    {
+        if (strtoupper(trim(self::propertyValue($properties, 'X-OPENCALENDAR-TASK'))) !== 'TRUE') {
+            return [];
+        }
+        $status = strtolower(trim(self::propertyValue($properties, 'X-OPENCALENDAR-TASK-STATUS')));
+        $scope = strtolower(trim(self::propertyValue($properties, 'X-OPENCALENDAR-ROLL-FORWARD')));
+        if (!in_array($scope, [
+            CalendarTaskEvent::ROLL_FORWARD_SCOPE_OCCURRENCE,
+            CalendarTaskEvent::ROLL_FORWARD_SCOPE_FOLLOWING,
+            CalendarTaskEvent::ROLL_FORWARD_SCOPE_DISABLED
+        ], true)) {
+            $scope = CalendarTaskEvent::ROLL_FORWARD_SCOPE_OCCURRENCE;
+        }
+        $completed = $status === 'completed';
+        return [
+            'task' => true,
+            'taskCompleted' => $completed,
+            'taskStatus' => $completed ? 'completed' : 'open',
+            'taskRollForwardScope' => $scope,
+            'taskFollowPlanned' => $scope === CalendarTaskEvent::ROLL_FORWARD_SCOPE_FOLLOWING
+        ];
+    }
+
+    /** @param array<string, mixed> $data */
+    private static function taskFieldsSupplied(array $data): bool
+    {
+        return array_key_exists('task', $data)
+            || array_key_exists('taskCompleted', $data)
+            || array_key_exists('taskStatus', $data)
+            || array_key_exists('taskFollowPlanned', $data)
+            || array_key_exists('taskRollForwardScope', $data);
+    }
+
+    /** @param array<string, mixed> $data @return array<string, mixed> */
+    private static function taskMetadataForWrite(array $data): array
+    {
+        $normalized = CalendarTaskEvent::enrich($data);
+        if (!(bool) ($normalized['task'] ?? false)) {
+            return [];
+        }
+        return [
+            'status' => (bool) ($normalized['taskCompleted'] ?? false) ? 'completed' : 'open',
+            'scope' => (string) ($normalized['taskRollForwardScope'] ?? CalendarTaskEvent::ROLL_FORWARD_SCOPE_OCCURRENCE)
+        ];
+    }
+
+    /** @param array<string, mixed> $metadata @return list<string> */
+    private static function taskMetadataLines(array $metadata): array
+    {
+        if ($metadata === []) {
+            return [];
+        }
+        return [
+            'X-OPENCALENDAR-TASK:TRUE',
+            'X-OPENCALENDAR-TASK-STATUS:' . strtoupper((string) $metadata['status']),
+            'X-OPENCALENDAR-ROLL-FORWARD:' . strtoupper((string) $metadata['scope'])
+        ];
     }
 
     /**
