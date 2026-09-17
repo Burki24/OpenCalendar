@@ -174,7 +174,7 @@
             "version": "1.0.0",
             "sha256": "adbc7680abe814dc6c15a9cda1312cc30023073595052006662716bc0d65f2a4",
             "path": "libs/helper/PersistentJsonCacheHelper.php",
-            "source_sha": "4d71557b91cd78878abc31b9ebba046657336ac4"
+            "source_sha": "f9672f8d3645786a64eb04b6579c979bc3f05611"
         },
         "ResponsiveVisualizationHelper": {
             "version": "1.0.0",
