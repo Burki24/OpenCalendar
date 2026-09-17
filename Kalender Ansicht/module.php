@@ -504,16 +504,6 @@ class CalendarView extends IPSModuleStrict
                     );
                     break;
 
-                case 'FormRegenerateIPSViewHTML':
-                    $this->UpdateFormField(
-                        $this->RegenerateIPSViewHTML()
-                            ? 'IPSViewRegenerationSuccessPopup'
-                            : 'IPSViewRegenerationFailurePopup',
-                        'visible',
-                        true
-                    );
-                    break;
-
                 default:
                     $result = $this->executeVisualizationAction($Ident, $Value);
                     $toast = $result['message'] !== ''
@@ -1190,25 +1180,13 @@ class CalendarView extends IPSModuleStrict
      */
     public function RegenerateIPSViewHTML(): bool
     {
-        if (!$this->IsIPSViewHTMLPageEnabled()) {
-            return false;
-        }
-        if (!$this->isRuntimeReady() && !$this->Initialize()) {
-            return false;
-        }
+        return $this->RegenerateIPSViewHTMLPages();
+    }
 
-        try {
-            $html = $this->renderNonEmptyIPSViewHTML($this->buildState(), 'IPSViewRegeneration');
-            if ($html === null) {
-                return false;
-            }
-
-            return $this->UpdateIPSViewHTMLVariable('IPSViewCalendar', $html);
-        } catch (Throwable $exception) {
-            $this->SendDebug('IPSViewRegeneration', $exception->getMessage(), 0);
-
-            return false;
-        }
+    /** Ensures provider state is available before the shared helper renders the page. */
+    protected function PrepareIPSViewHTMLRegeneration(): bool
+    {
+        return $this->isRuntimeReady() || $this->Initialize();
     }
 
     /**

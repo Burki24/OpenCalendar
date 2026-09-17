@@ -3844,6 +3844,7 @@ $viewStyleSource = file_get_contents(__DIR__ . '/../Kalender Ansicht/visualizati
 $viewScriptSource = file_get_contents(__DIR__ . '/../Kalender Ansicht/visualization/app.js');
 $viewFormSource = file_get_contents(__DIR__ . '/../Kalender Ansicht/form.json');
 $viewLocaleSource = file_get_contents(__DIR__ . '/../Kalender Ansicht/locale.json');
+$htmlPageHelperSource = file_get_contents(__DIR__ . '/../libs/helper/IPSViewHTMLPageHelper.php');
 assertTrueValue(
     is_string($accountModuleSource)
         && str_contains($accountModuleSource, 'self::GOOGLE_OAUTH_IDENTIFIER, self::MICROSOFT_OAUTH_IDENTIFIER')
@@ -4030,9 +4031,10 @@ assertTrueValue(
 );
 assertTrueValue(
     is_string($viewModuleSource)
-        && str_contains($viewModuleSource, "case 'FormRegenerateIPSViewHTML':")
+        && str_contains($viewModuleSource, '$this->HandleIPSViewHTMLPageAction($Ident, $Value)')
         && str_contains($viewModuleSource, 'public function RegenerateIPSViewHTML(): bool')
-        && str_contains($viewModuleSource, "return \$this->UpdateIPSViewHTMLVariable('IPSViewCalendar', \$html);")
+        && str_contains($viewModuleSource, 'return $this->RegenerateIPSViewHTMLPages();')
+        && str_contains($htmlPageHelperSource, "private const IPSVIEW_HTML_REGENERATE_ACTION = 'IPSViewHTMLRegenerateVariables';")
         && str_contains($viewModuleSource, 'private function renderNonEmptyIPSViewHTML(array $state, string $debugContext): ?string')
         && str_contains($viewModuleSource, 'private function existingIPSViewHTML(): string')
         && str_contains($viewModuleSource, "'Rendering returned an empty document; preserving the existing IPSView HTML.'")
