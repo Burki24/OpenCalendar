@@ -36,7 +36,7 @@
             "version": "1.4.1",
             "sha256": "c0baf0f6f8b71a9c0e1d3b7497f69d64a17f4b1e516a605f093ade5c1aa34929",
             "path": "libs/helper/IPSViewHTMLPageHelper.php",
-            "source_sha": "f9672f8d3645786a64eb04b6579c979bc3f05611",
+            "source_sha": "99d5f6fc9a1618a1c584e0910a3e13957f26f9d7",
             "assets": [
                 {
                     "path": "libs/helper/translations/IPSViewHTMLPageHelper.json",
@@ -49,14 +49,14 @@
                     "version": "1.0.0",
                     "sha256": "d3deee581eca9f8eb11e9adce060170227a2dc836ee898bd134f93d27604f639",
                     "path": "libs/helper/HelperTranslationHelper.php",
-                    "source_sha": "f9672f8d3645786a64eb04b6579c979bc3f05611"
+                    "source_sha": "99d5f6fc9a1618a1c584e0910a3e13957f26f9d7"
                 },
                 {
                     "name": "VisualizationAssetHelper",
                     "version": "1.0.0",
                     "sha256": "1693b2399bcf95d270a6d9a01df6534caad906497bd4ba9489916a951abaffcc",
                     "path": "libs/helper/VisualizationAssetHelper.php",
-                    "source_sha": "f9672f8d3645786a64eb04b6579c979bc3f05611"
+                    "source_sha": "99d5f6fc9a1618a1c584e0910a3e13957f26f9d7"
                 }
             ]
         },
@@ -198,7 +198,7 @@
             "version": "1.0.0",
             "sha256": "1693b2399bcf95d270a6d9a01df6534caad906497bd4ba9489916a951abaffcc",
             "path": "libs/helper/VisualizationAssetHelper.php",
-            "source_sha": "f9672f8d3645786a64eb04b6579c979bc3f05611"
+            "source_sha": "99d5f6fc9a1618a1c584e0910a3e13957f26f9d7"
         },
         "VisualizationThemeHelper": {
             "version": "1.1.0",
