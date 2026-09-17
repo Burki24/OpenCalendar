@@ -19,7 +19,7 @@ require_once __DIR__ . '/HelperTranslationHelper.php';
  * visual implementation in style.css/app.js. The helper owns asset loading,
  * bootstrap encoding, page metadata, fixed placeholders and validation.
  *
- * @version 1.4.0
+ * @version 1.4.1
  */
 trait IPSViewHTMLPageHelper
 {
@@ -139,13 +139,11 @@ trait IPSViewHTMLPageHelper
             [
                 'type'    => 'Button',
                 'caption' => $this->IPSViewHTMLPageText('action.regenerate_variables'),
-                'onClick' => [
-                    'IPS_RequestAction($id, ' . var_export(self::IPSVIEW_HTML_REGENERATE_ACTION, true) . ', "");',
-                    'return ' . var_export(
-                        'MESSAGE:' . $this->IPSViewHTMLPageText('message.variables_regenerated'),
-                        true
-                    ) . ';'
-                ]
+                'onClick' => 'IPS_RequestAction($id, '
+                    . var_export(self::IPSVIEW_HTML_REGENERATE_ACTION, true)
+                    . ', ""); return '
+                    . var_export('MESSAGE:' . $this->IPSViewHTMLPageText('message.variables_regenerated'), true)
+                    . ';'
             ]
         ];
 
