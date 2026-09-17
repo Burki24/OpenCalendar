@@ -219,8 +219,7 @@ try {
     );
 
     IPS\Kernel::reset();
-    $synchronizedCalendar = new class (IPS\ObjectManager::registerObject(1)) extends Calendar
-    {
+    $synchronizedCalendar = new class(IPS\ObjectManager::registerObject(1)) extends Calendar {
         protected function getTime(): int
         {
             return time();
