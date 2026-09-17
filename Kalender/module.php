@@ -631,7 +631,7 @@ class Calendar extends IPSModuleStrict
                     throw $exception;
                 }
             }
-            $currentEvent = CalendarTaskEvent::enrich($this->enrichAnniversaryEvent($currentEvent));
+            $currentEvent = $this->enrichAnniversaryEvent(CalendarTaskEvent::enrich($currentEvent));
 
             return json_encode(
                 $currentEvent,
@@ -674,7 +674,7 @@ class Calendar extends IPSModuleStrict
                     'ResourceURL' => trim($ResourceURL)
                 ]
             );
-            $series = CalendarTaskEvent::enrich($this->enrichAnniversaryEvent($series));
+            $series = $this->enrichAnniversaryEvent(CalendarTaskEvent::enrich($series));
             return json_encode(
                 $series,
                 JSON_UNESCAPED_SLASHES
@@ -726,7 +726,7 @@ class Calendar extends IPSModuleStrict
                     'ResourceURL'   => trim($ResourceURL)
                 ]
             );
-            $following = CalendarTaskEvent::enrich($this->enrichAnniversaryEvent($following));
+            $following = $this->enrichAnniversaryEvent(CalendarTaskEvent::enrich($following));
             return json_encode(
                 $following,
                 JSON_UNESCAPED_SLASHES
@@ -2475,7 +2475,7 @@ class Calendar extends IPSModuleStrict
     private function storeEvents(array $events): void
     {
         $timestamp = time();
-        $events = $this->enrichTaskEvents($this->enrichAnniversaryEvents($events));
+        $events = $this->enrichAnniversaryEvents($this->enrichTaskEvents($events));
         $this->WritePersistentJsonCache('CachedEvents', $events);
         $this->WriteAttributeInteger('LastSynchronization', $timestamp);
         $this->updateEventCounters($events);
@@ -3306,7 +3306,7 @@ class Calendar extends IPSModuleStrict
             return null;
         }
 
-        $event = CalendarTaskEvent::enrich($this->enrichAnniversaryEvent($event));
+        $event = $this->enrichAnniversaryEvent(CalendarTaskEvent::enrich($event));
         if (!(bool) ($event['task'] ?? false)) {
             return null;
         }
@@ -3399,7 +3399,7 @@ class Calendar extends IPSModuleStrict
     /** @param list<array<string, mixed>> $events */
     private function storeEventsAfterWrite(array $events): void
     {
-        $events = $this->enrichTaskEvents($this->enrichAnniversaryEvents($events));
+        $events = $this->enrichAnniversaryEvents($this->enrichTaskEvents($events));
         usort(
             $events,
             static fn (array $left, array $right): int => ((int) ($left['startTimestamp'] ?? 0)
