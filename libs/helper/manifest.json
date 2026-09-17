@@ -168,7 +168,7 @@
             "version": "1.0.0",
             "sha256": "d4f01dee721aa32e64410979ca15b2795a0fcc59c0232c0ad69e4702d9ff573c",
             "path": "libs/helper/ParentConnectionHelper.php",
-            "source_sha": "f9672f8d3645786a64eb04b6579c979bc3f05611"
+            "source_sha": "99d5f6fc9a1618a1c584e0910a3e13957f26f9d7"
         },
         "PersistentJsonCacheHelper": {
             "version": "1.0.0",
