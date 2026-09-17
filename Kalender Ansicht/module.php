@@ -1552,6 +1552,7 @@ class CalendarView extends IPSModuleStrict
             'Move this and all following occurrences',
             'Do not automatically reschedule',
             'Overdue tasks will remain on their original date until you move them manually.',
+            'Microsoft To Do manages this task series. The next task appears after the current task is completed.',
             'Changing the date moves this and all following occurrences. Existing following exceptions will be reset.',
             'This and all following tasks will be moved to the selected calendar.',
             'Changes will apply to this and all following occurrences.',
@@ -2568,7 +2569,7 @@ class CalendarView extends IPSModuleStrict
     }
 
     /**
-     * @return list<array{instanceId: int, name: string, color: string, canWrite: bool, timezone: string, canCreateRecurrence: bool, canUpdateRecurrence: bool, canUpdateOccurrence: bool, canDeleteOccurrence: bool, canUpdateFollowing: bool, canUpdateSeries: bool, canDeleteSeries: bool, canUseDefaultReminder: bool, canCreateWithDefaultReminder: bool, defaultReminder: array<string, mixed>, maxReminders: int, provider?: string, lastSynchronization?: int, status?: int, lastError?: string}>
+     * @return list<array{instanceId: int, name: string, color: string, canWrite: bool, timezone: string, canCreateRecurrence: bool, canUpdateRecurrence: bool, canUpdateOccurrence: bool, canDeleteOccurrence: bool, canUpdateFollowing: bool, canUpdateSeries: bool, canDeleteSeries: bool, canUseDefaultReminder: bool, canCreateWithDefaultReminder: bool, defaultReminder: array<string, mixed>, maxReminders: int, microsoftTodoEnabled: bool, provider?: string, lastSynchronization?: int, status?: int, lastError?: string}>
      */
     private function loadSelectedCalendars(bool $includeOperationalMetadata = false): array
     {
@@ -2626,7 +2627,9 @@ class CalendarView extends IPSModuleStrict
                     && !array_is_list($calendarStatus['defaultReminder'])
                     ? $calendarStatus['defaultReminder']
                     : [],
-                'maxReminders'                 => max(1, min(CalendarEventReminder::MAX_REMINDERS, (int) ($calendarStatus['maxReminders'] ?? 1)))
+                'maxReminders'                 => max(1, min(CalendarEventReminder::MAX_REMINDERS, (int) ($calendarStatus['maxReminders'] ?? 1))),
+                'microsoftTodoEnabled'         => trim((string) ($calendarStatus['microsoftTaskListId']
+                    ?? IPS_GetProperty($instanceId, 'MicrosoftTaskListID'))) !== ''
             ];
             if ($includeOperationalMetadata) {
                 $calendar['provider'] = (bool) ($calendarStatus['localCalendar'] ?? false)

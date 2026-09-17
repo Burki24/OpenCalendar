@@ -104,6 +104,7 @@ const eventTaskCompleted = document.getElementById('event-task-completed');
 const eventTaskCompletedRow = document.getElementById('event-task-completed-row');
 const eventTaskRollForwardScope = document.getElementById('event-task-roll-forward');
 const eventTaskRollForwardScopeRow = document.getElementById('event-task-roll-forward-row');
+const eventMicrosoftTodoRecurrenceNote = document.getElementById('event-microsoft-todo-recurrence-note');
 const eventRecurrenceRow = document.getElementById('event-recurrence-row');
 const eventRecurrenceFrequency = document.getElementById('event-recurrence-frequency');
 const eventRecurrenceOptions = document.getElementById('event-recurrence-options');
@@ -1861,12 +1862,16 @@ function updateTaskControls() {
     eventTaskCompletedRow.classList.toggle('hidden', !enabled);
     eventTaskCompleted.disabled = !eventDialogEditable || !enabled;
     const recurring = eventRecurrenceFrequency.value !== 'none' || Boolean(selectedEvent?.recurring);
+    const microsoftTodo = enabled && selectedCalendarUsesMicrosoftTodo();
     const canFollow = Boolean(selectedCalendarEntry()?.canUpdateFollowing);
-    eventTaskRollForwardScopeRow.classList.toggle('hidden', !enabled || !recurring);
-    eventTaskRollForwardScope.disabled = !eventDialogEditable || !enabled || !recurring;
+    eventTaskRollForwardScopeRow.classList.toggle('hidden', !enabled || !recurring || microsoftTodo);
+    eventMicrosoftTodoRecurrenceNote.classList.toggle('hidden', !enabled || !recurring || !microsoftTodo);
+    eventTaskRollForwardScope.disabled = !eventDialogEditable || !enabled || !recurring || microsoftTodo;
     const followingOption = eventTaskRollForwardScope.querySelector('option[value="following"]');
     followingOption.disabled = !canFollow;
-    if (!recurring || (!canFollow && eventTaskRollForwardScope.value === 'following')) {
+    if (microsoftTodo) {
+        eventTaskRollForwardScope.value = 'disabled';
+    } else if (!recurring || (!canFollow && eventTaskRollForwardScope.value === 'following')) {
         eventTaskRollForwardScope.value = 'occurrence';
     }
     updateTaskMoveNote();
@@ -3171,6 +3176,10 @@ function selectedCalendarEntry() {
     return calendarEntryByInstanceId(eventCalendarInput.value);
 }
 
+function selectedCalendarUsesMicrosoftTodo() {
+    return Boolean(selectedCalendarEntry()?.microsoftTodoEnabled);
+}
+
 function eventReminderState(event) {
     const reminder = event?.reminder;
     if (!reminder || typeof reminder !== 'object' || Array.isArray(reminder)) {
@@ -3934,14 +3943,15 @@ eventForm.addEventListener('submit', async event => {
     event.preventDefault();
     const allDay = document.getElementById('event-all-day').checked;
     const calendarInstanceId = Number(eventCalendarInput.value);
+    const microsoftTodo = eventTask.checked && selectedCalendarUsesMicrosoftTodo();
     const eventData = {
         summary: document.getElementById('event-summary').value.trim(),
         description: document.getElementById('event-description').value.trim(),
         location: document.getElementById('event-location').value.trim(),
         task: eventTask.checked,
         taskCompleted: eventTask.checked && eventTaskCompleted.checked,
-        taskRollForwardScope: eventTask.checked ? eventTaskRollForwardScope.value : 'occurrence',
-        taskFollowPlanned: eventTask.checked && eventTaskRollForwardScope.value === 'following',
+        taskRollForwardScope: eventTask.checked ? (microsoftTodo ? 'disabled' : eventTaskRollForwardScope.value) : 'occurrence',
+        taskFollowPlanned: eventTask.checked && !microsoftTodo && eventTaskRollForwardScope.value === 'following',
         allDay,
         start: inputDateValue(document.getElementById('event-start').value, allDay),
         end: inputDateValue(document.getElementById('event-end').value, allDay, allDay)

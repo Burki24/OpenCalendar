@@ -1272,9 +1272,18 @@ foreach ([$native, $ipsView] as $html) {
     );
     assertVisualization(
         str_contains($script, "['occurrence', 'following', 'disabled'].includes(scope)")
-            && str_contains($script, "taskRollForwardScope: eventTask.checked ? eventTaskRollForwardScope.value : 'occurrence'")
+            && str_contains($script, 'taskRollForwardScope: eventTask.checked ?')
             && str_contains($script, "'Overdue tasks will remain on their original date until you move them manually.'"),
         'The visualization must submit one explicit provider-neutral roll-forward policy for each task series.'
+    );
+    assertVisualization(
+        str_contains($indexSource, 'id="event-microsoft-todo-recurrence-note"')
+            && str_contains($script, 'function selectedCalendarUsesMicrosoftTodo()')
+            && str_contains($script, 'const microsoftTodo = enabled && selectedCalendarUsesMicrosoftTodo();')
+            && str_contains($script, "eventTaskRollForwardScope.value = 'disabled';")
+            && str_contains($script, "taskRollForwardScope: eventTask.checked ? (microsoftTodo ? 'disabled' : eventTaskRollForwardScope.value) : 'occurrence'")
+            && str_contains($localeSource, '"Microsoft To Do manages this task series. The next task appears after the current task is completed.": "Microsoft To Do verwaltet diese Aufgabenserie. Die nächste Aufgabe erscheint, nachdem die aktuelle Aufgabe erledigt wurde."'),
+        'Native Microsoft To Do series must hide OpenCalendar roll-forward policies and explain provider-managed recurrence.'
     );
     assertVisualization(
         str_contains($script, "openDialog?.querySelector('.dialog-layout, .dialog-body')"),

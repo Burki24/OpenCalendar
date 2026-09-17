@@ -75,6 +75,7 @@
             "Move this and all following occurrences": "Diesen und alle folgenden Termine verschieben",
             "Do not automatically reschedule": "Nicht automatisch nachziehen",
             "Overdue tasks will remain on their original date until you move them manually.": "Überfällige Aufgaben bleiben auf ihrem ursprünglichen Datum, bis Sie sie selbst verschieben.",
+            "Microsoft To Do manages this task series. The next task appears after the current task is completed.": "Microsoft To Do verwaltet diese Aufgabenserie. Die nächste Aufgabe erscheint, nachdem die aktuelle Aufgabe erledigt wurde.",
             "Mark completed": "Als erledigt markieren",
             "Reopen task": "Aufgabe wieder öffnen",
             "Edit event": "Termin bearbeiten",

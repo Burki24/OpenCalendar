@@ -384,6 +384,7 @@ assertCalendarViewApi(
         && str_contains($normalizedModuleSource, "'timezone' => trim((string) (\$calendarStatus['timezone'] ?? ''))")
         && str_contains($normalizedModuleSource, "'canCreateRecurrence' => (bool) (\$calendarStatus['canCreateRecurrence'] ?? false)")
         && str_contains($normalizedModuleSource, "'canDeleteSeries' => (bool) (\$calendarStatus['canDeleteSeries'] ?? false)")
+        && str_contains($normalizedModuleSource, "'microsoftTodoEnabled' => trim((string) (\$calendarStatus['microsoftTaskListId'] ?? IPS_GetProperty(\$instanceId, 'MicrosoftTaskListID'))) !== ''")
         && str_contains($normalizedModuleSource, "'maxReminders' => max(1, min(CalendarEventReminder::MAX_REMINDERS, (int) (\$calendarStatus['maxReminders'] ?? 1)))")
         && str_contains($moduleSource, "? 'local'")
         && str_contains($moduleSource, ': $this->calendarProviderKey($instance);')
