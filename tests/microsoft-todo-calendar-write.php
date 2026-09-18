@@ -5,6 +5,8 @@ declare(strict_types=1);
 require_once __DIR__ . '/stubs/autoload.php';
 require_once __DIR__ . '/../Kalender/module.php';
 
+date_default_timezone_set('Europe/Berlin');
+
 final class MicrosoftTodoCalendarWriteHarness extends Calendar
 {
     /** @var array<string, string|bool|int> */
@@ -267,8 +269,8 @@ assertTodoWrite(
         && $calendar->requests[1]['Changes']['title'] === 'Renamed'
         && $calendar->requests[1]['Changes']['description'] === 'Changed description'
         && $calendar->requests[1]['Changes']['dueDateTime'] === [
-            'dateTime' => '2026-09-22T17:30:00.0000000',
-            'timeZone' => 'W. Europe Standard Time'
+            'dateTime' => '2026-09-22T17:30:00',
+            'timeZone' => 'Europe/Berlin'
         ]
         && !isset($calendar->requests[1]['Changes']['status']),
     'Editing a native task must preserve its due time and timezone without rewriting an unchanged completion state.'
@@ -299,5 +301,26 @@ assertTodoWrite(
         && json_decode($calendar->GetMicrosoftTasks(), true, 512, JSON_THROW_ON_ERROR) === [],
     'Deleting a virtual task must delete the native Microsoft task and remove it from the local cache.'
 );
+
+$utcTask = todoWriteTask();
+$utcTask['dueDateTime'] = ['dateTime' => '2026-09-21T22:00:00.0000000', 'timeZone' => 'UTC'];
+$unchangedCalendar = new MicrosoftTodoCalendarWriteHarness($utcTask);
+$unchangedCalendar->responses[] = todoWriteSuccess($utcTask);
+$unchangedResult = json_decode($unchangedCalendar->UpdateEvent(json_encode(array_merge(todoWriteIdentity(), [
+    'changes' => ['summary' => 'Title only', 'start' => '2026-09-22', 'taskCompleted' => false]
+]), JSON_THROW_ON_ERROR)), true, 512, JSON_THROW_ON_ERROR);
+assertTodoWrite($unchangedResult['success'] === true
+    && $unchangedCalendar->requests[0]['Changes'] === ['title' => 'Title only'],
+    'An unchanged displayed date must never be forwarded, even if the server may have advanced the series.');
+
+$dstCalendar = new MicrosoftTodoCalendarWriteHarness($utcTask);
+$dstCalendar->responses[] = todoWriteSuccess($utcTask);
+$dstResult = json_decode($dstCalendar->UpdateEvent(json_encode(array_merge(todoWriteIdentity(), [
+    'changes' => ['start' => '2026-10-26']
+]), JSON_THROW_ON_ERROR)), true, 512, JSON_THROW_ON_ERROR);
+assertTodoWrite($dstResult['success'] === true
+    && $dstCalendar->requests[0]['Changes']['dueDateTime'] === [
+        'dateTime' => '2026-10-26T00:00:00', 'timeZone' => 'Europe/Berlin'
+    ], 'Moving a date across DST must preserve local midnight, not UTC 22:00 on the requested day.');
 
 fwrite(STDOUT, "Microsoft To Do calendar write tests passed.\n");

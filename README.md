@@ -257,6 +257,15 @@ Erledigen der aktuellen Aufgabe bereit; OpenCalendar übernimmt sie mit der
 nächsten Synchronisation. Zukünftige Instanzen werden nicht vorab lokal
 erzeugt.
 
+Beim Verschieben einer offenen nativen Microsoft-To-Do-Serienaufgabe wird die
+Wiederholung am neuen Datum ausgerichtet. Bei einer wöchentlichen Aufgabe
+verschiebt sich damit auch der Wochentag der Folgeaufgaben, beispielsweise
+von Dienstag auf Donnerstag. Dies ist keine Kalender-Serienausnahme „nur
+diesen Termin verschieben“. Microsoft bleibt für die nächste offene Aufgabe
+nach dem Erledigen zuständig; OpenCalendar erzeugt dafür keine Kopie und keine
+lokalen Zukunftstermine. Reine Titel- oder Beschreibungsänderungen richten die
+Serie nicht neu aus. Der Bearbeitungsdialog weist auf dieses Verhalten hin.
+
 Beim Erstellen oder Bearbeiten wird im Termindialog **Aufgabentermin** aktiviert.
 Aufgabentermine sind bewusst ganztägig und dauern genau einen Tag. Sie dürfen
 auch wiederkehrend sein. Intern unterscheidet OpenCalendar den Aufgabenstatus

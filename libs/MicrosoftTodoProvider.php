@@ -10,6 +10,8 @@ use RuntimeException;
 use Throwable;
 
 require_once __DIR__ . '/CalendarHttpClient.php';
+require_once __DIR__ . '/MicrosoftTodoTaskProjection.php';
+require_once __DIR__ . '/CalendarRecurrenceRule.php';
 
 final class MicrosoftTodoProviderException extends RuntimeException
 {
@@ -133,15 +135,110 @@ final class MicrosoftTodoProvider
         if ($payload === []) {
             throw new InvalidArgumentException('The task update is empty.');
         }
+        $path = '/me/todo/lists/' . rawurlencode($listId) . '/tasks/' . rawurlencode($taskId);
+        if (is_array($payload['dueDateTime'] ?? null)) {
+            // The cache can be older than a completion performed in Microsoft's UI.
+            $current = $this->requestJson('GET', $path, null, [200]);
+            $requestedDate = MicrosoftTodoTaskProjection::localDateTime($payload['dueDateTime']);
+            $currentDate = MicrosoftTodoTaskProjection::localDateTime(
+                is_array($current['dueDateTime'] ?? null) ? $current['dueDateTime'] : []
+            );
+            if ($requestedDate === null) {
+                throw new InvalidArgumentException('The Microsoft To Do due date is invalid.');
+            }
+            if ($requestedDate->format('Y-m-d') === $currentDate?->format('Y-m-d')) {
+                unset($payload['dueDateTime']);
+            } elseif (is_array($current['recurrence'] ?? null)
+                && ($current['status'] ?? '') !== 'completed') {
+                // Writing dueDateTime on a recurring task can create another native task.
+                // Microsoft To Do instead realigns the active recurrence when its date moves.
+                $payload['recurrence'] = $this->moveRecurrence($current['recurrence'], $requestedDate, $currentDate);
+                unset($payload['dueDateTime']);
+            }
+            if ($payload === []) {
+                return $this->mapTask($listId, $current)
+                    ?? throw new MicrosoftTodoProviderException('Microsoft To Do returned an invalid task.');
+            }
+        }
+        // Finish a moved task only after the recurrence write has succeeded. A single
+        // request with both properties does not specify their processing order.
+        $completeAfterMove = isset($payload['recurrence']) && ($payload['status'] ?? '') === 'completed';
+        if ($completeAfterMove) {
+            unset($payload['status']);
+        }
         $data = $this->requestJson(
             'PATCH',
-            '/me/todo/lists/' . rawurlencode($listId) . '/tasks/' . rawurlencode($taskId),
+            $path,
             $payload,
             [200]
         );
+        if ($completeAfterMove) {
+            $data = $this->requestJson('PATCH', $path, ['status' => 'completed'], [200]);
+        }
 
         return $this->mapTask($listId, $data)
             ?? throw new MicrosoftTodoProviderException('Microsoft To Do returned an invalid updated task.');
+    }
+
+    /** @param array<string, mixed> $recurrence @return array<string, mixed> */
+    private function moveRecurrence(
+        array $recurrence,
+        \DateTimeImmutable $date,
+        ?\DateTimeImmutable $previousDate
+    ): array {
+        $pattern = $recurrence['pattern'] ?? [];
+        $weekday = strtolower($date->format('l'));
+        switch ($pattern['type'] ?? '') {
+            case 'daily':
+                break;
+            case 'weekly':
+                $days = $pattern['daysOfWeek'] ?? [];
+                if (count($days) > 1 && $previousDate !== null) {
+                    $weekdays = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+                    $offset = (int) $date->format('w') - (int) $previousDate->format('w');
+                    $pattern['daysOfWeek'] = array_map(static function (string $day) use ($weekdays, $offset): string {
+                        $index = array_search(strtolower($day), $weekdays, true);
+                        if ($index === false) {
+                            throw new InvalidArgumentException('Invalid Microsoft To Do recurrence weekday.');
+                        }
+                        return $weekdays[($index + $offset + 7) % 7];
+                    }, $days);
+                } else {
+                    $pattern['daysOfWeek'] = [$weekday];
+                }
+                break;
+            case 'absoluteMonthly':
+            case 'absoluteYearly':
+                $pattern['dayOfMonth'] = (int) $date->format('j');
+                if ($pattern['type'] === 'absoluteYearly') {
+                    $pattern['month'] = (int) $date->format('n');
+                }
+                break;
+            case 'relativeMonthly':
+            case 'relativeYearly':
+                $pattern['daysOfWeek'] = [$weekday];
+                $ordinal = intdiv((int) $date->format('j') - 1, 7);
+                $pattern['index'] = ['first', 'second', 'third', 'fourth', 'last'][$ordinal];
+                if (($recurrence['pattern']['index'] ?? '') === 'last'
+                    && $date->modify('+7 days')->format('m') !== $date->format('m')) {
+                    $pattern['index'] = 'last';
+                }
+                if ($pattern['type'] === 'relativeYearly') {
+                    $pattern['month'] = (int) $date->format('n');
+                }
+                break;
+            default:
+                throw new InvalidArgumentException('Invalid Microsoft To Do recurrence pattern.');
+        }
+        if (($recurrence['range']['type'] ?? '') === 'numbered' && $previousDate !== null) {
+            $recurrence['range']['numberOfOccurrences'] = CalendarRecurrenceRule::remainingMicrosoftOccurrenceCount(
+                $recurrence,
+                $previousDate->format('Y-m-d')
+            );
+        }
+        $recurrence['pattern'] = $pattern;
+        $recurrence['range']['startDate'] = $date->format('Y-m-d');
+        return $recurrence;
     }
 
     /**

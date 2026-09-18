@@ -108,6 +108,15 @@ final class MicrosoftTodoTaskProjection
     /** @param array<string, mixed> $value */
     private static function date(array $value): ?DateTimeImmutable
     {
+        return self::localDateTime($value)?->setTime(0, 0);
+    }
+
+    /**
+     * Converts a Graph date/time to the calendar's local timezone, including Windows zone names.
+     * @param array<string, mixed> $value
+     */
+    public static function localDateTime(array $value): ?DateTimeImmutable
+    {
         $rawDateTime = trim((string) ($value['dateTime'] ?? ''));
         if ($rawDateTime === '') {
             return null;
@@ -126,11 +135,7 @@ final class MicrosoftTodoTaskProjection
             if ($errors !== false && ($errors['warning_count'] > 0 || $errors['error_count'] > 0)) {
                 return null;
             }
-            $dateValue = $sourceDate
-                ->setTimezone($displayTimezone)
-                ->format('Y-m-d');
-            $date = DateTimeImmutable::createFromFormat('!Y-m-d', $dateValue, $displayTimezone);
-            return $date !== false && $date->format('Y-m-d') === $dateValue ? $date : null;
+            return $sourceDate->setTimezone($displayTimezone);
         } catch (Throwable) {
             return null;
         }

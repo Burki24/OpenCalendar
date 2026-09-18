@@ -1864,7 +1864,11 @@ class Calendar extends IPSModuleStrict
         if (array_key_exists('description', $changes)) {
             $taskChanges['description'] = (string) $changes['description'];
         }
-        if (array_key_exists('start', $changes)) {
+        $cachedDueDate = MicrosoftTodoTaskProjection::localDateTime(
+            is_array($sourceTask['dueDateTime'] ?? null) ? $sourceTask['dueDateTime'] : []
+        );
+        if (array_key_exists('start', $changes)
+            && substr(trim((string) $changes['start']), 0, 10) !== $cachedDueDate?->format('Y-m-d')) {
             $taskChanges['dueDateTime'] = $this->microsoftTodoDueDateTime(
                 (string) $changes['start'],
                 is_array($sourceTask['dueDateTime'] ?? null) ? $sourceTask['dueDateTime'] : []
@@ -1880,7 +1884,7 @@ class Calendar extends IPSModuleStrict
             }
         }
         if ($taskChanges === []) {
-            throw new InvalidArgumentException('No Microsoft To Do task changes were supplied.');
+            return $sourceTask;
         }
 
         return $this->sendRequest('UpdateTask', [
@@ -1901,18 +1905,14 @@ class Calendar extends IPSModuleStrict
         if ($parsed === false || $parsed->format('Y-m-d') !== $date) {
             throw new InvalidArgumentException('The Microsoft To Do due date is invalid.');
         }
-        $currentValue = trim((string) ($currentDueDateTime['dateTime'] ?? ''));
-        $time = preg_match(
-            '/^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}:\d{2}(?:\.\d+)?)(?:Z|[+-]\d{2}:\d{2})?$/D',
-            $currentValue,
-            $matches
-        ) === 1
-            ? $matches[1]
-            : 'T00:00:00';
-        $timezone = trim((string) ($currentDueDateTime['timeZone'] ?? ''));
+        // Preserve the local wall-clock time, not the raw UTC clock on another date.
+        // In particular, UTC 22:00 can represent midnight on the following local day.
+        $current = MicrosoftTodoTaskProjection::localDateTime($currentDueDateTime);
         return [
-            'dateTime' => $date . $time,
-            'timeZone' => $timezone !== '' ? $timezone : date_default_timezone_get()
+            'dateTime' => $date . ($current !== null ? $current->format('\\TH:i:s') : 'T00:00:00'),
+            'timeZone' => $current !== null
+                ? date_default_timezone_get()
+                : (trim((string) ($currentDueDateTime['timeZone'] ?? '')) ?: date_default_timezone_get())
         ];
     }
 

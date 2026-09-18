@@ -160,4 +160,104 @@ try {
     );
 }
 
+$originalTimezone = date_default_timezone_get();
+date_default_timezone_set('Europe/Berlin');
+foreach ([
+    ['type' => 'daily', 'interval' => 1],
+    ['type' => 'weekly', 'interval' => 2, 'daysOfWeek' => ['tuesday'], 'firstDayOfWeek' => 'sunday'],
+    ['type' => 'absoluteMonthly', 'interval' => 1, 'dayOfMonth' => 22],
+    ['type' => 'absoluteYearly', 'interval' => 1, 'month' => 9, 'dayOfMonth' => 22]
+] as $pattern) {
+    $before = [
+        'id' => 'series', 'title' => 'Series', 'status' => 'notStarted',
+        'dueDateTime' => ['dateTime' => '2026-09-21T22:00:00.0000000', 'timeZone' => 'UTC'],
+        'recurrence' => [
+            'pattern' => $pattern,
+            'range' => ['type' => 'noEnd', 'startDate' => '2026-09-22', 'recurrenceTimeZone' => 'UTC']
+        ]
+    ];
+    $moveClient = new MicrosoftTodoTestHttpClient([todoResponse(200, $before), todoResponse(200, $before)]);
+    (new MicrosoftTodoProvider($moveClient, 'access-token'))->updateTask('list-1', 'series', [
+        'title' => 'Renamed series',
+        'dueDateTime' => ['dateTime' => '2026-09-24T00:00:00', 'timeZone' => 'Europe/Berlin']
+    ]);
+    assertMicrosoftTodo(count($moveClient->requests) === 2 && $moveClient->requests[0]['method'] === 'GET',
+        'A due-date edit must read the current server recurrence before writing.');
+    $move = json_decode($moveClient->requests[1]['body'], true, 512, JSON_THROW_ON_ERROR);
+    assertMicrosoftTodo(!array_key_exists('dueDateTime', $move)
+        && $move['title'] === 'Renamed series'
+        && $move['recurrence']['range']['startDate'] === '2026-09-24'
+        && $move['recurrence']['pattern']['interval'] === $pattern['interval'],
+        'Moving a native series must re-anchor recurrence without a duplicating dueDateTime PATCH.');
+    if ($pattern['type'] === 'weekly') {
+        assertMicrosoftTodo($move['recurrence']['pattern']['daysOfWeek'] === ['thursday']
+            && $move['recurrence']['pattern']['firstDayOfWeek'] === 'sunday',
+            'Moving a weekly task must align its weekday, preserving interval and week start.');
+    }
+    if (str_starts_with($pattern['type'], 'absolute')) {
+        assertMicrosoftTodo($move['recurrence']['pattern']['dayOfMonth'] === 24,
+            'Absolute recurrence must follow the new day of month.');
+    }
+    $sameClient = new MicrosoftTodoTestHttpClient([todoResponse(200, $before), todoResponse(200, $before)]);
+    (new MicrosoftTodoProvider($sameClient, 'access-token'))->updateTask('list-1', 'series', [
+        'title' => 'Only title',
+        'dueDateTime' => ['dateTime' => '2026-09-22T00:00:00', 'timeZone' => 'Europe/Berlin']
+    ]);
+    $same = json_decode($sameClient->requests[1]['body'], true, 512, JSON_THROW_ON_ERROR);
+    assertMicrosoftTodo($same === ['title' => 'Only title'],
+        'An unchanged local calendar day must not rewrite due date or recurrence (UTC date differs).');
+}
+$daily = [
+    'id' => 'series', 'title' => 'Series', 'status' => 'notStarted',
+    'dueDateTime' => ['dateTime' => '2026-09-23T22:00:00.0000000', 'timeZone' => 'UTC'],
+    'recurrence' => [
+        'pattern' => ['type' => 'daily', 'interval' => 1],
+        'range' => ['type' => 'numbered', 'startDate' => '2026-09-22', 'numberOfOccurrences' => 5]
+    ]
+];
+$sequenceClient = new MicrosoftTodoTestHttpClient([
+    todoResponse(200, $daily), todoResponse(200, $daily), todoResponse(200, $daily)
+]);
+(new MicrosoftTodoProvider($sequenceClient, 'access-token'))->updateTask('list-1', 'series', [
+    'dueDateTime' => ['dateTime' => '2026-09-26T00:00:00', 'timeZone' => 'Europe/Berlin'],
+    'status' => 'completed'
+]);
+$sequenceMove = json_decode($sequenceClient->requests[1]['body'], true, 512, JSON_THROW_ON_ERROR);
+assertMicrosoftTodo(count($sequenceClient->requests) === 3
+    && !isset($sequenceMove['status'])
+    && $sequenceMove['recurrence']['range']['numberOfOccurrences'] === 3
+    && json_decode($sequenceClient->requests[2]['body'], true) === ['status' => 'completed'],
+    'Move before completing, and retain only the remaining occurrences of a bounded series.');
+
+foreach (['single', 'completed'] as $kind) {
+    $task = $daily;
+    if ($kind === 'single') {
+        $task['recurrence'] = null;
+    } else {
+        $task['status'] = 'completed';
+    }
+    $plainClient = new MicrosoftTodoTestHttpClient([todoResponse(200, $task), todoResponse(200, $task)]);
+    $due = ['dateTime' => '2026-09-26T00:00:00', 'timeZone' => 'Europe/Berlin'];
+    (new MicrosoftTodoProvider($plainClient, 'access-token'))->updateTask('list-1', 'series', ['dueDateTime' => $due]);
+    assertMicrosoftTodo(json_decode($plainClient->requests[1]['body'], true) === ['dueDateTime' => $due],
+        'A single task or completed history entry must not re-anchor the active recurrence.');
+}
+$noopClient = new MicrosoftTodoTestHttpClient([todoResponse(200, $daily)]);
+(new MicrosoftTodoProvider($noopClient, 'access-token'))->updateTask('list-1', 'series', [
+    'dueDateTime' => ['dateTime' => '2026-09-24T00:00:00', 'timeZone' => 'Europe/Berlin']
+]);
+assertMicrosoftTodo(count($noopClient->requests) === 1, 'A date-only no-op must not issue an empty PATCH.');
+
+$failedReadClient = new MicrosoftTodoTestHttpClient([todoResponse(404, ['error' => ['message' => 'Task missing']])]);
+try {
+    (new MicrosoftTodoProvider($failedReadClient, 'access-token'))->updateTask('list-1', 'series', [
+        'dueDateTime' => ['dateTime' => '2026-09-26T00:00:00', 'timeZone' => 'Europe/Berlin']
+    ]);
+    throw new RuntimeException('A failed preflight must not continue to PATCH.');
+} catch (MicrosoftTodoProviderException $exception) {
+    assertMicrosoftTodo($exception->httpStatus === 404 && count($failedReadClient->requests) === 1,
+        'Missing tasks must stop the update without another write.');
+}
+date_default_timezone_set($originalTimezone);
+
 fwrite(STDOUT, "Microsoft To Do provider tests passed.\n");

@@ -215,3 +215,38 @@ The provider SHA-256 remained
 Script 36778 was removed recoverably with `IPS_DeleteScript(36778, false)`
 and its tab disappeared. No production code, installed module, existing
 task, branch or GitHub state was changed in this reference run.
+
+## Implementation work and Windows-timezone probe
+
+The local `dev` implementation now reads fresh task state before a due-date
+write and reanchors the active recurrence instead of PATCHing its due date.
+Unchanged displayed dates are suppressed at the calendar boundary (before a
+possibly advanced server task can be accidentally moved back). UTC source
+dates are converted to local wall-clock time before selecting another date.
+Move and completion writes are ordered separately. Local contract tests cover
+daily, weekly, absolute monthly/yearly patterns, unchanged dates, remaining
+numbered counts, completed history, single tasks, and preflight failures.
+These tests are HTTP-boundary tests, not evidence of native UI parity for
+every recurrence variant.
+
+A disposable daily task `OC IMPLEMENT REF 20260918 WINDOWS` tested a temporary
+provider probe with a recurrence-only PATCH using the Windows zone
+`W. Europe Standard Time`. Moving 22 to 24 September retained hash
+`7fbd029cfe69`, with exactly one open task. Completion produced that same ID
+open on 25 September and completed history `be2f837f27b2` on 24 September.
+Both due times were 00:00 UTC. Thus Windows recurrence timezone did **not**
+resolve the difference from native UI's local-midnight/22:00 UTC result.
+This probe validates the write mechanism, not the complete final local diff.
+
+The test returned `REMAINING 0` and restored provider SHA-256
+`9dc15c25b33cc0c4145a16e1496d924dc05442ee4b20c6edd1845d837d7e0a75`.
+Temporary script 47143 was removed recoverably after another
+hash/empty-test-set check; its tab disappeared from the console. No existing
+task was changed. The full `php tests/run.php` suite passed after integration,
+including CalDAV HTTP integration tests; `git diff --check` also passed.
+
+Release verification still needs exact end-to-end execution of the final
+implementation, native references for relative/multi-weekday and bounded
+patterns, reopened history, and timezone parity outside the tested Berlin
+calendar day. Do not describe the current result as fully Microsoft-native
+or globally timezone-correct on the basis of the local tests alone.

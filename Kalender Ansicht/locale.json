@@ -170,6 +170,7 @@
             "Entire series": "Gesamte Serie",
             "Changes will apply to the entire recurring series.": "Änderungen werden auf die gesamte Terminserie angewendet.",
             "The recurrence pattern of this series cannot be edited here.": "Das Wiederholungsmuster dieser Serie kann hier nicht bearbeitet werden.",
+            "Changing the due date also realigns the Microsoft To Do recurrence. Future tasks are provided by Microsoft after completion.": "Wenn du das Fälligkeitsdatum änderst, wird auch die Wiederholung in Microsoft To Do neu ausgerichtet. Folgeaufgaben stellt Microsoft nach dem Erledigen bereit.",
             "Edit recurring event": "Serientermin bearbeiten",
             "Which events do you want to edit?": "Welche Termine möchten Sie bearbeiten?",
             "Continue": "Weiter",
