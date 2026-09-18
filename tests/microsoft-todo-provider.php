@@ -176,7 +176,9 @@ foreach ([
             'range'   => ['type' => 'noEnd', 'startDate' => '2026-09-22', 'recurrenceTimeZone' => 'UTC']
         ]
     ];
-    $moveClient = new MicrosoftTodoTestHttpClient([todoResponse(200, $before), todoResponse(200, $before)]);
+    $after = $before;
+    $after['dueDateTime'] = ['dateTime' => '2026-09-24T00:00:00', 'timeZone' => 'UTC'];
+    $moveClient = new MicrosoftTodoTestHttpClient([todoResponse(200, $before), todoResponse(200, $after)]);
     (new MicrosoftTodoProvider($moveClient, 'access-token'))->updateTask('list-1', 'series', [
         'title'       => 'Renamed series',
         'dueDateTime' => ['dateTime' => '2026-09-24T00:00:00', 'timeZone' => 'Europe/Berlin']
@@ -225,8 +227,12 @@ $daily = [
         'range'   => ['type' => 'numbered', 'startDate' => '2026-09-22', 'numberOfOccurrences' => 5]
     ]
 ];
+$movedDaily = $daily;
+$movedDaily['dueDateTime'] = ['dateTime' => '2026-09-26T00:00:00', 'timeZone' => 'UTC'];
+$completedDaily = $movedDaily;
+$completedDaily['status'] = 'completed';
 $sequenceClient = new MicrosoftTodoTestHttpClient([
-    todoResponse(200, $daily), todoResponse(200, $daily), todoResponse(200, $daily)
+    todoResponse(200, $daily), todoResponse(200, $movedDaily), todoResponse(200, $completedDaily)
 ]);
 (new MicrosoftTodoProvider($sequenceClient, 'access-token'))->updateTask('list-1', 'series', [
     'dueDateTime' => ['dateTime' => '2026-09-26T00:00:00', 'timeZone' => 'Europe/Berlin'],
@@ -258,9 +264,12 @@ foreach ([2, 1] as $remaining) {
     $movedPending = $pending;
     $movedPending['dueDateTime'] = ['dateTime' => '2026-09-26T00:00:00', 'timeZone' => 'UTC'];
     $movedPending['recurrence']['range']['startDate'] = '2026-09-26';
+    $movedAgain = $movedPending;
+    $movedAgain['dueDateTime']['dateTime'] = '2026-09-28T00:00:00';
+    $movedAgain['recurrence']['range']['startDate'] = '2026-09-28';
     $remainingClient = new MicrosoftTodoTestHttpClient([
         todoResponse(200, $pending), todoResponse(200, $movedPending),
-        todoResponse(200, $movedPending), todoResponse(200, $movedPending)
+        todoResponse(200, $movedPending), todoResponse(200, $movedAgain)
     ]);
     $remainingProvider = new MicrosoftTodoProvider($remainingClient, 'access-token');
     foreach (['2026-09-26', '2026-09-28'] as $moveIndex => $targetDate) {
@@ -311,6 +320,102 @@ try {
         $exception->httpStatus === 404 && count($failedReadClient->requests) === 1,
         'Missing tasks must stop the update without another write.'
     );
+}
+date_default_timezone_set($originalTimezone);
+
+// Replay Graph's observed UTC-midnight response in western timezones. The
+// HTTP success must not hide a different displayed day or trigger completion.
+foreach (['America/New_York', 'America/Los_Angeles', 'America/Phoenix'] as $zone) {
+    date_default_timezone_set($zone);
+    foreach ([false, true] as $complete) {
+        $returned = $daily;
+        $returned['dueDateTime'] = ['dateTime' => '2026-09-26T00:00:00.0000000', 'timeZone' => 'UTC'];
+        $driftClient = new MicrosoftTodoTestHttpClient([
+            todoResponse(200, $daily), todoResponse(200, $returned), todoResponse(200, $returned)
+        ]);
+        $changes = ['dueDateTime' => ['dateTime' => '2026-09-26T00:00:00', 'timeZone' => $zone]];
+        if ($complete) {
+            $changes['status'] = 'completed';
+        }
+        $rejected = false;
+        try {
+            (new MicrosoftTodoProvider($driftClient, 'access-token'))->updateTask('list-1', 'series', $changes);
+        } catch (MicrosoftTodoProviderException $exception) {
+            $rejected = $exception->errorCode === 'TaskDueDateMismatch'
+                && str_contains($exception->getMessage(), '2026-09-26')
+                && str_contains($exception->getMessage(), '2026-09-25')
+                && str_contains($exception->getMessage(), $zone);
+        }
+        assertMicrosoftTodo($rejected, 'A different local due date must not be reported as a successful move.');
+        assertMicrosoftTodo(
+            array_column($driftClient->requests, 'method') === ['GET', 'PATCH', 'GET'],
+            'Verify a mismatching response once, without compensating writes or completing the task.'
+        );
+    }
+}
+date_default_timezone_set($originalTimezone);
+
+foreach ([
+    'Europe/Berlin', 'Europe/London', 'UTC', 'America/New_York',
+    'America/Los_Angeles', 'America/Phoenix', 'Asia/Kolkata',
+    'Asia/Tokyo', 'Australia/Sydney', 'Pacific/Auckland'
+] as $zone) {
+    date_default_timezone_set($zone);
+    foreach (['2026-03-08', '2026-03-09', '2026-03-29', '2026-03-30',
+        '2026-10-25', '2026-10-26', '2026-11-01', '2026-11-02'] as $target) {
+        $correct = $daily;
+        $correct['dueDateTime'] = [
+            'dateTime' => (new DateTimeImmutable($target, new DateTimeZone($zone)))
+                ->setTimezone(new DateTimeZone('UTC'))->format('Y-m-d\TH:i:s'),
+            'timeZone' => 'UTC'
+        ];
+        $correctClient = new MicrosoftTodoTestHttpClient([
+            todoResponse(200, $daily), todoResponse(200, $correct)
+        ]);
+        $result = (new MicrosoftTodoProvider($correctClient, 'access-token'))->updateTask('list-1', 'series', [
+            'dueDateTime' => ['dateTime' => $target . 'T00:00:00', 'timeZone' => $zone]
+        ]);
+        assertMicrosoftTodo(
+            $result['id'] === 'series' && count($correctClient->requests) === 2,
+            'Correct local dates must remain writable across timezones and DST boundaries.'
+        );
+    }
+}
+date_default_timezone_set('Europe/Berlin');
+// A stale PATCH response is recoverable through readback; complete only then.
+$staleClient = new MicrosoftTodoTestHttpClient([
+    todoResponse(200, $daily), todoResponse(200, $daily),
+    todoResponse(200, $movedDaily), todoResponse(200, $completedDaily)
+]);
+$verified = (new MicrosoftTodoProvider($staleClient, 'access-token'))->updateTask('list-1', 'series', [
+    'dueDateTime' => ['dateTime' => '2026-09-26T00:00:00', 'timeZone' => 'Europe/Berlin'],
+    'status'      => 'completed'
+]);
+assertMicrosoftTodo(
+    $verified['status'] === 'completed'
+    && array_column($staleClient->requests, 'method') === ['GET', 'PATCH', 'GET', 'PATCH'],
+    'A correct readback must allow completion after a stale PATCH response.'
+);
+foreach (['missing-date', 'wrong-id'] as $invalidResult) {
+    $invalid = $movedDaily;
+    if ($invalidResult === 'missing-date') {
+        unset($invalid['dueDateTime']);
+    } else {
+        $invalid['id'] = 'different-task';
+    }
+    $invalidClient = new MicrosoftTodoTestHttpClient([
+        todoResponse(200, $daily), todoResponse(200, $invalid), todoResponse(200, $invalid)
+    ]);
+    $rejected = false;
+    try {
+        (new MicrosoftTodoProvider($invalidClient, 'access-token'))->updateTask('list-1', 'series', [
+            'dueDateTime' => ['dateTime' => '2026-09-26T00:00:00', 'timeZone' => 'Europe/Berlin'],
+            'status'      => 'completed'
+        ]);
+    } catch (MicrosoftTodoProviderException $exception) {
+        $rejected = $exception->errorCode === 'TaskDueDateMismatch';
+    }
+    assertMicrosoftTodo($rejected && count($invalidClient->requests) === 3, 'Invalid move responses must prevent completion.');
 }
 date_default_timezone_set($originalTimezone);
 

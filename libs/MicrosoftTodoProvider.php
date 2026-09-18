@@ -135,6 +135,7 @@ final class MicrosoftTodoProvider
             throw new InvalidArgumentException('The task update is empty.');
         }
         $path = '/me/todo/lists/' . rawurlencode($listId) . '/tasks/' . rawurlencode($taskId);
+        $movedDate = null;
         if (is_array($payload['dueDateTime'] ?? null)) {
             // The cache can be older than a completion performed in Microsoft's UI.
             $current = $this->requestJson('GET', $path, null, [200]);
@@ -152,6 +153,7 @@ final class MicrosoftTodoProvider
                 // Writing dueDateTime on a recurring task can create another native task.
                 // Microsoft To Do instead realigns the active recurrence when its date moves.
                 $payload['recurrence'] = $this->moveRecurrence($current['recurrence'], $requestedDate, $currentDate);
+                $movedDate = $requestedDate->format('Y-m-d');
                 unset($payload['dueDateTime']);
             }
             if ($payload === []) {
@@ -171,6 +173,30 @@ final class MicrosoftTodoProvider
             $payload,
             [200]
         );
+        if ($movedDate !== null) {
+            $returnedDate = $this->localTaskDate($data);
+            if (($data['id'] ?? '') !== $taskId || $returnedDate !== $movedDate) {
+                // A PATCH response may be stale. Verify the same native task once;
+                // never compensate by writing dueDateTime (which can duplicate it).
+                $data = $this->requestJson('GET', $path, null, [200]);
+                $returnedDate = $this->localTaskDate($data);
+            }
+            if (($data['id'] ?? '') !== $taskId || $returnedDate !== $movedDate) {
+                throw new MicrosoftTodoProviderException(
+                    sprintf(
+                        'Microsoft To Do may already have changed the series, but the requested due date %s '
+                        . 'was not confirmed for the same task (returned: %s, timezone: %s). '
+                        . 'Synchronize and check the task in Microsoft To Do before retrying. '
+                        . 'No subsequent completion was sent.',
+                        $movedDate,
+                        $returnedDate ?? 'missing or invalid',
+                        date_default_timezone_get()
+                    ),
+                    200,
+                    'TaskDueDateMismatch'
+                );
+            }
+        }
         if ($completeAfterMove) {
             $data = $this->requestJson('PATCH', $path, ['status' => 'completed'], [200]);
         }
@@ -193,6 +219,14 @@ final class MicrosoftTodoProvider
             [204]
         );
         return true;
+    }
+
+    /** @param array<string, mixed> $task */
+    private function localTaskDate(array $task): ?string
+    {
+        return MicrosoftTodoTaskProjection::localDateTime(
+            is_array($task['dueDateTime'] ?? null) ? $task['dueDateTime'] : []
+        )?->format('Y-m-d');
     }
 
     /** @param array<string, mixed> $recurrence @return array<string, mixed> */

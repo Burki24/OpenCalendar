@@ -266,6 +266,17 @@ nach dem Erledigen zuständig; OpenCalendar erzeugt dafür keine Kopie und keine
 lokalen Zukunftstermine. Reine Titel- oder Beschreibungsänderungen richten die
 Serie nicht neu aus. Der Bearbeitungsdialog weist auf dieses Verhalten hin.
 
+OpenCalendar prüft nach dem Verschieben einer nativen Aufgabenserie, ob Microsoft
+für dieselbe Aufgabe das gewünschte Datum in der Symcon-Zeitzone zurückliefert.
+Bei einer Abweichung wird die Aufgabe einmal erneut gelesen. Bleibt die Abweichung
+bestehen, erscheint eine Fehlermeldung statt einer Erfolgsbestätigung. Eine zugleich
+angeforderte Erledigung wird dann nicht gesendet. Die Serienänderung kann bei
+Microsoft bereits gespeichert sein: bitte synchronisieren und die Aufgabe in
+Microsoft To Do prüfen, bevor die Änderung erneut versucht wird.
+Diese Kontrolle behebt noch nicht die beobachtete UTC-Mitternacht-Abweichung
+in westlichen Zeitzonen. Es erfolgt weder eine pauschale Tagverschiebung noch
+ein automatischer Korrekturschreibzugriff, der zusätzliche Aufgaben erzeugen könnte.
+
 Beim Erstellen oder Bearbeiten wird im Termindialog **Aufgabentermin** aktiviert.
 Aufgabentermine sind bewusst ganztägig und dauern genau einen Tag. Sie dürfen
 auch wiederkehrend sein. Intern unterscheidet OpenCalendar den Aufgabenstatus
