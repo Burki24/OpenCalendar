@@ -4,6 +4,20 @@ declare(strict_types=1);
 
 $root = dirname(__DIR__);
 
+$bash = 'bash';
+if (PHP_OS_FAMILY === 'Windows') {
+    foreach ([
+        (getenv('ProgramFiles') ?: 'C:/Program Files') . '/Git/bin/bash.exe',
+        (getenv('ProgramFiles(x86)') ?: 'C:/Program Files (x86)') . '/Git/bin/bash.exe',
+        (getenv('LOCALAPPDATA') ?: '') . '/Programs/Git/bin/bash.exe'
+    ] as $candidate) {
+        if (is_file($candidate)) {
+            $bash = $candidate;
+            break;
+        }
+    }
+}
+
 $commands = [
     ['Verify local calendar provider and original data', [PHP_BINARY, 'tests/local-calendar-provider.php']],
     ['Verify standalone local calendar runtime', [PHP_BINARY, 'tests/local-calendar-module.php']],
@@ -19,7 +33,7 @@ $commands = [
     ['Check RFC VTIMEZONE import', [PHP_BINARY, 'tests/vtimezone.php']],
     ['Check timezone and DST hardening', [PHP_BINARY, 'tests/timezone-dst.php']],
     ['Check provider timezone/DST parity', [PHP_BINARY, 'tests/provider-timezone-dst.php']],
-    ['Run data load and recurrence stress tests', [PHP_BINARY, 'tests/load-stress.php']],
+    ['Run data load and recurrence stress tests', [PHP_BINARY, '-d', 'memory_limit=512M', 'tests/load-stress.php']],
     ['Check module localization contract', [PHP_BINARY, 'tests/localization.php']],
     ['Verify chunked event transfers', [PHP_BINARY, 'tests/chunked-event-transfer.php']],
     ['Verify current-day event counting', [PHP_BINARY, 'tests/calendar-event-counter.php']],
@@ -37,8 +51,15 @@ $commands = [
     ['Verify provider-neutral post-delete refresh', [PHP_BINARY, 'tests/post-delete-refresh.php']],
     ['Verify confirmed writes and synchronization recovery', [PHP_BINARY, 'tests/write-recovery.php']],
     ['Verify task appointment backend', [PHP_BINARY, 'tests/task-appointments.php']],
+    ['Verify provider-native task metadata', [PHP_BINARY, 'tests/task-metadata.php']],
+    ['Verify Microsoft To Do provider', [PHP_BINARY, 'tests/microsoft-todo-provider.php']],
+    ['Verify Microsoft To Do account gateway', [PHP_BINARY, 'tests/microsoft-todo-gateway.php']],
+    ['Verify Microsoft To Do calendar synchronization', [PHP_BINARY, 'tests/microsoft-todo-calendar-sync.php']],
+    ['Verify Microsoft To Do task projection', [PHP_BINARY, 'tests/microsoft-todo-projection.php']],
+    ['Verify Microsoft To Do calendar writes', [PHP_BINARY, 'tests/microsoft-todo-calendar-write.php']],
     ['Verify task series calendar transfers', [PHP_BINARY, 'tests/task-series-transfer.php']],
     ['Verify task UI behavior', ['node', 'tests/task-ui.js']],
+    ['Verify event editor viewport bounds', ['node', 'tests/dialog-viewport.js']],
     ['Verify calendar startup recovery', [PHP_BINARY, 'tests/calendar-startup.php']],
     ['Verify synchronization failure labels', [PHP_BINARY, 'tests/sync-failure-labels.php']],
     ['Verify native client startup and layout', ['node', 'tests/startup-client.js']],
@@ -59,6 +80,7 @@ $commands = [
     ['Verify IPSView font role rendering', [PHP_BINARY, 'tests/ipsview-style-font-rendering.php']],
     ['Verify IPSView Assistant Style Profile V1 E2E', [PHP_BINARY, 'tests/style-profile-e2e.php']],
     ['Verify shared IPSView style configuration', [PHP_BINARY, 'tests/ipsview-style-configuration.php']],
+    ['Verify shared IPSView HTML regeneration', [PHP_BINARY, 'tests/ipsview-regeneration.php']],
     ['Verify IPSView documentation contract', [PHP_BINARY, 'tests/ipsview-documentation.php']],
     ['Check visualization UI regression contract', [PHP_BINARY, 'tests/ui-regression.php']],
     ['Run account module structure tests', [PHP_BINARY, 'tests/account-module.php']],
@@ -70,7 +92,7 @@ $commands = [
     ['Verify OpenCalendar 2.1 persisted-state migration', [PHP_BINARY, 'tests/upgrade-2.1.php']],
     ['Verify upgrade ApplyChanges and restart contract', [PHP_BINARY, 'tests/upgrade-runtime-restart.php']],
     ['Run CalDAV provider tests', [PHP_BINARY, 'tests/caldav.php']],
-    ['Run CalDAV HTTP integration tests', ['bash', 'tests/run-caldav-http.sh']]
+    ['Run CalDAV HTTP integration tests', [$bash, 'tests/run-caldav-http.sh']]
 ];
 
 foreach ($commands as [$label, $command]) {

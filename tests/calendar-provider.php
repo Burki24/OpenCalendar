@@ -4331,14 +4331,16 @@ assertTrueValue(
 );
 assertTrueValue(
     is_string($viewModuleSource)
-        && str_contains($viewModuleSource, "case 'FormRegenerateIPSViewHTML':")
+        && str_contains($viewModuleSource, '$this->HandleIPSViewHTMLPageAction($Ident, $Value)')
         && str_contains($viewModuleSource, 'public function RegenerateIPSViewHTML(): bool')
-        && str_contains($viewModuleSource, "return \$this->UpdateIPSViewHTMLVariable('IPSViewCalendar', \$html);")
+        && str_contains($viewModuleSource, 'return $this->RegenerateIPSViewHTMLPages();')
+        && str_contains($viewModuleSource, 'protected function PrepareIPSViewHTMLRegeneration(): bool')
+        && str_contains($viewModuleSource, 'return $this->isRuntimeReady() || $this->Initialize();')
         && str_contains($viewModuleSource, 'private function renderNonEmptyIPSViewHTML(array $state, string $debugContext): ?string')
         && str_contains($viewModuleSource, 'private function existingIPSViewHTML(): string')
         && str_contains($viewModuleSource, "'Rendering returned an empty document; preserving the existing IPSView HTML.'")
         && !str_contains($viewModuleSource, "UnregisterVariable('IPSViewCalendar')"),
-    'IPSView regeneration must preserve the object ID and must never replace valid WebContent with an empty render result.'
+    'IPSView regeneration must use the shared helper with runtime preparation while preserving existing nonempty-render safeguards.'
 );
 assertTrueValue(
     is_string($viewModuleSource)

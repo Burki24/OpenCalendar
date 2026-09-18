@@ -218,6 +218,55 @@ try {
         'Birthday events must retain the compatibility birthday fields.'
     );
 
+    IPS\Kernel::reset();
+    $synchronizedCalendar = new class(IPS\ObjectManager::registerObject(1)) extends Calendar {
+        protected function getTime(): int
+        {
+            return time();
+        }
+    };
+    $synchronizedCalendar->Create();
+    $upsert->invoke(
+        $synchronizedCalendar,
+        ['uid' => 'synchronized-birthday', 'summary' => 'Erika Mustermann'],
+        'birthday',
+        '1990-09-17',
+        'Erika Mustermann'
+    );
+    $storeEvents = new ReflectionMethod(Calendar::class, 'storeEvents');
+    $storeEvents->setAccessible(true);
+    $storeEvents->invoke($synchronizedCalendar, [[
+        'uid'            => 'synchronized-birthday',
+        'summary'        => 'Erika Mustermann',
+        'start'          => '2026-09-17',
+        'end'            => '2026-09-18',
+        'originalStart'  => '2026-09-17',
+        'startTimestamp' => (new DateTimeImmutable('2026-09-17'))->getTimestamp(),
+        'endTimestamp'   => (new DateTimeImmutable('2026-09-18'))->getTimestamp(),
+        'allDay'         => true,
+        'recurring'      => true
+    ]]);
+    $transfer = json_decode(
+        $synchronizedCalendar->BeginEventsTransfer(
+            (new DateTimeImmutable('2026-09-17'))->getTimestamp(),
+            (new DateTimeImmutable('2026-09-19'))->getTimestamp()
+        ),
+        true,
+        512,
+        JSON_THROW_ON_ERROR
+    );
+    $transferPage = json_decode(
+        $synchronizedCalendar->ReadEventsTransferPage($transfer['Token'], 0),
+        true,
+        512,
+        JSON_THROW_ON_ERROR
+    );
+    assertAnniversary(
+        ($transferPage['Items'][0]['displaySummary'] ?? '') === 'Erika Mustermann (36J)',
+        'Synchronization and view transfer must preserve the year count in the annual-event display summary.'
+    );
+    $synchronizedCalendar->FinishEventsTransfer($transfer['Token']);
+
     $leap = new ReflectionMethod(Calendar::class, 'nextAnniversaryDate');
     $leap->setAccessible(true);
     $nextLeap = $leap->invoke($calendar, '2000-02-29', new DateTimeImmutable('2026-08-17'));

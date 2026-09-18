@@ -99,35 +99,85 @@ Google-, Microsoft-, Apple-iCloud- und CalDAV-Serien können als einzelnes Vorko
 
 ## Aufgabentermine
 
-Die Kalender-API unterstützt jetzt die aus Version 2.1 übernommenen
-Aufgabentermine. Die Bedienung in der Kalender Ansicht ist unter
-[Aufgabentermine](../Kalender%20Ansicht/README.md#aufgabentermine) beschrieben.
+Die API unterstützt kalenderbasierte Aufgaben und native Microsoft-To-Do-Aufgaben.
+Die [Kalender Ansicht](../Kalender%20Ansicht/README.md#aufgabentermine) beschreibt
+die Bedienung; die [Microsoft-Einrichtung](../README.md#microsoft-to-do-einrichten)
+erläutert `Tasks.ReadWrite`, erneute OAuth-Anmeldung und Listenauswahl.
 
-- Aufgabentermine sind eintägige, ganztägige Kalendertermine. Über `CreateEvent`
-  und `UpdateEvent` werden `task`, `taskCompleted` und `taskFollowPlanned`
-  übergeben. Der Titel speichert den Zustand providerübergreifend als
-  `[OC:TODO]` beziehungsweise `[OC:DONE]`; die Variante `:FOLLOW` speichert die
-  Entscheidung zum Mitverschieben geplanter Folgetermine. Alte Kästchenmarker
-  werden weiterhin erkannt. Zusätzliche OAuth-Berechtigungen sind nicht nötig.
-- Offene, überfällige Aufgaben werden bei der Synchronisation und beim lokalen
-  Tageswechsel nachgezogen. Erledigte Aufgaben werden nicht weitergeschoben.
-  Bei Serien wird jeweils nur die früheste noch anstehende Aufgabe nachgezogen.
-- Mit `taskFollowPlanned` werden bei einer Datumsänderung auch die folgenden
-  Serientermine verschoben. Das Erledigen betrifft weiterhin nur das ausgewählte
-  Vorkommnis. Ohne diese Option bleibt die geplante Serie bestehen. Würde ein
-  nachgezogener Termin ein anderes Vorkommnis überschreiten, wird er als
-  Einzeltermin fortgeführt; die Zuordnung zur Ursprungsserie bleibt gespeichert.
-- Eine offene, fortgeführte Aufgabe blockiert weiteres Nachziehen aus ihrer
-  Ursprungsserie auch außerhalb des geladenen Zeitraums. Erst bestätigtes
-  Erledigen, Entfernen des Aufgabenmarkers oder Löschen gibt die Serie frei.
-  Fehlgeschlagene oder uneindeutige Provider-Abfragen lösen diese Zuordnung nicht.
-- Der Aufgabenstatus ist unabhängig vom Terminstatus und der Verfügbarkeit aus
-  Version 3.0. Beispielsweise bleibt ein vorläufiger, als frei markierter Termin
-  beim Fortführen als Einzelaufgabe weiterhin vorläufig und frei. Abgesagte
-  Termine bleiben ausgeblendet und werden nicht automatisch verschoben.
-- Beim Bearbeiten darf nur nach einem als vorübergehend klassifizierten
-  Providerfehler auf eine bekannte Aufgabe im Cache zurückgegriffen werden.
+### Kalenderbasierte Aufgaben
+
+Über `CreateEvent` und `UpdateEvent` werden `task`, `taskCompleted` und
+`taskRollForwardScope` übergeben. Aufgaben sind eintägig und ganztägig.
+CalDAV und lokale Kalender speichern die Aufgabenfelder als
+`X-OPENCALENDAR-*`-Eigenschaften, Google Calendar als private
+`extendedProperties`; der Titel bleibt dabei frei von technischen Markern.
+Bestehende ASCII- und Kästchenmarker bleiben lesbar und werden für diese
+Anbieter beim nächsten Aufgabenschreiben migriert. Microsoft-Kalendertermine
+ohne native Aufgabenanbindung behalten die kompatiblen Titelmarker.
+
+`taskRollForwardScope` steuert offene, überfällige Aufgaben bei Synchronisation
+und lokalem Tageswechsel:
+
+- `occurrence`: Nur die früheste anstehende Aufgabe auf heute nachziehen.
+- `following`: Auch den folgenden Serienteil verschieben, sofern der Anbieter
+  dies sicher unterstützt. Diese Auswahl gilt ebenfalls für manuelle
+  Datumsänderungen.
+- `disabled`: Keine automatische Änderung des Datums.
+
+`taskFollowPlanned` bleibt kompatibel: `true` entspricht `following`, `false`
+entspricht `occurrence`. Ein ausdrücklich übergebenes `taskRollForwardScope`
+hat Vorrang. Erledigte Aufgaben werden nicht nachgezogen; eine reine
+Statusänderung betrifft nur das ausgewählte Vorkommnis.
+
+Würde das einzelne Nachziehen ein anderes Vorkommnis überschreiten, wird die
+Aufgabe als Einzeltermin fortgeführt; die Zuordnung zur Ursprungsserie bleibt
+gespeichert. Eine solche offene Aufgabe blockiert weiteres Nachziehen aus ihrer
+Serie auch außerhalb des geladenen Zeitraums. Erst bestätigtes Erledigen,
+Entfernen der Aufgabenkennzeichnung oder Löschen gibt die Serie frei.
+Fehlgeschlagene oder uneindeutige Provider-Abfragen lösen diese Zuordnung nicht.
+
+Die 3.0-Verträge bleiben erhalten:
+
+- Aufgabenstatus, Terminstatus und Verfügbarkeit sind unabhängig. Ein
+  vorläufiger, als frei markierter Kalendertermin bleibt beim Fortführen als
+  Einzelaufgabe vorläufig und frei. Abgesagte Termine bleiben ausgeblendet und
+  werden nicht automatisch verschoben.
+- Nur nach einem als vorübergehend klassifizierten Providerfehler darf beim
+  Bearbeiten auf eine bekannte Aufgabe im Cache zurückgegriffen werden.
   Berechtigungsfehler, Konflikte und bestätigtes Fehlen werden nicht verdeckt.
+
+### Native Microsoft To Do
+
+Die Eigenschaft `MicrosoftTaskListID` bindet eine Aufgabenliste des verbundenen
+Microsoft-Kontos ein. Die Auswahl ist eine OpenCalendar-Zuordnung, keine
+Verknüpfung der Liste mit einem Outlook-Kalender bei Microsoft.
+
+Bei ausgewählter Liste legt `CreateEvent` mit `task = true` eine native Aufgabe
+an. Ohne Aufgabenkennzeichnung entsteht weiterhin ein Outlook-Kalendertermin.
+Bestehende kalenderbasierte Aufgaben werden nicht automatisch konvertiert.
+Die Schreibantwort enthält die projizierte Aufgabenidentität mit
+`sourceType = microsoft-todo`, `taskId` und `taskListId`. Diese Identität bei
+späteren Änderungen oder Löschungen beibehalten.
+
+Native Aufgaben liegen getrennt vom Termin-Cache in `CachedMicrosoftTasks`.
+`GetMicrosoftTasks` liefert diese nativen Aufgabendaten; `GetEvents` bleibt
+ein Abruf der Kalendertermine. Erst der paginierte Transfer zur Kalender
+Ansicht ergänzt die Aufgaben mit gültiger Fälligkeit als ganztägige Einträge.
+Die Fälligkeit wird auf den lokalen Kalendertag umgerechnet; Aufgaben ohne
+Fälligkeit erscheinen nicht in dieser Projektion.
+
+Microsoft verwaltet die Wiederholung. OpenCalendar erzeugt keine zukünftigen
+Vorkommnisse, solange die aktuelle Serienaufgabe offen ist. Nach ihrer Erledigung
+übernimmt die nächste Synchronisation die von Microsoft bereitgestellte
+Folgeaufgabe. Native Aufgaben werden nicht nachgezogen und erhalten in der
+Projektion `taskRollForwardScope = disabled`. Die Kalenderoperationen für
+ganze Serien oder folgende Serienteile gelten nicht für diese Projektion.
+
+Unterstützt das Konto keine Delta-Abfrage für Aufgaben, wird die Liste vollständig
+und seitenweise eingelesen. Der Vollabgleich ersetzt den Aufgabenbestand, damit
+gelöschte Einträge nicht im Cache verbleiben. Aufgabenfehler stehen getrennt
+unter `microsoftTaskLastError` im Kalenderstatus; ein erfolgreicher
+Kalenderabruf allein beweist daher noch keine erfolgreiche Aufgabensynchronisation.
 
 ## Voraussetzungen
 
@@ -144,6 +194,7 @@ Aktualisierungsplan | Vorgegebener Rhythmus von fünf Minuten bis jährlich oder
 Benutzerdefiniertes Intervall | Eigener Abstand in Minuten; wird nur beim Zeitplan „Benutzerdefiniertes Intervall“ angezeigt
 Vergangene Termine laden | Anzahl der Tage vor dem aktuellen Datum
 Zukünftige Termine laden | Anzahl der Tage nach dem aktuellen Datum
+Microsoft-To-Do-Aufgabenliste | Optional eingebundene native Liste des Microsoft-Kontos; leer bedeutet keine Einbindung. Benötigt Aufgaben-Zugriff über OAuth
 Kalenderidentität | Von der Kalender Einrichtung oder dem Konfigurator gesetzte, schreibgeschützte Anbieterinformationen
 
 Bestehende Instanzen behalten ihren bisherigen Minutenwert als benutzerdefiniertes Intervall. Monatliche und jährliche Zeitpläne werden intern täglich auf Fälligkeit geprüft, damit keine für lange Zeiträume ungeeigneten Millisekunden-Timer verwendet werden. **Jetzt synchronisieren** bleibt unabhängig vom Zeitplan jederzeit verfügbar.
@@ -171,7 +222,8 @@ Ein Termin enthält unter anderem `id`, `uid`, `resourceUrl`, `etag`, `summary`,
 ## PHP-Befehlsreferenz
 
 Aufgabentermine enthalten zusätzlich `task`, `taskCompleted`, `taskStatus`
-(`open` oder `completed`), `taskFollowPlanned` und `displaySummary` mit dem von
+(`open` oder `completed`), `taskRollForwardScope` (`occurrence`, `following` oder
+`disabled`), das kompatible Feld `taskFollowPlanned` und `displaySummary` mit dem von
 Aufgabenmarkern bereinigten Titel. Bei einem aus einer Serie nachgezogenen
 Einzeltermin kennzeichnet `taskRolledForward` die gespeicherte Serienzuordnung.
 Diese Aufgabenfelder sind unabhängig von `status` (Terminstatus) und
@@ -180,6 +232,7 @@ Diese Aufgabenfelder sind unabhängig von `status` (Terminstatus) und
 ```php
 bool IPSKAL_Synchronize(int $InstanzID);
 string IPSKAL_GetEvents(int $InstanzID);
+string IPSKAL_GetMicrosoftTasks(int $InstanzID);
 string IPSKAL_GetAnniversaryList(int $InstanzID, int $Days = 0, string $Type = '');
 string IPSKAL_GetBirthdayList(int $InstanzID, int $Days = 0);
 bool IPSKAL_SetAnniversary(int $InstanzID, string $EventJSON, string $Type, string $Date);

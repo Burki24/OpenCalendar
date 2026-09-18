@@ -446,7 +446,7 @@
         {
             "type": "Label",
             "name": "MicrosoftConnectHint",
-            "caption": "Only calendar access is requested. An active Symcon Connect connection is required for sign-in.",
+            "caption": "Calendar and Microsoft To Do task access is requested. An active Symcon Connect connection is required for sign-in.",
             "visible": false
         },
         {

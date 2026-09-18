@@ -180,6 +180,7 @@
             "Google authorization could not be started. Please check the instance status for details.": "Die Google-Autorisierung konnte nicht gestartet werden. Bitte prüfen Sie den Instanzstatus für weitere Details.",
             "Connect your Microsoft 365 or Outlook.com account directly through Symcon. No client ID or client secret is required.": "Verbinde dein Microsoft-365- oder Outlook.com-Konto direkt über Symcon. Eine Client-ID oder ein Clientschlüssel ist nicht erforderlich.",
             "Only calendar access is requested. An active Symcon Connect connection is required for sign-in.": "Es wird ausschließlich Kalenderzugriff angefordert. Für die Anmeldung ist eine aktive Symcon-Connect-Verbindung erforderlich.",
+            "Calendar and Microsoft To Do task access is requested. An active Symcon Connect connection is required for sign-in.": "Es wird Zugriff auf Kalender und Microsoft-To-Do-Aufgaben angefordert. Für die Anmeldung ist eine aktive Symcon-Connect-Verbindung erforderlich.",
             "Microsoft account is not connected.": "Das Microsoft-Konto ist nicht verbunden.",
             "Microsoft account is connected.": "Das Microsoft-Konto ist verbunden.",
             "Connect Microsoft account": "Microsoft-Konto verbinden",

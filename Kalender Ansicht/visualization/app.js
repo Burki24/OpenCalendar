@@ -105,8 +105,9 @@ const eventAnniversaryDateLabel = document.getElementById('event-anniversary-dat
 const eventTask = document.getElementById('event-task');
 const eventTaskCompleted = document.getElementById('event-task-completed');
 const eventTaskCompletedRow = document.getElementById('event-task-completed-row');
-const eventTaskFollowPlanned = document.getElementById('event-task-follow-planned');
-const eventTaskFollowPlannedRow = document.getElementById('event-task-follow-planned-row');
+const eventTaskRollForwardScope = document.getElementById('event-task-roll-forward');
+const eventTaskRollForwardScopeRow = document.getElementById('event-task-roll-forward-row');
+const eventMicrosoftTodoRecurrenceNote = document.getElementById('event-microsoft-todo-recurrence-note');
 const eventStatusInput = document.getElementById('event-status');
 const eventAvailabilityInput = document.getElementById('event-availability');
 const eventRecurrenceRow = document.getElementById('event-recurrence-row');
@@ -413,9 +414,76 @@ function setEventDialogLoading(mode = '') {
     eventReminderRow.classList.remove('hidden');
 }
 
+function eventDialogHostViewport() {
+    if (calendarVisualization.mode !== 'symcon' || window.parent === window || !window.frameElement) return null;
+
+    try {
+        const hostWindow = window.parent;
+        const hostViewport = hostWindow.visualViewport || hostWindow;
+        const viewportLeft = Number(hostViewport.offsetLeft || 0);
+        const viewportTop = Number(hostViewport.offsetTop || 0);
+        const viewportWidth = Number(hostViewport.width || hostWindow.innerWidth);
+        const viewportHeight = Number(hostViewport.height || hostWindow.innerHeight);
+        const frameBounds = window.frameElement.getBoundingClientRect();
+        const horizontalScale = frameBounds.width / window.innerWidth;
+        const verticalScale = frameBounds.height / window.innerHeight;
+        if (!Number.isFinite(viewportWidth)
+            || !Number.isFinite(viewportHeight)
+            || !Number.isFinite(horizontalScale)
+            || !Number.isFinite(verticalScale)
+            || horizontalScale <= 0
+            || verticalScale <= 0) {
+            return null;
+        }
+
+        const viewportRight = viewportLeft + viewportWidth;
+        const viewportBottom = viewportTop + viewportHeight;
+        const visibleLeft = Math.max(viewportLeft, frameBounds.left);
+        const visibleTop = Math.max(viewportTop, frameBounds.top);
+        const visibleRight = Math.min(viewportRight, frameBounds.right);
+        const visibleBottom = Math.min(viewportBottom, frameBounds.bottom);
+        if (visibleRight <= visibleLeft || visibleBottom <= visibleTop) return null;
+
+        return {
+            left: (visibleLeft - frameBounds.left) / horizontalScale,
+            top: (visibleTop - frameBounds.top) / verticalScale,
+            right: window.innerWidth - ((visibleRight - frameBounds.left) / horizontalScale),
+            bottom: window.innerHeight - ((visibleBottom - frameBounds.top) / verticalScale)
+        };
+    } catch (_) {
+        // Standalone mode and cross-origin hosts use the CSS viewport fallback.
+        return null;
+    }
+}
+
+function updateEventDialogViewportBounds() {
+    const hostViewport = eventDialogHostViewport();
+    if (!hostViewport) {
+        eventDialog.style.removeProperty('--event-dialog-visible-left');
+        eventDialog.style.removeProperty('--event-dialog-visible-top');
+        eventDialog.style.removeProperty('--event-dialog-visible-right');
+        eventDialog.style.removeProperty('--event-dialog-visible-bottom');
+        return;
+    }
+
+    const titleClearance = Number.parseFloat(getComputedStyle(document.documentElement)
+        .getPropertyValue('--tile-title-clearance')) || 0;
+    const edge = window.innerWidth <= 560 ? 8 : 12;
+    const left = Math.max(edge, hostViewport.left + edge);
+    const top = Math.max(titleClearance + edge, hostViewport.top + edge);
+    const right = Math.max(edge, hostViewport.right + edge);
+    const bottom = Math.max(edge, hostViewport.bottom + edge);
+    eventDialog.style.setProperty('--event-dialog-visible-left', `${left}px`);
+    eventDialog.style.setProperty('--event-dialog-visible-top', `${top}px`);
+    eventDialog.style.setProperty('--event-dialog-visible-right', `${right}px`);
+    eventDialog.style.setProperty('--event-dialog-visible-bottom', `${bottom}px`);
+}
+
 function showEventDialog() {
     if (!eventEditingActive) beginEventEditing();
+    updateEventDialogViewportBounds();
     if (!eventDialog.open) eventDialog.showModal();
+    requestAnimationFrame(updateEventDialogViewportBounds);
 }
 
 function deferEventDialogSetup(callback) {
@@ -1810,8 +1878,24 @@ function eventDisplaySummary(event) {
 
 function taskPlainSummary(summary) {
     return String(summary || '').trim()
-        .replace(/^(?:\[OC:(?:TODO|DONE)(?::FOLLOW)?\]|☐↻|☑↻|☐|☑)\s*/u, '')
+        .replace(/^(?:\[OC:(?:TODO|DONE)(?::(?:FOLLOW|KEEP))?\]|☐↻|☑↻|☐|☑)\s*/u, '')
         .trim();
+}
+
+function taskRollForwardScope(event) {
+    const scope = String(event?.taskRollForwardScope || '').trim().toLowerCase();
+    if (['occurrence', 'following', 'disabled'].includes(scope)) return scope;
+    return event?.taskFollowPlanned ? 'following' : 'occurrence';
+}
+
+function microsoftTodoIdentity(event) {
+    if (String(event?.sourceType || '').trim().toLowerCase() !== 'microsoft-todo') return {};
+    return {
+        sourceType: 'microsoft-todo',
+        taskProvider: 'microsoft-todo',
+        taskId: String(event?.taskId || ''),
+        taskListId: String(event?.taskListId || '')
+    };
 }
 
 function editableEventSummary(event) {
@@ -1822,21 +1906,35 @@ function editableEventSummary(event) {
 function loadTaskEditor(event) {
     eventTask.checked = Boolean(event?.task);
     eventTaskCompleted.checked = Boolean(event?.taskCompleted);
-    eventTaskFollowPlanned.checked = Boolean(event?.taskFollowPlanned);
+    eventTaskRollForwardScope.value = taskRollForwardScope(event);
     updateTaskControls();
 }
 
 function updateTaskControls() {
     const enabled = eventTask.checked;
-    eventTask.disabled = !eventDialogEditable;
+    eventTask.disabled = !eventDialogEditable
+        || String(selectedEvent?.sourceType || '').trim().toLowerCase() === 'microsoft-todo';
     eventTaskCompletedRow.classList.toggle('hidden', !enabled);
     eventTaskCompleted.disabled = !eventDialogEditable || !enabled;
-    const recurring = eventRecurrenceFrequency.value !== 'none' || Boolean(selectedEvent?.recurring);
+    const recurring = eventRecurrenceFrequency.value !== 'none' || Boolean(selectedEvent?.recurring)
+        || Boolean(selectedEvent?.taskNativeRecurrence?.pattern);
+    const microsoftTodo = enabled && selectedCalendarUsesMicrosoftTodo();
     const canFollow = Boolean(selectedCalendarEntry()?.canUpdateFollowing);
-    eventTaskFollowPlannedRow.classList.toggle('hidden', !enabled || !recurring || !canFollow);
-    eventTaskFollowPlanned.disabled = !eventDialogEditable || !enabled || !recurring || !canFollow;
-    if (!recurring || !canFollow) eventTaskFollowPlanned.checked = false;
+    eventTaskRollForwardScopeRow.classList.toggle('hidden', !enabled || !recurring || microsoftTodo);
+    eventMicrosoftTodoRecurrenceNote.classList.toggle('hidden', !enabled || !recurring || !microsoftTodo);
+    eventTaskRollForwardScope.disabled = !eventDialogEditable || !enabled || !recurring || microsoftTodo;
+    const followingOption = eventTaskRollForwardScope.querySelector('option[value="following"]');
+    followingOption.disabled = !canFollow;
+    if (microsoftTodo) {
+        eventTaskRollForwardScope.value = 'disabled';
+    } else if (!recurring || (!canFollow && eventTaskRollForwardScope.value === 'following')) {
+        eventTaskRollForwardScope.value = 'occurrence';
+    }
     updateTaskMoveNote();
+
+    ['event-all-day', 'event-end', 'event-location'].forEach(id => {
+        document.getElementById(id).disabled = !eventDialogEditable || microsoftTodo;
+    });
 
     if (!enabled || !eventDialogEditable) return;
 
@@ -1858,10 +1956,13 @@ function updateTaskMoveNote() {
         || ['series', 'following'].includes(selectedEvent?.writeScope)) return;
     const note = document.getElementById('dialog-note');
     const moving = Number(eventCalendarInput.value) !== Number(selectedEvent?.calendarInstanceId);
-    note.textContent = eventTask.checked && eventTaskFollowPlanned.checked && moving
+    const scope = eventTaskRollForwardScope.value;
+    note.textContent = eventTask.checked && scope === 'following' && moving
         ? t('This and all following tasks will be moved to the selected calendar.')
-        : eventTask.checked && eventTaskFollowPlanned.checked
+        : eventTask.checked && scope === 'following'
         ? t('Changing the date moves this and all following occurrences. Existing following exceptions will be reset.')
+        : eventTask.checked && scope === 'disabled'
+        ? t('Overdue tasks will remain on their original date until you move them manually.')
         : t('Only this occurrence of the recurring event will be changed.');
     note.classList.remove('hidden');
 }
@@ -2595,6 +2696,8 @@ async function toggleSelectedTaskCompletion() {
             end: selectedEvent.end,
             summary: selectedEvent.summary,
             taskFollowPlanned: Boolean(selectedEvent.taskFollowPlanned),
+            taskRollForwardScope: taskRollForwardScope(selectedEvent),
+            ...microsoftTodoIdentity(selectedEvent),
             ...recurrencePayload(selectedEvent),
             changes: {
                 task: true,
@@ -2742,6 +2845,7 @@ async function prepareEventEdit(event) {
             uid,
             resourceUrl: String(event?.resourceUrl || ''),
             eventReference,
+            ...microsoftTodoIdentity(event),
             seriesId,
             occurrenceId,
             originalStart,
@@ -2831,6 +2935,7 @@ async function confirmDeleteEvent() {
             event: {
                 resourceUrl: event.resourceUrl,
                 etag: event.etag,
+                ...microsoftTodoIdentity(event),
                 ...recurrencePayload(event, selectedDeleteScope(event))
             }
         });
@@ -2887,6 +2992,7 @@ function eventCanUpdate(event) {
 
 function eventCanMove(event, writeScope = '') {
     if (!hasActionBridge() || !Boolean(event?.canWrite)) return false;
+    if (String(event?.sourceType || '').trim().toLowerCase() === 'microsoft-todo') return false;
     const reminder = eventReminderState(event);
     if (reminder.mode === 'complex') return false;
     if (reminder.mode === 'default') {
@@ -2952,6 +3058,8 @@ function recurrencePayload(event, writeScope = '') {
 
 function eventReadOnlyReason(event) {
     if (eventCanUpdate(event) || eventCanDelete(event)) return '';
+    const explicitReason = String(event?.readOnlyReason || '').trim();
+    if (explicitReason) return explicitReason;
     if (!hasActionBridge()) return 'Editing events is unavailable because no action bridge is configured.';
     if (event.recurring || event.recurrenceId) return 'Recurring occurrences are currently read-only.';
     return 'This calendar is read-only.';
@@ -3043,8 +3151,9 @@ function updateEventStateDefaults() {
 
 function updateEventStateControls() {
     const calendar = selectedCalendarEntry();
-    eventStatusInput.disabled = !eventDialogEditable || !calendarSupportsEventStatus(calendar);
-    eventAvailabilityInput.disabled = !eventDialogEditable || !calendarSupportsEventAvailability(calendar);
+    const nativeTask = eventTask.checked && selectedCalendarUsesMicrosoftTodo();
+    eventStatusInput.disabled = !eventDialogEditable || nativeTask || !calendarSupportsEventStatus(calendar);
+    eventAvailabilityInput.disabled = !eventDialogEditable || nativeTask || !calendarSupportsEventAvailability(calendar);
     synchronizeIPSViewEventStatePickers();
 }
 
@@ -3242,6 +3351,8 @@ function handleIPSViewEventStateOptionKeydown(event, select) {
 }
 
 function appendEventStateChanges(eventData, targetCalendar, moving, allDay) {
+    if (eventData.task && ((!selectedEvent || moving) && Boolean(targetCalendar?.microsoftTodoEnabled)
+        || String(selectedEvent?.sourceType || '').toLowerCase() === 'microsoft-todo')) return;
     if (calendarSupportsEventStatus(targetCalendar)) {
         const defaultStatus = defaultEventStatus(targetCalendar);
         const status = normalizedEventStatus(eventStatusInput.value, defaultStatus);
@@ -3447,6 +3558,13 @@ function calendarEntryByInstanceId(instanceId) {
 
 function selectedCalendarEntry() {
     return calendarEntryByInstanceId(eventCalendarInput.value);
+}
+
+function selectedCalendarUsesMicrosoftTodo() {
+    if (selectedEvent && Number(selectedEvent.calendarInstanceId) === Number(eventCalendarInput.value)) {
+        return String(selectedEvent.sourceType || '').trim().toLowerCase() === 'microsoft-todo';
+    }
+    return Boolean(selectedCalendarEntry()?.microsoftTodoEnabled);
 }
 
 function eventReminderState(event) {
@@ -3715,6 +3833,7 @@ function reminderLimitMessage(maxReminders) {
 function updateReminderControls() {
     const selectedReminder = selectedEvent ? eventReminderState(selectedEvent) : null;
     const reminderEditable = eventDialogEditable
+        && !(eventTask.checked && selectedCalendarUsesMicrosoftTodo())
         && (!selectedReminder || selectedReminder.editable);
     const selectedCalendar = selectedCalendarEntry();
     const defaultAllowed = selectedEvent
@@ -3990,6 +4109,7 @@ function updateRecurrenceAvailability() {
         : selectedEvent === null
             ? Boolean(calendar?.canWrite) && Boolean(calendar?.canCreateRecurrence)
             : editingSingle
+                && selectedEvent?.recurrenceEditable !== false
                 && eventCanUpdateOccurrence(selectedEvent)
                 && Boolean(calendar?.canWrite)
                 && Boolean(movingSingle ? calendar?.canCreateRecurrence : calendar?.canUpdateRecurrence);
@@ -4144,6 +4264,13 @@ function setDialogEditable(editable, descriptionEditable = editable) {
     updateReminderControls();
     updateAnniversaryControls();
     updateEventStateControls();
+    if (String(selectedEvent?.sourceType || '').trim().toLowerCase() === 'microsoft-todo') {
+        ['event-all-day', 'event-end', 'event-location'].forEach(id => {
+            document.getElementById(id).disabled = true;
+        });
+        eventTask.disabled = true;
+        eventTaskRollForwardScope.disabled = true;
+    }
 }
 
 function setDateInputs(start, end, allDay, allDayEndExclusive = false) {
@@ -4214,17 +4341,20 @@ eventForm.addEventListener('submit', async event => {
     const sourceCalendarInstanceId = Number(selectedEvent?.calendarInstanceId || 0);
     const moving = Boolean(selectedEvent) && calendarInstanceId !== sourceCalendarInstanceId;
     const targetCalendar = calendarEntryByInstanceId(calendarInstanceId);
+    const microsoftTodo = eventTask.checked && selectedCalendarUsesMicrosoftTodo();
     const eventData = {
         summary: document.getElementById('event-summary').value.trim(),
         description: document.getElementById('event-description').value.trim(),
         location: document.getElementById('event-location').value.trim(),
         task: eventTask.checked,
         taskCompleted: eventTask.checked && eventTaskCompleted.checked,
-        taskFollowPlanned: eventTask.checked && eventTaskFollowPlanned.checked,
+        taskRollForwardScope: eventTask.checked ? (microsoftTodo ? 'disabled' : eventTaskRollForwardScope.value) : 'occurrence',
+        taskFollowPlanned: eventTask.checked && !microsoftTodo && eventTaskRollForwardScope.value === 'following',
         allDay,
         start: inputDateValue(document.getElementById('event-start').value, allDay),
         end: inputDateValue(document.getElementById('event-end').value, allDay, allDay)
     };
+    if (microsoftTodo) delete eventData.location;
     const anniversaryChange = anniversaryEditorChange();
     if (anniversaryChange) {
         eventData.anniversaryType = anniversaryChange.enabled ? anniversaryChange.type : '';
@@ -4293,6 +4423,7 @@ eventForm.addEventListener('submit', async event => {
                     uid: selectedEvent.uid,
                     resourceUrl: selectedEvent.resourceUrl,
                     etag: selectedEvent.etag,
+                    ...microsoftTodoIdentity(selectedEvent),
                     ...recurrencePayload(selectedEvent),
                     changes: eventData
                 }
@@ -4345,14 +4476,15 @@ document.getElementById('event-all-day').addEventListener('change', event => {
 eventTask.addEventListener('change', () => {
     if (!eventTask.checked) {
         eventTaskCompleted.checked = false;
-        eventTaskFollowPlanned.checked = false;
+        eventTaskRollForwardScope.value = 'occurrence';
     }
     updateTaskControls();
+    updateReminderControls();
     updateRecurrenceAvailability();
     updateAnniversaryControls();
     updateEventStateDefaults();
 });
-eventTaskFollowPlanned.addEventListener('change', updateTaskMoveNote);
+eventTaskRollForwardScope.addEventListener('change', updateTaskMoveNote);
 eventCalendarInput.addEventListener('change', () => {
     updateDialogColor();
     updateSaveButtonLabel();
@@ -4553,6 +4685,7 @@ document.querySelectorAll('.view-selector-option').forEach(button => button.addE
     render();
 }));
 window.addEventListener('resize', () => {
+    updateEventDialogViewportBounds();
     if (activeView === 'month') {
         scheduleMonthEventLayout();
     } else if (activeView === 'week' || activeView === 'workWeek') {
@@ -4561,6 +4694,14 @@ window.addEventListener('resize', () => {
     }
     updateSwipeNavigationMode();
 });
+try {
+    window.parent?.addEventListener('resize', updateEventDialogViewportBounds);
+    window.parent?.addEventListener('scroll', updateEventDialogViewportBounds, true);
+    window.parent?.visualViewport?.addEventListener('resize', updateEventDialogViewportBounds);
+    window.parent?.visualViewport?.addEventListener('scroll', updateEventDialogViewportBounds);
+} catch (_) {
+    // Standalone mode and cross-origin hosts use the CSS viewport fallback.
+}
 document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'hidden') return;
     void ensureVisibleRangeLoaded();
@@ -4664,7 +4805,9 @@ function containWheelInsideTile(event) {
         : null;
     const openDialog = [eventDialog, eventDetailsDialog, editScopeDialog, deleteConfirmDialog, dayEventsDialog, viewSelectorDialog, calendarFilterDialog]
         .find(dialog => dialog.open);
-    const scrollTarget = calendarOptionList || openDialog?.querySelector('.dialog-body') || content;
+    const scrollTarget = calendarOptionList
+        || openDialog?.querySelector(openDialog === eventDialog ? '.dialog-layout' : '.dialog-body')
+        || content;
     const factor = event.deltaMode === WheelEvent.DOM_DELTA_LINE
         ? 16
         : (event.deltaMode === WheelEvent.DOM_DELTA_PAGE ? scrollTarget.clientHeight : 1);
@@ -5173,7 +5316,6 @@ function applyStaticTranslations() {
     document.getElementById('all-day-label').textContent = t('All day');
     document.getElementById('event-task-label').textContent = t('Task appointment');
     document.getElementById('event-task-completed-label').textContent = t('Completed');
-    document.getElementById('event-task-follow-planned-label').textContent = t('Move planned follow-up appointments');
     document.getElementById('dialog-title').textContent = t('Event');
     document.getElementById('details-dialog-title').textContent = t('Event details');
     document.getElementById('edit-scope-dialog-title').textContent = t('Edit recurring event');

@@ -7,6 +7,7 @@ use IPSKalender\CalendarProviderError;
 
 require_once __DIR__ . '/../libs/CalendarHttpClient.php';
 require_once __DIR__ . '/../libs/CalendarProviderError.php';
+require_once __DIR__ . '/../libs/MicrosoftTodoProvider.php';
 
 function providerErrorContractExpect(bool $condition, string $message): void
 {
@@ -40,6 +41,17 @@ final class ProviderErrorContractException extends RuntimeException
 $conflict = CalendarProviderError::fromThrowable(
     new ProviderErrorContractException('Provider-specific precondition failure.', 412)
 );
+foreach ([401 => CalendarProviderError::TYPE_AUTHENTICATION, 403 => CalendarProviderError::TYPE_ACCESS_DENIED,
+    404       => CalendarProviderError::TYPE_NOT_FOUND, 429 => CalendarProviderError::TYPE_RATE_LIMITED,
+    503       => CalendarProviderError::TYPE_UNAVAILABLE] as $status => $expectedType) {
+    $taskError = CalendarProviderError::fromThrowable(
+        new IPSKalender\MicrosoftTodoProviderException('Graph request failed.', $status, 'GraphError')
+    );
+    providerErrorContractExpect(
+        $taskError['type'] === $expectedType && $taskError['httpStatus'] === $status,
+        'Native Microsoft task errors must preserve the provider-neutral HTTP classification.'
+    );
+}
 providerErrorContractExpect(
     $conflict['type'] === CalendarProviderError::TYPE_CONFLICT
         && $conflict['message'] === CalendarProviderError::MESSAGE_CONFLICT

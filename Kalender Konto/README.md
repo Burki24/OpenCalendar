@@ -134,10 +134,12 @@ Konten wie Outlook.com.
 1. Eine aktive Symcon-Connect-Verbindung sicherstellen.
 2. Als Anbieter **Microsoft 365** wählen und die Konfiguration übernehmen.
 3. **Microsoft-Konto verbinden** aufrufen.
-4. Bei Microsoft anmelden und den Kalenderzugriff bestätigen.
+4. Bei Microsoft anmelden und den Kalender- und Aufgabenzugriff bestätigen.
 5. Zur Instanz zurückkehren und **Jetzt synchronisieren** ausführen.
 
-OpenCalendar verwendet delegierten Kalenderzugriff. Mail, Kontakte, OneDrive,
+OpenCalendar verwendet delegierten Kalenderzugriff (`Calendars.ReadWrite`) und
+Aufgabenzugriff (`Tasks.ReadWrite`) sowie `offline_access` zum Erneuern des Zugriffs
+ohne erneute interaktive Anmeldung. Mail, Kontakte, OneDrive,
 Teams und andere Microsoft-Graph-Bereiche werden nicht angefordert. Microsofts
 `canEdit`-Angabe bestimmt, ob ein Kalender beschreibbar oder schreibgeschützt
 angelegt wird. In beschreibbaren Microsoft-Kalendern können außerdem neue tägliche,
@@ -148,6 +150,14 @@ außerdem bearbeitet und gelöscht werden. Für „dieses und folgende“ wird d
 bestehende Serie vor dem ausgewählten Vorkommnis beendet und beim Bearbeiten ab
 dort als neuer Serienteil fortgeführt. Nummerierte Serien übernehmen dabei die
 verbleibende Anzahl.
+
+Native Microsoft-To-Do-Listen werden beim Synchronisieren des Kontos ermittelt.
+In der Kalenderinstanz kann eine Liste unter **Microsoft-To-Do-Aufgabenliste**
+eingebunden werden; sie bleibt bei Microsoft unabhängig vom Kalender.
+Bestehende Verbindungen benötigen nach Erweiterung der Berechtigungen gegebenenfalls
+eine neue Zustimmung: **Microsoft-Konto trennen**, erneut **Microsoft-Konto verbinden**,
+die angeforderten Zugriffe bestätigen und anschließend Konto und Kalender synchronisieren.
+Bei fehlendem Aufgabenzugriff bleibt der Kalenderzugriff weiterhin nutzbar.
 
 Bei bestehenden Microsoft-Onlinebesprechungen wird die Beschreibung in der
 Kalenderansicht nicht zur Bearbeitung angeboten. Microsoft speichert darin

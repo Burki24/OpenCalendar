@@ -92,6 +92,18 @@
             "maximum": 1095
         },
         {
+            "type": "Select",
+            "name": "MicrosoftTaskListID",
+            "caption": "Microsoft To Do task list",
+            "visible": false,
+            "options": [
+                {
+                    "caption": "Do not include Microsoft To Do tasks",
+                    "value": ""
+                }
+            ]
+        },
+        {
             "type": "ExpansionPanel",
             "caption": "Calendar identity",
             "expanded": false,

@@ -16,6 +16,12 @@ final class CalendarTaskEvent
     public const COMPLETED_MARKER = '[OC:DONE]';
     public const OPEN_FOLLOW_MARKER = '[OC:TODO:FOLLOW]';
     public const COMPLETED_FOLLOW_MARKER = '[OC:DONE:FOLLOW]';
+    public const OPEN_KEEP_MARKER = '[OC:TODO:KEEP]';
+    public const COMPLETED_KEEP_MARKER = '[OC:DONE:KEEP]';
+
+    public const ROLL_FORWARD_SCOPE_OCCURRENCE = 'occurrence';
+    public const ROLL_FORWARD_SCOPE_FOLLOWING = 'following';
+    public const ROLL_FORWARD_SCOPE_DISABLED = 'disabled';
 
     private const LEGACY_OPEN_MARKER = '☐';
     private const LEGACY_COMPLETED_MARKER = '☑';
@@ -29,28 +35,41 @@ final class CalendarTaskEvent
     {
         $marker = self::marker((string) ($event['summary'] ?? ''));
         if ($marker === '') {
-            if ((bool) ($event['task'] ?? false)) {
-                unset($event['displaySummary']);
+            if (!(bool) ($event['task'] ?? false)) {
+                unset(
+                    $event['task'],
+                    $event['taskCompleted'],
+                    $event['taskStatus'],
+                    $event['taskFollowPlanned'],
+                    $event['taskRollForwardScope'],
+                    $event['displaySummary']
+                );
+                return $event;
             }
-            unset($event['task'], $event['taskCompleted'], $event['taskStatus'], $event['taskFollowPlanned']);
+
+            $completed = self::requestedCompletion($event, []);
+            $scope = self::requestedRollForwardScope($event, []);
+            $event['task'] = true;
+            $event['taskCompleted'] = $completed;
+            $event['taskStatus'] = $completed ? 'completed' : 'open';
+            $event['taskRollForwardScope'] = $scope;
+            $event['taskFollowPlanned'] = $scope === self::ROLL_FORWARD_SCOPE_FOLLOWING;
+            $event['displaySummary'] = trim((string) ($event['summary'] ?? ''));
             return $event;
         }
 
         $completed = in_array($marker, [
             self::COMPLETED_MARKER,
             self::COMPLETED_FOLLOW_MARKER,
+            self::COMPLETED_KEEP_MARKER,
             self::LEGACY_COMPLETED_MARKER,
             self::LEGACY_COMPLETED_FOLLOW_MARKER
         ], true);
         $event['task'] = true;
         $event['taskCompleted'] = $completed;
         $event['taskStatus'] = $completed ? 'completed' : 'open';
-        $event['taskFollowPlanned'] = in_array($marker, [
-            self::OPEN_FOLLOW_MARKER,
-            self::COMPLETED_FOLLOW_MARKER,
-            self::LEGACY_OPEN_FOLLOW_MARKER,
-            self::LEGACY_COMPLETED_FOLLOW_MARKER
-        ], true);
+        $event['taskRollForwardScope'] = self::rollForwardScopeForMarker($marker);
+        $event['taskFollowPlanned'] = $event['taskRollForwardScope'] === self::ROLL_FORWARD_SCOPE_FOLLOWING;
         $event['displaySummary'] = self::plainSummary((string) ($event['summary'] ?? ''));
 
         return $event;
@@ -68,13 +87,14 @@ final class CalendarTaskEvent
         $taskWasSupplied = array_key_exists('task', $event)
             || array_key_exists('taskCompleted', $event)
             || array_key_exists('taskStatus', $event)
-            || array_key_exists('taskFollowPlanned', $event);
+            || array_key_exists('taskFollowPlanned', $event)
+            || array_key_exists('taskRollForwardScope', $event);
         $source = self::enrich($sourceEvent);
         $isTask = $taskWasSupplied
             ? (bool) ($event['task'] ?? true)
             : (bool) ($source['task'] ?? false);
         $completed = self::requestedCompletion($event, $source);
-        $followPlanned = self::requestedFollowPlanned($event, $source);
+        $rollForwardScope = self::requestedRollForwardScope($event, $source);
 
         if ($isTask) {
             self::assertTaskShape($event, $sourceEvent);
@@ -85,12 +105,34 @@ final class CalendarTaskEvent
             if ($summary === '') {
                 throw new InvalidArgumentException('The task title is missing.');
             }
-            $event['summary'] = self::markerFor($completed, $followPlanned) . ' ' . $summary;
-        } elseif ($taskWasSupplied && array_key_exists('summary', $event)) {
-            $event['summary'] = self::plainSummary((string) $event['summary']);
+            $event['summary'] = self::markerFor($completed, $rollForwardScope) . ' ' . $summary;
+            $event['task'] = true;
+            $event['taskCompleted'] = $completed;
+            $event['taskStatus'] = $completed ? 'completed' : 'open';
+            $event['taskRollForwardScope'] = $rollForwardScope;
+            $event['taskFollowPlanned'] = $rollForwardScope === self::ROLL_FORWARD_SCOPE_FOLLOWING;
+        } elseif ($taskWasSupplied) {
+            $event['summary'] = self::plainSummary((string) ($event['summary'] ?? $sourceEvent['summary'] ?? ''));
+            if ((bool) ($source['task'] ?? false)) {
+                $event['task'] = false;
+                unset(
+                    $event['taskCompleted'],
+                    $event['taskStatus'],
+                    $event['taskFollowPlanned'],
+                    $event['taskRollForwardScope']
+                );
+            } else {
+                unset(
+                    $event['task'],
+                    $event['taskCompleted'],
+                    $event['taskStatus'],
+                    $event['taskFollowPlanned'],
+                    $event['taskRollForwardScope']
+                );
+            }
         }
 
-        unset($event['task'], $event['taskCompleted'], $event['taskStatus'], $event['taskFollowPlanned'], $event['displaySummary']);
+        unset($event['displaySummary']);
         return $event;
     }
 
@@ -105,6 +147,8 @@ final class CalendarTaskEvent
         $event = self::enrich($event);
         if (!(bool) ($event['task'] ?? false)
             || (bool) ($event['taskCompleted'] ?? false)
+            || ($event['taskRollForwardScope'] ?? self::ROLL_FORWARD_SCOPE_OCCURRENCE)
+                === self::ROLL_FORWARD_SCOPE_DISABLED
             || !(bool) ($event['allDay'] ?? false)) {
             return null;
         }
@@ -353,6 +397,8 @@ final class CalendarTaskEvent
         foreach ([
             self::OPEN_FOLLOW_MARKER,
             self::COMPLETED_FOLLOW_MARKER,
+            self::OPEN_KEEP_MARKER,
+            self::COMPLETED_KEEP_MARKER,
             self::OPEN_MARKER,
             self::COMPLETED_MARKER,
             self::LEGACY_OPEN_FOLLOW_MARKER,
@@ -460,22 +506,64 @@ final class CalendarTaskEvent
     }
 
     /** @param array<string, mixed> $event @param array<string, mixed> $source */
-    private static function requestedFollowPlanned(array $event, array $source): bool
+    private static function requestedRollForwardScope(array $event, array $source): string
     {
+        if (array_key_exists('taskRollForwardScope', $event)) {
+            return self::normalizeRollForwardScope($event['taskRollForwardScope']);
+        }
         if (array_key_exists('taskFollowPlanned', $event)) {
-            return (bool) $event['taskFollowPlanned'];
+            return (bool) $event['taskFollowPlanned']
+                ? self::ROLL_FORWARD_SCOPE_FOLLOWING
+                : self::ROLL_FORWARD_SCOPE_OCCURRENCE;
         }
 
-        return (bool) ($source['taskFollowPlanned'] ?? false);
+        if (isset($source['taskRollForwardScope'])) {
+            return self::normalizeRollForwardScope($source['taskRollForwardScope']);
+        }
+
+        return (bool) ($source['taskFollowPlanned'] ?? false)
+            ? self::ROLL_FORWARD_SCOPE_FOLLOWING
+            : self::ROLL_FORWARD_SCOPE_OCCURRENCE;
     }
 
-    private static function markerFor(bool $completed, bool $followPlanned): string
+    private static function markerFor(bool $completed, string $rollForwardScope): string
     {
-        if ($followPlanned) {
-            return $completed ? self::COMPLETED_FOLLOW_MARKER : self::OPEN_FOLLOW_MARKER;
+        return match ($rollForwardScope) {
+            self::ROLL_FORWARD_SCOPE_FOLLOWING => $completed ? self::COMPLETED_FOLLOW_MARKER : self::OPEN_FOLLOW_MARKER,
+            self::ROLL_FORWARD_SCOPE_DISABLED  => $completed ? self::COMPLETED_KEEP_MARKER : self::OPEN_KEEP_MARKER,
+            default                            => $completed ? self::COMPLETED_MARKER : self::OPEN_MARKER
+        };
+    }
+
+    private static function rollForwardScopeForMarker(string $marker): string
+    {
+        if (in_array($marker, [self::OPEN_KEEP_MARKER, self::COMPLETED_KEEP_MARKER], true)) {
+            return self::ROLL_FORWARD_SCOPE_DISABLED;
+        }
+        if (in_array($marker, [
+            self::OPEN_FOLLOW_MARKER,
+            self::COMPLETED_FOLLOW_MARKER,
+            self::LEGACY_OPEN_FOLLOW_MARKER,
+            self::LEGACY_COMPLETED_FOLLOW_MARKER
+        ], true)) {
+            return self::ROLL_FORWARD_SCOPE_FOLLOWING;
         }
 
-        return $completed ? self::COMPLETED_MARKER : self::OPEN_MARKER;
+        return self::ROLL_FORWARD_SCOPE_OCCURRENCE;
+    }
+
+    private static function normalizeRollForwardScope(mixed $scope): string
+    {
+        $scope = strtolower(trim((string) $scope));
+        if (in_array($scope, [
+            self::ROLL_FORWARD_SCOPE_OCCURRENCE,
+            self::ROLL_FORWARD_SCOPE_FOLLOWING,
+            self::ROLL_FORWARD_SCOPE_DISABLED
+        ], true)) {
+            return $scope;
+        }
+
+        throw new InvalidArgumentException('The task roll-forward scope is invalid.');
     }
 
     /** @param array<string, mixed> $event @param array<string, mixed> $source */

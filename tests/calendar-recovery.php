@@ -21,6 +21,7 @@ final class RecoveryCalendar extends Calendar
     public string $nextSyncToken = 'delta-next';
     public int $failUpdateNumber = 0;
     public int $updateCount = 0;
+    public ?array $eventAfterWrite = null;
 
     protected function HasActiveParent(): bool
     {
@@ -109,7 +110,10 @@ final class RecoveryCalendar extends Calendar
                 'ItemCount' => count($this->items), 'Complete' => true, 'Items' => $this->items
             ],
             'FinishEventsTransfer', 'DeleteEvent' => ['success' => true],
-            'UpdateEvent'                         => ['uid' => $request['UID'], 'resourceUrl' => $request['ResourceURL'], 'etag' => 'updated-etag'],
+            'GetEventAfterWrite'                  => $this->eventAfterWrite ?? [],
+            'UpdateEvent'                         => $this->eventAfterWrite !== null
+                ? array_intersect_key($this->eventAfterWrite, array_flip(['uid', 'resourceUrl', 'eventReference', 'etag']))
+                : ['uid' => $request['UID'], 'resourceUrl' => $request['ResourceURL'], 'etag' => 'updated-etag'],
             'CreateEvent'                         => ['uid' => 'written', 'resourceUrl' => 'written'],
             default                               => []
         };
@@ -298,6 +302,95 @@ $calendar->items = [array_merge($first, ['status' => 'CANCELLED'])];
 $check($calendar->Synchronize(), 'Cancelled tasks must synchronize without rollover.');
 $check(array_filter($calendar->requests, static fn (array $r): bool => in_array($r['Operation'], ['CreateEvent', 'UpdateEvent'], true)) === [], 'Cancelled tasks must never be recreated or moved.');
 $check(json_decode($calendar->GetEvents(), true) === [], 'Cancelled tasks must remain hidden.');
+
+// Microsoft may return a new exception ID for the same logical occurrence.
+$calendar = new RecoveryCalendar(9099);
+$original = array_merge(
+    recoveryEvent('occurrence-uid', 'Microsoft recurring event', '+2 days'),
+    CalendarEventRecurrence::occurrence('ms-series', 'old-id', (new DateTimeImmutable('+2 days'))->format('Y-m-d'), '', true, false, true, true, true),
+    ['eventReference' => 'old-id', 'resourceUrl' => 'https://graph.microsoft.com/v1.0/me/calendars/test/events/old-id']
+);
+$following = array_merge($original, array_intersect_key(
+    recoveryEvent('following-uid', 'Microsoft recurring event', '+9 days'),
+    array_flip(['uid', 'start', 'end', 'startTimestamp', 'endTimestamp'])
+), [
+    'eventReference' => 'following-id', 'occurrenceId' => 'following-id',
+    'resourceUrl'    => 'https://graph.microsoft.com/v1.0/me/calendars/test/events/following-id',
+    'originalStart'  => (new DateTimeImmutable('+9 days'))->format('Y-m-d')
+]);
+$moved = array_merge($original, array_intersect_key(
+    recoveryEvent('occurrence-uid', 'Microsoft recurring event', '+4 days'),
+    array_flip(['uid', 'start', 'end', 'startTimestamp', 'endTimestamp'])
+), [
+    'eventReference' => 'new-id', 'occurrenceId' => 'new-id', 'recurrenceType' => 'exception',
+    'resourceUrl'    => 'https://graph.microsoft.com/v1.0/me/calendars/test/events/new-id', 'etag' => 'new-etag'
+]);
+$calendar->items = [$original, $following];
+$check($calendar->Synchronize(), 'The recurring-event cache baseline must synchronize.');
+$calendar->incremental = true;
+$calendar->items = []; // The delta endpoint has not caught up with the write yet.
+$calendar->eventAfterWrite = $moved;
+$calendar->eventAfterWrite['originalStart'] = '';
+$calendar->requests = [];
+$result = json_decode($calendar->UpdateEvent(json_encode(array_merge($original, [
+    'writeScope' => 'occurrence',
+    'changes'    => ['start' => $moved['start'], 'end' => $moved['end'], 'allDay' => true]
+]), JSON_THROW_ON_ERROR)), true, 512, JSON_THROW_ON_ERROR);
+$events = array_column(json_decode($calendar->GetEvents(), true, 512, JSON_THROW_ON_ERROR), null, 'eventReference');
+$check(($result['success'] ?? false) === true, 'A confirmed recurring occurrence update must succeed.');
+$check(count($events) === 2 && !isset($events['old-id']) && isset($events['new-id'], $events['following-id']), 'A moved Microsoft occurrence must replace the old cache entry immediately, without losing siblings.');
+$check(($events['new-id']['originalStart'] ?? '') === $original['originalStart'], 'A direct exception lookup must preserve the original occurrence anchor.');
+$check(in_array('GetEventAfterWrite', array_column($calendar->requests, 'Operation'), true), 'Microsoft occurrence writes must use the authoritative direct lookup instead of a delayed delta.');
+
+// A subsequent delta must also repair an old/new duplicate already in the cache.
+$calendar = new RecoveryCalendar(9100);
+$calendar->items = [$original, $moved, $following];
+$check($calendar->Synchronize(), 'The duplicate-cache baseline must synchronize.');
+$calendar->incremental = true;
+$calendar->items = [$moved];
+$check($calendar->Synchronize(), 'The moved exception delta must synchronize.');
+$events = json_decode($calendar->GetEvents(), true, 512, JSON_THROW_ON_ERROR);
+$check(count($events) === 2 && !in_array('old-id', array_column($events, 'eventReference'), true), 'A new exception ID must replace the former occurrence, including pre-existing cached duplicates.');
+$calendar->items = [];
+$check($calendar->Synchronize() && count(json_decode($calendar->GetEvents(), true)) === 2, 'An empty next delta must preserve the repaired occurrence cache.');
+
+// Secondary identity must never collapse unrelated series or non-Microsoft events.
+$cases = [
+    'missing original start'      => [$original, array_merge($moved, ['originalStart' => '']), 1],
+    'original anchor without UID' => [array_merge($original, ['uid' => '']), array_merge($moved, ['uid' => '']), 1],
+    'equivalent UTC anchor'       => [
+        array_merge($original, ['uid' => '', 'allDay' => false, 'originalStart' => '2026-09-20T10:00:00+02:00']),
+        array_merge($moved, ['uid' => '', 'allDay' => false, 'originalStart' => '2026-09-20T08:00:00Z']), 1
+    ],
+    'different series'        => [$original, array_merge($moved, ['seriesId' => 'other-series']), 2],
+    'different calendar'      => [$original, array_merge($moved, ['resourceUrl' => 'https://graph.microsoft.com/v1.0/me/calendars/other/events/new-id']), 2],
+    'unrelated occurrence'    => [$original, array_merge($moved, ['uid' => 'other-uid', 'originalStart' => $following['originalStart']]), 2],
+    'unknown anchor timezone' => [
+        array_merge($original, ['uid' => '', 'originalStart' => '2026-09-20']),
+        array_merge($moved, ['uid' => '', 'originalStart' => '2026-09-20T22:00:00Z']), 2
+    ],
+    'CalDAV shared UID' => [
+        array_merge($original, ['resourceUrl' => 'https://caldav.example/one.ics']),
+        array_merge($moved, ['resourceUrl' => 'https://caldav.example/two.ics']), 2
+    ],
+    'Google shared UID' => [
+        array_merge($original, ['resourceUrl' => 'https://www.googleapis.com/calendar/v3/calendars/test/events/one']),
+        array_merge($moved, ['resourceUrl' => 'https://www.googleapis.com/calendar/v3/calendars/test/events/two']), 2
+    ]
+];
+foreach ($cases as $label => [$before, $after, $expectedCount]) {
+    $calendar = new RecoveryCalendar(9101);
+    $calendar->items = [$before];
+    $check($calendar->Synchronize(), 'Identity baseline must synchronize: ' . $label);
+    $calendar->incremental = true;
+    $calendar->items = [$after];
+    $check($calendar->Synchronize(), 'Identity delta must synchronize: ' . $label);
+    $events = json_decode($calendar->GetEvents(), true, 512, JSON_THROW_ON_ERROR);
+    $check(count($events) === $expectedCount, 'Occurrence identity must respect provider, calendar and series boundaries: ' . $label);
+    if ($label === 'missing original start') {
+        $check(($events[0]['originalStart'] ?? '') === $original['originalStart'], 'An ID-changing delta must restore the occurrence anchor using its Microsoft UID.');
+    }
+}
 
 if ($failures !== []) {
     fwrite(STDERR, implode(PHP_EOL, $failures) . PHP_EOL);

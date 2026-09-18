@@ -313,69 +313,102 @@ befindet sich in der Dokumentation der Module **Kalender** und
 
 ## Aufgabentermine
 
-OpenCalendar kann einen gewöhnlichen ganztägigen Termin als
-**Aufgabentermin** behandeln. Dafür wird keine Aufgaben-API des Anbieters und
-keine zusätzliche OAuth-Berechtigung benötigt. Der Eintrag bleibt technisch ein
-normaler Kalendertermin und verwendet ausschließlich die bereits vorhandenen
-Schreibrechte des gewählten Kalenders.
+OpenCalendar unterscheidet kalenderbasierte Aufgabentermine und native
+Microsoft-To-Do-Aufgaben. Im Dialog wird in beiden Fällen **Aufgabentermin**
+aktiviert. Die Kalenderdarstellung ist ganztägig und eintägig; Jahresereignisse
+und Aufgabentermine schließen sich aus.
 
-Beim Erstellen oder Bearbeiten wird im Termindialog **Aufgabentermin** aktiviert.
-Aufgabentermine sind bewusst ganztägig und dauern genau einen Tag. Sie dürfen
-auch wiederkehrend sein. OpenCalendar
-speichert den Status direkt und providerunabhängig am Anfang des Termintitels:
+### Kalenderbasierte Aufgaben
 
-- `[OC:TODO]` kennzeichnet eine offene Aufgabe.
-- `[OC:DONE]` kennzeichnet eine erledigte Aufgabe.
-- `[OC:TODO:FOLLOW]` beziehungsweise `[OC:DONE:FOLLOW]` kennzeichnet eine Aufgabenserie, deren geplante
-  Folgetermine beim täglichen Nachziehen ebenfalls verschoben werden sollen.
+Bei CalDAV und lokalen Kalendern werden die Aufgabenfelder als
+`X-OPENCALENDAR-*`-Eigenschaften des iCalendar-Termins gespeichert. Google
+Calendar verwendet private `extendedProperties`. Der sichtbare Titel bleibt
+bei diesen Anbietern frei von technischen Statusmarkern. Es werden keine
+Google-Tasks-Listen importiert und keine Einträge aus „Meine Aufgaben“
+synchronisiert. ICS-/Webcal-Abonnements und lokale ICS-Dateien bleiben
+schreibgeschützt; sie sind nicht mit einem beschreibbaren Symcon-lokalen
+Kalender gleichzusetzen.
 
-In der Kalenderansicht öffnet ein Klick auf den Eintrag die Termindetails. Dort
-kann die Aufgabe mit **Als erledigt markieren** abgeschlossen und mit
-**Aufgabe wieder öffnen** erneut aktiviert werden. Der eigentliche Titel wird im
-Editor ohne technischen Marker angezeigt. In Google Calendar, Outlook, Apple
-Calendar oder anderen Clients bleibt der ASCII-Marker dagegen sichtbar, sodass der
-Status auch außerhalb von OpenCalendar erkennbar ist. Wird der Marker dort
-manuell entfernt oder geändert, übernimmt OpenCalendar diese Änderung bei der
-nächsten Synchronisation. Die früher verwendeten grafischen Kästchen (`☐`, `☑`)
-werden weiterhin erkannt und bei der nächsten Aufgabenänderung automatisch ersetzt.
+Die iCalendar-Metadaten lauten:
 
-Eine offene Aufgabe, deren Datum vor dem aktuellen lokalen Tag liegt, wird beim
-lokalen Tageswechsel und zusätzlich bei jeder Kalendersynchronisation auf den
-aktuellen Tag verschoben. Dadurch bleibt eine nicht erledigte Aufgabe täglich
-sichtbar. Erledigte Aufgaben werden nicht mehr verschoben und verbleiben an ihrem
-zuletzt erreichten Datum. Das Verschieben ändert den echten Termin beim
-Kalenderanbieter; es ist keine rein lokale Anzeige.
+- `X-OPENCALENDAR-TASK:TRUE`
+- `X-OPENCALENDAR-TASK-STATUS:OPEN` beziehungsweise `COMPLETED`
+- `X-OPENCALENDAR-ROLL-FORWARD:OCCURRENCE`, `FOLLOWING` oder `DISABLED`
 
-Bei einer Aufgabenserie entscheidet die Option **Geplante Folgetermine
-mitverschieben**: Ohne sie bleibt der reguläre Serienplan erhalten und nur das
-älteste überfällige Vorkommnis wird auf heute gezogen. Mit ihr verschiebt
-OpenCalendar den ab diesem Vorkommnis verbleibenden Serienteil gemeinsam. Diese
-Option wird nur bei Kalendern angeboten, die „diesen und alle folgenden Termine“
-sicher bearbeiten können.
+Bestehende Titelmarker wie `[OC:TODO]`, `[OC:DONE]`, deren Varianten
+`:FOLLOW`/`:KEEP` sowie frühere Kästchenmarker werden weiterhin erkannt.
+Bei einer Aufgabenänderung schreiben CalDAV, lokale Kalender und Google
+Calendar die strukturierten Metadaten und bereinigen den Titel. Bestehende
+Microsoft-Kalenderaufgaben bleiben kalenderbasierte Termine mit Titelmarker;
+sie werden nicht automatisch in Microsoft To Do umgewandelt.
 
-Die Option gilt auch beim manuellen Ändern des Datums einer Serienaufgabe:
-Mit Häkchen werden der ausgewählte und alle folgenden Termine gemeinsam
-verschoben. Beim ersten Vorkommnis betrifft das die gesamte Serie. Reines
-Erledigen oder Umbenennen ohne Datumsänderung betrifft weiterhin nur den
-ausgewählten Termin. Beim Verschieben des Serienteils werden bestehende
-Ausnahmen innerhalb dieses Teils zurückgesetzt.
+Bei kalenderbasierten Aufgaben steuert **Wenn diese Aufgabe überfällig wird**
+das Verhalten beim lokalen Tageswechsel und bei der Synchronisation:
 
-Liegt zwischen dem überfälligen und dem heutigen Datum bereits ein weiterer
-geplanter Serientermin, führt OpenCalendar den nachgezogenen Termin ohne
-Mitverschieben als einzelnen Aufgabentermin weiter. Dadurch bleibt der
-ursprüngliche Serienplan unverändert und Microsoft 365 muss kein Vorkommnis über
-ein anderes Serienelement hinweg verschieben – eine von Microsoft technisch
-abgelehnte Operation.
+- **Nur diesen Termin nachziehen:** Nur die offene Aufgabe wird auf heute
+  verschoben; der reguläre Serienplan bleibt erhalten.
+- **Diesen und alle folgenden Termine verschieben:** Der verbleibende
+  Serienteil wird gemeinsam verschoben. Diese Option setzt entsprechende
+  Schreibmöglichkeiten des Kalenders voraus.
+- **Nicht automatisch nachziehen:** Die Aufgabe bleibt auf ihrem geplanten
+  Datum, bis sie manuell geändert wird.
 
-Aufgabentermine stehen deshalb nur in beschreibbaren Kalendern zur Verfügung.
-ICS-/Webcal-Abonnements und lokale ICS-Dateien bleiben schreibgeschützt. Die
-Funktion ist bewusst keine Anbindung an Google Tasks: Es werden weder
-Google-Aufgabenlisten importiert noch bestehende Einträge aus „Meine Aufgaben“
-synchronisiert.
+Erledigte Aufgaben werden nicht nachgezogen. Das Nachziehen ändert den echten
+Kalendertermin, nicht nur seine lokale Anzeige. Die Auswahl zum Mitverschieben
+gilt auch beim manuellen Ändern des Datums einer Serienaufgabe. Reines Erledigen
+oder Umbenennen betrifft nur das ausgewählte Vorkommnis. Beim Verschieben eines
+Serienteils werden vorhandene Ausnahmen innerhalb dieses Teils zurückgesetzt.
+Würde das einzelne Nachziehen ein weiteres geplantes Vorkommnis überschreiten,
+wird die offene Aufgabe als zugeordneter Einzeltermin weitergeführt.
 
-In Version 3.0 bleiben Aufgabenstatus, Terminstatus und Verfügbarkeit voneinander
-unabhängig. Die ausführliche Bedienung einschließlich Kalenderwechsel und
-Kennzeichnung nachgezogener Aufgaben beschreibt die
+In Version 3.0 bleiben bei kalenderbasierten Aufgaben **Aufgabenstatus**,
+**Terminstatus** und **Verfügbarkeit** unabhängig voneinander. Eine erledigte
+Aufgabe ist beispielsweise nicht automatisch ein abgesagter Termin.
+
+### Microsoft To Do einrichten
+
+Native Microsoft-To-Do-Aufgaben benötigen zusätzlich die delegierte
+Microsoft-Graph-Berechtigung `Tasks.ReadWrite`. `Calendars.ReadWrite` allein
+reicht nicht. Der OAuth-Zugang läuft weiterhin über Symcon; Anwender müssen
+keine eigene App-Registrierung, Client-ID oder ein Geheimnis anlegen.
+
+1. Nach einer Erweiterung der zentralen OAuth-Freigabe im **Kalender Konto**
+   die Microsoft-Verbindung trennen und erneut verbinden. Mit demselben
+   Microsoft-Konto anmelden und die angeforderten Berechtigungen bestätigen.
+   Kalenderinstanzen und Termine dafür nicht löschen.
+2. Das Konto synchronisieren und den Kontostatus prüfen. Ein erfolgreicher
+   Kalender-Verbindungstest allein bestätigt noch keinen Aufgaben-Zugriff.
+   `microsoftTasks.available` und `listCount` zeigen die Aufgabenlisten-Erkennung.
+3. In der gewünschten Microsoft-365-**Kalender**-Instanz eine
+   **Microsoft-To-Do-Aufgabenliste** auswählen, übernehmen und synchronisieren.
+4. Die Kalender Ansicht neu laden. Aufgaben mit gültigem Fälligkeitsdatum
+   werden am lokalen Fälligkeitstag angezeigt; Aufgaben ohne Fälligkeit werden
+   nicht als Kalendereintrag dargestellt.
+
+Aufgabenlisten gehören zum Microsoft-Konto, nicht zu einem Outlook-Kalender.
+Die Auswahl in OpenCalendar bestimmt lediglich, welche Liste über diese
+Kalenderinstanz eingebunden und für neue Aufgaben verwendet wird. Dieselbe Liste
+nicht in mehreren gleichzeitig angezeigten Kalenderinstanzen einbinden, wenn
+die Aufgaben nicht mehrfach erscheinen sollen.
+
+Ist eine Liste ausgewählt, erzeugt **Aufgabentermin** eine native Aufgabe über
+Microsoft Graph. Normale Termine bleiben Outlook-Kalendertermine. Ohne
+ausgewählte Aufgabenliste bleibt der bisherige kalenderbasierte Aufgabenweg
+erhalten. Vorhandene Termine werden durch die Listenauswahl nicht migriert.
+
+**Serienaufgaben werden nicht im Voraus aufgefächert:** OpenCalendar zeigt die
+von Microsoft bereitgestellten Aufgaben an. Solange die aktuelle Serienaufgabe
+offen ist, erzeugt OpenCalendar keine zukünftigen Vorkommnisse. Erst nach ihrem
+Erledigen stellt Microsoft die nächste offene Aufgabe bereit; sie erscheint
+nach der folgenden Synchronisation. Bereits erledigte Einträge können weiterhin
+an ihrem Fälligkeitsdatum sichtbar sein.
+
+Die Fälligkeit und Serienlogik nativer Aufgaben verwaltet Microsoft. Die
+OpenCalendar-Auswahl **Wenn diese Aufgabe überfällig wird** wird dafür nicht
+angeboten; native Aufgaben werden nicht automatisch durch OpenCalendar
+nachgezogen. Erledigen und erneutes Öffnen ändern den nativen Aufgabenstatus.
+
+Weitere Bedienhinweise einschließlich Kalenderwechsel enthält die
 [Kalender Ansicht](Kalender%20Ansicht/README.md#aufgabentermine).
 
 ## Upgrade von 2.1 auf 3.0

@@ -280,7 +280,7 @@ foreach ([[49, 0, 'yesterday'], [50, 30, '-40 days']] as [$id, $pastDays, $day])
     $afterOriginals = json_decode($restored->attributes['LocalCalendarResources'], true, 512, JSON_THROW_ON_ERROR);
     localModuleCheck(count($afterOriginals) === 3, 'Recovery must preserve all local original resources.');
     foreach ($beforeOriginals as $url => $ical) {
-        if (!str_contains($ical, '[OC:TODO] Still open')) {
+        if (!str_contains($ical, 'SUMMARY:Still open')) {
             localModuleCheck($afterOriginals[$url] === $ical, 'Completed tasks and ordinary old events must not be moved by overdue recovery.');
         }
     }

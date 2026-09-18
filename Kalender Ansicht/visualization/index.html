@@ -125,7 +125,16 @@
             </div>
             <label class="checkbox-row" id="event-task-row"><input type="checkbox" id="event-task"> <span id="event-task-label">Task appointment</span></label>
             <label class="checkbox-row hidden" id="event-task-completed-row"><input type="checkbox" id="event-task-completed"> <span id="event-task-completed-label">Completed</span></label>
-            <label class="checkbox-row hidden" id="event-task-follow-planned-row"><input type="checkbox" id="event-task-follow-planned"> <span id="event-task-follow-planned-label">Move planned follow-up appointments</span></label>
+            <div class="form-row hidden" id="event-task-roll-forward-row">
+                <label for="event-task-roll-forward" data-i18n="When this task becomes overdue">When this task becomes overdue</label>
+                <select id="event-task-roll-forward">
+                    <option value="occurrence" data-i18n="Continue only this occurrence">Continue only this occurrence</option>
+                    <option value="following" data-i18n="Move this and all following occurrences">Move this and all following occurrences</option>
+                    <option value="disabled" data-i18n="Do not automatically reschedule">Do not automatically reschedule</option>
+                </select>
+            </div>
+            <div class="dialog-note hidden" id="event-microsoft-todo-recurrence-note" role="note"
+                data-i18n="Microsoft To Do manages this task series. The next task appears after the current task is completed.">Microsoft To Do manages this task series. The next task appears after the current task is completed.</div>
             <label class="checkbox-row" id="event-all-day-row"><input type="checkbox" id="event-all-day"> <span id="all-day-label">All day</span></label>
             <div class="form-row two" id="event-anniversary-row">
                 <div class="form-row">

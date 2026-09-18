@@ -469,16 +469,6 @@ class CalendarView extends IPSModuleStrict
                     );
                     break;
 
-                case 'FormRegenerateIPSViewHTML':
-                    $this->UpdateFormField(
-                        $this->RegenerateIPSViewHTML()
-                            ? 'IPSViewRegenerationSuccessPopup'
-                            : 'IPSViewRegenerationFailurePopup',
-                        'visible',
-                        true
-                    );
-                    break;
-
                 default:
                     $result = $this->executeVisualizationAction($Ident, $Value);
                     $toast = $result['message'] !== ''
@@ -1155,25 +1145,7 @@ class CalendarView extends IPSModuleStrict
      */
     public function RegenerateIPSViewHTML(): bool
     {
-        if (!$this->IsIPSViewHTMLPageEnabled()) {
-            return false;
-        }
-        if (!$this->isRuntimeReady() && !$this->Initialize()) {
-            return false;
-        }
-
-        try {
-            $html = $this->renderNonEmptyIPSViewHTML($this->buildState(), 'IPSViewRegeneration');
-            if ($html === null) {
-                return false;
-            }
-
-            return $this->UpdateIPSViewHTMLVariable('IPSViewCalendar', $html);
-        } catch (Throwable $exception) {
-            $this->SendDebug('IPSViewRegeneration', $exception->getMessage(), 0);
-
-            return false;
-        }
+        return $this->RegenerateIPSViewHTMLPages();
     }
 
     /**
@@ -1207,6 +1179,12 @@ class CalendarView extends IPSModuleStrict
         $this->broadcastState(null, true);
 
         return true;
+    }
+
+    /** Ensures provider state is available before the shared helper renders the page. */
+    protected function PrepareIPSViewHTMLRegeneration(): bool
+    {
+        return $this->isRuntimeReady() || $this->Initialize();
     }
 
     /**
@@ -1553,7 +1531,12 @@ class CalendarView extends IPSModuleStrict
             'Completed',
             'Continued from series',
             'This overdue task was continued from a series.',
-            'Move planned follow-up appointments',
+            'When this task becomes overdue',
+            'Continue only this occurrence',
+            'Move this and all following occurrences',
+            'Do not automatically reschedule',
+            'Overdue tasks will remain on their original date until you move them manually.',
+            'Microsoft To Do manages this task series. The next task appears after the current task is completed.',
             'Mark completed',
             'Reopen task',
             'more',
@@ -1694,7 +1677,8 @@ class CalendarView extends IPSModuleStrict
                     $event['calendarInstanceId'] = $calendar['instanceId'];
                     $event['calendarName'] = $calendar['name'];
                     $event['calendarColor'] = $calendar['color'];
-                    $event['canWrite'] = $calendar['canWrite'];
+                    $event['canWrite'] = $calendar['canWrite']
+                        && (!array_key_exists('canWrite', $event) || (bool) $event['canWrite']);
                     if (CalendarEventRecurrence::isOccurrence($event)
                         && trim((string) ($event['originalStart'] ?? '')) === '') {
                         $event['originalStart'] = trim((string) ($event['start'] ?? ''));
@@ -1835,7 +1819,8 @@ class CalendarView extends IPSModuleStrict
                 $event['calendarInstanceId'] = $calendar['instanceId'];
                 $event['calendarName'] = $calendar['name'];
                 $event['calendarColor'] = $calendar['color'];
-                $event['canWrite'] = $calendar['canWrite'];
+                $event['canWrite'] = $calendar['canWrite']
+                    && (!array_key_exists('canWrite', $event) || (bool) $event['canWrite']);
                 if (CalendarEventRecurrence::isOccurrence($event)
                     && trim((string) ($event['originalStart'] ?? '')) === '') {
                     $event['originalStart'] = trim((string) ($event['start'] ?? ''));
@@ -2673,6 +2658,8 @@ class CalendarView extends IPSModuleStrict
                     ? $calendarStatus['defaultReminder']
                     : [],
                 'maxReminders'                 => max(1, min(CalendarEventReminder::MAX_REMINDERS, (int) ($calendarStatus['maxReminders'] ?? 1))),
+                'microsoftTodoEnabled'         => trim((string) ($calendarStatus['microsoftTaskListId']
+                    ?? IPS_GetProperty($instanceId, 'MicrosoftTaskListID'))) !== '',
                 'canWriteStatus'               => (bool) ($calendarStatus['canWriteStatus'] ?? false),
                 'canWriteTransparency'         => (bool) ($calendarStatus['canWriteTransparency'] ?? false),
                 'defaultStatus'                => CalendarEventState::normalizeStatus(
@@ -3445,7 +3432,8 @@ class CalendarView extends IPSModuleStrict
     private function prepareTaskSeriesTransfer(int $sourceInstanceId, array &$sourceEvent, array &$event): void
     {
         if (!(bool) ($event['task'] ?? false)
-            || !(bool) ($event['taskFollowPlanned'] ?? false)
+            || ((string) ($event['taskRollForwardScope'] ?? '') !== CalendarTaskEvent::ROLL_FORWARD_SCOPE_FOLLOWING
+                && !(bool) ($event['taskFollowPlanned'] ?? false))
             || !(bool) ($sourceEvent['recurring'] ?? false)
             || ($sourceEvent['writeScope'] ?? '') !== 'occurrence') {
             return;
@@ -3490,7 +3478,15 @@ class CalendarView extends IPSModuleStrict
             'resourceUrl' => trim((string) ($createdEvent['resourceUrl'] ?? '')),
             'etag'        => trim((string) ($createdEvent['etag'] ?? ''))
         ];
-        if ($recurring) {
+        if (($createdEvent['sourceType'] ?? '') === 'microsoft-todo') {
+            $rollbackEvent['sourceType'] = 'microsoft-todo';
+            $rollbackEvent['taskProvider'] = 'microsoft-todo';
+            $rollbackEvent['taskId'] = trim((string) ($createdEvent['taskId'] ?? ''));
+            $rollbackEvent['taskListId'] = trim((string) ($createdEvent['taskListId'] ?? ''));
+            if ($rollbackEvent['taskId'] === '' || $rollbackEvent['taskListId'] === '') {
+                return false;
+            }
+        } elseif ($recurring) {
             $seriesId = trim((string) ($createdEvent['eventReference'] ?? ''));
             if ($seriesId === '') {
                 $seriesId = $rollbackEvent['uid'];

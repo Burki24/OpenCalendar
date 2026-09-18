@@ -19,6 +19,7 @@ require_once __DIR__ . '/CalendarHttpClient.php';
 require_once __DIR__ . '/CalendarEventRecurrence.php';
 require_once __DIR__ . '/CalendarEventReminder.php';
 require_once __DIR__ . '/CalendarEventState.php';
+require_once __DIR__ . '/CalendarTaskEvent.php';
 require_once __DIR__ . '/CalendarRecurrenceRule.php';
 
 final class GoogleCalendarProviderException extends RuntimeException
@@ -38,6 +39,9 @@ final class GoogleCalendarProviderException extends RuntimeException
 final class GoogleCalendarProvider implements CalendarEventLookupProviderInterface, CalendarProviderInterface, RecurringCalendarProviderInterface
 {
     private const API_URL = 'https://www.googleapis.com/calendar/v3';
+    private const TASK_PROPERTY = 'opencalendarTask';
+    private const TASK_STATUS_PROPERTY = 'opencalendarTaskStatus';
+    private const TASK_ROLL_FORWARD_PROPERTY = 'opencalendarRollForward';
     private const MAX_PAGES = 100;
     private const MAX_CALENDARS = 10_000;
     private const MAX_EVENTS = 100_000;
@@ -881,6 +885,7 @@ final class GoogleCalendarProvider implements CalendarEventLookupProviderInterfa
                 : CalendarEventRecurrence::single());
         $resourceUrl = $this->eventUrl($calendarId, $eventId);
 
+        $taskMetadata = $this->taskMetadataFromGoogle($item);
         return array_merge([
             'id'             => hash('sha256', 'google|' . $calendarId . '|' . $eventId),
             'uid'            => trim((string) ($item['iCalUID'] ?? $eventId)),
@@ -904,7 +909,7 @@ final class GoogleCalendarProvider implements CalendarEventLookupProviderInterfa
             'lastModified'   => trim((string) ($item['updated'] ?? '')),
             'url'            => trim((string) ($item['htmlLink'] ?? '')),
             'reminder'       => $this->mapReminder($item)
-        ], $recurrenceIdentity);
+        ], $recurrenceIdentity, $taskMetadata);
     }
 
     /**
@@ -1019,12 +1024,34 @@ final class GoogleCalendarProvider implements CalendarEventLookupProviderInterfa
     private function buildEventPayload(array $data, bool $creating, bool $allowRecurrenceUpdate = false): array
     {
         $payload = [];
+        $taskSupplied = $this->taskFieldsSupplied($data);
+        $taskMetadata = $taskSupplied ? CalendarTaskEvent::enrich($data) : [];
         if ($creating || array_key_exists('summary', $data)) {
             $summary = trim((string) ($data['summary'] ?? ''));
             if ($summary === '') {
                 throw new InvalidArgumentException('The event summary is missing.');
             }
-            $payload['summary'] = $summary;
+            $payload['summary'] = $taskSupplied ? CalendarTaskEvent::plainSummary($summary) : $summary;
+        }
+        if ($taskSupplied) {
+            $isTask = (bool) ($taskMetadata['task'] ?? false);
+            if ($isTask) {
+                $payload['extendedProperties'] = ['private' => [
+                    self::TASK_PROPERTY        => 'true',
+                    self::TASK_STATUS_PROPERTY => (bool) ($taskMetadata['taskCompleted'] ?? false)
+                        ? 'completed'
+                        : 'open',
+                    self::TASK_ROLL_FORWARD_PROPERTY => (string) (
+                        $taskMetadata['taskRollForwardScope'] ?? CalendarTaskEvent::ROLL_FORWARD_SCOPE_OCCURRENCE
+                    )
+                ]];
+            } elseif (!$creating) {
+                $payload['extendedProperties'] = ['private' => [
+                    self::TASK_PROPERTY              => null,
+                    self::TASK_STATUS_PROPERTY       => null,
+                    self::TASK_ROLL_FORWARD_PROPERTY => null
+                ]];
+            }
         }
         foreach (['description', 'location'] as $property) {
             if (array_key_exists($property, $data)) {
@@ -1150,6 +1177,45 @@ final class GoogleCalendarProvider implements CalendarEventLookupProviderInterfa
         }
 
         return $payload;
+    }
+
+    /** @param array<string, mixed> $item @return array<string, mixed> */
+    private function taskMetadataFromGoogle(array $item): array
+    {
+        $extended = is_array($item['extendedProperties'] ?? null) ? $item['extendedProperties'] : [];
+        $private = is_array($extended['private'] ?? null) ? $extended['private'] : [];
+        if (strtolower(trim((string) ($private[self::TASK_PROPERTY] ?? ''))) !== 'true') {
+            return [];
+        }
+        $completed = strtolower(trim((string) ($private[self::TASK_STATUS_PROPERTY] ?? ''))) === 'completed';
+        $scope = strtolower(trim((string) ($private[self::TASK_ROLL_FORWARD_PROPERTY] ?? '')));
+        if (!in_array($scope, [
+            CalendarTaskEvent::ROLL_FORWARD_SCOPE_OCCURRENCE,
+            CalendarTaskEvent::ROLL_FORWARD_SCOPE_FOLLOWING,
+            CalendarTaskEvent::ROLL_FORWARD_SCOPE_DISABLED
+        ], true)) {
+            $scope = CalendarTaskEvent::ROLL_FORWARD_SCOPE_OCCURRENCE;
+        }
+        return [
+            'task'                 => true,
+            'taskCompleted'        => $completed,
+            'taskStatus'           => $completed ? 'completed' : 'open',
+            'taskRollForwardScope' => $scope,
+            'taskFollowPlanned'    => $scope === CalendarTaskEvent::ROLL_FORWARD_SCOPE_FOLLOWING
+        ];
+    }
+
+    /** @param array<string, mixed> $data */
+    private function taskFieldsSupplied(array $data): bool
+    {
+        if (array_key_exists('task', $data)
+            || array_key_exists('taskCompleted', $data)
+            || array_key_exists('taskStatus', $data)
+            || array_key_exists('taskFollowPlanned', $data)
+            || array_key_exists('taskRollForwardScope', $data)) {
+            return true;
+        }
+        return (bool) (CalendarTaskEvent::enrich($data)['task'] ?? false);
     }
 
     private function inputTimezone(string $name): DateTimeZone

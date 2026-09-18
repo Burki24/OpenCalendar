@@ -40,40 +40,74 @@ Maximieren bleiben erhalten.
 
 ![Anonymisierte Beispielansicht eines Monats mit Terminen und Aufgaben](../docs/images/opencalendar-month-anonymized-20260913.png)
 
-Aufgaben werden als gewöhnliche ganztägige Kalendertermine gespeichert; eine
-zusätzliche Aufgaben-API oder OAuth-Freigabe ist nicht erforderlich.
+Die Auswahl im Kalender-Modul bestimmt den Speicherweg: Mit einer eingebundenen
+Microsoft-To-Do-Liste entstehen neue Aufgaben nativ in Microsoft To Do.
+Andernfalls werden Aufgabentermine im gewählten beschreibbaren Kalender
+gespeichert. Die [Einrichtung von Microsoft To Do](../README.md#microsoft-to-do-einrichten)
+beschreibt Berechtigungen, erneute OAuth-Anmeldung und Listenauswahl.
 
-1. **Termin erstellen** öffnen, einen beschreibbaren Kalender auswählen und
-   **Aufgabentermin** aktivieren. Die Aufgabe wird automatisch ganztägig und
-   eintägig. Jahresereignisse und Aufgabentermine schließen sich aus.
-2. Bei Bedarf eine Wiederholung einstellen. Mit **Geplante Folgetermine
-   mitverschieben** festlegen, ob sich bei einer Datumsverschiebung auch die
-   folgenden Termine der Serie verschieben sollen.
-3. In den Termindetails die Aufgabe über **Als erledigt markieren** abschließen.
-   **Aufgabe wieder öffnen** setzt sie zurück auf offen. Das Erledigen betrifft
-   nur das ausgewählte Vorkommnis, nicht die gesamte Serie.
+1. **Termin erstellen** öffnen, den gewünschten Kalender auswählen und
+   **Aufgabentermin** aktivieren. Die Aufgabe wird ganztägig und eintägig.
+   Jahresereignisse und Aufgabentermine schließen sich aus.
+2. Bei Bedarf eine unterstützte Wiederholung einstellen.
+3. Nur für kalenderbasierte Aufgaben unter **Wenn diese Aufgabe überfällig
+   wird** zwischen **Nur diesen Termin nachziehen**, **Diesen und alle folgenden
+   Termine verschieben** und **Nicht automatisch nachziehen** wählen.
+   Die Folgeterminoption wird nur bei entsprechend beschreibbaren Serien angeboten.
+4. In den Termindetails die Aufgabe über **Als erledigt markieren** abschließen.
+   **Aufgabe wieder öffnen** setzt sie zurück auf offen.
 
-Offene, überfällige Aufgaben werden durch das Kalender-Modul bei der
-Synchronisation und beim Tageswechsel nachgezogen. Bei einer Serie wird die
-aktuell anstehende Aufgabe weitergeführt; erledigte Aufgaben laufen nicht mit.
+### Kalenderbasierte Serien und Nachziehen
+
+Offene, überfällige Aufgaben werden entsprechend der gewählten Regel bei der
+Synchronisation und beim Tageswechsel nachgezogen. Bei **Nicht automatisch
+nachziehen** bleibt das Datum unverändert. Erledigte Aufgaben laufen nicht mit.
 Ein aus der Serie fortgeführter Einzeltermin erhält zusätzlich **↻** und in den
 Details den Hinweis **Aus Serie nachgezogen**.
 
-Beim Bearbeiten von Aufgabenterminen entfällt die zusätzliche Auswahl zwischen
-Einzelvorkommnis und gesamter Serie. Die Folgeterminoption steuert das
-Mitverschieben; der Hinweis im Editor erklärt den gewählten Umfang. Bei einem
-Kalenderwechsel mit aktivierter Option werden die ausgewählte Aufgabe und der
-verbleibende Serienteil übertragen. Ohne die Option wird nur das ausgewählte
-Vorkommnis verschoben. Für normale Terminserien bleibt die bisherige
-Umfangsauswahl erhalten. Vorhandene Ausnahmen im folgenden Serienteil werden
-beim Teilen einer Serie zurückgesetzt.
+Beim Bearbeiten kalenderbasierter Aufgabentermine entfällt die zusätzliche
+Auswahl zwischen Einzelvorkommnis und gesamter Serie. **Diesen und alle folgenden
+Termine verschieben** steuert auch manuelle Datumsänderungen; der Hinweis im
+Editor erklärt den Umfang. Beim Kalenderwechsel mit dieser Auswahl werden die
+ausgewählte Aufgabe und der verbleibende Serienteil übertragen. Andernfalls
+wird nur das ausgewählte Vorkommnis verschoben. Für normale Terminserien bleibt
+die bisherige Umfangsauswahl erhalten. Vorhandene Ausnahmen im folgenden
+Serienteil werden beim Teilen zurückgesetzt. Erledigen ohne Datumsänderung
+betrifft weiterhin nur die ausgewählte Aufgabe.
 
-**Aufgabenstatus** und die 9.1-Felder **Status** sowie **Verfügbarkeit** sind
-unabhängig: Eine erledigte Aufgabe ist nicht automatisch ein abgesagter Termin.
-Die zusätzlichen Felder und die IPSView-Auswahllisten bleiben verfügbar.
-In externen Kalendern wird der Aufgabenstatus über Titelmarker wie `[OC:TODO]`
-und `[OC:DONE]` gespeichert; OpenCalendar zeigt stattdessen Kästchen und einen
-bereinigten Titel an.
+**Aufgabenstatus** und die 9.1-Felder **Status** sowie **Verfügbarkeit** sind bei
+kalenderbasierten Aufgaben unabhängig: Eine erledigte Aufgabe ist nicht
+automatisch ein abgesagter Termin. Die zusätzlichen Felder und die
+IPSView-Auswahllisten bleiben für Kalendertermine verfügbar.
+
+CalDAV und lokale Kalender speichern Aufgabenmetadaten in iCalendar-X-Properties,
+Google Calendar in privaten erweiterten Eigenschaften; der Titel bleibt sauber.
+Alte Titelmarker werden weiterhin gelesen und beim nächsten Aufgabenschreiben
+für diese Anbieter migriert. Das ist keine Google-Tasks-Anbindung.
+
+### Native Microsoft-To-Do-Aufgaben
+
+Die Anzeige erfolgt am lokalen Fälligkeitstag. Aufgaben ohne Fälligkeit
+erscheinen nicht im Kalender. Änderungen und Erledigungen werden über Microsoft
+Graph in die ausgewählte Aufgabenliste geschrieben; ein zusätzlicher
+Outlook-Kalendertermin wird dabei nicht erzeugt.
+
+Unterstützt sind Titel, Beschreibung, Fälligkeitsdatum, Erledigen und Löschen;
+beim Erstellen kann eine Wiederholung angelegt werden. Ort, separates Enddatum,
+Kalenderstatus/Verfügbarkeit sowie die Bearbeitung von To-Do-Erinnerungen sind
+in diesem Dialog deaktiviert. Bereits vorhandene Erinnerungen und die native
+Wiederholungsregel bleiben beim Bearbeiten erhalten.
+
+Bei einer Wiederholung ist nur die aktuell von Microsoft bereitgestellte
+Aufgabe offen sichtbar. OpenCalendar erzeugt keine zukünftigen Serienvorkommnisse.
+Nach dem Erledigen und der nächsten Synchronisation erscheint die nächste von
+Microsoft erzeugte Aufgabe. Erledigte Aufgaben können weiterhin sichtbar sein.
+
+**Wenn diese Aufgabe überfällig wird** ist für native Aufgaben ausgeblendet.
+OpenCalendar verändert ihre Fälligkeit nicht automatisch. Die Serienfolge liegt
+bei Microsoft; die Bearbeitungsoptionen für normale Kalender-Serienteile sind
+darauf nicht übertragbar. Bereits bestehende kalenderbasierte
+Microsoft-Aufgabentermine behalten dagegen ihren bisherigen Speicherweg.
 
 Nach dem Update die Kachel neu laden. Für bereits gespeicherte IPSView-Seiten
 **IPSView-HTML neu generieren** ausführen und die Ansicht neu laden, damit die

@@ -10,12 +10,15 @@ use Burki24\SymconModuleHelper\PersistentJsonCacheHelper;
 use Burki24\SymconModuleHelper\VariableHelper;
 use IPSKalender\CalendarEventCounter;
 use IPSKalender\CalendarEventDeletion;
+use IPSKalender\CalendarEventLookup;
 use IPSKalender\CalendarEventRecurrence;
 use IPSKalender\CalendarEventState;
 use IPSKalender\CalendarProviderError;
 use IPSKalender\CalendarProviderErrorException;
+use IPSKalender\CalendarRecurrenceRule;
 use IPSKalender\CalendarTaskEvent;
 use IPSKalender\LocalCalendarProvider;
+use IPSKalender\MicrosoftTodoTaskProjection;
 use IPSKalender\SynchronizationSchedule;
 
 require_once __DIR__ . '/../libs/helper/ChunkedJsonTransferHelper.php';
@@ -27,11 +30,14 @@ require_once __DIR__ . '/../libs/helper/VariableHelper.php';
 require_once __DIR__ . '/../libs/CalendarEventCounter.php';
 require_once __DIR__ . '/../libs/CalendarTaskEvent.php';
 require_once __DIR__ . '/../libs/CalendarEventDeletion.php';
+require_once __DIR__ . '/../libs/CalendarEventLookup.php';
 require_once __DIR__ . '/../libs/CalendarEventRecurrence.php';
+require_once __DIR__ . '/../libs/CalendarRecurrenceRule.php';
 require_once __DIR__ . '/../libs/CalendarEventState.php';
 require_once __DIR__ . '/../libs/CalendarProviderError.php';
 require_once __DIR__ . '/../libs/SynchronizationSchedule.php';
 require_once __DIR__ . '/../libs/LocalCalendarProvider.php';
+require_once __DIR__ . '/../libs/MicrosoftTodoTaskProjection.php';
 
 class Calendar extends IPSModuleStrict
 {
@@ -105,12 +111,14 @@ class Calendar extends IPSModuleStrict
         $this->RegisterPropertyString('CalendarURL', '');
         $this->RegisterPropertyString('CalendarColor', '');
         $this->RegisterPropertyBoolean('CanWrite', false);
+        $this->RegisterPropertyString('MicrosoftTaskListID', '');
         $this->RegisterPropertyInteger('UpdateSchedule', SynchronizationSchedule::CUSTOM);
         $this->RegisterPropertyInteger('UpdateInterval', 15);
         $this->RegisterPropertyInteger('PastDays', 30);
         $this->RegisterPropertyInteger('FutureDays', 365);
 
         $this->RegisterPersistentJsonCache('CachedEvents');
+        $this->RegisterPersistentJsonCache('CachedMicrosoftTasks');
         $this->RegisterAttributeString('AnniversaryMetadata', '[]');
         $this->RegisterAttributeString('BirthdayMetadata', '[]');
         $this->RegisterAttributeString('PendingTaskSeries', '{}');
@@ -122,6 +130,9 @@ class Calendar extends IPSModuleStrict
         $this->RegisterAttributeInteger('IncrementalSyncWindowStart', 0);
         $this->RegisterAttributeInteger('IncrementalSyncWindowEnd', 0);
         $this->RegisterAttributeString('IncrementalSyncCalendarID', '');
+        $this->RegisterAttributeString('MicrosoftTaskDeltaLink', '');
+        $this->RegisterAttributeString('MicrosoftTaskSyncListID', '');
+        $this->RegisterAttributeString('MicrosoftTaskLastError', '');
         $this->registerCalendarMetadataAttributes();
         $this->RegisterAttributeBoolean('RuntimeReady', false);
 
@@ -152,6 +163,7 @@ class Calendar extends IPSModuleStrict
         $form = $this->LoadConfigurationForm();
         $customSchedule = $this->ReadPropertyInteger('UpdateSchedule') === SynchronizationSchedule::CUSTOM;
         $local = $this->ReadPropertyBoolean('LocalCalendar');
+        $taskListOptions = $this->microsoftTaskListOptions();
         foreach ($form['elements'] as &$element) {
             if (($element['name'] ?? '') === 'UpdateInterval') {
                 $element['visible'] = !$local && $customSchedule;
@@ -161,6 +173,10 @@ class Calendar extends IPSModuleStrict
             }
             if (($element['name'] ?? '') === 'LocalCalendarNotice') {
                 $element['visible'] = $local;
+            }
+            if (($element['name'] ?? '') === 'MicrosoftTaskListID') {
+                $element['visible'] = !$local && count($taskListOptions) > 1;
+                $element['options'] = $taskListOptions;
             }
             if (($element['caption'] ?? '') === 'Calendar identity') {
                 foreach ($element['items'] as &$item) {
@@ -235,6 +251,7 @@ class Calendar extends IPSModuleStrict
         $this->removeLegacyEventsVariable();
         $this->WriteAttributeBoolean('RuntimeReady', false);
         $this->clearIncrementalSyncState();
+        $this->resetMicrosoftTaskSyncForSelection();
         $this->RegisterMessage(0, IPS_KERNELSTARTED);
         $this->SetTimerInterval('InitializationTimer', 0);
         $this->SetTimerInterval('SynchronizationTimer', 0);
@@ -414,10 +431,12 @@ class Calendar extends IPSModuleStrict
             $this->refreshCalendarMetadataSafely();
             $events = $this->rollForwardTaskEvents($this->requestEvents());
             $this->storeEvents($events);
+            $taskCount = $this->synchronizeMicrosoftTasksSafely();
             $this->WriteAttributeString('LastError', '');
             $this->SetStatus(IS_ACTIVE);
             $this->SendSafeDebug('SynchronizationCompleted', [
                 'eventCount' => count($events),
+                'taskCount'  => $taskCount,
                 'durationMs' => (int) round((microtime(true) - $startedAt) * 1000)
             ]);
             return true;
@@ -436,6 +455,22 @@ class Calendar extends IPSModuleStrict
     {
         return json_encode(
             $this->readEvents(),
+            JSON_UNESCAPED_SLASHES
+                | JSON_UNESCAPED_UNICODE
+                | JSON_PRESERVE_ZERO_FRACTION
+                | JSON_THROW_ON_ERROR
+        );
+    }
+
+    /**
+     * Returns the cached native Microsoft To Do tasks without converting them into calendar events.
+     *
+     * @return string JSON-encoded task list.
+     */
+    public function GetMicrosoftTasks(): string
+    {
+        return json_encode(
+            $this->readMicrosoftTasks(),
             JSON_UNESCAPED_SLASHES
                 | JSON_UNESCAPED_UNICODE
                 | JSON_PRESERVE_ZERO_FRACTION
@@ -581,6 +616,15 @@ class Calendar extends IPSModuleStrict
     {
         try {
             $event = $this->decodeObject($EventJSON, 'event');
+            if ($this->isMicrosoftTodoEvent($event)) {
+                return json_encode(
+                    $this->microsoftTodoEventForEdit($event),
+                    JSON_UNESCAPED_SLASHES
+                        | JSON_UNESCAPED_UNICODE
+                        | JSON_PRESERVE_ZERO_FRACTION
+                        | JSON_THROW_ON_ERROR
+                );
+            }
             $startTimestamp = (int) ($event['startTimestamp'] ?? 0);
             $endTimestamp = (int) ($event['endTimestamp'] ?? 0);
             if ($startTimestamp <= 0) {
@@ -606,7 +650,7 @@ class Calendar extends IPSModuleStrict
                 }
             }
             $this->assertEventAvailable($currentEvent);
-            $currentEvent = CalendarTaskEvent::enrich($this->enrichAnniversaryEvent($currentEvent));
+            $currentEvent = $this->enrichAnniversaryEvent(CalendarTaskEvent::enrich($currentEvent));
 
             return json_encode(
                 $currentEvent,
@@ -650,7 +694,7 @@ class Calendar extends IPSModuleStrict
                 ]
             );
             $this->assertEventAvailable($series);
-            $series = CalendarTaskEvent::enrich($this->enrichAnniversaryEvent($series));
+            $series = $this->enrichAnniversaryEvent(CalendarTaskEvent::enrich($series));
             return json_encode(
                 $series,
                 JSON_UNESCAPED_SLASHES
@@ -703,7 +747,7 @@ class Calendar extends IPSModuleStrict
                 ]
             );
             $this->assertEventAvailable($following);
-            $following = CalendarTaskEvent::enrich($this->enrichAnniversaryEvent($following));
+            $following = $this->enrichAnniversaryEvent(CalendarTaskEvent::enrich($following));
             return json_encode(
                 $following,
                 JSON_UNESCAPED_SLASHES
@@ -736,7 +780,10 @@ class Calendar extends IPSModuleStrict
         }
 
         $events = array_values(array_filter(
-            $this->readEvents(),
+            array_merge(
+                $this->readEvents(),
+                MicrosoftTodoTaskProjection::project($this->readMicrosoftTasks())
+            ),
             static function (array $event) use ($StartTimestamp, $EndTimestamp): bool
             {
                 $startTimestamp = (int) ($event['startTimestamp'] ?? 0);
@@ -800,6 +847,17 @@ class Calendar extends IPSModuleStrict
         $created = null;
         try {
             $event = $this->decodeObject($EventJSON, 'event');
+            if ($this->mustCreateMicrosoftTodoTask($event)) {
+                $created = $this->createMicrosoftTodoTask($event);
+                $writeConfirmed = true;
+                $this->storeMicrosoftTaskAfterWrite($created);
+                $projected = MicrosoftTodoTaskProjection::project([$created]);
+                if ($projected === []) {
+                    throw new UnexpectedValueException('The calendar account returned invalid Microsoft task data.');
+                }
+
+                return $this->encodeResult(true, $projected[0]);
+            }
             $anniversary = $this->anniversaryInput($event);
             if ($anniversary !== null && $anniversary['enabled']) {
                 $recurrenceInput = $event['recurrence'] ?? null;
@@ -884,6 +942,12 @@ class Calendar extends IPSModuleStrict
             if (!is_array($changes)) {
                 throw new InvalidArgumentException('The event changes are invalid.');
             }
+            if ($this->isMicrosoftTodoEvent($event)) {
+                $updated = $this->updateMicrosoftTodoEvent($event, $changes);
+                $writeConfirmed = true;
+                $this->storeMicrosoftTaskAfterWrite($updated);
+                return $this->encodeResult(true, MicrosoftTodoTaskProjection::project([$updated])[0] ?? $updated);
+            }
             $recurrence = $this->resolveWriteRecurrence($event, true);
             $anniversary = $this->anniversaryInput($changes);
             $existingAnniversary = $this->anniversaryMetadataForEvent($event);
@@ -902,7 +966,8 @@ class Calendar extends IPSModuleStrict
             if (array_key_exists('task', $changes)
                 || array_key_exists('taskCompleted', $changes)
                 || array_key_exists('taskStatus', $changes)
-                || array_key_exists('taskFollowPlanned', $changes)) {
+                || array_key_exists('taskFollowPlanned', $changes)
+                || array_key_exists('taskRollForwardScope', $changes)) {
                 $cachedEvent = $this->cachedEventForIdentity($event);
                 if ($cachedEvent !== null) {
                     $taskSource = array_merge($cachedEvent, $event);
@@ -928,7 +993,11 @@ class Calendar extends IPSModuleStrict
                     // completed task when that override is removed with the former start.
                     $followingChanges['task'] = true;
                     $followingChanges['taskCompleted'] = (bool) $followingTask['taskCompleted'];
+                    $followingChanges['taskStatus'] = (bool) $followingTask['taskCompleted'] ? 'completed' : 'open';
                     $followingChanges['taskFollowPlanned'] = (bool) ($followingTask['taskFollowPlanned'] ?? false);
+                    $followingChanges['taskRollForwardScope'] = (string) (
+                        $followingTask['taskRollForwardScope'] ?? CalendarTaskEvent::ROLL_FORWARD_SCOPE_OCCURRENCE
+                    );
                     $followingChanges = CalendarTaskEvent::prepareWrite($followingChanges, $following);
                 }
                 $providerStart = $this->taskEventDate($following, 'start');
@@ -998,6 +1067,8 @@ class Calendar extends IPSModuleStrict
                 throw new InvalidArgumentException('No event changes were supplied.');
             }
             $cachedEvent = $recurrenceType === CalendarEventRecurrence::SINGLE
+                || ($writeScope === CalendarEventRecurrence::WRITE_SCOPE_OCCURRENCE
+                    && CalendarEventLookup::supportsOccurrenceReadback($event))
                 ? $this->cachedEventForIdentity($event)
                 : null;
 
@@ -1064,6 +1135,19 @@ class Calendar extends IPSModuleStrict
         $writeConfirmed = false;
         try {
             $event = $this->decodeObject($EventJSON, 'event');
+            if ($this->isMicrosoftTodoEvent($event)) {
+                [$listId, $taskId] = $this->microsoftTodoIdentity($event);
+                $result = $this->sendRequest('DeleteTask', [
+                    'TaskListID' => $listId,
+                    'TaskID'     => $taskId
+                ]);
+                if (!(bool) ($result['success'] ?? false)) {
+                    throw new RuntimeException('The calendar account did not confirm the Microsoft task deletion.');
+                }
+                $writeConfirmed = true;
+                $this->removeMicrosoftTaskFromCache($listId, $taskId);
+                return true;
+            }
             $recurrence = $this->resolveWriteRecurrence($event, false);
             $writeScope = (string) ($recurrence['writeScope'] ?? '');
             $recurrenceType = (string) ($recurrence['recurrenceType'] ?? CalendarEventRecurrence::SINGLE);
@@ -1113,6 +1197,8 @@ class Calendar extends IPSModuleStrict
     public function ClearCache(): void
     {
         $this->clearIncrementalSyncState();
+        $this->clearMicrosoftTaskSyncState();
+        $this->ClearPersistentJsonCache('CachedMicrosoftTasks');
         $this->storeEvents([]);
         $this->WriteAttributeInteger('LastSynchronization', 0);
         $this->SetValue('LastSynchronization', 0);
@@ -1218,6 +1304,9 @@ class Calendar extends IPSModuleStrict
                     ? max(1, min(5, (int) $metadata['maxReminders']))
                     : 1,
                 'eventCount'                    => count($events),
+                'microsoftTaskListId'           => trim($this->ReadPropertyString('MicrosoftTaskListID')),
+                'microsoftTaskCount'            => count($this->readMicrosoftTasks()),
+                'microsoftTaskLastError'        => $this->ReadAttributeString('MicrosoftTaskLastError'),
                 'todayEventCount'               => CalendarEventCounter::countForDay(
                     $events,
                     new DateTimeImmutable('today')
@@ -1626,6 +1715,453 @@ class Calendar extends IPSModuleStrict
     }
 
     /**
+     * Synchronizes a selected Microsoft To Do list without making calendar-event synchronization fail.
+     */
+    private function synchronizeMicrosoftTasksSafely(): int
+    {
+        $listId = trim($this->ReadPropertyString('MicrosoftTaskListID'));
+        if ($this->ReadPropertyBoolean('LocalCalendar') || $listId === '') {
+            $this->clearMicrosoftTaskSyncState();
+            $this->ClearPersistentJsonCache('CachedMicrosoftTasks');
+            return 0;
+        }
+
+        try {
+            $tasks = $this->synchronizeMicrosoftTasks($listId);
+            $this->WriteAttributeString('MicrosoftTaskLastError', '');
+            return count($tasks);
+        } catch (Throwable $exception) {
+            $message = trim((string) preg_replace('/\s+/', ' ', $exception->getMessage()));
+            if ($message === '') {
+                $message = 'Microsoft To Do synchronization failed.';
+            }
+            $this->WriteAttributeString('MicrosoftTaskLastError', $this->Translate($message));
+            $this->SendSafeDebugException('MicrosoftTaskSynchronizationError', $exception);
+            return count($this->readMicrosoftTasks());
+        }
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    private function synchronizeMicrosoftTasks(string $listId): array
+    {
+        $sameList = hash_equals($this->ReadAttributeString('MicrosoftTaskSyncListID'), $listId);
+        $deltaLink = $sameList ? trim($this->ReadAttributeString('MicrosoftTaskDeltaLink')) : '';
+        $result = $this->sendRequest('SynchronizeTasks', [
+            'TaskListID' => $listId,
+            'DeltaLink'  => $deltaLink
+        ]);
+        if (!isset($result['tasks']) || !is_array($result['tasks']) || !array_is_list($result['tasks'])) {
+            throw new UnexpectedValueException('The calendar account returned invalid Microsoft task data.');
+        }
+        $nextDeltaLink = trim((string) ($result['deltaLink'] ?? ''));
+        if ($nextDeltaLink === '') {
+            throw new UnexpectedValueException('The calendar account returned no Microsoft task delta link.');
+        }
+        $fullSnapshot = (bool) ($result['fullSnapshot'] ?? false);
+
+        $changes = [];
+        foreach ($result['tasks'] as $task) {
+            if (!is_array($task) || array_is_list($task) || trim((string) ($task['id'] ?? '')) === '') {
+                throw new UnexpectedValueException('The calendar account returned invalid Microsoft task data.');
+            }
+            $changes[] = $task;
+        }
+
+        $tasks = $deltaLink === '' || $fullSnapshot ? $this->activeMicrosoftTasks($changes) : $this->mergeMicrosoftTaskChanges(
+            $sameList ? $this->readMicrosoftTasks() : [],
+            $changes
+        );
+        // Persist task data before advancing the Graph delta cursor.
+        $this->WritePersistentJsonCache('CachedMicrosoftTasks', $tasks);
+        $this->WriteAttributeString('MicrosoftTaskSyncListID', $listId);
+        $this->WriteAttributeString('MicrosoftTaskDeltaLink', $nextDeltaLink);
+
+        return $tasks;
+    }
+
+    /**
+     * @param list<array<string, mixed>> $tasks
+     * @return list<array<string, mixed>>
+     */
+    private function activeMicrosoftTasks(array $tasks): array
+    {
+        return array_values(array_filter(
+            $tasks,
+            static fn (array $task): bool => !(bool) ($task['deleted'] ?? false)
+        ));
+    }
+
+    /**
+     * @param list<array<string, mixed>> $tasks
+     * @param list<array<string, mixed>> $changes
+     * @return list<array<string, mixed>>
+     */
+    private function mergeMicrosoftTaskChanges(array $tasks, array $changes): array
+    {
+        $indexed = [];
+        foreach ($tasks as $task) {
+            $id = trim((string) ($task['id'] ?? ''));
+            if ($id !== '') {
+                $indexed[$id] = $task;
+            }
+        }
+        foreach ($changes as $change) {
+            $id = trim((string) $change['id']);
+            if ((bool) ($change['deleted'] ?? false)) {
+                unset($indexed[$id]);
+                continue;
+            }
+            $indexed[$id] = $change;
+        }
+
+        return array_values($indexed);
+    }
+
+    private function resetMicrosoftTaskSyncForSelection(): void
+    {
+        $selectedListId = trim($this->ReadPropertyString('MicrosoftTaskListID'));
+        $synchronizedListId = trim($this->ReadAttributeString('MicrosoftTaskSyncListID'));
+        if ($synchronizedListId === '' || hash_equals($synchronizedListId, $selectedListId)) {
+            return;
+        }
+        $this->clearMicrosoftTaskSyncState();
+        $this->ClearPersistentJsonCache('CachedMicrosoftTasks');
+    }
+
+    private function clearMicrosoftTaskSyncState(): void
+    {
+        $this->WriteAttributeString('MicrosoftTaskDeltaLink', '');
+        $this->WriteAttributeString('MicrosoftTaskSyncListID', '');
+        $this->WriteAttributeString('MicrosoftTaskLastError', '');
+    }
+
+    /** @param array<string, mixed> $event */
+    private function isMicrosoftTodoEvent(array $event): bool
+    {
+        return strtolower(trim((string) ($event['sourceType'] ?? ''))) === 'microsoft-todo'
+            || strtolower(trim((string) ($event['taskProvider'] ?? ''))) === 'microsoft-todo';
+    }
+
+    /** @param array<string, mixed> $event */
+    private function mustCreateMicrosoftTodoTask(array $event): bool
+    {
+        return !$this->ReadPropertyBoolean('LocalCalendar')
+            && trim($this->ReadPropertyString('MicrosoftTaskListID')) !== ''
+            && (bool) ($event['task'] ?? false);
+    }
+
+    /**
+     * @param array<string, mixed> $event
+     * @return array<string, mixed>
+     */
+    private function createMicrosoftTodoTask(array $event): array
+    {
+        // Reuse the shared task validation without persisting its calendar title marker.
+        CalendarTaskEvent::prepareWrite($event);
+
+        $listId = trim($this->ReadPropertyString('MicrosoftTaskListID'));
+        $title = trim((string) ($event['summary'] ?? ''));
+        $timezone = trim((string) ($event['timezone'] ?? ''));
+        if ($timezone === '') {
+            $timezone = trim($this->ReadAttributeString('DetectedCalendarTimezone'));
+        }
+        if ($timezone === '') {
+            $timezone = date_default_timezone_get();
+        }
+
+        $task = [
+            'title'       => $title,
+            'description' => (string) ($event['description'] ?? ''),
+            'status'      => (bool) ($event['taskCompleted'] ?? false) ? 'completed' : 'notStarted',
+            'dueDateTime' => $this->microsoftTodoDueDateTime(
+                (string) ($event['start'] ?? ''),
+                ['timeZone' => $timezone]
+            )
+        ];
+
+        $recurrence = $event['recurrence'] ?? null;
+        if ($recurrence !== null && $recurrence !== []) {
+            if (!is_array($recurrence) || array_is_list($recurrence)) {
+                throw new InvalidArgumentException('The recurrence settings are invalid.');
+            }
+            if (trim((string) ($recurrence['recurrenceTimeZone'] ?? '')) === '') {
+                $recurrence['recurrenceTimeZone'] = $timezone;
+            }
+            $startDate = DateTimeImmutable::createFromFormat(
+                '!Y-m-d',
+                substr(trim((string) ($event['start'] ?? '')), 0, 10),
+                new DateTimeZone('UTC')
+            );
+            if ($startDate === false) {
+                throw new InvalidArgumentException('The Microsoft To Do due date is invalid.');
+            }
+            $task['recurrence'] = CalendarRecurrenceRule::toMicrosoftRecurrence($recurrence, $startDate);
+        }
+
+        return $this->sendRequest('CreateTask', [
+            'TaskListID' => $listId,
+            'Task'       => $task
+        ]);
+    }
+
+    /**
+     * @param array<string, mixed> $event
+     * @return array{0:string,1:string}
+     */
+    private function microsoftTodoIdentity(array $event): array
+    {
+        if (!$this->isMicrosoftTodoEvent($event)) {
+            throw new InvalidArgumentException('The selected item is not a Microsoft To Do task.');
+        }
+        $listId = trim((string) ($event['taskListId'] ?? ''));
+        $taskId = trim((string) ($event['taskId'] ?? ''));
+        $configuredListId = trim($this->ReadPropertyString('MicrosoftTaskListID'));
+        if ($listId === '' || $taskId === '' || $configuredListId === '' || !hash_equals($configuredListId, $listId)) {
+            throw new InvalidArgumentException('The Microsoft To Do task identity is invalid.');
+        }
+        foreach ($this->readMicrosoftTasks() as $task) {
+            if (hash_equals($taskId, trim((string) ($task['id'] ?? '')))
+                && hash_equals($listId, trim((string) ($task['listId'] ?? '')))) {
+                return [$listId, $taskId];
+            }
+        }
+        throw new RuntimeException('The Microsoft To Do task is no longer available. Synchronize the calendar and try again.');
+    }
+
+    /**
+     * @param array<string, mixed> $event
+     * @return array<string, mixed>
+     */
+    private function microsoftTodoEventForEdit(array $event): array
+    {
+        [$listId, $taskId] = $this->microsoftTodoIdentity($event);
+        foreach ($this->readMicrosoftTasks() as $task) {
+            if (hash_equals($taskId, trim((string) ($task['id'] ?? '')))
+                && hash_equals($listId, trim((string) ($task['listId'] ?? '')))) {
+                $projected = MicrosoftTodoTaskProjection::project([$task]);
+                if ($projected !== []) {
+                    return $projected[0];
+                }
+                throw new RuntimeException('The Microsoft To Do task has no valid due date.');
+            }
+        }
+        throw new RuntimeException('The Microsoft To Do task is no longer available. Synchronize the calendar and try again.');
+    }
+
+    /**
+     * @param array<string, mixed> $event
+     * @param array<string, mixed> $changes
+     * @return array<string, mixed>
+     */
+    private function updateMicrosoftTodoEvent(array $event, array $changes): array
+    {
+        [$listId, $taskId] = $this->microsoftTodoIdentity($event);
+        $sourceTask = null;
+        foreach ($this->readMicrosoftTasks() as $task) {
+            if (hash_equals($taskId, trim((string) ($task['id'] ?? '')))
+                && hash_equals($listId, trim((string) ($task['listId'] ?? '')))) {
+                $sourceTask = $task;
+                break;
+            }
+        }
+        if ($sourceTask === null) {
+            throw new RuntimeException('The Microsoft To Do task is no longer available. Synchronize the calendar and try again.');
+        }
+        if (array_key_exists('task', $changes) && !(bool) $changes['task']) {
+            throw new InvalidArgumentException('A Microsoft To Do task cannot be converted into a calendar event.');
+        }
+        if (array_key_exists('recurrence', $changes)) {
+            throw new InvalidArgumentException('Microsoft To Do recurrence editing is not supported yet.');
+        }
+
+        $taskChanges = [];
+        if (array_key_exists('summary', $changes)) {
+            $taskChanges['title'] = trim((string) $changes['summary']);
+        }
+        if (array_key_exists('description', $changes)) {
+            $taskChanges['description'] = (string) $changes['description'];
+        }
+        if (array_key_exists('start', $changes)) {
+            $currentDue = is_array($sourceTask['dueDateTime'] ?? null) ? $sourceTask['dueDateTime'] : [];
+            $dueDateTime = $this->microsoftTodoDueDateTime(
+                (string) $changes['start'],
+                $currentDue
+            );
+            if ($dueDateTime !== $currentDue) {
+                $taskChanges['dueDateTime'] = $dueDateTime;
+            }
+        }
+        if (array_key_exists('taskCompleted', $changes) || array_key_exists('taskStatus', $changes)) {
+            $requestedCompleted = array_key_exists('taskStatus', $changes)
+                ? strtolower(trim((string) $changes['taskStatus'])) === 'completed'
+                : (bool) ($changes['taskCompleted'] ?? false);
+            $currentlyCompleted = strcasecmp(trim((string) ($sourceTask['status'] ?? '')), 'completed') === 0;
+            if ($requestedCompleted !== $currentlyCompleted) {
+                $taskChanges['status'] = $requestedCompleted ? 'completed' : 'notStarted';
+            }
+        }
+        if ($taskChanges === []) {
+            throw new InvalidArgumentException('No Microsoft To Do task changes were supplied.');
+        }
+
+        return $this->sendRequest('UpdateTask', [
+            'TaskListID' => $listId,
+            'TaskID'     => $taskId,
+            'Changes'    => $taskChanges
+        ]);
+    }
+
+    /**
+     * @param array<string, mixed> $currentDueDateTime
+     * @return array{dateTime:string,timeZone:string}
+     */
+    private function microsoftTodoDueDateTime(string $value, array $currentDueDateTime): array
+    {
+        $date = substr(trim($value), 0, 10);
+        $parsed = DateTimeImmutable::createFromFormat('!Y-m-d', $date);
+        if ($parsed === false || $parsed->format('Y-m-d') !== $date) {
+            throw new InvalidArgumentException('The Microsoft To Do due date is invalid.');
+        }
+        $currentValue = trim((string) ($currentDueDateTime['dateTime'] ?? ''));
+        $timezone = trim((string) ($currentDueDateTime['timeZone'] ?? ''));
+        $timezone = $timezone !== '' ? $timezone : date_default_timezone_get();
+        if ($currentValue === '') {
+            return ['dateTime' => $date . 'T00:00:00', 'timeZone' => $timezone];
+        }
+        $sourceDate = MicrosoftTodoTaskProjection::dateTime($currentDueDateTime);
+        if ($sourceDate === null) {
+            throw new InvalidArgumentException('The Microsoft To Do due date is invalid.');
+        }
+        $displayDate = $sourceDate->setTimezone(new DateTimeZone(date_default_timezone_get()));
+        if ($displayDate->format('Y-m-d') === $date) {
+            return $currentDueDateTime;
+        }
+        // The editor changes a displayed local date, not the date component of Graph's UTC timestamp.
+        // Keep the local wall time while resolving the selected date's own daylight-saving offset.
+        $movedDate = $displayDate->setDate((int) $parsed->format('Y'), (int) $parsed->format('m'), (int) $parsed->format('d'));
+        $movedDate = $movedDate->setTimezone(MicrosoftTodoTaskProjection::timezone($timezone));
+        $fraction = preg_match('/(\.\d+)(?:Z|[+-]\d{2}:\d{2})?$/D', $currentValue, $matches) === 1
+            ? $matches[1]
+            : '';
+        return [
+            'dateTime' => $movedDate->format('Y-m-d\TH:i:s') . $fraction,
+            'timeZone' => $timezone
+        ];
+    }
+
+    /** @param array<string, mixed> $updatedTask */
+    private function storeMicrosoftTaskAfterWrite(array $updatedTask): void
+    {
+        $taskId = trim((string) ($updatedTask['id'] ?? ''));
+        $listId = trim((string) ($updatedTask['listId'] ?? ''));
+        if ($taskId === '' || $listId === '') {
+            throw new UnexpectedValueException('The calendar account returned invalid Microsoft task data.');
+        }
+        $tasks = $this->readMicrosoftTasks();
+        $replaced = false;
+        foreach ($tasks as &$task) {
+            if (hash_equals($taskId, trim((string) ($task['id'] ?? '')))
+                && hash_equals($listId, trim((string) ($task['listId'] ?? '')))) {
+                $task = $updatedTask;
+                $replaced = true;
+                break;
+            }
+        }
+        unset($task);
+        if (!$replaced) {
+            $tasks[] = $updatedTask;
+        }
+        $this->WritePersistentJsonCache('CachedMicrosoftTasks', $tasks);
+        $this->afterMicrosoftTaskWrite();
+    }
+
+    private function removeMicrosoftTaskFromCache(string $listId, string $taskId): void
+    {
+        $tasks = array_values(array_filter(
+            $this->readMicrosoftTasks(),
+            static fn (array $task): bool => !(
+                hash_equals($taskId, trim((string) ($task['id'] ?? '')))
+                && hash_equals($listId, trim((string) ($task['listId'] ?? '')))
+            )
+        ));
+        $this->WritePersistentJsonCache('CachedMicrosoftTasks', $tasks);
+        $this->afterMicrosoftTaskWrite();
+    }
+
+    private function afterMicrosoftTaskWrite(): void
+    {
+        $this->WriteAttributeString('MicrosoftTaskLastError', '');
+        $this->WriteAttributeString('LastError', '');
+        $this->SetStatus($this->ReadPropertyBoolean('Active') ? IS_ACTIVE : IS_INACTIVE);
+        $this->SetValue('LastSynchronization', $this->ReadAttributeInteger('LastSynchronization'));
+    }
+
+    /**
+     * @return list<array{caption:string,value:string}>
+     */
+    private function microsoftTaskListOptions(): array
+    {
+        $options = [['caption' => 'Do not include Microsoft To Do tasks', 'value' => '']];
+        $selectedListId = trim($this->ReadPropertyString('MicrosoftTaskListID'));
+        if ($this->ReadPropertyBoolean('LocalCalendar') || !$this->HasActiveParent()) {
+            return $this->appendMissingMicrosoftTaskListOption($options, $selectedListId);
+        }
+
+        try {
+            $taskLists = $this->requestMicrosoftTaskListsForForm();
+            foreach ($taskLists as $taskList) {
+                $id = trim((string) ($taskList['id'] ?? ''));
+                if ($id === '') {
+                    continue;
+                }
+                $name = trim((string) ($taskList['name'] ?? ''));
+                $options[] = ['caption' => $name !== '' ? $name : $id, 'value' => $id];
+            }
+        } catch (Throwable $exception) {
+            $this->SendSafeDebugException('MicrosoftTaskListDiscoveryError', $exception);
+        }
+
+        return $this->appendMissingMicrosoftTaskListOption($options, $selectedListId);
+    }
+
+    /**
+     * @param list<array{caption:string,value:string}> $options
+     * @return list<array{caption:string,value:string}>
+     */
+    private function appendMissingMicrosoftTaskListOption(array $options, string $selectedListId): array
+    {
+        if ($selectedListId === '' || in_array($selectedListId, array_column($options, 'value'), true)) {
+            return $options;
+        }
+        $options[] = [
+            'caption' => sprintf($this->Translate('Configured task list (%s)'), $selectedListId),
+            'value'   => $selectedListId
+        ];
+        return $options;
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    private function requestMicrosoftTaskListsForForm(): array
+    {
+        $responseJson = $this->SendDataToParent($this->EncodeDataFlowMessage(
+            self::DATA_ID_TO_PARENT,
+            ['Operation' => 'GetTaskLists', 'RequestID' => bin2hex(random_bytes(8))]
+        ));
+        if ($responseJson === '') {
+            throw new RuntimeException('The calendar account did not return a response.');
+        }
+        $response = json_decode($responseJson, true, 512, JSON_THROW_ON_ERROR);
+        if (!is_array($response) || !($response['Success'] ?? false) || !is_array($response['Payload'] ?? null)) {
+            throw new UnexpectedValueException('The calendar account returned invalid Microsoft task data.');
+        }
+        return array_values(array_filter($response['Payload'], 'is_array'));
+    }
+
+    /**
      * @param list<array<string, mixed>> $events
      * @param list<array<string, mixed>> $changes
      * @return list<array<string, mixed>>
@@ -1704,11 +2240,12 @@ class Calendar extends IPSModuleStrict
             }
             $events = array_values(array_filter(
                 $events,
-                static function (array $event) use (
+                function (array $event) use (
                     $eventReference,
                     $resourceUrl,
                     $occurrenceId,
-                    $replaceResource
+                    $replaceResource,
+                    $change
                 ): bool {
                     foreach ([
                         [$eventReference, trim((string) ($event['eventReference'] ?? ''))],
@@ -1720,7 +2257,7 @@ class Calendar extends IPSModuleStrict
                         }
                     }
 
-                    return true;
+                    return !CalendarEventLookup::sameOccurrence($event, $change);
                 }
             ));
             if ($this->eventOverlapsConfiguredRange($change)) {
@@ -1766,6 +2303,13 @@ class Calendar extends IPSModuleStrict
                     ];
                 }
             }
+            $uid = trim((string) ($event['uid'] ?? ''));
+            if ($uid !== '' && CalendarEventLookup::supportsOccurrenceReadback($event)) {
+                $identities[$seriesId . '|microsoft-uid:' . $uid] = [
+                    'originalStart'      => $originalStart,
+                    'canUpdateFollowing' => (bool) ($event['canUpdateFollowing'] ?? false)
+                ];
+            }
         }
 
         return $identities;
@@ -1799,6 +2343,14 @@ class Calendar extends IPSModuleStrict
                 $change['canUpdateFollowing'] = true;
             }
             break;
+        }
+        if (trim((string) ($change['originalStart'] ?? '')) === '' && CalendarEventLookup::supportsOccurrenceReadback($change)) {
+            $uid = trim((string) ($change['uid'] ?? ''));
+            $identity = $uid !== '' ? ($cachedIdentities[$seriesId . '|microsoft-uid:' . $uid] ?? null) : null;
+            if ($identity !== null) {
+                $change['originalStart'] = $identity['originalStart'];
+                $change['canUpdateFollowing'] = $identity['canUpdateFollowing'];
+            }
         }
 
         return $change;
@@ -2050,7 +2602,7 @@ class Calendar extends IPSModuleStrict
     {
         $timestamp = time();
         $events = CalendarEventState::filterVisibleEvents($events);
-        $events = $this->enrichTaskEvents($this->enrichAnniversaryEvents($events));
+        $events = $this->enrichAnniversaryEvents($this->enrichTaskEvents($events));
         $this->WritePersistentJsonCache('CachedEvents', $events);
         $this->WriteAttributeInteger('LastSynchronization', $timestamp);
         $this->updateEventCounters($events);
@@ -2088,8 +2640,21 @@ class Calendar extends IPSModuleStrict
     {
         try {
             $events = $this->ReadPersistentJsonCache('CachedEvents');
-            $events = $this->enrichTaskEvents($events);
+            $events = $this->enrichAnniversaryEvents($this->enrichTaskEvents($events));
             return CalendarEventState::filterVisibleEvents($events);
+        } catch (UnexpectedValueException) {
+            return [];
+        }
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    private function readMicrosoftTasks(): array
+    {
+        try {
+            $tasks = $this->ReadPersistentJsonCache('CachedMicrosoftTasks');
+            return array_values(array_filter($tasks, 'is_array'));
         } catch (UnexpectedValueException) {
             return [];
         }
@@ -2821,17 +3386,24 @@ class Calendar extends IPSModuleStrict
             }
         }
 
-        if ((bool) ($currentEvent['recurring'] ?? false)
+        $occurrenceReadback = CalendarEventLookup::resolveOccurrenceReadback(
+            $sourceEvent,
+            $currentEvent,
+            $lookupIdentity['EventReference']
+        );
+        if ($occurrenceReadback === null && ((bool) ($currentEvent['recurring'] ?? false)
             || (string) ($currentEvent['recurrenceType'] ?? CalendarEventRecurrence::SINGLE)
-                !== CalendarEventRecurrence::SINGLE) {
+                !== CalendarEventRecurrence::SINGLE)) {
             return false;
         }
+        $currentEvent = $occurrenceReadback ?? $currentEvent;
 
         $previousIdentity = $sourceEvent !== [] ? $sourceEvent : $event;
         $events = array_values(array_filter(
             $this->readEvents(),
             fn (array $cachedEvent): bool => !$this->eventIdentityMatches($cachedEvent, $previousIdentity)
                 && !$this->eventIdentityMatches($cachedEvent, $currentEvent)
+                && !CalendarEventLookup::sameOccurrence($cachedEvent, $currentEvent)
         ));
         if ($this->eventOverlapsConfiguredRange($currentEvent)) {
             $events[] = $currentEvent;
@@ -2917,7 +3489,7 @@ class Calendar extends IPSModuleStrict
     private function storeEventsAfterWrite(array $events): void
     {
         $events = CalendarEventState::filterVisibleEvents($events);
-        $events = $this->enrichTaskEvents($this->enrichAnniversaryEvents($events));
+        $events = $this->enrichAnniversaryEvents($this->enrichTaskEvents($events));
         usort(
             $events,
             static fn (array $left, array $right): int => ((int) ($left['startTimestamp'] ?? 0)
@@ -3253,9 +3825,9 @@ class Calendar extends IPSModuleStrict
         $detachedEvent = array_merge($detachedEvent, $changes);
         $detachedEvent = CalendarTaskEvent::prepareWrite([
             ...$detachedEvent,
-            'task'              => true,
-            'taskCompleted'     => false,
-            'taskFollowPlanned' => false
+            'task'                 => true,
+            'taskCompleted'        => false,
+            'taskRollForwardScope' => CalendarTaskEvent::ROLL_FORWARD_SCOPE_OCCURRENCE
         ], $event);
         $created = $this->sendRequest('CreateEvent', ['Event' => $detachedEvent]);
 
@@ -3550,7 +4122,7 @@ class Calendar extends IPSModuleStrict
             return null;
         }
 
-        $event = CalendarTaskEvent::enrich($this->enrichAnniversaryEvent($event));
+        $event = $this->enrichAnniversaryEvent(CalendarTaskEvent::enrich($event));
         if (!(bool) ($event['task'] ?? false)) {
             return null;
         }

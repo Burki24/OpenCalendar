@@ -7,6 +7,12 @@ require_once dirname(__DIR__) . '/Kalender Ansicht/module.php';
 require_once dirname(__DIR__) . '/libs/CalendarEventRecurrence.php';
 
 $lookupResult = null;
+$rollbackRequests = [];
+function IPSKAL_DeleteEvent(int $instanceId, string $eventJson): bool
+{
+    $GLOBALS['rollbackRequests'][] = [$instanceId, json_decode($eventJson, true, 512, JSON_THROW_ON_ERROR)];
+    return true;
+}
 function IPSKAL_GetRecurringFollowing(int $instanceId, string $seriesId, string $occurrenceId, string $originalStart, string $resourceUrl): mixed
 {
     return $GLOBALS['lookupResult'];
@@ -57,4 +63,19 @@ foreach ([false, '', '{', 'null', '{}', json_encode(array_merge($verified, ['can
     taskTransferExpect($thrown, 'Unsafe or failed series lookup must fail before creating a target event.');
     taskTransferExpect($source === $original && !isset($target['recurrence']), 'Failed preparation must not change source scope or target recurrence.');
 }
+$rollback = new ReflectionMethod(CalendarView::class, 'rollbackMovedTargetEvent');
+$nativeCreated = ['sourceType' => 'microsoft-todo', 'taskProvider' => 'microsoft-todo',
+    'taskId'                   => 'created-task', 'taskListId' => 'target-list', 'uid' => 'microsoft-todo:created-task'];
+foreach ([false, true] as $recurring) {
+    taskTransferExpect($rollback->invoke($view, 9015, ['event' => $nativeCreated], $recurring), 'Native target task rollback must succeed.');
+    $rollbackRequest = $rollbackRequests[array_key_last($rollbackRequests)][1];
+    taskTransferExpect(($rollbackRequest['sourceType'] ?? '') === 'microsoft-todo'
+        && ($rollbackRequest['taskId'] ?? '') === 'created-task'
+        && ($rollbackRequest['taskListId'] ?? '') === 'target-list'
+        && !isset($rollbackRequest['seriesId']), 'Rollback must retain task-list identity, never route a native task as a calendar series.');
+}
+$rollback->invoke($view, 9015, ['event' => ['uid' => 'normal', 'eventReference' => 'series', 'resourceUrl' => 'url']], true);
+$rollbackRequest = $rollbackRequests[array_key_last($rollbackRequests)][1];
+taskTransferExpect(($rollbackRequest['writeScope'] ?? '') === 'series'
+    && ($rollbackRequest['seriesId'] ?? '') === 'series', 'Normal calendar series rollback must remain unchanged.');
 fwrite(STDOUT, "Task series transfer tests passed.\n");

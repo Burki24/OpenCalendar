@@ -222,9 +222,9 @@ $created = CalendarTaskEvent::prepareWrite([
 ]);
 assertTaskAppointment(
     $created['summary'] === '[OC:TODO] Versicherung prüfen'
-        && !array_key_exists('task', $created)
-        && !array_key_exists('taskCompleted', $created),
-    'Creating a task appointment must persist only the open title marker.'
+        && ($created['task'] ?? false) === true
+        && ($created['taskCompleted'] ?? true) === false,
+    'Creating a task appointment must retain structured metadata for provider-specific persistence.'
 );
 
 $enriched = CalendarTaskEvent::enrich($created);
@@ -251,9 +251,40 @@ $followPlanned = CalendarTaskEvent::prepareWrite(
 );
 assertTaskAppointment(
     $followPlanned['summary'] === '[OC:TODO:FOLLOW] Versicherung prüfen'
-        && (CalendarTaskEvent::enrich($followPlanned)['taskFollowPlanned'] ?? false) === true,
-    'A task series must persist the choice to move planned follow-up appointments.'
+        && (CalendarTaskEvent::enrich($followPlanned)['taskFollowPlanned'] ?? false) === true
+        && (CalendarTaskEvent::enrich($followPlanned)['taskRollForwardScope'] ?? '')
+            === CalendarTaskEvent::ROLL_FORWARD_SCOPE_FOLLOWING
+        && ($enriched['taskRollForwardScope'] ?? '') === CalendarTaskEvent::ROLL_FORWARD_SCOPE_OCCURRENCE,
+    'Existing task markers must map to their compatible explicit roll-forward policies.'
 );
+
+$rollForwardDisabled = CalendarTaskEvent::prepareWrite(
+    ['task' => true, 'taskRollForwardScope' => CalendarTaskEvent::ROLL_FORWARD_SCOPE_DISABLED],
+    $enriched + ['allDay' => true, 'recurring' => true, 'start' => '2026-09-08', 'end' => '2026-09-09']
+);
+$disabledTask = CalendarTaskEvent::enrich($rollForwardDisabled);
+assertTaskAppointment(
+    $rollForwardDisabled['summary'] === '[OC:TODO:KEEP] Versicherung prüfen'
+        && ($disabledTask['taskRollForwardScope'] ?? '') === CalendarTaskEvent::ROLL_FORWARD_SCOPE_DISABLED
+        && ($disabledTask['taskFollowPlanned'] ?? true) === false,
+    'The disabled roll-forward scope must persist independently of the legacy follow-up flag.'
+);
+assertTaskAppointment(
+    CalendarTaskEvent::rollForwardChanges(
+        $disabledTask + ['allDay' => true, 'start' => '2026-09-08', 'end' => '2026-09-09'],
+        new DateTimeImmutable('2026-09-10')
+    ) === null,
+    'A task with disabled roll-forward must remain on its planned date while overdue.'
+);
+try {
+    CalendarTaskEvent::prepareWrite(
+        ['task' => true, 'taskRollForwardScope' => 'invalid'],
+        $enriched + ['allDay' => true, 'start' => '2026-09-08', 'end' => '2026-09-09']
+    );
+    throw new RuntimeException('An invalid task roll-forward scope must be rejected.');
+} catch (InvalidArgumentException) {
+    // Expected: public visualization input must not introduce arbitrary title markers.
+}
 
 $renamed = CalendarTaskEvent::prepareWrite(
     ['summary' => 'Versicherung wechseln'],
@@ -285,13 +316,30 @@ $normal = CalendarTaskEvent::prepareWrite(
     $enriched
 );
 assertTaskAppointment(
-    $normal['summary'] === 'Versicherung prüfen',
+    $normal['summary'] === 'Versicherung prüfen'
+        && array_key_exists('task', $normal)
+        && $normal['task'] === false,
     'Converting a task back to a normal event must remove its marker.'
 );
 $normalEnriched = CalendarTaskEvent::enrich(array_merge($enriched, $normal));
 assertTaskAppointment(
     !array_key_exists('task', $normalEnriched) && !array_key_exists('displaySummary', $normalEnriched),
     'Converting a task back to a normal event must remove stale task display metadata.'
+);
+
+$ordinary = CalendarTaskEvent::prepareWrite([
+    'summary'              => 'Normaler Termin',
+    'task'                 => false,
+    'taskCompleted'        => false,
+    'taskRollForwardScope' => CalendarTaskEvent::ROLL_FORWARD_SCOPE_OCCURRENCE,
+    'taskFollowPlanned'    => false
+], ['summary' => 'Normaler Termin']);
+assertTaskAppointment(
+    !array_key_exists('task', $ordinary)
+        && !array_key_exists('taskCompleted', $ordinary)
+        && !array_key_exists('taskRollForwardScope', $ordinary)
+        && !array_key_exists('taskFollowPlanned', $ordinary),
+    'Task controls submitted for a normal event must not reach calendar providers.'
 );
 
 $calendar = new Calendar(9012);
@@ -456,7 +504,7 @@ $detachedTaskWrite = CalendarTaskEvent::prepareWrite([
 ]);
 assertTaskAppointment(
     $detachedTaskWrite['summary'] === '[OC:TODO] Serienaufgabe'
-        && !array_key_exists('taskFollowPlanned', $detachedTaskWrite),
+        && ($detachedTaskWrite['taskFollowPlanned'] ?? true) === false,
     'A rolled-forward detached task must be persisted as a standalone task without the series-follow marker.'
 );
 $shiftedEvents = CalendarTaskEvent::shiftFollowingEvents(

@@ -13,7 +13,7 @@ function extract(name) {
     assert(end > start, 'Missing UI function end: ' + name);
     return source.slice(source.slice(start - 6, start) === 'async ' ? start - 6 : start, end + 2);
 }
-for (const id of ['event-task', 'event-task-completed', 'event-task-follow-planned', 'details-task-toggle-button',
+for (const id of ['event-task', 'event-task-completed', 'event-task-roll-forward', 'event-microsoft-todo-recurrence-note', 'details-task-toggle-button',
     'event-status', 'event-availability', 'details-status', 'details-availability']) {
     assert.strictEqual(markup.split('id="' + id + '"').length - 1, 1, 'Expected one accessible control: ' + id);
 }
@@ -34,14 +34,14 @@ const context = vm.createContext({
     document: { getElementById: id => id === 'dialog-note' ? note : {classList: {toggle() {}}} },
     eventDialogEditable: true,
     eventTask: {checked: true},
-    eventTaskFollowPlanned: {checked: true},
+    eventTaskRollForwardScope: {value: 'following'},
     eventCalendarInput: {value: '1'},
     t: text => text
 });
-for (const name of ['taskPlainSummary', 'editableEventSummary', 'requestEdit', 'updateTaskMoveNote']) {
+for (const name of ['taskPlainSummary', 'taskRollForwardScope', 'microsoftTodoIdentity', 'editableEventSummary', 'requestEdit', 'updateTaskMoveNote']) {
     vm.runInContext(extract(name), context);
 }
-for (const marker of ['[OC:TODO]', '[OC:DONE]', '[OC:TODO:FOLLOW]', '[OC:DONE:FOLLOW]', '☐', '☑', '☐↻', '☑↻']) {
+for (const marker of ['[OC:TODO]', '[OC:DONE]', '[OC:TODO:FOLLOW]', '[OC:DONE:FOLLOW]', '[OC:TODO:KEEP]', '[OC:DONE:KEEP]', '☐', '☑', '☐↻', '☑↻']) {
     assert.strictEqual(context.taskPlainSummary(marker + ' Clean fridge'), 'Clean fridge');
     assert.strictEqual(context.editableEventSummary({task: true, summary: marker + ' Clean fridge'}), 'Clean fridge');
 }
@@ -59,9 +59,14 @@ assert(note.textContent.startsWith('Changing the date'), 'Local task shift must 
 context.eventCalendarInput.value = '2';
 context.updateTaskMoveNote();
 assert(note.textContent.includes('selected calendar'), 'Calendar transfer must explain following tasks');
-context.eventTaskFollowPlanned.checked = false;
+context.eventTaskRollForwardScope.value = 'occurrence';
 context.updateTaskMoveNote();
 assert(note.textContent.startsWith('Only this occurrence'), 'Unchecked option must explain occurrence-only write');
+context.eventTaskRollForwardScope.value = 'disabled';
+context.updateTaskMoveNote();
+assert(note.textContent.startsWith('Overdue tasks will remain'), 'Disabled scheduling must retain the original date');
+assert.strictEqual(context.taskRollForwardScope({taskFollowPlanned: true}), 'following');
+assert.strictEqual(context.taskRollForwardScope({taskFollowPlanned: true, taskRollForwardScope: 'disabled'}), 'disabled');
 
 // The migration must retain independent 9.1 state controls and optimized rendering.
 for (const symbol of ['loadEventStateEditor', 'appendEventStateChanges', 'initializeIPSViewEventStatePickers',
@@ -82,6 +87,79 @@ const taskPayload = {task: true, taskCompleted: false, taskFollowPlanned: true};
 context.appendEventStateChanges(taskPayload, targetCalendar, true, true);
 assert.deepStrictEqual(taskPayload, {task: true, taskCompleted: false, taskFollowPlanned: true,
     status: 'TENTATIVE', transparency: 'TRANSPARENT'}, 'Task transfer must preserve independent 9.1 event state');
+context.selectedEvent = null;
+const nativeTaskPayload = {task: true};
+context.appendEventStateChanges(nativeTaskPayload, {...targetCalendar, microsoftTodoEnabled: true}, false, true);
+assert.deepStrictEqual(nativeTaskPayload, {task: true}, 'Native To Do must not receive calendar availability/status fields');
+
+// Native To Do recurrence belongs to Microsoft; ordinary task series retain all policies.
+const followingOption = {disabled: false};
+function row() {
+    return {hidden: false, classList: {toggle(name, value) { this.hidden = value; }, add() {}}};
+}
+context.eventTaskCompleted = {checked: false};
+context.eventTaskCompletedRow = row();
+context.eventTaskRollForwardScopeRow = row();
+context.eventMicrosoftTodoRecurrenceNote = row();
+context.eventTaskRollForwardScope.querySelector = () => followingOption;
+context.eventRecurrenceFrequency = {value: 'DAILY'};
+context.eventAnniversaryType = {value: ''};
+context.eventAnniversaryDate = {value: ''};
+context.eventAnniversaryDateRow = row();
+context.selectedCalendarEntry = () => ({canUpdateFollowing: true, microsoftTodoEnabled: context.nativeTodo});
+context.nativeTodo = true;
+context.selectedEvent = null;
+context.readInputDate = () => new Date('2026-09-18T00:00:00Z');
+context.dayKey = () => '2026-09-18';
+const nativeFields = Object.fromEntries(['event-all-day', 'event-end', 'event-location', 'event-start']
+    .map(id => [id, {checked: true, value: '2026-09-18', disabled: false}]));
+context.document = {getElementById: id => id === 'dialog-note' ? note : nativeFields[id]};
+for (const name of ['selectedCalendarUsesMicrosoftTodo', 'updateTaskControls']) vm.runInContext(extract(name), context);
+context.updateTaskControls();
+assert.strictEqual(context.eventTaskRollForwardScopeRow.classList.hidden, true);
+assert.strictEqual(context.eventMicrosoftTodoRecurrenceNote.classList.hidden, false);
+assert.strictEqual(context.eventTaskRollForwardScope.value, 'disabled');
+assert.strictEqual(nativeFields['event-location'].disabled, true, 'New native tasks must not offer an unsupported location');
+assert.strictEqual(nativeFields['event-end'].disabled, true, 'Native task due dates must not offer a separate calendar end date');
+context.nativeTodo = false;
+context.eventTaskRollForwardScope.value = 'following';
+context.updateTaskControls();
+assert.strictEqual(context.eventTaskRollForwardScopeRow.classList.hidden, false);
+assert.strictEqual(context.eventMicrosoftTodoRecurrenceNote.classList.hidden, true);
+assert.strictEqual(context.eventTaskRollForwardScope.value, 'following');
+assert.strictEqual(nativeFields['event-location'].disabled, false, 'Calendar tasks retain their existing location control');
+context.nativeTodo = true;
+context.selectedEvent = {task: true, recurring: true, calendarInstanceId: 2};
+context.updateTaskControls();
+assert.strictEqual(context.eventTaskRollForwardScopeRow.classList.hidden, false, 'Existing calendar tasks must keep their scheduling after a To Do list is enabled');
+assert.strictEqual(context.eventTaskRollForwardScope.value, 'following');
+const legacyPayload = {task: true};
+context.appendEventStateChanges(legacyPayload, {...targetCalendar, microsoftTodoEnabled: true}, false, true);
+assert.strictEqual(legacyPayload.status, 'TENTATIVE', 'Existing calendar tasks must retain independent 9.1 state controls');
+context.selectedEvent = {sourceType: 'microsoft-todo', task: true, recurring: false, calendarInstanceId: 2,
+    taskNativeRecurrence: {pattern: {type: 'daily'}}};
+context.eventRecurrenceFrequency.value = 'none';
+context.updateTaskControls();
+assert.strictEqual(context.eventMicrosoftTodoRecurrenceNote.classList.hidden, false, 'Native task recurrence must be explained without pretending it is a calendar series');
+
+context.eventReminderMode = {value: 'custom', querySelector: () => ({disabled: false})};
+context.eventReminderCustomRow = row();
+context.eventReminderExtraList = row();
+context.eventReminderAddRow = row();
+context.eventReminderAddButton = {};
+context.eventReminderValue = {setCustomValidity() {}};
+context.reminderEditorEntries = () => [];
+context.reminderMinutesFromEntry = () => 15;
+context.maxReminderCount = () => 1;
+context.synchronizeIPSViewEventStatePickers = () => {};
+vm.runInContext(extract('updateReminderControls'), context);
+context.selectedEvent = null;
+context.updateReminderControls();
+assert.strictEqual(context.eventReminderMode.disabled, true, 'Creation must not offer native task reminders that are not persisted');
+context.nativeTodo = false;
+context.updateReminderControls();
+assert.strictEqual(context.eventReminderMode.disabled, false, 'Calendar task reminders must remain editable');
+
 vm.runInContext(extract('recurrencePayload'), context);
 vm.runInContext(extract('toggleSelectedTaskCompletion'), context);
 const toggleButton = {disabled: false};
@@ -102,6 +180,12 @@ context.sendAction = async (action, value) => { updates.push({action, value}); r
     context.selectedEvent.taskCompleted = true;
     await context.toggleSelectedTaskCompletion();
     assert.strictEqual(updates[1].value.event.changes.taskCompleted, false);
+    context.selectedEvent = {...context.selectedEvent, sourceType: 'microsoft-todo', taskId: 'task-1', taskListId: 'list-1', taskRollForwardScope: 'disabled'};
+    await context.toggleSelectedTaskCompletion();
+    assert.strictEqual(updates[2].value.event.sourceType, 'microsoft-todo');
+    assert.strictEqual(updates[2].value.event.taskId, 'task-1');
+    assert.strictEqual(updates[2].value.event.taskListId, 'list-1');
+    assert.strictEqual(updates[2].value.event.taskRollForwardScope, 'disabled');
     assert.strictEqual(toggleButton.disabled, false);
     console.log('Task UI behavior tests passed.');
 })().catch(error => { console.error(error); process.exitCode = 1; });

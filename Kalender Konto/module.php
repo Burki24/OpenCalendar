@@ -30,6 +30,8 @@ use IPSKalender\ICalendarSubscriptionProvider;
 use IPSKalender\MicrosoftCalendarProvider;
 use IPSKalender\MicrosoftCalendarProviderException;
 use IPSKalender\MicrosoftGraphOriginPolicy;
+use IPSKalender\MicrosoftTodoProvider;
+use IPSKalender\MicrosoftTodoProviderException;
 use IPSKalender\SynchronizationSchedule;
 
 require_once __DIR__ . '/../libs/helper/ChunkedJsonTransferHelper.php';
@@ -57,6 +59,7 @@ require_once __DIR__ . '/../libs/ICalendarFileProvider.php';
 require_once __DIR__ . '/../libs/ICalendarSubscriptionProvider.php';
 require_once __DIR__ . '/../libs/MicrosoftCalendarProvider.php';
 require_once __DIR__ . '/../libs/MicrosoftGraphOriginPolicy.php';
+require_once __DIR__ . '/../libs/MicrosoftTodoProvider.php';
 require_once __DIR__ . '/../libs/SymconOAuthOriginPolicy.php';
 require_once __DIR__ . '/../libs/SynchronizationSchedule.php';
 require_once __DIR__ . '/traits/SymconOAuthTrait.php';
@@ -137,6 +140,8 @@ class CalendarAccount extends IPSModuleStrict
         $this->RegisterAttributeString('GoogleTokenClientID', '');
         $this->RegisterAttributeString('MicrosoftRefreshToken', '');
         $this->RegisterAttributeString('MicrosoftAccount', '');
+        $this->RegisterAttributeString('CachedMicrosoftTaskLists', '[]');
+        $this->RegisterAttributeBoolean('MicrosoftTasksAvailable', false);
         $this->RegisterAttributeInteger('PendingOAuthProvider', -1);
         $this->RegisterAttributeInteger('PendingOAuthInstanceID', 0);
         $this->RegisterAttributeInteger('PendingOAuthStartedAt', 0);
@@ -466,6 +471,7 @@ class CalendarAccount extends IPSModuleStrict
 
         try {
             $calendars = $this->discoverCalendars();
+            $taskLists = $this->synchronizeMicrosoftTaskLists();
             $this->SetStatus(IS_ACTIVE);
 
             $this->SendDataToChildren($this->EncodeDataFlowMessage(
@@ -479,6 +485,7 @@ class CalendarAccount extends IPSModuleStrict
             $this->SendSafeDebug('AccountSynchronizationCompleted', [
                 'provider'      => $providerName,
                 'calendarCount' => count($calendars),
+                'taskListCount' => count($taskLists),
                 'durationMs'    => (int) round((microtime(true) - $startedAt) * 1000)
             ]);
 
@@ -528,6 +535,20 @@ class CalendarAccount extends IPSModuleStrict
     }
 
     /**
+     * Returns native Microsoft To Do lists cached for this account.
+     *
+     * @return string JSON-encoded task-list collection.
+     */
+    public function GetTaskLists(): string
+    {
+        if ($this->ReadPropertyInteger('Provider') !== self::PROVIDER_MICROSOFT) {
+            return '[]';
+        }
+
+        return $this->ReadAttributeString('CachedMicrosoftTaskLists');
+    }
+
+    /**
      * Returns provider, synchronization, and cache status for this account.
      *
      * @return string JSON-encoded account status.
@@ -553,6 +574,12 @@ class CalendarAccount extends IPSModuleStrict
                 'lastError'           => $this->ReadAttributeString('LastError'),
                 'subscriptionCache'   => $this->ReadPropertyInteger('Provider') === self::PROVIDER_ICS
                     ? $this->iCalendarCacheStatus()
+                    : [],
+                'microsoftTasks'      => $this->ReadPropertyInteger('Provider') === self::PROVIDER_MICROSOFT
+                    ? [
+                        'available' => $this->ReadAttributeBoolean('MicrosoftTasksAvailable'),
+                        'listCount' => count(json_decode($this->GetTaskLists(), true, 512, JSON_THROW_ON_ERROR))
+                    ]
                     : []
             ],
             JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR
@@ -566,6 +593,8 @@ class CalendarAccount extends IPSModuleStrict
     {
         $this->WriteAttributeString('CachedCalendars', '[]');
         $this->WriteAttributeString('ICalendarFeedCache', '{}');
+        $this->WriteAttributeString('CachedMicrosoftTaskLists', '[]');
+        $this->WriteAttributeBoolean('MicrosoftTasksAvailable', false);
         $this->WriteAttributeInteger('LastSynchronization', 0);
         $this->WriteAttributeString('LastError', '');
     }
@@ -1141,6 +1170,37 @@ class CalendarAccount extends IPSModuleStrict
         return $calendars;
     }
 
+    /** @return list<array<string, mixed>> */
+    private function synchronizeMicrosoftTaskLists(): array
+    {
+        if ($this->ReadPropertyInteger('Provider') !== self::PROVIDER_MICROSOFT) {
+            $this->WriteAttributeString('CachedMicrosoftTaskLists', '[]');
+            $this->WriteAttributeBoolean('MicrosoftTasksAvailable', false);
+            return [];
+        }
+
+        try {
+            $taskLists = $this->microsoftTodoProvider()->getTaskLists();
+            $this->WriteAttributeString(
+                'CachedMicrosoftTaskLists',
+                json_encode($taskLists, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR)
+            );
+            $this->WriteAttributeBoolean('MicrosoftTasksAvailable', true);
+            return $taskLists;
+        } catch (MicrosoftTodoProviderException $exception) {
+            if (in_array($exception->httpStatus, [401, 403], true)) {
+                $this->WriteAttributeString('CachedMicrosoftTaskLists', '[]');
+                $this->WriteAttributeBoolean('MicrosoftTasksAvailable', false);
+                $this->SendSafeDebug('MicrosoftTasksUnavailable', [
+                    'httpStatus' => $exception->httpStatus,
+                    'errorCode'  => $exception->errorCode
+                ]);
+                return [];
+            }
+            throw $exception;
+        }
+    }
+
     private function createProvider(): CalendarProviderInterface
     {
         $provider = $this->ReadPropertyInteger('Provider');
@@ -1487,6 +1547,10 @@ class CalendarAccount extends IPSModuleStrict
             $this->SetStatus(in_array($exception->httpStatus, [401, 403], true)
                 ? self::STATUS_AUTHENTICATION_FAILED
                 : self::STATUS_CONNECTION_FAILED);
+        } elseif ($exception instanceof MicrosoftTodoProviderException) {
+            $this->SetStatus(in_array($exception->httpStatus, [401, 403], true)
+                ? self::STATUS_AUTHENTICATION_FAILED
+                : self::STATUS_CONNECTION_FAILED);
         } elseif ($exception instanceof ICalendarFeedProviderException
             || $exception instanceof ICalendarFileProviderException) {
             $this->SetStatus(in_array($exception->httpStatus, [401, 403], true)
@@ -1508,6 +1572,7 @@ class CalendarAccount extends IPSModuleStrict
             $exception instanceof CalDAVProviderException,
             $exception instanceof GoogleCalendarProviderException,
             $exception instanceof MicrosoftCalendarProviderException,
+            $exception instanceof MicrosoftTodoProviderException,
             $exception instanceof ICalendarFeedProviderException,
             $exception instanceof ICalendarFileProviderException => $exception->httpStatus,
             default                                              => 0

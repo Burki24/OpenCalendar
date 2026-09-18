@@ -89,6 +89,46 @@ try {
     );
 }
 
+$sourceOccurrence = array_merge(
+    IPSKalender\CalendarEventRecurrence::occurrence('series', 'old-id', '2026-09-20', '', true),
+    [
+        'uid'            => 'occurrence-uid',
+        'resourceUrl'    => 'https://graph.microsoft.com/v1.0/me/calendars/calendar/events/old-id',
+        'eventReference' => 'old-id'
+    ]
+);
+$writtenOccurrence = array_merge($sourceOccurrence, [
+    'eventReference' => 'new-id',
+    'occurrenceId'   => 'new-id',
+    'resourceUrl'    => 'https://graph.microsoft.com/v1.0/me/calendars/calendar/events/new-id',
+    'originalStart'  => ''
+]);
+$readback = CalendarEventLookup::resolveOccurrenceReadback($sourceOccurrence, $writtenOccurrence, 'new-id');
+assertEventLookup(
+    ($readback['originalStart'] ?? '') === '2026-09-20',
+    'Confirmed occurrence readback must restore the immutable original anchor when a new provider ID omits it.'
+);
+assertEventLookup(
+    CalendarEventLookup::sameOccurrence($sourceOccurrence, $writtenOccurrence),
+    'Occurrence-specific UIDs must match a new exception ID within the same calendar and series.'
+);
+foreach ([
+    'wrong returned ID'  => [$sourceOccurrence, $writtenOccurrence, 'different-id'],
+    'different series'   => [$sourceOccurrence, array_merge($writtenOccurrence, ['seriesId' => 'other']), 'new-id'],
+    'different calendar' => [$sourceOccurrence, array_merge(
+        $writtenOccurrence,
+        ['resourceUrl' => 'https://graph.microsoft.com/v1.0/me/calendars/other/events/new-id']
+    ), 'new-id'],
+    'series-wide write' => [array_merge($sourceOccurrence, ['writeScope' => 'series']), $writtenOccurrence, 'new-id'],
+    'CalDAV shared UID' => [array_merge($sourceOccurrence, ['resourceUrl' => 'https://caldav.example/series.ics']),
+        array_merge($writtenOccurrence, ['resourceUrl' => 'https://caldav.example/series.ics']), 'new-id']
+] as $label => [$source, $current, $reference]) {
+    assertEventLookup(
+        CalendarEventLookup::resolveOccurrenceReadback($source, $current, $reference) === null,
+        'Direct readback must reject unsafe occurrence identity: ' . $label
+    );
+}
+
 foreach ([
     'GoogleCalendarProvider.php'    => 'GoogleCalendarProviderException',
     'MicrosoftCalendarProvider.php' => 'MicrosoftCalendarProviderException',
