@@ -3,6 +3,20 @@
 declare(strict_types=1);
 
 $root = dirname(__DIR__);
+$bash = 'bash';
+if (PHP_OS_FAMILY === 'Windows') {
+    // Prefer Git Bash over the Windows bash.exe alias that launches WSL.
+    foreach ([
+        (getenv('ProgramFiles') ?: 'C:/Program Files') . '/Git/bin/bash.exe',
+        (getenv('ProgramFiles(x86)') ?: 'C:/Program Files (x86)') . '/Git/bin/bash.exe',
+        (getenv('LOCALAPPDATA') ?: '') . '/Programs/Git/bin/bash.exe'
+    ] as $candidate) {
+        if (is_file($candidate)) {
+            $bash = $candidate;
+            break;
+        }
+    }
+}
 
 $commands = [
     ['Verify vendored helper integrity', ['python3', 'tests/helper_integrity.py']],
@@ -49,7 +63,7 @@ $commands = [
     ['Check public PHPDoc coverage', [PHP_BINARY, 'tests/phpdocs.php']],
     ['Check Symcon Strict compliance', [PHP_BINARY, 'tests/symcon-strict.php']],
     ['Run CalDAV provider tests', [PHP_BINARY, 'tests/caldav.php']],
-    ['Run CalDAV HTTP integration tests', ['bash', 'tests/run-caldav-http.sh']]
+    ['Run CalDAV HTTP integration tests', [$bash, 'tests/run-caldav-http.sh']]
 ];
 
 foreach ($commands as [$label, $command]) {
