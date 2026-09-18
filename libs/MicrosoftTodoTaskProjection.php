@@ -34,6 +34,36 @@ final class MicrosoftTodoTaskProjection
     }
 
     /**
+     * Converts a Graph date/time to the calendar's local timezone, including Windows zone names.
+     * @param array<string, mixed> $value
+     */
+    public static function localDateTime(array $value): ?DateTimeImmutable
+    {
+        $rawDateTime = trim((string) ($value['dateTime'] ?? ''));
+        if ($rawDateTime === '') {
+            return null;
+        }
+
+        try {
+            $rawDateTime = preg_replace(
+                '/(\.\d{6})\d+(?=(?:Z|[+-]\d{2}:\d{2})?$)/',
+                '$1',
+                $rawDateTime
+            ) ?? $rawDateTime;
+            $sourceTimezone = self::timezone(trim((string) ($value['timeZone'] ?? 'UTC')));
+            $displayTimezone = new DateTimeZone(date_default_timezone_get());
+            $sourceDate = new DateTimeImmutable($rawDateTime, $sourceTimezone);
+            $errors = DateTimeImmutable::getLastErrors();
+            if ($errors !== false && ($errors['warning_count'] > 0 || $errors['error_count'] > 0)) {
+                return null;
+            }
+            return $sourceDate->setTimezone($displayTimezone);
+        } catch (Throwable) {
+            return null;
+        }
+    }
+
+    /**
      * @param array<string, mixed> $task
      * @return array<string, mixed>|null
      */
@@ -109,36 +139,6 @@ final class MicrosoftTodoTaskProjection
     private static function date(array $value): ?DateTimeImmutable
     {
         return self::localDateTime($value)?->setTime(0, 0);
-    }
-
-    /**
-     * Converts a Graph date/time to the calendar's local timezone, including Windows zone names.
-     * @param array<string, mixed> $value
-     */
-    public static function localDateTime(array $value): ?DateTimeImmutable
-    {
-        $rawDateTime = trim((string) ($value['dateTime'] ?? ''));
-        if ($rawDateTime === '') {
-            return null;
-        }
-
-        try {
-            $rawDateTime = preg_replace(
-                '/(\.\d{6})\d+(?=(?:Z|[+-]\d{2}:\d{2})?$)/',
-                '$1',
-                $rawDateTime
-            ) ?? $rawDateTime;
-            $sourceTimezone = self::timezone(trim((string) ($value['timeZone'] ?? 'UTC')));
-            $displayTimezone = new DateTimeZone(date_default_timezone_get());
-            $sourceDate = new DateTimeImmutable($rawDateTime, $sourceTimezone);
-            $errors = DateTimeImmutable::getLastErrors();
-            if ($errors !== false && ($errors['warning_count'] > 0 || $errors['error_count'] > 0)) {
-                return null;
-            }
-            return $sourceDate->setTimezone($displayTimezone);
-        } catch (Throwable) {
-            return null;
-        }
     }
 
     private static function timezone(string $name): DateTimeZone

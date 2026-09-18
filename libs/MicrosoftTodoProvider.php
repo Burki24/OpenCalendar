@@ -179,6 +179,22 @@ final class MicrosoftTodoProvider
             ?? throw new MicrosoftTodoProviderException('Microsoft To Do returned an invalid updated task.');
     }
 
+    /**
+     * Deletes one native task from a Microsoft To Do list.
+     */
+    public function deleteTask(string $listId, string $taskId): bool
+    {
+        $listId = $this->requiredId($listId, 'task list');
+        $taskId = $this->requiredId($taskId, 'task');
+        $this->requestJson(
+            'DELETE',
+            '/me/todo/lists/' . rawurlencode($listId) . '/tasks/' . rawurlencode($taskId),
+            null,
+            [204]
+        );
+        return true;
+    }
+
     /** @param array<string, mixed> $recurrence @return array<string, mixed> */
     private function moveRecurrence(
         array $recurrence,
@@ -195,7 +211,8 @@ final class MicrosoftTodoProvider
                 if (count($days) > 1 && $previousDate !== null) {
                     $weekdays = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
                     $offset = (int) $date->format('w') - (int) $previousDate->format('w');
-                    $pattern['daysOfWeek'] = array_map(static function (string $day) use ($weekdays, $offset): string {
+                    $pattern['daysOfWeek'] = array_map(static function (string $day) use ($weekdays, $offset): string
+                    {
                         $index = array_search(strtolower($day), $weekdays, true);
                         if ($index === false) {
                             throw new InvalidArgumentException('Invalid Microsoft To Do recurrence weekday.');
@@ -235,22 +252,6 @@ final class MicrosoftTodoProvider
         $recurrence['pattern'] = $pattern;
         $recurrence['range']['startDate'] = $date->format('Y-m-d');
         return $recurrence;
-    }
-
-    /**
-     * Deletes one native task from a Microsoft To Do list.
-     */
-    public function deleteTask(string $listId, string $taskId): bool
-    {
-        $listId = $this->requiredId($listId, 'task list');
-        $taskId = $this->requiredId($taskId, 'task');
-        $this->requestJson(
-            'DELETE',
-            '/me/todo/lists/' . rawurlencode($listId) . '/tasks/' . rawurlencode($taskId),
-            null,
-            [204]
-        );
-        return true;
     }
 
     /**

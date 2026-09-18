@@ -309,9 +309,11 @@ $unchangedCalendar->responses[] = todoWriteSuccess($utcTask);
 $unchangedResult = json_decode($unchangedCalendar->UpdateEvent(json_encode(array_merge(todoWriteIdentity(), [
     'changes' => ['summary' => 'Title only', 'start' => '2026-09-22', 'taskCompleted' => false]
 ]), JSON_THROW_ON_ERROR)), true, 512, JSON_THROW_ON_ERROR);
-assertTodoWrite($unchangedResult['success'] === true
+assertTodoWrite(
+    $unchangedResult['success'] === true
     && $unchangedCalendar->requests[0]['Changes'] === ['title' => 'Title only'],
-    'An unchanged displayed date must never be forwarded, even if the server may have advanced the series.');
+    'An unchanged displayed date must never be forwarded, even if the server may have advanced the series.'
+);
 
 $dstCalendar = new MicrosoftTodoCalendarWriteHarness($utcTask);
 $dstCalendar->responses[] = todoWriteSuccess($utcTask);
