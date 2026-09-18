@@ -24,7 +24,7 @@
             "version": "1.0.1",
             "sha256": "c5433bf0cd7141c93d98f16ae23325a7f00ab9d11438c44fbfd12ad239e21373",
             "path": "libs/helper/DebugHelper.php",
-            "source_sha": "1dea4ac47b81f7380aff1dcb4e6d26d29861a6e0"
+            "source_sha": "99d5f6fc9a1618a1c584e0910a3e13957f26f9d7"
         },
         "HttpResponseHelper": {
             "version": "1.1.0",
