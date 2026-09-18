@@ -1051,7 +1051,10 @@ class Calendar extends IPSModuleStrict
                 && !$convertingSingleToSeries
                 && $anniversary === null
                 && $existingAnniversary === null;
-            $cachedEvent = $simpleSingleWrite ? $this->cachedEventForIdentity($event) : null;
+            $microsoftOccurrenceWrite = $writeScope === CalendarEventRecurrence::WRITE_SCOPE_OCCURRENCE
+                && $this->isMicrosoftCalendarOccurrence($event);
+            $directEventWrite = $simpleSingleWrite || $microsoftOccurrenceWrite;
+            $cachedEvent = $directEventWrite ? $this->cachedEventForIdentity($event) : null;
 
             $this->SendSafeDebug('EventUpdate', [
                 'recurrenceType'     => $recurrenceType,
@@ -1093,7 +1096,7 @@ class Calendar extends IPSModuleStrict
                     $event
                 );
             }
-            if (!$simpleSingleWrite
+            if (!$directEventWrite
                 || $cachedEvent === null
                 || !$this->refreshSingleEventAfterWrite(
                     array_merge($cachedEvent, $changes, $updated),
@@ -2102,11 +2105,12 @@ class Calendar extends IPSModuleStrict
             }
             $events = array_values(array_filter(
                 $events,
-                static function (array $event) use (
+                function (array $event) use (
                     $eventReference,
                     $resourceUrl,
                     $occurrenceId,
-                    $replaceResource
+                    $replaceResource,
+                    $change
                 ): bool {
                     foreach ([
                         [$eventReference, trim((string) ($event['eventReference'] ?? ''))],
@@ -2118,7 +2122,7 @@ class Calendar extends IPSModuleStrict
                         }
                     }
 
-                    return true;
+                    return !$this->microsoftOccurrenceIdentityMatches($event, $change);
                 }
             ));
             if ($this->eventOverlapsConfiguredRange($change)) {
@@ -2164,6 +2168,13 @@ class Calendar extends IPSModuleStrict
                     ];
                 }
             }
+            $uid = trim((string) ($event['uid'] ?? ''));
+            if ($uid !== '' && $this->isMicrosoftCalendarOccurrence($event)) {
+                $identities[$seriesId . '|microsoft-uid:' . $uid] = [
+                    'originalStart'      => $originalStart,
+                    'canUpdateFollowing' => (bool) ($event['canUpdateFollowing'] ?? false)
+                ];
+            }
         }
 
         return $identities;
@@ -2197,6 +2208,14 @@ class Calendar extends IPSModuleStrict
                 $change['canUpdateFollowing'] = true;
             }
             break;
+        }
+        if (trim((string) ($change['originalStart'] ?? '')) === '' && $this->isMicrosoftCalendarOccurrence($change)) {
+            $uid = trim((string) ($change['uid'] ?? ''));
+            $identity = $uid !== '' ? ($cachedIdentities[$seriesId . '|microsoft-uid:' . $uid] ?? null) : null;
+            if ($identity !== null) {
+                $change['originalStart'] = $identity['originalStart'];
+                $change['canUpdateFollowing'] = $identity['canUpdateFollowing'];
+            }
         }
 
         return $change;
@@ -3207,7 +3226,7 @@ class Calendar extends IPSModuleStrict
     }
 
     /**
-     * Refreshes one non-recurring event directly from the provider and updates the local cache.
+     * Refreshes a single event or one Microsoft occurrence directly after a confirmed write.
      *
      * @param array<string, mixed> $event Event identity and current time boundaries after the write.
      * @param array<string, mixed> $sourceEvent Previous event identity when an existing event was updated.
@@ -3257,10 +3276,22 @@ class Calendar extends IPSModuleStrict
             }
         }
 
-        if ((bool) ($currentEvent['recurring'] ?? false)
+        $microsoftOccurrenceWrite = $this->isMicrosoftCalendarOccurrence($sourceEvent)
+            && $this->isMicrosoftCalendarOccurrence($currentEvent)
+            && (string) ($sourceEvent['writeScope'] ?? '') === CalendarEventRecurrence::WRITE_SCOPE_OCCURRENCE
+            && (string) $sourceEvent['seriesId'] === (string) $currentEvent['seriesId']
+            && $eventReference !== ''
+            && $eventReference === (string) ($currentEvent['eventReference'] ?? '');
+        if (!$microsoftOccurrenceWrite && ((bool) ($currentEvent['recurring'] ?? false)
             || (string) ($currentEvent['recurrenceType'] ?? CalendarEventRecurrence::SINGLE)
-                !== CalendarEventRecurrence::SINGLE) {
+                !== CalendarEventRecurrence::SINGLE)) {
             return false;
+        }
+        if ($microsoftOccurrenceWrite && trim((string) ($currentEvent['originalStart'] ?? '')) === '') {
+            // The PATCH result links the new exception ID to the edited occurrence.
+            // A direct Graph lookup may omit its immutable original-start anchor.
+            $currentEvent['originalStart'] = trim((string) ($sourceEvent['originalStart'] ?? ''));
+            $currentEvent['canUpdateFollowing'] = $currentEvent['originalStart'] !== '';
         }
 
         $previousIdentity = $sourceEvent !== [] ? $sourceEvent : $event;
@@ -3268,6 +3299,7 @@ class Calendar extends IPSModuleStrict
             $this->readEvents(),
             fn (array $cachedEvent): bool => !$this->eventIdentityMatches($cachedEvent, $previousIdentity)
                 && !$this->eventIdentityMatches($cachedEvent, $currentEvent)
+                && !$this->microsoftOccurrenceIdentityMatches($cachedEvent, $currentEvent)
         ));
         if ($this->eventOverlapsConfiguredRange($currentEvent)) {
             $events[] = $currentEvent;
@@ -3275,6 +3307,58 @@ class Calendar extends IPSModuleStrict
         $this->storeEventsAfterWrite($events);
 
         return true;
+    }
+
+    /** @param array<string, mixed> $event */
+    private function isMicrosoftCalendarOccurrence(array $event): bool
+    {
+        return CalendarEventRecurrence::isOccurrence($event)
+            && trim((string) ($event['seriesId'] ?? '')) !== ''
+            && preg_match(
+                '~^https://graph\.microsoft\.com/v1\.0/me/calendars/[^/]+/events/[^/?#]+$~D',
+                (string) ($event['resourceUrl'] ?? '')
+            ) === 1;
+    }
+
+    /**
+     * Matches a logical Microsoft occurrence when its provider ID changes.
+     * Other providers can share one UID across a whole series and must not use this fallback.
+     *
+     * @param array<string, mixed> $left
+     * @param array<string, mixed> $right
+     */
+    private function microsoftOccurrenceIdentityMatches(array $left, array $right): bool
+    {
+        if (!$this->isMicrosoftCalendarOccurrence($left)
+            || !$this->isMicrosoftCalendarOccurrence($right)
+            || (string) $left['seriesId'] !== (string) $right['seriesId']
+            || dirname((string) $left['resourceUrl']) !== dirname((string) $right['resourceUrl'])) {
+            return false;
+        }
+        $uid = trim((string) ($left['uid'] ?? ''));
+        if ($uid !== '' && $uid === trim((string) ($right['uid'] ?? ''))) {
+            return true;
+        }
+        $leftStart = trim((string) ($left['originalStart'] ?? ''));
+        $rightStart = trim((string) ($right['originalStart'] ?? ''));
+        if ($leftStart === '' || $rightStart === '') {
+            return false;
+        }
+        if ($leftStart === $rightStart) {
+            return true;
+        }
+        if (preg_match('/^\d{4}-\d{2}-\d{2}$/D', $leftStart) === 1
+            || preg_match('/^\d{4}-\d{2}-\d{2}$/D', $rightStart) === 1) {
+            // A date-only fallback cannot safely be compared with Graph's UTC
+            // originalStart without a verified timezone. Prefer the UID above.
+            return false;
+        }
+        try {
+            return (new DateTimeImmutable($leftStart))->getTimestamp()
+                === (new DateTimeImmutable($rightStart))->getTimestamp();
+        } catch (Throwable) {
+            return false;
+        }
     }
 
     /** @param array<string, mixed> $identity */
