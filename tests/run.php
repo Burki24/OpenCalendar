@@ -19,6 +19,7 @@ if (PHP_OS_FAMILY === 'Windows') {
 }
 
 $commands = [
+    ['Verify event editor duration preservation', ['node', 'tests/event-editor-duration.js']],
     ['Verify local calendar provider and original data', [PHP_BINARY, 'tests/local-calendar-provider.php']],
     ['Verify standalone local calendar runtime', [PHP_BINARY, 'tests/local-calendar-module.php']],
     ['Verify local calendar account, configurator and console export', [PHP_BINARY, 'tests/local-calendar-account.php']],

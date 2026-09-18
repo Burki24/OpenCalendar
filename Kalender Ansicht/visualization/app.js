@@ -4300,24 +4300,12 @@ function updateEndFromStart() {
     if (allDay) {
         end = start;
     } else {
-        const dateChanged = previousStart && dayKey(previousStart) !== dayKey(start);
-        const timeChanged = previousStart
-            && (previousStart.getHours() !== start.getHours()
-                || previousStart.getMinutes() !== start.getMinutes());
         const currentEnd = readInputDate(endInput.value);
-
-        if (dateChanged && !timeChanged && currentEnd) {
-            end = new Date(
-                start.getFullYear(),
-                start.getMonth(),
-                start.getDate(),
-                currentEnd.getHours(),
-                currentEnd.getMinutes()
-            );
-            if (end <= start) end = new Date(start.getTime() + 60 * 60 * 1000);
-        } else {
-            end = new Date(start.getTime() + 60 * 60 * 1000);
-        }
+        const duration = previousStart && currentEnd
+            ? currentEnd.getTime() - previousStart.getTime()
+            : 0;
+        // Preserve the current duration, including manual end edits and overnight events.
+        end = new Date(start.getTime() + (duration > 0 ? duration : 60 * 60 * 1000));
     }
 
     endInput.value = allDay ? localDate(end) : localDateTime(end);
