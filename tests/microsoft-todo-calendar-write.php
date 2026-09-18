@@ -340,6 +340,14 @@ try {
                 !isset($outgoing['dueDateTime']),
                 'Saving an unchanged displayed date alongside a title edit must preserve the original provider due date untouched.'
             );
+            $unchanged = new MicrosoftTodoCalendarWriteHarness($task);
+            $unchangedResult = json_decode($unchanged->UpdateEvent(json_encode(array_merge(todoWriteIdentity(), [
+                'changes' => ['start' => $selectedDate, 'taskCompleted' => false]
+            ]), JSON_THROW_ON_ERROR)), true, 512, JSON_THROW_ON_ERROR);
+            assertTodoWrite(
+                $unchangedResult['success'] === true && $unchanged->requests === [],
+                'Saving an unchanged native task must succeed without a provider write or recurrence reset.'
+            );
         }
         $titleOnly = new MicrosoftTodoCalendarWriteHarness($task);
         $titleOnly->echoTask = $task;

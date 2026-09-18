@@ -367,6 +367,24 @@ Aufgabe ist beispielsweise nicht automatisch ein abgesagter Termin.
 
 ### Microsoft To Do einrichten
 
+Beim Verschieben einer offenen nativen Aufgabenserie richtet OpenCalendar die
+Wiederholung am neuen Datum aus. Bei wöchentlichen Aufgaben ändert sich damit
+auch der Wochentag der Folgeaufgaben. Das ist keine Kalender-Serienausnahme
+„nur diesen Termin verschieben“. Microsoft stellt die nächste offene Aufgabe
+erst nach Erledigung bereit; OpenCalendar erzeugt keine zukünftigen Kopien.
+Reine Titeländerungen oder unveränderte Datumsangaben richten die Serie nicht
+neu aus. Die von Microsoft gelieferte verbleibende Wiederholungsanzahl wird
+nicht nochmals um bereits erledigte Aufgaben reduziert.
+
+Nach dem Verschieben prüft OpenCalendar Aufgabenidentität und Fälligkeitsdatum
+in der Symcon-Zeitzone. Bei einer Abweichung wird einmal erneut gelesen.
+Bleibt die Abweichung bestehen, erscheint eine Fehlermeldung statt einer
+Erfolgsbestätigung. Eine gleichzeitig angeforderte Erledigung wird nicht gesendet.
+Die Serienänderung kann bei Microsoft bereits gespeichert sein: bitte
+synchronisieren und in Microsoft To Do prüfen, bevor der Vorgang wiederholt wird.
+Diese Prüfung behebt noch nicht die beobachtete UTC-Mitternacht-Abweichung in
+westlichen Zeitzonen. Es erfolgt keine automatische Tageskorrektur oder Rücknahme.
+
 Native Microsoft-To-Do-Aufgaben benötigen zusätzlich die delegierte
 Microsoft-Graph-Berechtigung `Tasks.ReadWrite`. `Calendars.ReadWrite` allein
 reicht nicht. Der OAuth-Zugang läuft weiterhin über Symcon; Anwender müssen

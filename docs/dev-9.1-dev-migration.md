@@ -7,6 +7,29 @@ und `dev_9.1` bei `086eb43`.
 
 ## Übernahmeregeln
 
+### Ergänzung: native To-Do-Serien (dev `f0deaa9`)
+
+Die Folgekorrekturen wurden auf Basis von `dev_9.1` bei `d3a03ae` fachlich
+übernommen, ohne den älteren Modulaufbau zu übernehmen:
+
+- Frischer Aufgabenstand vor Datumsänderungen; Neuausrichtung nativer Serien
+  über ihre Wiederholung statt eines duplizierenden Fälligkeits-PATCH.
+- Bereits von Microsoft reduzierte Restanzahl unverändert übernehmen.
+- Verschieben vor Erledigen; Identität und lokales Rückgabedatum prüfen,
+  bei Abweichung einmal nachlesen und keine anschließende Erledigung senden.
+- Unveränderte Bearbeitungen ohne Schreibzugriff erfolgreich abschließen.
+- Hinweis im bestehenden 9.1-Dialog und Dokumentation der Zeitzoneneinschränkung.
+
+Die vorhandene 9.1-Fälligkeitsumrechnung einschließlich UTC-Quellformat,
+Sekundenbruchteilen und Sommerzeit-Roundtrips bleibt erhalten. Die öffentliche
+Quellzeit- und Zeitzonenauflösung wird nur um eine lokale Datumsansicht ergänzt.
+Providerneutrale Fehlerverträge, 9.1-UI, zentrale Helper, Metadaten und
+Upgrade-Strukturen bleiben unverändert. Die Graph-Zeitzonenabweichung wird
+erkannt, nicht serverseitig behoben; die Zeitzonenfälle sind lokale HTTP-Replays,
+kein zusätzlicher Live-Nachweis für 9.1.
+
+### Allgemeine Regeln
+
 - Bereits gleichwertig gelöste Fehler werden nicht erneut implementiert.
 - Fehlendes Verhalten wird an den bestehenden 9.1-Schnittstellen ergänzt.
 - Providerneutrale Verträge, lokale Originaldaten und Upgrade-Kompatibilität

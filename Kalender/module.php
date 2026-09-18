@@ -2003,7 +2003,7 @@ class Calendar extends IPSModuleStrict
             }
         }
         if ($taskChanges === []) {
-            throw new InvalidArgumentException('No Microsoft To Do task changes were supplied.');
+            return $sourceTask;
         }
 
         return $this->sendRequest('UpdateTask', [

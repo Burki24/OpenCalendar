@@ -3437,6 +3437,10 @@ function openExistingEvent(event, writeScope = '') {
     if (!editable) {
         note.textContent = t(eventReadOnlyReason(selectedEvent));
         note.classList.remove('hidden');
+    } else if (String(selectedEvent.sourceType || '').toLowerCase() === 'microsoft-todo'
+        && selectedEvent.taskNativeRecurrence && !selectedEvent.taskCompleted) {
+        note.textContent = t('Changing the due date also realigns the Microsoft To Do recurrence. Future tasks are provided by Microsoft after completion.');
+        note.classList.remove('hidden');
     } else if (editingSeries) {
         note.textContent = selectedEvent.recurrenceEditable === false
             ? `${t('Changes will apply to the entire recurring series.')} ${t('The recurrence pattern of this series cannot be edited here.')}`

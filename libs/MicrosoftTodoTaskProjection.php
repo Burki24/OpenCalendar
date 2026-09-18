@@ -63,6 +63,12 @@ final class MicrosoftTodoTaskProjection
         }
     }
 
+    /** @param array<string, mixed> $value */
+    public static function localDateTime(array $value): ?DateTimeImmutable
+    {
+        return self::dateTime($value)?->setTimezone(new DateTimeZone(date_default_timezone_get()));
+    }
+
     /** Resolves Microsoft and IANA timezone names consistently for task projection and writes. */
     public static function timezone(string $name): DateTimeZone
     {
