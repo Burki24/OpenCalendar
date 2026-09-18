@@ -225,9 +225,45 @@ $sequenceClient = new MicrosoftTodoTestHttpClient([
 $sequenceMove = json_decode($sequenceClient->requests[1]['body'], true, 512, JSON_THROW_ON_ERROR);
 assertMicrosoftTodo(count($sequenceClient->requests) === 3
     && !isset($sequenceMove['status'])
-    && $sequenceMove['recurrence']['range']['numberOfOccurrences'] === 3
+    && $sequenceMove['recurrence']['range']['numberOfOccurrences'] === 5
     && json_decode($sequenceClient->requests[2]['body'], true) === ['status' => 'completed'],
-    'Move before completing, and retain only the remaining occurrences of a bounded series.');
+    'Move before completing, and preserve the remaining count already supplied by Microsoft To Do.');
+
+// Live Graph observation: after completing the first of three tasks, startDate
+// stays September 22 while the next task is due September 23 and the count is 2.
+// Unlike a calendar series, this count is already the remaining number of tasks.
+foreach ([2, 1] as $remaining) {
+    $pending = $daily;
+    $pending['dueDateTime'] = [
+        'dateTime' => $remaining === 2 ? '2026-09-22T22:00:00.0000000' : '2026-09-23T22:00:00.0000000',
+        'timeZone' => 'UTC'
+    ];
+    $pending['recurrence']['range'] = [
+        'type' => 'numbered', 'startDate' => '2026-09-22',
+        'endDate' => '2026-09-24', 'recurrenceTimeZone' => 'UTC',
+        'numberOfOccurrences' => $remaining
+    ];
+    $movedPending = $pending;
+    $movedPending['dueDateTime'] = ['dateTime' => '2026-09-26T00:00:00', 'timeZone' => 'UTC'];
+    $movedPending['recurrence']['range']['startDate'] = '2026-09-26';
+    $remainingClient = new MicrosoftTodoTestHttpClient([
+        todoResponse(200, $pending), todoResponse(200, $movedPending),
+        todoResponse(200, $movedPending), todoResponse(200, $movedPending)
+    ]);
+    $remainingProvider = new MicrosoftTodoProvider($remainingClient, 'access-token');
+    foreach (['2026-09-26', '2026-09-28'] as $moveIndex => $targetDate) {
+        $remainingProvider->updateTask('list-1', 'series', [
+            'dueDateTime' => ['dateTime' => $targetDate . 'T00:00:00', 'timeZone' => 'Europe/Berlin']
+        ]);
+        $request = $remainingClient->requests[$moveIndex * 2 + 1];
+        $payload = json_decode($request['body'], true, 512, JSON_THROW_ON_ERROR);
+        assertMicrosoftTodo($request['method'] === 'PATCH'
+            && $payload['recurrence']['range']['numberOfOccurrences'] === $remaining
+            && $payload['recurrence']['range']['startDate'] === $targetDate
+            && !isset($payload['dueDateTime']) && !isset($payload['status']),
+            'Repeated rescheduling must neither consume remaining To Do tasks nor reject the final occurrence.');
+    }
+}
 
 foreach (['single', 'completed'] as $kind) {
     $task = $daily;

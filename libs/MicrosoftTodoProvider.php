@@ -11,7 +11,6 @@ use Throwable;
 
 require_once __DIR__ . '/CalendarHttpClient.php';
 require_once __DIR__ . '/MicrosoftTodoTaskProjection.php';
-require_once __DIR__ . '/CalendarRecurrenceRule.php';
 
 final class MicrosoftTodoProviderException extends RuntimeException
 {
@@ -230,12 +229,9 @@ final class MicrosoftTodoProvider
             default:
                 throw new InvalidArgumentException('Invalid Microsoft To Do recurrence pattern.');
         }
-        if (($recurrence['range']['type'] ?? '') === 'numbered' && $previousDate !== null) {
-            $recurrence['range']['numberOfOccurrences'] = CalendarRecurrenceRule::remainingMicrosoftOccurrenceCount(
-                $recurrence,
-                $previousDate->format('Y-m-d')
-            );
-        }
+        // To Do already decrements numberOfOccurrences after completion while
+        // retaining the original range start. Preserve this remaining count;
+        // calendar-series occurrence arithmetic would subtract completed tasks twice.
         $recurrence['pattern'] = $pattern;
         $recurrence['range']['startDate'] = $date->format('Y-m-d');
         return $recurrence;
