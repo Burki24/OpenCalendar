@@ -186,7 +186,7 @@
             "version": "1.0.0",
             "sha256": "d9053bfd083a581b96f8526cbb05e8568a6ad24a81cafa3e9b05108343bf2a65",
             "path": "libs/helper/SymconOAuthHelper.php",
-            "source_sha": "99d5f6fc9a1618a1c584e0910a3e13957f26f9d7"
+            "source_sha": "c3104e556cdd02621a5efc5b8fa5ee3577f1c793"
         },
         "VariableHelper": {
             "version": "1.2.0",
