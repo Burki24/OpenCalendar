@@ -19,7 +19,7 @@ require_once __DIR__ . '/HelperTranslationHelper.php';
  * visual implementation in style.css/app.js. The helper owns asset loading,
  * bootstrap encoding, page metadata, fixed placeholders and validation.
  *
- * @version 1.3.0
+ * @version 1.4.0
  */
 trait IPSViewHTMLPageHelper
 {
@@ -31,6 +31,7 @@ trait IPSViewHTMLPageHelper
     private const IPSVIEW_HTML_VARIABLE_REGISTRY_ATTRIBUTE = 'IPSViewHTMLVariableRegistry';
     private const IPSVIEW_HTML_FORM_MARKER = 'Configure optional IPSView HTML output.';
     private const IPSVIEW_HTML_DELETE_ACTION = 'IPSViewHTMLDeleteVariables';
+    private const IPSVIEW_HTML_REGENERATE_ACTION = 'IPSViewHTMLRegenerateVariables';
 
     /** @var array<string,string> */
     private const IPSVIEW_HTML_TRANSLATION_SOURCES = [
@@ -42,7 +43,10 @@ trait IPSViewHTMLPageHelper
         'popup.delete_description'       => 'The following IPSView variables will be deleted permanently. Existing links and placements that reference them will no longer work.',
         'action.keep_variables'          => 'Keep variables',
         'action.confirm_delete'          => 'Delete variables',
-        'message.variables_deleted'      => 'The retained IPSView variables were deleted.'
+        'message.variables_deleted'      => 'The retained IPSView variables were deleted.',
+        'action.regenerate_variables'    => 'Regenerate IPSView HTML',
+        'message.variables_regenerated'  => 'IPSView HTML regenerated.',
+        'error.regenerate_variables'     => 'IPSView HTML could not be regenerated. Enable IPSView output and apply the instance configuration first.'
     ];
 
     /** @var list<string> */
@@ -92,12 +96,19 @@ trait IPSViewHTMLPageHelper
      */
     protected function HandleIPSViewHTMLPageAction(string $ident, mixed $value): bool
     {
-        if ($ident !== self::IPSVIEW_HTML_DELETE_ACTION) {
-            return false;
+        if ($ident === self::IPSVIEW_HTML_DELETE_ACTION) {
+            $this->DeleteRetainedIPSViewHTMLVariables();
+            return true;
+        }
+        if ($ident === self::IPSVIEW_HTML_REGENERATE_ACTION) {
+            if (!$this->RegenerateIPSViewHTMLPages()) {
+                throw new RuntimeException($this->IPSViewHTMLPageText('error.regenerate_variables'));
+            }
+
+            return true;
         }
 
-        $this->DeleteRetainedIPSViewHTMLVariables();
-        return true;
+        return false;
     }
 
     /**
@@ -124,6 +135,17 @@ trait IPSViewHTMLPageHelper
             [
                 'type'    => 'Label',
                 'caption' => $description
+            ],
+            [
+                'type'    => 'Button',
+                'caption' => $this->IPSViewHTMLPageText('action.regenerate_variables'),
+                'onClick' => [
+                    'IPS_RequestAction($id, ' . var_export(self::IPSVIEW_HTML_REGENERATE_ACTION, true) . ', "");',
+                    'return ' . var_export(
+                        'MESSAGE:' . $this->IPSViewHTMLPageText('message.variables_regenerated'),
+                        true
+                    ) . ';'
+                ]
             ]
         ];
 
@@ -188,6 +210,50 @@ trait IPSViewHTMLPageHelper
     protected function IsIPSViewHTMLPageEnabled(): bool
     {
         return $this->ReadPropertyBoolean(self::IPSVIEW_HTML_ENABLE_PROPERTY);
+    }
+
+    /**
+     * Re-renders every registered IPSView WebContent variable through the
+     * consumer's GetIPSViewHTML() method without replacing the variables.
+     */
+    protected function RegenerateIPSViewHTMLPages(): bool
+    {
+        if (!$this->IsIPSViewHTMLPageEnabled() || !method_exists($this, 'GetIPSViewHTML')) {
+            return false;
+        }
+
+        try {
+            if (
+                method_exists($this, 'PrepareIPSViewHTMLRegeneration')
+                && !$this->PrepareIPSViewHTMLRegeneration()
+            ) {
+                return false;
+            }
+
+            $html = $this->GetIPSViewHTML();
+            if (!is_string($html) || trim($html) === '') {
+                return false;
+            }
+
+            $updated = false;
+            foreach (array_keys($this->ReadIPSViewHTMLVariableRegistry()) as $ident) {
+                if (!$this->IPSViewHTMLVariableExists($ident)) {
+                    continue;
+                }
+                if (!$this->UpdateIPSViewHTMLVariable($ident, $html)) {
+                    return false;
+                }
+                $updated = true;
+            }
+
+            return $updated;
+        } catch (Throwable $exception) {
+            if (method_exists($this, 'SendDebug')) {
+                $this->SendDebug('IPSViewHTMLRegeneration', $exception->getMessage(), 0);
+            }
+
+            return false;
+        }
     }
 
     /**
