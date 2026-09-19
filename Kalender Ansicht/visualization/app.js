@@ -4700,6 +4700,11 @@ document.addEventListener('visibilitychange', () => {
     requestIPSViewStateRefresh();
 });
 document.addEventListener('wheel', containWheelInsideTile, { capture: true, passive: false });
+let pickerTouchScroll = null;
+document.addEventListener('touchstart', beginPickerTouchScroll, { capture: true, passive: true });
+document.addEventListener('touchmove', movePickerTouchScroll, { capture: true, passive: false });
+document.addEventListener('touchend', endPickerTouchScroll, { capture: true, passive: true });
+document.addEventListener('touchcancel', endPickerTouchScroll, { capture: true, passive: true });
 content.addEventListener('pointerdown', beginSwipeNavigation);
 content.addEventListener('pointerup', finishSwipeNavigation);
 content.addEventListener('pointercancel', cancelSwipeNavigation);
@@ -4789,12 +4794,50 @@ function calendarDialogIsOpen() {
     ].some(dialog => dialog.open);
 }
 
+function pickerScrollTarget(event) {
+    // Embedded hosts can retarget an event; prefer its original DOM path.
+    const targets = typeof event.composedPath === 'function' ? event.composedPath() : [];
+    targets.push(event.target);
+    for (const target of targets) {
+        const element = target instanceof Element ? target : target?.parentElement;
+        const list = element?.closest?.('.calendar-picker-options');
+        if (list) return list;
+    }
+    return null;
+}
+
+function beginPickerTouchScroll(event) {
+    pickerTouchScroll = null;
+    if (event.touches.length !== 1) return;
+    const target = pickerScrollTarget(event);
+    if (!target) return;
+    const touch = event.touches[0];
+    pickerTouchScroll = { target, identifier: touch.identifier, y: touch.clientY };
+}
+
+function movePickerTouchScroll(event) {
+    if (!pickerTouchScroll) return;
+    if (event.touches.length !== 1 || !event.cancelable) {
+        pickerTouchScroll = null;
+        return;
+    }
+    const touch = event.touches[0];
+    if (touch.identifier !== pickerTouchScroll.identifier) return;
+    // Keep the gesture in the list, including at its upper and lower limits.
+    pickerTouchScroll.target.scrollTop += pickerTouchScroll.y - touch.clientY;
+    pickerTouchScroll.y = touch.clientY;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+}
+
+function endPickerTouchScroll() {
+    pickerTouchScroll = null;
+}
+
 function containWheelInsideTile(event) {
     if (event.ctrlKey) return;
 
-    const calendarOptionList = event.target instanceof Element
-        ? event.target.closest('.calendar-picker-options')
-        : null;
+    const calendarOptionList = pickerScrollTarget(event);
     const openDialog = [eventDialog, eventDetailsDialog, editScopeDialog, deleteConfirmDialog, dayEventsDialog, viewSelectorDialog, calendarFilterDialog]
         .find(dialog => dialog.open);
     const scrollTarget = calendarOptionList
