@@ -2180,6 +2180,179 @@ function handleIPSViewEventStateOptionKeydown(event, select) {
     options[nextIndex]?.focus();
 }
 
+function datePickerMonthDays(year, month) {
+    const first = new Date(year, month, 1, 12);
+    const offset = (first.getDay() + 6) % 7;
+    return Array.from({length: 42}, (_, index) => new Date(year, month, 1 - offset + index, 12));
+}
+
+function datePickerInputValue(day, hours, minutes, allDay) {
+    if (!(day instanceof Date) || !Number.isFinite(day.getTime())) return '';
+    const date = `${String(day.getFullYear()).padStart(4, '0')}-${String(day.getMonth() + 1).padStart(2, '0')}-${String(day.getDate()).padStart(2, '0')}`;
+    if (allDay) return date;
+    if (!/^\d{1,2}$/.test(String(hours)) || !/^\d{1,2}$/.test(String(minutes))
+        || Number(hours) > 23 || Number(minutes) > 59) return '';
+    return `${date}T${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+}
+
+function initializeIPSViewDatePickers() {
+    if (calendarVisualization.mode !== 'ipsview') return;
+    let closeActive = null;
+    const locale = calendarVisualization.language || undefined;
+    for (const id of ['event-start', 'event-end']) {
+        const input = document.getElementById(id);
+        if (!input || input.closest('.ips-date-field')) continue;
+        const wrapper = element('div', 'ips-date-field');
+        input.before(wrapper);
+        wrapper.append(input);
+        const trigger = element('button', 'secondary-button ips-date-trigger');
+        trigger.type = 'button';
+        trigger.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4m10-4v4M3 11h18m-13 4h2m4 0h2m-8 3h2m4 0h2"/></svg>';
+        trigger.setAttribute('aria-label', `${t('Date')} – ${t(id === 'event-start' ? 'Start' : 'End')}`);
+        trigger.setAttribute('aria-expanded', 'false');
+        trigger.setAttribute('aria-controls', `${id}-picker`);
+        wrapper.append(trigger);
+        const panel = element('div', 'ips-date-panel hidden');
+        panel.id = `${id}-picker`;
+        panel.setAttribute('role', 'group');
+        panel.setAttribute('aria-label', trigger.getAttribute('aria-label'));
+        wrapper.append(panel);
+        let day;
+        let month;
+        let hours;
+        let minutes;
+        const close = (focus = false) => {
+            panel.classList.add('hidden');
+            panel.replaceChildren();
+            trigger.setAttribute('aria-expanded', 'false');
+            if (closeActive === close) closeActive = null;
+            if (focus) trigger.focus();
+        };
+        const button = (text, action, parent = panel) => {
+            const node = element('button', 'secondary-button');
+            node.type = 'button';
+            node.textContent = text;
+            node.addEventListener('click', action);
+            parent.append(node);
+            return node;
+        };
+        const render = (focusDay = false) => {
+            panel.replaceChildren();
+            const nav = element('div', 'ips-date-nav');
+            panel.append(nav);
+            const changeMonth = delta => {
+                month = new Date(month.getFullYear(), month.getMonth() + delta, 1, 12);
+                render();
+                panel.querySelectorAll('.ips-date-nav button')[delta < 0 ? 0 : 1]?.focus({preventScroll: true});
+            };
+            const formatMonth = value => new Intl.DateTimeFormat(locale, {month: 'long', year: 'numeric'}).format(value);
+            const previous = button('‹', () => changeMonth(-1), nav);
+            previous.setAttribute('aria-label', formatMonth(new Date(month.getFullYear(), month.getMonth() - 1, 1)));
+            const title = element('span', '');
+            title.textContent = formatMonth(month);
+            title.setAttribute('aria-live', 'polite');
+            nav.append(title);
+            const next = button('›', () => changeMonth(1), nav);
+            next.setAttribute('aria-label', formatMonth(new Date(month.getFullYear(), month.getMonth() + 1, 1)));
+            const grid = element('div', 'ips-date-grid');
+            panel.append(grid);
+            for (let index = 0; index < 7; index++) {
+                const label = element('span', '');
+                label.textContent = new Intl.DateTimeFormat(locale, {weekday: 'short'}).format(new Date(2024, 0, 1 + index));
+                grid.append(label);
+            }
+            let selectedButton;
+            const choose = value => {
+                day = value;
+                month = new Date(day.getFullYear(), day.getMonth(), 1, 12);
+                render(true);
+            };
+            for (const value of datePickerMonthDays(month.getFullYear(), month.getMonth())) {
+                const cell = button(String(value.getDate()), () => choose(value), grid);
+                const selected = datePickerInputValue(day, '', '', true) === datePickerInputValue(value, '', '', true);
+                cell.setAttribute('aria-label', new Intl.DateTimeFormat(locale, {dateStyle: 'full'}).format(value));
+                cell.setAttribute('aria-pressed', String(selected));
+                cell.classList.toggle('ips-date-adjacent', value.getMonth() !== month.getMonth());
+                cell.tabIndex = selected ? 0 : -1;
+                if (selected) selectedButton = cell;
+                cell.addEventListener('keydown', event => {
+                    const offsets = {ArrowLeft: -1, ArrowRight: 1, ArrowUp: -7, ArrowDown: 7};
+                    if (!(event.key in offsets)) return;
+                    event.preventDefault();
+                    choose(new Date(value.getFullYear(), value.getMonth(), value.getDate() + offsets[event.key], 12));
+                });
+            }
+            // Keep the displayed month keyboard-accessible after navigating away from the selection.
+            if (!selectedButton) grid.querySelector('button').tabIndex = 0;
+            const time = element('div', 'ips-date-time');
+            panel.append(time);
+            const numberInput = (caption, value, maximum) => {
+                const label = element('label', '');
+                label.textContent = t(caption);
+                const field = document.createElement('input');
+                field.type = 'number'; field.min = '0'; field.max = String(maximum); field.step = '1'; field.required = true;
+                field.value = value;
+                label.append(field); time.append(label);
+                return field;
+            };
+            const hourInput = numberInput('Hours', hours, 23);
+            const minuteInput = numberInput('Minutes', minutes, 59);
+            const allDay = input.type === 'date';
+            time.classList.toggle('hidden', allDay);
+            hourInput.disabled = minuteInput.disabled = allDay;
+            hourInput.addEventListener('input', () => { hours = hourInput.value; });
+            minuteInput.addEventListener('input', () => { minutes = minuteInput.value; });
+            const actions = element('div', 'ips-date-actions');
+            panel.append(actions);
+            button(t('Today'), () => choose(new Date()), actions);
+            button(t('Cancel'), () => close(true), actions);
+            button(t('Apply'), () => {
+                if (input.disabled || input.readOnly) return close();
+                if (!allDay && (!hourInput.reportValidity() || !minuteInput.reportValidity())) return;
+                const value = datePickerInputValue(day, hours, minutes, allDay);
+                if (!value) return;
+                const previousValue = input.value;
+                input.value = value;
+                if (!input.reportValidity()) { input.value = previousValue; return; }
+                close(true);
+                input.dispatchEvent(new Event('input', {bubbles: true}));
+                input.dispatchEvent(new Event('change', {bubbles: true}));
+            }, actions);
+            if (focusDay) selectedButton?.focus({preventScroll: true});
+        };
+        trigger.addEventListener('click', () => {
+            if (input.disabled || input.readOnly) return;
+            if (!panel.classList.contains('hidden')) return close();
+            closeActive?.();
+            day = readInputDate(input.value) || new Date();
+            month = new Date(day.getFullYear(), day.getMonth(), 1, 12);
+            hours = String(day.getHours()).padStart(2, '0');
+            minutes = String(day.getMinutes()).padStart(2, '0');
+            closeActive = close;
+            render();
+            panel.classList.remove('hidden');
+            trigger.setAttribute('aria-expanded', 'true');
+            panel.querySelector('[aria-pressed="true"]')?.focus({preventScroll: true});
+        });
+        document.addEventListener('click', event => {
+            // Rendering a new month removes the clicked cell, but its event path
+            // still identifies this picker as the original click destination.
+            const inside = event.composedPath?.().includes(wrapper) || wrapper.contains(event.target);
+            if (!inside) close();
+        });
+        document.addEventListener('keydown', event => {
+            if (event.key !== 'Escape' || panel.classList.contains('hidden')) return;
+            event.preventDefault(); event.stopImmediatePropagation(); close(true);
+        }, true);
+        const updateDisabled = () => { trigger.disabled = input.disabled || input.readOnly; close(); };
+        new MutationObserver(updateDisabled).observe(input, {attributes: true, attributeFilter: ['disabled', 'readonly', 'type']});
+        input.addEventListener('change', () => close());
+        eventDialog.addEventListener('close', () => close());
+        document.getElementById('event-all-day').addEventListener('change', () => close());
+        updateDisabled();
+    }
+}
+
 function suggestedAnniversaryDate() {
     const eventStart = readInputDate(document.getElementById('event-start').value);
     if (!eventStart) return '';
@@ -5335,6 +5508,7 @@ function safeColor(value) {
 }
 
 initializeIPSViewEventStatePicker(eventAnniversaryType);
+initializeIPSViewDatePickers();
 
 if (calendarVisualization.state && typeof calendarVisualization.state === 'object') {
     handleMessage({ type: 'state', payload: calendarVisualization.state });
