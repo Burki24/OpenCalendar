@@ -19,7 +19,7 @@ require_once __DIR__ . '/IPSViewStyleProfileHelper.php';
  * their components, but do not define module-specific colors, gradients,
  * typography, borders or shadows.
  *
- * @version 1.6.8
+ * @version 1.6.9
  */
 trait IPSViewStyleHelper
 {
@@ -953,7 +953,7 @@ trait IPSViewStyleHelper
             '--ipsview-gradient-positive'                   => $style['GradientPositive'],
             '--ipsview-gradient-warning'                    => $style['GradientWarning'],
             '--ipsview-gradient-critical'                   => $style['GradientCritical'],
-            '--ipsview-font-family'                         => $style['FontFamily'],
+            '--ipsview-font-family'                         => IPSViewFontCatalogHelper::cssFamily((string) $style['FontFamily']),
             '--ipsview-font-size'                           => $this->IPSViewFormatNumber((float) $style['FontSize']) . 'px',
             '--ipsview-font-style'                          => $fontStyle,
             '--ipsview-font-weight'                         => $fontWeight,
@@ -1036,7 +1036,10 @@ trait IPSViewStyleHelper
         }
         $lines[] = '}';
 
-        return implode("\n", $lines);
+        $css = implode("\n", $lines);
+        $fontFaceCSS = IPSViewFontCatalogHelper::fontFaceCSS((string) $style['FontFamily'], $fontCut);
+
+        return $fontFaceCSS === '' ? $css : $css . "\n" . $fontFaceCSS;
     }
 
     /** Reads and decodes the selected IPSView media object. */
