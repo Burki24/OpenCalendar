@@ -756,6 +756,7 @@ html.ipsview-mode .danger-button { min-height: 48px; padding-inline: 18px; }
     box-shadow: 0 1px 0 var(--cal-line, var(--cal-border));
 }
 #event-dialog .dialog-actions {
+    flex-wrap: wrap;
     position: sticky;
     bottom: 0;
     z-index: 6;
@@ -869,6 +870,8 @@ html.ipsview-mode #event-dialog .dialog-actions {
 
 .form-row { display: grid; min-width: 0; gap: 5px; }
 .form-row.two { grid-template-columns: 1fr 1fr; gap: 10px; }
+/* Keep fields usable when the configured dialog font grows. */
+#event-dialog .form-row.two { grid-template-columns: repeat(auto-fit, minmax(min(100%, 14em), 1fr)); }
 #event-state-row { align-items: start; }
 .form-row label { color: var(--cal-label-text); font-weight: 600; }
 .form-row input, .form-row select, .form-row textarea {
@@ -906,6 +909,7 @@ html.ipsview-mode #event-dialog .dialog-actions {
     text-align: left;
 }
 .calendar-picker-trigger:hover:not(:disabled) { background: var(--cal-surface-hover); }
+.calendar-picker-trigger > span:first-child { min-width: 0; overflow-wrap: anywhere; }
 .calendar-picker-trigger:disabled {
     background: var(--cal-surface-inactive, var(--cal-surface));
     color: var(--cal-text-inactive);
@@ -920,6 +924,10 @@ html.ipsview-mode #event-dialog .dialog-actions {
 .calendar-picker-trigger[aria-expanded="true"] .calendar-picker-chevron { transform: rotate(180deg); }
 .calendar-picker-options {
     display: grid;
+    /* A bounded scroll area must not compress multiline option rows. */
+    grid-auto-rows: max-content;
+    align-content: start;
+    grid-template-columns: minmax(0, 1fr);
     gap: 2px;
     max-height: min(230px, 36vh);
     padding: 4px;
@@ -932,6 +940,10 @@ html.ipsview-mode #event-dialog .dialog-actions {
 }
 .calendar-picker-option {
     width: 100%;
+    min-width: 0;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    line-height: 1.25;
     min-height: 34px;
     padding: 7px 9px;
     border: 0;
@@ -1092,6 +1104,8 @@ html.ipsview-mode .view-selector-option { min-height: 48px; padding: 10px 13px; 
 }
 .dialog-actions-start, .dialog-actions-end { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .dialog-actions-end { margin-left: auto; justify-content: flex-end; }
+#event-dialog .dialog-actions-start, #event-dialog .dialog-actions-end { min-width: 0; max-width: 100%; }
+#event-dialog .dialog-actions button { max-width: 100%; white-space: normal; overflow-wrap: anywhere; line-height: 1.25; }
 .primary-button, .secondary-button, .danger-button { min-height: 36px; padding: 7px 12px; }
 .primary-button { border-color: var(--cal-accent); background: var(--cal-gradient-accent); color: var(--cal-text-active, var(--cal-text)); }
 .danger-button { border-color: color-mix(in srgb, var(--cal-danger) 60%, transparent); background: var(--cal-danger-soft); color: var(--cal-danger); }

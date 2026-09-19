@@ -1,0 +1,68 @@
+<!doctype html>
+<html class="ipsview-mode" lang="de">
+<meta charset="utf-8">
+<title>Event editor font layout regression</title>
+<link rel="stylesheet" href="../Kalender%20Ansicht/visualization/style.css">
+<style>
+body { overflow: auto; background: #202638; color: white; }
+#results { white-space: pre-wrap; font: 14px monospace; }
+#event-dialog { position: relative; inset: auto; margin: 8px; max-width: none; overflow: visible; }
+</style>
+<pre id="results">Running layout checks…</pre>
+<section id="event-dialog">
+  <div class="form-row two">
+    <div class="form-row"><label>Jahresereignis</label><div class="calendar-picker">
+      <button class="calendar-picker-trigger"><span>Kein Jahresereignis</span><span class="calendar-picker-chevron">⌄</span></button>
+      <div class="calendar-picker-options">
+        <button class="calendar-picker-option">Kein Jahresereignis</button>
+        <button class="calendar-picker-option">Geburtstag</button>
+        <button class="calendar-picker-option">Jahrestag</button>
+        <button class="calendar-picker-option">Hochzeitstag</button>
+      </div>
+    </div></div>
+    <div class="form-row"><label>Titel</label><input value="Test"></div>
+  </div>
+  <footer class="dialog-actions">
+    <div class="dialog-actions-start"><button class="secondary-button">ICS importieren</button></div>
+    <div class="dialog-actions-end"><button class="secondary-button">Abbrechen</button><button class="primary-button">Speichern</button></div>
+  </footer>
+</section>
+<script>
+// Serve the repository root and open /tests/editor-font-layout.html.
+// Uses the production stylesheet; no provider connection or calendar writes.
+(async () => {
+    const editor = document.getElementById('event-dialog');
+    const results = [];
+    for (const mode of ['ipsview-mode', '']) {
+        document.documentElement.className = mode;
+        for (const width of [320, 680]) {
+            for (const font of [16, 38, 48]) {
+                editor.style.width = width + 'px';
+                editor.style.fontSize = font + 'px';
+                await new Promise(requestAnimationFrame);
+                const options = [...editor.querySelectorAll('.calendar-picker-option')];
+                const failures = [];
+                for (const option of options) {
+                    const range = document.createRange();
+                    range.selectNodeContents(option);
+                    const text = range.getBoundingClientRect();
+                    const box = option.getBoundingClientRect();
+                    if (text.top < box.top || text.bottom > box.bottom) failures.push('option text overlaps');
+                    if (option.scrollWidth > option.clientWidth + 1) failures.push('option overflows horizontally');
+                }
+                const row = editor.querySelector('.form-row.two');
+                const columns = getComputedStyle(row).gridTemplateColumns.split(' ').length;
+                if (width === 680 && columns !== (font === 16 ? 2 : 1)) failures.push('incorrect responsive column count');
+                const groups = [...editor.querySelectorAll('.dialog-actions > div')].map(el => el.getBoundingClientRect());
+                if (groups[0].right > groups[1].left + 1 && groups[0].bottom > groups[1].top + 1) failures.push('footer groups overlap');
+                results.push(`${mode || 'symcon'} ${width}px / ${font}px: ${failures.length ? 'FAIL ' + failures.join(', ') : 'PASS'}`);
+            }
+        }
+    }
+    document.getElementById('results').textContent = results.join('\n');
+    document.documentElement.className = 'ipsview-mode';
+    editor.style.width = '680px';
+    editor.style.fontSize = '38px';
+})();
+</script>
+</html>

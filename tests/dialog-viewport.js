@@ -39,4 +39,13 @@ assert.strictEqual(context.eventDialogHostViewport(), null, 'Inaccessible hosts 
 assert(css.includes('#event-dialog > .dialog-layout {') && css.includes('#event-dialog .dialog-actions {'));
 assert(css.includes('#event-state-row { align-items: start; }'), '9.1 state controls must retain their layout');
 assert(source.includes("openDialog === eventDialog ? '.dialog-layout' : '.dialog-body'"), 'Other 9.1 modals must retain their existing scroll container');
+function cssRule(selector) {
+    const start = css.indexOf(selector + ' {');
+    assert(start >= 0, 'Missing layout rule: ' + selector);
+    return css.slice(start, css.indexOf('}', start));
+}
+assert(cssRule('.calendar-picker-options').includes('grid-auto-rows: max-content'), 'Scrollable picker rows must retain their full wrapped text height');
+assert(cssRule('.calendar-picker-option').includes('overflow-wrap: anywhere'), 'Long option names must fit the available width');
+assert(cssRule('#event-dialog .form-row.two').includes('repeat(auto-fit, minmax(min(100%, 14em), 1fr))'), 'Editor columns must respond to font size as well as viewport width');
+assert(cssRule('#event-dialog .dialog-actions').includes('flex-wrap: wrap'), 'Editor footer groups must wrap instead of compressing each other');
 console.log('Dialog viewport integration tests passed.');
