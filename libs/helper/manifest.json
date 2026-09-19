@@ -30,7 +30,7 @@
             "version": "1.1.0",
             "sha256": "be4fae4c23f757ab462237d8e74d2a9dca1b504937ed4d4b51c7ff76004cf1cd",
             "path": "libs/helper/HttpResponseHelper.php",
-            "source_sha": "c3104e556cdd02621a5efc5b8fa5ee3577f1c793"
+            "source_sha": "9a17a9ad9f7c7bc6bb29a5e386b8691f4a37216b"
         },
         "IPSViewHTMLPageHelper": {
             "version": "1.4.1",
