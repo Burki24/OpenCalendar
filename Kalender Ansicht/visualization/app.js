@@ -2081,6 +2081,7 @@ function rebuildIPSViewEventStatePickerOptions(select, picker) {
         const option = document.createElement('button');
         option.type = 'button';
         option.className = 'calendar-picker-option';
+        if (calendarVisualization.mode === 'ipsview') option.tabIndex = -1;
         option.dataset.value = nativeOption.value;
         option.setAttribute('role', 'option');
         option.textContent = t(nativeOption.dataset.i18n || nativeOption.textContent.trim());
@@ -3447,6 +3448,7 @@ function populateCalendarSelect(calendars, selectedId) {
         const option = document.createElement('button');
         option.type = 'button';
         option.className = 'calendar-picker-option';
+        if (calendarVisualization.mode === 'ipsview') option.tabIndex = -1;
         option.dataset.value = String(calendar.instanceId);
         option.textContent = calendar.name;
         option.setAttribute('role', 'option');
@@ -3510,6 +3512,19 @@ function toggleCalendarPicker() {
     } else {
         closeCalendarPicker();
     }
+}
+
+function handleIPSViewPickerTab(event) {
+    if (calendarVisualization.mode !== 'ipsview' || event.key !== 'Tab') return;
+    const picker = event.target.closest?.('.calendar-picker');
+    if (!picker || !eventDialog.contains(picker)) return;
+    const trigger = picker.querySelector('.calendar-picker-trigger[aria-expanded="true"]');
+    if (!trigger) return;
+    picker.querySelector('.calendar-picker-options')?.classList.add('hidden');
+    trigger.setAttribute('aria-expanded', 'false');
+    // Let native Tab/Shift+Tab proceed from the field, not a hidden option.
+    // Do not preventDefault: date segments and other native controls keep their behavior.
+    trigger.focus();
 }
 
 function handleCalendarOptionKeydown(event) {
@@ -5517,6 +5532,7 @@ function safeColor(value) {
 
 initializeIPSViewEventStatePicker(eventAnniversaryType);
 initializeIPSViewDatePickers();
+eventDialog.addEventListener('keydown', handleIPSViewPickerTab);
 
 if (calendarVisualization.state && typeof calendarVisualization.state === 'object') {
     handleMessage({ type: 'state', payload: calendarVisualization.state });
