@@ -1109,7 +1109,8 @@ html.ipsview-mode .view-selector-option { min-height: 48px; padding: 10px 13px; 
     outline-offset: 1px;
 }
 .hidden { display: none !important; }
-.ips-date-field { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px; min-width: 0; }
+html.ipsview-mode #event-date-row { align-items: start; }
+.ips-date-field { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; align-content: start; gap: 4px; min-width: 0; }
 .ips-date-field > input::-webkit-calendar-picker-indicator { display: none; }
 .ips-date-trigger { align-self: start; }
 .ips-date-trigger svg { width: 1.1em; height: 1.1em; vertical-align: middle; }
@@ -1125,6 +1126,7 @@ html.ipsview-mode .ips-date-grid > button { padding: 4px 0; min-width: 0; min-he
 .ips-date-time label { min-width: 0; }
 .ips-date-actions { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
 .ips-date-actions button { max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
+html.ipsview-mode .ips-date-actions button { flex: 1 1 auto; padding-inline: .5em; }
 
 @media (max-width: 560px) {
     .oc-dialog {
