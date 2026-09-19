@@ -19,6 +19,7 @@ if (PHP_OS_FAMILY === 'Windows') {
 }
 
 $commands = [
+    ['Verify Microsoft task discovery on first connection', [PHP_BINARY, 'tests/microsoft-task-discovery.php']],
     ['Verify event editor duration preservation', ['node', 'tests/event-editor-duration.js']],
     ['Verify vendored helper integrity', ['python3', 'tests/helper_integrity.py']],
     ['Verify DataFlowHelper integration', ['python3', 'tests/data_flow_integration.py']],

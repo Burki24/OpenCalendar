@@ -574,6 +574,10 @@ class CalendarAccount extends IPSModuleStrict
         try {
             $provider = $this->createProvider();
             $result = $provider->testConnection();
+            if ($this->ReadPropertyInteger('Provider') === self::PROVIDER_MICROSOFT
+                && (bool) ($result['success'] ?? true)) {
+                $this->synchronizeMicrosoftTaskLists();
+            }
             if (isset($result['message']) && is_string($result['message'])) {
                 $result['message'] = $this->Translate($result['message']);
             }
@@ -620,7 +624,7 @@ class CalendarAccount extends IPSModuleStrict
 
         try {
             $calendars = $this->discoverCalendars();
-            $taskLists = $this->synchronizeMicrosoftTaskLists();
+            $taskLists = json_decode($this->GetTaskLists(), true, 512, JSON_THROW_ON_ERROR);
             $this->SetStatus(IS_ACTIVE);
 
             $this->SendDataToChildren($this->EncodeDataFlowMessage(
@@ -1144,6 +1148,8 @@ class CalendarAccount extends IPSModuleStrict
                 JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR
             )
         );
+        // Discovery is also used by the configurator before a scheduled sync.
+        $this->synchronizeMicrosoftTaskLists();
         $this->WriteAttributeInteger('LastSynchronization', time());
         $this->WriteAttributeString(
             'LastError',
