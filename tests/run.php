@@ -19,6 +19,8 @@ if (PHP_OS_FAMILY === 'Windows') {
 }
 
 $commands = [
+    ['Verify picker wheel and touch scrolling', ['node', 'tests/picker-scroll.js']],
+    ['Verify IPSView annual-event picker', ['node', 'tests/ipsview-anniversary-picker.js']],
     ['Verify Microsoft task discovery on first connection', [PHP_BINARY, 'tests/microsoft-task-discovery.php']],
     ['Verify event editor duration preservation', ['node', 'tests/event-editor-duration.js']],
     ['Verify vendored helper integrity', ['python3', 'tests/helper_integrity.py']],

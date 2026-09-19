@@ -919,6 +919,9 @@ html.ipsview-mode #event-dialog .dialog-actions {
 .calendar-picker-trigger[aria-expanded="true"] .calendar-picker-chevron { transform: rotate(180deg); }
 .calendar-picker-options {
     display: grid;
+    grid-auto-rows: max-content;
+    align-content: start;
+    grid-template-columns: minmax(0, 1fr);
     gap: 2px;
     max-height: min(230px, 36vh);
     padding: 4px;
@@ -931,6 +934,10 @@ html.ipsview-mode #event-dialog .dialog-actions {
 }
 .calendar-picker-option {
     width: 100%;
+    min-width: 0;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    line-height: 1.25;
     min-height: 34px;
     padding: 7px 9px;
     border: 0;
