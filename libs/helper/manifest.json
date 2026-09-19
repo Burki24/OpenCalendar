@@ -61,10 +61,10 @@
             ]
         },
         "IPSViewStyleConfigurationHelper": {
-            "version": "1.0.5",
-            "sha256": "b422a23edfa3fc848fb4dd5d92b79c3c71673fd397e90d5e22bf8e2fe82c7c53",
+            "version": "1.1.0",
+            "sha256": "e6f558a0dee301d251d2f5845ebdedb765dc07ca5352427d1e08792d940629b7",
             "path": "libs/helper/IPSViewStyleConfigurationHelper.php",
-            "source_sha": "f9672f8d3645786a64eb04b6579c979bc3f05611",
+            "source_sha": "9a17a9ad9f7c7bc6bb29a5e386b8691f4a37216b",
             "assets": [
                 {
                     "path": "libs/helper/translations/IPSViewStyleConfigurationHelper.json",
@@ -77,42 +77,144 @@
                     "version": "1.0.1",
                     "sha256": "770bfc48051a908b55e931f6d4eba6e8984ba73b4aa78cd987470006c7b3a9e7",
                     "path": "libs/helper/IPSViewStylePresetHelper.php",
-                    "source_sha": "f9672f8d3645786a64eb04b6579c979bc3f05611"
+                    "source_sha": "9a17a9ad9f7c7bc6bb29a5e386b8691f4a37216b"
                 },
                 {
                     "name": "IPSViewControlThemeHelper",
                     "version": "1.0.3",
                     "sha256": "7be5f3300ebf0562f818b050a53cfa67d7631a30e3d62f1ab41525501604fac6",
                     "path": "libs/helper/IPSViewControlThemeHelper.php",
-                    "source_sha": "f9672f8d3645786a64eb04b6579c979bc3f05611"
+                    "source_sha": "9a17a9ad9f7c7bc6bb29a5e386b8691f4a37216b"
                 },
                 {
                     "name": "HelperTranslationHelper",
                     "version": "1.0.0",
                     "sha256": "d3deee581eca9f8eb11e9adce060170227a2dc836ee898bd134f93d27604f639",
                     "path": "libs/helper/HelperTranslationHelper.php",
-                    "source_sha": "f9672f8d3645786a64eb04b6579c979bc3f05611"
+                    "source_sha": "9a17a9ad9f7c7bc6bb29a5e386b8691f4a37216b"
                 },
                 {
                     "name": "IPSViewFontCatalogHelper",
-                    "version": "1.0.0",
-                    "sha256": "8f352af086f4ac98b57e5768d15f538301c54cb41e5f8d1d41c62330592bc660",
+                    "version": "1.1.0",
+                    "sha256": "cddb6f51b2d4ceb76d8b291204d26fa17d7ccf4711c3f4f462ec7f73f5514c25",
                     "path": "libs/helper/IPSViewFontCatalogHelper.php",
-                    "source_sha": "f9672f8d3645786a64eb04b6579c979bc3f05611"
+                    "source_sha": "9a17a9ad9f7c7bc6bb29a5e386b8691f4a37216b",
+                    "assets": [
+                        {
+                            "path": "libs/helper/fonts/Apache-2.0.txt",
+                            "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+                        },
+                        {
+                            "path": "libs/helper/fonts/BebasNeue-Regular.ttf",
+                            "sha256": "8c6b9d4587002e47891b0d7dd66e37b5ecb6c61d0d571144d9e7dce03b6661f2"
+                        },
+                        {
+                            "path": "libs/helper/fonts/DancingScript-Bold.ttf",
+                            "sha256": "953d83cf694dd25031eaf93de3161f271faf2a61c51f143d09adb5d8788af84a"
+                        },
+                        {
+                            "path": "libs/helper/fonts/DancingScript-Regular.ttf",
+                            "sha256": "bebd5c61533d48c9d9812f590fa6274dc8e907a62d573f52933c19d1a33caa10"
+                        },
+                        {
+                            "path": "libs/helper/fonts/IndieFlower-Regular.ttf",
+                            "sha256": "e92aceba3c95fabe12edf01ae248f613f6d97eef3bdb7009200cb3fae53df609"
+                        },
+                        {
+                            "path": "libs/helper/fonts/NOTICE.md",
+                            "sha256": "8382ef7a68e2bc68836fd9b27aa7d890ebd4a3c048b880c6b1514ae5a5489936"
+                        },
+                        {
+                            "path": "libs/helper/fonts/OFL-1.1.txt",
+                            "sha256": "6863ff4dc820f24756b6acfb38a2c6bc19d5b8d71b17030330a6f16eb4cee348"
+                        },
+                        {
+                            "path": "libs/helper/fonts/OpenSans-Bold.ttf",
+                            "sha256": "f7916a37377e38527d4306303cfe89b653b49b0a6b0b05c6b7593f7ab0248da8"
+                        },
+                        {
+                            "path": "libs/helper/fonts/OpenSans-BoldItalic.ttf",
+                            "sha256": "b08b454c8e47e7ba3cbb59c0e6a8344174363c034d581fe12cb3c6fc3942b6d3"
+                        },
+                        {
+                            "path": "libs/helper/fonts/OpenSans-Regular.ttf",
+                            "sha256": "037236ed4bf58a85f67074c165d308260fd6be01c86d7df4e79ea16eb273f8c5"
+                        },
+                        {
+                            "path": "libs/helper/fonts/OpenSans-RegularItalic.ttf",
+                            "sha256": "df8cd21a27b100aeb75454d0c4cb04bbf5d1cc54676cc35718189bf07b774000"
+                        },
+                        {
+                            "path": "libs/helper/fonts/ParaType-Free-Font-License.txt",
+                            "sha256": "7b5da0a0bd901f50e4325f8258a814ff791a4281c262b2150a9215bed0241d3c"
+                        },
+                        {
+                            "path": "libs/helper/fonts/PTSans-Bold.ttf",
+                            "sha256": "af2ea7b99dfa8102105df9ddbf0aa58893169d9bf5befe54fb9d8f12549c477d"
+                        },
+                        {
+                            "path": "libs/helper/fonts/PTSans-BoldItalic.ttf",
+                            "sha256": "ffd600561e9bc58f6ad014fb74e8790134dd735f40e504059aa3717fe7be6e11"
+                        },
+                        {
+                            "path": "libs/helper/fonts/PTSans-Regular.ttf",
+                            "sha256": "419e240303f11800c2b0d24b19bd361831be1789142586aeca5bf078a1e7733e"
+                        },
+                        {
+                            "path": "libs/helper/fonts/PTSans-RegularItalic.ttf",
+                            "sha256": "187f3d67223972f22229cfcfaf1c26aef0f06db1e8130e1bbb8056b10d67af83"
+                        },
+                        {
+                            "path": "libs/helper/fonts/Roboto-Bold.ttf",
+                            "sha256": "c9cc991deb5d27f267830a19f2301eb164d9e61ec08669c1a1a291c5620ff40a"
+                        },
+                        {
+                            "path": "libs/helper/fonts/Roboto-BoldItalic.ttf",
+                            "sha256": "e408e93bc15805661247698520f1ab944bbc2899fbd9ca71edc1b24dea6565f7"
+                        },
+                        {
+                            "path": "libs/helper/fonts/Roboto-Regular.ttf",
+                            "sha256": "017c0be9aaa6d0359737e1fa762ad304c0e0107927faff5a6c1f415c7f5244ed"
+                        },
+                        {
+                            "path": "libs/helper/fonts/Roboto-RegularItalic.ttf",
+                            "sha256": "2c0958e0c7e9b63f36f672d3cccba14ca0d7ce2e3d6945b38e4ef3de35b79691"
+                        },
+                        {
+                            "path": "libs/helper/fonts/RobotoMono-Bold.ttf",
+                            "sha256": "d580ebfd08b9b1bb637021ac9a34d30abdf3a1a731865886ec01e0c5859f29c8"
+                        },
+                        {
+                            "path": "libs/helper/fonts/RobotoMono-BoldItalic.ttf",
+                            "sha256": "ff99cc35746371f5cf412823d5237ad4c038a3b8a5e5eaad9b854d30075bc13a"
+                        },
+                        {
+                            "path": "libs/helper/fonts/RobotoMono-Regular.ttf",
+                            "sha256": "c59ecb6c18e38d4194249b6e1c555eb55c8e809258cf6d9b624d19d9268253bf"
+                        },
+                        {
+                            "path": "libs/helper/fonts/RobotoMono-RegularItalic.ttf",
+                            "sha256": "591503d536469d17b08282d15f7f7b25fa2bfb5ed01ff9555808bd0439043b05"
+                        },
+                        {
+                            "path": "libs/helper/fonts/Segment7-Regular.ttf",
+                            "sha256": "defa7e57af4c4447d9b2875feedcdaa727df3acc67ee237aa74ed575f3616ed2"
+                        }
+                    ]
                 },
                 {
                     "name": "IPSViewStyleProfileHelper",
                     "version": "1.0.1",
                     "sha256": "eca6aa486d60b0db11cc7db0b486dc5b1723c49e26c23fe72465a33cf73f453d",
                     "path": "libs/helper/IPSViewStyleProfileHelper.php",
-                    "source_sha": "f9672f8d3645786a64eb04b6579c979bc3f05611"
+                    "source_sha": "9a17a9ad9f7c7bc6bb29a5e386b8691f4a37216b"
                 },
                 {
                     "name": "IPSViewStyleHelper",
-                    "version": "1.6.7",
-                    "sha256": "67ff6608658f2a5c61d56ba4c74673f92af988babf705fe598f0ab4e313288ad",
+                    "version": "1.6.9",
+                    "sha256": "44140d34f866a59808948d29849de23a5bc2b1441df1fdc92df6f39d97e90e21",
                     "path": "libs/helper/IPSViewStyleHelper.php",
-                    "source_sha": "f9672f8d3645786a64eb04b6579c979bc3f05611",
+                    "source_sha": "9a17a9ad9f7c7bc6bb29a5e386b8691f4a37216b",
                     "assets": [
                         {
                             "path": "libs/helper/translations/IPSViewStyleHelper.json",
@@ -123,10 +225,10 @@
             ]
         },
         "IPSViewStyleHelper": {
-            "version": "1.6.7",
-            "sha256": "67ff6608658f2a5c61d56ba4c74673f92af988babf705fe598f0ab4e313288ad",
+            "version": "1.6.9",
+            "sha256": "44140d34f866a59808948d29849de23a5bc2b1441df1fdc92df6f39d97e90e21",
             "path": "libs/helper/IPSViewStyleHelper.php",
-            "source_sha": "f9672f8d3645786a64eb04b6579c979bc3f05611",
+            "source_sha": "9a17a9ad9f7c7bc6bb29a5e386b8691f4a37216b",
             "assets": [
                 {
                     "path": "libs/helper/translations/IPSViewStyleHelper.json",
@@ -139,28 +241,130 @@
                     "version": "1.0.0",
                     "sha256": "d3deee581eca9f8eb11e9adce060170227a2dc836ee898bd134f93d27604f639",
                     "path": "libs/helper/HelperTranslationHelper.php",
-                    "source_sha": "f9672f8d3645786a64eb04b6579c979bc3f05611"
+                    "source_sha": "9a17a9ad9f7c7bc6bb29a5e386b8691f4a37216b"
                 },
                 {
                     "name": "IPSViewFontCatalogHelper",
-                    "version": "1.0.0",
-                    "sha256": "8f352af086f4ac98b57e5768d15f538301c54cb41e5f8d1d41c62330592bc660",
+                    "version": "1.1.0",
+                    "sha256": "cddb6f51b2d4ceb76d8b291204d26fa17d7ccf4711c3f4f462ec7f73f5514c25",
                     "path": "libs/helper/IPSViewFontCatalogHelper.php",
-                    "source_sha": "f9672f8d3645786a64eb04b6579c979bc3f05611"
+                    "source_sha": "9a17a9ad9f7c7bc6bb29a5e386b8691f4a37216b",
+                    "assets": [
+                        {
+                            "path": "libs/helper/fonts/Apache-2.0.txt",
+                            "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+                        },
+                        {
+                            "path": "libs/helper/fonts/BebasNeue-Regular.ttf",
+                            "sha256": "8c6b9d4587002e47891b0d7dd66e37b5ecb6c61d0d571144d9e7dce03b6661f2"
+                        },
+                        {
+                            "path": "libs/helper/fonts/DancingScript-Bold.ttf",
+                            "sha256": "953d83cf694dd25031eaf93de3161f271faf2a61c51f143d09adb5d8788af84a"
+                        },
+                        {
+                            "path": "libs/helper/fonts/DancingScript-Regular.ttf",
+                            "sha256": "bebd5c61533d48c9d9812f590fa6274dc8e907a62d573f52933c19d1a33caa10"
+                        },
+                        {
+                            "path": "libs/helper/fonts/IndieFlower-Regular.ttf",
+                            "sha256": "e92aceba3c95fabe12edf01ae248f613f6d97eef3bdb7009200cb3fae53df609"
+                        },
+                        {
+                            "path": "libs/helper/fonts/NOTICE.md",
+                            "sha256": "8382ef7a68e2bc68836fd9b27aa7d890ebd4a3c048b880c6b1514ae5a5489936"
+                        },
+                        {
+                            "path": "libs/helper/fonts/OFL-1.1.txt",
+                            "sha256": "6863ff4dc820f24756b6acfb38a2c6bc19d5b8d71b17030330a6f16eb4cee348"
+                        },
+                        {
+                            "path": "libs/helper/fonts/OpenSans-Bold.ttf",
+                            "sha256": "f7916a37377e38527d4306303cfe89b653b49b0a6b0b05c6b7593f7ab0248da8"
+                        },
+                        {
+                            "path": "libs/helper/fonts/OpenSans-BoldItalic.ttf",
+                            "sha256": "b08b454c8e47e7ba3cbb59c0e6a8344174363c034d581fe12cb3c6fc3942b6d3"
+                        },
+                        {
+                            "path": "libs/helper/fonts/OpenSans-Regular.ttf",
+                            "sha256": "037236ed4bf58a85f67074c165d308260fd6be01c86d7df4e79ea16eb273f8c5"
+                        },
+                        {
+                            "path": "libs/helper/fonts/OpenSans-RegularItalic.ttf",
+                            "sha256": "df8cd21a27b100aeb75454d0c4cb04bbf5d1cc54676cc35718189bf07b774000"
+                        },
+                        {
+                            "path": "libs/helper/fonts/ParaType-Free-Font-License.txt",
+                            "sha256": "7b5da0a0bd901f50e4325f8258a814ff791a4281c262b2150a9215bed0241d3c"
+                        },
+                        {
+                            "path": "libs/helper/fonts/PTSans-Bold.ttf",
+                            "sha256": "af2ea7b99dfa8102105df9ddbf0aa58893169d9bf5befe54fb9d8f12549c477d"
+                        },
+                        {
+                            "path": "libs/helper/fonts/PTSans-BoldItalic.ttf",
+                            "sha256": "ffd600561e9bc58f6ad014fb74e8790134dd735f40e504059aa3717fe7be6e11"
+                        },
+                        {
+                            "path": "libs/helper/fonts/PTSans-Regular.ttf",
+                            "sha256": "419e240303f11800c2b0d24b19bd361831be1789142586aeca5bf078a1e7733e"
+                        },
+                        {
+                            "path": "libs/helper/fonts/PTSans-RegularItalic.ttf",
+                            "sha256": "187f3d67223972f22229cfcfaf1c26aef0f06db1e8130e1bbb8056b10d67af83"
+                        },
+                        {
+                            "path": "libs/helper/fonts/Roboto-Bold.ttf",
+                            "sha256": "c9cc991deb5d27f267830a19f2301eb164d9e61ec08669c1a1a291c5620ff40a"
+                        },
+                        {
+                            "path": "libs/helper/fonts/Roboto-BoldItalic.ttf",
+                            "sha256": "e408e93bc15805661247698520f1ab944bbc2899fbd9ca71edc1b24dea6565f7"
+                        },
+                        {
+                            "path": "libs/helper/fonts/Roboto-Regular.ttf",
+                            "sha256": "017c0be9aaa6d0359737e1fa762ad304c0e0107927faff5a6c1f415c7f5244ed"
+                        },
+                        {
+                            "path": "libs/helper/fonts/Roboto-RegularItalic.ttf",
+                            "sha256": "2c0958e0c7e9b63f36f672d3cccba14ca0d7ce2e3d6945b38e4ef3de35b79691"
+                        },
+                        {
+                            "path": "libs/helper/fonts/RobotoMono-Bold.ttf",
+                            "sha256": "d580ebfd08b9b1bb637021ac9a34d30abdf3a1a731865886ec01e0c5859f29c8"
+                        },
+                        {
+                            "path": "libs/helper/fonts/RobotoMono-BoldItalic.ttf",
+                            "sha256": "ff99cc35746371f5cf412823d5237ad4c038a3b8a5e5eaad9b854d30075bc13a"
+                        },
+                        {
+                            "path": "libs/helper/fonts/RobotoMono-Regular.ttf",
+                            "sha256": "c59ecb6c18e38d4194249b6e1c555eb55c8e809258cf6d9b624d19d9268253bf"
+                        },
+                        {
+                            "path": "libs/helper/fonts/RobotoMono-RegularItalic.ttf",
+                            "sha256": "591503d536469d17b08282d15f7f7b25fa2bfb5ed01ff9555808bd0439043b05"
+                        },
+                        {
+                            "path": "libs/helper/fonts/Segment7-Regular.ttf",
+                            "sha256": "defa7e57af4c4447d9b2875feedcdaa727df3acc67ee237aa74ed575f3616ed2"
+                        }
+                    ]
                 },
                 {
                     "name": "IPSViewStylePresetHelper",
                     "version": "1.0.1",
                     "sha256": "770bfc48051a908b55e931f6d4eba6e8984ba73b4aa78cd987470006c7b3a9e7",
                     "path": "libs/helper/IPSViewStylePresetHelper.php",
-                    "source_sha": "f9672f8d3645786a64eb04b6579c979bc3f05611"
+                    "source_sha": "9a17a9ad9f7c7bc6bb29a5e386b8691f4a37216b"
                 },
                 {
                     "name": "IPSViewStyleProfileHelper",
                     "version": "1.0.1",
                     "sha256": "eca6aa486d60b0db11cc7db0b486dc5b1723c49e26c23fe72465a33cf73f453d",
                     "path": "libs/helper/IPSViewStyleProfileHelper.php",
-                    "source_sha": "f9672f8d3645786a64eb04b6579c979bc3f05611"
+                    "source_sha": "9a17a9ad9f7c7bc6bb29a5e386b8691f4a37216b"
                 }
             ]
         },

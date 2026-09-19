@@ -19,7 +19,7 @@ require_once __DIR__ . '/IPSViewControlThemeHelper.php';
  * collapsed advanced section exposes all known native IPSView color fields grouped by family.
  * Disabled native overrides always inherit their current semantic base color.
  *
- * @version 1.0.5
+ * @version 1.1.0
  */
 trait IPSViewStyleConfigurationHelper
 {
@@ -136,7 +136,7 @@ trait IPSViewStyleConfigurationHelper
             ]
         ];
 
-        foreach (IPSViewControlThemeHelper::families() as $family => $fields) {
+        foreach ($this->IPSViewStyleConfigurationFormFamilies() as $family => $fields) {
             $familyItems[] = [
                 'type'     => 'ExpansionPanel',
                 'name'     => 'IPSViewStyleNativeFamily_' . $family,
@@ -282,6 +282,37 @@ trait IPSViewStyleConfigurationHelper
     protected function IPSViewStyleNativeOverrideProperties(): array
     {
         return self::IPSVIEW_NATIVE_OVERRIDE_PROPERTIES;
+    }
+
+    /**
+     * Returns the native IPSView families exposed by this consumer's form.
+     *
+     * Consumers may implement IPSViewStyleNativeFamilyNames() and return a
+     * list of supported family identifiers. The catalogue, storage and theme
+     * transport remain complete so existing configurations stay lossless.
+     *
+     * @return array<string,list<string>>
+     */
+    private function IPSViewStyleConfigurationFormFamilies(): array
+    {
+        $families = IPSViewControlThemeHelper::families();
+        if (!method_exists($this, 'IPSViewStyleNativeFamilyNames')) {
+            return $families;
+        }
+
+        $selected = $this->IPSViewStyleNativeFamilyNames();
+        if (!is_array($selected)) {
+            return $families;
+        }
+
+        $filtered = [];
+        foreach ($selected as $family) {
+            if (is_string($family) && isset($families[$family])) {
+                $filtered[$family] = $families[$family];
+            }
+        }
+
+        return $filtered;
     }
 
     /**
