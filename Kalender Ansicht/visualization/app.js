@@ -4819,7 +4819,7 @@ function toggleScrollDiagnostics() {
         : '-';
     const render = () => {
         if (!active) return;
-        panel.textContent = `OC scroll diagnostic 1 | wheel=${counts.wheel} legacy=${counts.mousewheel} scroll=${counts.scroll}\n`
+        panel.textContent = `OC scroll diagnostic 2 | wheel=${counts.wheel} legacy=${counts.mousewheel} scroll=${counts.scroll}\n`
             + `pointer=${pointer} list=${position(hoveredList)} form=${position(eventDialog.querySelector('.dialog-layout'))}\n`
             + lines.join('\n');
     };
@@ -4838,8 +4838,10 @@ function toggleScrollDiagnostics() {
         counts[type] += 1;
         const list = pickerScrollTarget(event);
         const before = position(list);
+        const hit = Number.isFinite(event.clientX) && Number.isFinite(event.clientY)
+            ? document.elementFromPoint?.(event.clientX, event.clientY) : null;
         const label = `${type}#${counts[type]} target=${event.target?.tagName || 'non-element'} list=${Boolean(list)}`;
-        record(`${label} dy=${event.deltaY ?? event.wheelDelta ?? 0} mode=${event.deltaMode ?? '-'} cancel=${event.cancelable}`);
+        record(`${label} xy=${event.clientX},${event.clientY} hit=${hit?.tagName || '-'} dy=${event.deltaY ?? event.wheelDelta ?? 0} mode=${event.deltaMode ?? '-'} cancel=${event.cancelable}`);
         requestAnimationFrame(() => {
             if (!active) return;
             record(`${label} prevented=${event.defaultPrevented} list=${position(list)} (was ${before})`);
@@ -4872,6 +4874,14 @@ function pickerScrollTarget(event) {
         const element = target instanceof Element ? target : target?.parentElement;
         const list = element?.closest?.('.calendar-picker-options');
         if (list) return list;
+    }
+    // Some embedded hosts report DIALOG as the wheel target, with no list in
+    // the composed path. Use viewport coordinates to resolve the visible hit.
+    // Touch retains its existing gesture target; never reuse stale mouse data.
+    if (['wheel', 'mousewheel', 'pointermove'].includes(event.type)
+        && Number.isFinite(event.clientX) && Number.isFinite(event.clientY)) {
+        const hit = document.elementFromPoint?.(event.clientX, event.clientY);
+        return hit?.closest?.('.calendar-picker-options') || null;
     }
     return null;
 }

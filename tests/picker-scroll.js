@@ -14,7 +14,10 @@ const option = new Element(list);
 const body = new Element();
 const content = new Element();
 const eventDialog = {open: true, querySelector: () => body};
+let hit = null;
+let hitQueries = 0;
 const context = vm.createContext({Element, eventDialog, content,
+    document: {elementFromPoint: (x, y) => { hitQueries++; assert.strictEqual(x, 120); assert.strictEqual(y, 240); return hit; }},
     eventDetailsDialog: {}, editScopeDialog: {}, deleteConfirmDialog: {}, dayEventsDialog: {}, viewSelectorDialog: {}, calendarFilterDialog: {},
     WheelEvent: {DOM_DELTA_LINE: 1, DOM_DELTA_PAGE: 2}, pickerTouchScroll: null});
 function load(name) {
@@ -89,4 +92,23 @@ const outside = event({target: body, touches: [touch(60)], cancelable: true});
 context.movePickerTouchScroll(outside);
 assert(!outside.prevented, 'Touch scrolling outside a picker must stay native');
 assert(source.includes("document.addEventListener('touchmove', movePickerTouchScroll, { capture: true, passive: false })"));
+// IPSView reports the DIALOG itself, without any option in the event path.
+list.scrollTop = 0;
+const formBefore = body.scrollTop;
+hit = option;
+wheel = event({type: 'wheel', target: eventDialog, composedPath: () => [eventDialog], clientX: 120, clientY: 240});
+context.containWheelInsideTile(wheel);
+assert.strictEqual(list.scrollTop, 40, 'Dialog-targeted wheels must resolve the list under the pointer');
+assert.strictEqual(body.scrollTop, formBefore, 'The outer form must not move when hit-testing finds a list');
+assert.strictEqual(hitQueries, 1);
+hit = body;
+context.containWheelInsideTile(wheel);
+assert.strictEqual(body.scrollTop, formBefore + 40, 'Hit-testing outside a list must preserve normal form scrolling');
+hit = null;
+context.containWheelInsideTile(wheel);
+assert.strictEqual(body.scrollTop, formBefore + 80, 'An empty hit-test must safely fall back');
+const queriesBefore = hitQueries;
+context.pickerScrollTarget(event({type: 'wheel', target: body, clientX: NaN, clientY: 240}));
+context.pickerScrollTarget(event({type: 'touchstart', target: body, clientX: 120, clientY: 240}));
+assert.strictEqual(hitQueries, queriesBefore, 'Invalid coordinates and touch must not use mouse hit-testing');
 console.log('Picker wheel and touch scroll tests passed.');
