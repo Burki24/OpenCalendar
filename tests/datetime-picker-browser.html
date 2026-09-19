@@ -24,7 +24,7 @@ body { color: white; font-family: sans-serif; }
     const output = document.getElementById('results');
     try {
         const source = await (await fetch('../Kalender%20Ansicht/visualization/app.js')).text();
-        const names = ['datePickerMonthDays', 'datePickerInputValue', 'initializeIPSViewDatePickers', 'element',
+        const names = ['datePickerMonthDays', 'datePickerInputValue', 'initializeIPSViewDatePickers', 'initializeIPSViewDateSegments', 'ipsViewDateText', 'ipsViewDateValue', 'element',
             'dayKey', 'localDate', 'localDateTime', 'readInputDate', 'setDateInputs', 'updateEndFromStart'];
         const code = names.map(name => {
             const start = source.indexOf('function ' + name + '(');
@@ -48,12 +48,31 @@ body { color: white; font-family: sans-serif; }
         api.initializeIPSViewDatePickers();
         check(document.querySelectorAll('.ips-date-trigger').length === 2, 'Exactly two picker buttons');
         api.setDateInputs(new Date(2026, 8, 21, 9), new Date(2026, 8, 21, 13), false);
+        const editor = document.getElementById('event-start-segments');
+        editor.focus();
+        for (const position of [3, 6, 11, 14]) {
+            editor.dispatchEvent(new KeyboardEvent('keydown', {key:'Tab', bubbles:true, cancelable:true}));
+            check(editor.selectionStart === position, 'Tab selects segment at ' + position);
+        }
+        for (const position of [11, 6, 3, 0]) {
+            editor.dispatchEvent(new KeyboardEvent('keydown', {key:'Tab', shiftKey:true, bubbles:true, cancelable:true}));
+            check(editor.selectionStart === position, 'Shift+Tab selects segment at ' + position);
+        }
+        editor.dispatchEvent(new KeyboardEvent('keydown', {key:'2', bubbles:true, cancelable:true}));
+        editor.dispatchEvent(new KeyboardEvent('keydown', {key:'2', bubbles:true, cancelable:true}));
+        editor.dispatchEvent(new Event('change', {bubbles:true}));
+        check(start.value === '2026-09-22T09:00' && end.value === '2026-09-22T13:00', 'Segment edit preserves four-hour duration');
+        editor.value = '31.02.2026 09:00';
+        editor.dispatchEvent(new Event('change', {bubbles:true}));
+        check(!editor.validity.valid && start.value === '2026-09-22T09:00', 'Impossible date blocks saving without changing the original');
+        api.setDateInputs(new Date(2026, 8, 21, 9), new Date(2026, 8, 21, 13), false);
+        changes = 0;
         const trigger = start.parentElement.querySelector('button');
         const panel = start.parentElement.querySelector('.ips-date-panel');
         const action = label => [...panel.querySelectorAll('button')].find(b => b.textContent === label).click();
         trigger.click();
         check(!panel.classList.contains('hidden'), 'Calendar opens');
-        const startBox = start.getBoundingClientRect(), endBox = end.getBoundingClientRect();
+        const startBox = document.getElementById('event-start-segments').getBoundingClientRect(), endBox = document.getElementById('event-end-segments').getBoundingClientRect();
         check(Math.abs(startBox.height - endBox.height) < 1, 'Opening calendar must not stretch the other input');
         check(Math.abs(startBox.top - endBox.top) < 1, 'Side-by-side inputs remain aligned at the top');
         [...panel.querySelectorAll('.ips-date-grid button')].find(b => b.textContent === '22').click();

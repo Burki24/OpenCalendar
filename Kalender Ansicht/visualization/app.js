@@ -2087,6 +2087,108 @@ function datePickerInputValue(day, hours, minutes, allDay) {
     return `${date}T${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
 }
 
+function ipsViewDateText(value) {
+    const match = /^(\d{4})-(\d{2})-(\d{2})(?:T(\d{2}):(\d{2}))?$/.exec(value);
+    return match ? `${match[3]}.${match[2]}.${match[1]}` + (match[4] ? ` ${match[4]}:${match[5]}` : '') : '';
+}
+
+function ipsViewDateValue(text, allDay) {
+    const match = /^(\d{2})\.(\d{2})\.(\d{4})(?: (\d{2}):(\d{2}))?$/.exec(text);
+    if (!match || (!allDay && !match[4]) || (allDay && match[4])) return '';
+    const [, day, month, year, hour = '00', minute = '00'] = match;
+    if (+year < 1 || +hour > 23 || +minute > 59) return '';
+    const date = new Date(0);
+    date.setFullYear(+year, +month - 1, +day);
+    date.setHours(+hour, +minute, 0, 0);
+    if (date.getFullYear() !== +year || date.getMonth() !== +month - 1 || date.getDate() !== +day
+        || date.getHours() !== +hour || date.getMinutes() !== +minute) return '';
+    return `${year}-${month}-${day}` + (allDay ? '' : `T${hour}:${minute}`);
+}
+
+function initializeIPSViewDateSegments(input) {
+    const editor = document.createElement('input');
+    editor.type = 'text';
+    editor.id = `${input.id}-segments`;
+    editor.className = 'ips-date-segments';
+    editor.autocomplete = 'off';
+    editor.spellcheck = false;
+    input.before(editor);
+    input.classList.add('hidden');
+    input.tabIndex = -1;
+    input.setAttribute('aria-hidden', 'true');
+    const label = document.querySelector(`label[for="${input.id}"]`);
+    if (label) label.htmlFor = editor.id;
+    const ranges = () => input.type === 'date' ? [[0, 2], [3, 5], [6, 10]] : [[0, 2], [3, 5], [6, 10], [11, 13], [14, 16]];
+    let reverseEntry = false;
+    const sync = () => {
+        editor.value = ipsViewDateText(input.value);
+        editor.disabled = input.disabled;
+        editor.readOnly = input.readOnly;
+        editor.required = input.required;
+        editor.placeholder = input.type === 'date' ? 'TT.MM.JJJJ' : 'TT.MM.JJJJ hh:mm';
+        editor.setCustomValidity('');
+    };
+    input.ipsViewSync = sync;
+    sync();
+    let digits = '';
+    const select = index => { digits = ''; editor.setSelectionRange(...ranges()[index]); };
+    document.addEventListener('keydown', event => { if (event.key === 'Tab') reverseEntry = event.shiftKey; }, true);
+    editor.addEventListener('focus', () => select(reverseEntry ? ranges().length - 1 : 0));
+    editor.addEventListener('click', () => {
+        const index = ranges().findIndex(([, end]) => editor.selectionStart <= end);
+        select(index < 0 ? ranges().length - 1 : index);
+    });
+    editor.addEventListener('keydown', event => {
+        const parts = ranges();
+        let index = parts.findIndex(([, end]) => editor.selectionStart <= end);
+        if (index < 0) index = parts.length - 1;
+        if (!editor.readOnly && !event.ctrlKey && !event.metaKey && !event.altKey
+            && (/^\d$/.test(event.key) || ['Backspace', 'Delete'].includes(event.key))) {
+            event.preventDefault();
+            const [start, end] = parts[index];
+            if (!editor.value) editor.value = input.type === 'date' ? '00.00.0000' : '00.00.0000 00:00';
+            digits = /^\d$/.test(event.key) ? (digits.length >= end - start ? '' : digits) + event.key : '';
+            editor.value = editor.value.slice(0, start) + digits.padStart(end - start, '0') + editor.value.slice(end);
+            editor.setSelectionRange(start, end);
+            editor.dispatchEvent(new Event('input', {bubbles: true}));
+            return;
+        }
+        if (event.key !== 'Tab') return;
+        const next = index + (event.shiftKey ? -1 : 1);
+        if (next < 0 || next >= parts.length) return;
+        event.preventDefault();
+        select(next);
+    });
+    const validate = () => {
+        const value = ipsViewDateValue(editor.value, input.type === 'date');
+        editor.setCustomValidity(value || (!editor.required && !editor.value) ? '' : t('Invalid date.'));
+        return value;
+    };
+    editor.addEventListener('input', validate);
+    editor.addEventListener('change', () => {
+        if (input.disabled || input.readOnly) return;
+        const value = validate();
+        if (!value || value === input.value) return;
+        const previous = input.value;
+        input.value = value;
+        if (!input.validity.valid) {
+            editor.setCustomValidity(input.validationMessage);
+            input.value = previous;
+            return;
+        }
+        input.dispatchEvent(new Event('input', {bubbles: true}));
+        input.dispatchEvent(new Event('change', {bubbles: true}));
+    });
+    input.addEventListener('input', sync);
+    input.addEventListener('change', sync);
+    input.addEventListener('invalid', event => {
+        event.preventDefault();
+        editor.setCustomValidity(input.validationMessage);
+        editor.reportValidity();
+    });
+    new MutationObserver(sync).observe(input, {attributes: true, attributeFilter: ['type', 'disabled', 'readonly', 'required']});
+}
+
 function initializeIPSViewDatePickers() {
     if (calendarVisualization.mode !== 'ipsview') return;
     let closeActive = null;
@@ -2097,6 +2199,7 @@ function initializeIPSViewDatePickers() {
         const wrapper = element('div', 'ips-date-field');
         input.before(wrapper);
         wrapper.append(input);
+        initializeIPSViewDateSegments(input);
         const trigger = element('button', 'secondary-button ips-date-trigger');
         trigger.type = 'button';
         trigger.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4m10-4v4M3 11h18m-13 4h2m4 0h2m-8 3h2m4 0h2"/></svg>';
@@ -4484,6 +4587,8 @@ function setDateInputs(start, end, allDay, allDayEndExclusive = false) {
     startInput.dataset.previousValue = startInput.value;
     const displayEnd = allDay && allDayEndExclusive && end > start ? addDays(end, -1) : end;
     endInput.value = allDay ? localDate(displayEnd) : localDateTime(displayEnd);
+    startInput.ipsViewSync?.();
+    endInput.ipsViewSync?.();
 }
 
 function updateEndFromStart() {
@@ -4508,6 +4613,7 @@ function updateEndFromStart() {
 
     endInput.value = allDay ? localDate(end) : localDateTime(end);
     startInput.dataset.previousValue = startInput.value;
+    endInput.ipsViewSync?.();
 }
 
 function updateDialogColor() {
