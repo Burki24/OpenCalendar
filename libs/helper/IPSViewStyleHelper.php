@@ -19,7 +19,7 @@ require_once __DIR__ . '/IPSViewStyleProfileHelper.php';
  * their components, but do not define module-specific colors, gradients,
  * typography, borders or shadows.
  *
- * @version 1.6.7
+ * @version 1.6.9
  */
 trait IPSViewStyleHelper
 {
@@ -953,7 +953,7 @@ trait IPSViewStyleHelper
             '--ipsview-gradient-positive'                   => $style['GradientPositive'],
             '--ipsview-gradient-warning'                    => $style['GradientWarning'],
             '--ipsview-gradient-critical'                   => $style['GradientCritical'],
-            '--ipsview-font-family'                         => $style['FontFamily'],
+            '--ipsview-font-family'                         => IPSViewFontCatalogHelper::cssFamily((string) $style['FontFamily']),
             '--ipsview-font-size'                           => $this->IPSViewFormatNumber((float) $style['FontSize']) . 'px',
             '--ipsview-font-style'                          => $fontStyle,
             '--ipsview-font-weight'                         => $fontWeight,
@@ -1013,6 +1013,10 @@ trait IPSViewStyleHelper
             '--ipsview-role-disabled-opacity'               => 'var(--ipsview-disabled-opacity)',
             '--ipsview-role-shadow'                         => 'var(--ipsview-shadow)',
             '--ipsview-role-popup-shadow'                   => 'var(--ipsview-popup-shadow)',
+            // VisualizationThemeHelper uses this compatibility token for the
+            // common HTML foundation. Rebind it here so IPSView typography is
+            // inherited by consumers that use either helper contract.
+            '--symc-font-family'                            => 'var(--ipsview-role-font-family)',
             '--ipsview-page'                                => 'var(--ipsview-page-background)',
             '--ipsview-surface'                             => 'var(--ipsview-control-background)',
             '--ipsview-surface-strong'                      => 'var(--ipsview-control-background-active)',
@@ -1032,7 +1036,10 @@ trait IPSViewStyleHelper
         }
         $lines[] = '}';
 
-        return implode("\n", $lines);
+        $css = implode("\n", $lines);
+        $fontFaceCSS = IPSViewFontCatalogHelper::fontFaceCSS((string) $style['FontFamily'], $fontCut);
+
+        return $fontFaceCSS === '' ? $css : $css . "\n" . $fontFaceCSS;
     }
 
     /** Reads and decodes the selected IPSView media object. */

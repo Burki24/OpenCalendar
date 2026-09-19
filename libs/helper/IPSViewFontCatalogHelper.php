@@ -7,11 +7,10 @@ namespace Burki24\SymconModuleHelper;
 /**
  * Provides the canonical IPSView font catalogue and supported font cuts.
  *
- * The catalogue contains only font metadata. Font files remain a consumer
- * responsibility so modules can use the shared definitions without bundling
- * preview assets that they do not need.
+ * The catalogue also renders self-contained @font-face rules for standalone
+ * HTML pages. Only the selected font cut is embedded in the generated CSS.
  *
- * @version 1.0.0
+ * @version 1.1.0
  */
 final class IPSViewFontCatalogHelper
 {
@@ -75,6 +74,73 @@ final class IPSViewFontCatalogHelper
         ]
     ];
 
+    /**
+     * @var array<string, array{fallback: string, faces: array<string, array{filename: string, style: string, weight: int}>}>
+     */
+    private const FONT_FACES = [
+        self::FONT_ROBOTO => [
+            'fallback' => 'sans-serif',
+            'faces'    => [
+                self::STYLE_REGULAR     => ['filename' => 'Roboto-Regular.ttf', 'style' => 'normal', 'weight' => 400],
+                self::STYLE_BOLD        => ['filename' => 'Roboto-Bold.ttf', 'style' => 'normal', 'weight' => 700],
+                self::STYLE_ITALIC      => ['filename' => 'Roboto-RegularItalic.ttf', 'style' => 'italic', 'weight' => 400],
+                self::STYLE_BOLD_ITALIC => ['filename' => 'Roboto-BoldItalic.ttf', 'style' => 'italic', 'weight' => 700]
+            ]
+        ],
+        self::FONT_ROBOTO_MONO => [
+            'fallback' => 'monospace',
+            'faces'    => [
+                self::STYLE_REGULAR     => ['filename' => 'RobotoMono-Regular.ttf', 'style' => 'normal', 'weight' => 400],
+                self::STYLE_BOLD        => ['filename' => 'RobotoMono-Bold.ttf', 'style' => 'normal', 'weight' => 700],
+                self::STYLE_ITALIC      => ['filename' => 'RobotoMono-RegularItalic.ttf', 'style' => 'italic', 'weight' => 400],
+                self::STYLE_BOLD_ITALIC => ['filename' => 'RobotoMono-BoldItalic.ttf', 'style' => 'italic', 'weight' => 700]
+            ]
+        ],
+        self::FONT_DANCING_SCRIPT => [
+            'fallback' => 'cursive',
+            'faces'    => [
+                self::STYLE_REGULAR => ['filename' => 'DancingScript-Regular.ttf', 'style' => 'normal', 'weight' => 400],
+                self::STYLE_BOLD    => ['filename' => 'DancingScript-Bold.ttf', 'style' => 'normal', 'weight' => 700]
+            ]
+        ],
+        self::FONT_INDIE_FLOWER => [
+            'fallback' => 'cursive',
+            'faces'    => [
+                self::STYLE_REGULAR => ['filename' => 'IndieFlower-Regular.ttf', 'style' => 'normal', 'weight' => 400]
+            ]
+        ],
+        self::FONT_OPEN_SANS => [
+            'fallback' => 'sans-serif',
+            'faces'    => [
+                self::STYLE_REGULAR     => ['filename' => 'OpenSans-Regular.ttf', 'style' => 'normal', 'weight' => 400],
+                self::STYLE_BOLD        => ['filename' => 'OpenSans-Bold.ttf', 'style' => 'normal', 'weight' => 700],
+                self::STYLE_ITALIC      => ['filename' => 'OpenSans-RegularItalic.ttf', 'style' => 'italic', 'weight' => 400],
+                self::STYLE_BOLD_ITALIC => ['filename' => 'OpenSans-BoldItalic.ttf', 'style' => 'italic', 'weight' => 700]
+            ]
+        ],
+        self::FONT_PT_SANS => [
+            'fallback' => 'sans-serif',
+            'faces'    => [
+                self::STYLE_REGULAR     => ['filename' => 'PTSans-Regular.ttf', 'style' => 'normal', 'weight' => 400],
+                self::STYLE_BOLD        => ['filename' => 'PTSans-Bold.ttf', 'style' => 'normal', 'weight' => 700],
+                self::STYLE_ITALIC      => ['filename' => 'PTSans-RegularItalic.ttf', 'style' => 'italic', 'weight' => 400],
+                self::STYLE_BOLD_ITALIC => ['filename' => 'PTSans-BoldItalic.ttf', 'style' => 'italic', 'weight' => 700]
+            ]
+        ],
+        self::FONT_BEBAS_NEUE => [
+            'fallback' => 'sans-serif',
+            'faces'    => [
+                self::STYLE_REGULAR => ['filename' => 'BebasNeue-Regular.ttf', 'style' => 'normal', 'weight' => 400]
+            ]
+        ],
+        self::FONT_SEGMENT_7 => [
+            'fallback' => 'monospace',
+            'faces'    => [
+                self::STYLE_REGULAR => ['filename' => 'Segment7-Regular.ttf', 'style' => 'normal', 'weight' => 400]
+            ]
+        ]
+    ];
+
     /** @var array<string, string> */
     private const FAMILY_ALIASES = [
         'roboto'         => self::FONT_ROBOTO,
@@ -103,6 +169,9 @@ final class IPSViewFontCatalogHelper
         'bolditalic'  => self::STYLE_BOLD_ITALIC,
         'bold italic' => self::STYLE_BOLD_ITALIC
     ];
+
+    /** @var array<string, string> */
+    private static array $fontData = [];
 
     /**
      * Returns the complete immutable font catalogue.
@@ -259,6 +328,68 @@ final class IPSViewFontCatalogHelper
         }
 
         return $normalizedFallback;
+    }
+
+    /**
+     * Returns a CSS font-family value with a generic fallback for a known font.
+     *
+     * Unknown or custom values are returned unchanged for backwards
+     * compatibility with existing consumer configurations.
+     */
+    public static function cssFamily(string $fontFamily): string
+    {
+        $normalized = self::normalizeFamily($fontFamily);
+        if ($normalized === null) {
+            return $fontFamily;
+        }
+
+        return sprintf('"%s", %s', $normalized, self::FONT_FACES[$normalized]['fallback']);
+    }
+
+    /**
+     * Renders a self-contained @font-face rule for the selected catalogue cut.
+     *
+     * An empty string is returned for system/custom fonts or when a bundled
+     * asset is unavailable, allowing existing consumers to retain their
+     * browser fallback behavior.
+     */
+    public static function fontFaceCSS(string $fontFamily, string $fontStyle): string
+    {
+        $fontFamily = self::normalizeFamily($fontFamily);
+        if ($fontFamily === null) {
+            return '';
+        }
+
+        $fontStyle = self::normalizeStyle($fontFamily, $fontStyle);
+        if ($fontStyle === null) {
+            return '';
+        }
+
+        $face = self::FONT_FACES[$fontFamily]['faces'][$fontStyle] ?? null;
+        if ($face === null) {
+            return '';
+        }
+
+        $path = __DIR__ . '/fonts/' . $face['filename'];
+        if (!isset(self::$fontData[$path])) {
+            if (!is_file($path) || !is_readable($path)) {
+                return '';
+            }
+
+            $data = file_get_contents($path);
+            if ($data === false) {
+                return '';
+            }
+            self::$fontData[$path] = base64_encode($data);
+        }
+
+        return sprintf(
+            '@font-face { font-family: "%s"; src: url("data:font/ttf;base64,%s") format("truetype"); font-style: %s; font-weight: %d; font-display: block; }',
+            $fontFamily,
+            self::$fontData[$path],
+            $face['style'],
+            $face['weight']
+        );
     }
 
     private static function normalizeStyleName(string $fontStyle): ?string

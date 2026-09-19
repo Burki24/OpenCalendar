@@ -106,7 +106,9 @@ assertStyleProfileE2E(str_contains($resolved['Shadow'], '0.410'), 'Main shadow o
 assertStyleProfileE2E(str_contains($resolved['PopupShadow'], '0px 8px 19px 1.5px'), 'Popup shadow geometry was not preserved.');
 assertStyleProfileE2E(str_contains($resolved['PopupShadow'], '0.570'), 'Popup shadow opacity was not preserved.');
 
-assertStyleProfileE2E(str_contains($css, '--ipsview-font-family: RobotoMono;'), 'Canonical font family CSS variable is missing.');
+assertStyleProfileE2E(str_contains($css, '--ipsview-font-family: "RobotoMono", monospace;'), 'Canonical font family CSS variable is missing.');
+assertStyleProfileE2E(str_contains($css, 'data:font/ttf;base64,'), 'Selected IPSView font must be embedded for the standalone WebView.');
+assertStyleProfileE2E(str_contains($css, '--symc-font-family: var(--ipsview-role-font-family);'), 'Shared theme must inherit the IPSView font.');
 assertStyleProfileE2E(str_contains($css, '--ipsview-font-style: italic;'), 'Bold italic style did not produce italic CSS.');
 assertStyleProfileE2E(str_contains($css, '--ipsview-font-weight: 700;'), 'Bold italic style did not produce bold CSS.');
 assertStyleProfileE2E(str_contains($css, '--ipsview-radius: 9px;'), 'Profile radius is missing from CSS variables.');
