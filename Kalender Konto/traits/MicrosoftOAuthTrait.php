@@ -67,6 +67,8 @@ trait KalenderKontoMicrosoftOAuthTrait
             $this->WriteAttributeString('LastError', '');
             $this->ClearCache();
             $this->SetStatus($this->ReadPropertyBoolean('Active') ? IS_ACTIVE : IS_INACTIVE);
+            // Synchronize catches discovery errors without discarding valid OAuth tokens.
+            $this->Synchronize();
             $this->ReloadForm();
 
             $this->SendHtmlTextResponse(

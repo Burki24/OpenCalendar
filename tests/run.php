@@ -19,6 +19,7 @@ if (PHP_OS_FAMILY === 'Windows') {
 }
 
 $commands = [
+    ['Verify Microsoft task discovery on first connection', [PHP_BINARY, 'tests/microsoft-task-discovery.php']],
     ['Verify event editor opening and ICS import', ['node', 'tests/event-editor-opening.js']],
     ['Verify event editor duration preservation', ['node', 'tests/event-editor-duration.js']],
     ['Verify local calendar provider and original data', [PHP_BINARY, 'tests/local-calendar-provider.php']],
