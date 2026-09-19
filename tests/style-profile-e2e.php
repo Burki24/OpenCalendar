@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use Burki24\SymconModuleHelper\IPSViewFontCatalogHelper;
 use Burki24\SymconModuleHelper\IPSViewStyleHelper;
 use Burki24\SymconModuleHelper\IPSViewStyleProfileHelper;
 
@@ -106,7 +107,32 @@ assertStyleProfileE2E(str_contains($resolved['Shadow'], '0.410'), 'Main shadow o
 assertStyleProfileE2E(str_contains($resolved['PopupShadow'], '0px 8px 19px 1.5px'), 'Popup shadow geometry was not preserved.');
 assertStyleProfileE2E(str_contains($resolved['PopupShadow'], '0.570'), 'Popup shadow opacity was not preserved.');
 
-assertStyleProfileE2E(str_contains($css, '--ipsview-font-family: RobotoMono;'), 'Canonical font family CSS variable is missing.');
+// Catalogue identifiers in profiles remain stable, but rendered CSS now includes
+// quotes and a fallback family. Support the installed and incoming helper bundle
+// without deriving the expected value from the implementation under test.
+$bundledFonts = method_exists(IPSViewFontCatalogHelper::class, 'cssFamily');
+$expectedFontFamily = $bundledFonts ? '"RobotoMono", monospace' : 'RobotoMono';
+assertStyleProfileE2E(
+    str_contains($css, '--ipsview-font-family: ' . $expectedFontFamily . ';'),
+    'The profile font must be rendered as RobotoMono with the supported CSS fallback.'
+);
+if ($bundledFonts) {
+    assertStyleProfileE2E(
+        preg_match('/@font-face\\s*\\{([^}]+)\\}/s', $css, $fontFace) === 1,
+        'The selected catalogue font must be embedded in the generated CSS.'
+    );
+    assertStyleProfileE2E(
+        str_contains($fontFace[1], 'font-family: "RobotoMono";')
+        && str_contains($fontFace[1], 'font-style: italic;')
+        && str_contains($fontFace[1], 'font-weight: 700;')
+        && preg_match('/base64,([A-Za-z0-9+\\/=]+)/', $fontFace[1], $fontData) === 1,
+        'The embedded font must match the selected family and bold-italic cut.'
+    );
+    assertStyleProfileE2E(
+        base64_decode($fontData[1], true) === file_get_contents(__DIR__ . '/../libs/helper/fonts/RobotoMono-BoldItalic.ttf'),
+        'The embedded font must contain the bundled bold-italic font asset.'
+    );
+}
 assertStyleProfileE2E(str_contains($css, '--ipsview-font-style: italic;'), 'Bold italic style did not produce italic CSS.');
 assertStyleProfileE2E(str_contains($css, '--ipsview-font-weight: 700;'), 'Bold italic style did not produce bold CSS.');
 assertStyleProfileE2E(str_contains($css, '--ipsview-radius: 9px;'), 'Profile radius is missing from CSS variables.');
