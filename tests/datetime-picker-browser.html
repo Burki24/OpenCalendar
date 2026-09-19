@@ -13,8 +13,10 @@ body { color: white; font-family: sans-serif; }
 <div class="dialog-body">
 <pre id="results">Running…</pre>
 <label><input id="event-all-day" type="checkbox"> Ganztägig</label>
+<div class="form-row two" id="event-date-row" style="font-size:16px">
 <div class="form-row"><label for="event-start">Beginn</label><input id="event-start" type="datetime-local" required></div>
 <div class="form-row"><label for="event-end">Ende</label><input id="event-end" type="datetime-local" required></div>
+</div>
 </div></form></dialog>
 <script>
 // Serve the repository root and open this file. No accounts or providers are used.
@@ -51,6 +53,9 @@ body { color: white; font-family: sans-serif; }
         const action = label => [...panel.querySelectorAll('button')].find(b => b.textContent === label).click();
         trigger.click();
         check(!panel.classList.contains('hidden'), 'Calendar opens');
+        const startBox = start.getBoundingClientRect(), endBox = end.getBoundingClientRect();
+        check(Math.abs(startBox.height - endBox.height) < 1, 'Opening calendar must not stretch the other input');
+        check(Math.abs(startBox.top - endBox.top) < 1, 'Side-by-side inputs remain aligned at the top');
         [...panel.querySelectorAll('.ips-date-grid button')].find(b => b.textContent === '22').click();
         check(!panel.classList.contains('hidden'), 'Selecting a day leaves time and Apply accessible');
         const hours = panel.querySelector('input');
