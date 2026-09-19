@@ -2534,7 +2534,7 @@ function applyImportedIcsEvent(importedEvent) {
     document.getElementById('event-all-day').checked = importedEvent.allDay;
     eventTask.checked = false;
     eventTaskCompleted.checked = false;
-    eventTaskFollowPlanned.checked = false;
+    eventTaskRollForwardScope.value = 'occurrence';
     eventStatusInput.value = normalizedEventStatus(importedEvent.status, 'CONFIRMED');
     eventAvailabilityInput.value = normalizedEventTransparency(importedEvent.transparency);
     eventStatusEdited = normalizedEventStatus(importedEvent.status) !== '';
@@ -2585,7 +2585,7 @@ function openNewEvent(preferredDay = null) {
     document.getElementById('event-all-day').checked = false;
     eventTask.checked = false;
     eventTaskCompleted.checked = false;
-    eventTaskFollowPlanned.checked = false;
+    eventTaskRollForwardScope.value = 'occurrence';
     resetEventStateEditor();
     resetAnniversaryEditor();
     let start;
