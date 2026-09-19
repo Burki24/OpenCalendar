@@ -40,7 +40,8 @@ function makeContext(mode) {
         Event: class { constructor(type) { this.type = type; } }});
     for (const name of ['initializeIPSViewEventStatePicker', 'rebuildIPSViewEventStatePickerOptions', 'synchronizeIPSViewEventStatePicker',
         'openIPSViewEventStatePicker', 'closeIPSViewEventStatePicker', 'closeIPSViewEventStatePickers',
-        'toggleIPSViewEventStatePicker', 'handleIPSViewEventStateOptionKeydown']) {
+        'toggleIPSViewEventStatePicker', 'handleIPSViewEventStateOptionKeydown',
+        'initializeIPSViewEventStatePickers', 'synchronizeIPSViewEventStatePickers']) {
         const start = source.indexOf('function ' + name + '(');
         assert(start >= 0, 'Missing IPSView picker: ' + name);
         vm.runInContext(source.slice(start, source.indexOf('\n}', start) + 2), context);
@@ -80,6 +81,42 @@ assert.strictEqual(picker.value.textContent, 'anniversary');
 const native = new Select();
 makeContext('symcon').context.initializeIPSViewEventStatePicker(native);
 assert(!native.classList.contains('hidden'), 'Native tile controls must stay unchanged');
-assert(source.includes('initializeIPSViewEventStatePicker(eventAnniversaryType);'), 'The annual selector must actually be initialized');
+assert(source.includes("eventDialog.querySelectorAll('select').forEach(select => initializeIPSViewEventStatePicker(select));"), 'All editor selects must be initialized');
+for (const name of ['unitSelect', 'mode', 'index']) {
+    assert(source.includes(`initializeIPSViewEventStatePicker(${name});`), 'Dynamic selector must be initialized: ' + name);
+}
 assert(source.includes('synchronizeIPSViewEventStatePicker(eventAnniversaryType);'), 'Programmatic annual changes must refresh the picker');
-console.log('IPSView annual-event picker tests passed.');
+const html = fs.readFileSync(path.join(__dirname, '../Kalender Ansicht/visualization/index.html'), 'utf8');
+const ids = [...html.matchAll(/<select id="([^"]+)"/g)].map(match => match[1]);
+const selects = ids.map(id => {
+    const item = new Select(); item.id = id; item.value = 'a'; item.row = new Node();
+    const itemLabel = new Label(); itemLabel.htmlFor = id; item.row.append(itemLabel);
+    item.options = ['a', 'b', 'c'].map(value => ({value, textContent:value, dataset:{}, disabled:value === 'c'}));
+    return item;
+});
+const all = makeContext('ipsview');
+all.context.eventDialog = {querySelectorAll: () => selects};
+all.context.initializeIPSViewEventStatePickers();
+assert.strictEqual(all.map.size, ids.length, 'Every static select is replaced');
+for (const item of selects) {
+    const p = all.map.get(item);
+    all.context.openIPSViewEventStatePicker(item, true);
+    assert(p.options.children[0].focused && !p.options.classList.contains('hidden'));
+    p.options.children[1].listeners.click(click);
+    assert.strictEqual(item.value, 'b');
+    assert(p.options.classList.contains('hidden'));
+    p.options.children[2].listeners.click(click);
+    assert.strictEqual(item.value, 'b', 'Disabled option cannot change the selection');
+    item.disabled = true;
+    all.context.synchronizeIPSViewEventStatePickers();
+    assert(p.trigger.disabled, 'Provider restrictions propagate to every trigger');
+}
+selects[0].isConnected = false;
+all.context.synchronizeIPSViewEventStatePickers();
+assert(!all.map.has(selects[0]), 'Removed fields must not remain registered');
+const dynamic = new Select(); dynamic.value = 'hours'; dynamic.row = new Node();
+dynamic.row.append(new Label());
+dynamic.options = [{value:'hours', textContent:'Hours', dataset:{}, disabled:false}];
+all.context.initializeIPSViewEventStatePicker(dynamic);
+assert(dynamic.id && all.map.get(dynamic).value.textContent === 'Hours', 'Generated reminder select receives an ID and current label');
+console.log('IPSView static/dynamic selector, selection and disabled-state tests passed.');

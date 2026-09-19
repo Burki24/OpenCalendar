@@ -1885,6 +1885,7 @@ function updateTaskControls() {
         eventTaskRollForwardScope.value = 'occurrence';
     }
     updateTaskMoveNote();
+    synchronizeIPSViewEventStatePickers();
 
     if (!enabled || !eventDialogEditable) return;
 
@@ -2009,10 +2010,16 @@ function updateAnniversaryControls() {
     } else {
         allDayInput.disabled = !eventDialogEditable || eventTask.checked;
     }
+    synchronizeIPSViewEventStatePickers();
 }
 
 const ipsViewEventStatePickers = new Map();
 let ipsViewEventSelectSequence = 0;
+
+function initializeIPSViewEventStatePickers() {
+    if (calendarVisualization.mode !== 'ipsview') return;
+    eventDialog.querySelectorAll('select').forEach(select => initializeIPSViewEventStatePicker(select));
+}
 
 function initializeIPSViewEventStatePicker(select) {
     if (calendarVisualization.mode !== 'ipsview'
@@ -2128,6 +2135,16 @@ function synchronizeIPSViewEventStatePicker(select) {
     picker.options.querySelectorAll('.calendar-picker-option').forEach(option => {
         const selected = option.dataset.value === select.value;
         option.setAttribute('aria-selected', String(selected));
+    });
+}
+
+function synchronizeIPSViewEventStatePickers() {
+    ipsViewEventStatePickers.forEach((picker, select) => {
+        if (!select.isConnected || !picker.picker.isConnected) {
+            ipsViewEventStatePickers.delete(select);
+            return;
+        }
+        synchronizeIPSViewEventStatePicker(select);
     });
 }
 
@@ -3713,7 +3730,9 @@ function appendReminderEditorEntry(minutesBeforeStart) {
 
     entry.append(fields, actions);
     eventReminderExtraList.append(entry);
+    initializeIPSViewEventStatePicker(unitSelect);
     setReminderFieldsFromMinutes(valueInput, unitSelect, minutesBeforeStart);
+    synchronizeIPSViewEventStatePicker(unitSelect);
 }
 
 function clearExtraReminderEntries() {
@@ -3863,6 +3882,7 @@ function updateReminderControls() {
     const maxReminders = maxReminderCount(selectedCalendar);
     eventReminderAddRow.classList.toggle('hidden', !custom || entries.length >= maxReminders);
     eventReminderAddButton.disabled = !custom || entries.length >= maxReminders;
+    synchronizeIPSViewEventStatePickers();
 
     eventReminderValue.setCustomValidity('');
     if (custom && entries.length > maxReminders) {
@@ -4062,6 +4082,8 @@ function recurrencePatternControls() {
     eventRecurrenceWeekdays.before(row);
     mode.addEventListener('change', updateRecurrenceControls);
     index.addEventListener('change', updateRecurrenceControls);
+    initializeIPSViewEventStatePicker(mode);
+    initializeIPSViewEventStatePicker(index);
 
     return { row, mode, index };
 }
@@ -4148,6 +4170,7 @@ function updateRecurrenceControls() {
     };
     eventRecurrenceIntervalUnit.textContent = enabled ? t(units[frequency] || 'Days') : '';
     updateRecurrenceEndDateMinimum();
+    synchronizeIPSViewEventStatePickers();
 }
 
 function updateRecurrenceEndDateMinimum() {
@@ -4552,11 +4575,12 @@ eventDialog.addEventListener('cancel', event => {
         eventCalendarTrigger.focus();
         return;
     }
-    const picker = ipsViewEventStatePickers.get(eventAnniversaryType);
-    if (picker && !picker.options.classList.contains('hidden')) {
+    const openStatePicker = Array.from(ipsViewEventStatePickers.entries())
+        .find(([, picker]) => !picker.options.classList.contains('hidden'));
+    if (openStatePicker) {
         event.preventDefault();
-        closeIPSViewEventStatePicker(eventAnniversaryType);
-        picker.trigger.focus();
+        closeIPSViewEventStatePicker(openStatePicker[0]);
+        openStatePicker[1].trigger.focus();
     }
 });
 eventDialog.addEventListener('close', () => {
@@ -5530,7 +5554,7 @@ function safeColor(value) {
     return getComputedStyle(document.documentElement).getPropertyValue('--cal-accent').trim() || 'currentColor';
 }
 
-initializeIPSViewEventStatePicker(eventAnniversaryType);
+initializeIPSViewEventStatePickers();
 initializeIPSViewDatePickers();
 eventDialog.addEventListener('keydown', handleIPSViewPickerTab);
 
