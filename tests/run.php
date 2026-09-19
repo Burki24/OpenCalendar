@@ -63,6 +63,7 @@ $commands = [
     ['Verify task UI behavior', ['node', 'tests/task-ui.js']],
     ['Verify event editor viewport bounds', ['node', 'tests/dialog-viewport.js']],
     ['Verify picker wheel and touch scrolling', ['node', 'tests/picker-scroll.js']],
+    ['Verify opt-in scroll diagnostics', ['node', 'tests/scroll-diagnostics.js']],
     ['Verify calendar startup recovery', [PHP_BINARY, 'tests/calendar-startup.php']],
     ['Verify synchronization failure labels', [PHP_BINARY, 'tests/sync-failure-labels.php']],
     ['Verify native client startup and layout', ['node', 'tests/startup-client.js']],

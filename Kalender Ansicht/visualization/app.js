@@ -59,6 +59,7 @@ let toastTimer = null;
 let monthLayoutFrame = null;
 let selectedDayEventsDate = null;
 let swipeGesture = null;
+let scrollDiagnosticsCleanup = null;
 let suppressSwipeClickUntil = 0;
 let deferredCalendarState = null;
 let calendarStateSignature = '';
@@ -4594,6 +4595,7 @@ eventDialog.addEventListener('cancel', event => {
     }
 });
 eventDialog.addEventListener('close', () => {
+    scrollDiagnosticsCleanup?.();
     closeCalendarPicker();
     closeIPSViewEventStatePickers();
     if (eventDialogLoadingMode === 'provider') {
@@ -4700,6 +4702,8 @@ document.addEventListener('visibilitychange', () => {
     requestIPSViewStateRefresh();
 });
 document.addEventListener('wheel', containWheelInsideTile, { capture: true, passive: false });
+// Temporary, opt-in diagnostics for embedded IPSView hosts without devtools.
+eventDialog.querySelector('#dialog-title')?.addEventListener('dblclick', toggleScrollDiagnostics);
 let pickerTouchScroll = null;
 document.addEventListener('touchstart', beginPickerTouchScroll, { capture: true, passive: true });
 document.addEventListener('touchmove', movePickerTouchScroll, { capture: true, passive: false });
@@ -4792,6 +4796,72 @@ function calendarDialogIsOpen() {
         viewSelectorDialog,
         calendarFilterDialog
     ].some(dialog => dialog.open);
+}
+
+function toggleScrollDiagnostics() {
+    if (scrollDiagnosticsCleanup) {
+        scrollDiagnosticsCleanup();
+        return;
+    }
+    if (calendarVisualization.mode !== 'ipsview' || !eventDialog.open) return;
+    const header = eventDialog.querySelector('.dialog-header');
+    if (!header) return;
+    const panel = document.createElement('pre');
+    panel.className = 'scroll-diagnostics';
+    header.appendChild(panel);
+    const counts = { wheel: 0, mousewheel: 0, scroll: 0 };
+    const lines = [];
+    let active = true;
+    let hoveredList = null;
+    let pointer = 'unknown';
+    const position = element => element
+        ? `${Math.round(element.scrollTop)}/${Math.max(0, element.scrollHeight - element.clientHeight)}`
+        : '-';
+    const render = () => {
+        if (!active) return;
+        panel.textContent = `OC scroll diagnostic 1 | wheel=${counts.wheel} legacy=${counts.mousewheel} scroll=${counts.scroll}\n`
+            + `pointer=${pointer} list=${position(hoveredList)} form=${position(eventDialog.querySelector('.dialog-layout'))}\n`
+            + lines.join('\n');
+    };
+    const record = line => {
+        lines.push(line);
+        if (lines.length > 4) lines.shift();
+        render();
+    };
+    const onPointer = event => {
+        hoveredList = pickerScrollTarget(event);
+        pointer = `${Math.round(event.clientX)},${Math.round(event.clientY)} ${hoveredList ? 'list' : 'outside'}`;
+        render();
+    };
+    const onWheel = event => {
+        const type = event.type === 'mousewheel' ? 'mousewheel' : 'wheel';
+        counts[type] += 1;
+        const list = pickerScrollTarget(event);
+        const before = position(list);
+        const label = `${type}#${counts[type]} target=${event.target?.tagName || 'non-element'} list=${Boolean(list)}`;
+        record(`${label} dy=${event.deltaY ?? event.wheelDelta ?? 0} mode=${event.deltaMode ?? '-'} cancel=${event.cancelable}`);
+        requestAnimationFrame(() => {
+            if (!active) return;
+            record(`${label} prevented=${event.defaultPrevented} list=${position(list)} (was ${before})`);
+        });
+    };
+    const onScroll = event => {
+        counts.scroll += 1;
+        const target = event.target;
+        const area = target === eventDialog.querySelector('.dialog-layout') ? 'form'
+            : pickerScrollTarget(event) ? 'list' : 'other';
+        record(`scroll ${area}=${position(target)}`);
+    };
+    // Observe on window before the document-level wheel handler; never cancel or redirect input.
+    const listeners = [['wheel', onWheel], ['mousewheel', onWheel], ['pointermove', onPointer], ['scroll', onScroll]];
+    listeners.forEach(([type, handler]) => window.addEventListener(type, handler, { capture: true, passive: true }));
+    scrollDiagnosticsCleanup = () => {
+        active = false;
+        listeners.forEach(([type, handler]) => window.removeEventListener(type, handler, true));
+        panel.remove();
+        scrollDiagnosticsCleanup = null;
+    };
+    render();
 }
 
 function pickerScrollTarget(event) {
