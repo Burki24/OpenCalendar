@@ -788,7 +788,7 @@ function renderAgenda() {
             openDayEvents(group.date, dayEvents);
         });
         section.appendChild(heading);
-        group.events.forEach(event => section.appendChild(createAgendaEvent(event)));
+        group.events.forEach(event => section.appendChild(createAgendaEvent(event, group.date)));
         content.appendChild(section);
     });
 }
@@ -812,7 +812,7 @@ function agendaEventAnchorKey(event) {
     return `${calendarInstanceId}|${identity}|${start}`;
 }
 
-function createAgendaEvent(event) {
+function createAgendaEvent(event, day) {
     const card = element('button', 'event-card');
     card.type = 'button';
     card.dataset.agendaAnchor = agendaEventAnchorKey(event);
@@ -820,7 +820,7 @@ function createAgendaEvent(event) {
     const color = element('span', 'event-color');
     color.style.background = safeColor(event.calendarColor);
     const time = element('span', 'event-time');
-    time.textContent = event.allDay ? t('All day') : formatTime(eventStart(event)) + '\n' + formatTime(eventEnd(event));
+    time.textContent = event.allDay ? t('All day') : eventDayTimes(event, day).join('\n');
     time.style.whiteSpace = 'pre-line';
     const main = element('span', 'event-main');
     const title = element('span', 'event-title');
@@ -934,14 +934,14 @@ function listColumns() {
         columns.push({
             key: 'start',
             label: 'Start',
-            value: event => event.allDay ? t('All day') : formatTime(eventStart(event))
+            value: (event, displayDate) => event.allDay ? t('All day') : eventDayTimes(event, displayDate)[0]
         });
     }
     if (calendarState.settings.showListEnd !== false) {
         columns.push({
             key: 'end',
             label: 'End',
-            value: event => event.allDay ? '' : formatTime(eventEnd(event))
+            value: (event, displayDate) => event.allDay ? '' : eventDayTimes(event, displayDate)[1]
         });
     }
     if (calendarState.settings.showListTitle !== false) {
@@ -1291,7 +1291,7 @@ function appendTimelineEvents(container, dayStart, entries, range) {
     const minute = 60_000;
     const dayStartTimestamp = dayStart.getTime();
     entries.forEach(entry => {
-        const item = createSingleDayTimelineEvent(entry.event);
+        const item = createSingleDayTimelineEvent(entry.event, dayStart);
         const startMinute = (entry.startTimestamp - dayStartTimestamp) / minute;
         const endMinute = (entry.endTimestamp - dayStartTimestamp) / minute;
         const top = Math.max(0, (startMinute - range.startMinute) * range.pixelsPerMinute);
@@ -1304,19 +1304,19 @@ function appendTimelineEvents(container, dayStart, entries, range) {
     });
 }
 
-function createSingleDayTimelineEvent(event) {
+function createSingleDayTimelineEvent(event, day) {
     const item = element('button', 'single-day-timeline-event');
     item.type = 'button';
     item.style.setProperty('--event-color', safeColor(event.calendarColor));
     item.setAttribute(
         'aria-label',
-        `${eventDisplaySummary(event) || t('Untitled event')}, ${formatTime(eventStart(event))} – ${formatTime(eventEnd(event))}`
+        `${eventDisplaySummary(event) || t('Untitled event')}, ${eventDayTimes(event, day).join(' – ')}`
     );
 
     const title = document.createElement('strong');
     title.textContent = eventDisplaySummary(event) || t('Untitled event');
     const time = element('span', 'single-day-timeline-time');
-    time.textContent = formatTime(eventStart(event));
+    time.textContent = eventDayTimes(event, day)[0];
     item.append(title, time);
     item.addEventListener('click', () => openEventDetails(event));
     return item;
@@ -1380,18 +1380,18 @@ function renderWeekEventLayout(eventList, events, dayStart, dayEnd) {
         });
     });
 
-    fallbackEvents.forEach(event => eventList.appendChild(createWeekEventElement(event)));
+    fallbackEvents.forEach(event => eventList.appendChild(createWeekEventElement(event, dayStart)));
     buildWeekEventOverlapGroups(timedEvents).forEach(group => {
         const laneCount = group.reduce((maximum, entry) => Math.max(maximum, entry.lane + 1), 1);
         if (laneCount <= 1) {
-            group.forEach(entry => eventList.appendChild(createWeekEventElement(entry.event)));
+            group.forEach(entry => eventList.appendChild(createWeekEventElement(entry.event, dayStart)));
             return;
         }
 
         const overlapGroup = element('div', 'week-event-overlap-group');
         overlapGroup.style.setProperty('--week-event-columns', String(laneCount));
         const lanes = Array.from({ length: laneCount }, () => element('div', 'week-event-overlap-lane'));
-        group.forEach(entry => lanes[entry.lane].appendChild(createWeekEventElement(entry.event)));
+        group.forEach(entry => lanes[entry.lane].appendChild(createWeekEventElement(entry.event, dayStart)));
         lanes.forEach(lane => overlapGroup.appendChild(lane));
         eventList.appendChild(overlapGroup);
     });
@@ -1435,7 +1435,7 @@ function buildWeekEventOverlapGroups(entries) {
     return groups;
 }
 
-function createWeekEventElement(event) {
+function createWeekEventElement(event, day) {
     const item = element('div', 'week-event');
     item.style.setProperty('--event-color', safeColor(event.calendarColor));
     item.tabIndex = 0;
@@ -1444,7 +1444,7 @@ function createWeekEventElement(event) {
     const title = document.createElement('strong');
     title.textContent = eventDisplaySummary(event) || t('Untitled event');
     const time = document.createElement('span');
-    const timeParts = [event.allDay ? t('All day') : formatTime(eventStart(event))];
+    const timeParts = [event.allDay ? t('All day') : eventDayTimes(event, day)[0]];
     if (calendarState.settings.showAnniversaryType !== false) timeParts.push(annualEventLabel(event));
     time.textContent = timeParts.filter(Boolean).join(' · ');
     item.append(title, time);
@@ -1588,7 +1588,7 @@ function bindDayOverview(target, day, events) {
 function renderMonthEventPreview(container, day, events) {
     container.replaceChildren();
     const visibleCount = Math.min(3, events.length);
-    events.slice(0, visibleCount).forEach(event => container.appendChild(createMonthEventChip(event)));
+    events.slice(0, visibleCount).forEach(event => container.appendChild(createMonthEventChip(event, day)));
     if (events.length > visibleCount) {
         container.appendChild(createMoreEventsButton(day, events, events.length - visibleCount));
     }
@@ -1612,7 +1612,7 @@ function fitMonthEventContainer(container, day, events) {
     const visibleChips = [];
 
     for (const event of events) {
-        const chip = createMonthEventChip(event);
+        const chip = createMonthEventChip(event, day);
         container.appendChild(chip);
         if (container.scrollHeight > container.clientHeight) {
             chip.remove();
@@ -1631,12 +1631,12 @@ function fitMonthEventContainer(container, day, events) {
     }
 }
 
-function createMonthEventChip(event) {
+function createMonthEventChip(event, day) {
     const chip = element('button', 'event-chip');
     chip.type = 'button';
     chip.style.setProperty('--event-color', safeColor(event.calendarColor));
     const occasion = calendarState.settings.showAnniversaryType !== false ? annualEventLabel(event) : '';
-    chip.textContent = (event.allDay ? '' : formatTime(eventStart(event)) + ' ')
+    chip.textContent = (event.allDay ? '' : eventDayTimes(event, day)[0] + ' ')
         + (eventDisplaySummary(event) || t('Untitled event'))
         + (occasion ? ' · ' + occasion : '');
     chip.addEventListener('click', () => openEventDetails(event));
@@ -1670,7 +1670,7 @@ function openDayEvents(day, events) {
         item.type = 'button';
         item.style.setProperty('--event-color', safeColor(event.calendarColor));
         const time = element('span', 'day-event-time');
-        time.textContent = event.allDay ? t('All day') : `${formatTime(eventStart(event))} – ${formatTime(eventEnd(event))}`;
+        time.textContent = event.allDay ? t('All day') : eventDayTimes(event, day).join(' – ');
         const summary = element('span', 'day-event-summary');
         summary.textContent = eventDisplaySummary(event) || t('Untitled event');
         item.append(time, summary);
@@ -1789,17 +1789,25 @@ function eventsForIndexedDay(eventsByDay, day) {
     return eventsByDay.get(dayKey(day)) || [];
 }
 
+// Display-only clipping: never change the original event used for editing or syncing.
+function eventDayTimes(event, day = eventStart(event)) {
+    const start = eventStart(event);
+    const end = eventEnd(event);
+    const dayStart = startOfDay(day);
+    const dayEnd = addDays(dayStart, 1);
+    return [
+        formatTime(start < dayStart ? dayStart : start),
+        end >= dayEnd ? '24:00' : formatTime(end)
+    ];
+}
+
 function dailyViewEntries(events, rangeStart, rangeEnd) {
     const entries = [];
     events.forEach(event => {
-        if (!event.allDay) {
-            const date = eventStart(event);
-            entries.push({ event, date: date < rangeStart ? startOfDay(rangeStart) : date });
-            return;
-        }
-
-        let day = eventStart(event);
-        const end = eventEnd(event);
+        if (!eventOverlaps(event, rangeStart, rangeEnd)) return;
+        const start = eventStart(event);
+        let day = startOfDay(start);
+        const end = new Date(Math.max(eventEnd(event).getTime(), start.getTime() + 1));
         if (day < rangeStart) day = startOfDay(rangeStart);
         while (day < end && day < rangeEnd) {
             entries.push({ event, date: startOfDay(day) });

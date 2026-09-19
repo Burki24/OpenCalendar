@@ -19,6 +19,7 @@ if (PHP_OS_FAMILY === 'Windows') {
 }
 
 $commands = [
+    ['Verify multi-day event display', ['node', 'tests/multi-day-display.js']],
     ['Verify IPSView date/time picker', ['node', 'tests/datetime-picker.js']],
     ['Verify Microsoft task discovery on first connection', [PHP_BINARY, 'tests/microsoft-task-discovery.php']],
     ['Verify event editor opening and ICS import', ['node', 'tests/event-editor-opening.js']],
