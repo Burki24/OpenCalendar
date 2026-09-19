@@ -1,0 +1,84 @@
+<!doctype html>
+<html class="ipsview-mode" lang="de">
+<meta charset="utf-8"><title>IPSView date picker regression</title>
+<link rel="stylesheet" href="../Kalender%20Ansicht/visualization/style.css">
+<style>
+html.ipsview-mode { --cal-dialog:#202638; --cal-view-background:#343b4c; --cal-surface:#202638; --cal-text:#fff; --cal-label-text:#fff; --cal-border:#606b80; --cal-accent:#8aa7ff; --cal-radius:8px; --cal-dialog-large-width:680px; --cal-dialog-font-size:24px; --cal-font-family:sans-serif; --cal-border-width:1px; }
+body { color: white; font-family: sans-serif; }
+#results { font: 12px monospace; white-space: pre-wrap; }
+</style>
+<dialog id="event-dialog" class="oc-dialog oc-dialog-large" open>
+<form class="dialog-layout" onsubmit="return false">
+<header class="dialog-header"><h2>Termin erstellen – lokaler Test</h2></header>
+<div class="dialog-body">
+<pre id="results">Running…</pre>
+<label><input id="event-all-day" type="checkbox"> Ganztägig</label>
+<div class="form-row"><label for="event-start">Beginn</label><input id="event-start" type="datetime-local" required></div>
+<div class="form-row"><label for="event-end">Ende</label><input id="event-end" type="datetime-local" required></div>
+</div></form></dialog>
+<script>
+// Serve the repository root and open this file. No accounts or providers are used.
+(async () => {
+    const output = document.getElementById('results');
+    try {
+        const source = await (await fetch('../Kalender%20Ansicht/visualization/app.js')).text();
+        const names = ['datePickerMonthDays', 'datePickerInputValue', 'initializeIPSViewDatePickers', 'element',
+            'dayKey', 'localDate', 'localDateTime', 'readInputDate', 'setDateInputs', 'updateEndFromStart'];
+        const code = names.map(name => {
+            const start = source.indexOf('function ' + name + '(');
+            if (start < 0) throw Error('Missing function ' + name);
+            const firstEnd = source.indexOf('\n', start);
+            return source.slice(start, source.slice(start, firstEnd).trimEnd().endsWith('}') ? firstEnd : source.indexOf('\n}', start) + 2);
+        }).join('\n');
+        const config = {mode: 'symcon', language: 'de'};
+        const dialog = document.getElementById('event-dialog');
+        const api = new Function('calendarVisualization', 'eventDialog', 't', code + '\nreturn {initializeIPSViewDatePickers, setDateInputs, updateEndFromStart};')(
+            config, dialog, text => ({Start:'Beginn', End:'Ende', Date:'Datum', Hours:'Stunden', Minutes:'Minuten', Apply:'Übernehmen', Cancel:'Abbrechen', Today:'Heute'}[text] || text));
+        const results = [];
+        const check = (condition, message) => { if (!condition) throw Error(message); results.push('PASS ' + message); };
+        const start = document.getElementById('event-start'), end = document.getElementById('event-end');
+        let changes = 0;
+        start.addEventListener('change', () => { changes++; api.updateEndFromStart(); });
+        api.initializeIPSViewDatePickers();
+        check(!document.querySelector('.ips-date-field'), 'Native tile controls remain unchanged');
+        config.mode = 'ipsview';
+        api.initializeIPSViewDatePickers();
+        api.initializeIPSViewDatePickers();
+        check(document.querySelectorAll('.ips-date-trigger').length === 2, 'Exactly two picker buttons');
+        api.setDateInputs(new Date(2026, 8, 21, 9), new Date(2026, 8, 21, 13), false);
+        const trigger = start.parentElement.querySelector('button');
+        const panel = start.parentElement.querySelector('.ips-date-panel');
+        const action = label => [...panel.querySelectorAll('button')].find(b => b.textContent === label).click();
+        trigger.click();
+        check(!panel.classList.contains('hidden'), 'Calendar opens');
+        [...panel.querySelectorAll('.ips-date-grid button')].find(b => b.textContent === '22').click();
+        check(!panel.classList.contains('hidden'), 'Selecting a day leaves time and Apply accessible');
+        const hours = panel.querySelector('input');
+        hours.value = '10'; hours.dispatchEvent(new Event('input'));
+        action('Übernehmen');
+        check(start.value === '2026-09-22T10:00' && end.value === '2026-09-22T14:00', 'Apply preserves four-hour duration');
+        check(changes === 1, 'Existing change handler called once');
+        trigger.click(); action('Heute'); action('Abbrechen');
+        check(start.value === '2026-09-22T10:00' && changes === 1, 'Cancel does not modify inputs');
+        check(panel.querySelectorAll('input').length === 0, 'Closed picker cannot block form validation');
+        trigger.click();
+        panel.dispatchEvent(new KeyboardEvent('keydown', {key:'Escape', bubbles:true, cancelable:true}));
+        check(panel.classList.contains('hidden'), 'Escape closes picker');
+        start.disabled = true; trigger.click();
+        check(panel.classList.contains('hidden'), 'Disabled inputs cannot be edited');
+        start.disabled = false;
+        document.getElementById('event-all-day').checked = true;
+        api.setDateInputs(new Date(2026, 8, 21), new Date(2026, 8, 22), true);
+        await new Promise(requestAnimationFrame);
+        trigger.click();
+        check(panel.querySelector('.ips-date-time').classList.contains('hidden'), 'All-day picker hides and disables time fields');
+        action('Übernehmen');
+        check(start.type === 'date' && start.value === '2026-09-21', 'All-day date stays date-only');
+        document.getElementById('event-all-day').checked = false;
+        api.setDateInputs(new Date(2026, 8, 21, 9), new Date(2026, 8, 21, 13), false);
+        await new Promise(requestAnimationFrame);
+        output.textContent = results.join('\n');
+        trigger.click();
+    } catch (error) { output.textContent = 'FAIL ' + error.stack; }
+})();
+</script></html>
