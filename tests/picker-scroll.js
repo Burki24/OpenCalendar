@@ -16,7 +16,7 @@ const content = new Element();
 const eventDialog = {open: true, querySelector: () => body};
 let hit = null;
 let hitQueries = 0;
-const context = vm.createContext({Element, eventDialog, content,
+const context = vm.createContext({Element, eventDialog, content, pickerMousePosition: null,
     document: {elementFromPoint: (x, y) => { hitQueries++; assert.strictEqual(x, 120); assert.strictEqual(y, 240); return hit; }},
     eventDetailsDialog: {}, editScopeDialog: {}, deleteConfirmDialog: {}, dayEventsDialog: {}, viewSelectorDialog: {}, calendarFilterDialog: {},
     WheelEvent: {DOM_DELTA_LINE: 1, DOM_DELTA_PAGE: 2}, pickerTouchScroll: null});
@@ -27,6 +27,7 @@ function load(name) {
 }
 // Allow the baseline wheel regression to fail before the new helper exists.
 if (source.includes('function pickerScrollTarget(')) load('pickerScrollTarget');
+if (source.includes('function pickerHitTestPoint(')) load('pickerHitTestPoint');
 load('containWheelInsideTile');
 function event(extra = {}) {
     return Object.assign({target: option, deltaMode: 0, deltaX: 0, deltaY: 40,
@@ -111,4 +112,20 @@ const queriesBefore = hitQueries;
 context.pickerScrollTarget(event({type: 'wheel', target: body, clientX: NaN, clientY: 240}));
 context.pickerScrollTarget(event({type: 'touchstart', target: body, clientX: 120, clientY: 240}));
 assert.strictEqual(hitQueries, queriesBefore, 'Invalid coordinates and touch must not use mouse hit-testing');
+// Observed in IPSView: every wheel reports DIALOG and (0, 0), while
+// pointer movements carry the actual viewport coordinates.
+context.pickerMousePosition = {clientX: 120, clientY: 240};
+hit = option;
+list.scrollTop = 0;
+const previousForm = body.scrollTop;
+context.containWheelInsideTile(event({type: 'wheel', target: eventDialog, clientX: 0, clientY: 0}));
+assert.strictEqual(list.scrollTop, 40, 'Zero-coordinate dialog wheels must use the current mouse position');
+assert.strictEqual(body.scrollTop, previousForm);
+for (const name of ['rememberPickerMousePosition', 'clearPickerMousePosition']) load(name);
+context.clearPickerMousePosition();
+assert.strictEqual(context.pickerMousePosition, null);
+context.rememberPickerMousePosition({pointerType: 'mouse', clientX: 120, clientY: 240});
+assert.strictEqual(context.pickerMousePosition.clientX, 120);
+context.rememberPickerMousePosition({pointerType: 'touch', clientX: 10, clientY: 20});
+assert.strictEqual(context.pickerMousePosition, null, 'Touch input must discard the remembered mouse position');
 console.log('Picker wheel and touch scroll tests passed.');

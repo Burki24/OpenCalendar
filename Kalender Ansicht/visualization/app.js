@@ -60,6 +60,7 @@ let monthLayoutFrame = null;
 let selectedDayEventsDate = null;
 let swipeGesture = null;
 let scrollDiagnosticsCleanup = null;
+let pickerMousePosition = null;
 let suppressSwipeClickUntil = 0;
 let deferredCalendarState = null;
 let calendarStateSignature = '';
@@ -4595,6 +4596,7 @@ eventDialog.addEventListener('cancel', event => {
     }
 });
 eventDialog.addEventListener('close', () => {
+    clearPickerMousePosition();
     scrollDiagnosticsCleanup?.();
     closeCalendarPicker();
     closeIPSViewEventStatePickers();
@@ -4702,6 +4704,9 @@ document.addEventListener('visibilitychange', () => {
     requestIPSViewStateRefresh();
 });
 document.addEventListener('wheel', containWheelInsideTile, { capture: true, passive: false });
+window.addEventListener('pointermove', rememberPickerMousePosition, { capture: true, passive: true });
+window.addEventListener('blur', clearPickerMousePosition);
+document.documentElement.addEventListener('pointerleave', clearPickerMousePosition);
 // Temporary, opt-in diagnostics for embedded IPSView hosts without devtools.
 eventDialog.querySelector('#dialog-title')?.addEventListener('dblclick', toggleScrollDiagnostics);
 let pickerTouchScroll = null;
@@ -4819,7 +4824,7 @@ function toggleScrollDiagnostics() {
         : '-';
     const render = () => {
         if (!active) return;
-        panel.textContent = `OC scroll diagnostic 2 | wheel=${counts.wheel} legacy=${counts.mousewheel} scroll=${counts.scroll}\n`
+        panel.textContent = `OC scroll diagnostic 3 | wheel=${counts.wheel} legacy=${counts.mousewheel} scroll=${counts.scroll}\n`
             + `pointer=${pointer} list=${position(hoveredList)} form=${position(eventDialog.querySelector('.dialog-layout'))}\n`
             + lines.join('\n');
     };
@@ -4838,10 +4843,11 @@ function toggleScrollDiagnostics() {
         counts[type] += 1;
         const list = pickerScrollTarget(event);
         const before = position(list);
-        const hit = Number.isFinite(event.clientX) && Number.isFinite(event.clientY)
-            ? document.elementFromPoint?.(event.clientX, event.clientY) : null;
+        const point = pickerHitTestPoint(event);
+        const hit = Number.isFinite(point.clientX) && Number.isFinite(point.clientY)
+            ? document.elementFromPoint?.(point.clientX, point.clientY) : null;
         const label = `${type}#${counts[type]} target=${event.target?.tagName || 'non-element'} list=${Boolean(list)}`;
-        record(`${label} xy=${event.clientX},${event.clientY} hit=${hit?.tagName || '-'} dy=${event.deltaY ?? event.wheelDelta ?? 0} mode=${event.deltaMode ?? '-'} cancel=${event.cancelable}`);
+        record(`${label} xy=${event.clientX},${event.clientY} used=${point.clientX},${point.clientY} hit=${hit?.tagName || '-'} dy=${event.deltaY ?? event.wheelDelta ?? 0} mode=${event.deltaMode ?? '-'} cancel=${event.cancelable}`);
         requestAnimationFrame(() => {
             if (!active) return;
             record(`${label} prevented=${event.defaultPrevented} list=${position(list)} (was ${before})`);
@@ -4866,6 +4872,28 @@ function toggleScrollDiagnostics() {
     render();
 }
 
+function clearPickerMousePosition() {
+    pickerMousePosition = null;
+}
+
+function rememberPickerMousePosition(event) {
+    if (event.pointerType !== 'mouse' || !eventDialog.open
+        || !Number.isFinite(event.clientX) || !Number.isFinite(event.clientY)) {
+        clearPickerMousePosition();
+        return;
+    }
+    pickerMousePosition = {clientX: event.clientX, clientY: event.clientY};
+}
+
+function pickerHitTestPoint(event) {
+    // IPSView can deliver wheel input to the dialog with (0, 0) instead of
+    // the mouse coordinates. Resolve against the last real mouse movement.
+    if (['wheel', 'mousewheel'].includes(event.type) && eventDialog.open
+        && event.target === eventDialog && event.clientX === 0 && event.clientY === 0
+        && pickerMousePosition) return pickerMousePosition;
+    return event;
+}
+
 function pickerScrollTarget(event) {
     // Embedded hosts can retarget an event; prefer its original DOM path.
     const targets = typeof event.composedPath === 'function' ? event.composedPath() : [];
@@ -4877,10 +4905,11 @@ function pickerScrollTarget(event) {
     }
     // Some embedded hosts report DIALOG as the wheel target, with no list in
     // the composed path. Use viewport coordinates to resolve the visible hit.
-    // Touch retains its existing gesture target; never reuse stale mouse data.
+    // Touch retains its existing gesture target.
     if (['wheel', 'mousewheel', 'pointermove'].includes(event.type)
         && Number.isFinite(event.clientX) && Number.isFinite(event.clientY)) {
-        const hit = document.elementFromPoint?.(event.clientX, event.clientY);
+        const point = pickerHitTestPoint(event);
+        const hit = document.elementFromPoint?.(point.clientX, point.clientY);
         return hit?.closest?.('.calendar-picker-options') || null;
     }
     return null;

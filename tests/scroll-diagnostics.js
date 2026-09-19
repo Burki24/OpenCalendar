@@ -16,7 +16,8 @@ const context = vm.createContext({
     document: {createElement: () => ({textContent: '', remove() { this.removed = true; }})},
     window: {addEventListener: (type, callback) => listeners.set(type, callback), removeEventListener: type => listeners.delete(type)},
     requestAnimationFrame: callback => pending.push(callback),
-    pickerScrollTarget: event => event.list || null
+    pickerScrollTarget: event => event.list || null,
+    pickerHitTestPoint: event => event
 });
 const start = source.indexOf('function toggleScrollDiagnostics(');
 assert(start >= 0, 'Missing opt-in scroll diagnostics');
