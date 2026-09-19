@@ -180,7 +180,7 @@
             "version": "1.0.0",
             "sha256": "0cebd0f08e6416a6d7d4d5fdbb19bf96d457d3e2d51fcf2a1d3e6adf5e967451",
             "path": "libs/helper/ResponsiveVisualizationHelper.php",
-            "source_sha": "c3104e556cdd02621a5efc5b8fa5ee3577f1c793"
+            "source_sha": "9a17a9ad9f7c7bc6bb29a5e386b8691f4a37216b"
         },
         "SymconOAuthHelper": {
             "version": "1.0.0",
