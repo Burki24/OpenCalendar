@@ -11,6 +11,13 @@ and local calendars remain in scope; this is not a Microsoft-only first release.
 - Disabled by default. Separate read-only access from attachment management.
 - The administrator may allow local storage, provider storage, or both.
 - The uploader explicitly selects an allowed destination before transmission.
+- Base access is scoped to a protected OpenCalendar view and must not require
+  IPSView Professional. All authorized holders of that view share its attachment
+  permissions; this is not private-per-user storage.
+- Optional IPSViewUsers user/group restrictions are an additional intersection
+  with view/calendar/destination permissions, never a way to widen them.
+- If user/group restrictions are configured but verified identity or the adapter
+  is unavailable, deny attachment access. Never fall back to shared-view access.
 - Local storage never silently uploads files to the calendar provider.
 - Existing provider attachments are distinct from locally added documents.
 - Disabling the feature or changing destinations neither migrates nor deletes files.
@@ -32,6 +39,50 @@ and local calendars remain in scope; this is not a Microsoft-only first release.
 The inspection and the PHP stub-based hook test do not establish TLS termination,
 real Symcon user/session authorization, multi-client isolation, filesystem access,
 backup encryption or provider permissions on an installed system.
+
+## IPSViewUsers integration investigation (2026-09-20)
+
+Read-only inspection of the installed IPSViewConnect 6.5.15 package, including
+`IPSViewUsers/module.php`, `IPSViewConnect/module.php` and their manifests:
+
+- IPSViewUsers module ID: `{B695E7A3-0F24-4B8D-8B78-6E86F24C4D97}`; prefix `IVU`.
+- `GetUserViewID` maps a supplied username to its assigned view. It does not
+  authenticate the caller. `GetUserView` computes a view with group-dependent
+  `UsedIDs` write flags; this is not a current-session identity API either.
+- IPSViewConnect `API_AssignViewData` resolves user/view context. Its
+  `ProcessHookAPIRequest` validates the password at its own endpoint using
+  `PHP_AUTH_PW` before executing an API operation. That verification does not
+  establish identity on OpenCalendar's separate hook.
+- No public session-verification/ticket API for third-party hooks was found in
+  these inspected module files. This is a version-scoped finding, not proof
+  that no supported integration exists anywhere in the product.
+- Do not call password-returning APIs or copy credential-bearing user/view
+  properties to implement an identity shortcut. Only source code was inspected;
+  no actual user/password configuration was read and no live changes were made.
+
+The vendor documentation confirms user/view assignment and group restrictions,
+but does not document third-party hook identity propagation:
+
+- https://docu.brownson.at/viewdesigner/WebHelp/DesignerSettingsMaintainUsers.html
+- https://docu.brownson.at/viewdesigner/WebHelp/DesignerSettingsMaintainGroups.html
+
+Before implementing the optional identity adapter, obtain a supported contract:
+
+1. How can an embedded HTML-Box request carry a server-verifiable principal to a
+   third-party hook without exporting the user's password?
+2. Is a signed, short-lived, audience-bound ticket or server-side validation API
+   available? How are replay, expiry and revocation handled?
+3. How are authoritative user and group identifiers obtained? How are changes
+   and user deletion reflected immediately without trusting client claims?
+4. Can the caller's assigned view and permitted objects be verified for a specific
+   OpenCalendar view? Do not confuse an IPSView media ID with an OpenCalendar
+   calendar-view instance ID.
+5. Which versions and clients support this, and what happens after logout?
+
+No automatic user/group integration is enabled by this plan. Do not present the
+presence of IPSViewUsers, a username, client-supplied groups or HTTP Basic header
+fields alone as authenticated identity. Do not change existing calendar access
+or require a Professional license for the base attachment mode.
 
 ## Architecture and required invariants
 
