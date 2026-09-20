@@ -13,9 +13,18 @@
                     "name": "AttachmentMode",
                     "caption": "Attachment access",
                     "options": [
-                        {"caption": "Disabled", "value": 0},
-                        {"caption": "Read attachments", "value": 1},
-                        {"caption": "Manage attachments", "value": 2}
+                        {
+                            "caption": "Disabled",
+                            "value": 0
+                        },
+                        {
+                            "caption": "Read attachments",
+                            "value": 1
+                        },
+                        {
+                            "caption": "Manage attachments",
+                            "value": 2
+                        }
                     ]
                 },
                 {
