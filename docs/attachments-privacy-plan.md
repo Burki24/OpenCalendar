@@ -164,6 +164,29 @@ local-only storage. Provider-side files remain governed by provider permissions.
 
 ## Acceptance evidence still required
 
+### Implemented configuration policy slice (2026-09-20)
+
+`CalendarAttachmentPolicy` centralizes disabled/read/manage modes and explicit
+local/provider permissions. Both calendar and view default to disabled with no
+destination allowed. Calendar permissions are the ceiling; the view checks its
+selection and intersects both configurations on every query. Inactive calendars
+deny access; provider mutations also require calendar write capability. Local
+annotations do not require remote write access. Settings do not migrate/delete files.
+
+`IPSKAL_CanAccessAttachments(calendarID, operation, destination)` and
+`IPSKALVIEW_CanAccessAttachments(viewID, calendarID, operation, destination)` are
+configuration queries only, not credentials or transfer endpoints. Operations are
+`list`, `download`, `upload`, `delete`; destinations are `local`, `provider`.
+Disabling a destination also denies reads there. Unknown parameters deny access.
+The reserved view `AttachmentIdentityMode` defaults to shared mode (0); all other
+values fail closed until the optional identity adapter is implemented.
+
+Tests cover the policy matrix and real module methods with a stubbed Symcon
+runtime, including selection, revocation, unavailable calendar APIs and local vs
+provider write rights. No live identity/session or file transfer is proven by
+these tests. Upload, download, storage, provider capabilities and event ownership
+checks remain future work; the preparation settings do not enable file delivery.
+
 - Disabled means no extra provider requests, file transfers or attachment disclosure.
 - Forged calendar/event/task/attachment IDs, wrong view, read-only policy, revoked
   credentials, uninitialized credentials and expired transfers fail before file I/O.

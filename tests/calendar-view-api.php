@@ -137,6 +137,7 @@ assertCalendarViewApi(
 );
 
 $supportedScriptApiMethods = [
+    'CanAccessAttachments',
     'SynchronizeCalendars',
     'SelectAllCalendars',
     'GetAggregatedEvents',

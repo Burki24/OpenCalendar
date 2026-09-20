@@ -14,6 +14,29 @@ Ein externer Öffnen-Link entfällt. Einrichtung und Datensicherung sind unter
 
 ## Startverhalten und schmale Kacheln
 
+### Anhangsberechtigungen (Vorbereitung)
+
+Kalenderinstanz und Kalenderansicht besitzen jeweils die Einstellung
+**Zugriff auf Anhänge**: deaktiviert (Standard), lesen oder verwalten.
+Zusätzlich müssen beide Instanzen den gewünschten Speicherort (lokal oder
+beim Anbieter) ausdrücklich erlauben. Die Ansicht kann Kalenderrechte nur
+einschränken. Berechtigte Nutzer derselben Ansicht teilen diese Rechte;
+lokale Dateien sind nicht automatisch benutzerprivat.
+
+`IPSKALVIEW_CanAccessAttachments(12345, 67890, 'download', 'local)` prüft
+die Konfiguration für Ansicht 12345 und ausgewählten Kalender 67890.
+Operationen: `list`, `download`, `upload`, `delete`; Speicherorte: `local`,
+`provider`. Unbekannte Werte und nicht ausgewählte Kalender werden abgelehnt.
+Lesen erlaubt nur Auflisten und Download; Verwalten zusätzlich Upload und Löschen.
+Provider-Schreiboperationen benötigen außerdem einen schreibbaren Kalender.
+
+Diese Funktion ist **nur eine Berechtigungsabfrage**, kein Zugriffsticket.
+Dateitransfer und Speicherung sind noch nicht implementiert. Die spätere
+Transferschnittstelle muss zusätzlich Anmeldung, Terminzugehörigkeit und
+Anbieterfähigkeiten prüfen. Persönliche IPSViewUsers-Rechte bleiben bis zur
+verifizierbaren Identitätsanbindung gesperrt. Änderungen an Einstellungen
+verschieben oder löschen keine Dateien. Google bleibt zurückgestellt.
+
 Schlägt **Kalender synchronisieren** fehl, nennt die Meldung den Provider und
 den Kalender, beispielsweise **Microsoft 365 (Arbeit)**. Bei mehreren Fehlern
 werden die betroffenen Kalender aufgelistet. Die genaue technische Ursache

@@ -1,6 +1,40 @@
 {
     "elements": [
         {
+            "type": "ExpansionPanel",
+            "caption": "Attachment permissions (preparation)",
+            "items": [
+                {
+                    "type": "Label",
+                    "caption": "Permissions only: file upload, download and storage are not available yet. Calendar and view permissions must both allow access."
+                },
+                {
+                    "type": "Select",
+                    "name": "AttachmentMode",
+                    "caption": "Attachment access",
+                    "options": [
+                        {"caption": "Disabled", "value": 0},
+                        {"caption": "Read attachments", "value": 1},
+                        {"caption": "Manage attachments", "value": 2}
+                    ]
+                },
+                {
+                    "type": "CheckBox",
+                    "name": "AttachmentAllowLocal",
+                    "caption": "Allow local attachment storage access"
+                },
+                {
+                    "type": "CheckBox",
+                    "name": "AttachmentAllowProvider",
+                    "caption": "Allow provider attachment storage access"
+                },
+                {
+                    "type": "Label",
+                    "caption": "Authorized users of this view share attachment rights. Local files are not private per user. Settings do not move or delete files."
+                }
+            ]
+        },
+        {
             "type": "CheckBox",
             "name": "Active",
             "caption": "Active"

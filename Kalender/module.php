@@ -2,6 +2,10 @@
 
 declare(strict_types=1);
 
+use IPSKalender\CalendarAttachmentPolicy;
+
+require_once __DIR__ . '/../libs/CalendarAttachmentPolicy.php';
+
 use Burki24\SymconModuleHelper\ChunkedJsonTransferHelper;
 use Burki24\SymconModuleHelper\ConfigurationFormHelper;
 use Burki24\SymconModuleHelper\DataFlowHelper;
@@ -107,6 +111,9 @@ class Calendar extends IPSModuleStrict
 
         $this->RegisterMessage(0, IPS_KERNELSTARTED);
         $this->RegisterPropertyBoolean('Active', true);
+        $this->RegisterPropertyInteger('AttachmentMode', 0);
+        $this->RegisterPropertyBoolean('AttachmentAllowLocal', false);
+        $this->RegisterPropertyBoolean('AttachmentAllowProvider', false);
         $this->RegisterPropertyBoolean('LocalCalendar', false);
         $this->RegisterPropertyString('CalendarID', '');
         $this->RegisterPropertyString('ProviderCalendarID', '');
@@ -1318,6 +1325,35 @@ class Calendar extends IPSModuleStrict
             ],
             JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR
         );
+    }
+
+    /**
+     * Checks the calendar's attachment policy ceiling without transferring files.
+     * This is not event ownership validation or a reusable access credential.
+     *
+     * @param string $Operation Requested list, download, upload or delete operation.
+     * @param string $Destination Explicit local or provider storage destination.
+     * @return bool Whether calendar configuration permits this operation.
+     */
+    public function CanAccessAttachments(string $Operation, string $Destination): bool
+    {
+        $policy = new CalendarAttachmentPolicy(
+            $this->ReadPropertyInteger('AttachmentMode'),
+            $this->ReadPropertyBoolean('AttachmentAllowLocal'),
+            $this->ReadPropertyBoolean('AttachmentAllowProvider')
+        );
+        if (!$this->ReadPropertyBoolean('Active') || !$policy->allows($Operation, $Destination)) {
+            return false;
+        }
+        if ($Destination === 'provider') {
+            if ($this->ReadPropertyBoolean('LocalCalendar')) {
+                return false;
+            }
+            if (in_array($Operation, ['upload', 'delete'], true) && !$this->calendarCanWrite()) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private function refreshCalendarMetadataSafely(): void

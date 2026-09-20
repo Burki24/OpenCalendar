@@ -1,6 +1,15 @@
 {
     "translations": {
         "de": {
+            "Disabled": "Deaktiviert",
+            "Attachment permissions (preparation)": "Anhangsberechtigungen (Vorbereitung)",
+            "Permissions only: file upload, download and storage are not available yet. Calendar and view permissions must both allow access.": "Nur Berechtigungen: Datei-Upload, Download und Speicherung sind noch nicht verfügbar. Kalender und Ansicht müssen den Zugriff beide erlauben.",
+            "Attachment access": "Zugriff auf Anhänge",
+            "Read attachments": "Anhänge lesen",
+            "Manage attachments": "Anhänge verwalten",
+            "Allow local attachment storage access": "Zugriff auf lokal gespeicherte Anhänge erlauben",
+            "Allow provider attachment storage access": "Zugriff auf Anhänge beim Anbieter erlauben",
+            "Authorized users of this view share attachment rights. Local files are not private per user. Settings do not move or delete files.": "Berechtigte Nutzer dieser Ansicht teilen sich die Anhangsrechte. Lokale Dateien sind nicht benutzerprivat. Einstellungen verschieben oder löschen keine Dateien.",
             "Local calendar": "Lokaler Kalender",
             "Unknown provider": "Unbekannter Anbieter",
             "Synchronization failed for: %s.": "Synchronisation fehlgeschlagen bei: %s.",

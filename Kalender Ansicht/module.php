@@ -2,6 +2,10 @@
 
 declare(strict_types=1);
 
+use IPSKalender\CalendarAttachmentPolicy;
+
+require_once __DIR__ . '/../libs/CalendarAttachmentPolicy.php';
+
 use Burki24\SymconModuleHelper\ConfigurationFormHelper;
 use Burki24\SymconModuleHelper\IPSViewHTMLPageHelper;
 use Burki24\SymconModuleHelper\IPSViewStyleConfigurationHelper;
@@ -112,6 +116,10 @@ class CalendarView extends IPSModuleStrict
 
         $this->RegisterMessage(0, IPS_KERNELSTARTED);
         $this->RegisterPropertyString('Calendars', '[]');
+        $this->RegisterPropertyInteger('AttachmentMode', 0);
+        $this->RegisterPropertyBoolean('AttachmentAllowLocal', false);
+        $this->RegisterPropertyBoolean('AttachmentAllowProvider', false);
+        $this->RegisterPropertyInteger('AttachmentIdentityMode', 0);
         $this->RegisterPropertyInteger('DefaultView', 0);
         $this->RegisterPropertyInteger('TileWeekOrientation', 0);
         $this->RegisterPropertyInteger('TileFontScale', 100);
@@ -1179,6 +1187,39 @@ class CalendarView extends IPSModuleStrict
         $this->broadcastState(null, true);
 
         return true;
+    }
+
+    /**
+     * Intersects view permissions with a selected calendar's server-owned policy.
+     * No file is read and no token is issued; future transfers must recheck this,
+     * caller authentication, event ownership and provider capabilities per request.
+     *
+     * @param int $CalendarID Calendar instance selected in this view.
+     * @param string $Operation Requested list, download, upload or delete operation.
+     * @param string $Destination Explicit local or provider storage destination.
+     * @return bool Whether both configurations permit this operation.
+     */
+    public function CanAccessAttachments(int $CalendarID, string $Operation, string $Destination): bool
+    {
+        $policy = new CalendarAttachmentPolicy(
+            $this->ReadPropertyInteger('AttachmentMode'),
+            $this->ReadPropertyBoolean('AttachmentAllowLocal'),
+            $this->ReadPropertyBoolean('AttachmentAllowProvider'),
+            $this->ReadPropertyInteger('AttachmentIdentityMode')
+        );
+        if (!$policy->allows($Operation, $Destination)) {
+            return false;
+        }
+        try {
+            foreach ($this->loadSelectedCalendars() as $calendar) {
+                if ($calendar['instanceId'] === $CalendarID) {
+                    return IPSKAL_CanAccessAttachments($CalendarID, $Operation, $Destination);
+                }
+            }
+        } catch (Throwable) {
+            // Missing/older calendar modules or unreadable policy never grant access.
+        }
+        return false;
     }
 
     /** Ensures provider state is available before the shared helper renders the page. */

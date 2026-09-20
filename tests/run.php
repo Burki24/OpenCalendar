@@ -19,6 +19,8 @@ if (PHP_OS_FAMILY === 'Windows') {
 }
 
 $commands = [
+    ['Verify attachment permission policy', [PHP_BINARY, 'tests/attachment-policy.php']],
+    ['Verify attachment module permission gates', [PHP_BINARY, 'tests/attachment-policy-modules.php']],
     ['Verify attachment access security baseline', [PHP_BINARY, 'tests/attachment-access-baseline.php']],
     ['Verify CalDAV cache resource identity', [PHP_BINARY, 'tests/caldav-resource-identity.php']],
     ['Verify IPSView picker TAB navigation', ['node', 'tests/ipsview-tab-navigation.js']],
