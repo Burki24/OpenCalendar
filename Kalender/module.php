@@ -8,6 +8,7 @@ use Burki24\SymconModuleHelper\DataFlowHelper;
 use Burki24\SymconModuleHelper\DebugHelper;
 use Burki24\SymconModuleHelper\PersistentJsonCacheHelper;
 use Burki24\SymconModuleHelper\VariableHelper;
+use IPSKalender\CalDAVResourceIdentity;
 use IPSKalender\CalendarEventCounter;
 use IPSKalender\CalendarEventRecurrence;
 use IPSKalender\CalendarRecurrenceRule;
@@ -23,6 +24,7 @@ require_once __DIR__ . '/../libs/helper/DebugHelper.php';
 require_once __DIR__ . '/../libs/helper/PersistentJsonCacheHelper.php';
 require_once __DIR__ . '/../libs/helper/VariableHelper.php';
 require_once __DIR__ . '/../libs/CalendarEventCounter.php';
+require_once __DIR__ . '/../libs/CalDAVResourceIdentity.php';
 require_once __DIR__ . '/../libs/CalendarEventRecurrence.php';
 require_once __DIR__ . '/../libs/CalendarRecurrenceRule.php';
 require_once __DIR__ . '/../libs/CalendarTaskEvent.php';
@@ -2042,7 +2044,7 @@ class Calendar extends IPSModuleStrict
             }
             $resourceUrl = trim((string) ($change['resourceUrl'] ?? ''));
             if ($resourceUrl !== '') {
-                $replacedResources[$resourceUrl] = true;
+                $replacedResources[CalDAVResourceIdentity::key($resourceUrl)] = true;
             }
         }
         if ($replacedResources !== []) {
@@ -2051,7 +2053,7 @@ class Calendar extends IPSModuleStrict
                 static function (array $event) use ($replacedResources): bool
                 {
                     $resourceUrl = trim((string) ($event['resourceUrl'] ?? ''));
-                    return $resourceUrl === '' || !isset($replacedResources[$resourceUrl]);
+                    return $resourceUrl === '' || !isset($replacedResources[CalDAVResourceIdentity::key($resourceUrl)]);
                 }
             ));
         }
@@ -2075,7 +2077,7 @@ class Calendar extends IPSModuleStrict
                         $candidateResource = trim((string) ($event['resourceUrl'] ?? ''));
                         if ($resourceUrl !== ''
                             && $candidateResource !== ''
-                            && hash_equals($resourceUrl, $candidateResource)) {
+                            && hash_equals(CalDAVResourceIdentity::key($resourceUrl), CalDAVResourceIdentity::key($candidateResource))) {
                             return false;
                         }
 
@@ -2114,7 +2116,7 @@ class Calendar extends IPSModuleStrict
                 ): bool {
                     foreach ([
                         [$eventReference, trim((string) ($event['eventReference'] ?? ''))],
-                        [$replaceResource ? '' : $resourceUrl, trim((string) ($event['resourceUrl'] ?? ''))],
+                        [$replaceResource ? '' : CalDAVResourceIdentity::key($resourceUrl), CalDAVResourceIdentity::key((string) ($event['resourceUrl'] ?? ''))],
                         [$occurrenceId, trim((string) ($event['occurrenceId'] ?? ''))]
                     ] as [$expected, $actual]) {
                         if ($expected !== '' && $actual !== '' && hash_equals($expected, $actual)) {

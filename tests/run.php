@@ -19,6 +19,7 @@ if (PHP_OS_FAMILY === 'Windows') {
 }
 
 $commands = [
+    ['Verify CalDAV cache resource identity', [PHP_BINARY, 'tests/caldav-resource-identity.php']],
     ['Verify IPSView bundled fonts', [PHP_BINARY, 'tests/ipsview-font-assets.php']],
     ['Verify IPSView picker TAB navigation', ['node', 'tests/ipsview-tab-navigation.js']],
     ['Verify multi-day event display', ['node', 'tests/multi-day-display.js']],
