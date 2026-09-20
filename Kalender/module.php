@@ -3,12 +3,14 @@
 declare(strict_types=1);
 
 use IPSKalender\AttachmentOwnerIdentity;
+use IPSKalender\AttachmentUploadPolicy;
 use IPSKalender\CalendarAttachmentPolicy;
 use IPSKalender\LocalAttachmentStore;
 
 require_once __DIR__ . '/../libs/CalendarAttachmentPolicy.php';
 require_once __DIR__ . '/../libs/AttachmentOwnerIdentity.php';
 require_once __DIR__ . '/../libs/LocalAttachmentStore.php';
+require_once __DIR__ . '/../libs/AttachmentUploadPolicy.php';
 
 use Burki24\SymconModuleHelper\ChunkedJsonTransferHelper;
 use Burki24\SymconModuleHelper\ConfigurationFormHelper;
@@ -1399,6 +1401,9 @@ class Calendar extends IPSModuleStrict
                 }
                 return $request[$name];
             };
+            if ($operation === 'upload') {
+                AttachmentUploadPolicy::validate($field('name'), $field('content'));
+            }
             $result = match ($operation) {
                 'list'     => $store->listForOwner($owner),
                 'download' => $store->read($owner, $field('id')),

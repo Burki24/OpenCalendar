@@ -167,6 +167,30 @@ local-only storage. Provider-side files remain governed by provider permissions.
 
 ## Acceptance evidence still required
 
+### Upload admission policy (2026-09-20)
+
+`AttachmentUploadPolicy` now validates new local uploads inside the private
+calendar persistence adapter before saving. Initial formats are UTF-8 TXT, PDF,
+PNG and JPEG, limited to 2 MiB. Unsupported extensions (including HTML, SVG,
+executables, archives and Office documents), path/header/control characters,
+Unicode formatting controls, Windows reserved names, noncanonical base64 and
+oversized content are rejected without changing originals. Existing stored files
+are not deleted, migrated or revalidated during restore, listing or download.
+
+The policy uses UTF-8/control checks for text, PDF header/end markers and image
+header dimensions/type for PNG/JPEG. These are admission checks only: PDF scripts,
+embedded documents, polyglots, malformed internals and malware are NOT reliably
+detected or removed. Even accepted files are untrusted. Future delivery must use
+download-only disposition, nosniff, no preview and a protected requester-bound
+route. The helper does not execute files, fetch URLs or decompress image pixels.
+Image dimensions are capped at 10,000 per axis and 40 million pixels.
+
+Tests exercise the actual private adapter, rejection without persistence changes,
+lock release, UTF-8 text, PDF/PNG admission and the exact size boundary. Provider
+upload adapters must reuse this policy when implemented; no provider uploads or
+public transfer endpoint are enabled by this step. File-type selection can be
+expanded deliberately later; this is not antivirus or a privacy certification.
+
 ### Authoritative local event access (2026-09-20)
 
 Private `verifiedLocalAttachmentOperation` now joins the local provider, owner
