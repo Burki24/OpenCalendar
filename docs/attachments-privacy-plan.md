@@ -101,7 +101,10 @@ or require a Professional license for the base attachment mode.
    Opaque IDs, safe generated paths, owner binding, quotas and atomic writes are
    required. Do not use the event cache as the only original. Define backup/restore,
    encryption and key recovery against the actual Symcon 9.1 storage facilities.
-5. Transfers require authenticated, authorized access over verified TLS. Do not
+5. Transfers require authenticated, authorized access over verified TLS by default.
+   The user approved an explicit, default-off local HTTP exception on 2026-09-20.
+   This accepts interception/modification risk, not legal compliance or privacy.
+   Do not
    trust arbitrary forwarded-protocol headers. Download tickets, if used, must be
    short-lived, resource/destination scoped and revocable; never appear in URLs,
    logs or shared state. They are not a substitute for user/view authorization.
@@ -163,6 +166,25 @@ local-only storage. Provider-side files remain governed by provider permissions.
    authorized disposable provider tests, operator privacy/retention documentation.
 
 ## Acceptance evidence still required
+
+### Transport preparation and approved HTTP exception (2026-09-20)
+
+View property `AttachmentAllowLocalHttp` defaults to false and has a visible
+warning. The transport policy accepts runtime HTTPS or explicitly enabled HTTP
+from a private/loopback peer. Forwarded headers cannot prove HTTPS and reject
+the HTTP exception. A private peer does not prove original client location:
+operators must not expose plaintext forwarding or hidden proxy paths.
+Connect/ipmagic TLS recognition remains unverified and is not inferred from
+hostnames. No provider-side TLS validation was weakened.
+
+Authenticated POST `CheckAttachmentAccess` on the existing IPSView hook accepts
+a JSON `value` with integer `calendarId`, string `operation` and `destination`.
+It checks transport and the existing calendar/view policy intersection, returns
+only to that HTTP request, and never updates shared visualization state.
+Success explicitly returns `transferAvailable: false`: this is configuration
+preflight, not document authorization, upload/download or an access ticket.
+The native tile transport, Connect validation, document ownership and actual
+storage/transfer implementation still need completion before step 2 is complete.
 
 ### Implemented configuration policy slice (2026-09-20)
 

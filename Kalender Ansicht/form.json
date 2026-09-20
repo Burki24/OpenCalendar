@@ -29,6 +29,15 @@
                     "caption": "Allow provider attachment storage access"
                 },
                 {
+                    "type": "CheckBox",
+                    "name": "AttachmentAllowLocalHttp",
+                    "caption": "Allow unencrypted attachment access on local HTTP connections"
+                },
+                {
+                    "type": "Label",
+                    "caption": "Warning: HTTP exposes files and access credentials to interception or modification. Enable only on a trusted network without external HTTP forwarding. This does not grant attachment rights or enable file transfers yet."
+                },
+                {
                     "type": "Label",
                     "caption": "Authorized users of this view share attachment rights. Local files are not private per user. Settings do not move or delete files."
                 }

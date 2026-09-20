@@ -19,6 +19,7 @@ if (PHP_OS_FAMILY === 'Windows') {
 }
 
 $commands = [
+    ['Verify attachment transport policy', [PHP_BINARY, 'tests/attachment-transport.php']],
     ['Verify attachment permission policy', [PHP_BINARY, 'tests/attachment-policy.php']],
     ['Verify attachment module permission gates', [PHP_BINARY, 'tests/attachment-policy-modules.php']],
     ['Verify attachment access security baseline', [PHP_BINARY, 'tests/attachment-access-baseline.php']],

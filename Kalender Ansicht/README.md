@@ -37,6 +37,23 @@ Anbieterfähigkeiten prüfen. Persönliche IPSViewUsers-Rechte bleiben bis zur
 verifizierbaren Identitätsanbindung gesperrt. Änderungen an Einstellungen
 verschieben oder löschen keine Dateien. Google bleibt zurückgestellt.
 
+**HTTP-Ausnahme:** Nur in der Kalenderansicht gibt es zusätzlich
+„Unverschlüsselten Anhangszugriff über lokale HTTP-Verbindungen erlauben“.
+Standard ist aus. Die Ausnahme gilt für direkte private IPv4-/IPv6- und
+Loopback-Gegenstellen, nicht für öffentliche Adressen oder erkannte Proxies.
+Dateien und Zugriffskennungen wären dabei mitlesbar und manipulierbar.
+Private IP-Adressen beweisen keine sichere Verbindung: keine externe
+HTTP-Portweiterleitung oder verdeckte Proxy-Weiterleitung hierfür betreiben.
+Die Option ersetzt weder Anmeldung noch Kalender-/Ansichtsrechte.
+
+Die neue angemeldete Hook-Vorabprüfung `CheckAttachmentAccess` prüft Transport
+und aktuelle Rechte und antwortet ausschließlich auf die einzelne Anfrage.
+Sie überträgt keine Dateien und stellt kein Zugriffsticket aus.
+HTTPS wird nur anhand der serverseitigen TLS-Angabe erkannt; Hostnamen,
+Port 443 und weitergeleitete HTTPS-Header reichen nicht aus.
+Die sichere Erkennung von Symcon Connect/ipmagic ist noch nicht live verifiziert.
+Ein dort abgelehnter Zugriff ist kein Anlass, Proxy-Header pauschal zu vertrauen.
+
 Schlägt **Kalender synchronisieren** fehl, nennt die Meldung den Provider und
 den Kalender, beispielsweise **Microsoft 365 (Arbeit)**. Bei mehreren Fehlern
 werden die betroffenen Kalender aufgelistet. Die genaue technische Ursache

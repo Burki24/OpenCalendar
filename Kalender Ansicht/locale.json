@@ -1,6 +1,8 @@
 {
     "translations": {
         "de": {
+            "Allow unencrypted attachment access on local HTTP connections": "Unverschlüsselten Anhangszugriff über lokale HTTP-Verbindungen erlauben",
+            "Warning: HTTP exposes files and access credentials to interception or modification. Enable only on a trusted network without external HTTP forwarding. This does not grant attachment rights or enable file transfers yet.": "Warnung: Über HTTP können Dateien und Zugriffskennungen mitgelesen oder verändert werden. Nur in einem vertrauenswürdigen Netzwerk ohne externe HTTP-Weiterleitung aktivieren. Dies erteilt keine Anhangsrechte und aktiviert noch keine Dateiübertragung.",
             "Disabled": "Deaktiviert",
             "Attachment permissions (preparation)": "Anhangsberechtigungen (Vorbereitung)",
             "Permissions only: file upload, download and storage are not available yet. Calendar and view permissions must both allow access.": "Nur Berechtigungen: Datei-Upload, Download und Speicherung sind noch nicht verfügbar. Kalender und Ansicht müssen den Zugriff beide erlauben.",

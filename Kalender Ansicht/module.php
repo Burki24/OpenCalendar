@@ -3,8 +3,10 @@
 declare(strict_types=1);
 
 use IPSKalender\CalendarAttachmentPolicy;
+use IPSKalender\CalendarAttachmentTransport;
 
 require_once __DIR__ . '/../libs/CalendarAttachmentPolicy.php';
+require_once __DIR__ . '/../libs/CalendarAttachmentTransport.php';
 
 use Burki24\SymconModuleHelper\ConfigurationFormHelper;
 use Burki24\SymconModuleHelper\IPSViewHTMLPageHelper;
@@ -120,6 +122,7 @@ class CalendarView extends IPSModuleStrict
         $this->RegisterPropertyBoolean('AttachmentAllowLocal', false);
         $this->RegisterPropertyBoolean('AttachmentAllowProvider', false);
         $this->RegisterPropertyInteger('AttachmentIdentityMode', 0);
+        $this->RegisterPropertyBoolean('AttachmentAllowLocalHttp', false);
         $this->RegisterPropertyInteger('DefaultView', 0);
         $this->RegisterPropertyInteger('TileWeekOrientation', 0);
         $this->RegisterPropertyInteger('TileFontScale', 100);
@@ -1265,6 +1268,10 @@ class CalendarView extends IPSModuleStrict
             ? max(0, (int) $rawClientContractVersion)
             : 0;
         $action = is_string($request['action'] ?? null) ? $request['action'] : '';
+        if ($action === 'CheckAttachmentAccess') {
+            $this->checkAttachmentRequestAccess($request);
+            return;
+        }
         if ($action === 'GetState') {
             try {
                 $this->outputIPSViewResponse([
@@ -3261,6 +3268,42 @@ class CalendarView extends IPSModuleStrict
                 self::ATTRIBUTE_IPSVIEW_TOKEN_4
             ]
         ));
+    }
+
+    /**
+     * Request-scoped preflight only; does not issue credentials or transfer files.
+     * Authentication has already been checked by ProcessHookData.
+     *
+     * @param array<string, mixed> $request Untrusted request fields.
+     */
+    private function checkAttachmentRequestAccess(array $request): void
+    {
+        // No wildcard CORS and no shared visualization state for attachment responses.
+        header('Content-Type: application/json; charset=utf-8');
+        header('Cache-Control: no-store');
+        header('X-Content-Type-Options: nosniff');
+        if (!CalendarAttachmentTransport::allows($_SERVER, $this->ReadPropertyBoolean('AttachmentAllowLocalHttp'))) {
+            http_response_code(403);
+            echo '{"Error":"Attachment transport is not allowed."}';
+            return;
+        }
+        $raw = $request['value'] ?? null;
+        $value = is_string($raw) && strlen($raw) <= 4096 ? json_decode($raw, true, 8) : null;
+        if (!is_array($value) || !is_int($value['calendarId'] ?? null)
+            || $value['calendarId'] <= 0 || !is_string($value['operation'] ?? null)
+            || !is_string($value['destination'] ?? null)) {
+            http_response_code(400);
+            echo '{"Error":"Invalid attachment request."}';
+            return;
+        }
+        if (!$this->CanAccessAttachments($value['calendarId'], $value['operation'], $value['destination'])) {
+            http_response_code(403);
+            echo '{"Error":"Attachment access denied."}';
+            return;
+        }
+        http_response_code(200);
+        // This result is never a grant for a subsequent request or a specific document.
+        echo '{"policyAllowed":true,"transferAvailable":false}';
     }
 
     /** @param array<string, mixed> $payload */
