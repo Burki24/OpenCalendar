@@ -19,6 +19,8 @@ final class MicrosoftTodoCalendarWriteHarness extends Calendar
     /** @var array<string, mixed>|null */
     public ?array $echoTask = null;
 
+    public int $reopenMode = 0;
+
     /** @param array<string, mixed> $task */
     public function __construct(array $task)
     {
@@ -32,6 +34,11 @@ final class MicrosoftTodoCalendarWriteHarness extends Calendar
             'MicrosoftTaskDeltaLink'  => 'https://graph.microsoft.com/delta',
             'MicrosoftTaskSyncListID' => 'list-1'
         ];
+    }
+
+    protected function ReadPropertyInteger(string $Name): int
+    {
+        return $Name === 'MicrosoftTaskReopenMode' ? $this->reopenMode : 0;
     }
 
     protected function ReadPropertyBoolean(string $Name): bool
@@ -290,6 +297,37 @@ assertTodoWrite(
         && $calendar->requests[2]['Changes'] === ['status' => 'notStarted'],
     'Reopening a completed task must restore the native Microsoft To Do status.'
 );
+
+foreach (['taskCompleted' => false, 'taskStatus' => 'notStarted'] as $field => $value) {
+    $singleCalendar = new MicrosoftTodoCalendarWriteHarness(todoWriteTask('completed'));
+    $singleCalendar->reopenMode = 1;
+    $singleTask = todoWriteTask();
+    $singleTask['recurrence'] = null;
+    $singleCalendar->responses[] = todoWriteSuccess($singleTask);
+    $result = json_decode($singleCalendar->UpdateEvent(json_encode(array_merge(todoWriteIdentity(), [
+        'changes' => [$field => $value]
+    ]), JSON_THROW_ON_ERROR)), true, 512, JSON_THROW_ON_ERROR);
+    assertTodoWrite(
+        $result['success'] === true
+        && count($singleCalendar->requests) === 1
+        && $singleCalendar->requests[0]['Changes'] === ['status' => 'notStarted', 'reopenAsSingle' => true],
+        'Opt-in reactivation must request a guarded single-task reopen for the same task only.'
+    );
+}
+
+foreach (['notStarted', 'completed'] as $currentStatus) {
+    $unchangedCalendar = new MicrosoftTodoCalendarWriteHarness(todoWriteTask($currentStatus));
+    $unchangedCalendar->reopenMode = 1;
+    $unchangedCalendar->responses[] = todoWriteSuccess(todoWriteTask($currentStatus, 'Edited title'));
+    $result = json_decode($unchangedCalendar->UpdateEvent(json_encode(array_merge(todoWriteIdentity(), [
+        'changes' => ['summary' => 'Edited title', 'taskCompleted' => $currentStatus === 'completed']
+    ]), JSON_THROW_ON_ERROR)), true, 512, JSON_THROW_ON_ERROR);
+    assertTodoWrite(
+        $result['success'] === true
+        && $unchangedCalendar->requests[0]['Changes'] === ['title' => 'Edited title'],
+        'Opt-in must not detach a series when editing without a completion-state transition.'
+    );
+}
 
 $forged = json_decode($calendar->UpdateEvent(json_encode(array_merge(todoWriteIdentity('other-list'), [
     'changes' => ['task' => true, 'taskCompleted' => true]

@@ -125,6 +125,7 @@ class Calendar extends IPSModuleStrict
         $this->RegisterPropertyString('CalendarColor', '');
         $this->RegisterPropertyBoolean('CanWrite', false);
         $this->RegisterPropertyString('MicrosoftTaskListID', '');
+        $this->RegisterPropertyInteger('MicrosoftTaskReopenMode', 0);
         $this->RegisterPropertyInteger('UpdateSchedule', SynchronizationSchedule::CUSTOM);
         $this->RegisterPropertyInteger('UpdateInterval', 15);
         $this->RegisterPropertyInteger('PastDays', 30);
@@ -191,6 +192,10 @@ class Calendar extends IPSModuleStrict
             if (($element['name'] ?? '') === 'MicrosoftTaskListID') {
                 $element['visible'] = !$local && count($taskListOptions) > 1;
                 $element['options'] = $taskListOptions;
+            }
+            if (($element['name'] ?? '') === 'MicrosoftTaskReopenSettings') {
+                $element['visible'] = !$local && (count($taskListOptions) > 1
+                    || trim($this->ReadPropertyString('MicrosoftTaskListID')) !== '');
             }
             if (($element['caption'] ?? '') === 'Calendar identity') {
                 foreach ($element['items'] as &$item) {
@@ -2173,6 +2178,9 @@ class Calendar extends IPSModuleStrict
             $currentlyCompleted = strcasecmp(trim((string) ($sourceTask['status'] ?? '')), 'completed') === 0;
             if ($requestedCompleted !== $currentlyCompleted) {
                 $taskChanges['status'] = $requestedCompleted ? 'completed' : 'notStarted';
+                if (!$requestedCompleted && $this->ReadPropertyInteger('MicrosoftTaskReopenMode') === 1) {
+                    $taskChanges['reopenAsSingle'] = true;
+                }
             }
         }
         if ($taskChanges === []) {

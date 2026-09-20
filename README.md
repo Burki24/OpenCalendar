@@ -385,6 +385,37 @@ synchronisieren und in Microsoft To Do prüfen, bevor der Vorgang wiederholt wir
 Diese Prüfung behebt noch nicht die beobachtete UTC-Mitternacht-Abweichung in
 westlichen Zeitzonen. Es erfolgt keine automatische Tageskorrektur oder Rücknahme.
 
+#### Erledigte Microsoft-To-Do-Aufgaben reaktivieren
+
+In der **Kalender-Instanz → Reaktivierte Microsoft-To-Do-Aufgaben** lässt sich
+das Verhalten beim Wiederöffnen einstellen (nicht in der Kalenderansicht):
+
+- **Microsoft-Verhalten beibehalten (Standard):** Die Wiederholung bleibt erhalten.
+  Die bereits erzeugte Folgeaufgabe wird nicht zurückgenommen. Wird die alte
+  Aufgabe reaktiviert, verschoben und erneut erledigt, können zwei unabhängig
+  fortlaufende Aufgabenserien entstehen. Dieses Verhalten wurde auch direkt
+  in Microsoft To Do mit einer täglichen Serie beobachtet.
+- **Als Einzelaufgabe reaktivieren:** OpenCalendar entfernt zuerst die Wiederholung
+  der alten erledigten Aufgabe **auch bei Microsoft** und öffnet sie erst nach
+  bestätigter Entfernung wieder. Sie bleibt verschiebbar, erzeugt beim Erledigen
+  aber keine weitere Folgeaufgabe. Die ursprüngliche Folgeaufgabe führt ihre
+  Serie unverändert fort; es wird nichts gelöscht.
+
+Die Einstellung gilt nur für künftige Reaktivierungen **über diese OpenCalendar-
+Instanz**, sowohl aus IPSView als auch aus der Kachelansicht und der Kalender-API.
+Sie verändert keine vorhandenen Aufgaben beim Umschalten und greift nicht bei
+Reaktivierungen direkt in Microsoft To Do. Wird dieselbe Aufgabenliste in mehreren
+Kalenderinstanzen verwendet, entscheidet die Einstellung der ausführenden Instanz.
+Andere Anbieter, normale Kalendertermine und das Erstellen/Erledigen von Aufgaben
+bleiben unverändert. Nachträglich wird keine Serie automatisch wiederhergestellt.
+
+Bei Fehlern kann die Wiederholung bereits entfernt sein, obwohl die Aufgabe noch
+erledigt ist. OpenCalendar stellt sie nicht automatisch wieder her und meldet
+keinen Erfolg ohne bestätigten Einzelaufgabenstatus. Bitte synchronisieren und
+die Aufgabe bei Microsoft prüfen, bevor der Vorgang wiederholt wird.
+
+#### OAuth-Verbindung
+
 Native Microsoft-To-Do-Aufgaben benötigen zusätzlich die delegierte
 Microsoft-Graph-Berechtigung `Tasks.ReadWrite`. `Calendars.ReadWrite` allein
 reicht nicht. Der OAuth-Zugang läuft weiterhin über Symcon; Anwender müssen

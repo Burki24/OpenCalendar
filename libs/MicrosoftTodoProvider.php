@@ -135,6 +135,9 @@ final class MicrosoftTodoProvider
             throw new InvalidArgumentException('The task update is empty.');
         }
         $path = '/me/todo/lists/' . rawurlencode($listId) . '/tasks/' . rawurlencode($taskId);
+        if (($changes['reopenAsSingle'] ?? false) === true) {
+            return $this->reopenTaskAsSingle($listId, $taskId, $path, $payload);
+        }
         $movedDate = null;
         if (is_array($payload['dueDateTime'] ?? null)) {
             // The cache can be older than a completion performed in Microsoft's UI.
@@ -219,6 +222,47 @@ final class MicrosoftTodoProvider
             [204]
         );
         return true;
+    }
+
+    /** @param array<string, mixed> $payload @return array<string, mixed> */
+    private function reopenTaskAsSingle(string $listId, string $taskId, string $path, array $payload): array
+    {
+        if (($payload['status'] ?? '') !== 'notStarted' || array_key_exists('recurrence', $payload)) {
+            throw new InvalidArgumentException('Single-task reactivation requires status notStarted and no recurrence override.');
+        }
+        // Do not detach an active successor based on an outdated calendar cache.
+        $current = $this->requestJson('GET', $path, null, [200]);
+        if (($current['id'] ?? '') !== $taskId || ($current['status'] ?? '') !== 'completed') {
+            throw new MicrosoftTodoProviderException('The task is no longer completed. Synchronize before reopening it as a single task.');
+        }
+        if (!array_key_exists('recurrence', $current)) {
+            throw new MicrosoftTodoProviderException('Microsoft To Do did not confirm the recurrence state. Synchronize and try again.');
+        }
+        if ($current['recurrence'] !== null) {
+            $cleared = $this->requestJson('PATCH', $path, ['recurrence' => null], [200]);
+            if (!$this->isConfirmedSingleTask($cleared, $taskId, 'completed')) {
+                $cleared = $this->requestJson('GET', $path, null, [200]);
+            }
+            if (!$this->isConfirmedSingleTask($cleared, $taskId, 'completed')) {
+                throw new MicrosoftTodoProviderException('Removing recurrence was not confirmed. The task was not reopened. Synchronize and check it in Microsoft To Do.');
+            }
+        }
+        // Reopening and any date move happen only after recurrence removal is confirmed.
+        // On a later failure the task may already be non-recurring; never restore a series blindly.
+        $this->requestJson('PATCH', $path, $payload, [200]);
+        $confirmed = $this->requestJson('GET', $path, null, [200]);
+        if (!$this->isConfirmedSingleTask($confirmed, $taskId, 'notStarted')) {
+            throw new MicrosoftTodoProviderException('Single-task reactivation was not confirmed. Changes may already be saved. Synchronize and check the task in Microsoft To Do.');
+        }
+        return $this->mapTask($listId, $confirmed)
+            ?? throw new MicrosoftTodoProviderException('Microsoft To Do returned an invalid updated task.');
+    }
+
+    /** @param array<string, mixed> $task */
+    private function isConfirmedSingleTask(array $task, string $taskId, string $status): bool
+    {
+        return ($task['id'] ?? '') === $taskId && ($task['status'] ?? '') === $status
+            && array_key_exists('recurrence', $task) && $task['recurrence'] === null;
     }
 
     /** @param array<string, mixed> $task */

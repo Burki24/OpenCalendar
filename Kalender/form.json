@@ -148,6 +148,33 @@
         },
         {
             "type": "ExpansionPanel",
+            "name": "MicrosoftTaskReopenSettings",
+            "caption": "Reactivated Microsoft To Do tasks",
+            "visible": false,
+            "items": [
+                {
+                    "type": "Select",
+                    "name": "MicrosoftTaskReopenMode",
+                    "caption": "When reopening a completed task",
+                    "options": [
+                        {
+                            "caption": "Keep Microsoft behavior (default)",
+                            "value": 0
+                        },
+                        {
+                            "caption": "Reopen as a single task",
+                            "value": 1
+                        }
+                    ]
+                },
+                {
+                    "type": "Label",
+                    "caption": "Only applies when reopening through OpenCalendar. Single-task mode removes recurrence from the old task at Microsoft too; existing successor tasks remain unchanged. No tasks are deleted. Changing this setting does not modify existing tasks."
+                }
+            ]
+        },
+        {
+            "type": "ExpansionPanel",
             "caption": "Calendar identity",
             "expanded": false,
             "items": [

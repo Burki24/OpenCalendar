@@ -419,4 +419,76 @@ foreach (['missing-date', 'wrong-id'] as $invalidResult) {
 }
 date_default_timezone_set($originalTimezone);
 
+$completedSeries = [
+    'id'          => 'reopen-task', 'title' => 'Old occurrence', 'status' => 'completed',
+    'recurrence'  => ['pattern' => ['type' => 'daily', 'interval' => 1], 'range' => ['type' => 'noEnd']],
+    'dueDateTime' => ['dateTime' => '2026-09-20T00:00:00', 'timeZone' => 'Europe/Berlin']
+];
+$completedSingle = array_replace($completedSeries, ['recurrence' => null]);
+$openSingle = array_replace($completedSingle, ['status' => 'notStarted']);
+foreach ([false, true] as $staleClearResponse) {
+    $responses = [todoResponse(200, $completedSeries)];
+    $responses[] = todoResponse(200, $staleClearResponse ? $completedSeries : $completedSingle);
+    if ($staleClearResponse) {
+        $responses[] = todoResponse(200, $completedSingle);
+    }
+    $responses[] = todoResponse(200, $openSingle);
+    $responses[] = todoResponse(200, $openSingle);
+    $singleClient = new MicrosoftTodoTestHttpClient($responses);
+    $single = (new MicrosoftTodoProvider($singleClient, 'access-token'))->updateTask('list-1', 'reopen-task', [
+        'status' => 'notStarted', 'reopenAsSingle' => true, 'description' => 'Keep my note'
+    ]);
+    $writes = array_values(array_filter($singleClient->requests, static fn (array $request): bool => $request['method'] !== 'GET'));
+    assertMicrosoftTodo($single['recurrence'] === null && $single['status'] === 'notStarted'
+        && count($writes) === 2
+        && json_decode($writes[0]['body'], true, 512, JSON_THROW_ON_ERROR) === ['recurrence' => null]
+        && json_decode($writes[1]['body'], true, 512, JSON_THROW_ON_ERROR) === [
+            'body' => ['contentType' => 'text', 'content' => 'Keep my note'], 'status' => 'notStarted'
+        ], 'Single-task reopen must confirm removal before reopening and preserve other edits without sending its internal flag.');
+    foreach ($singleClient->requests as $request) {
+        assertMicrosoftTodo(str_ends_with($request['url'], '/tasks/reopen-task'), 'Reopening must never modify or delete a successor.');
+    }
+}
+foreach (['active', 'missing-recurrence', 'clear-ignored', 'wrong-id', 'reopen-ignored', 'clear-failed'] as $failure) {
+    $current = $completedSeries;
+    if ($failure === 'active') {
+        $current['status'] = 'notStarted';
+    }
+    if ($failure === 'missing-recurrence') {
+        unset($current['recurrence']);
+    }
+    $badClear = $failure === 'wrong-id' ? array_replace($completedSingle, ['id' => 'successor']) : $completedSeries;
+    $responses = [todoResponse(200, $current)];
+    if ($failure === 'clear-failed') {
+        $responses[] = todoResponse(500, ['error' => ['code' => 'ServerError', 'message' => 'failed']]);
+    } elseif ($failure === 'reopen-ignored') {
+        $responses = array_merge($responses, [todoResponse(200, $completedSingle), todoResponse(200, $completedSingle), todoResponse(200, $completedSingle)]);
+    } else {
+        $responses = array_merge($responses, [todoResponse(200, $badClear), todoResponse(200, $badClear)]);
+    }
+    $failureClient = new MicrosoftTodoTestHttpClient($responses);
+    $rejected = false;
+    try {
+        (new MicrosoftTodoProvider($failureClient, 'access-token'))->updateTask('list-1', 'reopen-task', [
+            'status' => 'notStarted', 'reopenAsSingle' => true
+        ]);
+    } catch (MicrosoftTodoProviderException $exception) {
+        $rejected = true;
+    }
+    assertMicrosoftTodo($rejected, 'Unconfirmed single-task reactivation must fail: ' . $failure);
+    if ($failure !== 'reopen-ignored') {
+        foreach ($failureClient->requests as $request) {
+            assertMicrosoftTodo(!str_contains($request['body'], 'notStarted'), 'Unconfirmed removal must not reopen the task.');
+        }
+    }
+}
+
+$retrySingleClient = new MicrosoftTodoTestHttpClient([
+    todoResponse(200, $completedSingle), todoResponse(200, $openSingle), todoResponse(200, $openSingle)
+]);
+(new MicrosoftTodoProvider($retrySingleClient, 'access-token'))->updateTask('list-1', 'reopen-task', [
+    'status' => 'notStarted', 'reopenAsSingle' => true
+]);
+assertMicrosoftTodo(count($retrySingleClient->requests) === 3, 'Retry after removal must reopen the already non-recurring completed task without restoring recurrence.');
+
 fwrite(STDOUT, "Microsoft To Do provider tests passed.\n");
