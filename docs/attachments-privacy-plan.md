@@ -167,6 +167,37 @@ local-only storage. Provider-side files remain governed by provider permissions.
 
 ## Acceptance evidence still required
 
+### Local original-data working store (2026-09-20)
+
+`LocalAttachmentStore` is the bounded working-copy engine, not yet a runtime
+storage adapter or an upload API. Like the local calendar resource adapter it
+returns a private snapshot that a future adapter must persist atomically under
+a calendar lock. Nothing currently registers, writes or exposes that snapshot
+in Symcon. This avoids choosing a public media directory or placing original
+files in the event cache before the storage/access boundary is verified.
+
+- Limits: 2 MiB per file, 8 MiB original bytes and 100 files per store. These
+  conservative initial limits are constants, not advertised provider limits.
+- Canonical base64 is bounded before decoding; filenames cannot contain paths,
+  control characters or header injection. The display name is never a disk path.
+- Opaque random file IDs, owner-bound listing/read/delete, content revisions,
+  and matching retries prevent duplicate uploads while the record is retained.
+  Retry IDs are not credentials. Deletes require the current revision.
+- Metadata excludes file content, ownership keys and retry IDs. Originals are
+  separate and restored with schema, hash, size and quota validation. Corrupt
+  snapshots throw instead of silently resetting data.
+- Content is opaque, with no preview, MIME/type safety or malware guarantee.
+  The future upload boundary still needs a conservative file-type policy.
+
+Tests prove binary snapshot round trips, working-copy isolation, quota boundaries,
+cross-owner denial, repeated upload handling and corruption rejection. They do
+not prove durable Symcon writes, concurrency, backup/restore, encryption, cache
+clearing or real restart behavior. Owner keys must be resolved by the server from
+verified account/calendar/event/task identity, never accepted from browser input.
+The runtime adapter must recheck policy and identity before all I/O, and handle
+deletion/retry races, retention, orphan cleanup and series identity changes.
+No uploads/downloads are enabled by this core; `transferAvailable` stays false.
+
 ### Transport preparation and approved HTTP exception (2026-09-20)
 
 View property `AttachmentAllowLocalHttp` defaults to false and has a visible
