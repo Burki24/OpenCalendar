@@ -167,6 +167,34 @@ local-only storage. Provider-side files remain governed by provider permissions.
 
 ## Acceptance evidence still required
 
+### Authoritative local event access (2026-09-20)
+
+Private `verifiedLocalAttachmentOperation` now joins the local provider, owner
+identity builder and persistence transaction. It accepts only UID, a bounded
+seven-day lookup window and optional original recurrence slot selectors. Caller
+owner hashes, source/provider identities and resource URLs are rejected. Source
+identity is built from the actual local calendar instance/reference; matching
+records are read fresh from local iCalendar originals, never the display cache.
+Exactly one record must match; recurring records require an original slot.
+
+Lock ordering is local calendar first, attachment storage second. The original
+calendar lock remains held through the attachment operation, preventing normal
+calendar writes/deletion from racing the ownership check. Both layers recheck
+calendar policy after acquiring locks and release locks on failure. Remote
+calendars are rejected by this local-only path, not treated as local originals.
+
+Tests exercise real local event creation, series expansion, upload/read/list
+through this private gate, independent series slots, cache clearing, unknown
+UIDs, forged URLs/owner fields, oversize lookup windows, revoked rights and
+deleted events with a simulated Symcon platform. Deleted-event attachments stay
+stored but inaccessible via that event; deliberate orphan cleanup/export is still
+needed. Calendar transfer/series splitting is not automatic attachment migration.
+
+This closes the local event lookup gap, NOT the full access boundary: the method
+is still private, with no public wrapper, browser upload/download route or UI.
+View/session/transport validation, file-type restrictions, actual Symcon runtime
+tests and provider-specific ownership lookup remain necessary before release.
+
 ### Attachment identity rules (2026-09-20)
 
 `AttachmentOwnerIdentity` defines versioned storage keys from authoritative source

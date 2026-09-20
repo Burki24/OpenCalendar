@@ -2,10 +2,12 @@
 
 declare(strict_types=1);
 
+use IPSKalender\AttachmentOwnerIdentity;
 use IPSKalender\CalendarAttachmentPolicy;
 use IPSKalender\LocalAttachmentStore;
 
 require_once __DIR__ . '/../libs/CalendarAttachmentPolicy.php';
+require_once __DIR__ . '/../libs/AttachmentOwnerIdentity.php';
 require_once __DIR__ . '/../libs/LocalAttachmentStore.php';
 
 use Burki24\SymconModuleHelper\ChunkedJsonTransferHelper;
@@ -1413,6 +1415,77 @@ class Calendar extends IPSModuleStrict
                 }
             }
             return $result;
+        } finally {
+            IPS_SemaphoreLeave($lock);
+        }
+    }
+
+    /**
+     * Resolves an untrusted local event selector from current originals, then
+     * runs the attachment transaction while preventing concurrent event deletion.
+     * No public entry point exists yet; future callers must enforce view/session
+     * and transport rights separately. Lock order: calendar, then attachments.
+     *
+     * @param string $operation Requested attachment operation.
+     * @param array<string, mixed> $selector UID, bounded time window and optional original slot.
+     * @param array<string, mixed> $request Attachment fields, never owner/source claims.
+     * @return array<mixed>|string Metadata or private file bytes.
+     */
+    private function verifiedLocalAttachmentOperation(string $operation, array $selector, array $request): array|string
+    {
+        if (!$this->ReadPropertyBoolean('LocalCalendar') || !$this->CanAccessAttachments($operation, 'local')) {
+            throw new RuntimeException('Local attachment access denied.');
+        }
+        if (array_diff(array_keys($selector), ['uid', 'startTimestamp', 'endTimestamp', 'recurrenceId', 'originalStart']) !== []
+            || !is_string($selector['uid'] ?? null) || $selector['uid'] === '' || strlen($selector['uid']) > 8192
+            || !is_int($selector['startTimestamp'] ?? null) || !is_int($selector['endTimestamp'] ?? null)
+            || $selector['startTimestamp'] <= 0 || $selector['endTimestamp'] <= $selector['startTimestamp']
+            || $selector['endTimestamp'] - $selector['startTimestamp'] > 7 * 86400) {
+            throw new InvalidArgumentException('Invalid attachment event selector.');
+        }
+        foreach (['recurrenceId', 'originalStart'] as $slot) {
+            if (isset($selector[$slot]) && (!is_string($selector[$slot]) || strlen($selector[$slot]) > 128)) {
+                throw new InvalidArgumentException('Invalid attachment occurrence selector.');
+            }
+        }
+        $lock = 'OpenCalendar.LocalCalendar.' . $this->InstanceID;
+        if (!IPS_SemaphoreEnter($lock, 5000)) {
+            throw new RuntimeException('The local calendar is busy. Please try again.');
+        }
+        try {
+            if (!$this->ReadPropertyBoolean('LocalCalendar') || !$this->CanAccessAttachments($operation, 'local')) {
+                throw new RuntimeException('Local attachment access denied.');
+            }
+            $reference = $this->effectiveCalendarId();
+            $resources = json_decode($this->ReadAttributeString('LocalCalendarResources'), true, 512, JSON_THROW_ON_ERROR);
+            if (!is_array($resources)) {
+                throw new UnexpectedValueException('Invalid local calendar originals.');
+            }
+            $provider = new LocalCalendarProvider($resources, $reference);
+            $matches = [];
+            foreach ($provider->getEvents($reference, new DateTimeImmutable('@' . $selector['startTimestamp']), new DateTimeImmutable('@' . $selector['endTimestamp'])) as $event) {
+                if (($event['uid'] ?? '') !== $selector['uid']) {
+                    continue;
+                }
+                $recurring = in_array($event['recurrenceType'] ?? '', ['occurrence', 'exception'], true) || !empty($event['recurring']);
+                if ($recurring && empty($selector['recurrenceId']) && empty($selector['originalStart'])) {
+                    continue;
+                }
+                foreach (['recurrenceId', 'originalStart'] as $slot) {
+                    if (!empty($selector[$slot]) && ($event[$slot] ?? '') !== $selector[$slot]) {
+                        continue 2;
+                    }
+                }
+                $matches[] = $event;
+            }
+            if (count($matches) !== 1) {
+                throw new RuntimeException('The attachment event is missing or ambiguous.');
+            }
+            $owner = AttachmentOwnerIdentity::key([
+                'instanceId' => $this->InstanceID, 'provider' => 'local',
+                'accountId'  => 'local:' . $this->InstanceID, 'calendarId' => $reference
+            ], $matches[0]);
+            return $this->localAttachmentOperation($operation, $owner, $request);
         } finally {
             IPS_SemaphoreLeave($lock);
         }
