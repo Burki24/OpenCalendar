@@ -23,6 +23,13 @@ $reject = static function (callable $callback): void
     throw new LogicException('Expected authoritative ownership denial.');
 };
 $meta = $call($calendar, 'upload', $selector, $request);
+$publicResult = json_decode($calendar->TransferLocalAttachment(json_encode([
+    'operation' => 'download', 'selector' => $selector, 'data' => ['id' => $meta['id']]
+], JSON_THROW_ON_ERROR)), true, 512, JSON_THROW_ON_ERROR);
+localModuleCheck(base64_decode($publicResult['content'], true) === 'PRIVATE', 'Trusted transfer API must use authoritative ownership.');
+$reject(fn () => $calendar->TransferLocalAttachment(json_encode([
+    'operation' => 'download', 'selector' => array_replace($selector, ['uid' => 'foreign']), 'data' => ['id' => $meta['id']]
+], JSON_THROW_ON_ERROR)));
 localModuleCheck($call($calendar, 'download', $selector, ['id' => $meta['id']]) === 'PRIVATE', 'Verified local binary roundtrip failed.');
 $calendar->ClearCache();
 localModuleCheck($call($calendar, 'list', $selector) === [$meta], 'Lookup must use originals, not event cache.');

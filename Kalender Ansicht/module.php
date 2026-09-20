@@ -1248,9 +1248,18 @@ class CalendarView extends IPSModuleStrict
             return;
         }
 
+        if ((int) ($_SERVER['CONTENT_LENGTH'] ?? 0) > 4_000_000) {
+            $this->outputIPSViewResponse(['Error' => 'Request too large.'], 413);
+            return;
+        }
         $request = $_POST;
         if ($request === []) {
-            parse_str((string) file_get_contents('php://input'), $request);
+            $body = (string) file_get_contents('php://input', false, null, 0, 4_000_001);
+            if (strlen($body) > 4_000_000) {
+                $this->outputIPSViewResponse(['Error' => 'Request too large.'], 413);
+                return;
+            }
+            parse_str($body, $request);
         }
 
         $token = is_string($request['token'] ?? null) ? $request['token'] : '';
@@ -1268,6 +1277,10 @@ class CalendarView extends IPSModuleStrict
             ? max(0, (int) $rawClientContractVersion)
             : 0;
         $action = is_string($request['action'] ?? null) ? $request['action'] : '';
+        if ($action === 'TransferAttachment') {
+            $this->transferAttachmentRequest($request);
+            return;
+        }
         if ($action === 'CheckAttachmentAccess') {
             $this->checkAttachmentRequestAccess($request);
             return;
@@ -3304,6 +3317,65 @@ class CalendarView extends IPSModuleStrict
         http_response_code(200);
         // This result is never a grant for a subsequent request or a specific document.
         echo '{"policyAllowed":true,"transferAvailable":false}';
+    }
+
+    /** @param array<string, mixed> $request Authenticated but untrusted HTTP request. */
+    private function transferAttachmentRequest(array $request): void
+    {
+        header_remove('Access-Control-Allow-Origin');
+        header('Content-Type: application/json; charset=utf-8');
+        header('Cache-Control: no-store');
+        header('X-Content-Type-Options: nosniff');
+        header('Content-Security-Policy: sandbox');
+        header('Referrer-Policy: no-referrer');
+        if (!CalendarAttachmentTransport::allows($_SERVER, $this->ReadPropertyBoolean('AttachmentAllowLocalHttp'))) {
+            http_response_code(403);
+            echo '{"Error":"Attachment transport is not allowed."}';
+            return;
+        }
+        try {
+            $raw = $request['value'] ?? null;
+            $value = is_string($raw) && strlen($raw) <= 3_000_000 ? json_decode($raw, true, 12, JSON_THROW_ON_ERROR) : null;
+            if (!is_array($value) || array_diff(array_keys($value), ['calendarId', 'operation', 'destination', 'selector', 'data']) !== []
+                || !is_int($value['calendarId'] ?? null) || $value['calendarId'] <= 0
+                || !is_string($value['operation'] ?? null) || ($value['destination'] ?? '') !== 'local'
+                || !is_array($value['selector'] ?? null) || !is_array($value['data'] ?? null)) {
+                throw new InvalidArgumentException('Invalid request.');
+            }
+            $allowed = fn (): bool => $this->IsIPSViewHTMLPageEnabled()
+                && hash_equals($this->ipsViewToken(), $request['token'])
+                && $this->CanAccessAttachments($value['calendarId'], $value['operation'], 'local');
+            if (!$allowed()) {
+                http_response_code(403);
+                echo '{"Error":"Attachment access denied."}';
+                return;
+            }
+            $result = IPSKAL_TransferLocalAttachment($value['calendarId'], json_encode([
+                'operation' => $value['operation'], 'selector' => $value['selector'], 'data' => $value['data']
+            ], JSON_THROW_ON_ERROR));
+            if (!$allowed()) {
+                throw new RuntimeException('Access changed.');
+            }
+            $payload = json_decode($result, true, 12, JSON_THROW_ON_ERROR);
+            if ($value['operation'] === 'download') {
+                $bytes = base64_decode($payload['content'], true);
+                if ($bytes === false) {
+                    throw new RuntimeException('Invalid download.');
+                }
+                header('Content-Type: application/octet-stream');
+                header('Content-Disposition: attachment; filename="attachment.bin"');
+                header('Content-Length: ' . strlen($bytes));
+                http_response_code(200);
+                echo $bytes;
+                return;
+            }
+            http_response_code(200);
+            echo json_encode($payload, JSON_THROW_ON_ERROR);
+        } catch (Throwable) {
+            // No provider exception, file bytes, names, credentials or paths in logs.
+            http_response_code(400);
+            echo '{"Error":"Attachment transfer failed. Refresh before retrying; a change may already be saved."}';
+        }
     }
 
     /** @param array<string, mixed> $payload */

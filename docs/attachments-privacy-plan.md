@@ -167,6 +167,34 @@ local-only storage. Provider-side files remain governed by provider permissions.
 
 ## Acceptance evidence still required
 
+### Request-scoped local transfer route (2026-09-20)
+
+The IPSView POST hook now accepts `TransferAttachment` with the existing view
+token and bounded JSON `value`: calendarId, operation, explicit destination
+`local`, selector and data. Operations are list/upload/download/delete. Selection
+and view/calendar policy are checked before dispatch and before returning data;
+TLS (or the explicitly configured private-peer HTTP exception) is mandatory.
+The calendar's `TransferLocalAttachment` script API resolves the event from local
+originals under lock. Unknown owners, remote calendars and provider destinations
+are rejected. This script API is for trusted Symcon callers, not browser identity.
+
+Responses are request-local: no state update, wildcard CORS, content logging or
+URL credentials. Downloads use octet-stream, attachment disposition (currently
+the neutral filename attachment.bin), nosniff and no-store. Failed transfers have
+generic errors; mutations may have committed before a final access revocation,
+so clients must refresh and reuse upload retry IDs, not assume rollback.
+The hook limits encoded HTTP bodies to 4 MB and decoded JSON values to 3 MB;
+file content remains capped at 2 MiB. The web server must also impose request
+limits before PHP parses POST bodies. No streaming/chunked uploads are enabled.
+
+Local tests exercise hook authorization, transport denial, selected-calendar
+checks, post-read revocation, and the real calendar API's authoritative lookup.
+Real HTTP response headers, Symcon multi-client behavior and restart/backup tests
+remain release gates. No upload UI or native tile transfer action is enabled;
+preflight still reports transferAvailable=false for the end-user feature.
+Remote-provider ownership, protected export/orphan cleanup and the user/group
+adapter remain pending. This route does not make the overall feature release-ready.
+
 ### Upload admission policy (2026-09-20)
 
 `AttachmentUploadPolicy` now validates new local uploads inside the private

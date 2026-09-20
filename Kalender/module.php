@@ -1369,6 +1369,36 @@ class Calendar extends IPSModuleStrict
     }
 
     /**
+     * Transfers local originals for trusted Symcon callers; browser authentication
+     * and view rights must additionally be enforced by the requesting view hook.
+     *
+     * @param string $Request Bounded JSON with operation, selector and data.
+     * @return string Private JSON result, never broadcast or log it.
+     */
+    public function TransferLocalAttachment(string $Request): string
+    {
+        if (strlen($Request) > 3_000_000) {
+            throw new InvalidArgumentException('Attachment request is too large.');
+        }
+        $value = json_decode($Request, true, 12, JSON_THROW_ON_ERROR);
+        if (!is_array($value) || array_diff(array_keys($value), ['operation', 'selector', 'data']) !== []
+            || !is_string($value['operation'] ?? null) || !is_array($value['selector'] ?? null)
+            || !is_array($value['data'] ?? null)) {
+            throw new InvalidArgumentException('Invalid attachment request.');
+        }
+        $fields = match ($value['operation']) {
+            'list'   => [], 'download' => ['id'], 'delete' => ['id', 'revision'],
+            'upload' => ['name', 'content', 'requestId'],
+            default  => throw new InvalidArgumentException('Invalid attachment operation.')
+        };
+        if (array_diff(array_keys($value['data']), $fields) !== []) {
+            throw new InvalidArgumentException('Invalid attachment fields.');
+        }
+        $result = $this->verifiedLocalAttachmentOperation($value['operation'], $value['selector'], $value['data']);
+        return json_encode($value['operation'] === 'download' ? ['content' => base64_encode($result)] : ['result' => $result], JSON_THROW_ON_ERROR);
+    }
+
+    /**
      * Internal persistence boundary, not a public script or browser API.
      * The caller must first authenticate and resolve a verified owner binding.
      * Files remain in a dedicated durable attribute, never in caches/media/state.
