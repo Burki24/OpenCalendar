@@ -211,7 +211,9 @@ assertSymconStrict(
 assertSymconStrict(
     str_contains($viewSource, '$this->RegisterHook($this->ipsViewHookAddress());')
         && str_contains($viewSource, 'protected function ProcessHookData(): void')
-        && str_contains($viewSource, 'hash_equals($this->ipsViewToken(), $token)')
+        && str_contains($viewSource, '$expectedToken = $this->ipsViewToken();')
+        && str_contains($viewSource, "\$expectedToken === str_repeat('0', 32)")
+        && str_contains($viewSource, 'hash_equals($expectedToken, $token)')
         && str_contains($viewSource, 'private function executeVisualizationAction(')
         && str_contains($viewSource, "case 'CreateEvent':")
         && str_contains($viewSource, "case 'UpdateEvent':")

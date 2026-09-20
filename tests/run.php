@@ -19,6 +19,7 @@ if (PHP_OS_FAMILY === 'Windows') {
 }
 
 $commands = [
+    ['Verify attachment access security baseline', [PHP_BINARY, 'tests/attachment-access-baseline.php']],
     ['Verify CalDAV cache resource identity', [PHP_BINARY, 'tests/caldav-resource-identity.php']],
     ['Verify IPSView picker TAB navigation', ['node', 'tests/ipsview-tab-navigation.js']],
     ['Verify multi-day event display', ['node', 'tests/multi-day-display.js']],

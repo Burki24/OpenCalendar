@@ -1210,7 +1210,10 @@ class CalendarView extends IPSModuleStrict
         }
 
         $token = is_string($request['token'] ?? null) ? $request['token'] : '';
-        if ($token === '' || !hash_equals($this->ipsViewToken(), $token)) {
+        $expectedToken = $this->ipsViewToken();
+        // The persisted zero sentinel is not an issued credential. Fail closed
+        // during initialization instead of accepting a predictable placeholder.
+        if ($token === '' || $expectedToken === str_repeat('0', 32) || !hash_equals($expectedToken, $token)) {
             $this->outputIPSViewResponse(['Error' => 'Unauthorized.'], 403);
 
             return;
