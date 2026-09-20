@@ -167,6 +167,37 @@ local-only storage. Provider-side files remain governed by provider permissions.
 
 ## Acceptance evidence still required
 
+### Internal Symcon persistence adapter (2026-09-20)
+
+The calendar now registers `LocalAttachmentOriginals`, a dedicated persistent
+string attribute, separate from event originals, event caches, transfer buffers
+and media. The private `localAttachmentOperation` stages mutations through
+`LocalAttachmentStore`, reads the latest snapshot under a per-instance semaphore,
+checks calendar attachment policy before reading and again before returning or
+saving, and only acknowledges a mutation after `WriteAttributeString` succeeds.
+Exceptions always release the semaphore; no body/path is logged by this adapter.
+
+This is intentionally private: no new script wrapper or browser action accepts
+an owner hash. A future authenticated transfer layer must resolve the real
+calendar/account/event/task identity and intersect view rights before calling it.
+The generic public event-edit lookup is not automatically sufficient proof of
+document ownership. Upload/download and `transferAvailable` remain unchanged.
+
+Tests invoke the private seam with a platform double to demonstrate lifecycle
+preservation, simulated restart, cache clearing, failed saves, lock rejection,
+rights revocation and reading the latest committed snapshot after acquiring the
+lock. Real Symcon crash durability, concurrent clients and actual backup/restore
+are still unverified; the module relies on Symcon's attribute persistence contract.
+
+Storage consequences: this is bounded, base64-encoded attribute storage, not
+encrypted file storage. Symcon configuration backups containing attributes also
+contain original attachments. Administrators with instance/backup access can read
+them. Do not export full attributes as routine diagnostics. Disabling attachments
+does not erase originals. Deleting the calendar instance can remove its attribute
+store; protected export/cleanup and operator backup instructions are required
+before enabling the end-user feature. ICS calendar export does not include these
+local documents. No public media file or remote-provider upload is created.
+
 ### Local original-data working store (2026-09-20)
 
 `LocalAttachmentStore` is the bounded working-copy engine, not yet a runtime

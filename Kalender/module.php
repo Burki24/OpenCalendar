@@ -3,8 +3,10 @@
 declare(strict_types=1);
 
 use IPSKalender\CalendarAttachmentPolicy;
+use IPSKalender\LocalAttachmentStore;
 
 require_once __DIR__ . '/../libs/CalendarAttachmentPolicy.php';
+require_once __DIR__ . '/../libs/LocalAttachmentStore.php';
 
 use Burki24\SymconModuleHelper\ChunkedJsonTransferHelper;
 use Burki24\SymconModuleHelper\ConfigurationFormHelper;
@@ -133,6 +135,7 @@ class Calendar extends IPSModuleStrict
         $this->RegisterAttributeString('PendingTaskSeries', '{}');
         // Original calendar objects, never part of the disposable event cache.
         $this->RegisterAttributeString('LocalCalendarResources', '{}');
+        $this->RegisterAttributeString('LocalAttachmentOriginals', '');
         $this->RegisterAttributeInteger('LastSynchronization', 0);
         $this->RegisterAttributeString('LastError', '');
         $this->RegisterAttributeString('IncrementalSyncToken', '');
@@ -1354,6 +1357,65 @@ class Calendar extends IPSModuleStrict
             }
         }
         return true;
+    }
+
+    /**
+     * Internal persistence boundary, not a public script or browser API.
+     * The caller must first authenticate and resolve a verified owner binding.
+     * Files remain in a dedicated durable attribute, never in caches/media/state.
+     *
+     * @param string $operation Policy operation: list, download, upload or delete.
+     * @param string $owner Server-resolved owner hash, never browser input.
+     * @param array<string, mixed> $request Operation fields after request validation.
+     * @return array<mixed>|string Metadata or private download bytes.
+     */
+    private function localAttachmentOperation(string $operation, string $owner, array $request): array|string
+    {
+        if (!$this->CanAccessAttachments($operation, 'local')) {
+            throw new RuntimeException('Attachment access denied.');
+        }
+        $lock = 'OpenCalendar.Attachments.' . $this->InstanceID;
+        if (!IPS_SemaphoreEnter($lock, 5000)) {
+            throw new RuntimeException('Attachment storage is busy. Please try again.');
+        }
+        try {
+            // A request may have waited while the administrator revoked access.
+            if (!$this->CanAccessAttachments($operation, 'local')) {
+                throw new RuntimeException('Attachment access denied.');
+            }
+            $original = $this->ReadAttributeString('LocalAttachmentOriginals');
+            $store = new LocalAttachmentStore($original);
+            $field = static function (string $name) use ($request): string
+            {
+                if (!is_string($request[$name] ?? null)) {
+                    throw new InvalidArgumentException('Invalid attachment request.');
+                }
+                return $request[$name];
+            };
+            $result = match ($operation) {
+                'list'     => $store->listForOwner($owner),
+                'download' => $store->read($owner, $field('id')),
+                'upload'   => $store->add($owner, $field('requestId'), $field('name'), $field('content')),
+                'delete'   => (static function () use ($store, $owner, $field): array
+                {
+                    $store->remove($owner, $field('id'), $field('revision'));
+                    return ['deleted' => true];
+                })(),
+                default => throw new InvalidArgumentException('Invalid attachment operation.')
+            };
+            if (!$this->CanAccessAttachments($operation, 'local')) {
+                throw new RuntimeException('Attachment access denied.');
+            }
+            if (in_array($operation, ['upload', 'delete'], true)) {
+                $updated = $store->exportSnapshot();
+                if ($updated !== $original && !$this->WriteAttributeString('LocalAttachmentOriginals', $updated)) {
+                    throw new RuntimeException('Attachment originals could not be saved.');
+                }
+            }
+            return $result;
+        } finally {
+            IPS_SemaphoreLeave($lock);
+        }
     }
 
     private function refreshCalendarMetadataSafely(): void

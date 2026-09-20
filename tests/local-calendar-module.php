@@ -52,6 +52,7 @@ class IPSModuleStrict
     public array $timers = [];
     public array $values = [];
     public bool $failOriginalSave = false;
+    public bool $failAttachmentSave = false;
     public int $status = 0;
     public function __construct(protected int $InstanceID)
     {
@@ -74,6 +75,14 @@ class IPSModuleStrict
             return $this->attributes[$key];
         }
         if (str_starts_with($method, 'WriteAttribute')) {
+            if ($key === 'LocalAttachmentOriginals') {
+                if (!isset($GLOBALS['localLocks']['OpenCalendar.Attachments.' . $this->InstanceID])) {
+                    throw new RuntimeException('Attachment write without its instance lock.');
+                }
+                if ($this->failAttachmentSave) {
+                    return false;
+                }
+            }
             if ($key === 'LocalCalendarResources' && $this->failOriginalSave) {
                 return false;
             }
