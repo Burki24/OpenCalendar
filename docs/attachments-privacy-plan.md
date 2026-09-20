@@ -167,6 +167,34 @@ local-only storage. Provider-side files remain governed by provider permissions.
 
 ## Acceptance evidence still required
 
+### Attachment identity rules (2026-09-20)
+
+`AttachmentOwnerIdentity` defines versioned storage keys from authoritative source
+and normalized event records. The source includes the calendar instance, provider,
+actual provider account identity and calendar identity. A reused account instance
+number alone is not a provider-account identity. Local calendars need a stable
+server-owned local identity in this field. Google remains unsupported.
+
+- Local/CalDAV/ICS events use UID; Microsoft events use provider event reference.
+- Occurrences/exceptions use their parent identity and immutable original slot:
+  RECURRENCE-ID for iCalendar sources, series ID/originalStart for Microsoft.
+  A moved exception and the original occurrence share a key, not the next slot.
+- Microsoft To Do uses list ID plus task ID, tested with the real projection
+  implementation. Completion/reopening preserve identity; newly created successor
+  tasks have separate identities. No implicit attachment copying is implemented.
+- Titles, descriptions, current dates and ETags never determine ownership.
+  Missing/ambiguous recurrence or provider identity fails closed. Series masters,
+  individual occurrences and single events are separate; no inheritance is implied.
+
+Tests cover these rules and round trips through the local attachment store.
+This helper is NOT yet the server-side ownership verifier and is not wired to
+a public upload endpoint. It must never receive unverified browser records. The
+adapter still needs authoritative lookup, source/account-change detection and
+revocation checks; cached events alone do not establish current remote rights.
+Provider normalization stability, series splits, moves between calendars and real
+provider lifecycle tests remain release requirements. Current date changes cannot
+be used to recover orphaned files by guessing a title or nearby occurrence.
+
 ### Internal Symcon persistence adapter (2026-09-20)
 
 The calendar now registers `LocalAttachmentOriginals`, a dedicated persistent

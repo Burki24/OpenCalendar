@@ -19,6 +19,7 @@ if (PHP_OS_FAMILY === 'Windows') {
 }
 
 $commands = [
+    ['Verify attachment owner identities', [PHP_BINARY, 'tests/attachment-owner.php']],
     ['Verify attachment module persistence', [PHP_BINARY, 'tests/local-attachment-persistence.php']],
     ['Verify local attachment storage core', [PHP_BINARY, 'tests/local-attachment-store.php']],
     ['Verify attachment transport policy', [PHP_BINARY, 'tests/attachment-transport.php']],
