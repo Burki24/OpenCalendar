@@ -35,3 +35,40 @@ for (const [h, m] of [['24', '0'], ['-1', '0'], ['12', '60'], ['', '0'], ['1.5',
 assert(source.includes("calendarVisualization.mode !== 'ipsview'"));
 assert(source.includes('initializeIPSViewDatePickers();'));
 console.log('Date/time picker calendar and value tests passed.');
+
+// Segment typing changes .value programmatically: browsers need not emit change.
+function control() {
+    return {value:'', listeners:{}, classList:{add(){}}, validity:{valid:true},
+        setAttribute(){}, setCustomValidity(message){this.error=message;}, reportValidity(){return !this.error;},
+        setSelectionRange(start,end){this.selectionStart=start;this.selectionEnd=end;},
+        addEventListener(type,fn){(this.listeners[type]??=[]).push(fn);},
+        dispatchEvent(event){for(const fn of this.listeners[event.type]||[]) fn(event);}};
+}
+const inputs = {};
+const editors = {};
+let nextEditor;
+const dom = vm.createContext({Date, t:value=>value,
+    document:{createElement:()=>nextEditor, querySelector:()=>null, addEventListener(){}, getElementById:id=>inputs[id]},
+    Event:class {constructor(type){this.type=type;}}, MutationObserver:class {observe(){}}});
+for(const name of ['ipsViewDateText','ipsViewDateValue','initializeIPSViewDateSegments']) vm.runInContext(extract(name),dom);
+for(const [id,value] of [['event-start','2026-09-21T09:00'],['event-end','2026-09-21T13:00']]) {
+    const input=Object.assign(control(),{id,type:'datetime-local',value,before(){}});
+    inputs[id]=input; nextEditor=editors[id]=control(); dom.initializeIPSViewDateSegments(input);
+}
+const editor=editors['event-start']; editor.selectionStart=11;
+for(const key of ['1','4']) editor.dispatchEvent({type:'keydown',key,preventDefault(){}});
+assert.strictEqual(editor.value,'21.09.2026 14:00');
+editor.dispatchEvent({type:'blur'});
+assert.strictEqual(inputs['event-start'].value,'2026-09-21T14:00','Blur must commit keyboard segments without a native change event');
+vm.runInContext(extract('commitIPSViewDateSegments'),dom);
+editors['event-start'].value='21.09.2026 15:00';
+editors['event-end'].value='21.09.2026 19:30';
+inputs['event-start'].addEventListener('change',()=>{inputs['event-end'].value='2026-09-21T19:00';inputs['event-end'].ipsViewSync();});
+assert.strictEqual(dom.commitIPSViewDateSegments(),true);
+assert.strictEqual(inputs['event-start'].value,'2026-09-21T15:00');
+assert.strictEqual(inputs['event-end'].value,'2026-09-21T19:30','Explicit end must survive start-driven duration update');
+editors['event-end'].value='21.09.2026 25:00';
+assert.strictEqual(dom.commitIPSViewDateSegments(),false,'Invalid visible time must block saving');
+assert.strictEqual(inputs['event-end'].value,'2026-09-21T19:30');
+assert(source.includes("event.preventDefault();\n    if (!commitIPSViewDateSegments()) return;"),'Submit must commit before reading payload');
+console.log('IPSView segment blur, submit and invalid-input regression tests passed.');

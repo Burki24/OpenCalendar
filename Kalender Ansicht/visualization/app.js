@@ -2299,20 +2299,34 @@ function initializeIPSViewDateSegments(input) {
         return value;
     };
     editor.addEventListener('input', validate);
-    editor.addEventListener('change', () => {
-        if (input.disabled || input.readOnly) return;
+    const commit = () => {
+        if (input.disabled || input.readOnly) return true;
         const value = validate();
-        if (!value || value === input.value) return;
+        if (!value && (editor.required || editor.value)) {
+            editor.reportValidity();
+            return false;
+        }
+        if (value === input.value) return true;
         const previous = input.value;
         input.value = value;
         if (!input.validity.valid) {
             editor.setCustomValidity(input.validationMessage);
             input.value = previous;
-            return;
+            editor.reportValidity();
+            return false;
         }
         input.dispatchEvent(new Event('input', {bubbles: true}));
         input.dispatchEvent(new Event('change', {bubbles: true}));
-    });
+        return true;
+    };
+    editor.addEventListener('change', commit);
+    // Programmatic segment keystrokes do not cause a native change on Windows.
+    editor.addEventListener('blur', commit);
+    input.ipsViewPendingCommit = () => {
+        if (input.disabled || input.readOnly || editor.value === ipsViewDateText(input.value)) return () => true;
+        const text = editor.value;
+        return () => { editor.value = text; return commit(); };
+    };
     input.addEventListener('input', sync);
     input.addEventListener('change', sync);
     input.addEventListener('invalid', event => {
@@ -2321,6 +2335,13 @@ function initializeIPSViewDateSegments(input) {
         editor.reportValidity();
     });
     new MutationObserver(sync).observe(input, {attributes: true, attributeFilter: ['type', 'disabled', 'readonly', 'required']});
+}
+
+function commitIPSViewDateSegments() {
+    // Snapshot both pending edits before the start update adjusts the end.
+    const commits = ['event-start', 'event-end'].map(id =>
+        document.getElementById(id).ipsViewPendingCommit?.() || (() => true));
+    return commits.every(commit => commit());
 }
 
 function initializeIPSViewDatePickers() {
@@ -4438,6 +4459,7 @@ function updateSaveButtonLabel() {
 
 eventForm.addEventListener('submit', async event => {
     event.preventDefault();
+    if (!commitIPSViewDateSegments()) return;
     const allDay = document.getElementById('event-all-day').checked;
     const calendarInstanceId = Number(eventCalendarInput.value);
     const microsoftTodo = eventTask.checked && selectedCalendarUsesMicrosoftTodo();
