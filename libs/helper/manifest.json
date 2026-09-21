@@ -3,10 +3,10 @@
     "source_repository": "Burki24/Symcon_ModuleHelper",
     "helpers": {
         "ChunkedJsonTransferHelper": {
-            "version": "1.0.0",
-            "sha256": "b9922d52dab18a253b1a1b371d93aec1631396741cbd611cf34922219ec6ab30",
+            "version": "1.1.0",
+            "sha256": "13e009dac28cda9bbf22638db00bd8d562a522a10fd592d9c770a7c5f22cf1fb",
             "path": "libs/helper/ChunkedJsonTransferHelper.php",
-            "source_sha": "39f8a3f9502ca75beb35c7f1016b1c52b4f774a5"
+            "source_sha": "2b37799d66a2c3395ddc5c8998c3b6859c2367e5"
         },
         "ConfigurationFormHelper": {
             "version": "1.0.0",
