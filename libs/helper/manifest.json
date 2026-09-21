@@ -384,7 +384,7 @@
             "version": "1.0.0",
             "sha256": "0cebd0f08e6416a6d7d4d5fdbb19bf96d457d3e2d51fcf2a1d3e6adf5e967451",
             "path": "libs/helper/ResponsiveVisualizationHelper.php",
-            "source_sha": "9a17a9ad9f7c7bc6bb29a5e386b8691f4a37216b"
+            "source_sha": "39f8a3f9502ca75beb35c7f1016b1c52b4f774a5"
         },
         "SymconOAuthHelper": {
             "version": "1.0.0",
