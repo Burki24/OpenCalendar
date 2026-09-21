@@ -53,7 +53,15 @@ final class OpenCalendarChunkedTransferHarness
 
     protected function SetBuffer(string $name, string $value): void
     {
+        $next = $this->buffers;
+        $next[$name] = $value;
+        assertChunkedTransfer(array_sum(array_map('strlen', $next)) <= 1_048_576, 'Symcon total instance buffer hard limit exceeded.');
         $this->buffers[$name] = $value;
+    }
+
+    protected function GetBufferList(): array
+    {
+        return array_keys($this->buffers);
     }
 }
 
@@ -75,12 +83,20 @@ assertChunkedTransfer(
 
 $helper = new OpenCalendarChunkedTransferHarness();
 $metadata = $helper->create($events);
+assertChunkedTransfer(
+    array_sum(array_map('strlen', $helper->buffers())) < 16 * 1024,
+    'Large event transfers must keep only small metadata in instance buffers.'
+);
 assertChunkedTransfer($metadata['PageCount'] > 1, 'Large event data must be split into multiple pages.');
 assertChunkedTransfer($metadata['ItemCount'] === count($events), 'Transfer metadata must retain the event count.');
 
 $received = [];
 for ($page = 0; $page < $metadata['PageCount']; ++$page) {
     $payload = $helper->page($metadata['Token'], $page);
+    assertChunkedTransfer(
+        strlen(json_encode($payload['Items'], JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PRESERVE_ZERO_FRACTION)) <= 192 * 1024,
+        'A decoded transfer page exceeds its transport limit.'
+    );
     assertChunkedTransfer(
         $payload['Complete'] === ($page === $metadata['PageCount'] - 1),
         'Only the final event page may be marked complete.'
