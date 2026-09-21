@@ -19,7 +19,7 @@ require_once __DIR__ . '/HelperTranslationHelper.php';
  * visual implementation in style.css/app.js. The helper owns asset loading,
  * bootstrap encoding, page metadata, fixed placeholders and validation.
  *
- * @version 1.4.1
+ * @version 1.5.0
  */
 trait IPSViewHTMLPageHelper
 {
@@ -29,6 +29,7 @@ trait IPSViewHTMLPageHelper
 
     private const IPSVIEW_HTML_ENABLE_PROPERTY = 'EnableIPSView';
     private const IPSVIEW_HTML_VARIABLE_REGISTRY_ATTRIBUTE = 'IPSViewHTMLVariableRegistry';
+    private const IPSVIEW_HTML_VARIABLE_IDS_ATTRIBUTE = 'IPSViewHTMLVariableIDs';
     private const IPSVIEW_HTML_FORM_MARKER = 'Configure optional IPSView HTML output.';
     private const IPSVIEW_HTML_DELETE_ACTION = 'IPSViewHTMLDeleteVariables';
     private const IPSVIEW_HTML_REGENERATE_ACTION = 'IPSViewHTMLRegenerateVariables';
@@ -86,6 +87,7 @@ trait IPSViewHTMLPageHelper
     {
         $this->RegisterPropertyBoolean(self::IPSVIEW_HTML_ENABLE_PROPERTY, false);
         $this->RegisterAttributeString(self::IPSVIEW_HTML_VARIABLE_REGISTRY_ATTRIBUTE, '[]');
+        $this->RegisterAttributeString(self::IPSVIEW_HTML_VARIABLE_IDS_ATTRIBUTE, '[]');
     }
 
     /**
@@ -290,6 +292,7 @@ trait IPSViewHTMLPageHelper
         }
 
         $this->RememberIPSViewHTMLVariable($ident, $caption);
+        $variableID = $this->IPSViewHTMLVariableID($ident);
 
         if (!$this->IsIPSViewHTMLPageEnabled()) {
             return false;
@@ -298,6 +301,10 @@ trait IPSViewHTMLPageHelper
             throw new RuntimeException('IPSViewHTMLPageHelper requires MaintainVariable() and SetValue().');
         }
 
+        if ($variableID > 0 && !$this->IPSViewHTMLVariableHasOriginalIdent($ident, $variableID)) {
+            // Keep a moved output at the user's chosen location.
+            return false;
+        }
         $presentation = [
             'PRESENTATION' => VARIABLE_PRESENTATION_WEB_CONTENT,
             'HTML_TYPE'    => 0
@@ -315,6 +322,7 @@ trait IPSViewHTMLPageHelper
             true
         );
 
+        $this->IPSViewHTMLVariableID($ident);
         if ($created) {
             $this->SetValue($ident, $initialHtml);
         }
@@ -343,7 +351,12 @@ trait IPSViewHTMLPageHelper
         }
 
         try {
-            $this->SetValue($ident, $html);
+            $variableID = $this->IPSViewHTMLVariableID($ident);
+            if ($variableID > 0) {
+                SetValueString($variableID, $html);
+            } else {
+                $this->SetValue($ident, $html);
+            }
 
             return true;
         } catch (Throwable $exception) {
@@ -513,6 +526,44 @@ trait IPSViewHTMLPageHelper
     protected function IPSViewTranslationsFor(array $keys): array
     {
         return $this->TranslateIPSViewHTMLKeys($this->NormalizeIPSViewHTMLTranslationKeys($keys));
+    }
+
+    /**
+     * Resolves an owned HTML variable independently of its current parent.
+     * Legacy child variables are adopted once; no global ident/name search is used.
+     *
+     * @param string $ident Registered output ident.
+     * @return int Existing String variable ID, or zero when unavailable.
+     */
+    protected function IPSViewHTMLVariableID(string $ident): int
+    {
+        $ident = $this->NormalizeIPSViewHTMLVariableIdent($ident);
+        $ids = $this->ReadIPSViewHTMLStringMapAttribute(self::IPSVIEW_HTML_VARIABLE_IDS_ATTRIBUTE);
+        $variableID = (int) ($ids[$ident] ?? 0);
+        if ($variableID > 0 && IPS_VariableExists($variableID)) {
+            if (IPS_GetVariable($variableID)['VariableType'] !== VARIABLETYPE_STRING) {
+                throw new RuntimeException('Registered IPSView output is not a String variable.');
+            }
+            return $variableID;
+        }
+        if (!method_exists($this, 'GetIDForIdent')) {
+            return 0;
+        }
+        try {
+            $variableID = @$this->GetIDForIdent($ident);
+        } catch (Throwable) {
+            return 0;
+        }
+        if (!is_int($variableID) || $variableID <= 0 || !IPS_VariableExists($variableID)
+            || IPS_GetVariable($variableID)['VariableType'] !== VARIABLETYPE_STRING) {
+            return 0;
+        }
+        $ids[$ident] = (string) $variableID;
+        $this->WriteAttributeString(
+            self::IPSVIEW_HTML_VARIABLE_IDS_ATTRIBUTE,
+            json_encode($ids, JSON_THROW_ON_ERROR)
+        );
+        return $variableID;
     }
 
     /**
@@ -790,11 +841,17 @@ trait IPSViewHTMLPageHelper
 
         foreach (array_keys($this->ReadIPSViewHTMLVariableRegistry()) as $ident) {
             if ($this->IPSViewHTMLVariableExists($ident)) {
-                $this->UnregisterVariable($ident);
+                $variableID = $this->IPSViewHTMLVariableID($ident);
+                if ($variableID > 0 && !$this->IPSViewHTMLVariableHasOriginalIdent($ident, $variableID)) {
+                    IPS_DeleteVariable($variableID);
+                } else {
+                    $this->UnregisterVariable($ident);
+                }
             }
         }
 
         $this->WriteAttributeString(self::IPSVIEW_HTML_VARIABLE_REGISTRY_ATTRIBUTE, '[]');
+        $this->WriteAttributeString(self::IPSVIEW_HTML_VARIABLE_IDS_ATTRIBUTE, '[]');
     }
 
     /** @return array<string,string> */
@@ -827,6 +884,9 @@ trait IPSViewHTMLPageHelper
 
     private function IPSViewHTMLVariableExists(string $ident): bool
     {
+        if ($this->IPSViewHTMLVariableID($ident) > 0) {
+            return true;
+        }
         if (method_exists($this, 'VariableExists')) {
             return (bool) $this->VariableExists($ident);
         }
@@ -838,6 +898,15 @@ trait IPSViewHTMLPageHelper
             $variableID = @$this->GetIDForIdent($ident);
 
             return is_int($variableID) && $variableID > 0;
+        } catch (Throwable) {
+            return false;
+        }
+    }
+
+    private function IPSViewHTMLVariableHasOriginalIdent(string $ident, int $variableID): bool
+    {
+        try {
+            return @$this->GetIDForIdent($ident) === $variableID;
         } catch (Throwable) {
             return false;
         }

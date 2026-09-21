@@ -341,10 +341,22 @@ IPSView-HTML-Box. In beschreibbaren Kalendern lassen sich dort außerdem Termine
 erstellen, bearbeiten, zwischen beschreibbaren Kalendern verschieben und löschen. Die kompakte Schaltfläche **＋ Termin** bleibt
 sichtbar, ist ohne beschreibbaren Kalender jedoch deaktiviert.
 
+Die erzeugte WebContent-Variable wird dauerhaft über ihre Objekt-ID zugeordnet.
+Nach dem Update und einmaligem Anwenden der Instanzkonfiguration darf sie im
+Objektbaum in eine andere Kategorie verschoben oder umbenannt werden. Aktualisierung
+und **IPSView-HTML neu generieren** verwenden weiterhin dieselbe Variable; es wird
+keine zusätzliche Ausgabe angelegt. Die Kalender-Ansicht-Instanz bleibt ihr Besitzer.
+Vorhandene Variablen direkt unter der Instanz werden beim Update übernommen.
+Bereits vorher verschobene Ausgaben oder entstandene Duplikate werden nicht anhand
+ihres Namens automatisch zugeordnet oder gelöscht. Für die Übernahme einer solchen
+Ausgabe muss zuerst die eindeutige ursprüngliche Zuordnung unter der Instanz
+wiederhergestellt werden.
+
 Wird die IPSView-Ausgabe später deaktiviert, bleibt die vorhandene Variable mit
 ihrer Objekt-ID, Position und bestehenden Verknüpfungen erhalten, wird aber nicht
 mehr aktualisiert. In der Instanz erscheint dann eine eigene Löschaktion. Erst
-nach ausdrücklicher Bestätigung wird die Variable entfernt.
+nach ausdrücklicher Bestätigung wird die Variable entfernt, auch wenn sie inzwischen
+in einer anderen Kategorie liegt.
 
 ### IPSView-Verbindung absichern
 
