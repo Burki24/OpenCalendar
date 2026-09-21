@@ -390,7 +390,7 @@
             "version": "1.2.0",
             "sha256": "43b205a2ca87553a3a59a9e94f1c5c72fc4643cebedb080a9706139d98b30624",
             "path": "libs/helper/VariableHelper.php",
-            "source_sha": "9a17a9ad9f7c7bc6bb29a5e386b8691f4a37216b"
+            "source_sha": "39f8a3f9502ca75beb35c7f1016b1c52b4f774a5"
         },
         "VisualizationAssetHelper": {
             "version": "1.0.0",
