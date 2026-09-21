@@ -12,7 +12,7 @@
             "version": "1.0.0",
             "sha256": "fa87dd4c67f43a3838fe87110387e4c1a1b98685c13403eeb52c189246045678",
             "path": "libs/helper/ConfigurationFormHelper.php",
-            "source_sha": "9a17a9ad9f7c7bc6bb29a5e386b8691f4a37216b"
+            "source_sha": "39f8a3f9502ca75beb35c7f1016b1c52b4f774a5"
         },
         "DataFlowHelper": {
             "version": "1.0.0",
