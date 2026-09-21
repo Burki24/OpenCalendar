@@ -1544,6 +1544,7 @@ class CalendarView extends IPSModuleStrict
             'This calendar is read-only.',
             'Editing events is unavailable because no action bridge is configured.',
             'Action failed.',
+            'The IPSView connection address is unavailable. Reload the view.',
             'Continued from series',
             'This overdue task was continued from a series.',
             'The description of Microsoft online meetings is protected and cannot be edited here.'

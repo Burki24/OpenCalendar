@@ -5,6 +5,14 @@ gemeinsamen responsiven Darstellung zusammen. Sie kann direkt in der
 Symcon-Kachelvisualisierung oder über eine WebContent-Variable in IPSView
 verwendet werden.
 
+Die IPSView-Aktionsverbindung übernimmt die Adresse automatisch aus dem
+Client-Kontext: aus der HTML-Basisadresse der App, der eigenen HTTP(S)-Seite
+oder bei eingebetteten HTML-Boxen aus dem Elternfenster bzw. dessen Referrer.
+Es ist keine zusätzliche Serveradresse einzugeben und keine Connect-Verbindung
+für den lokalen Zugriff erforderlich. Fehlt jeder verwertbare Verbindungskontext,
+zeigt der Speicherdialog einen Hinweis zum Neuladen; es werden keine Server
+geraten und fehlgeschlagene Schreibzugriffe nicht automatisch wiederholt.
+
 ## Voraussetzungen
 
 - Symcon ab Version 9.0 mit Kachelvisualisierung und HTML-SDK

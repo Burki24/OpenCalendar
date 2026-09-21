@@ -97,6 +97,7 @@
             "This calendar is read-only.": "Dieser Kalender ist schreibgeschützt.",
             "Editing events is unavailable because no action bridge is configured.": "Termine können nicht bearbeitet werden, weil keine Aktionsverbindung verfügbar ist.",
             "Action failed.": "Aktion fehlgeschlagen.",
+            "The IPSView connection address is unavailable. Reload the view.": "Die IPSView-Verbindungsadresse ist nicht verfügbar. Bitte die Ansicht neu laden.",
             "The event data is invalid.": "Die Termindaten sind ungültig.",
             "Event creation failed.": "Der Termin konnte nicht erstellt werden.",
             "Event update failed.": "Der Termin konnte nicht geändert werden.",

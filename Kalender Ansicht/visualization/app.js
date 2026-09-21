@@ -5379,6 +5379,38 @@ function hasIPSViewActionBridge() {
     return Boolean(calendarIPSViewConfig?.endpoint && calendarIPSViewConfig?.token);
 }
 
+function calendarIPSViewEndpoint() {
+    const endpoint = String(calendarIPSViewConfig?.endpoint || '');
+    if (!/^\/hook\/opencalendar\/view\/\d+$/.test(endpoint)) {
+        throw new Error(t('Action failed.'));
+    }
+    // IPSView injects a base element (including in about:blank on Windows).
+    // The tile HTML box instead uses a data: frame with the Symcon referrer.
+    // Neither must require another user-entered address or a Connect account.
+    const candidates = [
+        document.querySelector('base[href]')?.getAttribute('href'),
+        document.baseURI,
+        window.location.href
+    ];
+    try {
+        if (window.parent !== window) candidates.push(window.parent.location.href);
+    } catch (_) {
+        // An opaque data: frame cannot read its parent, even on the same server.
+    }
+    candidates.push(document.referrer);
+    for (const candidate of candidates) {
+        if (typeof candidate !== 'string' || !/^https?:\/\//i.test(candidate)) continue;
+        try {
+            const base = new URL(candidate);
+            // Use only the origin: no inherited credentials, path, query or fragment.
+            return new URL(endpoint, base.origin).href;
+        } catch (_) {
+            // Try the next host-provided document context, never a guessed host.
+        }
+    }
+    throw new Error(t('The IPSView connection address is unavailable. Reload the view.'));
+}
+
 async function calendarIPSViewRequest(action, value) {
     if (!hasIPSViewActionBridge()) {
         throw new Error(t('Action failed.'));
@@ -5389,12 +5421,13 @@ async function calendarIPSViewRequest(action, value) {
     body.set('action', action);
     body.set('value', JSON.stringify(value));
 
-    const response = await fetch(String(calendarIPSViewConfig.endpoint), {
+    const response = await fetch(calendarIPSViewEndpoint(), {
         method: 'POST',
         headers: {
             'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8'
         },
         body: body.toString(),
+        redirect: 'error',
         cache: 'no-store',
         credentials: 'same-origin'
     });
