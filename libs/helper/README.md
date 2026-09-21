@@ -10,7 +10,7 @@ The files in this directory are vendored from
 | `DataFlowHelper.php` | 1.0.0 | `4c25828b283367692d0db1631d2b7d71ba6012883798bc5ffddb8f2d551d6dfb` |
 | `DebugHelper.php` | 1.0.1 | `c5433bf0cd7141c93d98f16ae23325a7f00ab9d11438c44fbfd12ad239e21373` |
 | `HttpResponseHelper.php` | 1.1.0 | `be4fae4c23f757ab462237d8e74d2a9dca1b504937ed4d4b51c7ff76004cf1cd` |
-| `IPSViewHTMLPageHelper.php` | 1.4.1 | `c0baf0f6f8b71a9c0e1d3b7497f69d64a17f4b1e516a605f093ade5c1aa34929` |
+| `IPSViewHTMLPageHelper.php` | 1.5.0 | `755bb013107369d1b2253ec9cafdce89f5fff76383afc35248a7aedd294914b6` |
 | `HelperTranslationHelper.php` | 1.0.0 | `d3deee581eca9f8eb11e9adce060170227a2dc836ee898bd134f93d27604f639` |
 | `VisualizationAssetHelper.php` | 1.0.0 | `1693b2399bcf95d270a6d9a01df6534caad906497bd4ba9489916a951abaffcc` |
 | `IPSViewStyleConfigurationHelper.php` | 1.1.0 | `e6f558a0dee301d251d2f5845ebdedb765dc07ca5352427d1e08792d940629b7` |
