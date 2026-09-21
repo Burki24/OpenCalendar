@@ -64,7 +64,7 @@
             "version": "1.1.0",
             "sha256": "e6f558a0dee301d251d2f5845ebdedb765dc07ca5352427d1e08792d940629b7",
             "path": "libs/helper/IPSViewStyleConfigurationHelper.php",
-            "source_sha": "9a17a9ad9f7c7bc6bb29a5e386b8691f4a37216b",
+            "source_sha": "39f8a3f9502ca75beb35c7f1016b1c52b4f774a5",
             "assets": [
                 {
                     "path": "libs/helper/translations/IPSViewStyleConfigurationHelper.json",
@@ -77,28 +77,28 @@
                     "version": "1.0.1",
                     "sha256": "770bfc48051a908b55e931f6d4eba6e8984ba73b4aa78cd987470006c7b3a9e7",
                     "path": "libs/helper/IPSViewStylePresetHelper.php",
-                    "source_sha": "9a17a9ad9f7c7bc6bb29a5e386b8691f4a37216b"
+                    "source_sha": "39f8a3f9502ca75beb35c7f1016b1c52b4f774a5"
                 },
                 {
                     "name": "IPSViewControlThemeHelper",
                     "version": "1.0.3",
                     "sha256": "7be5f3300ebf0562f818b050a53cfa67d7631a30e3d62f1ab41525501604fac6",
                     "path": "libs/helper/IPSViewControlThemeHelper.php",
-                    "source_sha": "9a17a9ad9f7c7bc6bb29a5e386b8691f4a37216b"
+                    "source_sha": "39f8a3f9502ca75beb35c7f1016b1c52b4f774a5"
                 },
                 {
                     "name": "HelperTranslationHelper",
                     "version": "1.0.0",
                     "sha256": "d3deee581eca9f8eb11e9adce060170227a2dc836ee898bd134f93d27604f639",
                     "path": "libs/helper/HelperTranslationHelper.php",
-                    "source_sha": "9a17a9ad9f7c7bc6bb29a5e386b8691f4a37216b"
+                    "source_sha": "39f8a3f9502ca75beb35c7f1016b1c52b4f774a5"
                 },
                 {
                     "name": "IPSViewFontCatalogHelper",
                     "version": "1.1.0",
                     "sha256": "cddb6f51b2d4ceb76d8b291204d26fa17d7ccf4711c3f4f462ec7f73f5514c25",
                     "path": "libs/helper/IPSViewFontCatalogHelper.php",
-                    "source_sha": "9a17a9ad9f7c7bc6bb29a5e386b8691f4a37216b",
+                    "source_sha": "39f8a3f9502ca75beb35c7f1016b1c52b4f774a5",
                     "assets": [
                         {
                             "path": "libs/helper/fonts/Apache-2.0.txt",
@@ -207,14 +207,14 @@
                     "version": "1.0.1",
                     "sha256": "eca6aa486d60b0db11cc7db0b486dc5b1723c49e26c23fe72465a33cf73f453d",
                     "path": "libs/helper/IPSViewStyleProfileHelper.php",
-                    "source_sha": "9a17a9ad9f7c7bc6bb29a5e386b8691f4a37216b"
+                    "source_sha": "39f8a3f9502ca75beb35c7f1016b1c52b4f774a5"
                 },
                 {
                     "name": "IPSViewStyleHelper",
                     "version": "1.6.9",
                     "sha256": "44140d34f866a59808948d29849de23a5bc2b1441df1fdc92df6f39d97e90e21",
                     "path": "libs/helper/IPSViewStyleHelper.php",
-                    "source_sha": "9a17a9ad9f7c7bc6bb29a5e386b8691f4a37216b",
+                    "source_sha": "39f8a3f9502ca75beb35c7f1016b1c52b4f774a5",
                     "assets": [
                         {
                             "path": "libs/helper/translations/IPSViewStyleHelper.json",
@@ -228,7 +228,7 @@
             "version": "1.6.9",
             "sha256": "44140d34f866a59808948d29849de23a5bc2b1441df1fdc92df6f39d97e90e21",
             "path": "libs/helper/IPSViewStyleHelper.php",
-            "source_sha": "9a17a9ad9f7c7bc6bb29a5e386b8691f4a37216b",
+            "source_sha": "39f8a3f9502ca75beb35c7f1016b1c52b4f774a5",
             "assets": [
                 {
                     "path": "libs/helper/translations/IPSViewStyleHelper.json",
@@ -241,14 +241,14 @@
                     "version": "1.0.0",
                     "sha256": "d3deee581eca9f8eb11e9adce060170227a2dc836ee898bd134f93d27604f639",
                     "path": "libs/helper/HelperTranslationHelper.php",
-                    "source_sha": "9a17a9ad9f7c7bc6bb29a5e386b8691f4a37216b"
+                    "source_sha": "39f8a3f9502ca75beb35c7f1016b1c52b4f774a5"
                 },
                 {
                     "name": "IPSViewFontCatalogHelper",
                     "version": "1.1.0",
                     "sha256": "cddb6f51b2d4ceb76d8b291204d26fa17d7ccf4711c3f4f462ec7f73f5514c25",
                     "path": "libs/helper/IPSViewFontCatalogHelper.php",
-                    "source_sha": "9a17a9ad9f7c7bc6bb29a5e386b8691f4a37216b",
+                    "source_sha": "39f8a3f9502ca75beb35c7f1016b1c52b4f774a5",
                     "assets": [
                         {
                             "path": "libs/helper/fonts/Apache-2.0.txt",
@@ -357,14 +357,14 @@
                     "version": "1.0.1",
                     "sha256": "770bfc48051a908b55e931f6d4eba6e8984ba73b4aa78cd987470006c7b3a9e7",
                     "path": "libs/helper/IPSViewStylePresetHelper.php",
-                    "source_sha": "9a17a9ad9f7c7bc6bb29a5e386b8691f4a37216b"
+                    "source_sha": "39f8a3f9502ca75beb35c7f1016b1c52b4f774a5"
                 },
                 {
                     "name": "IPSViewStyleProfileHelper",
                     "version": "1.0.1",
                     "sha256": "eca6aa486d60b0db11cc7db0b486dc5b1723c49e26c23fe72465a33cf73f453d",
                     "path": "libs/helper/IPSViewStyleProfileHelper.php",
-                    "source_sha": "9a17a9ad9f7c7bc6bb29a5e386b8691f4a37216b"
+                    "source_sha": "39f8a3f9502ca75beb35c7f1016b1c52b4f774a5"
                 }
             ]
         },
