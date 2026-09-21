@@ -220,6 +220,20 @@ try {
 
     IPS\Kernel::reset();
     $synchronizedCalendar = new class(IPS\ObjectManager::registerObject(1)) extends Calendar {
+        private array $bufferNames = [];
+
+        protected function SetBuffer(string $Name, string $Data): bool
+        {
+            $this->bufferNames[$Name] = true;
+            return parent::SetBuffer($Name, $Data);
+        }
+
+        protected function GetBufferList(): array
+        {
+            // The upstream strict stub forwards undefined arguments here.
+            return array_keys($this->bufferNames);
+        }
+
         protected function getTime(): int
         {
             return time();

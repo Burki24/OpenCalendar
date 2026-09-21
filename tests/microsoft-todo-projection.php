@@ -97,6 +97,11 @@ final class MicrosoftTodoProjectionCalendarHarness extends Calendar
         return $this->buffers[$Name] ?? '';
     }
 
+    protected function GetBufferList(): array
+    {
+        return array_keys($this->buffers);
+    }
+
     protected function SetBuffer(string $Name, string $Value): bool
     {
         $this->buffers[$Name] = $Value;

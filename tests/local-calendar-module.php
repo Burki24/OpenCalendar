@@ -98,6 +98,7 @@ class IPSModuleStrict
             'SetStatus'                                                                                   => $this->status = $key,
             'SetValue'                                                                                    => $this->values[$key] = $arguments[1],
             'GetBuffer'                                                                                   => $this->buffers[$key] ?? '',
+            'GetBufferList'                                                                               => array_keys($this->buffers),
             'SetBuffer'                                                                                   => $this->buffers[$key] = $arguments[1],
             'Translate'                                                                                   => $key,
             'HasActiveParent', 'SendDataToParent'                                                         => throw new RuntimeException('Local mode must never access an account.'),
