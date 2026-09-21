@@ -417,9 +417,8 @@ function setEventDialogLoading(mode = '') {
 }
 
 function eventDialogHostViewport() {
-    if (calendarVisualization.mode !== 'symcon' || window.parent === window || !window.frameElement) return null;
-
     try {
+        if (window.parent === window || !window.frameElement) return null;
         const hostWindow = window.parent;
         const hostViewport = hostWindow.visualViewport || hostWindow;
         const viewportLeft = Number(hostViewport.offsetLeft || 0);
@@ -482,6 +481,7 @@ function updateEventDialogViewportBounds() {
 }
 
 function showEventDialog() {
+    eventDialog.querySelector('.event-save-error')?.remove();
     if (!eventEditingActive) beginEventEditing();
     updateEventDialogViewportBounds();
     if (!eventDialog.open) eventDialog.showModal();
@@ -5817,6 +5817,19 @@ function applyStaticTranslations() {
 }
 
 function showToast(message, level) {
+    if (level === 'error' && eventDialog.open) {
+        // A regular page toast is behind a modal dialog's top layer.
+        let note = eventDialog.querySelector('.event-save-error');
+        if (!note) {
+            note = document.createElement('div');
+            note.className = 'dialog-note event-save-error';
+            note.setAttribute('role', 'alert');
+            eventDialog.append(note);
+        }
+        note.textContent = message;
+        note.scrollIntoView({block: 'nearest'});
+        return;
+    }
     const toast = document.getElementById('toast');
     toast.textContent = message;
     toast.className = 'toast visible' + (level === 'error' ? ' error' : '');
