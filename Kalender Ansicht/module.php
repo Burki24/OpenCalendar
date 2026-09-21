@@ -1549,7 +1549,7 @@ class CalendarView extends IPSModuleStrict
     private function existingIPSViewHTML(): string
     {
         try {
-            $variableId = @$this->GetIDForIdent('IPSViewCalendar');
+            $variableId = $this->IPSViewHTMLVariableID('IPSViewCalendar');
         } catch (Throwable) {
             return '';
         }
