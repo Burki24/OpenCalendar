@@ -4362,7 +4362,10 @@ assertTrueValue(
 assertTrueValue(
     is_string($viewScriptSource)
         && str_contains($viewScriptSource, "const calendarIPSViewConfig = calendarVisualization.mode === 'ipsview'")
+        && str_contains($viewScriptSource, 'function calendarRuntimeEndpoint(runtime)')
+        && str_contains($viewScriptSource, 'bases.push(document.referrer);')
         && str_contains($viewScriptSource, 'async function calendarIPSViewRequest(action, value)')
+        && str_contains($viewScriptSource, 'const endpoint = calendarRuntimeEndpoint(calendarIPSViewConfig);')
         && str_contains($viewScriptSource, "body.set('token', String(calendarIPSViewConfig.token));")
         && str_contains($viewScriptSource, "'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8'")
         && !str_contains($viewScriptSource, 'Authorization')

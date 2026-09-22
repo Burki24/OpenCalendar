@@ -2946,7 +2946,51 @@ function openNewEvent(preferredDay = null) {
 }
 
 function hasAttachmentTransferBridge() {
-    return Boolean(calendarRuntime?.endpoint && calendarRuntime?.token);
+    return Boolean(calendarRuntimeEndpoint(calendarRuntime) && calendarRuntime?.token);
+}
+
+/**
+ * Resolves the server-owned hook path for regular HTTP documents and for the
+ * data: documents used when IPSView HTML is embedded in a Symcon tile.
+ *
+ * A relative URL has no usable base inside a data: document. The embedding
+ * Symcon page is still reported as document.referrer, so its origin is the
+ * correct and configuration-free base for the same-server hook.
+ */
+function calendarRuntimeEndpoint(runtime) {
+    const endpoint = String(runtime?.endpoint || '').trim();
+    if (!endpoint) return '';
+
+    const bases = [];
+    if (['http:', 'https:'].includes(window.location.protocol)) {
+        bases.push(window.location.href);
+    }
+    if (/^https?:\/\//i.test(String(document.referrer || ''))) {
+        bases.push(document.referrer);
+    }
+    try {
+        Array.from(window.location.ancestorOrigins || []).forEach(origin => {
+            if (/^https?:\/\//i.test(String(origin || ''))) bases.push(`${origin}/`);
+        });
+    } catch (_) {
+        // Some embedded WebViews do not expose ancestorOrigins.
+    }
+
+    try {
+        const absolute = new URL(endpoint);
+        return ['http:', 'https:'].includes(absolute.protocol) ? absolute.href : '';
+    } catch (_) {
+        // Resolve the expected root-relative hook against a trusted page context below.
+    }
+    for (const base of bases) {
+        try {
+            const resolved = new URL(endpoint, base);
+            if (['http:', 'https:'].includes(resolved.protocol)) return resolved.href;
+        } catch (_) {
+            // Try the next browser-provided embedding context.
+        }
+    }
+    return '';
 }
 
 function providerAttachmentSelector(event, calendar) {
@@ -2987,7 +3031,8 @@ function attachmentTransferValue(event, operation, data = {}) {
 }
 
 async function attachmentTransferRequest(value, binary = false) {
-    if (!hasAttachmentTransferBridge() || !value) {
+    const endpoint = calendarRuntimeEndpoint(calendarRuntime);
+    if (!endpoint || !calendarRuntime?.token || !value) {
         throw new Error(t('Attachment transfer failed.'));
     }
     const body = new URLSearchParams();
@@ -2995,7 +3040,7 @@ async function attachmentTransferRequest(value, binary = false) {
     body.set('clientContractVersion', String(calendarClientContractVersion));
     body.set('action', 'TransferAttachment');
     body.set('value', JSON.stringify(value));
-    const response = await fetch(String(calendarRuntime.endpoint), {
+    const response = await fetch(endpoint, {
         method: 'POST',
         headers: {'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8'},
         body: body.toString(),
@@ -5887,11 +5932,12 @@ async function waitForNativeActionBridge(timeoutMilliseconds = 1500) {
 }
 
 function hasIPSViewActionBridge() {
-    return Boolean(calendarIPSViewConfig?.endpoint && calendarIPSViewConfig?.token);
+    return Boolean(calendarRuntimeEndpoint(calendarIPSViewConfig) && calendarIPSViewConfig?.token);
 }
 
 async function calendarIPSViewRequest(action, value) {
-    if (!hasIPSViewActionBridge()) {
+    const endpoint = calendarRuntimeEndpoint(calendarIPSViewConfig);
+    if (!endpoint || !calendarIPSViewConfig?.token) {
         throw new Error(t('Action failed.'));
     }
 
@@ -5901,7 +5947,7 @@ async function calendarIPSViewRequest(action, value) {
     body.set('action', action);
     body.set('value', JSON.stringify(value));
 
-    const response = await fetch(String(calendarIPSViewConfig.endpoint), {
+    const response = await fetch(endpoint, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8'

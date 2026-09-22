@@ -1406,6 +1406,13 @@ foreach ([$native, $ipsView] as $html) {
     assertVisualization(str_contains($html, 'addButton.disabled = !hasWritableCalendar'), 'The creation control must stay visible and communicate unavailable write access by disabling itself.');
     assertVisualization(str_contains($html, "calendarVisualization.mode === 'symcon'"), 'Native action availability must be derived from the explicit visualization mode.');
     assertVisualization(str_contains($html, 'waitForNativeActionBridge'), 'Native actions must tolerate delayed HTML-SDK bridge injection.');
+    assertVisualization(
+        str_contains($html, 'function calendarRuntimeEndpoint(runtime)')
+            && str_contains($html, 'bases.push(document.referrer);')
+            && str_contains($html, 'const endpoint = calendarRuntimeEndpoint(calendarIPSViewConfig);')
+            && str_contains($html, 'const endpoint = calendarRuntimeEndpoint(calendarRuntime);'),
+        'IPSView actions and attachment transfers must resolve their hook against the embedding Symcon page when rendered as a data document.'
+    );
     assertVisualization(str_contains($html, '--agenda-color-bar-width'), 'Calendar-specific options must remain available through the shared bootstrap.');
 }
 
