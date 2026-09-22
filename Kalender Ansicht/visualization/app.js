@@ -2955,7 +2955,10 @@ function hasAttachmentTransferBridge() {
  *
  * A relative URL has no usable base inside a data: document. The embedding
  * Symcon page is still reported as document.referrer, so its origin is the
- * correct and configuration-free base for the same-server hook.
+ * correct and configuration-free base for the same-server hook. Standalone
+ * IPSView WebViews can route root-relative hook URLs themselves even though
+ * they do not expose an HTTP document base to JavaScript, so preserve the
+ * original endpoint as the final compatibility fallback.
  */
 function calendarRuntimeEndpoint(runtime) {
     const endpoint = String(runtime?.endpoint || '').trim();
@@ -2990,7 +2993,7 @@ function calendarRuntimeEndpoint(runtime) {
             // Try the next browser-provided embedding context.
         }
     }
-    return '';
+    return endpoint.startsWith('/') ? endpoint : '';
 }
 
 function providerAttachmentSelector(event, calendar) {
@@ -3098,7 +3101,25 @@ function normalizedAttachmentMetadata(file) {
     if (!id || id.length > 2048 || !name || name.length > 1024
         || !['file', 'embedded', 'reference', 'item', 'unsupported'].includes(kind)
         || (size !== null && (!Number.isInteger(size) || size < 0))) return null;
-    return {id, name, kind, size};
+    const url = kind === 'reference' ? trustedMicrosoftReferenceUrl(file.url) : '';
+    return {id, name, kind, size, url};
+}
+
+function trustedMicrosoftReferenceUrl(value) {
+    const raw = String(value || '').trim();
+    if (!raw || raw.length > 2048) return '';
+    try {
+        const url = new URL(raw);
+        const host = url.hostname.toLowerCase().replace(/\.$/, '');
+        const trustedHost = host === '1drv.ms'
+            || host === 'onedrive.live.com'
+            || host.endsWith('.sharepoint.com');
+        if (url.protocol !== 'https:' || !trustedHost || url.username || url.password
+            || (url.port && url.port !== '443')) return '';
+        return url.href;
+    } catch (_) {
+        return '';
+    }
 }
 
 function safeAttachmentDownloadName(value) {
@@ -3168,6 +3189,14 @@ function renderProviderAttachments(event, files, revision) {
             button.setAttribute('aria-label', `${t('Download')}: ${file.name}`);
             button.addEventListener('click', () => void downloadProviderAttachment(event, file, button, revision));
             item.append(button);
+        } else if (file.kind === 'reference' && file.url) {
+            const link = element('a', 'secondary-button');
+            link.href = file.url;
+            link.target = '_blank';
+            link.rel = 'noopener noreferrer';
+            link.textContent = t('Open in provider');
+            link.setAttribute('aria-label', `${t('Open in provider')}: ${file.name}`);
+            item.append(link);
         } else {
             parts.push(file.size !== null && file.size > providerAttachmentMaximumDownloadBytes
                 ? t('Too large to download')

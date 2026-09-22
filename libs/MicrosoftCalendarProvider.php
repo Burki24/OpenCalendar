@@ -69,11 +69,12 @@ final class MicrosoftCalendarProvider implements CalendarEventLookupProviderInte
         $eventId = $this->eventId($eventReference);
         $url = $this->eventUrl($calendarId, $eventId);
         $request = fn (string $target): array => $this->requestJsonUrl('GET', $target, null, [], [200], MicrosoftAttachmentCollection::MAX_RESPONSE_BYTES);
-        $parent = $request($url . '?$select=id,isCancelled');
+        $parent = $request($url . '?$select=id,isCancelled,body');
         if (($parent['id'] ?? null) !== $eventId || ($parent['isCancelled'] ?? false) === true) {
             throw new MicrosoftCalendarProviderException('The attachment event is no longer available.');
         }
-        return MicrosoftAttachmentCollection::read($url . '/attachments', false, $request);
+        $attachments = MicrosoftAttachmentCollection::read($url . '/attachments', false, $request);
+        return $this->mergeMicrosoftBodyReferences($attachments, $parent['body'] ?? null);
     }
 
     /**
@@ -474,6 +475,99 @@ final class MicrosoftCalendarProvider implements CalendarEventLookupProviderInte
         );
 
         return true;
+    }
+
+    /**
+     * Outlook consumer accounts can represent a OneDrive cloud attachment only
+     * as a trusted link in the event body instead of a Graph attachment object.
+     * Expose such links as non-downloadable reference metadata without following
+     * them or accepting arbitrary description URLs.
+     *
+     * @param list<array<string,mixed>> $attachments
+     * @return list<array<string,mixed>>
+     */
+    private function mergeMicrosoftBodyReferences(array $attachments, mixed $body): array
+    {
+        if (!is_array($body) || !is_string($body['content'] ?? null)) {
+            return $attachments;
+        }
+        $content = $body['content'];
+        if ($content === '' || strlen($content) > MicrosoftAttachmentCollection::MAX_RESPONSE_BYTES) {
+            return $attachments;
+        }
+
+        $candidates = [];
+        if (preg_match_all('/<a\b[^>]*\bhref\s*=\s*(["\'])(.*?)\1[^>]*>(.*?)<\/a>/isu', $content, $matches, PREG_SET_ORDER)) {
+            foreach ($matches as $match) {
+                $candidates[] = [$match[2], $match[3]];
+            }
+        }
+        // Graph can return Outlook's plain-text representation:
+        // [icon-url]file-name.pdf<https://1drv.ms/...>
+        if (preg_match_all('/\]([^\r\n<>]{1,1024})<(https:\/\/[^>\s]{1,2048})>/u', $content, $matches, PREG_SET_ORDER)) {
+            foreach ($matches as $match) {
+                $candidates[] = [$match[2], $match[1]];
+            }
+        }
+
+        $knownNames = [];
+        foreach ($attachments as $attachment) {
+            $knownNames[mb_strtolower(trim((string) ($attachment['name'] ?? '')))] = true;
+        }
+        $knownUrls = [];
+        foreach ($candidates as [$rawUrl, $rawName]) {
+            $referenceUrl = $this->trustedMicrosoftReferenceUrl(
+                html_entity_decode((string) $rawUrl, ENT_QUOTES | ENT_HTML5, 'UTF-8')
+            );
+            if ($referenceUrl === '' || isset($knownUrls[$referenceUrl])) {
+                continue;
+            }
+            $name = html_entity_decode(strip_tags((string) $rawName), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+            $name = trim((string) preg_replace('/\s+/u', ' ', $name));
+            if ($name === '' || strlen($name) > 1024 || preg_match('//u', $name) !== 1
+                || preg_match('/[\x00-\x1f\x7f]/', $name)) {
+                continue;
+            }
+            $nameKey = mb_strtolower($name);
+            if (isset($knownNames[$nameKey])) {
+                continue;
+            }
+            $knownNames[$nameKey] = true;
+            $knownUrls[$referenceUrl] = true;
+            $attachments[] = [
+                'id'          => 'body-reference-' . hash('sha256', $referenceUrl),
+                'name'        => $name,
+                'size'        => null,
+                'contentType' => 'application/octet-stream',
+                'kind'        => 'reference',
+                'destination' => 'provider',
+                'isInline'    => true,
+                'url'         => $referenceUrl
+            ];
+            if (count($attachments) >= 100) {
+                break;
+            }
+        }
+        return $attachments;
+    }
+
+    private function trustedMicrosoftReferenceUrl(string $value): string
+    {
+        $value = trim($value);
+        if ($value === '' || strlen($value) > 2048 || preg_match('/[\x00-\x20\x7f]/', $value)) {
+            return '';
+        }
+        $parts = parse_url($value);
+        if (!is_array($parts) || strtolower((string) ($parts['scheme'] ?? '')) !== 'https'
+            || isset($parts['user']) || isset($parts['pass'])
+            || (isset($parts['port']) && (int) $parts['port'] !== 443)) {
+            return '';
+        }
+        $host = strtolower(rtrim((string) ($parts['host'] ?? ''), '.'));
+        if ($host !== '1drv.ms' && $host !== 'onedrive.live.com' && !str_ends_with($host, '.sharepoint.com')) {
+            return '';
+        }
+        return $value;
     }
 
     /**

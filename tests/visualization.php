@@ -1409,9 +1409,15 @@ foreach ([$native, $ipsView] as $html) {
     assertVisualization(
         str_contains($html, 'function calendarRuntimeEndpoint(runtime)')
             && str_contains($html, 'bases.push(document.referrer);')
+            && str_contains($html, "return endpoint.startsWith('/') ? endpoint : '';")
             && str_contains($html, 'const endpoint = calendarRuntimeEndpoint(calendarIPSViewConfig);')
             && str_contains($html, 'const endpoint = calendarRuntimeEndpoint(calendarRuntime);'),
-        'IPSView actions and attachment transfers must resolve their hook against the embedding Symcon page when rendered as a data document.'
+        'IPSView actions and attachment transfers must resolve embedded pages and preserve the standalone IPSView hook fallback.'
+    );
+    assertVisualization(
+        str_contains($html, 'function trustedMicrosoftReferenceUrl(value)')
+            && str_contains($html, "link.textContent = t('Open in provider');"),
+        'Trusted Microsoft cloud-file references must be exposed as explicit external links.'
     );
     assertVisualization(str_contains($html, '--agenda-color-bar-width'), 'Calendar-specific options must remain available through the shared bootstrap.');
 }

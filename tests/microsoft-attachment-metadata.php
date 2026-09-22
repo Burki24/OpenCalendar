@@ -111,6 +111,40 @@ attachmentMetadataCheck(array_column($list, 'kind') === ['file', 'item', 'refere
 $client = new AttachmentMetadataHttp([[200, ['id' => 'event', 'isCancelled' => true]]]);
 attachmentMetadataReject(fn () => (new MicrosoftCalendarProvider($client, 'secret'))->getAttachmentMetadata('calendar', 'event'));
 
+$cloudBody = '<p><a href="https://1drv.ms/b/c/example">Unterlagen.pdf</a></p>';
+$client = new AttachmentMetadataHttp([
+    [200, ['id' => 'event', 'body' => ['contentType' => 'html', 'content' => $cloudBody]]],
+    [200, ['value' => []]]
+]);
+$list = (new MicrosoftCalendarProvider($client, 'secret'))->getAttachmentMetadata('calendar', 'event');
+attachmentMetadataCheck(
+    count($list) === 1
+        && $list[0]['kind'] === 'reference'
+        && $list[0]['name'] === 'Unterlagen.pdf'
+        && $list[0]['url'] === 'https://1drv.ms/b/c/example',
+    'Trusted OneDrive links represented only in the Outlook event body must be exposed as references.'
+);
+
+$plainCloudBody = '[https://res.public.onecdn.static.microsoft/icon.png]Handbuch.pdf<https://1drv.ms/b/c/plain-example>';
+$client = new AttachmentMetadataHttp([
+    [200, ['id' => 'event', 'body' => ['contentType' => 'text', 'content' => $plainCloudBody]]],
+    [200, ['value' => []]]
+]);
+$list = (new MicrosoftCalendarProvider($client, 'secret'))->getAttachmentMetadata('calendar', 'event');
+attachmentMetadataCheck(
+    count($list) === 1 && $list[0]['name'] === 'Handbuch.pdf' && $list[0]['kind'] === 'reference',
+    'Outlook plain-text OneDrive references must be recognized.'
+);
+
+$client = new AttachmentMetadataHttp([
+    [200, ['id' => 'event', 'body' => ['contentType' => 'html', 'content' => '<a href="https://outside.invalid/private">Privat.pdf</a>']]],
+    [200, ['value' => []]]
+]);
+attachmentMetadataCheck(
+    (new MicrosoftCalendarProvider($client, 'secret'))->getAttachmentMetadata('calendar', 'event') === [],
+    'Arbitrary event-body links must never be promoted to attachments.'
+);
+
 // Repeated pagination and oversized collections must fail instead of returning partial lists.
 $next = 'https://graph.microsoft.com/v1.0/me/calendars/cal/events/evt/attachments?$skiptoken=same';
 $client = new AttachmentMetadataHttp([[200, ['id' => 'evt']], [200, ['value' => [], '@odata.nextLink' => $next]], [200, ['value' => [], '@odata.nextLink' => $next]]]);
