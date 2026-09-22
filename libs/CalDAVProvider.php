@@ -65,24 +65,33 @@ final class CalDAVProvider implements CalendarEventLookupProviderInterface, Cale
      *
      * @return list<array<string,mixed>> Private metadata without attachment bodies or URLs.
      */
-    public function getAttachmentMetadata(string $calendarReference, string $uid, string $recurrenceId = ''): array
-    {
+    public function getAttachmentMetadata(
+        string $calendarReference,
+        string $uid,
+        string $recurrenceId = '',
+        string $resourceReference = ''
+    ): array {
         if ($uid === '' || strlen($uid) > 2048 || preg_match('/[\x00-\x1f\x7f]/', $uid)) {
             throw new CalDAVProviderException('Invalid attachment event identity.');
         }
         $calendarReference = $this->normalizeAbsoluteUrl($calendarReference);
-        $resource = $this->findEventResourceByUid($calendarReference, $uid, ICalendarAttachmentMetadata::MAX_RESOURCE_BYTES);
+        $resource = $this->attachmentResource($calendarReference, $uid, $resourceReference);
         return ICalendarCodec::attachmentMetadata($resource['ical'], $uid, $recurrenceId);
     }
 
     /** @return array{name:string,contentType:string,content:string} Raw embedded attachment content. */
-    public function getAttachmentContent(string $calendarReference, string $uid, string $recurrenceId, string $attachmentId): array
-    {
+    public function getAttachmentContent(
+        string $calendarReference,
+        string $uid,
+        string $recurrenceId,
+        string $attachmentId,
+        string $resourceReference = ''
+    ): array {
         if ($uid === '' || strlen($uid) > 2048 || preg_match('/[\x00-\x1f\x7f]/', $uid)) {
             throw new CalDAVProviderException('Invalid attachment event identity.');
         }
         $calendarReference = $this->normalizeAbsoluteUrl($calendarReference);
-        $resource = $this->findEventResourceByUid($calendarReference, $uid, ICalendarAttachmentMetadata::MAX_RESOURCE_BYTES);
+        $resource = $this->attachmentResource($calendarReference, $uid, $resourceReference);
         return ICalendarCodec::attachmentContent($resource['ical'], $uid, $recurrenceId, $attachmentId);
     }
 
@@ -635,6 +644,41 @@ final class CalDAVProvider implements CalendarEventLookupProviderInterface, Cale
         }
 
         return $this->deleteResource($calendarUrl, $effectiveResourceUrl, $currentEtag, 'event deletion');
+    }
+
+    /** @return array{resourceUrl: string, etag: string, ical: string} */
+    private function attachmentResource(string $calendarReference, string $uid, string $resourceReference): array
+    {
+        $resourceReference = trim($resourceReference);
+        if ($resourceReference === '') {
+            return $this->findEventResourceByUid(
+                $calendarReference,
+                $uid,
+                ICalendarAttachmentMetadata::MAX_RESOURCE_BYTES
+            );
+        }
+
+        $resourceReference = $this->normalizeAbsoluteUrl($resourceReference);
+        $this->assertResourceBelongsToCalendar($calendarReference, $resourceReference);
+        $response = $this->httpClient->request(
+            'GET',
+            $resourceReference,
+            ['Accept' => 'text/calendar'],
+            '',
+            ICalendarAttachmentMetadata::MAX_RESOURCE_BYTES
+        );
+        $this->assertResponseStatus($response, [200], 'attachment retrieval');
+        if (strlen($response->body) > ICalendarAttachmentMetadata::MAX_RESOURCE_BYTES) {
+            throw new CalDAVProviderException('Attachment event resource exceeds the supported limit.');
+        }
+        $resourceUrl = $this->trustedEffectiveUrl($response, $resourceReference);
+        $this->assertResourceBelongsToCalendar($calendarReference, $resourceUrl);
+
+        return [
+            'resourceUrl' => $resourceUrl,
+            'etag'        => trim((string) ($response->headers['etag'] ?? '')),
+            'ical'        => $response->body
+        ];
     }
 
     /**

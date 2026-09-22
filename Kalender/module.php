@@ -1558,7 +1558,35 @@ class Calendar extends IPSModuleStrict
                     && preg_match('/^\d{8}(?:T\d{6}Z?)?$/D', $selector['recurrenceId']) !== 1)))) {
             throw new InvalidArgumentException('Invalid attachment event selector.');
         }
-        return ['UID' => $selector['uid'], 'RecurrenceID' => $selector['recurrenceId'] ?? ''];
+        $request = ['UID' => $selector['uid'], 'RecurrenceID' => $selector['recurrenceId'] ?? ''];
+        $resourceUrl = $this->providerAttachmentResourceUrl($selector['uid']);
+        if ($resourceUrl !== '') {
+            $request['ResourceURL'] = $resourceUrl;
+        }
+        return $request;
+    }
+
+    /**
+     * Resolves a provider resource only from the synchronized server-side cache.
+     * Browser selectors deliberately cannot supply URLs. Ambiguous or non-HTTP
+     * resources retain the provider's UID lookup fallback.
+     */
+    private function providerAttachmentResourceUrl(string $uid): string
+    {
+        $resources = [];
+        foreach ($this->readEvents() as $event) {
+            $cachedUid = trim((string) ($event['uid'] ?? ''));
+            if ($cachedUid === '' || !hash_equals($uid, $cachedUid)) {
+                continue;
+            }
+            $resourceUrl = trim((string) ($event['resourceUrl'] ?? ''));
+            $scheme = strtolower((string) parse_url($resourceUrl, PHP_URL_SCHEME));
+            if ($resourceUrl !== '' && in_array($scheme, ['http', 'https'], true)) {
+                $resources[$resourceUrl] = true;
+            }
+        }
+
+        return count($resources) === 1 ? (string) array_key_first($resources) : '';
     }
 
     /**

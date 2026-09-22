@@ -97,4 +97,26 @@ icalAttachmentCheck(count($davHttp->requests) === 1 && $davHttp->requests[0]['me
 $davHttp->responses = [[207, [], $xml]];
 icalAttachmentCheck($dav->getAttachmentContent('https://dav.invalid/cal/', 'one', '', $files[0]['id'])['content'] === 'Hello', 'CalDAV embedded download failed.');
 
+$emptyCalendar = "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nBEGIN:VEVENT\r\nUID:empty\r\nDTSTART:20260922T100000Z\r\nDTEND:20260922T110000Z\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n";
+$directHttp = new ICalendarAttachmentHttp([[200, ['etag' => '"direct"'], $emptyCalendar]]);
+$directDav = new CalDAVProvider($directHttp, 'https://dav.invalid/', new CalDAVOriginPolicy('https://dav.invalid/'));
+icalAttachmentCheck(
+    $directDav->getAttachmentMetadata('https://dav.invalid/cal/', 'empty', '', 'https://dav.invalid/cal/empty.ics') === [],
+    'A known CalDAV resource without attachments must return an empty list.'
+);
+icalAttachmentCheck(
+    count($directHttp->requests) === 1
+        && $directHttp->requests[0]['method'] === 'GET'
+        && $directHttp->requests[0]['url'] === 'https://dav.invalid/cal/empty.ics'
+        && $directHttp->requests[0]['maxResponseBytes'] === 16 * 1024 * 1024,
+    'A synchronized CalDAV resource must be fetched directly without a UID REPORT.'
+);
+icalAttachmentReject(fn () => $directDav->getAttachmentMetadata(
+    'https://dav.invalid/cal/',
+    'empty',
+    '',
+    'https://outside.invalid/empty.ics'
+));
+icalAttachmentCheck(count($directHttp->requests) === 1, 'An untrusted attachment resource must be rejected before HTTP access.');
+
 fwrite(STDOUT, "iCalendar/CalDAV attachment metadata: exact event identity, recurrence inheritance and opaque references passed.\n");

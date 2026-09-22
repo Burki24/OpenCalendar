@@ -174,18 +174,38 @@ attachmentMetadataReject(fn () => $calendar->DownloadProviderAttachment(json_enc
 $xml = '<?xml version="1.0"?><d:multistatus xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav"><d:response>' .
     '<d:href>/cal/event.ics</d:href><d:propstat><d:prop><d:getetag>"e"</d:getetag><c:calendar-data>' .
     htmlspecialchars($ical, ENT_XML1) . '</c:calendar-data></d:prop></d:propstat></d:response></d:multistatus>';
-$davHttp = new AttachmentMetadataHttp([[207, $xml]]);
+$davHttp = new AttachmentMetadataHttp([[200, $ical]]);
 $gateway->provider = 1;
 $gateway->cachedCalendars = '[{"id":"dav42","url":"https://dav.invalid/cal/"}]';
 $gateway->providerObject = new IPSKalender\CalDAVProvider($davHttp, 'https://dav.invalid/', new IPSKalender\CalDAVOriginPolicy('https://dav.invalid/'));
 $calendar->properties['CalendarID'] = 'dav42';
+$calendar->attributes['CachedEvents'] = json_encode([[
+    'uid' => 'ics-event', 'resourceUrl' => 'https://dav.invalid/cal/event.ics', 'status' => 'CONFIRMED'
+]], JSON_THROW_ON_ERROR);
 $result = json_decode($calendar->ListProviderAttachments('{"uid":"ics-event"}'), true, 512, JSON_THROW_ON_ERROR);
-attachmentMetadataCheck($result['result'][0]['name'] === 'ICS.pdf' && count($davHttp->requests) === 1, 'CalDAV metadata routing failed.');
-$davHttp->responses = [[207, $xml]];
+attachmentMetadataCheck(
+    $result['result'][0]['name'] === 'ICS.pdf'
+        && count($davHttp->requests) === 1
+        && $davHttp->requests[0]['method'] === 'GET'
+        && $davHttp->requests[0]['url'] === 'https://dav.invalid/cal/event.ics',
+    'CalDAV metadata must use the synchronized server-side resource.'
+);
+$davHttp->responses = [[200, $ical]];
 $davDownload = json_decode($calendar->DownloadProviderAttachment(json_encode([
     'selector' => ['uid' => 'ics-event'], 'id' => $result['result'][0]['id']
 ], JSON_THROW_ON_ERROR)), true, 512, JSON_THROW_ON_ERROR);
 attachmentMetadataCheck(base64_decode($davDownload['content'], true) === 'ICS FILE', 'CalDAV attachment download routing failed.');
+
+$calendar->attributes['CachedEvents'] = json_encode([[
+    'uid' => 'empty-event', 'resourceUrl' => 'https://dav.invalid/cal/empty.ics', 'status' => 'CONFIRMED'
+]], JSON_THROW_ON_ERROR);
+$davHttp->responses = [[200, str_replace(
+    ["UID:ics-event\r\n", "ATTACH;FMTTYPE=application/pdf;ENCODING=BASE64;VALUE=BINARY;FILENAME=ICS.pdf:SUNTIEZJTEU=\r\n", "ATTACH;FILENAME=Reference.pdf:https://private.invalid/document?secret=1\r\n"],
+    ["UID:empty-event\r\n", '', ''],
+    $ical
+)]];
+$emptyResult = json_decode($calendar->ListProviderAttachments('{"uid":"empty-event"}'), true, 512, JSON_THROW_ON_ERROR);
+attachmentMetadataCheck($emptyResult['result'] === [], 'A CalDAV event without attachments must return an empty result.');
 
 $gateway->provider = 3;
 $gateway->cachedCalendars = '[{"id":"calendar42","providerId":"cal","url":"https://graph.microsoft.com/v1.0/me/calendars/cal"}]';

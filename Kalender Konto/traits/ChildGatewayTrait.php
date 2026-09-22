@@ -262,7 +262,15 @@ trait KalenderKontoChildGatewayTrait
         $uid = (string) ($request['UID'] ?? '');
         $recurrenceId = (string) ($request['RecurrenceID'] ?? '');
         $provider = $this->createProvider();
-        if ($provider instanceof CalDAVProvider || $provider instanceof ICalendarSubscriptionProvider) {
+        if ($provider instanceof CalDAVProvider) {
+            return $provider->getAttachmentMetadata(
+                $reference,
+                $uid,
+                $recurrenceId,
+                (string) ($request['ResourceURL'] ?? '')
+            );
+        }
+        if ($provider instanceof ICalendarSubscriptionProvider) {
             return $provider->getAttachmentMetadata($reference, $uid, $recurrenceId);
         }
         throw new RuntimeException('This provider does not support attachment listing yet.');
@@ -304,7 +312,16 @@ trait KalenderKontoChildGatewayTrait
             throw new RuntimeException('Google attachment access is not enabled.');
         }
         $provider = $this->createProvider();
-        if ($provider instanceof CalDAVProvider || $provider instanceof ICalendarSubscriptionProvider) {
+        if ($provider instanceof CalDAVProvider) {
+            return $this->encodeProviderAttachment($provider->getAttachmentContent(
+                $reference,
+                (string) ($request['UID'] ?? ''),
+                (string) ($request['RecurrenceID'] ?? ''),
+                $attachmentId,
+                (string) ($request['ResourceURL'] ?? '')
+            ));
+        }
+        if ($provider instanceof ICalendarSubscriptionProvider) {
             return $this->encodeProviderAttachment($provider->getAttachmentContent(
                 $reference,
                 (string) ($request['UID'] ?? ''),
