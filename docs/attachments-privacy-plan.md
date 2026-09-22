@@ -197,8 +197,8 @@ redirect origin restrictions. Attachment gateway requests/errors bypass event
 debug logging and return generic errors without filenames or provider URLs.
 
 This is a request-local backend listing, not an end-user attachment UI. Native
-tile transfer isolation, provider downloads/uploads/deletions, CalDAV/ICS adapters
-and live provider tests remain open; Google stays deferred. No provider attachment
+tile transfer isolation, provider downloads/uploads/deletions and live provider
+tests remain open; Google stays deferred. No provider attachment
 requests are added to normal synchronization. `transferAvailable` remains false
 for the not-yet-released complete feature. Existing local transfers are retained.
 
@@ -212,6 +212,45 @@ API references checked for this implementation:
 
 - https://learn.microsoft.com/en-us/graph/api/event-list-attachments?view=graph-rest-1.0
 - https://learn.microsoft.com/en-us/graph/api/todotask-list-attachments?view=graph-rest-1.0
+
+### On-demand CalDAV and ICS metadata (2026-09-22)
+
+The same protected provider-list route now accepts an exact iCalendar event
+identity: `uid` and an optional original `recurrenceId`. The calendar rejects
+additional owner, URL and calendar claims. The account resolves the configured
+calendar server-side, rejects Google and task selectors for non-Microsoft
+accounts, and routes only CalDAV/Apple or configured read-only ICS sources.
+
+CalDAV performs one bounded calendar query for the UID and requires exactly one
+resource under the selected calendar. Read-only URL subscriptions use one fresh,
+bounded request without writing attachment data into their shared parsed-event
+cache. Configured ICS files are parsed from their existing source. Normal calendar
+synchronization remains unchanged and never copies attachment bodies or metadata.
+
+The parser handles RFC 5545 `ATTACH` values only at VEVENT level. Valid Base64
+`VALUE=BINARY` attachments are classified as `embedded`; URI values are classified
+as `reference`. URI values, credentials, query tokens and binary contents are not
+returned. References are not opened, redirected, probed or downloaded. Nested
+alarm attachments are excluded. A filename is used only when a supported filename
+parameter exists; otherwise a neutral generated label is returned. All metadata
+remains untrusted display text.
+
+Recurring exceptions use their own ATTACH properties. A verified generated
+occurrence inherits the series master's metadata. Missing, cancelled, duplicate
+or ambiguous UID/recurrence identities fail closed. Resources are limited to
+16 MiB, results to 100 entries and encoded metadata to 192 KiB. Malformed binary
+content or attachment parameters abort the whole list without partial results.
+
+Focused tests cover embedded data, opaque external references, nested alarms,
+exception selection, master inheritance, missing occurrences, duplicate UIDs,
+malformed Base64, configured ICS files, fresh URL feeds and bounded CalDAV lookup.
+The calendar/account/provider integration is exercised for ICS and CalDAV.
+No live CalDAV/Apple/ICS server was contacted. Downloads, uploads, provider-side
+deletion and the shared end-user UI remain open; Google remains deferred.
+
+Specification used for the parser:
+
+- https://www.rfc-editor.org/rfc/rfc5545#section-3.8.1.1
 
 ### Administrative local recovery and cleanup (2026-09-22)
 

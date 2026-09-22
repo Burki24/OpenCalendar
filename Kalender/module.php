@@ -1403,7 +1403,7 @@ class Calendar extends IPSModuleStrict
      * Lists provider attachment metadata on demand under calendar attachment policy.
      * The caller must additionally authenticate the requesting view and transport.
      *
-     * @param string $Selector JSON eventReference or sourceType=microsoft-todo with taskId/taskListId.
+     * @param string $Selector JSON provider event identity or sourceType=microsoft-todo with taskId/taskListId.
      * @return string Private JSON result, never shared through visualization state or caches.
      */
     public function ListProviderAttachments(string $Selector): string
@@ -1423,11 +1423,22 @@ class Calendar extends IPSModuleStrict
                 throw new InvalidArgumentException('Invalid attachment task selector.');
             }
             $request = ['TaskListID' => $listId, 'TaskID' => $selector['taskId']];
-        } else {
-            if (array_keys($selector) !== ['eventReference'] || !is_string($selector['eventReference']) || trim($selector['eventReference']) === '') {
+        } elseif (array_keys($selector) === ['eventReference']) {
+            if (!is_string($selector['eventReference']) || trim($selector['eventReference']) === ''
+                || strlen($selector['eventReference']) > 8192) {
                 throw new InvalidArgumentException('Invalid attachment event selector.');
             }
             $request = ['EventReference' => $selector['eventReference']];
+        } else {
+            if (array_diff(array_keys($selector), ['uid', 'recurrenceId']) !== []
+                || !is_string($selector['uid'] ?? null) || trim($selector['uid']) === ''
+                || strlen($selector['uid']) > 2048 || preg_match('/[\x00-\x1f\x7f]/', $selector['uid'])
+                || (isset($selector['recurrenceId']) && (!is_string($selector['recurrenceId'])
+                    || ($selector['recurrenceId'] !== ''
+                        && preg_match('/^\d{8}(?:T\d{6}Z?)?$/D', $selector['recurrenceId']) !== 1)))) {
+                throw new InvalidArgumentException('Invalid attachment event selector.');
+            }
+            $request = ['UID' => $selector['uid'], 'RecurrenceID' => $selector['recurrenceId'] ?? ''];
         }
         $calendarId = $this->effectiveCalendarId();
         $connectionId = IPS_GetInstance($this->InstanceID)['ConnectionID'];

@@ -59,6 +59,24 @@ final class ICalendarFeedProvider implements CalendarProviderInterface
         $this->cacheWriter = $cacheWriter !== null ? Closure::fromCallable($cacheWriter) : null;
     }
 
+    /**
+     * Fetches fresh private metadata; never reads/writes the shared feed cache or follows ATTACH links.
+     *
+     * @return list<array<string,mixed>> Attachment metadata for one event/occurrence.
+     */
+    public function getAttachmentMetadata(string $calendarReference, string $uid, string $recurrenceId = ''): array
+    {
+        if ($this->normalizeUrl($calendarReference) !== $this->feedUrl) {
+            throw new ICalendarFeedProviderException('The attachment calendar does not belong to this feed.');
+        }
+        $response = $this->httpClient->request('GET', $this->feedUrl, ['Accept' => 'text/calendar'], '', self::MAX_FEED_SIZE);
+        if ($response->statusCode !== 200) {
+            throw new ICalendarFeedProviderException('The attachment source could not be refreshed.');
+        }
+        $this->validateFeedBody($response->body);
+        return ICalendarCodec::attachmentMetadata($response->body, $uid, $recurrenceId);
+    }
+
     /** @inheritDoc */
     public function testConnection(): array
     {

@@ -14,6 +14,7 @@ use IPSKalender\GoogleCalendarIncrementalSync;
 use IPSKalender\GoogleCalendarOriginPolicy;
 use IPSKalender\GoogleCalendarProvider;
 use IPSKalender\ICalendarRecurrence;
+use IPSKalender\ICalendarSubscriptionProvider;
 use IPSKalender\MicrosoftCalendarDebugHttpClient;
 use IPSKalender\MicrosoftCalendarIncrementalSync;
 use IPSKalender\MicrosoftCalendarProvider;
@@ -26,6 +27,7 @@ require_once __DIR__ . '/../../libs/GoogleCalendarIncrementalSync.php';
 require_once __DIR__ . '/../../libs/MicrosoftCalendarDebugHttpClient.php';
 require_once __DIR__ . '/../../libs/MicrosoftCalendarIncrementalSync.php';
 require_once __DIR__ . '/../../libs/CalendarProviderError.php';
+require_once __DIR__ . '/../../libs/ICalendarSubscriptionProvider.php';
 require_once __DIR__ . '/../../libs/MicrosoftGraphOriginPolicy.php';
 require_once __DIR__ . '/../../libs/MicrosoftTodoProvider.php';
 
@@ -226,10 +228,11 @@ trait KalenderKontoChildGatewayTrait
     /** @param array<string,mixed> $request @return list<array<string,mixed>> */
     private function listProviderAttachmentsForChild(array $request): array
     {
-        if ($this->ReadPropertyInteger('Provider') !== self::PROVIDER_MICROSOFT) {
-            throw new RuntimeException('This provider does not support attachment listing yet.');
-        }
+        $providerType = $this->ReadPropertyInteger('Provider');
         if (isset($request['TaskID'])) {
+            if ($providerType !== self::PROVIDER_MICROSOFT) {
+                throw new RuntimeException('This provider does not support task attachments.');
+            }
             return $this->microsoftTodoProvider()->getAttachmentMetadata(
                 (string) ($request['TaskListID'] ?? ''),
                 (string) $request['TaskID']
@@ -240,13 +243,26 @@ trait KalenderKontoChildGatewayTrait
         if ($calendarId === '' || ($calendar['id'] ?? '') !== $calendarId) {
             throw new RuntimeException('The attachment calendar could not be verified.');
         }
-        // Use the trusted client directly; the normal event debug decorator is not
-        // appropriate for private document metadata.
-        $provider = new MicrosoftCalendarProvider(
-            $this->createTrustedCloudHttpClient(new MicrosoftGraphOriginPolicy()),
-            $this->getMicrosoftAccessToken()
-        );
-        return $provider->getAttachmentMetadata($this->calendarReference($calendar), (string) ($request['EventReference'] ?? ''));
+        $reference = $this->calendarReference($calendar);
+        if ($providerType === self::PROVIDER_MICROSOFT) {
+            // Use the trusted client directly; the normal event debug decorator is not
+            // appropriate for private document metadata.
+            $provider = new MicrosoftCalendarProvider(
+                $this->createTrustedCloudHttpClient(new MicrosoftGraphOriginPolicy()),
+                $this->getMicrosoftAccessToken()
+            );
+            return $provider->getAttachmentMetadata($reference, (string) ($request['EventReference'] ?? ''));
+        }
+        if ($providerType === self::PROVIDER_GOOGLE) {
+            throw new RuntimeException('Google attachment access is not enabled.');
+        }
+        $uid = (string) ($request['UID'] ?? '');
+        $recurrenceId = (string) ($request['RecurrenceID'] ?? '');
+        $provider = $this->createProvider();
+        if ($provider instanceof CalDAVProvider || $provider instanceof ICalendarSubscriptionProvider) {
+            return $provider->getAttachmentMetadata($reference, $uid, $recurrenceId);
+        }
+        throw new RuntimeException('This provider does not support attachment listing yet.');
     }
 
     private function assertMicrosoftTaskOperation(): void

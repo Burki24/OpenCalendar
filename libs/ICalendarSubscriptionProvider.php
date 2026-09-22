@@ -99,6 +99,21 @@ final class ICalendarSubscriptionProvider implements CalendarProviderInterface
         return $calendars;
     }
 
+    /**
+     * Routes a private metadata read to exactly the configured subscription.
+     *
+     * @return list<array<string,mixed>> Attachment metadata for one event/occurrence.
+     */
+    public function getAttachmentMetadata(string $calendarReference, string $uid, string $recurrenceId = ''): array
+    {
+        $subscription = $this->resolveSubscription($calendarReference);
+        $provider = $this->provider($subscription);
+        if (!$provider instanceof ICalendarFeedProvider && !$provider instanceof ICalendarFileProvider) {
+            throw new ICalendarFeedProviderException('Unsupported attachment subscription.');
+        }
+        return $provider->getAttachmentMetadata($subscription['providerReference'], $uid, $recurrenceId);
+    }
+
     /** @inheritDoc */
     public function getEvents(string $calendarReference, DateTimeImmutable $start, DateTimeImmutable $end): array
     {

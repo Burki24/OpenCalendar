@@ -47,6 +47,19 @@ final class ICalendarFileProvider implements CalendarProviderInterface
         $this->calendarReference = 'urn:ips-kalender:ics-file:' . $sourceId;
     }
 
+    /**
+     * Reads private attachment metadata from this configured local ICS source.
+     *
+     * @return list<array<string,mixed>> Attachment metadata for one event/occurrence.
+     */
+    public function getAttachmentMetadata(string $calendarReference, string $uid, string $recurrenceId = ''): array
+    {
+        if ($calendarReference !== $this->calendarReference) {
+            throw new ICalendarFileProviderException('The attachment calendar does not belong to this file.');
+        }
+        return ICalendarCodec::attachmentMetadata($this->ical, $uid, $recurrenceId);
+    }
+
     /** @inheritDoc */
     public function testConnection(): array
     {

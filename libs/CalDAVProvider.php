@@ -60,6 +60,21 @@ final class CalDAVProvider implements CalendarEventLookupProviderInterface, Cale
         $this->originPolicy = $originPolicy ?? new CalDAVOriginPolicy($serverUrl);
     }
 
+    /**
+     * Reads attachment metadata only from the unique resource in the selected calendar.
+     *
+     * @return list<array<string,mixed>> Private metadata without attachment bodies or URLs.
+     */
+    public function getAttachmentMetadata(string $calendarReference, string $uid, string $recurrenceId = ''): array
+    {
+        if ($uid === '' || strlen($uid) > 2048 || preg_match('/[\x00-\x1f\x7f]/', $uid)) {
+            throw new CalDAVProviderException('Invalid attachment event identity.');
+        }
+        $calendarReference = $this->normalizeAbsoluteUrl($calendarReference);
+        $resource = $this->findEventResourceByUid($calendarReference, $uid, ICalendarAttachmentMetadata::MAX_RESOURCE_BYTES);
+        return ICalendarCodec::attachmentMetadata($resource['ical'], $uid, $recurrenceId);
+    }
+
     /** @inheritDoc */
     public function testConnection(): array
     {
@@ -1293,7 +1308,7 @@ final class CalDAVProvider implements CalendarEventLookupProviderInterface, Cale
      *
      * @return array{resourceUrl: string, etag: string, ical: string}
      */
-    private function findEventResourceByUid(string $calendarUrl, string $uid): array
+    private function findEventResourceByUid(string $calendarUrl, string $uid, int $maxResponseBytes = 67_108_864): array
     {
         $escapedUid = htmlspecialchars($uid, ENT_QUOTES | ENT_XML1, 'UTF-8');
         $body = '<?xml version="1.0" encoding="utf-8" ?>' .
@@ -1310,9 +1325,13 @@ final class CalDAVProvider implements CalendarEventLookupProviderInterface, Cale
                 'Content-Type' => 'application/xml; charset=utf-8',
                 'Depth'        => '1'
             ],
-            $body
+            $body,
+            $maxResponseBytes
         );
         $this->assertResponseStatus($response, [207], 'event lookup');
+        if (strlen($response->body) > $maxResponseBytes) {
+            throw new CalDAVProviderException('Event lookup response exceeds the supported limit.');
+        }
         $effectiveCalendarUrl = $this->trustedEffectiveUrl($response, $calendarUrl);
 
         $document = $this->parseXml($response->body);
