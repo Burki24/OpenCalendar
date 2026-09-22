@@ -1,6 +1,6 @@
 # Optional attachments: implementation and security plan
 
-Status: foundation in progress, not a released attachment feature.
+Status: protected read UI in progress, not a released complete attachment feature.
 Scope: `dev_9.1` only. No changes to `dev`, deployments or OAuth registrations.
 Google is deferred until its OAuth scopes are agreed with Symcon. Microsoft
 calendar events and native To Do tasks, CalDAV/Apple, read-only iCalendar feeds
@@ -292,6 +292,37 @@ Microsoft API references checked for this implementation:
 
 - https://learn.microsoft.com/en-us/graph/api/attachment-get?view=graph-rest-1.0
 - https://learn.microsoft.com/en-us/graph/api/taskfileattachment-get?view=graph-rest-1.0
+
+### Shared lazy read UI (2026-09-22)
+
+The event-details dialog now exposes existing provider attachments in the native
+Symcon tile and IPSView when both the Calendar and Calendar View permit provider
+listing and download. The section stays hidden for disabled policies, Google,
+local calendars and events without a complete server-verifiable selector. Opening
+an event does not load metadata. Only the explicit **Show attachments** action
+contacts the provider, and every refresh performs a fresh protected list request.
+
+The native tile and IPSView use the same per-view authenticated POST hook. Runtime
+credentials are embedded only in their rendered document, never in calendar state,
+URLs or attachment metadata. The hook remains registered independently of the
+optional IPSView HTML variable so a native tile does not depend on IPSView being
+enabled. Transport, token, selected calendar, view/calendar policy and exact event
+or task identity are checked again for list and download. The binary response is
+not broadcast through visualization updates.
+
+Microsoft events use their event reference, Microsoft To Do uses the concrete list
+and task IDs, and Apple/CalDAV/ICS use UID plus the original recurrence slot when
+present. The client receives only a provider-neutral selector capability; it does
+not receive the account provider metadata used by operational diagnostics.
+Filenames are inserted with `textContent`, references and unsupported Microsoft
+types have no download control, oversized entries are disabled, and downloaded
+Blob URLs are revoked after use. Provider errors are presented generically.
+
+This slice deliberately has no upload or delete control and no fallback to local
+storage. Local attachment UI, provider mutations, named-user identity, Google and
+live multi-client/provider validation remain open. Focused tests cover lazy loading,
+selector construction, malformed metadata, text-only filename rendering, native
+hook availability and protected Blob-download cleanup.
 
 ### Administrative local recovery and cleanup (2026-09-22)
 

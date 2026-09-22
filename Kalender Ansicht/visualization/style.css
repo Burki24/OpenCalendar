@@ -1010,6 +1010,17 @@ html.ipsview-mode .event-details-dialog { --dialog-width: 840px; }
 .event-details-dialog .dialog-actions-start,
 .event-details-dialog .dialog-actions-end { flex-wrap: wrap; }
 .event-details-dialog .dialog-actions button { flex: 0 0 auto; white-space: nowrap; }
+.event-attachments { display: grid; gap: 10px; padding-top: 12px; border-top: var(--cal-line-width, 1px) solid var(--cal-line, var(--cal-border)); }
+.event-attachments-header { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.event-attachments-header h3 { flex: 1 1 12em; min-width: 0; margin: 0; font-size: 1em; }
+.event-attachments-status { color: var(--cal-muted); line-height: 1.4; overflow-wrap: anywhere; }
+.event-attachments-status.error { color: var(--cal-danger); }
+.event-attachments-list { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.event-attachment-item { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 9px 10px; border: var(--cal-line-width, 1px) solid var(--cal-line, var(--cal-border)); border-radius: var(--cal-radius); background: var(--cal-surface); }
+.event-attachment-text { flex: 1 1 15em; min-width: 0; display: grid; gap: 2px; }
+.event-attachment-name { font-weight: 650; overflow-wrap: anywhere; }
+.event-attachment-meta { color: var(--cal-muted); font-size: var(--cal-dialog-meta-font-size); overflow-wrap: anywhere; }
+.event-attachment-item button { flex: 0 0 auto; max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
 
 .delete-confirm-body { gap: 8px; }
 .delete-confirm-summary { font-size: 1.02em; font-weight: 700; line-height: 1.35; overflow-wrap: anywhere; }

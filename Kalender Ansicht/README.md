@@ -14,7 +14,7 @@ Ein externer Öffnen-Link entfällt. Einrichtung und Datensicherung sind unter
 
 ## Startverhalten und schmale Kacheln
 
-### Anhangsberechtigungen (Vorbereitung)
+### Anhangsberechtigungen und bestehende Anhänge
 
 Kalenderinstanz und Kalenderansicht besitzen jeweils die Einstellung
 **Zugriff auf Anhänge**: deaktiviert (Standard), lesen oder verwalten.
@@ -30,12 +30,25 @@ Operationen: `list`, `download`, `upload`, `delete`; Speicherorte: `local`,
 Lesen erlaubt nur Auflisten und Download; Verwalten zusätzlich Upload und Löschen.
 Provider-Schreiboperationen benötigen außerdem einen schreibbaren Kalender.
 
-Diese Funktion ist **nur eine Berechtigungsabfrage**, kein Zugriffsticket.
-Dateitransfer und Speicherung sind noch nicht implementiert. Die spätere
-Transferschnittstelle muss zusätzlich Anmeldung, Terminzugehörigkeit und
-Anbieterfähigkeiten prüfen. Persönliche IPSViewUsers-Rechte bleiben bis zur
-verifizierbaren Identitätsanbindung gesperrt. Änderungen an Einstellungen
-verschieben oder löschen keine Dateien. Google bleibt zurückgestellt.
+Bei erlaubtem Anbieterzugriff erscheint in den Termindetails **Anhänge anzeigen**.
+Erst dieser Klick liest die aktuelle Liste direkt beim Anbieter. Der normale
+Kalenderabruf, die Synchronisation und das Öffnen der Details laden weder
+Anhangslisten noch Dateiinhalte. Unterstützte Dateien können anschließend einzeln
+heruntergeladen werden. Externe iCalendar-Verweise, Microsoft-Elementanhänge und
+nicht unterstützte Typen werden nur kenntlich gemacht und nicht geöffnet.
+
+Die Oberfläche steht in der nativen Kachel und in IPSView zur Verfügung. Der
+Download läuft als angemeldete POST-Anfrage über den privaten Hook dieser Ansicht;
+Dateiinhalte, Anbieternamen, Downloadadressen und Zugriffstoken gelangen nicht in
+den gemeinsam verteilten Kalenderzustand. Rechte, Kalenderzugehörigkeit,
+Termin-/Aufgabenidentität und Transport werden bei jeder Anfrage erneut geprüft.
+
+Aktuell umfasst die Oberfläche ausschließlich das Auflisten und Herunterladen
+bereits vorhandener Anbieteranhänge. Upload, Löschen und die Oberfläche für lokal
+gespeicherte Dokumente folgen separat. Google bleibt bis zur Klärung der
+zusätzlichen Scopes zurückgestellt. Persönliche IPSViewUsers-Rechte bleiben bis
+zur verifizierbaren Identitätsanbindung gesperrt. Änderungen an Einstellungen
+verschieben oder löschen keine Dateien.
 
 **HTTP-Ausnahme:** Nur in der Kalenderansicht gibt es zusätzlich
 „Unverschlüsselten Anhangszugriff über lokale HTTP-Verbindungen erlauben“.
@@ -46,9 +59,9 @@ Private IP-Adressen beweisen keine sichere Verbindung: keine externe
 HTTP-Portweiterleitung oder verdeckte Proxy-Weiterleitung hierfür betreiben.
 Die Option ersetzt weder Anmeldung noch Kalender-/Ansichtsrechte.
 
-Die neue angemeldete Hook-Vorabprüfung `CheckAttachmentAccess` prüft Transport
-und aktuelle Rechte und antwortet ausschließlich auf die einzelne Anfrage.
-Sie überträgt keine Dateien und stellt kein Zugriffsticket aus.
+Die angemeldete Hook-Vorabprüfung `CheckAttachmentAccess` prüft Transport und
+aktuelle Rechte und antwortet ausschließlich auf die einzelne Anfrage. Sie stellt
+kein Zugriffsticket aus; der eigentliche Transfer prüft alle Rechte erneut.
 HTTPS wird nur anhand der serverseitigen TLS-Angabe erkannt; Hostnamen,
 Port 443 und weitergeleitete HTTPS-Header reichen nicht aus.
 Die sichere Erkennung von Symcon Connect/ipmagic ist noch nicht live verifiziert.

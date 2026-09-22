@@ -2,11 +2,11 @@
     "elements": [
         {
             "type": "ExpansionPanel",
-            "caption": "Attachment permissions (preparation)",
+            "caption": "Attachment permissions",
             "items": [
                 {
                     "type": "Label",
-                    "caption": "Permissions only: file upload, download and storage are not available yet. Calendar and view permissions must both allow access."
+                    "caption": "Existing provider attachments can be listed and downloaded on demand. Upload and delete are not available yet. Calendar and view permissions must both allow access."
                 },
                 {
                     "type": "Select",

@@ -40,6 +40,24 @@ foreach ([
         throw new RuntimeException('Transfer isolation/authentication/revocation failed.');
     }
 }
+// Native visualization tiles use the same isolated transfer route even when no
+// separate IPSView HTML variable is enabled.
+$view->enabled = false;
+$view->allowPolicy = true;
+$GLOBALS['attachmentCalls'] = 0;
+$GLOBALS['attachmentRevoke'] = false;
+$_SERVER = ['REQUEST_METHOD' => 'POST', 'HTTPS' => 'on'];
+$_POST = ['token' => $validToken, 'action' => 'TransferAttachment', 'value' => json_encode([
+    'calendarId' => 42, 'operation' => 'download', 'destination' => 'local',
+    'selector'   => ['uid' => 'native-tile'], 'data' => ['id' => str_repeat('a', 64)]
+], JSON_THROW_ON_ERROR)];
+ob_start();
+$hook->invoke($view);
+$nativeDownload = ob_get_clean();
+if (http_response_code() !== 200 || $nativeDownload !== 'PRIVATE DOWNLOAD' || $GLOBALS['attachmentCalls'] !== 1) {
+    throw new RuntimeException('Native visualization attachment transfer route is unavailable.');
+}
+$view->enabled = true;
 // A shared view credential must never grant administrative recovery/cleanup access.
 $GLOBALS['attachmentRevoke'] = false;
 $GLOBALS['attachmentCalls'] = 0;

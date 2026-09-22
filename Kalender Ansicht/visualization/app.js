@@ -38,6 +38,7 @@ const ipsViewStateRefreshIntervalMilliseconds = 15_000;
 const visibleRangeRetryDelayMilliseconds = 300;
 const visibleRangeRetryMaxAttempts = 40;
 const calendarClientContractVersion = 2;
+const providerAttachmentMaximumDownloadBytes = 3 * 1024 * 1024;
 document.documentElement.style.setProperty('--agenda-color-bar-width', `${calendarAgendaColorBarWidth}px`);
 document.documentElement.style.setProperty('--compact-color-bar-width', `${calendarCompactColorBarWidth}px`);
 
@@ -81,12 +82,17 @@ let eventAvailabilityEdited = false;
 let preservedAgendaScrollPosition = null;
 let agendaScrollWorkflow = '';
 let releaseAgendaScrollPositionAfterState = false;
+let attachmentDetailsRevision = 0;
 const monthEventData = new WeakMap();
 
 const content = document.getElementById('calendar-content');
 const periodTitle = document.getElementById('period-title');
 const eventDialog = document.getElementById('event-dialog');
 const eventDetailsDialog = document.getElementById('event-details-dialog');
+const eventAttachments = document.getElementById('details-attachments');
+const eventAttachmentsLoadButton = document.getElementById('details-load-attachments');
+const eventAttachmentsStatus = document.getElementById('details-attachments-status');
+const eventAttachmentsList = document.getElementById('details-attachments-list');
 const editScopeDialog = document.getElementById('edit-scope-dialog');
 const editScopeConfirmButton = document.getElementById('edit-scope-confirm');
 const deleteConfirmDialog = document.getElementById('delete-confirm-dialog');
@@ -2939,6 +2945,222 @@ function openNewEvent(preferredDay = null) {
     });
 }
 
+function hasAttachmentTransferBridge() {
+    return Boolean(calendarRuntime?.endpoint && calendarRuntime?.token);
+}
+
+function providerAttachmentSelector(event, calendar) {
+    if (!event || !calendar || calendar.canReadProviderAttachments !== true) return null;
+    if (String(event.sourceType || '').trim().toLowerCase() === 'microsoft-todo') {
+        const taskId = String(event.taskId || '').trim();
+        const taskListId = String(event.taskListId || '').trim();
+        return taskId && taskListId
+            ? {sourceType: 'microsoft-todo', taskId, taskListId}
+            : null;
+    }
+
+    const selectorType = String(calendar.attachmentSelectorType || '').trim().toLowerCase();
+    if (selectorType === 'event-reference') {
+        const eventReference = String(event.eventReference || '').trim();
+        return eventReference ? {eventReference} : null;
+    }
+    if (selectorType === 'icalendar') {
+        const uid = String(event.uid || '').trim();
+        if (!uid) return null;
+        const recurrenceId = String(event.recurrenceId || '').trim();
+        return recurrenceId ? {uid, recurrenceId} : {uid};
+    }
+    return null;
+}
+
+function attachmentTransferValue(event, operation, data = {}) {
+    const calendar = calendarEntryByInstanceId(event?.calendarInstanceId);
+    const selector = providerAttachmentSelector(event, calendar);
+    if (!calendar || !selector) return null;
+    return {
+        calendarId: Number(calendar.instanceId),
+        operation,
+        destination: 'provider',
+        selector,
+        data
+    };
+}
+
+async function attachmentTransferRequest(value, binary = false) {
+    if (!hasAttachmentTransferBridge() || !value) {
+        throw new Error(t('Attachment transfer failed.'));
+    }
+    const body = new URLSearchParams();
+    body.set('token', String(calendarRuntime.token));
+    body.set('clientContractVersion', String(calendarClientContractVersion));
+    body.set('action', 'TransferAttachment');
+    body.set('value', JSON.stringify(value));
+    const response = await fetch(String(calendarRuntime.endpoint), {
+        method: 'POST',
+        headers: {'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8'},
+        body: body.toString(),
+        cache: 'no-store',
+        credentials: 'same-origin'
+    });
+    if (!response.ok) {
+        throw new Error(t('Attachment transfer failed.'));
+    }
+    if (binary) return response;
+    const payload = await response.json();
+    if (!payload || typeof payload !== 'object' || payload.Error) {
+        throw new Error(t('Attachment transfer failed.'));
+    }
+    return payload;
+}
+
+function setAttachmentDetailsStatus(message, error = false) {
+    eventAttachmentsStatus.textContent = message;
+    eventAttachmentsStatus.classList.toggle('hidden', message === '');
+    eventAttachmentsStatus.classList.toggle('error', error);
+}
+
+function resetAttachmentDetails(event = null) {
+    attachmentDetailsRevision++;
+    eventAttachmentsList.replaceChildren();
+    eventAttachmentsList.classList.add('hidden');
+    setAttachmentDetailsStatus('');
+    eventAttachmentsLoadButton.disabled = false;
+    eventAttachmentsLoadButton.textContent = t('Show attachments');
+    const value = attachmentTransferValue(event, 'list');
+    eventAttachments.classList.toggle('hidden', !hasAttachmentTransferBridge() || value === null);
+}
+
+function attachmentFileSize(size) {
+    if (!Number.isInteger(size) || size < 0) return '';
+    if (size < 1024) return `${size} B`;
+    if (size < 1024 * 1024) return `${Math.max(1, Math.round(size / 1024))} KB`;
+    return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function attachmentKindText(file) {
+    if (file.kind === 'reference') return t('External reference');
+    if (file.kind === 'item') return t('Attached item');
+    if (file.kind === 'unsupported') return t('Unsupported attachment');
+    return t('Provider attachment');
+}
+
+function normalizedAttachmentMetadata(file) {
+    if (!file || typeof file !== 'object') return null;
+    const id = String(file.id || '');
+    const name = String(file.name || '');
+    const kind = String(file.kind || '').toLowerCase();
+    const size = file.size === null ? null : Number(file.size);
+    if (!id || id.length > 2048 || !name || name.length > 1024
+        || !['file', 'embedded', 'reference', 'item', 'unsupported'].includes(kind)
+        || (size !== null && (!Number.isInteger(size) || size < 0))) return null;
+    return {id, name, kind, size};
+}
+
+function safeAttachmentDownloadName(value) {
+    const name = String(value || '').replace(/[\\/\u0000-\u001f\u007f]/g, '_').trim();
+    return name && name.length <= 1024 ? name : 'attachment.bin';
+}
+
+function attachmentResponseName(response, fallback) {
+    const disposition = String(response.headers.get('Content-Disposition') || '');
+    const encoded = disposition.match(/filename\*=UTF-8''([^;]+)/i)?.[1] || '';
+    if (encoded) {
+        try { return safeAttachmentDownloadName(decodeURIComponent(encoded)); } catch (_) { /* use fallback */ }
+    }
+    return safeAttachmentDownloadName(fallback);
+}
+
+async function downloadProviderAttachment(event, file, button, revision) {
+    if (revision !== attachmentDetailsRevision) return;
+    const value = attachmentTransferValue(event, 'download', {id: file.id});
+    if (!value) return;
+    button.disabled = true;
+    setAttachmentDetailsStatus(t('Downloading attachment…'));
+    try {
+        const response = await attachmentTransferRequest(value, true);
+        const declaredSize = Number(response.headers.get('Content-Length') || 0);
+        if (declaredSize > providerAttachmentMaximumDownloadBytes) throw new Error();
+        const blob = await response.blob();
+        if (blob.size > providerAttachmentMaximumDownloadBytes || revision !== attachmentDetailsRevision) return;
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = attachmentResponseName(response, file.name);
+        link.style.display = 'none';
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+        setAttachmentDetailsStatus('');
+    } catch (_) {
+        if (revision === attachmentDetailsRevision) {
+            setAttachmentDetailsStatus(t('The attachment could not be downloaded.'), true);
+        }
+    } finally {
+        if (revision === attachmentDetailsRevision) button.disabled = false;
+    }
+}
+
+function renderProviderAttachments(event, files, revision) {
+    eventAttachmentsList.replaceChildren();
+    files.forEach(file => {
+        const item = element('li', 'event-attachment-item');
+        const text = element('div', 'event-attachment-text');
+        const name = element('span', 'event-attachment-name');
+        name.textContent = file.name;
+        const meta = element('span', 'event-attachment-meta');
+        const parts = [attachmentKindText(file)];
+        const size = attachmentFileSize(file.size);
+        if (size) parts.push(size);
+        text.append(name, meta);
+        item.append(text);
+        const downloadable = ['file', 'embedded'].includes(file.kind)
+            && (file.size === null || file.size <= providerAttachmentMaximumDownloadBytes);
+        if (downloadable) {
+            const button = element('button', 'secondary-button');
+            button.type = 'button';
+            button.textContent = t('Download');
+            button.setAttribute('aria-label', `${t('Download')}: ${file.name}`);
+            button.addEventListener('click', () => void downloadProviderAttachment(event, file, button, revision));
+            item.append(button);
+        } else {
+            parts.push(file.size !== null && file.size > providerAttachmentMaximumDownloadBytes
+                ? t('Too large to download')
+                : t('Download unavailable'));
+        }
+        meta.textContent = parts.join(' · ');
+        eventAttachmentsList.append(item);
+    });
+    eventAttachmentsList.classList.toggle('hidden', files.length === 0);
+}
+
+async function loadSelectedEventAttachments() {
+    const event = selectedEvent;
+    const value = attachmentTransferValue(event, 'list');
+    if (!event || !value) return;
+    const revision = ++attachmentDetailsRevision;
+    eventAttachmentsLoadButton.disabled = true;
+    eventAttachmentsLoadButton.textContent = t('Refresh attachments');
+    setAttachmentDetailsStatus(t('Loading attachments…'));
+    eventAttachmentsList.replaceChildren();
+    eventAttachmentsList.classList.add('hidden');
+    try {
+        const payload = await attachmentTransferRequest(value);
+        if (revision !== attachmentDetailsRevision) return;
+        if (!Array.isArray(payload.result) || payload.result.length > 100) throw new Error();
+        const files = payload.result.map(normalizedAttachmentMetadata);
+        if (files.some(file => file === null)) throw new Error();
+        renderProviderAttachments(event, files, revision);
+        setAttachmentDetailsStatus(files.length === 0 ? t('No attachments') : '');
+    } catch (_) {
+        if (revision === attachmentDetailsRevision) {
+            setAttachmentDetailsStatus(t('Attachments could not be loaded.'), true);
+        }
+    } finally {
+        if (revision === attachmentDetailsRevision) eventAttachmentsLoadButton.disabled = false;
+    }
+}
+
 function openEventDetails(event) {
     beginAgendaScrollWorkflow('details');
     selectedEvent = event;
@@ -2972,6 +3194,7 @@ function openEventDetails(event) {
     setOptionalDetail('reminder', reminderDetailText(event));
     setOptionalDetail('location', event.location);
     setOptionalDetail('description', event.description);
+    resetAttachmentDetails(event);
     document.getElementById('details-provider-button').classList.toggle('hidden', providerEventUrl(event) === '');
     document.getElementById('details-edit-button').classList.toggle('hidden', !editable);
     document.getElementById('details-delete-button').classList.toggle('hidden', !deletable);
@@ -4939,6 +5162,7 @@ eventDialog.addEventListener('close', () => {
     requestIPSViewStateRefresh();
 });
 eventDetailsDialog.addEventListener('close', () => {
+    resetAttachmentDetails();
     restorePreservedAgendaScrollPosition();
     applyDeferredCalendarState();
     if (!releaseAgendaScrollPositionAfterState
@@ -4949,6 +5173,7 @@ eventDetailsDialog.addEventListener('close', () => {
 document.getElementById('details-close').addEventListener('click', () => eventDetailsDialog.close());
 document.getElementById('details-close-button').addEventListener('click', () => eventDetailsDialog.close());
 document.getElementById('details-provider-button').addEventListener('click', openProviderEvent);
+eventAttachmentsLoadButton.addEventListener('click', () => void loadSelectedEventAttachments());
 document.getElementById('details-edit-button').addEventListener('click', () => requestEdit(eventDetailsDialog));
 document.getElementById('details-task-toggle-button').addEventListener('click', toggleSelectedTaskCompletion);
 document.getElementById('edit-scope-close').addEventListener('click', () => editScopeDialog.close());
@@ -5759,6 +5984,7 @@ function applyStaticTranslations() {
         ['save-button', 'Save'],
         ['details-delete-button', 'Delete'],
         ['details-task-toggle-button', 'Mark completed'],
+        ['details-load-attachments', 'Show attachments'],
         ['details-close-button', 'Close'],
         ['details-edit-button', 'Edit'],
         ['edit-scope-cancel', 'Cancel'],
@@ -5786,6 +6012,7 @@ function applyStaticTranslations() {
     document.getElementById('event-task-completed-label').textContent = t('Completed');
     document.getElementById('dialog-title').textContent = t('Event');
     document.getElementById('details-dialog-title').textContent = t('Event details');
+    document.getElementById('details-attachments-title').textContent = t('Attachments');
     document.getElementById('edit-scope-dialog-title').textContent = t('Edit recurring event');
     document.getElementById('edit-scope-question').textContent = t('Which events do you want to edit?');
     document.getElementById('delete-confirm-dialog-title').textContent = t('Delete event');

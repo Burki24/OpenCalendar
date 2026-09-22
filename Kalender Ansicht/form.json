@@ -2,11 +2,11 @@
     "elements": [
         {
             "type": "ExpansionPanel",
-            "caption": "Attachment permissions (preparation)",
+            "caption": "Attachment permissions",
             "items": [
                 {
                     "type": "Label",
-                    "caption": "Permissions only: file upload, download and storage are not available yet. Calendar and view permissions must both allow access."
+                    "caption": "Existing provider attachments can be listed and downloaded on demand. Upload and delete are not available yet. Calendar and view permissions must both allow access."
                 },
                 {
                     "type": "Select",
@@ -44,7 +44,7 @@
                 },
                 {
                     "type": "Label",
-                    "caption": "Warning: HTTP exposes files and access credentials to interception or modification. Enable only on a trusted network without external HTTP forwarding. This does not grant attachment rights or enable file transfers yet."
+                    "caption": "Warning: HTTP exposes files and access credentials to interception or modification. Enable only on a trusted network without external HTTP forwarding. This does not grant attachment rights."
                 },
                 {
                     "type": "Label",

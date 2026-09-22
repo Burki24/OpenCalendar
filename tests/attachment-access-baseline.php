@@ -93,8 +93,8 @@ try {
             ob_end_clean();
         }
         if (http_response_code() !== $expected || isset($payload['payload'])
-            || ($expected === 200 && $payload !== ['policyAllowed' => true, 'transferAvailable' => false])) {
-            throw new RuntimeException('Attachment preflight must remain request-scoped and never enable transfers.');
+            || ($expected === 200 && $payload !== ['policyAllowed' => true, 'transferAvailable' => true])) {
+            throw new RuntimeException('Attachment preflight must remain request-scoped and report the protected transfer route.');
         }
         if (($token === 'wrong' || (!$http && $https === '')) && $view->policyChecks !== 0) {
             throw new RuntimeException('Authentication/transport rejection must precede policy lookup.');

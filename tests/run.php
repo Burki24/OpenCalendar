@@ -22,6 +22,7 @@ $commands = [
     ['Verify embedded dialog bounds and errors', ['node', 'tests/dialog-embedding.js']],
     ['Verify moved IPSView output identity', [PHP_BINARY, 'tests/ipsview-moved-output.php']],
     ['Verify private attachment transfers', [PHP_BINARY, 'tests/attachment-transfer.php']],
+    ['Verify lazy attachment list and download UI', ['node', 'tests/attachment-ui.js']],
     ['Verify local attachment backup and cleanup', [PHP_BINARY, 'tests/local-attachment-maintenance.php']],
     ['Verify provider attachment access and Microsoft metadata', [PHP_BINARY, 'tests/provider-attachment-access.php']],
     ['Verify iCalendar and CalDAV attachment metadata', [PHP_BINARY, 'tests/icalendar-attachment-metadata.php']],

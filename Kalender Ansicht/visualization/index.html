@@ -333,6 +333,14 @@
                 <dd id="details-description"></dd>
             </div>
         </dl>
+        <section class="event-attachments hidden" id="details-attachments" aria-labelledby="details-attachments-title">
+            <div class="event-attachments-header">
+                <h3 id="details-attachments-title">Attachments</h3>
+                <button type="button" class="secondary-button" id="details-load-attachments">Show attachments</button>
+            </div>
+            <div class="event-attachments-status hidden" id="details-attachments-status" role="status" aria-live="polite"></div>
+            <ul class="event-attachments-list hidden" id="details-attachments-list"></ul>
+        </section>
         <div class="dialog-note hidden" id="details-note"></div>
     </div>
     <div class="dialog-actions">

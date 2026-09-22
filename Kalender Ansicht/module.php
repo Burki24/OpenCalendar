@@ -1204,25 +1204,50 @@ class CalendarView extends IPSModuleStrict
      */
     public function CanAccessAttachments(int $CalendarID, string $Operation, string $Destination): bool
     {
+        try {
+            return $this->isSelectedCalendarForAttachments($CalendarID)
+                && $this->selectedCalendarAllowsAttachments($CalendarID, $Operation, $Destination);
+        } catch (Throwable) {
+            // Missing/older calendar modules or unreadable policy never grant access.
+        }
+        return false;
+    }
+
+    /** Verifies view selection without loading status or attachment capabilities. */
+    private function isSelectedCalendarForAttachments(int $calendarId): bool
+    {
+        foreach ($this->effectiveCalendarConfiguration() as $row) {
+            if (!is_array($row) || !($row['Enabled'] ?? true)
+                || (int) ($row['InstanceID'] ?? 0) !== $calendarId
+                || !IPS_InstanceExists($calendarId)) {
+                continue;
+            }
+            $instance = IPS_GetInstance($calendarId);
+            return ($instance['ModuleInfo']['ModuleID'] ?? '') === self::CALENDAR_MODULE_ID;
+        }
+        return false;
+    }
+
+    /**
+     * Checks the already server-selected calendar without recursively loading the
+     * complete view selection. This is also used for non-secret UI capabilities.
+     */
+    private function selectedCalendarAllowsAttachments(int $calendarId, string $operation, string $destination): bool
+    {
         $policy = new CalendarAttachmentPolicy(
             $this->ReadPropertyInteger('AttachmentMode'),
             $this->ReadPropertyBoolean('AttachmentAllowLocal'),
             $this->ReadPropertyBoolean('AttachmentAllowProvider'),
             $this->ReadPropertyInteger('AttachmentIdentityMode')
         );
-        if (!$policy->allows($Operation, $Destination)) {
+        if (!$policy->allows($operation, $destination)) {
             return false;
         }
         try {
-            foreach ($this->loadSelectedCalendars() as $calendar) {
-                if ($calendar['instanceId'] === $CalendarID) {
-                    return IPSKAL_CanAccessAttachments($CalendarID, $Operation, $Destination);
-                }
-            }
+            return IPSKAL_CanAccessAttachments($calendarId, $operation, $destination);
         } catch (Throwable) {
-            // Missing/older calendar modules or unreadable policy never grant access.
+            return false;
         }
-        return false;
     }
 
     /** Ensures provider state is available before the shared helper renders the page. */
@@ -1236,7 +1261,10 @@ class CalendarView extends IPSModuleStrict
      */
     protected function ProcessHookData(): void
     {
-        if (!$this->IsIPSViewHTMLPageEnabled()) {
+        $attachmentAction = strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? '')) === 'POST'
+            && is_string($_POST['action'] ?? null)
+            && in_array($_POST['action'], ['TransferAttachment', 'CheckAttachmentAccess'], true);
+        if (!$this->IsIPSViewHTMLPageEnabled() && !$attachmentAction) {
             $this->outputIPSViewResponse(['Error' => 'IPSView is disabled.'], 404);
 
             return;
@@ -1486,12 +1514,13 @@ class CalendarView extends IPSModuleStrict
             ? $this->IPSViewTranslationsFromLocale($this->calendarVisualizationTranslationKeys())
             : [];
 
-        $runtime = $ipsView
-            ? [
-                'endpoint' => '/hook/' . $this->ipsViewHookAddress(),
-                'token'    => $this->ipsViewToken()
-            ]
-            : null;
+        // File transfers use the same requester-bound POST endpoint in the native
+        // tile and IPSView. File data must never travel through visualization
+        // state updates, which are shared with every open client of this view.
+        $runtime = [
+            'endpoint' => '/hook/' . $this->ipsViewHookAddress(),
+            'token'    => $this->ipsViewToken()
+        ];
 
         return $this->RenderVisualizationHTMLPage($ipsView, [
             'language'           => $this->Translate('Today') === 'Heute' ? 'de' : 'en',
@@ -1609,6 +1638,22 @@ class CalendarView extends IPSModuleStrict
             'New event',
             'No writable calendar available',
             'Event details',
+            'Attachments',
+            'Show attachments',
+            'Refresh attachments',
+            'Loading attachments…',
+            'No attachments',
+            'Attachments could not be loaded.',
+            'Download',
+            'Downloading attachment…',
+            'The attachment could not be downloaded.',
+            'Provider attachment',
+            'External reference',
+            'Attached item',
+            'Unsupported attachment',
+            'Download unavailable',
+            'Too large to download',
+            'Attachment transfer failed.',
             'Edit event',
             'Edit',
             'Calendar',
@@ -2702,6 +2747,13 @@ class CalendarView extends IPSModuleStrict
 
             $canWrite = (bool) ($calendarStatus['canWrite']
                 ?? IPS_GetProperty($instanceId, 'CanWrite'));
+            $attachmentSelectorType = (bool) ($calendarStatus['localCalendar'] ?? false)
+                ? ''
+                : match ($this->calendarProviderKey($instance)) {
+                    'microsoft'              => 'event-reference',
+                    'apple', 'caldav', 'ics' => 'icalendar',
+                    default                  => ''
+                };
             $calendar = [
                 'instanceId'                   => $instanceId,
                 'name'                         => IPS_GetName($instanceId),
@@ -2737,7 +2789,11 @@ class CalendarView extends IPSModuleStrict
                 'defaultAllDayTransparency'    => CalendarEventState::normalizeTransparency(
                     $calendarStatus['defaultAllDayTransparency'] ?? '',
                     CalendarEventState::TRANSP_OPAQUE
-                )
+                ),
+                'attachmentSelectorType'       => $attachmentSelectorType,
+                'canReadProviderAttachments'   => $attachmentSelectorType !== ''
+                    && $this->selectedCalendarAllowsAttachments($instanceId, 'list', 'provider')
+                    && $this->selectedCalendarAllowsAttachments($instanceId, 'download', 'provider')
             ];
             if ($includeOperationalMetadata) {
                 $calendar['provider'] = (bool) ($calendarStatus['localCalendar'] ?? false)
@@ -3316,7 +3372,7 @@ class CalendarView extends IPSModuleStrict
         }
         http_response_code(200);
         // This result is never a grant for a subsequent request or a specific document.
-        echo '{"policyAllowed":true,"transferAvailable":false}';
+        echo '{"policyAllowed":true,"transferAvailable":true}';
     }
 
     /** @param array<string, mixed> $request Authenticated but untrusted HTTP request. */
@@ -3358,8 +3414,7 @@ class CalendarView extends IPSModuleStrict
                     throw new InvalidArgumentException('Invalid provider attachment identity.');
                 }
             }
-            $allowed = fn (): bool => $this->IsIPSViewHTMLPageEnabled()
-                && hash_equals($this->ipsViewToken(), $request['token'])
+            $allowed = fn (): bool => hash_equals($this->ipsViewToken(), $request['token'])
                 && $this->CanAccessAttachments($value['calendarId'], $value['operation'], $value['destination']);
             if (!$allowed()) {
                 http_response_code(403);
