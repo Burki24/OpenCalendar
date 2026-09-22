@@ -36,6 +36,12 @@ Kalenderabruf, die Synchronisation und das Öffnen der Details laden weder
 Anhangslisten noch Dateiinhalte. Unterstützte Dateien können anschließend einzeln
 heruntergeladen werden. Externe iCalendar-Verweise, Microsoft-Elementanhänge und
 nicht unterstützte Typen werden nur kenntlich gemacht und nicht geöffnet.
+Beim Download öffnet sich eine Zielauswahl, sofern der Client einen sicheren
+„Speichern unter“-Dialog unterstützt. Die Datei wird erst danach abgerufen.
+Kann die eingebettete App diesen Dialog nicht öffnen, bleibt der bisherige
+Download erhalten; die Ansicht weist dann darauf hin, dass App oder Browser
+den Speicherort bestimmen und der eingestellte Downloadordner oder die
+Downloadliste geprüft werden sollte.
 
 Die Oberfläche steht in der nativen Kachel und in IPSView zur Verfügung. Der
 Download läuft als angemeldete POST-Anfrage über den privaten Hook dieser Ansicht;

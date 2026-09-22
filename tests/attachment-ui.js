@@ -150,6 +150,7 @@ assert.strictEqual(
     'Local deletion must require an authoritative current revision.'
 );
 assert.strictEqual(context.safeAttachmentDownloadName('../private.txt'), '.._private.txt');
+assert.strictEqual(context.safeAttachmentDownloadName('report:2026?.pdf'), 'report_2026_.pdf');
 
 const openDetails = functionSource('openEventDetails');
 assert(openDetails.includes('resetAttachmentDetails(event);'), 'Opening details must only prepare the lazy attachment area.');

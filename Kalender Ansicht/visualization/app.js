@@ -3198,7 +3198,7 @@ function trustedMicrosoftReferenceUrl(value) {
 }
 
 function safeAttachmentDownloadName(value) {
-    const name = String(value || '').replace(/[\\/\u0000-\u001f\u007f]/g, '_').trim();
+    const name = String(value || '').replace(/[<>:"/\\|?*\u0000-\u001f\u007f]/g, '_').trim().replace(/[. ]+$/g, '');
     return name && name.length <= 1024 ? name : 'attachment.bin';
 }
 
@@ -3218,13 +3218,44 @@ async function downloadAttachment(event, file, button, revision) {
         : attachmentTransferValue(event, 'download', {id: file.id});
     if (!value) return;
     button.disabled = true;
-    setAttachmentDetailsStatus(t('Downloading attachment…'));
     try {
+        let saveHandle = null;
+        if (typeof window.showSaveFilePicker === 'function') {
+            setAttachmentDetailsStatus(t('Choose a save location…'));
+            try {
+                // The picker must open from the click, before any network await.
+                saveHandle = await window.showSaveFilePicker({suggestedName: safeAttachmentDownloadName(file.name)});
+            } catch (error) {
+                if (error?.name === 'AbortError') {
+                    setAttachmentDetailsStatus('');
+                    return;
+                }
+                if (!['SecurityError', 'NotSupportedError'].includes(error?.name)) throw error;
+                // An embedded or HTTP client may expose the method but forbid its use.
+            }
+        }
+        if (revision !== attachmentDetailsRevision) return;
+        setAttachmentDetailsStatus(t('Downloading attachment…'));
         const response = await attachmentTransferRequest(value, true);
         const declaredSize = Number(response.headers.get('Content-Length') || 0);
         if (declaredSize > providerAttachmentMaximumDownloadBytes) throw new Error();
         const blob = await response.blob();
         if (blob.size > providerAttachmentMaximumDownloadBytes || revision !== attachmentDetailsRevision) return;
+        if (saveHandle) {
+            let writable = null;
+            try {
+                writable = await saveHandle.createWritable();
+                await writable.write(blob);
+                await writable.close();
+            } catch (error) {
+                try { await writable?.abort(); } catch (_) { /* preserve the original failure */ }
+                throw error;
+            }
+            if (revision === attachmentDetailsRevision) {
+                setAttachmentDetailsStatus(t('Attachment saved to the selected location.'));
+            }
+            return;
+        }
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = url;
@@ -3236,7 +3267,7 @@ async function downloadAttachment(event, file, button, revision) {
         link.click();
         link.remove();
         window.setTimeout(() => URL.revokeObjectURL(url), 1000);
-        setAttachmentDetailsStatus('');
+        setAttachmentDetailsStatus(t('Download started. If no save dialog appears, check the app or browser download folder or downloads list.'));
     } catch (_) {
         if (revision === attachmentDetailsRevision) {
             setAttachmentDetailsStatus(t('The attachment could not be downloaded.'), true);
