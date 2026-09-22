@@ -2750,7 +2750,8 @@ class CalendarView extends IPSModuleStrict
 
             $canWrite = (bool) ($calendarStatus['canWrite']
                 ?? IPS_GetProperty($instanceId, 'CanWrite'));
-            $attachmentSelectorType = (bool) ($calendarStatus['localCalendar'] ?? false)
+            $localCalendar = (bool) ($calendarStatus['localCalendar'] ?? false);
+            $attachmentSelectorType = $localCalendar
                 ? ''
                 : match ($this->calendarProviderKey($instance)) {
                     'microsoft'              => 'event-reference',
@@ -2796,7 +2797,15 @@ class CalendarView extends IPSModuleStrict
                 'attachmentSelectorType'       => $attachmentSelectorType,
                 'canReadProviderAttachments'   => $attachmentSelectorType !== ''
                     && $this->selectedCalendarAllowsAttachments($instanceId, 'list', 'provider')
-                    && $this->selectedCalendarAllowsAttachments($instanceId, 'download', 'provider')
+                    && $this->selectedCalendarAllowsAttachments($instanceId, 'download', 'provider'),
+                'canReadLocalAttachments'      => $localCalendar
+                    && $this->selectedCalendarAllowsAttachments($instanceId, 'list', 'local')
+                    && $this->selectedCalendarAllowsAttachments($instanceId, 'download', 'local'),
+                'canManageLocalAttachments'    => $localCalendar
+                    && $this->selectedCalendarAllowsAttachments($instanceId, 'list', 'local')
+                    && $this->selectedCalendarAllowsAttachments($instanceId, 'download', 'local')
+                    && $this->selectedCalendarAllowsAttachments($instanceId, 'upload', 'local')
+                    && $this->selectedCalendarAllowsAttachments($instanceId, 'delete', 'local')
             ];
             if ($includeOperationalMetadata) {
                 $calendar['provider'] = (bool) ($calendarStatus['localCalendar'] ?? false)

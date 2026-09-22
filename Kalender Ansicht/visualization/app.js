@@ -39,6 +39,7 @@ const visibleRangeRetryDelayMilliseconds = 300;
 const visibleRangeRetryMaxAttempts = 40;
 const calendarClientContractVersion = 2;
 const providerAttachmentMaximumDownloadBytes = 3 * 1024 * 1024;
+const localAttachmentMaximumUploadBytes = 2 * 1024 * 1024;
 document.documentElement.style.setProperty('--agenda-color-bar-width', `${calendarAgendaColorBarWidth}px`);
 document.documentElement.style.setProperty('--compact-color-bar-width', `${calendarCompactColorBarWidth}px`);
 
@@ -83,6 +84,7 @@ let preservedAgendaScrollPosition = null;
 let agendaScrollWorkflow = '';
 let releaseAgendaScrollPositionAfterState = false;
 let attachmentDetailsRevision = 0;
+let pendingAttachmentDelete = null;
 const monthEventData = new WeakMap();
 
 const content = document.getElementById('calendar-content');
@@ -91,8 +93,13 @@ const eventDialog = document.getElementById('event-dialog');
 const eventDetailsDialog = document.getElementById('event-details-dialog');
 const eventAttachments = document.getElementById('details-attachments');
 const eventAttachmentsLoadButton = document.getElementById('details-load-attachments');
+const eventAttachmentsAddButton = document.getElementById('details-add-attachment');
+const eventAttachmentsFileInput = document.getElementById('details-attachment-file');
+const eventAttachmentsLocalNote = document.getElementById('details-local-attachment-note');
 const eventAttachmentsStatus = document.getElementById('details-attachments-status');
 const eventAttachmentsList = document.getElementById('details-attachments-list');
+const attachmentDeleteConfirmDialog = document.getElementById('attachment-delete-confirm-dialog');
+const attachmentDeleteConfirmButton = document.getElementById('attachment-delete-confirm-button');
 const editScopeDialog = document.getElementById('edit-scope-dialog');
 const editScopeConfirmButton = document.getElementById('edit-scope-confirm');
 const deleteConfirmDialog = document.getElementById('delete-confirm-dialog');
@@ -376,7 +383,8 @@ function shouldDeferCalendarState() {
     return eventEditingActive
         || eventDialog.open
         || (releaseAgendaScrollPositionAfterState
-            && (eventDetailsDialog.open || editScopeDialog.open || deleteConfirmDialog.open));
+            && (eventDetailsDialog.open || attachmentDeleteConfirmDialog.open
+                || editScopeDialog.open || deleteConfirmDialog.open));
 }
 
 function applyDeferredCalendarState() {
@@ -534,7 +542,8 @@ function cancelAgendaScrollWorkflowRelease() {
 
 function failAgendaScrollWorkflow() {
     cancelAgendaScrollWorkflowRelease();
-    if (!eventDialog.open && !eventDetailsDialog.open && !editScopeDialog.open && !deleteConfirmDialog.open) {
+    if (!eventDialog.open && !eventDetailsDialog.open && !attachmentDeleteConfirmDialog.open
+        && !editScopeDialog.open && !deleteConfirmDialog.open) {
         clearAgendaScrollWorkflow(true);
     }
 }
@@ -3019,6 +3028,24 @@ function providerAttachmentSelector(event, calendar) {
     return null;
 }
 
+function localAttachmentSelector(event, calendar) {
+    if (!event || !calendar || calendar.canReadLocalAttachments !== true) return null;
+    const uid = String(event.uid || '').trim();
+    const startTimestamp = Number(event.startTimestamp);
+    const endTimestamp = Number(event.endTimestamp);
+    if (!uid || uid.length > 8192 || !Number.isInteger(startTimestamp) || !Number.isInteger(endTimestamp)
+        || startTimestamp <= 0 || endTimestamp <= startTimestamp || endTimestamp - startTimestamp > 7 * 86400) {
+        return null;
+    }
+    const selector = {uid, startTimestamp, endTimestamp};
+    for (const key of ['recurrenceId', 'originalStart']) {
+        const value = String(event[key] || '').trim();
+        if (value.length > 128) return null;
+        if (value) selector[key] = value;
+    }
+    return selector;
+}
+
 function attachmentTransferValue(event, operation, data = {}) {
     const calendar = calendarEntryByInstanceId(event?.calendarInstanceId);
     const selector = providerAttachmentSelector(event, calendar);
@@ -3030,6 +3057,25 @@ function attachmentTransferValue(event, operation, data = {}) {
         selector,
         data
     };
+}
+
+function localAttachmentTransferValue(event, operation, data = {}) {
+    const calendar = calendarEntryByInstanceId(event?.calendarInstanceId);
+    const selector = localAttachmentSelector(event, calendar);
+    if (!calendar || !selector
+        || (['upload', 'delete'].includes(operation) && calendar.canManageLocalAttachments !== true)) return null;
+    return {
+        calendarId: Number(calendar.instanceId),
+        operation,
+        destination: 'local',
+        selector,
+        data
+    };
+}
+
+function selectedAttachmentTransferValue(event, operation, data = {}) {
+    return localAttachmentTransferValue(event, operation, data)
+        || attachmentTransferValue(event, operation, data);
 }
 
 async function attachmentTransferRequest(value, binary = false) {
@@ -3073,7 +3119,12 @@ function resetAttachmentDetails(event = null) {
     setAttachmentDetailsStatus('');
     eventAttachmentsLoadButton.disabled = false;
     eventAttachmentsLoadButton.textContent = t('Show attachments');
-    const value = attachmentTransferValue(event, 'list');
+    eventAttachmentsAddButton.disabled = false;
+    eventAttachmentsFileInput.value = '';
+    const value = selectedAttachmentTransferValue(event, 'list');
+    const localUploadAvailable = localAttachmentTransferValue(event, 'upload') !== null;
+    eventAttachmentsAddButton.classList.toggle('hidden', !localUploadAvailable);
+    eventAttachmentsLocalNote.classList.toggle('hidden', !localUploadAvailable);
     eventAttachments.classList.toggle('hidden', !hasAttachmentTransferBridge() || value === null);
 }
 
@@ -3085,6 +3136,7 @@ function attachmentFileSize(size) {
 }
 
 function attachmentKindText(file) {
+    if (file.destination === 'local') return t('Local attachment');
     if (file.kind === 'reference') return t('External reference');
     if (file.kind === 'item') return t('Attached item');
     if (file.kind === 'unsupported') return t('Unsupported attachment');
@@ -3101,7 +3153,19 @@ function normalizedAttachmentMetadata(file) {
         || !['file', 'embedded', 'reference', 'item', 'unsupported'].includes(kind)
         || (size !== null && (!Number.isInteger(size) || size < 0))) return null;
     const url = kind === 'reference' ? trustedMicrosoftReferenceUrl(file.url) : '';
-    return {id, name, kind, size, url};
+    return {id, name, kind, size, url, destination: 'provider'};
+}
+
+function normalizedLocalAttachmentMetadata(file) {
+    if (!file || typeof file !== 'object') return null;
+    const id = String(file.id || '');
+    const name = String(file.name || '');
+    const revision = String(file.revision || '');
+    const size = Number(file.size);
+    if (!/^[a-f0-9]{64}$/.test(id) || !/^[a-f0-9]{64}$/.test(revision)
+        || !name || name.length > 1024 || !Number.isInteger(size) || size < 0
+        || size > localAttachmentMaximumUploadBytes) return null;
+    return {id, name, revision, size, kind: 'file', destination: 'local'};
 }
 
 function trustedMicrosoftReferenceUrl(value) {
@@ -3135,9 +3199,11 @@ function attachmentResponseName(response, fallback) {
     return safeAttachmentDownloadName(fallback);
 }
 
-async function downloadProviderAttachment(event, file, button, revision) {
+async function downloadAttachment(event, file, button, revision) {
     if (revision !== attachmentDetailsRevision) return;
-    const value = attachmentTransferValue(event, 'download', {id: file.id});
+    const value = file.destination === 'local'
+        ? localAttachmentTransferValue(event, 'download', {id: file.id})
+        : attachmentTransferValue(event, 'download', {id: file.id});
     if (!value) return;
     button.disabled = true;
     setAttachmentDetailsStatus(t('Downloading attachment…'));
@@ -3150,7 +3216,9 @@ async function downloadProviderAttachment(event, file, button, revision) {
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = url;
-        link.download = attachmentResponseName(response, file.name);
+        link.download = file.destination === 'local'
+            ? safeAttachmentDownloadName(file.name)
+            : attachmentResponseName(response, file.name);
         link.style.display = 'none';
         document.body.appendChild(link);
         link.click();
@@ -3166,7 +3234,50 @@ async function downloadProviderAttachment(event, file, button, revision) {
     }
 }
 
-function renderProviderAttachments(event, files, revision) {
+function requestLocalAttachmentDelete(event, file, revision) {
+    if (revision !== attachmentDetailsRevision
+        || !localAttachmentTransferValue(event, 'delete', {id: file.id, revision: file.revision})) return;
+    pendingAttachmentDelete = {event, file, revision};
+    document.getElementById('attachment-delete-confirm-summary').textContent = file.name;
+    attachmentDeleteConfirmButton.disabled = false;
+    attachmentDeleteConfirmDialog.showModal();
+}
+
+async function confirmLocalAttachmentDelete() {
+    const pending = pendingAttachmentDelete;
+    if (!pending || pending.revision !== attachmentDetailsRevision) {
+        attachmentDeleteConfirmDialog.close();
+        return;
+    }
+    const value = localAttachmentTransferValue(pending.event, 'delete', {
+        id: pending.file.id,
+        revision: pending.file.revision
+    });
+    if (!value) {
+        attachmentDeleteConfirmDialog.close();
+        return;
+    }
+    attachmentDeleteConfirmButton.disabled = true;
+    setAttachmentDetailsStatus(t('Deleting attachment…'));
+    try {
+        await attachmentTransferRequest(value);
+        if (pending.revision !== attachmentDetailsRevision) return;
+        attachmentDeleteConfirmDialog.close();
+        await loadSelectedEventAttachments();
+    } catch (_) {
+        if (pending.revision === attachmentDetailsRevision) {
+            attachmentDeleteConfirmDialog.close();
+            await loadSelectedEventAttachments();
+            if (selectedEvent === pending.event && eventDetailsDialog.open) {
+                setAttachmentDetailsStatus(t('The deletion result could not be confirmed. Check the refreshed list before retrying.'), true);
+            }
+        }
+    } finally {
+        attachmentDeleteConfirmButton.disabled = false;
+    }
+}
+
+function renderAttachments(event, files, revision) {
     eventAttachmentsList.replaceChildren();
     files.forEach(file => {
         const item = element('li', 'event-attachment-item');
@@ -3186,7 +3297,7 @@ function renderProviderAttachments(event, files, revision) {
             button.type = 'button';
             button.textContent = t('Download');
             button.setAttribute('aria-label', `${t('Download')}: ${file.name}`);
-            button.addEventListener('click', () => void downloadProviderAttachment(event, file, button, revision));
+            button.addEventListener('click', () => void downloadAttachment(event, file, button, revision));
             item.append(button);
         } else if (file.kind === 'reference' && file.url) {
             const link = element('a', 'secondary-button');
@@ -3201,6 +3312,15 @@ function renderProviderAttachments(event, files, revision) {
                 ? t('Too large to download')
                 : t('Download unavailable'));
         }
+        if (file.destination === 'local'
+            && localAttachmentTransferValue(event, 'delete', {id: file.id, revision: file.revision})) {
+            const deleteButton = element('button', 'danger-button');
+            deleteButton.type = 'button';
+            deleteButton.textContent = t('Delete');
+            deleteButton.setAttribute('aria-label', `${t('Delete attachment')}: ${file.name}`);
+            deleteButton.addEventListener('click', () => requestLocalAttachmentDelete(event, file, revision));
+            item.append(deleteButton);
+        }
         meta.textContent = parts.join(' · ');
         eventAttachmentsList.append(item);
     });
@@ -3209,7 +3329,7 @@ function renderProviderAttachments(event, files, revision) {
 
 async function loadSelectedEventAttachments() {
     const event = selectedEvent;
-    const value = attachmentTransferValue(event, 'list');
+    const value = selectedAttachmentTransferValue(event, 'list');
     if (!event || !value) return;
     const revision = ++attachmentDetailsRevision;
     eventAttachmentsLoadButton.disabled = true;
@@ -3221,16 +3341,86 @@ async function loadSelectedEventAttachments() {
         const payload = await attachmentTransferRequest(value);
         if (revision !== attachmentDetailsRevision) return;
         if (!Array.isArray(payload.result) || payload.result.length > 100) throw new Error();
-        const files = payload.result.map(normalizedAttachmentMetadata);
+        const normalize = value.destination === 'local'
+            ? normalizedLocalAttachmentMetadata
+            : normalizedAttachmentMetadata;
+        const files = payload.result.map(normalize);
         if (files.some(file => file === null)) throw new Error();
-        renderProviderAttachments(event, files, revision);
+        renderAttachments(event, files, revision);
         setAttachmentDetailsStatus(files.length === 0 ? t('No attachments') : '');
+        return true;
     } catch (_) {
         if (revision === attachmentDetailsRevision) {
             setAttachmentDetailsStatus(t('Attachments could not be loaded.'), true);
         }
+        return false;
     } finally {
         if (revision === attachmentDetailsRevision) eventAttachmentsLoadButton.disabled = false;
+    }
+}
+
+function localAttachmentRequestId() {
+    const bytes = new Uint8Array(32);
+    crypto.getRandomValues(bytes);
+    return Array.from(bytes, value => value.toString(16).padStart(2, '0')).join('');
+}
+
+async function localAttachmentFileContent(file) {
+    const buffer = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.addEventListener('load', () => resolve(reader.result), {once: true});
+        reader.addEventListener('error', reject, {once: true});
+        reader.addEventListener('abort', reject, {once: true});
+        reader.readAsArrayBuffer(file);
+    });
+    if (!(buffer instanceof ArrayBuffer)) throw new Error();
+    const bytes = new Uint8Array(buffer);
+    let binary = '';
+    for (let offset = 0; offset < bytes.length; offset += 32768) {
+        binary += String.fromCharCode(...bytes.subarray(offset, offset + 32768));
+    }
+    return btoa(binary);
+}
+
+async function uploadSelectedLocalAttachment() {
+    const event = selectedEvent;
+    const file = eventAttachmentsFileInput.files?.[0] || null;
+    if (!event || !file) return;
+    eventAttachmentsFileInput.value = '';
+    const validName = /\.(txt|pdf|png|jpe?g)$/i.test(file.name)
+        && file.name.length <= 180
+        && !/[\\/:\u0000-\u001f\u007f]/.test(file.name);
+    if (!validName || file.size <= 0 || file.size > localAttachmentMaximumUploadBytes) {
+        setAttachmentDetailsStatus(t('Only TXT, PDF, PNG and JPEG files up to 2 MiB are allowed.'), true);
+        return;
+    }
+    const revision = attachmentDetailsRevision;
+    let refreshedAfterFailure = true;
+    eventAttachmentsAddButton.disabled = true;
+    setAttachmentDetailsStatus(t('Uploading attachment…'));
+    try {
+        const content = await localAttachmentFileContent(file);
+        if (revision !== attachmentDetailsRevision) return;
+        const value = localAttachmentTransferValue(event, 'upload', {
+            name: file.name,
+            content,
+            requestId: localAttachmentRequestId()
+        });
+        if (!value) throw new Error();
+        await attachmentTransferRequest(value);
+        if (revision !== attachmentDetailsRevision) return;
+        await loadSelectedEventAttachments();
+    } catch (_) {
+        if (revision === attachmentDetailsRevision) {
+            refreshedAfterFailure = await loadSelectedEventAttachments();
+            if (selectedEvent === event && eventDetailsDialog.open) {
+                setAttachmentDetailsStatus(t('The upload result could not be confirmed. Check the refreshed list before retrying.'), true);
+            }
+        }
+    } finally {
+        if (selectedEvent === event && eventDetailsDialog.open) {
+            eventAttachmentsAddButton.disabled = !refreshedAfterFailure;
+        }
     }
 }
 
@@ -5247,6 +5437,15 @@ document.getElementById('details-close').addEventListener('click', () => eventDe
 document.getElementById('details-close-button').addEventListener('click', () => eventDetailsDialog.close());
 document.getElementById('details-provider-button').addEventListener('click', openProviderEvent);
 eventAttachmentsLoadButton.addEventListener('click', () => void loadSelectedEventAttachments());
+eventAttachmentsAddButton.addEventListener('click', () => {
+    eventAttachmentsFileInput.value = '';
+    eventAttachmentsFileInput.click();
+});
+eventAttachmentsFileInput.addEventListener('change', () => void uploadSelectedLocalAttachment());
+document.getElementById('attachment-delete-confirm-close').addEventListener('click', () => attachmentDeleteConfirmDialog.close());
+document.getElementById('attachment-delete-confirm-cancel').addEventListener('click', () => attachmentDeleteConfirmDialog.close());
+attachmentDeleteConfirmButton.addEventListener('click', () => void confirmLocalAttachmentDelete());
+attachmentDeleteConfirmDialog.addEventListener('close', () => { pendingAttachmentDelete = null; });
 document.getElementById('details-edit-button').addEventListener('click', () => requestEdit(eventDetailsDialog));
 document.getElementById('details-task-toggle-button').addEventListener('click', toggleSelectedTaskCompletion);
 document.getElementById('edit-scope-close').addEventListener('click', () => editScopeDialog.close());
@@ -5417,6 +5616,7 @@ function calendarDialogIsOpen() {
     return [
         eventDialog,
         eventDetailsDialog,
+        attachmentDeleteConfirmDialog,
         editScopeDialog,
         deleteConfirmDialog,
         dayEventsDialog,
@@ -5569,7 +5769,7 @@ function containWheelInsideTile(event) {
     if (event.ctrlKey) return;
 
     const calendarOptionList = pickerScrollTarget(event);
-    const openDialog = [eventDialog, eventDetailsDialog, editScopeDialog, deleteConfirmDialog, dayEventsDialog, viewSelectorDialog, calendarFilterDialog]
+    const openDialog = [attachmentDeleteConfirmDialog, eventDialog, eventDetailsDialog, editScopeDialog, deleteConfirmDialog, dayEventsDialog, viewSelectorDialog, calendarFilterDialog]
         .find(dialog => dialog.open);
     const scrollTarget = calendarOptionList
         || openDialog?.querySelector(openDialog === eventDialog ? '.dialog-layout' : '.dialog-body')
@@ -6059,12 +6259,15 @@ function applyStaticTranslations() {
         ['details-delete-button', 'Delete'],
         ['details-task-toggle-button', 'Mark completed'],
         ['details-load-attachments', 'Show attachments'],
+        ['details-add-attachment', 'Add file'],
         ['details-close-button', 'Close'],
         ['details-edit-button', 'Edit'],
         ['edit-scope-cancel', 'Cancel'],
         ['edit-scope-confirm', 'Continue'],
         ['delete-confirm-cancel', 'Cancel'],
         ['delete-confirm-button', 'Delete'],
+        ['attachment-delete-confirm-cancel', 'Cancel'],
+        ['attachment-delete-confirm-button', 'Delete'],
         ['day-events-create-button', 'Create event on this day'],
         ['day-events-close-button', 'Close'],
         ['view-selector-close-button', 'Close'],
@@ -6087,6 +6290,9 @@ function applyStaticTranslations() {
     document.getElementById('dialog-title').textContent = t('Event');
     document.getElementById('details-dialog-title').textContent = t('Event details');
     document.getElementById('details-attachments-title').textContent = t('Attachments');
+    eventAttachmentsLocalNote.textContent = t('Files added here are stored on the Symcon host, may be included in backups, and are available to everyone authorized for this view. They are not uploaded to the calendar provider.');
+    document.getElementById('attachment-delete-confirm-dialog-title').textContent = t('Delete attachment');
+    document.getElementById('attachment-delete-confirm-question').textContent = t('Do you really want to delete this attachment?');
     document.getElementById('edit-scope-dialog-title').textContent = t('Edit recurring event');
     document.getElementById('edit-scope-question').textContent = t('Which events do you want to edit?');
     document.getElementById('delete-confirm-dialog-title').textContent = t('Delete event');
@@ -6106,6 +6312,7 @@ function applyStaticTranslations() {
         ['details-close', 'Close'],
         ['edit-scope-close', 'Close'],
         ['delete-confirm-close', 'Close'],
+        ['attachment-delete-confirm-close', 'Close'],
         ['day-events-close', 'Close'],
         ['view-selector-close', 'Close'],
         ['calendar-filter-close', 'Close'],

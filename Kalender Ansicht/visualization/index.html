@@ -336,8 +336,13 @@
         <section class="event-attachments hidden" id="details-attachments" aria-labelledby="details-attachments-title">
             <div class="event-attachments-header">
                 <h3 id="details-attachments-title">Attachments</h3>
-                <button type="button" class="secondary-button" id="details-load-attachments">Show attachments</button>
+                <div class="event-attachments-actions">
+                    <input type="file" class="hidden" id="details-attachment-file" accept=".txt,.pdf,.png,.jpg,.jpeg,text/plain,application/pdf,image/png,image/jpeg">
+                    <button type="button" class="secondary-button hidden" id="details-add-attachment">Add file</button>
+                    <button type="button" class="secondary-button" id="details-load-attachments">Show attachments</button>
+                </div>
             </div>
+            <div class="dialog-note hidden" id="details-local-attachment-note">Files added here are stored on the Symcon host, may be included in backups, and are available to everyone authorized for this view. They are not uploaded to the calendar provider.</div>
             <div class="event-attachments-status hidden" id="details-attachments-status" role="status" aria-live="polite"></div>
             <ul class="event-attachments-list hidden" id="details-attachments-list"></ul>
         </section>
@@ -352,6 +357,24 @@
             <button type="button" class="secondary-button hidden" id="details-provider-button">Open in provider</button>
             <button type="button" class="secondary-button" id="details-close-button">Close</button>
             <button type="button" class="primary-button hidden" id="details-edit-button">Edit</button>
+        </div>
+    </div>
+</dialog>
+
+<dialog id="attachment-delete-confirm-dialog" class="oc-dialog oc-dialog-small delete-confirm-dialog" aria-labelledby="attachment-delete-confirm-dialog-title" aria-describedby="attachment-delete-confirm-question">
+    <div class="dialog-header">
+        <span class="dialog-accent" style="--dialog-accent-color:var(--cal-danger)"></span>
+        <h2 id="attachment-delete-confirm-dialog-title">Delete attachment</h2>
+        <button type="button" class="icon-button dialog-close-button" id="attachment-delete-confirm-close" title="Close" aria-label="Close">×</button>
+    </div>
+    <div class="dialog-body delete-confirm-body">
+        <div class="delete-confirm-summary" id="attachment-delete-confirm-summary"></div>
+        <p class="delete-confirm-question" id="attachment-delete-confirm-question">Do you really want to delete this attachment?</p>
+    </div>
+    <div class="dialog-actions">
+        <div class="dialog-actions-end">
+            <button type="button" class="secondary-button" id="attachment-delete-confirm-cancel">Cancel</button>
+            <button type="button" class="danger-button" id="attachment-delete-confirm-button">Delete</button>
         </div>
     </div>
 </dialog>

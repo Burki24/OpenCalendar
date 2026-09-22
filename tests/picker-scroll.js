@@ -18,7 +18,7 @@ let hit = null;
 let hitQueries = 0;
 const context = vm.createContext({Element, eventDialog, content, pickerMousePosition: null,
     document: {elementFromPoint: (x, y) => { hitQueries++; assert.strictEqual(x, 120); assert.strictEqual(y, 240); return hit; }},
-    eventDetailsDialog: {}, editScopeDialog: {}, deleteConfirmDialog: {}, dayEventsDialog: {}, viewSelectorDialog: {}, calendarFilterDialog: {},
+    eventDetailsDialog: {}, attachmentDeleteConfirmDialog: {}, editScopeDialog: {}, deleteConfirmDialog: {}, dayEventsDialog: {}, viewSelectorDialog: {}, calendarFilterDialog: {},
     WheelEvent: {DOM_DELTA_LINE: 1, DOM_DELTA_PAGE: 2}, pickerTouchScroll: null});
 function load(name) {
     const start = source.indexOf('function ' + name + '(');

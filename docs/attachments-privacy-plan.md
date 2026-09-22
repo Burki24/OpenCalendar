@@ -1,6 +1,6 @@
 # Optional attachments: implementation and security plan
 
-Status: protected read UI in progress, not a released complete attachment feature.
+Status: protected provider-read and local-calendar UI in progress, not a released complete attachment feature.
 Scope: `dev_9.1` only. No changes to `dev`, deployments or OAuth registrations.
 Google is deferred until its OAuth scopes are agreed with Symcon. Microsoft
 calendar events and native To Do tasks, CalDAV/Apple, read-only iCalendar feeds
@@ -318,11 +318,37 @@ Filenames are inserted with `textContent`, references and unsupported Microsoft
 types have no download control, oversized entries are disabled, and downloaded
 Blob URLs are revoked after use. Provider errors are presented generically.
 
-This slice deliberately has no upload or delete control and no fallback to local
-storage. Local attachment UI, provider mutations, named-user identity, Google and
-live multi-client/provider validation remain open. Focused tests cover lazy loading,
+The provider path deliberately has no upload or delete control and no fallback to
+local storage. Provider mutations, named-user identity, Google and live
+multi-client/provider validation remain open. Focused tests cover lazy loading,
 selector construction, malformed metadata, text-only filename rendering, native
 hook availability and protected Blob-download cleanup.
+
+### Symcon-local calendar attachment UI (2026-09-22)
+
+For server-owned events in a Symcon-local calendar, the shared event-details UI
+now uses the protected local transfer route. Read mode exposes the deliberate lazy
+list and individual download. Manage mode additionally exposes a hidden file
+picker for TXT, PDF, PNG and JPEG files up to 2 MiB and a separate confirmation
+dialog for deletion. The UI repeats the local destination, shared-view audience
+and backup implications before a file can be selected. It never offers this
+control for online calendars or silently falls back from a provider operation.
+
+The browser sends only the local event UID, bounded start/end timestamps and,
+where present, its recurrence slot. The calendar resolves exactly one current
+event from local originals before every operation and derives the owner identity
+server-side. View and calendar policy, selected calendar, transport and credential
+are checked around every transfer. Upload retry IDs use 256 bits from Web Crypto;
+the server remains authoritative for filename, content signature, quota and
+duplicate validation. Local list metadata is bounded and rendered as text. A
+stale file revision cannot delete a changed original.
+
+Opening details still performs no attachment request. Provider-side mutation,
+local annotations on online/read-only calendars, named-user identity, Google and
+live Windows/Android/backup validation remain open. Focused tests cover local
+selector bounds and occurrence identity, explicit destination, cryptographic retry
+identity, shared modal structure and the existing server-side ownership, storage,
+upload-policy and transfer protections.
 
 ### Administrative local recovery and cleanup (2026-09-22)
 
@@ -389,10 +415,11 @@ limits before PHP parses POST bodies. No streaming/chunked uploads are enabled.
 Local tests exercise hook authorization, transport denial, selected-calendar
 checks, post-read revocation, and the real calendar API's authoritative lookup.
 Real HTTP response headers, Symcon multi-client behavior and restart/backup tests
-remain release gates. No upload UI or native tile transfer action is enabled;
-preflight still reports transferAvailable=false for the end-user feature.
-Remote-provider ownership, protected export/orphan cleanup and the user/group
-adapter remain pending. This route does not make the overall feature release-ready.
+remain release gates. The route is now used by the Symcon-local calendar UI in
+native tiles and IPSView; the separate preflight response remains informational
+and does not grant a transfer. Local annotations on online calendars and the
+user/group adapter remain pending. This route does not make the overall feature
+release-ready.
 
 ### Upload admission policy (2026-09-20)
 

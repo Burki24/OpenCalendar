@@ -6,7 +6,7 @@
             "items": [
                 {
                     "type": "Label",
-                    "caption": "Existing provider attachments can be listed and downloaded on demand. Upload and delete are not available yet. Calendar and view permissions must both allow access."
+                    "caption": "Existing provider attachments can be listed and downloaded on demand. Files can also be stored locally for Symcon calendar events. Local upload and delete require Manage attachments. Calendar and view permissions must both allow access."
                 },
                 {
                     "type": "Select",

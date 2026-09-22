@@ -43,12 +43,18 @@ Dateiinhalte, Anbieternamen, Downloadadressen und Zugriffstoken gelangen nicht i
 den gemeinsam verteilten Kalenderzustand. Rechte, Kalenderzugehörigkeit,
 Termin-/Aufgabenidentität und Transport werden bei jeder Anfrage erneut geprüft.
 
-Aktuell umfasst die Oberfläche ausschließlich das Auflisten und Herunterladen
-bereits vorhandener Anbieteranhänge. Upload, Löschen und die Oberfläche für lokal
-gespeicherte Dokumente folgen separat. Google bleibt bis zur Klärung der
-zusätzlichen Scopes zurückgestellt. Persönliche IPSViewUsers-Rechte bleiben bis
-zur verifizierbaren Identitätsanbindung gesperrt. Änderungen an Einstellungen
-verschieben oder löschen keine Dateien.
+Bei Terminen eines Symcon-lokalen Kalenders kann die Oberfläche zusätzlich
+TXT-, PDF-, PNG- und JPEG-Dateien bis 2 MiB auf dem Symcon-System speichern,
+auflisten, herunterladen und nach einer eigenen Bestätigung löschen. Dafür müssen
+Kalender und Ansicht **Anhänge verwalten** sowie den lokalen Speicher erlauben.
+Vor dem Upload weist die Ansicht darauf hin, dass alle Berechtigten derselben
+Ansicht zugreifen können, Sicherungen die Dateien enthalten können und keine
+Übertragung zum Kalenderanbieter erfolgt.
+
+Anbieter-Uploads und -Löschungen sowie lokale Anhänge an Online-Termine folgen
+separat. Google bleibt bis zur Klärung der zusätzlichen Scopes zurückgestellt.
+Persönliche IPSViewUsers-Rechte bleiben bis zur verifizierbaren Identitätsanbindung
+gesperrt. Änderungen an Einstellungen verschieben oder löschen keine Dateien.
 
 **HTTP-Ausnahme:** Nur in der Kalenderansicht gibt es zusätzlich
 „Unverschlüsselten Anhangszugriff über lokale HTTP-Verbindungen erlauben“.

@@ -954,13 +954,14 @@ assertVisualization(
     str_contains($indexSource, 'id="event-dialog" class="oc-dialog oc-dialog-large"')
         && str_contains($indexSource, 'id="event-form" class="dialog-layout"')
         && str_contains($indexSource, 'id="event-details-dialog" class="oc-dialog oc-dialog-extra-large event-details-dialog"')
+        && str_contains($indexSource, 'id="attachment-delete-confirm-dialog" class="oc-dialog oc-dialog-small delete-confirm-dialog"')
         && str_contains($indexSource, 'id="edit-scope-dialog" class="oc-dialog oc-dialog-small edit-scope-dialog"')
         && str_contains($indexSource, 'id="delete-confirm-dialog" class="oc-dialog oc-dialog-small delete-confirm-dialog"')
         && str_contains($indexSource, 'id="day-events-dialog" class="oc-dialog oc-dialog-large day-events-dialog"')
         && str_contains($indexSource, 'id="view-selector-dialog" class="oc-dialog oc-dialog-small view-selector-dialog"')
         && str_contains($indexSource, 'id="calendar-filter-dialog" class="oc-dialog oc-dialog-medium calendar-filter-dialog"')
-        && substr_count($indexSource, 'class="icon-button dialog-close-button"') === 7
-        && substr_count($indexSource, 'class="dialog-actions-end"') === 7,
+        && substr_count($indexSource, 'class="icon-button dialog-close-button"') === 8
+        && substr_count($indexSource, 'class="dialog-actions-end"') === 8,
     'All calendar dialogs must use the shared OpenCalendar modal structure and action layout.'
 );
 

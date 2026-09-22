@@ -2,10 +2,13 @@
 
 Das Modul repräsentiert einen einzelnen Online- oder Symcon-lokalen Kalender.
 
-Die Dateianhangsfunktion befindet sich in `dev_9.1` noch in Vorbereitung.
-Die bereits vorhandenen Verwaltungsfunktionen für lokale Dateien sind unter
+Die Dateianhangsfunktion befindet sich in `dev_9.1` weiterhin im Ausbau.
+Für Termine eines Symcon-lokalen Kalenders können berechtigte Ansichten bereits
+TXT-, PDF-, PNG- und JPEG-Dateien bis 2 MiB lokal speichern, herunterladen und
+bewusst löschen. Die Verwaltungsfunktionen für Sicherung und Bereinigung sind unter
 [Lokale Dateianhänge sichern und aufräumen](../docs/attachments-administration.md)
-beschrieben. Eine Anhangsoberfläche in IPSView oder der Kachel ist noch nicht aktiviert.
+beschrieben. Anbieter-Uploads, lokale Anhänge an Online-Termine, Google und
+benutzerbezogene Rechte sind noch nicht freigegeben.
 
 ## Einrichtung
 

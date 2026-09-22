@@ -16,8 +16,8 @@ function functionSource(name) {
     return source.slice(start, next < 0 ? source.length : next);
 }
 
-const context = vm.createContext({});
-for (const name of ['providerAttachmentSelector', 'normalizedAttachmentMetadata', 'safeAttachmentDownloadName']) {
+const context = vm.createContext({localAttachmentMaximumUploadBytes: 2 * 1024 * 1024});
+for (const name of ['providerAttachmentSelector', 'localAttachmentSelector', 'normalizedAttachmentMetadata', 'normalizedLocalAttachmentMetadata', 'safeAttachmentDownloadName']) {
     vm.runInContext(functionSource(name), context);
 }
 
@@ -69,9 +69,67 @@ assert.strictEqual(
     'A disabled calendar capability must hide attachment access.'
 );
 
+assert.deepStrictEqual(
+    JSON.parse(JSON.stringify(context.localAttachmentSelector(
+        {uid: 'local-event', startTimestamp: 1789988400, endTimestamp: 1789992000},
+        {canReadLocalAttachments: true}
+    ))),
+    {uid: 'local-event', startTimestamp: 1789988400, endTimestamp: 1789992000},
+    'Local attachments must use the exact bounded local-event identity.'
+);
+assert.deepStrictEqual(
+    JSON.parse(JSON.stringify(context.localAttachmentSelector(
+        {
+            uid: 'local-series',
+            startTimestamp: 1789988400,
+            endTimestamp: 1789992000,
+            recurrenceId: '20260921T090000',
+            originalStart: '2026-09-21T09:00:00+02:00'
+        },
+        {canReadLocalAttachments: true}
+    ))),
+    {
+        uid: 'local-series',
+        startTimestamp: 1789988400,
+        endTimestamp: 1789992000,
+        recurrenceId: '20260921T090000',
+        originalStart: '2026-09-21T09:00:00+02:00'
+    },
+    'Local recurring attachments must retain their exact occurrence identity.'
+);
+assert.strictEqual(
+    context.localAttachmentSelector(
+        {uid: 'local-event', startTimestamp: 1789988400, endTimestamp: 1790683201},
+        {canReadLocalAttachments: true}
+    ),
+    null,
+    'The client must not offer local attachment operations outside the server selector bounds.'
+);
+assert.strictEqual(
+    context.localAttachmentSelector(
+        {uid: 'local-event', startTimestamp: 1789988400, endTimestamp: 1789992000},
+        {canReadLocalAttachments: false}
+    ),
+    null,
+    'A disabled local attachment capability must hide local attachment access.'
+);
+
 assert.strictEqual(context.normalizedAttachmentMetadata({id: '1', name: 'x.pdf', kind: 'file', size: 12}).name, 'x.pdf');
 assert.strictEqual(context.normalizedAttachmentMetadata({id: '', name: 'x.pdf', kind: 'file', size: 12}), null);
 assert.strictEqual(context.normalizedAttachmentMetadata({id: '1', name: 'x.pdf', kind: 'unknown', size: 12}), null);
+assert.strictEqual(
+    context.normalizedLocalAttachmentMetadata({
+        id: 'a'.repeat(64), name: 'local.pdf', revision: 'b'.repeat(64), size: 12
+    }).destination,
+    'local'
+);
+assert.strictEqual(
+    context.normalizedLocalAttachmentMetadata({
+        id: 'a'.repeat(64), name: 'local.pdf', revision: 'stale', size: 12
+    }),
+    null,
+    'Local deletion must require an authoritative current revision.'
+);
 assert.strictEqual(context.safeAttachmentDownloadName('../private.txt'), '.._private.txt');
 
 const openDetails = functionSource('openEventDetails');
@@ -81,10 +139,17 @@ assert(source.includes("eventAttachmentsLoadButton.addEventListener('click', () 
 assert(source.includes("name.textContent = file.name;"), 'Untrusted filenames must be rendered as text.');
 assert(!source.includes('name.innerHTML = file.name'), 'Untrusted filenames must never be rendered as HTML.');
 assert(source.includes("body.set('action', 'TransferAttachment');"));
-assert(source.includes("link.download = attachmentResponseName(response, file.name);"));
+assert(source.includes("attachmentResponseName(response, file.name)"));
 assert(source.includes('URL.revokeObjectURL(url)'));
 assert(html.includes('id="details-attachments"') && html.includes('id="details-load-attachments"'));
+assert(html.includes('id="details-add-attachment"') && html.includes('id="details-attachment-file"'));
+assert(html.includes('id="details-local-attachment-note"'));
+assert(html.includes('id="attachment-delete-confirm-dialog"'));
+assert(source.includes("destination: 'local'"), 'Local transfers must declare their storage destination explicitly.');
+assert(source.includes("crypto.getRandomValues"), 'Upload retry identities must use cryptographic randomness.');
 assert(moduleSource.includes("'runtime'            => $runtime"));
+assert(moduleSource.includes("'canReadLocalAttachments'"));
+assert(moduleSource.includes("'canManageLocalAttachments'"));
 assert(!moduleSource.includes('$runtime = $ipsView\n'));
 
 console.log('Lazy attachment list and protected download UI tests passed.');
