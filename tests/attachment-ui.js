@@ -21,6 +21,30 @@ for (const name of ['providerAttachmentSelector', 'normalizedAttachmentMetadata'
     vm.runInContext(functionSource(name), context);
 }
 
+const endpointContext = vm.createContext({
+    URL,
+    window: {location: {protocol: 'data:', href: 'data:text/html,fixture', ancestorOrigins: []}},
+    document: {referrer: ''}
+});
+vm.runInContext(functionSource('calendarRuntimeEndpoint'), endpointContext);
+assert.strictEqual(
+    endpointContext.calendarRuntimeEndpoint({
+        endpoint: '/hook/opencalendar/view/12345',
+        fallbackEndpoint: 'https://example.ipmagic.de/hook/opencalendar/view/12345'
+    }),
+    'https://example.ipmagic.de/hook/opencalendar/view/12345',
+    'Standalone IPSView must use the automatically discovered HTTPS Connect endpoint.'
+);
+endpointContext.document.referrer = 'http://192.168.178.6:3777/tile/';
+assert.strictEqual(
+    endpointContext.calendarRuntimeEndpoint({
+        endpoint: '/hook/opencalendar/view/12345',
+        fallbackEndpoint: 'https://example.ipmagic.de/hook/opencalendar/view/12345'
+    }),
+    'http://192.168.178.6:3777/hook/opencalendar/view/12345',
+    'Embedded IPSView must prefer its local Symcon origin.'
+);
+
 assert.deepStrictEqual(
     JSON.parse(JSON.stringify(context.providerAttachmentSelector(
         {sourceType: 'microsoft-todo', taskId: 'task', taskListId: 'list'},

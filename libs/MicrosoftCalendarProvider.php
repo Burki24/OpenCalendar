@@ -512,7 +512,7 @@ final class MicrosoftCalendarProvider implements CalendarEventLookupProviderInte
 
         $knownNames = [];
         foreach ($attachments as $attachment) {
-            $knownNames[mb_strtolower(trim((string) ($attachment['name'] ?? '')))] = true;
+            $knownNames[strtolower(trim((string) ($attachment['name'] ?? '')))] = true;
         }
         $knownUrls = [];
         foreach ($candidates as [$rawUrl, $rawName]) {
@@ -528,7 +528,7 @@ final class MicrosoftCalendarProvider implements CalendarEventLookupProviderInte
                 || preg_match('/[\x00-\x1f\x7f]/', $name)) {
                 continue;
             }
-            $nameKey = mb_strtolower($name);
+            $nameKey = strtolower($name);
             if (isset($knownNames[$nameKey])) {
                 continue;
             }

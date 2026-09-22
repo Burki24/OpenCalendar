@@ -2956,9 +2956,8 @@ function hasAttachmentTransferBridge() {
  * A relative URL has no usable base inside a data: document. The embedding
  * Symcon page is still reported as document.referrer, so its origin is the
  * correct and configuration-free base for the same-server hook. Standalone
- * IPSView WebViews can route root-relative hook URLs themselves even though
- * they do not expose an HTTP document base to JavaScript, so preserve the
- * original endpoint as the final compatibility fallback.
+ * Standalone IPSView WebViews do not expose an HTTP base, so the module also
+ * supplies its automatically discovered Symcon Connect endpoint.
  */
 function calendarRuntimeEndpoint(runtime) {
     const endpoint = String(runtime?.endpoint || '').trim();
@@ -2993,7 +2992,13 @@ function calendarRuntimeEndpoint(runtime) {
             // Try the next browser-provided embedding context.
         }
     }
-    return endpoint.startsWith('/') ? endpoint : '';
+    const fallbackEndpoint = String(runtime?.fallbackEndpoint || '').trim();
+    try {
+        const fallback = new URL(fallbackEndpoint);
+        return fallback.protocol === 'https:' ? fallback.href : '';
+    } catch (_) {
+        return '';
+    }
 }
 
 function providerAttachmentSelector(event, calendar) {

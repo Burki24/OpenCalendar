@@ -4355,8 +4355,11 @@ assertTrueValue(
         && str_contains($viewModuleSource, "case 'MoveEvent':")
         && str_contains($viewModuleSource, "case 'DeleteEvent':")
         && str_contains($viewModuleSource, "return 'opencalendar/view/' . \$this->InstanceID;")
-        && str_contains($viewModuleSource, "'endpoint' => '/hook/' . \$this->ipsViewHookAddress()")
-        && str_contains($viewModuleSource, "'token'    => \$this->ipsViewToken()"),
+        && str_contains($viewModuleSource, "'endpoint'         => '/hook/' . \$this->ipsViewHookAddress()")
+        && str_contains($viewModuleSource, "'fallbackEndpoint' => \$ipsView ? \$this->ipsViewConnectEndpoint() : ''")
+        && str_contains($viewModuleSource, "'token'            => \$this->ipsViewToken()")
+        && str_contains($viewModuleSource, "header('Access-Control-Allow-Origin: null');")
+        && !str_contains($viewModuleSource, "header_remove('Access-Control-Allow-Origin')"),
     'The calendar IPSView page must use a unique, token-protected POST WebHook with an explicit action whitelist.'
 );
 assertTrueValue(
