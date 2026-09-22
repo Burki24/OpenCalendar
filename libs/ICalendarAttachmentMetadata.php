@@ -165,7 +165,7 @@ final class ICalendarAttachmentMetadata
                 'name'        => $name !== '' ? $name : 'Attachment ' . (count($files) + 1),
                 'size'        => $size, 'contentType' => $mime, 'kind' => $kind,
                 'destination' => 'provider', 'isInline' => false, '_content' => $content,
-                '_uri' => $uri, '_managedId' => $managedId
+                '_uri'        => $uri, '_managedId' => $managedId
             ];
             $public = $record;
             unset($public['_content'], $public['_uri'], $public['_managedId']);

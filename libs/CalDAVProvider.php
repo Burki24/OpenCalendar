@@ -83,7 +83,10 @@ final class CalDAVProvider implements CalendarEventLookupProviderInterface, Cale
             }
             try {
                 $reference = ICalendarCodec::managedAttachmentReference(
-                    $resource['ical'], $uid, $recurrenceId, $attachment['id']
+                    $resource['ical'],
+                    $uid,
+                    $recurrenceId,
+                    $attachment['id']
                 );
                 if ($this->isTrustedManagedAttachmentUrl($reference['uri'])) {
                     $attachment['kind'] = 'file';
@@ -113,14 +116,20 @@ final class CalDAVProvider implements CalendarEventLookupProviderInterface, Cale
             return ICalendarCodec::attachmentContent($resource['ical'], $uid, $recurrenceId, $attachmentId);
         } catch (RuntimeException $exception) {
             $reference = ICalendarCodec::managedAttachmentReference(
-                $resource['ical'], $uid, $recurrenceId, $attachmentId
+                $resource['ical'],
+                $uid,
+                $recurrenceId,
+                $attachmentId
             );
             if (!$this->isTrustedManagedAttachmentUrl($reference['uri'])
                 || ($reference['size'] !== null && $reference['size'] > ICalendarAttachmentMetadata::MAX_DOWNLOAD_BYTES)) {
                 throw new CalDAVProviderException('Managed attachment is unavailable for download.', 0);
             }
             $response = $this->httpClient->request(
-                'GET', $reference['uri'], ['Accept' => $reference['contentType']], '',
+                'GET',
+                $reference['uri'],
+                ['Accept' => $reference['contentType']],
+                '',
                 ICalendarAttachmentMetadata::MAX_DOWNLOAD_BYTES
             );
             $this->assertResponseStatus($response, [200], 'managed attachment retrieval');
@@ -155,9 +164,9 @@ final class CalDAVProvider implements CalendarEventLookupProviderInterface, Cale
                 $url .= '&rid=' . rawurlencode($recurrenceId);
             }
             $response = $this->httpClient->request('POST', $url, [
-                'Content-Type' => $contentType,
+                'Content-Type'        => $contentType,
                 'Content-Disposition' => 'attachment; filename="' . $name . '"',
-                'Prefer' => 'return=representation'
+                'Prefer'              => 'return=representation'
             ], base64_decode($content, true), ICalendarAttachmentMetadata::MAX_RESOURCE_BYTES);
             $this->assertResponseStatus($response, [200, 201, 204], 'managed attachment upload');
             $this->assertResourceBelongsToCalendar(
@@ -840,7 +849,10 @@ final class CalDAVProvider implements CalendarEventLookupProviderInterface, Cale
             }
             try {
                 $reference = ICalendarCodec::managedAttachmentReference(
-                    $after['ical'], $uid, $recurrenceId, $attachment['id']
+                    $after['ical'],
+                    $uid,
+                    $recurrenceId,
+                    $attachment['id']
                 );
             } catch (RuntimeException) {
                 continue;

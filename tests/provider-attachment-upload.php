@@ -84,7 +84,8 @@ $url = 'https://dav.invalid/calendar/event.ics';
 $updated = IPSKalender\ICalendarCodec::appendAttachment($ical, 'event', '', $name, $content);
 $noManaged = [[405, '', []], [404, '', []]];
 $http = new AttachmentUploadHttp(array_merge(
-    [[200, $ical, ['etag' => '"v1"']]], $noManaged,
+    [[200, $ical, ['etag' => '"v1"']]],
+    $noManaged,
     [[204, '', ['etag' => '"v2"']], [200, $updated, ['etag' => '"v2"']]]
 ));
 $dav = new CalDAVProvider($http, 'https://dav.invalid/', new CalDAVOriginPolicy('https://dav.invalid/'));
@@ -117,14 +118,15 @@ uploadReject(fn () => $dav->uploadAttachment('https://dav.invalid/calendar/', 'e
 uploadCheck(count($http->requests) === 4, 'A conflicting CalDAV update must be rejected.');
 
 $http = new AttachmentUploadHttp(array_merge(
-    [[200, $ical, ['etag' => '"v1"']]], $noManaged,
+    [[200, $ical, ['etag' => '"v1"']]],
+    $noManaged,
     [[204, '', []], [200, $ical, ['etag' => '"v2"']]]
 ));
 $dav = new CalDAVProvider($http, 'https://dav.invalid/', new CalDAVOriginPolicy('https://dav.invalid/'));
 uploadReject(fn () => $dav->uploadAttachment('https://dav.invalid/calendar/', 'event', '', $url, $name, $content));
 uploadCheck(count($http->requests) === 5, 'A server-dropped inline attachment must not be reported as uploaded.');
 
-$managed = "ATTACH;MANAGED-ID=server-123;FMTTYPE=application/pdf;SIZE=" . strlen($bytes)
+$managed = 'ATTACH;MANAGED-ID=server-123;FMTTYPE=application/pdf;SIZE=' . strlen($bytes)
     . ";FILENAME=Proof.pdf:https://dav.invalid/attachments/123\r\n";
 $withManaged = str_replace('END:VEVENT', $managed . 'END:VEVENT', $ical);
 $http = new AttachmentUploadHttp([
@@ -179,19 +181,25 @@ $http = new AttachmentUploadHttp([
 ]);
 $apple = new CalDAVProvider($http, 'https://caldav.icloud.com/', new CalDAVOriginPolicy('https://caldav.icloud.com/'));
 $result = $apple->uploadAttachment($appleCalendar, 'apple-event', '', $appleUrl, $name, $content);
-uploadCheck(($result['uploaded'] ?? false) === true && $http->requests[5]['method'] === 'POST'
+uploadCheck(
+    ($result['uploaded'] ?? false) === true && $http->requests[5]['method'] === 'POST'
     && $http->requests[4]['url'] === 'https://p01-caldav.icloud.com/123/calendars/',
-    'iCloud upload must discover managed attachments on the calendar home.');
+    'iCloud upload must discover managed attachments on the calendar home.'
+);
 $http = new AttachmentUploadHttp([[200, $appleIcal, ['etag' => '"v1"']]]);
 $apple = new CalDAVProvider($http, 'https://caldav.icloud.com/', new CalDAVOriginPolicy('https://caldav.icloud.com/'));
 $metadata = $apple->getAttachmentMetadata($appleCalendar, 'apple-event', '', $appleUrl);
-uploadCheck(count($metadata) === 1 && $metadata[0]['kind'] === 'file'
+uploadCheck(
+    count($metadata) === 1 && $metadata[0]['kind'] === 'file'
     && !str_contains(json_encode($metadata, JSON_THROW_ON_ERROR), 'gateway.icloud.com'),
-    'Apple managed attachment must be downloadable without exposing its private URI.');
+    'Apple managed attachment must be downloadable without exposing its private URI.'
+);
 $http->responses = [[200, $appleIcal, ['etag' => '"v1"']], [200, $bytes, ['content-type' => 'application/pdf']]];
 $download = $apple->getAttachmentContent($appleCalendar, 'apple-event', '', $metadata[0]['id'], $appleUrl);
-uploadCheck($download['content'] === $bytes && $http->requests[2]['url'] === $appleAttachmentUrl,
-    'Apple managed attachment must be fetched by its trusted server URI.');
+uploadCheck(
+    $download['content'] === $bytes && $http->requests[2]['url'] === $appleAttachmentUrl,
+    'Apple managed attachment must be fetched by its trusted server URI.'
+);
 
 $untrustedIcal = str_replace($appleAttachmentUrl, 'https://private.invalid/secret', $appleIcal);
 $http = new AttachmentUploadHttp([[200, $untrustedIcal, ['etag' => '"v1"']]]);
