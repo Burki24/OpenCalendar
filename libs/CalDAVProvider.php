@@ -178,7 +178,11 @@ final class CalDAVProvider implements CalendarEventLookupProviderInterface, Cale
                 throw new CalDAVProviderException('The server did not confirm the managed attachment.');
             }
             $verified = $this->verifyManagedUpload(
-                $calendarReference, $uid, $recurrenceId, $resource['resourceUrl'], $managedId
+                $calendarReference,
+                $uid,
+                $recurrenceId,
+                $resource['resourceUrl'],
+                $managedId
             );
             return ['uploaded' => true, 'pendingVerification' => !$verified];
         }
@@ -860,7 +864,10 @@ final class CalDAVProvider implements CalendarEventLookupProviderInterface, Cale
             }
             try {
                 $reference = ICalendarCodec::managedAttachmentReference(
-                    $after['ical'], $uid, $recurrenceId, $attachment['id']
+                    $after['ical'],
+                    $uid,
+                    $recurrenceId,
+                    $attachment['id']
                 );
             } catch (RuntimeException) {
                 continue;
