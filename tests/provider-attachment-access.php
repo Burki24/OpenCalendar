@@ -109,6 +109,13 @@ $calendar->properties['MicrosoftTaskListID'] = 'list';
 $http->responses = [[200, ['id' => 'completed-task']], [200, ['value' => [$file]]]];
 $calendar->ListProviderAttachments('{"sourceType":"microsoft-todo","taskId":"completed-task","taskListId":"list"}');
 attachmentMetadataCheck(str_contains($http->requests[2]['url'], '/lists/list/tasks/completed-task?'), 'Completed/reopened task must use its own ID, never successor.');
+$taskContent = 'TASK FILE';
+$taskFile = array_replace($file, ['id' => 'task-file', 'size' => strlen($taskContent), '@odata.type' => '#microsoft.graph.taskFileAttachment']);
+$http->responses = [[200, ['id' => 'completed-task']], [200, $taskFile], [200, $taskContent]];
+$taskDownload = json_decode($calendar->DownloadProviderAttachment(json_encode([
+    'selector' => ['sourceType' => 'microsoft-todo', 'taskId' => 'completed-task', 'taskListId' => 'list'], 'id' => 'task-file'
+], JSON_THROW_ON_ERROR)), true, 512, JSON_THROW_ON_ERROR);
+attachmentMetadataCheck(base64_decode($taskDownload['content'], true) === $taskContent, 'To Do attachment download routing failed.');
 
 foreach (['policy', 'calendar', 'account', 'taskList'] as $change) {
     $calendar->properties['AttachmentAllowProvider'] = true;
@@ -135,7 +142,8 @@ attachmentMetadataReject(fn () => $calendar->ListProviderAttachments($selector))
 attachmentMetadataCheck(count($http->requests) === $count, 'Unsupported provider must not fetch attachments.');
 
 $ical = "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nBEGIN:VEVENT\r\nUID:ics-event\r\nDTSTART:20260922T100000Z\r\nDTEND:20260922T110000Z\r\n" .
-    "ATTACH;FMTTYPE=application/pdf;FILENAME=ICS.pdf:https://private.invalid/document?secret=1\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n";
+    "ATTACH;FMTTYPE=application/pdf;ENCODING=BASE64;VALUE=BINARY;FILENAME=ICS.pdf:SUNTIEZJTEU=\r\n" .
+    "ATTACH;FILENAME=Reference.pdf:https://private.invalid/document?secret=1\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n";
 $sourceId = hash('sha256', 'ics-file|Fixture');
 $gateway->provider = 4;
 $gateway->cachedCalendars = json_encode([['id' => $sourceId, 'reference' => 'urn:ips-kalender:ics-subscription:' . $sourceId]], JSON_THROW_ON_ERROR);
@@ -155,6 +163,13 @@ $calendar->properties['CalendarID'] = $sourceId;
 $result = json_decode($calendar->ListProviderAttachments('{"uid":"ics-event"}'), true, 512, JSON_THROW_ON_ERROR);
 attachmentMetadataCheck($result['result'][0]['name'] === 'ICS.pdf'
     && !str_contains(json_encode($result, JSON_THROW_ON_ERROR), 'private.invalid'), 'ICS metadata must be routed without exposing its URI.');
+$icsDownload = json_decode($calendar->DownloadProviderAttachment(json_encode([
+    'selector' => ['uid' => 'ics-event'], 'id' => $result['result'][0]['id']
+], JSON_THROW_ON_ERROR)), true, 512, JSON_THROW_ON_ERROR);
+attachmentMetadataCheck(base64_decode($icsDownload['content'], true) === 'ICS FILE', 'ICS attachment download routing failed.');
+attachmentMetadataReject(fn () => $calendar->DownloadProviderAttachment(json_encode([
+    'selector' => ['uid' => 'ics-event'], 'id' => $result['result'][1]['id']
+], JSON_THROW_ON_ERROR)));
 
 $xml = '<?xml version="1.0"?><d:multistatus xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav"><d:response>' .
     '<d:href>/cal/event.ics</d:href><d:propstat><d:prop><d:getetag>"e"</d:getetag><c:calendar-data>' .
@@ -166,6 +181,11 @@ $gateway->providerObject = new IPSKalender\CalDAVProvider($davHttp, 'https://dav
 $calendar->properties['CalendarID'] = 'dav42';
 $result = json_decode($calendar->ListProviderAttachments('{"uid":"ics-event"}'), true, 512, JSON_THROW_ON_ERROR);
 attachmentMetadataCheck($result['result'][0]['name'] === 'ICS.pdf' && count($davHttp->requests) === 1, 'CalDAV metadata routing failed.');
+$davHttp->responses = [[207, $xml]];
+$davDownload = json_decode($calendar->DownloadProviderAttachment(json_encode([
+    'selector' => ['uid' => 'ics-event'], 'id' => $result['result'][0]['id']
+], JSON_THROW_ON_ERROR)), true, 512, JSON_THROW_ON_ERROR);
+attachmentMetadataCheck(base64_decode($davDownload['content'], true) === 'ICS FILE', 'CalDAV attachment download routing failed.');
 
 $gateway->provider = 3;
 $gateway->cachedCalendars = '[{"id":"calendar42","providerId":"cal","url":"https://graph.microsoft.com/v1.0/me/calendars/cal"}]';

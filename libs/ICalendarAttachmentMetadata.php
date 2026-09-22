@@ -10,6 +10,7 @@ use RuntimeException;
 final class ICalendarAttachmentMetadata
 {
     public const MAX_RESOURCE_BYTES = 16 * 1024 * 1024;
+    public const MAX_DOWNLOAD_BYTES = 3 * 1024 * 1024;
 
     /**
      * Reads unfolded lines from one verified VEVENT, excluding nested alarms.
@@ -19,7 +20,42 @@ final class ICalendarAttachmentMetadata
      */
     public static function read(array $block): array
     {
+        return array_map(static function (array $record): array
+        {
+            unset($record['_content']);
+            return $record;
+        }, self::records($block));
+    }
+
+    /**
+     * Returns one embedded attachment. URI references are never dereferenced.
+     *
+     * @param list<string> $block Verified event component lines.
+     * @return array{name:string,contentType:string,content:string} Raw bounded file content.
+     */
+    public static function download(array $block, string $attachmentId): array
+    {
+        if (preg_match('/^[a-f0-9]{64}$/D', $attachmentId) !== 1) {
+            throw new RuntimeException('Invalid attachment identity.');
+        }
+        foreach (self::records($block) as $record) {
+            if (!hash_equals($attachmentId, $record['id'])) {
+                continue;
+            }
+            if ($record['kind'] !== 'embedded' || !is_string($record['_content'])
+                || strlen($record['_content']) > self::MAX_DOWNLOAD_BYTES) {
+                throw new RuntimeException('Attachment is unavailable for download.');
+            }
+            return ['name' => $record['name'], 'contentType' => $record['contentType'], 'content' => $record['_content']];
+        }
+        throw new RuntimeException('Attachment is no longer available.');
+    }
+
+    /** @param list<string> $block @return list<array<string,mixed>> */
+    private static function records(array $block): array
+    {
         $files = [];
+        $metadataBytes = 2;
         $depth = 0;
         foreach ($block as $line) {
             if (str_starts_with(strtoupper($line), 'BEGIN:')) {
@@ -76,13 +112,14 @@ final class ICalendarAttachmentMetadata
                     throw new RuntimeException('Invalid embedded attachment encoding.');
                 }
                 $size = strlen($bytes);
-                unset($bytes);
+                $content = $bytes;
                 $kind = 'embedded';
             } elseif ($type === 'URI' && !isset($params['ENCODING']) && $value !== ''
                 && strlen($value) <= 16_384 && preg_match('/[\x00-\x20\x7f]/', $value) !== 1
                 && preg_match('/^[a-zA-Z][a-zA-Z0-9+.-]*:/D', $value) === 1) {
                 // URI schemes, credentials and query tokens are intentionally opaque.
                 $kind = 'reference';
+                $content = null;
             } else {
                 throw new RuntimeException('Unsupported attachment property.');
             }
@@ -95,13 +132,17 @@ final class ICalendarAttachmentMetadata
             if (strlen($mime) > 255 || preg_match('/^[a-zA-Z0-9!#$&^_.+\-]+\/[a-zA-Z0-9!#$&^_.+\-]+$/D', $mime) !== 1) {
                 $mime = 'application/octet-stream';
             }
-            $files[] = [
+            $record = [
                 'id'          => hash('sha256', count($files) . '|' . $line),
                 'name'        => $name !== '' ? $name : 'Attachment ' . (count($files) + 1),
                 'size'        => $size, 'contentType' => $mime, 'kind' => $kind,
-                'destination' => 'provider', 'isInline' => false
+                'destination' => 'provider', 'isInline' => false, '_content' => $content
             ];
-            if (count($files) > 100 || strlen(json_encode($files, JSON_THROW_ON_ERROR)) > 192 * 1024) {
+            $public = $record;
+            unset($public['_content']);
+            $metadataBytes += strlen(json_encode($public, JSON_THROW_ON_ERROR)) + 1;
+            $files[] = $record;
+            if (count($files) > 100 || $metadataBytes > 192 * 1024) {
                 throw new RuntimeException('Attachment metadata exceeds the supported limit.');
             }
         }

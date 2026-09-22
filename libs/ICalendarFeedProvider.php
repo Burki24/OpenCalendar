@@ -77,6 +77,20 @@ final class ICalendarFeedProvider implements CalendarProviderInterface
         return ICalendarCodec::attachmentMetadata($response->body, $uid, $recurrenceId);
     }
 
+    /** @return array{name:string,contentType:string,content:string} Raw embedded attachment content. */
+    public function getAttachmentContent(string $calendarReference, string $uid, string $recurrenceId, string $attachmentId): array
+    {
+        if ($this->normalizeUrl($calendarReference) !== $this->feedUrl) {
+            throw new ICalendarFeedProviderException('The attachment calendar does not belong to this feed.');
+        }
+        $response = $this->httpClient->request('GET', $this->feedUrl, ['Accept' => 'text/calendar'], '', self::MAX_FEED_SIZE);
+        if ($response->statusCode !== 200) {
+            throw new ICalendarFeedProviderException('The attachment source could not be refreshed.');
+        }
+        $this->validateFeedBody($response->body);
+        return ICalendarCodec::attachmentContent($response->body, $uid, $recurrenceId, $attachmentId);
+    }
+
     /** @inheritDoc */
     public function testConnection(): array
     {

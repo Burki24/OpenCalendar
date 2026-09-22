@@ -13,6 +13,7 @@ use IPSKalender\CalendarProviderInterface;
 use IPSKalender\GoogleCalendarIncrementalSync;
 use IPSKalender\GoogleCalendarOriginPolicy;
 use IPSKalender\GoogleCalendarProvider;
+use IPSKalender\ICalendarAttachmentMetadata;
 use IPSKalender\ICalendarRecurrence;
 use IPSKalender\ICalendarSubscriptionProvider;
 use IPSKalender\MicrosoftCalendarDebugHttpClient;
@@ -28,6 +29,7 @@ require_once __DIR__ . '/../../libs/MicrosoftCalendarDebugHttpClient.php';
 require_once __DIR__ . '/../../libs/MicrosoftCalendarIncrementalSync.php';
 require_once __DIR__ . '/../../libs/CalendarProviderError.php';
 require_once __DIR__ . '/../../libs/ICalendarSubscriptionProvider.php';
+require_once __DIR__ . '/../../libs/ICalendarAttachmentMetadata.php';
 require_once __DIR__ . '/../../libs/MicrosoftGraphOriginPolicy.php';
 require_once __DIR__ . '/../../libs/MicrosoftTodoProvider.php';
 
@@ -48,7 +50,7 @@ trait KalenderKontoChildGatewayTrait
 
             $operation = (string) ($request['Operation'] ?? '');
             $requestID = (string) ($request['RequestID'] ?? '');
-            $debugRequest = !in_array($operation, ['ReadEventsTransferPage', 'ListProviderAttachments'], true);
+            $debugRequest = !in_array($operation, ['ReadEventsTransferPage', 'ListProviderAttachments', 'DownloadProviderAttachment'], true);
             if ($debugRequest) {
                 $this->SendSafeDebug('ChildRequest', [
                     'operation'         => $operation,
@@ -59,14 +61,15 @@ trait KalenderKontoChildGatewayTrait
             }
 
             $payload = match ($operation) {
-                'ListProviderAttachments' => $this->listProviderAttachmentsForChild($request),
-                'GetCalendars'            => json_decode($this->GetCalendars(), true, 512, JSON_THROW_ON_ERROR),
-                'GetTaskLists'            => json_decode($this->GetTaskLists(), true, 512, JSON_THROW_ON_ERROR),
-                'DiscoverCalendars'       => $this->discoverCalendars(),
-                'GetEvents'               => $this->getEventsForChild($request),
-                'BeginEventsTransfer'     => $this->beginEventsTransferForChild($request),
-                'ReadEventsTransferPage'  => $this->readEventsTransferPageForChild($request),
-                'FinishEventsTransfer'    => [
+                'ListProviderAttachments'    => $this->listProviderAttachmentsForChild($request),
+                'DownloadProviderAttachment' => $this->downloadProviderAttachmentForChild($request),
+                'GetCalendars'               => json_decode($this->GetCalendars(), true, 512, JSON_THROW_ON_ERROR),
+                'GetTaskLists'               => json_decode($this->GetTaskLists(), true, 512, JSON_THROW_ON_ERROR),
+                'DiscoverCalendars'          => $this->discoverCalendars(),
+                'GetEvents'                  => $this->getEventsForChild($request),
+                'BeginEventsTransfer'        => $this->beginEventsTransferForChild($request),
+                'ReadEventsTransferPage'     => $this->readEventsTransferPageForChild($request),
+                'FinishEventsTransfer'       => [
                     'success' => $this->finishEventsTransferForChild($request)
                 ],
                 'GetEventForEdit'        => $this->getEventForEditForChild($request),
@@ -96,7 +99,7 @@ trait KalenderKontoChildGatewayTrait
 
             return $this->encodeResponse(true, $operation, $requestID, $payload);
         } catch (Throwable $exception) {
-            if (($operation ?? '') === 'ListProviderAttachments') {
+            if (in_array(($operation ?? ''), ['ListProviderAttachments', 'DownloadProviderAttachment'], true)) {
                 // Provider failures may contain private filenames or URLs. Do not log them.
                 return $this->encodeResponse(false, $operation, $requestID ?? '', null, 'Provider attachments are unavailable.');
             }
@@ -263,6 +266,68 @@ trait KalenderKontoChildGatewayTrait
             return $provider->getAttachmentMetadata($reference, $uid, $recurrenceId);
         }
         throw new RuntimeException('This provider does not support attachment listing yet.');
+    }
+
+    /** @param array<string,mixed> $request @return array{name:string,contentType:string,content:string} */
+    private function downloadProviderAttachmentForChild(array $request): array
+    {
+        $providerType = $this->ReadPropertyInteger('Provider');
+        $attachmentId = (string) ($request['AttachmentID'] ?? '');
+        if (isset($request['TaskID'])) {
+            if ($providerType !== self::PROVIDER_MICROSOFT) {
+                throw new RuntimeException('This provider does not support task attachments.');
+            }
+            return $this->encodeProviderAttachment($this->microsoftTodoProvider()->getAttachmentContent(
+                (string) ($request['TaskListID'] ?? ''),
+                (string) $request['TaskID'],
+                $attachmentId
+            ));
+        }
+        $calendarId = (string) ($request['CalendarID'] ?? '');
+        $calendar = $this->resolveCalendar($calendarId);
+        if ($calendarId === '' || ($calendar['id'] ?? '') !== $calendarId) {
+            throw new RuntimeException('The attachment calendar could not be verified.');
+        }
+        $reference = $this->calendarReference($calendar);
+        if ($providerType === self::PROVIDER_MICROSOFT) {
+            $provider = new MicrosoftCalendarProvider(
+                $this->createTrustedCloudHttpClient(new MicrosoftGraphOriginPolicy()),
+                $this->getMicrosoftAccessToken()
+            );
+            return $this->encodeProviderAttachment($provider->getAttachmentContent(
+                $reference,
+                (string) ($request['EventReference'] ?? ''),
+                $attachmentId
+            ));
+        }
+        if ($providerType === self::PROVIDER_GOOGLE) {
+            throw new RuntimeException('Google attachment access is not enabled.');
+        }
+        $provider = $this->createProvider();
+        if ($provider instanceof CalDAVProvider || $provider instanceof ICalendarSubscriptionProvider) {
+            return $this->encodeProviderAttachment($provider->getAttachmentContent(
+                $reference,
+                (string) ($request['UID'] ?? ''),
+                (string) ($request['RecurrenceID'] ?? ''),
+                $attachmentId
+            ));
+        }
+        throw new RuntimeException('This provider does not support attachment downloads yet.');
+    }
+
+    /** @param array<string,mixed> $file @return array{name:string,contentType:string,content:string} */
+    private function encodeProviderAttachment(array $file): array
+    {
+        $name = $file['name'] ?? null;
+        $type = $file['contentType'] ?? null;
+        $content = $file['content'] ?? null;
+        if (!is_string($name) || $name === '' || strlen($name) > 1024 || preg_match('//u', $name) !== 1
+            || preg_match('/[\x00-\x1f\x7f]/', $name) || !is_string($type)
+            || preg_match('/^[a-zA-Z0-9!#$&^_.+\-]+\/[a-zA-Z0-9!#$&^_.+\-]+$/D', $type) !== 1
+            || !is_string($content) || strlen($content) > ICalendarAttachmentMetadata::MAX_DOWNLOAD_BYTES) {
+            throw new RuntimeException('Invalid provider attachment content.');
+        }
+        return ['name' => $name, 'contentType' => $type, 'content' => base64_encode($content)];
     }
 
     private function assertMicrosoftTaskOperation(): void

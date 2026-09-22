@@ -76,6 +76,33 @@ final class MicrosoftCalendarProvider implements CalendarEventLookupProviderInte
         return MicrosoftAttachmentCollection::read($url . '/attachments', false, $request);
     }
 
+    /**
+     * Downloads one verified file attachment without accepting item/reference links.
+     *
+     * @return array{name:string,contentType:string,content:string} Raw bounded file content.
+     */
+    public function getAttachmentContent(string $calendarReference, string $eventReference, string $attachmentId): array
+    {
+        $calendarId = $this->calendarId($calendarReference);
+        $eventId = $this->eventId($eventReference);
+        $url = $this->eventUrl($calendarId, $eventId);
+        $request = fn (string $target): array => $this->requestJsonUrl('GET', $target, null, [], [200], MicrosoftAttachmentCollection::MAX_RESPONSE_BYTES);
+        $parent = $request($url . '?$select=id,isCancelled');
+        if (($parent['id'] ?? null) !== $eventId || ($parent['isCancelled'] ?? false) === true) {
+            throw new MicrosoftCalendarProviderException('The attachment event is no longer available.');
+        }
+        $collection = $url . '/attachments';
+        $metadata = MicrosoftAttachmentCollection::selectDownload($collection, $attachmentId, false, $request);
+        $content = $this->requestBinaryUrl(
+            $collection . '/' . rawurlencode($metadata['id']) . '/$value',
+            MicrosoftAttachmentCollection::MAX_DOWNLOAD_BYTES
+        );
+        if (strlen($content) !== $metadata['size']) {
+            throw new MicrosoftCalendarProviderException('Attachment content changed during download.');
+        }
+        return ['name' => $metadata['name'], 'contentType' => $metadata['contentType'], 'content' => $content];
+    }
+
     /** @inheritDoc */
     public function testConnection(): array
     {
@@ -1336,6 +1363,23 @@ final class MicrosoftCalendarProvider implements CalendarEventLookupProviderInte
         }
 
         return $data;
+    }
+
+    private function requestBinaryUrl(string $url, int $maxResponseBytes): string
+    {
+        $this->assertGraphUrl($url);
+        $response = $this->httpClient->request('GET', $url, [
+            'Accept'        => 'application/octet-stream',
+            'Authorization' => 'Bearer ' . $this->accessToken,
+            'Prefer'        => $this->mergePreferHeader('')
+        ], '', $maxResponseBytes);
+        if ($response->statusCode !== 200) {
+            $this->throwApiError($response);
+        }
+        if (strlen($response->body) > $maxResponseBytes) {
+            throw new MicrosoftCalendarProviderException('Microsoft attachment exceeds the size limit.');
+        }
+        return $response->body;
     }
 
     private function throwApiError(CalendarHttpResponse $response): never

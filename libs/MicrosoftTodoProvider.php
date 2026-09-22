@@ -70,6 +70,36 @@ final class MicrosoftTodoProvider
         return MicrosoftAttachmentCollection::read($url . '/attachments', true, $request);
     }
 
+    /**
+     * Downloads one verified To Do file attachment.
+     *
+     * @return array{name:string,contentType:string,content:string} Raw bounded file content.
+     */
+    public function getAttachmentContent(string $listId, string $taskId, string $attachmentId): array
+    {
+        $listId = $this->requiredId($listId, 'task list');
+        $taskId = $this->requiredId($taskId, 'task');
+        $url = self::API_URL . '/me/todo/lists/' . rawurlencode($listId) . '/tasks/' . rawurlencode($taskId);
+        $request = fn (string $target): array => $this->requestJsonUrl('GET', $target, null, [200], MicrosoftAttachmentCollection::MAX_RESPONSE_BYTES);
+        $parent = $request($url . '?$select=id');
+        if (($parent['id'] ?? null) !== $taskId) {
+            throw new MicrosoftTodoProviderException('The attachment task is no longer available.');
+        }
+        $collection = $url . '/attachments';
+        $metadata = MicrosoftAttachmentCollection::selectDownload($collection, $attachmentId, true, $request);
+        $response = $this->httpClient->request('GET', $collection . '/' . rawurlencode($metadata['id']) . '/$value', [
+            'Authorization' => 'Bearer ' . $this->accessToken,
+            'Accept'        => 'application/octet-stream'
+        ], '', MicrosoftAttachmentCollection::MAX_DOWNLOAD_BYTES);
+        if ($response->statusCode !== 200 || strlen($response->body) > MicrosoftAttachmentCollection::MAX_DOWNLOAD_BYTES) {
+            throw new MicrosoftTodoProviderException('Microsoft To Do attachment download failed.', $response->statusCode);
+        }
+        if (strlen($response->body) !== $metadata['size']) {
+            throw new MicrosoftTodoProviderException('Attachment content changed during download.');
+        }
+        return ['name' => $metadata['name'], 'contentType' => $metadata['contentType'], 'content' => $response->body];
+    }
+
     /** @return list<array<string, mixed>> */
     public function getTaskLists(): array
     {

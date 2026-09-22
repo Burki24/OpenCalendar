@@ -3342,8 +3342,21 @@ class CalendarView extends IPSModuleStrict
                 || !is_array($value['selector'] ?? null) || !is_array($value['data'] ?? null)) {
                 throw new InvalidArgumentException('Invalid request.');
             }
-            if ($value['destination'] === 'provider' && ($value['operation'] !== 'list' || $value['data'] !== [])) {
-                throw new InvalidArgumentException('Unsupported provider attachment operation.');
+            if ($value['destination'] === 'provider') {
+                $providerFields = match ($value['operation']) {
+                    'list'     => [],
+                    'download' => ['id'],
+                    default    => throw new InvalidArgumentException('Unsupported provider attachment operation.')
+                };
+                if (array_diff(array_keys($value['data']), $providerFields) !== []
+                    || count($value['data']) !== count($providerFields)) {
+                    throw new InvalidArgumentException('Invalid provider attachment fields.');
+                }
+                if ($value['operation'] === 'download' && (!is_string($value['data']['id'])
+                    || $value['data']['id'] === '' || strlen($value['data']['id']) > 2048
+                    || preg_match('/[\x00-\x1f\x7f]/', $value['data']['id']))) {
+                    throw new InvalidArgumentException('Invalid provider attachment identity.');
+                }
             }
             $allowed = fn (): bool => $this->IsIPSViewHTMLPageEnabled()
                 && hash_equals($this->ipsViewToken(), $request['token'])
@@ -3354,7 +3367,11 @@ class CalendarView extends IPSModuleStrict
                 return;
             }
             $result = $value['destination'] === 'provider'
-                ? IPSKAL_ListProviderAttachments($value['calendarId'], json_encode($value['selector'], JSON_THROW_ON_ERROR))
+                ? ($value['operation'] === 'list'
+                    ? IPSKAL_ListProviderAttachments($value['calendarId'], json_encode($value['selector'], JSON_THROW_ON_ERROR))
+                    : IPSKAL_DownloadProviderAttachment($value['calendarId'], json_encode([
+                        'selector' => $value['selector'], 'id' => $value['data']['id']
+                    ], JSON_THROW_ON_ERROR)))
                 : IPSKAL_TransferLocalAttachment($value['calendarId'], json_encode([
                     'operation' => $value['operation'], 'selector' => $value['selector'], 'data' => $value['data']
                 ], JSON_THROW_ON_ERROR));
@@ -3363,12 +3380,27 @@ class CalendarView extends IPSModuleStrict
             }
             $payload = json_decode($result, true, 12, JSON_THROW_ON_ERROR);
             if ($value['operation'] === 'download') {
-                $bytes = base64_decode($payload['content'], true);
-                if ($bytes === false) {
+                $encoded = $payload['content'] ?? null;
+                if (!is_string($encoded) || strlen($encoded) > 4_194_304) {
                     throw new RuntimeException('Invalid download.');
                 }
-                header('Content-Type: application/octet-stream');
-                header('Content-Disposition: attachment; filename="attachment.bin"');
+                $bytes = base64_decode($encoded, true);
+                if ($bytes === false || strlen($bytes) > 3 * 1024 * 1024) {
+                    throw new RuntimeException('Invalid download.');
+                }
+                $contentType = is_string($payload['contentType'] ?? null) ? $payload['contentType'] : '';
+                if (preg_match('/^[a-zA-Z0-9!#$&^_.+\-]+\/[a-zA-Z0-9!#$&^_.+\-]+$/D', $contentType) !== 1) {
+                    $contentType = 'application/octet-stream';
+                }
+                $name = is_string($payload['name'] ?? null) ? $payload['name'] : '';
+                if ($name === '' || strlen($name) > 1024 || preg_match('//u', $name) !== 1
+                    || preg_match('/[\x00-\x1f\x7f]/', $name)) {
+                    $name = 'attachment.bin';
+                }
+                $fallback = preg_replace('/[^a-zA-Z0-9._ -]/', '_', $name) ?: 'attachment.bin';
+                header('Content-Type: ' . $contentType);
+                header('Content-Disposition: attachment; filename="' . addcslashes($fallback, '"\\')
+                    . '"; filename*=UTF-8\'\'' . rawurlencode($name));
                 header('Content-Length: ' . strlen($bytes));
                 http_response_code(200);
                 echo $bytes;

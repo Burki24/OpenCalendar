@@ -59,6 +59,9 @@ $files = ICalendarCodec::attachmentMetadata($calendar, 'one');
 icalAttachmentCheck(count($files) === 2, 'Top-level event attachments were not selected exactly.');
 icalAttachmentCheck($files[0]['kind'] === 'embedded' && $files[0]['size'] === 5 && $files[0]['name'] === 'Report.pdf', 'Embedded metadata is incorrect.');
 icalAttachmentCheck($files[1]['kind'] === 'reference' && $files[1]['size'] === null, 'External reference metadata is incorrect.');
+$download = ICalendarCodec::attachmentContent($calendar, 'one', '', $files[0]['id']);
+icalAttachmentCheck($download['content'] === 'Hello' && $download['name'] === 'Report.pdf', 'Embedded attachment download failed.');
+icalAttachmentReject(fn () => ICalendarCodec::attachmentContent($calendar, 'one', '', $files[1]['id']));
 $encoded = json_encode($files, JSON_THROW_ON_ERROR);
 icalAttachmentCheck(!str_contains($encoded, 'files.invalid') && !str_contains($encoded, 'SECRET') && !str_contains($encoded, 'SGVsbG8'), 'Private URI or content escaped metadata.');
 
@@ -73,12 +76,15 @@ icalAttachmentReject(fn () => ICalendarCodec::attachmentMetadata(str_replace('EN
 
 $fileProvider = new ICalendarFileProvider(base64_encode($calendar), 'Fixture', 'fixture');
 icalAttachmentCheck($fileProvider->getAttachmentMetadata('urn:ips-kalender:ics-file:fixture', 'one')[0]['name'] === 'Report.pdf', 'ICS file metadata failed.');
+icalAttachmentCheck($fileProvider->getAttachmentContent('urn:ips-kalender:ics-file:fixture', 'one', '', $files[0]['id'])['content'] === 'Hello', 'ICS file download failed.');
 
 $feedHttp = new ICalendarAttachmentHttp([[200, [], $calendar]]);
 $feed = new ICalendarFeedProvider($feedHttp, 'https://calendar.invalid/feed.ics');
 icalAttachmentCheck(count($feed->getAttachmentMetadata('https://calendar.invalid/feed.ics', 'one')) === 2, 'ICS feed metadata failed.');
 icalAttachmentCheck(count($feedHttp->requests) === 1 && $feedHttp->requests[0]['method'] === 'GET'
     && $feedHttp->requests[0]['maxResponseBytes'] === 16 * 1024 * 1024, 'ICS feed metadata must use one bounded on-demand request.');
+$feedHttp->responses = [[200, [], $calendar]];
+icalAttachmentCheck($feed->getAttachmentContent('https://calendar.invalid/feed.ics', 'one', '', $files[0]['id'])['content'] === 'Hello', 'ICS feed download failed.');
 
 $xml = '<?xml version="1.0"?><d:multistatus xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav"><d:response>' .
     '<d:href>/cal/one.ics</d:href><d:propstat><d:prop><d:getetag>"e1"</d:getetag><c:calendar-data>' .
@@ -88,5 +94,7 @@ $dav = new CalDAVProvider($davHttp, 'https://dav.invalid/', new CalDAVOriginPoli
 icalAttachmentCheck(count($dav->getAttachmentMetadata('https://dav.invalid/cal/', 'one')) === 2, 'CalDAV metadata failed.');
 icalAttachmentCheck(count($davHttp->requests) === 1 && $davHttp->requests[0]['method'] === 'REPORT'
     && $davHttp->requests[0]['maxResponseBytes'] === 16 * 1024 * 1024, 'CalDAV metadata must use one bounded event lookup.');
+$davHttp->responses = [[207, [], $xml]];
+icalAttachmentCheck($dav->getAttachmentContent('https://dav.invalid/cal/', 'one', '', $files[0]['id'])['content'] === 'Hello', 'CalDAV embedded download failed.');
 
 fwrite(STDOUT, "iCalendar/CalDAV attachment metadata: exact event identity, recurrence inheritance and opaque references passed.\n");

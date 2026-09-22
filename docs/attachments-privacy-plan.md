@@ -252,6 +252,47 @@ Specification used for the parser:
 
 - https://www.rfc-editor.org/rfc/rfc5545#section-3.8.1.1
 
+### Protected provider downloads (2026-09-22)
+
+The protected `TransferAttachment` POST now accepts provider destination with
+operation `download` and one attachment ID returned by a fresh list. The view,
+calendar and account validate the operation independently. View token, transport,
+selected calendar, calendar/view download policy, parent connection and configured
+To Do list are checked before and after provider I/O. IDs, selectors and response
+fields are bounded. Provider download requests and failures bypass debug output.
+
+Microsoft event and To Do downloads revalidate the exact event/task and attachment
+under the server-selected calendar/list. Only `fileAttachment` and
+`taskFileAttachment` values are accepted. Item and reference attachments are
+rejected before a raw-content request. Raw bytes are fetched from the scoped
+`/$value` endpoint with the guarded Graph client. The declared size must match
+the received content and both are limited to 3 MiB.
+
+CalDAV, Apple CalDAV and ICS downloads re-fetch/re-read the selected authoritative
+resource and resolve the exact UID and optional original recurrence slot again.
+Only inline RFC 5545 Base64 `VALUE=BINARY` data is returned. URI references remain
+opaque and are never followed, even when they use HTTP(S). The metadata ID is
+recomputed from the current ATTACH property, so changed or removed attachments
+fail rather than returning another file. Embedded downloads are limited to 3 MiB.
+
+The account Base64-encodes verified bytes only at the private child response
+boundary. The view decodes them after its post-I/O authorization check, applies
+validated media type and filename headers, disables caching/sniffing and sends the
+bytes directly. Contents are not stored in module attributes, buffers, media,
+event caches or visualization broadcasts. No download URL is generated.
+
+Focused tests cover correct bytes, exact owner paths, raw endpoint limits, changed
+sizes, item/reference rejection, embedded ICS content, blocked URI references,
+provider routing, invalid IDs, transport/token denial and mid-request permission
+revocation. The complete suite remains the release gate. No live provider data was
+read by these tests. Uploads, deletion and the shared end-user UI remain open;
+Google remains deferred and `transferAvailable` remains false.
+
+Microsoft API references checked for this implementation:
+
+- https://learn.microsoft.com/en-us/graph/api/attachment-get?view=graph-rest-1.0
+- https://learn.microsoft.com/en-us/graph/api/taskfileattachment-get?view=graph-rest-1.0
+
 ### Administrative local recovery and cleanup (2026-09-22)
 
 Trusted Symcon scripts can now inventory all local originals, start/read/finish

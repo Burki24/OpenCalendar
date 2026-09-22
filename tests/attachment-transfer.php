@@ -62,7 +62,8 @@ class ProviderAttachmentListView extends AttachmentAccessBaselineView
 {
     public function CanAccessAttachments(int $CalendarID, string $Operation, string $Destination): bool
     {
-        return $this->allowPolicy && $CalendarID === 42 && $Operation === 'list' && $Destination === 'provider';
+        return $this->allowPolicy && $CalendarID === 42
+            && in_array($Operation, ['list', 'download'], true) && $Destination === 'provider';
     }
 }
 function IPSKAL_ListProviderAttachments(int $id, string $selector): string
@@ -73,18 +74,32 @@ function IPSKAL_ListProviderAttachments(int $id, string $selector): string
     }
     return '{"result":[{"id":"file","name":"PRIVATE_PROVIDER_NAME.pdf","kind":"file","destination":"provider"}]}';
 }
+function IPSKAL_DownloadProviderAttachment(int $id, string $request): string
+{
+    ++$GLOBALS['providerAttachmentCalls'];
+    if ($GLOBALS['providerAttachmentRevoke']) {
+        $GLOBALS['providerAttachmentView']->allowPolicy = false;
+    }
+    return json_encode([
+        'name'    => 'Private Report.pdf', 'contentType' => 'application/pdf',
+        'content' => base64_encode('PRIVATE PROVIDER DOWNLOAD')
+    ], JSON_THROW_ON_ERROR);
+}
 $providerView = new ProviderAttachmentListView(99998);
 $GLOBALS['providerAttachmentView'] = $providerView;
 foreach ([
-    ['on', $validToken, 42, 'list', [], false, 200, 1],
-    ['', $validToken, 42, 'list', [], false, 403, 0],
-    ['on', 'wrong', 42, 'list', [], false, 403, 0],
-    ['on', $validToken, 43, 'list', [], false, 403, 0],
-    ['on', $validToken, 42, 'download', [], false, 400, 0],
-    ['on', $validToken, 42, 'upload', [], false, 400, 0],
-    ['on', $validToken, 42, 'list', ['url' => 'forged'], false, 400, 0],
-    ['on', $validToken, 42, 'list', [], true, 400, 1]
-] as [$https, $token, $calendarId, $operation, $data, $revoke, $status, $calls]) {
+    ['on', $validToken, 42, 'list', [], false, 200, 1, 'PRIVATE_PROVIDER_NAME'],
+    ['on', $validToken, 42, 'download', ['id' => 'file'], false, 200, 1, 'PRIVATE PROVIDER DOWNLOAD'],
+    ['', $validToken, 42, 'list', [], false, 403, 0, ''],
+    ['on', 'wrong', 42, 'list', [], false, 403, 0, ''],
+    ['on', $validToken, 43, 'list', [], false, 403, 0, ''],
+    ['on', $validToken, 42, 'download', [], false, 400, 0, ''],
+    ['on', $validToken, 42, 'download', ['id' => "bad\r\nid"], false, 400, 0, ''],
+    ['on', $validToken, 42, 'upload', [], false, 400, 0, ''],
+    ['on', $validToken, 42, 'list', ['url' => 'forged'], false, 400, 0, ''],
+    ['on', $validToken, 42, 'list', [], true, 400, 1, ''],
+    ['on', $validToken, 42, 'download', ['id' => 'file'], true, 400, 1, '']
+] as [$https, $token, $calendarId, $operation, $data, $revoke, $status, $calls, $expected]) {
     $providerView->allowPolicy = true;
     $GLOBALS['providerAttachmentCalls'] = 0;
     $GLOBALS['providerAttachmentRevoke'] = $revoke;
@@ -101,7 +116,8 @@ foreach ([
         ob_end_clean();
     }
     if (http_response_code() !== $status || $GLOBALS['providerAttachmentCalls'] !== $calls
-        || (($status === 200) !== str_contains($response, 'PRIVATE_PROVIDER_NAME')) || str_contains($response, '"payload"')) {
+        || ($expected !== '' ? $response !== $expected && !str_contains($response, $expected) : str_contains($response, 'PRIVATE'))
+        || str_contains($response, '"payload"')) {
         throw new RuntimeException('Provider metadata hook leaked data, ignored rights or accepted unsupported operations.');
     }
 }

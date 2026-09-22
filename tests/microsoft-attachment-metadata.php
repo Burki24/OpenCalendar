@@ -121,4 +121,48 @@ for ($i = 0; $i < 101; ++$i) {
 }
 $client = new AttachmentMetadataHttp([[200, ['id' => 'evt']], [200, ['value' => $large]]]);
 attachmentMetadataReject(fn () => (new MicrosoftCalendarProvider($client, 'secret'))->getAttachmentMetadata('cal', 'evt'));
+
+foreach ([false, true] as $task) {
+    $content = "BINARY\0DATA";
+    $item = array_replace($file, [
+        'id'          => 'download', 'name' => 'Download.bin', 'size' => strlen($content),
+        'contentType' => 'application/octet-stream',
+        '@odata.type' => $task ? '#microsoft.graph.taskFileAttachment' : '#microsoft.graph.fileAttachment'
+    ]);
+    $client = new AttachmentMetadataHttp([[200, ['id' => 'owner']], [200, $item], [200, $content]]);
+    $provider = $task ? new MicrosoftTodoProvider($client, 'secret') : new MicrosoftCalendarProvider($client, 'secret');
+    $download = $task
+        ? $provider->getAttachmentContent('list', 'owner', 'download')
+        : $provider->getAttachmentContent('calendar', 'owner', 'download');
+    attachmentMetadataCheck($download['content'] === $content && $download['name'] === 'Download.bin', 'Microsoft file download failed.');
+    attachmentMetadataCheck(
+        count($client->requests) === 3
+        && str_ends_with($client->requests[2]['url'], '/attachments/download/$value')
+        && $client->requests[2]['maxResponseBytes'] === 3 * 1024 * 1024,
+        'Microsoft download must use the exact bounded raw-content endpoint.'
+    );
+
+    $reference = array_replace($item, ['@odata.type' => '#microsoft.graph.referenceAttachment']);
+    $client = new AttachmentMetadataHttp([[200, ['id' => 'owner']], [200, $reference]]);
+    $provider = $task ? new MicrosoftTodoProvider($client, 'secret') : new MicrosoftCalendarProvider($client, 'secret');
+    attachmentMetadataReject(fn () => $task
+        ? $provider->getAttachmentContent('list', 'owner', 'download')
+        : $provider->getAttachmentContent('calendar', 'owner', 'download'));
+    attachmentMetadataCheck(count($client->requests) === 2, 'Reference attachments must be rejected before raw download.');
+
+    $oversized = array_replace($item, ['size' => 3 * 1024 * 1024 + 1]);
+    $client = new AttachmentMetadataHttp([[200, ['id' => 'owner']], [200, $oversized]]);
+    $provider = $task ? new MicrosoftTodoProvider($client, 'secret') : new MicrosoftCalendarProvider($client, 'secret');
+    attachmentMetadataReject(fn () => $task
+        ? $provider->getAttachmentContent('list', 'owner', 'download')
+        : $provider->getAttachmentContent('calendar', 'owner', 'download'));
+    attachmentMetadataCheck(count($client->requests) === 2, 'Oversized attachments must be rejected before raw download.');
+
+    $changed = array_replace($item, ['size' => strlen($content) + 1]);
+    $client = new AttachmentMetadataHttp([[200, ['id' => 'owner']], [200, $changed], [200, $content]]);
+    $provider = $task ? new MicrosoftTodoProvider($client, 'secret') : new MicrosoftCalendarProvider($client, 'secret');
+    attachmentMetadataReject(fn () => $task
+        ? $provider->getAttachmentContent('list', 'owner', 'download')
+        : $provider->getAttachmentContent('calendar', 'owner', 'download'));
+}
 fwrite(STDOUT, "Microsoft attachment metadata: scoped parents, bounded metadata-only requests, paging and failure isolation passed.\n");

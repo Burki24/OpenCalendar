@@ -1411,44 +1411,51 @@ class Calendar extends IPSModuleStrict
         if (!$this->CanAccessAttachments('list', 'provider') || strlen($Selector) > 8192) {
             throw new RuntimeException('Provider attachment access denied.');
         }
-        $selector = json_decode($Selector, true, 8, JSON_THROW_ON_ERROR);
-        if (!is_array($selector)) {
-            throw new InvalidArgumentException('Invalid attachment selector.');
-        }
-        if (($selector['sourceType'] ?? '') === 'microsoft-todo') {
-            $listId = trim($this->ReadPropertyString('MicrosoftTaskListID'));
-            if (array_diff(array_keys($selector), ['sourceType', 'taskId', 'taskListId']) !== []
-                || $listId === '' || ($selector['taskListId'] ?? null) !== $listId
-                || !is_string($selector['taskId'] ?? null) || trim($selector['taskId']) === '') {
-                throw new InvalidArgumentException('Invalid attachment task selector.');
-            }
-            $request = ['TaskListID' => $listId, 'TaskID' => $selector['taskId']];
-        } elseif (array_keys($selector) === ['eventReference']) {
-            if (!is_string($selector['eventReference']) || trim($selector['eventReference']) === ''
-                || strlen($selector['eventReference']) > 8192) {
-                throw new InvalidArgumentException('Invalid attachment event selector.');
-            }
-            $request = ['EventReference' => $selector['eventReference']];
-        } else {
-            if (array_diff(array_keys($selector), ['uid', 'recurrenceId']) !== []
-                || !is_string($selector['uid'] ?? null) || trim($selector['uid']) === ''
-                || strlen($selector['uid']) > 2048 || preg_match('/[\x00-\x1f\x7f]/', $selector['uid'])
-                || (isset($selector['recurrenceId']) && (!is_string($selector['recurrenceId'])
-                    || ($selector['recurrenceId'] !== ''
-                        && preg_match('/^\d{8}(?:T\d{6}Z?)?$/D', $selector['recurrenceId']) !== 1)))) {
-                throw new InvalidArgumentException('Invalid attachment event selector.');
-            }
-            $request = ['UID' => $selector['uid'], 'RecurrenceID' => $selector['recurrenceId'] ?? ''];
-        }
+        $request = $this->providerAttachmentRequest($Selector);
         $calendarId = $this->effectiveCalendarId();
         $connectionId = IPS_GetInstance($this->InstanceID)['ConnectionID'];
         $result = $this->sendRequest('ListProviderAttachments', $request);
         if (!$this->CanAccessAttachments('list', 'provider') || $calendarId !== $this->effectiveCalendarId()
             || $connectionId !== IPS_GetInstance($this->InstanceID)['ConnectionID']
-            || (isset($listId) && $listId !== trim($this->ReadPropertyString('MicrosoftTaskListID')))) {
+            || (isset($request['TaskListID']) && $request['TaskListID'] !== trim($this->ReadPropertyString('MicrosoftTaskListID')))) {
             throw new RuntimeException('Attachment access changed.');
         }
         return json_encode(['result' => $result], JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
+    }
+
+    /**
+     * Downloads one provider attachment after resolving its owner server-side.
+     *
+     * @param string $Request JSON containing selector and exact attachment ID.
+     * @return string Private JSON with Base64 content and validated filename/type.
+     */
+    public function DownloadProviderAttachment(string $Request): string
+    {
+        if (!$this->CanAccessAttachments('download', 'provider') || strlen($Request) > 12_000) {
+            throw new RuntimeException('Provider attachment access denied.');
+        }
+        $value = json_decode($Request, true, 8, JSON_THROW_ON_ERROR);
+        if (!is_array($value) || count($value) !== 2 || array_diff(array_keys($value), ['selector', 'id']) !== []
+            || !is_array($value['selector'])
+            || !is_string($value['id']) || $value['id'] === '' || strlen($value['id']) > 2048
+            || preg_match('/[\x00-\x1f\x7f]/', $value['id'])) {
+            throw new InvalidArgumentException('Invalid provider attachment download.');
+        }
+        $request = $this->providerAttachmentRequest(json_encode($value['selector'], JSON_THROW_ON_ERROR));
+        $request['AttachmentID'] = $value['id'];
+        $calendarId = $this->effectiveCalendarId();
+        $connectionId = IPS_GetInstance($this->InstanceID)['ConnectionID'];
+        $result = $this->sendRequest('DownloadProviderAttachment', $request);
+        if (!$this->CanAccessAttachments('download', 'provider') || $calendarId !== $this->effectiveCalendarId()
+            || $connectionId !== IPS_GetInstance($this->InstanceID)['ConnectionID']
+            || (isset($request['TaskListID']) && $request['TaskListID'] !== trim($this->ReadPropertyString('MicrosoftTaskListID')))) {
+            throw new RuntimeException('Attachment access changed.');
+        }
+        if (!is_string($result['name'] ?? null) || !is_string($result['contentType'] ?? null)
+            || !is_string($result['content'] ?? null)) {
+            throw new RuntimeException('Invalid provider attachment response.');
+        }
+        return json_encode($result, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
     }
 
     /**
@@ -1518,6 +1525,40 @@ class Calendar extends IPSModuleStrict
             throw new InvalidArgumentException('Invalid attachment cleanup selection.');
         }
         return $this->localAttachmentMaintenance('delete', $ids, $ExpectedRevision)['deleted'];
+    }
+
+    /** @return array<string,string> Server-bound provider request fields. */
+    private function providerAttachmentRequest(string $selectorJson): array
+    {
+        $selector = json_decode($selectorJson, true, 8, JSON_THROW_ON_ERROR);
+        if (!is_array($selector)) {
+            throw new InvalidArgumentException('Invalid attachment selector.');
+        }
+        if (($selector['sourceType'] ?? '') === 'microsoft-todo') {
+            $listId = trim($this->ReadPropertyString('MicrosoftTaskListID'));
+            if (array_diff(array_keys($selector), ['sourceType', 'taskId', 'taskListId']) !== []
+                || $listId === '' || ($selector['taskListId'] ?? null) !== $listId
+                || !is_string($selector['taskId'] ?? null) || trim($selector['taskId']) === '') {
+                throw new InvalidArgumentException('Invalid attachment task selector.');
+            }
+            return ['TaskListID' => $listId, 'TaskID' => $selector['taskId']];
+        }
+        if (array_keys($selector) === ['eventReference']) {
+            if (!is_string($selector['eventReference']) || trim($selector['eventReference']) === ''
+                || strlen($selector['eventReference']) > 8192) {
+                throw new InvalidArgumentException('Invalid attachment event selector.');
+            }
+            return ['EventReference' => $selector['eventReference']];
+        }
+        if (array_diff(array_keys($selector), ['uid', 'recurrenceId']) !== []
+            || !is_string($selector['uid'] ?? null) || trim($selector['uid']) === ''
+            || strlen($selector['uid']) > 2048 || preg_match('/[\x00-\x1f\x7f]/', $selector['uid'])
+            || (isset($selector['recurrenceId']) && (!is_string($selector['recurrenceId'])
+                || ($selector['recurrenceId'] !== ''
+                    && preg_match('/^\d{8}(?:T\d{6}Z?)?$/D', $selector['recurrenceId']) !== 1)))) {
+            throw new InvalidArgumentException('Invalid attachment event selector.');
+        }
+        return ['UID' => $selector['uid'], 'RecurrenceID' => $selector['recurrenceId'] ?? ''];
     }
 
     /**

@@ -75,6 +75,17 @@ final class CalDAVProvider implements CalendarEventLookupProviderInterface, Cale
         return ICalendarCodec::attachmentMetadata($resource['ical'], $uid, $recurrenceId);
     }
 
+    /** @return array{name:string,contentType:string,content:string} Raw embedded attachment content. */
+    public function getAttachmentContent(string $calendarReference, string $uid, string $recurrenceId, string $attachmentId): array
+    {
+        if ($uid === '' || strlen($uid) > 2048 || preg_match('/[\x00-\x1f\x7f]/', $uid)) {
+            throw new CalDAVProviderException('Invalid attachment event identity.');
+        }
+        $calendarReference = $this->normalizeAbsoluteUrl($calendarReference);
+        $resource = $this->findEventResourceByUid($calendarReference, $uid, ICalendarAttachmentMetadata::MAX_RESOURCE_BYTES);
+        return ICalendarCodec::attachmentContent($resource['ical'], $uid, $recurrenceId, $attachmentId);
+    }
+
     /** @inheritDoc */
     public function testConnection(): array
     {

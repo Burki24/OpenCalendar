@@ -32,44 +32,20 @@ final class ICalendarCodec
      */
     public static function attachmentMetadata(string $ical, string $uid, string $recurrenceId = ''): array
     {
-        if ($uid === '' || strlen($uid) > 2048 || strlen($ical) > ICalendarAttachmentMetadata::MAX_RESOURCE_BYTES
-            || ($recurrenceId !== '' && preg_match('/^\d{8}(?:T\d{6}Z?)?$/D', $recurrenceId) !== 1)) {
-            throw new RuntimeException('Invalid attachment event identity or resource.');
-        }
-        $blocks = [];
-        foreach (self::extractEventBlocks(self::unfoldLines($ical)) as $block) {
-            $properties = self::readTopLevelProperties($block);
-            if (self::propertyValue($properties, 'UID') !== $uid) {
-                continue;
-            }
-            $slot = self::propertyValue($properties, 'RECURRENCE-ID');
-            if (isset($blocks[$slot]) || count($properties['UID'] ?? []) !== 1
-                || count($properties['RECURRENCE-ID'] ?? []) > 1) {
-                throw new RuntimeException('Ambiguous attachment event identity.');
-            }
-            $blocks[$slot] = $block;
-        }
-        $selected = $blocks[$recurrenceId] ?? null;
-        if ($selected === null && $recurrenceId !== '' && isset($blocks[''])) {
-            $master = self::readTopLevelProperties($blocks['']);
-            $start = self::firstProperty($master, 'DTSTART');
-            if ($start !== null && (isset($master['RRULE']) || isset($master['RDATE']))) {
-                $start['value'] = $recurrenceId;
-                $parsed = self::parseDateProperty($start, ICalendarTimezoneResolver::fromCalendar($ical));
-                $date = new DateTimeImmutable('@' . $parsed['timestamp']);
-                $events = array_values(array_filter(self::parseEvents($ical, '', ''), static fn (array $event): bool => $event['uid'] === $uid));
-                foreach (ICalendarRecurrence::expand($events, $date->modify('-1 day'), $date->modify('+1 day')) as $event) {
-                    if (($event['recurrenceId'] ?? '') === $recurrenceId && ($event['status'] ?? '') !== 'CANCELLED') {
-                        $selected = $blocks[''];
-                        break;
-                    }
-                }
-            }
-        }
-        if ($selected === null || strtoupper(self::propertyValue(self::readTopLevelProperties($selected), 'STATUS')) === 'CANCELLED') {
-            throw new RuntimeException('Attachment event is unavailable.');
-        }
-        return ICalendarAttachmentMetadata::read($selected);
+        return ICalendarAttachmentMetadata::read(self::attachmentEventBlock($ical, $uid, $recurrenceId));
+    }
+
+    /**
+     * Downloads one embedded attachment from an exact UID/recurrence slot.
+     *
+     * @return array{name:string,contentType:string,content:string} Raw bounded file content.
+     */
+    public static function attachmentContent(string $ical, string $uid, string $recurrenceId, string $attachmentId): array
+    {
+        return ICalendarAttachmentMetadata::download(
+            self::attachmentEventBlock($ical, $uid, $recurrenceId),
+            $attachmentId
+        );
     }
 
     /**
@@ -1037,6 +1013,49 @@ final class ICalendarCodec
         }
 
         return self::foldLines($lines);
+    }
+
+    /** @return list<string> */
+    private static function attachmentEventBlock(string $ical, string $uid, string $recurrenceId): array
+    {
+        if ($uid === '' || strlen($uid) > 2048 || strlen($ical) > ICalendarAttachmentMetadata::MAX_RESOURCE_BYTES
+            || ($recurrenceId !== '' && preg_match('/^\d{8}(?:T\d{6}Z?)?$/D', $recurrenceId) !== 1)) {
+            throw new RuntimeException('Invalid attachment event identity or resource.');
+        }
+        $blocks = [];
+        foreach (self::extractEventBlocks(self::unfoldLines($ical)) as $block) {
+            $properties = self::readTopLevelProperties($block);
+            if (self::propertyValue($properties, 'UID') !== $uid) {
+                continue;
+            }
+            $slot = self::propertyValue($properties, 'RECURRENCE-ID');
+            if (isset($blocks[$slot]) || count($properties['UID'] ?? []) !== 1
+                || count($properties['RECURRENCE-ID'] ?? []) > 1) {
+                throw new RuntimeException('Ambiguous attachment event identity.');
+            }
+            $blocks[$slot] = $block;
+        }
+        $selected = $blocks[$recurrenceId] ?? null;
+        if ($selected === null && $recurrenceId !== '' && isset($blocks[''])) {
+            $master = self::readTopLevelProperties($blocks['']);
+            $start = self::firstProperty($master, 'DTSTART');
+            if ($start !== null && (isset($master['RRULE']) || isset($master['RDATE']))) {
+                $start['value'] = $recurrenceId;
+                $parsed = self::parseDateProperty($start, ICalendarTimezoneResolver::fromCalendar($ical));
+                $date = new DateTimeImmutable('@' . $parsed['timestamp']);
+                $events = array_values(array_filter(self::parseEvents($ical, '', ''), static fn (array $event): bool => $event['uid'] === $uid));
+                foreach (ICalendarRecurrence::expand($events, $date->modify('-1 day'), $date->modify('+1 day')) as $event) {
+                    if (($event['recurrenceId'] ?? '') === $recurrenceId && ($event['status'] ?? '') !== 'CANCELLED') {
+                        $selected = $blocks[''];
+                        break;
+                    }
+                }
+            }
+        }
+        if ($selected === null || strtoupper(self::propertyValue(self::readTopLevelProperties($selected), 'STATUS')) === 'CANCELLED') {
+            throw new RuntimeException('Attachment event is unavailable.');
+        }
+        return $selected;
     }
 
     /**

@@ -60,6 +60,15 @@ final class ICalendarFileProvider implements CalendarProviderInterface
         return ICalendarCodec::attachmentMetadata($this->ical, $uid, $recurrenceId);
     }
 
+    /** @return array{name:string,contentType:string,content:string} Raw embedded attachment content. */
+    public function getAttachmentContent(string $calendarReference, string $uid, string $recurrenceId, string $attachmentId): array
+    {
+        if ($calendarReference !== $this->calendarReference) {
+            throw new ICalendarFileProviderException('The attachment calendar does not belong to this file.');
+        }
+        return ICalendarCodec::attachmentContent($this->ical, $uid, $recurrenceId, $attachmentId);
+    }
+
     /** @inheritDoc */
     public function testConnection(): array
     {
