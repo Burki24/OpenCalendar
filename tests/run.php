@@ -23,6 +23,7 @@ $commands = [
     ['Verify moved IPSView output identity', [PHP_BINARY, 'tests/ipsview-moved-output.php']],
     ['Verify private attachment transfers', [PHP_BINARY, 'tests/attachment-transfer.php']],
     ['Verify local attachment backup and cleanup', [PHP_BINARY, 'tests/local-attachment-maintenance.php']],
+    ['Verify provider attachment access and Microsoft metadata', [PHP_BINARY, 'tests/provider-attachment-access.php']],
     ['Verify attachment upload admission', [PHP_BINARY, 'tests/attachment-upload-policy.php']],
     ['Verify authoritative local attachment access', [PHP_BINARY, 'tests/local-attachment-access.php']],
     ['Verify attachment owner identities', [PHP_BINARY, 'tests/attachment-owner.php']],

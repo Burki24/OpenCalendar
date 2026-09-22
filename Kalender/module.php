@@ -1400,6 +1400,47 @@ class Calendar extends IPSModuleStrict
     }
 
     /**
+     * Lists provider attachment metadata on demand under calendar attachment policy.
+     * The caller must additionally authenticate the requesting view and transport.
+     *
+     * @param string $Selector JSON eventReference or sourceType=microsoft-todo with taskId/taskListId.
+     * @return string Private JSON result, never shared through visualization state or caches.
+     */
+    public function ListProviderAttachments(string $Selector): string
+    {
+        if (!$this->CanAccessAttachments('list', 'provider') || strlen($Selector) > 8192) {
+            throw new RuntimeException('Provider attachment access denied.');
+        }
+        $selector = json_decode($Selector, true, 8, JSON_THROW_ON_ERROR);
+        if (!is_array($selector)) {
+            throw new InvalidArgumentException('Invalid attachment selector.');
+        }
+        if (($selector['sourceType'] ?? '') === 'microsoft-todo') {
+            $listId = trim($this->ReadPropertyString('MicrosoftTaskListID'));
+            if (array_diff(array_keys($selector), ['sourceType', 'taskId', 'taskListId']) !== []
+                || $listId === '' || ($selector['taskListId'] ?? null) !== $listId
+                || !is_string($selector['taskId'] ?? null) || trim($selector['taskId']) === '') {
+                throw new InvalidArgumentException('Invalid attachment task selector.');
+            }
+            $request = ['TaskListID' => $listId, 'TaskID' => $selector['taskId']];
+        } else {
+            if (array_keys($selector) !== ['eventReference'] || !is_string($selector['eventReference']) || trim($selector['eventReference']) === '') {
+                throw new InvalidArgumentException('Invalid attachment event selector.');
+            }
+            $request = ['EventReference' => $selector['eventReference']];
+        }
+        $calendarId = $this->effectiveCalendarId();
+        $connectionId = IPS_GetInstance($this->InstanceID)['ConnectionID'];
+        $result = $this->sendRequest('ListProviderAttachments', $request);
+        if (!$this->CanAccessAttachments('list', 'provider') || $calendarId !== $this->effectiveCalendarId()
+            || $connectionId !== IPS_GetInstance($this->InstanceID)['ConnectionID']
+            || (isset($listId) && $listId !== trim($this->ReadPropertyString('MicrosoftTaskListID')))) {
+            throw new RuntimeException('Attachment access changed.');
+        }
+        return json_encode(['result' => $result], JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
+    }
+
+    /**
      * Lists local originals for trusted administrator scripts, including deleted-event files.
      * Deliberately works when calendar/view attachment access is disabled. Never expose
      * this recovery API through visualization actions, hooks or shared state.

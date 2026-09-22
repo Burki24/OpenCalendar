@@ -11,6 +11,7 @@ use Throwable;
 
 require_once __DIR__ . '/CalendarHttpClient.php';
 require_once __DIR__ . '/MicrosoftTodoTaskProjection.php';
+require_once __DIR__ . '/MicrosoftAttachmentCollection.php';
 
 final class MicrosoftTodoProviderException extends RuntimeException
 {
@@ -46,6 +47,27 @@ final class MicrosoftTodoProvider
         if (trim($accessToken) === '') {
             throw new MicrosoftTodoProviderException('Microsoft 365 is not connected yet.', 401);
         }
+    }
+
+    /**
+     * Lists only the selected task's attachments, including completed/reopened tasks.
+     * Successor tasks have different IDs and are never queried as a fallback.
+     *
+     * @param string $listId Server-selected To Do list ID.
+     * @param string $taskId Exact task ID, not its title or due date.
+     * @return list<array<string,mixed>> Metadata only; no document content.
+     */
+    public function getAttachmentMetadata(string $listId, string $taskId): array
+    {
+        $listId = $this->requiredId($listId, 'task list');
+        $taskId = $this->requiredId($taskId, 'task');
+        $url = self::API_URL . '/me/todo/lists/' . rawurlencode($listId) . '/tasks/' . rawurlencode($taskId);
+        $request = fn (string $target): array => $this->requestJsonUrl('GET', $target, null, [200], MicrosoftAttachmentCollection::MAX_RESPONSE_BYTES);
+        $parent = $request($url . '?$select=id');
+        if (($parent['id'] ?? null) !== $taskId) {
+            throw new MicrosoftTodoProviderException('The attachment task is no longer available.');
+        }
+        return MicrosoftAttachmentCollection::read($url . '/attachments', true, $request);
     }
 
     /** @return list<array<string, mixed>> */
@@ -531,7 +553,8 @@ final class MicrosoftTodoProvider
         string $method,
         string $url,
         ?array $body = null,
-        array $expected = [200]
+        array $expected = [200],
+        int $maxResponseBytes = 67_108_864
     ): array {
         $headers = [
             'Authorization' => 'Bearer ' . $this->accessToken,
@@ -542,7 +565,10 @@ final class MicrosoftTodoProvider
             $headers['Content-Type'] = 'application/json';
             $encodedBody = json_encode($body, JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
         }
-        $response = $this->httpClient->request($method, $url, $headers, $encodedBody);
+        $response = $this->httpClient->request($method, $url, $headers, $encodedBody, $maxResponseBytes);
+        if (strlen($response->body) > $maxResponseBytes) {
+            throw new MicrosoftTodoProviderException('Microsoft To Do response exceeds the size limit.');
+        }
         if (!in_array($response->statusCode, $expected, true)) {
             $errorCode = '';
             $message = 'Microsoft To Do request failed.';

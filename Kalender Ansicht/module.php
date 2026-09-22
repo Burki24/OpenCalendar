@@ -3338,21 +3338,26 @@ class CalendarView extends IPSModuleStrict
             $value = is_string($raw) && strlen($raw) <= 3_000_000 ? json_decode($raw, true, 12, JSON_THROW_ON_ERROR) : null;
             if (!is_array($value) || array_diff(array_keys($value), ['calendarId', 'operation', 'destination', 'selector', 'data']) !== []
                 || !is_int($value['calendarId'] ?? null) || $value['calendarId'] <= 0
-                || !is_string($value['operation'] ?? null) || ($value['destination'] ?? '') !== 'local'
+                || !is_string($value['operation'] ?? null) || !in_array($value['destination'] ?? '', ['local', 'provider'], true)
                 || !is_array($value['selector'] ?? null) || !is_array($value['data'] ?? null)) {
                 throw new InvalidArgumentException('Invalid request.');
             }
+            if ($value['destination'] === 'provider' && ($value['operation'] !== 'list' || $value['data'] !== [])) {
+                throw new InvalidArgumentException('Unsupported provider attachment operation.');
+            }
             $allowed = fn (): bool => $this->IsIPSViewHTMLPageEnabled()
                 && hash_equals($this->ipsViewToken(), $request['token'])
-                && $this->CanAccessAttachments($value['calendarId'], $value['operation'], 'local');
+                && $this->CanAccessAttachments($value['calendarId'], $value['operation'], $value['destination']);
             if (!$allowed()) {
                 http_response_code(403);
                 echo '{"Error":"Attachment access denied."}';
                 return;
             }
-            $result = IPSKAL_TransferLocalAttachment($value['calendarId'], json_encode([
-                'operation' => $value['operation'], 'selector' => $value['selector'], 'data' => $value['data']
-            ], JSON_THROW_ON_ERROR));
+            $result = $value['destination'] === 'provider'
+                ? IPSKAL_ListProviderAttachments($value['calendarId'], json_encode($value['selector'], JSON_THROW_ON_ERROR))
+                : IPSKAL_TransferLocalAttachment($value['calendarId'], json_encode([
+                    'operation' => $value['operation'], 'selector' => $value['selector'], 'data' => $value['data']
+                ], JSON_THROW_ON_ERROR));
             if (!$allowed()) {
                 throw new RuntimeException('Access changed.');
             }

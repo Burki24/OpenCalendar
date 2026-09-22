@@ -167,6 +167,52 @@ local-only storage. Provider-side files remain governed by provider permissions.
 
 ## Acceptance evidence still required
 
+### On-demand Microsoft provider metadata (2026-09-22)
+
+The protected `TransferAttachment` POST now accepts destination `provider` for
+operation `list` with empty `data`. Calendar `ListProviderAttachments` intersects
+calendar policy with the view's selection/permissions and transport checks. It
+uses the configured calendar and, for To Do, the configured task list. Accepted
+selectors are only `eventReference`, or `sourceType=microsoft-todo`, `taskListId`
+and `taskId`. Extra source, owner, calendar or URL claims are rejected. The calendar
+rechecks policy, calendar ID, parent connection and task-list selection after I/O;
+the view rechecks its credential and permissions before sending the response.
+
+Microsoft event and task providers confirm the exact parent in its selected
+calendar/list using a fresh bounded Graph GET. They then list attachment metadata
+with an explicit `$select` excluding contentBytes. Parent failures, cancelled
+events and mismatched IDs stop the operation. No fallback to another calendar,
+series master, task successor or local store is attempted. Occurrence/master
+inheritance and stale event-ID recovery are not implemented by this reader.
+
+The shared collection reader restricts continuations to the same owner path and
+trusted Graph origin. It reasserts metadata-only selection, rejects expansion/body
+queries and loops, and limits page responses to 256 KiB, pagination to 32 pages,
+the list to 100 files and encoded result metadata to 192 KiB. Unsupported response
+shapes fail without a partial success. File, item, reference and unknown attachment
+types are distinguished. Provider URLs, private body fields and download tokens
+are never included in the result. Metadata remains untrusted display text, not a
+filesystem path or HTML fragment. The existing guarded Graph HTTP client enforces
+redirect origin restrictions. Attachment gateway requests/errors bypass event
+debug logging and return generic errors without filenames or provider URLs.
+
+This is a request-local backend listing, not an end-user attachment UI. Native
+tile transfer isolation, provider downloads/uploads/deletions, CalDAV/ICS adapters
+and live provider tests remain open; Google stays deferred. No provider attachment
+requests are added to normal synchronization. `transferAvailable` remains false
+for the not-yet-released complete feature. Existing local transfers are retained.
+
+Tests cover the real calendar/gateway/provider chain with an HTTP boundary double,
+disabled policy without I/O, scoped parent lookup, continued pages, malformed and
+oversized responses, private error handling, mid-request revocation/source changes,
+and the real view hook's authentication, transport and unsupported-operation gates.
+No live Microsoft data was read or changed by these tests.
+
+API references checked for this implementation:
+
+- https://learn.microsoft.com/en-us/graph/api/event-list-attachments?view=graph-rest-1.0
+- https://learn.microsoft.com/en-us/graph/api/todotask-list-attachments?view=graph-rest-1.0
+
 ### Administrative local recovery and cleanup (2026-09-22)
 
 Trusted Symcon scripts can now inventory all local originals, start/read/finish

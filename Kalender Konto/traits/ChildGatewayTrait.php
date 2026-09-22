@@ -46,7 +46,7 @@ trait KalenderKontoChildGatewayTrait
 
             $operation = (string) ($request['Operation'] ?? '');
             $requestID = (string) ($request['RequestID'] ?? '');
-            $debugRequest = $operation !== 'ReadEventsTransferPage';
+            $debugRequest = !in_array($operation, ['ReadEventsTransferPage', 'ListProviderAttachments'], true);
             if ($debugRequest) {
                 $this->SendSafeDebug('ChildRequest', [
                     'operation'         => $operation,
@@ -57,13 +57,14 @@ trait KalenderKontoChildGatewayTrait
             }
 
             $payload = match ($operation) {
-                'GetCalendars'           => json_decode($this->GetCalendars(), true, 512, JSON_THROW_ON_ERROR),
-                'GetTaskLists'           => json_decode($this->GetTaskLists(), true, 512, JSON_THROW_ON_ERROR),
-                'DiscoverCalendars'      => $this->discoverCalendars(),
-                'GetEvents'              => $this->getEventsForChild($request),
-                'BeginEventsTransfer'    => $this->beginEventsTransferForChild($request),
-                'ReadEventsTransferPage' => $this->readEventsTransferPageForChild($request),
-                'FinishEventsTransfer'   => [
+                'ListProviderAttachments' => $this->listProviderAttachmentsForChild($request),
+                'GetCalendars'            => json_decode($this->GetCalendars(), true, 512, JSON_THROW_ON_ERROR),
+                'GetTaskLists'            => json_decode($this->GetTaskLists(), true, 512, JSON_THROW_ON_ERROR),
+                'DiscoverCalendars'       => $this->discoverCalendars(),
+                'GetEvents'               => $this->getEventsForChild($request),
+                'BeginEventsTransfer'     => $this->beginEventsTransferForChild($request),
+                'ReadEventsTransferPage'  => $this->readEventsTransferPageForChild($request),
+                'FinishEventsTransfer'    => [
                     'success' => $this->finishEventsTransferForChild($request)
                 ],
                 'GetEventForEdit'        => $this->getEventForEditForChild($request),
@@ -93,6 +94,10 @@ trait KalenderKontoChildGatewayTrait
 
             return $this->encodeResponse(true, $operation, $requestID, $payload);
         } catch (Throwable $exception) {
+            if (($operation ?? '') === 'ListProviderAttachments') {
+                // Provider failures may contain private filenames or URLs. Do not log them.
+                return $this->encodeResponse(false, $operation, $requestID ?? '', null, 'Provider attachments are unavailable.');
+            }
             $providerError = CalendarProviderError::fromThrowable($exception);
             $this->SendSafeDebug('ChildRequestError', [
                 'operation'  => isset($operation) ? $operation : '',
@@ -216,6 +221,32 @@ trait KalenderKontoChildGatewayTrait
             trim((string) ($request['TaskListID'] ?? '')),
             trim((string) ($request['TaskID'] ?? ''))
         );
+    }
+
+    /** @param array<string,mixed> $request @return list<array<string,mixed>> */
+    private function listProviderAttachmentsForChild(array $request): array
+    {
+        if ($this->ReadPropertyInteger('Provider') !== self::PROVIDER_MICROSOFT) {
+            throw new RuntimeException('This provider does not support attachment listing yet.');
+        }
+        if (isset($request['TaskID'])) {
+            return $this->microsoftTodoProvider()->getAttachmentMetadata(
+                (string) ($request['TaskListID'] ?? ''),
+                (string) $request['TaskID']
+            );
+        }
+        $calendarId = (string) ($request['CalendarID'] ?? '');
+        $calendar = $this->resolveCalendar($calendarId);
+        if ($calendarId === '' || ($calendar['id'] ?? '') !== $calendarId) {
+            throw new RuntimeException('The attachment calendar could not be verified.');
+        }
+        // Use the trusted client directly; the normal event debug decorator is not
+        // appropriate for private document metadata.
+        $provider = new MicrosoftCalendarProvider(
+            $this->createTrustedCloudHttpClient(new MicrosoftGraphOriginPolicy()),
+            $this->getMicrosoftAccessToken()
+        );
+        return $provider->getAttachmentMetadata($this->calendarReference($calendar), (string) ($request['EventReference'] ?? ''));
     }
 
     private function assertMicrosoftTaskOperation(): void

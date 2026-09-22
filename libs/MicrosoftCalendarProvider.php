@@ -20,6 +20,7 @@ require_once __DIR__ . '/CalendarEventRecurrence.php';
 require_once __DIR__ . '/CalendarEventReminder.php';
 require_once __DIR__ . '/CalendarEventState.php';
 require_once __DIR__ . '/CalendarRecurrenceRule.php';
+require_once __DIR__ . '/MicrosoftAttachmentCollection.php';
 
 final class MicrosoftCalendarProviderException extends RuntimeException
 {
@@ -52,6 +53,27 @@ final class MicrosoftCalendarProvider implements CalendarEventLookupProviderInte
         if (trim($accessToken) === '') {
             throw new MicrosoftCalendarProviderException('Microsoft 365 is not connected yet.', 401);
         }
+    }
+
+    /**
+     * Lists attachment metadata for the exact event in the selected calendar.
+     * Does not fall back to a series master, cache or another calendar.
+     *
+     * @param string $calendarReference Server-selected calendar reference.
+     * @param string $eventReference Exact event or occurrence reference.
+     * @return list<array<string,mixed>> Metadata only; no document content.
+     */
+    public function getAttachmentMetadata(string $calendarReference, string $eventReference): array
+    {
+        $calendarId = $this->calendarId($calendarReference);
+        $eventId = $this->eventId($eventReference);
+        $url = $this->eventUrl($calendarId, $eventId);
+        $request = fn (string $target): array => $this->requestJsonUrl('GET', $target, null, [], [200], MicrosoftAttachmentCollection::MAX_RESPONSE_BYTES);
+        $parent = $request($url . '?$select=id,isCancelled');
+        if (($parent['id'] ?? null) !== $eventId || ($parent['isCancelled'] ?? false) === true) {
+            throw new MicrosoftCalendarProviderException('The attachment event is no longer available.');
+        }
+        return MicrosoftAttachmentCollection::read($url . '/attachments', false, $request);
     }
 
     /** @inheritDoc */
@@ -1277,7 +1299,8 @@ final class MicrosoftCalendarProvider implements CalendarEventLookupProviderInte
         string $url,
         ?array $body = null,
         array $headers = [],
-        array $expectedStatusCodes = [200]
+        array $expectedStatusCodes = [200],
+        int $maxResponseBytes = 67_108_864
     ): array {
         $this->assertGraphUrl($url);
         $headers['Accept'] = 'application/json';
@@ -1292,7 +1315,10 @@ final class MicrosoftCalendarProvider implements CalendarEventLookupProviderInte
             );
         }
 
-        $response = $this->httpClient->request($method, $url, $headers, $encodedBody);
+        $response = $this->httpClient->request($method, $url, $headers, $encodedBody, $maxResponseBytes);
+        if (strlen($response->body) > $maxResponseBytes) {
+            throw new MicrosoftCalendarProviderException('Microsoft Calendar response exceeds the size limit.');
+        }
         if (!in_array($response->statusCode, $expectedStatusCodes, true)) {
             $this->throwApiError($response);
         }

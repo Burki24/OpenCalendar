@@ -91,8 +91,8 @@ assertDebugIntegration(
     'Gateway debug output must log request field names instead of request payload values.'
 );
 assertDebugIntegration(
-    str_contains($gateway, "\$operation !== 'ReadEventsTransferPage'"),
-    'Paged transfer reads must be excluded from per-request debug noise.'
+    str_contains($gateway, "!in_array(\$operation, ['ReadEventsTransferPage', 'ListProviderAttachments'], true)"),
+    'Paged transfer reads and private attachment metadata must be excluded from per-request debug output.'
 );
 assertDebugIntegration(
     str_contains($gateway, 'ICalendarRecurrence::diagnostics($events)'),
