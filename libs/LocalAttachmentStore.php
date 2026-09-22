@@ -158,6 +158,55 @@ final class LocalAttachmentStore
         return json_encode(['version' => 1, 'records' => array_values($this->records)], JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
     }
 
+    /**
+     * Lists all originals for trusted administrator maintenance, including orphaned files.
+     * This is not an event/view API and does not determine whether an owner still exists.
+     *
+     * @return array{revision:string,totalBytes:int,files:list<array<string,mixed>>} Metadata only.
+     */
+    public function inventory(): array
+    {
+        return [
+            'revision'   => hash('sha256', $this->exportSnapshot()),
+            'totalBytes' => array_sum(array_column($this->records, 'size')),
+            'files'      => array_values(array_map($this->metadata(...), $this->records))
+        ];
+    }
+
+    /**
+     * Stages administrator-selected deletions against an unchanged inventory.
+     * Validates the complete selection before removing anything from the working copy.
+     *
+     * @param list<string> $ids Exact IDs deliberately selected by the administrator.
+     * @param string $revision Snapshot revision from inventory(), not a file revision.
+     * @return int Number of selected originals removed.
+     */
+    public function removeSelected(array $ids, string $revision): int
+    {
+        $this->assertKey($revision);
+        if ($ids === [] || !array_is_list($ids) || count($ids) > self::MAX_FILES) {
+            throw new InvalidArgumentException('Invalid attachment cleanup selection.');
+        }
+        $seen = [];
+        foreach ($ids as $id) {
+            if (!is_string($id)) {
+                throw new InvalidArgumentException('Invalid attachment cleanup selection.');
+            }
+            $this->assertKey($id);
+            if (isset($seen[$id]) || !isset($this->records[$id])) {
+                throw new InvalidArgumentException('Duplicate or missing attachment in cleanup selection.');
+            }
+            $seen[$id] = true;
+        }
+        if (!hash_equals(hash('sha256', $this->exportSnapshot()), $revision)) {
+            throw new RuntimeException('Attachment inventory changed. Refresh before deleting originals.');
+        }
+        foreach ($ids as $id) {
+            unset($this->records[$id]);
+        }
+        return count($ids);
+    }
+
     private function assertKey(string $key): void
     {
         if (preg_match('/^[a-f0-9]{64}$/D', $key) !== 1) {

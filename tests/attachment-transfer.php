@@ -40,6 +40,24 @@ foreach ([
         throw new RuntimeException('Transfer isolation/authentication/revocation failed.');
     }
 }
+// A shared view credential must never grant administrative recovery/cleanup access.
+$GLOBALS['attachmentRevoke'] = false;
+$GLOBALS['attachmentCalls'] = 0;
+$view->allowPolicy = true;
+foreach (['GetLocalAttachmentInventory', 'BeginLocalAttachmentBackup', 'ReadLocalAttachmentBackupPage', 'FinishLocalAttachmentBackup', 'DeleteLocalAttachmentOriginals'] as $action) {
+    $_SERVER = ['REQUEST_METHOD' => 'POST', 'HTTPS' => 'on'];
+    $_POST = ['token' => $validToken, 'action' => $action, 'value' => '{}'];
+    ob_start();
+    try {
+        $hook->invoke($view);
+        $response = json_decode((string) ob_get_contents(), true, 512, JSON_THROW_ON_ERROR);
+    } finally {
+        ob_end_clean();
+    }
+    if (http_response_code() !== 400 || !isset($response['Error']) || isset($response['payload']) || $GLOBALS['attachmentCalls'] !== 0) {
+        throw new RuntimeException('View token must not authorize attachment maintenance.');
+    }
+}
 $_SERVER = $savedServer;
 $_POST = $savedPost;
 fwrite(STDOUT, "Attachment transfer hook authentication, transport, selection and post-read revocation passed.\n");

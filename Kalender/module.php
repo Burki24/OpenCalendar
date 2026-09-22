@@ -64,6 +64,7 @@ class Calendar extends IPSModuleStrict
     private const DATA_ID_FROM_PARENT = '{8ED646DD-88E9-ACE2-95D5-9766EED4B5B0}';
     private const EVENT_TRANSFER_SCOPE = 'CalendarCachedEvents';
     private const LOCAL_EVENT_TRANSFER_SCOPE = 'LocalCalendarEvents';
+    private const ATTACHMENT_BACKUP_TRANSFER_SCOPE = 'LocalAttachmentBackup';
     private const INITIALIZATION_DELAY_MS = 3_000;
     private const LOCAL_EXPORT_DIRECTORY = 'media' . DIRECTORY_SEPARATOR . 'OpenCalendar';
 
@@ -1396,6 +1397,116 @@ class Calendar extends IPSModuleStrict
         }
         $result = $this->verifiedLocalAttachmentOperation($value['operation'], $value['selector'], $value['data']);
         return json_encode($value['operation'] === 'download' ? ['content' => base64_encode($result)] : ['result' => $result], JSON_THROW_ON_ERROR);
+    }
+
+    /**
+     * Lists local originals for trusted administrator scripts, including deleted-event files.
+     * Deliberately works when calendar/view attachment access is disabled. Never expose
+     * this recovery API through visualization actions, hooks or shared state.
+     *
+     * @return string Private JSON inventory with snapshot revision, total bytes and file metadata.
+     */
+    public function GetLocalAttachmentInventory(): string
+    {
+        return json_encode($this->localAttachmentMaintenance('inventory'), JSON_THROW_ON_ERROR);
+    }
+
+    /**
+     * Starts a point-in-time backup of all local originals for trusted administrator scripts.
+     * Pages contain private base64 chunks of the versioned store snapshot. Credentials
+     * and bytes must never be logged, broadcast or placed in public media directories.
+     * Works independently of end-user attachment permissions for disaster recovery.
+     *
+     * @return string JSON transfer metadata, source instance, snapshot size and SHA-256.
+     */
+    public function BeginLocalAttachmentBackup(): string
+    {
+        return json_encode($this->localAttachmentMaintenance('backup'), JSON_THROW_ON_ERROR);
+    }
+
+    /**
+     * Reads one private backup page for trusted administrator scripts only.
+     *
+     * @param string $Token Transfer token from BeginLocalAttachmentBackup().
+     * @param int $Page Zero-based page index.
+     * @return string Bounded JSON page; concatenate decoded Items in page order.
+     */
+    public function ReadLocalAttachmentBackupPage(string $Token, int $Page): string
+    {
+        return json_encode($this->ReadChunkedJsonTransferPage(self::ATTACHMENT_BACKUP_TRANSFER_SCOPE, $Token, $Page), JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
+    }
+
+    /**
+     * Removes a backup's temporary encrypted transfer data without changing originals.
+     *
+     * @param string $Token Transfer token from BeginLocalAttachmentBackup().
+     * @return bool Whether the transfer existed.
+     */
+    public function FinishLocalAttachmentBackup(string $Token): bool
+    {
+        return $this->ClearChunkedJsonTransfer(self::ATTACHMENT_BACKUP_TRANSFER_SCOPE, $Token);
+    }
+
+    /**
+     * Permanently removes explicitly selected local originals for trusted administrators.
+     * Works with attachments disabled; does not check event ownership or infer orphans.
+     * Does not delete provider files, backup copies or active backup transfers.
+     *
+     * @param string $Selection JSON list of exact file IDs from GetLocalAttachmentInventory().
+     * @param string $ExpectedRevision Inventory revision reviewed before confirming deletion.
+     * @return int Number of removed originals after successful persistence.
+     */
+    public function DeleteLocalAttachmentOriginals(string $Selection, string $ExpectedRevision): int
+    {
+        if (strlen($Selection) > 8192) {
+            throw new InvalidArgumentException('Attachment cleanup selection is too large.');
+        }
+        $ids = json_decode($Selection, true, 4, JSON_THROW_ON_ERROR);
+        if (!is_array($ids)) {
+            throw new InvalidArgumentException('Invalid attachment cleanup selection.');
+        }
+        return $this->localAttachmentMaintenance('delete', $ids, $ExpectedRevision)['deleted'];
+    }
+
+    /**
+     * Administrative recovery boundary. Unlike end-user transfers this deliberately
+     * ignores view/calendar policy, but uses the exact same original-data lock.
+     *
+     * @param list<string> $ids Explicit cleanup selection.
+     * @return array<string, mixed>
+     */
+    private function localAttachmentMaintenance(string $operation, array $ids = [], string $revision = ''): array
+    {
+        $lock = 'OpenCalendar.Attachments.' . $this->InstanceID;
+        if (!IPS_SemaphoreEnter($lock, 5000)) {
+            throw new RuntimeException('Attachment storage is busy. Please try again.');
+        }
+        try {
+            $store = new LocalAttachmentStore($this->ReadAttributeString('LocalAttachmentOriginals'));
+            if ($operation === 'inventory') {
+                return $store->inventory();
+            }
+            if ($operation === 'backup') {
+                $snapshot = $store->exportSnapshot();
+                $chunks = array_map(base64_encode(...), str_split($snapshot, 96 * 1024));
+                $transfer = $this->CreateChunkedJsonTransfer(self::ATTACHMENT_BACKUP_TRANSFER_SCOPE, $chunks);
+                return $transfer + [
+                    'Format'             => 'OpenCalendar.LocalAttachments', 'Version' => 1,
+                    'CalendarInstanceID' => $this->InstanceID,
+                    'Bytes'              => strlen($snapshot), 'SHA256' => hash('sha256', $snapshot)
+                ];
+            }
+            if ($operation !== 'delete') {
+                throw new InvalidArgumentException('Invalid attachment maintenance operation.');
+            }
+            $removed = $store->removeSelected($ids, $revision);
+            if (!$this->WriteAttributeString('LocalAttachmentOriginals', $store->exportSnapshot())) {
+                throw new RuntimeException('Attachment originals could not be saved.');
+            }
+            return ['deleted' => $removed];
+        } finally {
+            IPS_SemaphoreLeave($lock);
+        }
     }
 
     /**

@@ -2,6 +2,11 @@
 
 Das Modul repräsentiert einen einzelnen Online- oder Symcon-lokalen Kalender.
 
+Die Dateianhangsfunktion befindet sich in `dev_9.1` noch in Vorbereitung.
+Die bereits vorhandenen Verwaltungsfunktionen für lokale Dateien sind unter
+[Lokale Dateianhänge sichern und aufräumen](../docs/attachments-administration.md)
+beschrieben. Eine Anhangsoberfläche in IPSView oder der Kachel ist noch nicht aktiviert.
+
 ## Einrichtung
 
 Ein Online-Kalender wird nicht über **Instanz hinzufügen** manuell eingerichtet.

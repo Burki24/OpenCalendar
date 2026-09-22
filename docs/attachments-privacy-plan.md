@@ -167,6 +167,48 @@ local-only storage. Provider-side files remain governed by provider permissions.
 
 ## Acceptance evidence still required
 
+### Administrative local recovery and cleanup (2026-09-22)
+
+Trusted Symcon scripts can now inventory all local originals, start/read/finish
+a bounded backup transfer, and deliberately delete selected local file IDs.
+These maintenance methods intentionally work with attachment access disabled,
+an inactive calendar, or an event that no longer exists. They are administrator
+operations, not additional rights granted by a view token. The IPSView hook and
+visualization actions do not dispatch these methods; hook regression tests check
+rejection even with a valid view credential. No maintenance UI is enabled yet.
+
+The inventory excludes file bodies, owner bindings and upload retry IDs. It
+includes a revision of the complete current store. Cleanup must supply both an
+explicit, nonempty list of unique existing file IDs and this revision. The store
+is reread under the same per-instance lock used by uploads/deletions. Any changed
+inventory, missing selection member or failed save aborts the operation. Cleanup
+never guesses orphan status, migrates associations, or removes provider files.
+
+Backups are immutable point-in-time snapshots of the validated local store,
+including ownership and retry information needed to preserve identities. They
+use the existing encrypted temporary transfer helper with a separate scope and
+five-minute lifetime. Each script response is bounded below 200 KiB even for the
+full 8 MiB original-data quota; only small transfer metadata enters instance
+buffers. Explicit finish removes temporary transfer data. Expiry prevents reads;
+abandoned expired files are cleaned when the helper next creates a transfer.
+A Symcon restart discards the in-memory encryption keys. Cleanup of originals
+does not revoke an already-started administrator backup or erase saved copies.
+
+The backup protocol is documented in `docs/attachments-administration.md`.
+The caller chooses a private backup destination; the module creates no public
+media export, hook download or shared state update. Backup JSON is not encrypted
+once assembled by the administrator. It contains documents and private bindings.
+Treat it with the same access restrictions and retention as a Symcon backup.
+It does not include calendar originals or remap ownership to another instance.
+No automatic import/restore API or user-facing release is implied by this step.
+
+Fresh local tests cover deleted-event recovery, disabled access, empty and
+full-quota binary backups, exact snapshot restoration in the store, cross-instance
+and cross-transfer-scope denial, expiry, explicit cleanup, concurrent changes,
+failed writes and corrupt-store preservation. Actual Symcon script response
+limits, restart durability and operator backup restoration remain live release
+checks. Provider adapters, shared end-user UI and named-user identity remain open.
+
 ### Request-scoped local transfer route (2026-09-20)
 
 The IPSView POST hook now accepts `TransferAttachment` with the existing view
