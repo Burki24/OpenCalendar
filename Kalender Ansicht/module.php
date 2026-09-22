@@ -1213,43 +1213,6 @@ class CalendarView extends IPSModuleStrict
         return false;
     }
 
-    /** Verifies view selection without loading status or attachment capabilities. */
-    private function isSelectedCalendarForAttachments(int $calendarId): bool
-    {
-        foreach ($this->effectiveCalendarConfiguration() as $row) {
-            if (!is_array($row) || !($row['Enabled'] ?? true)
-                || (int) ($row['InstanceID'] ?? 0) !== $calendarId
-                || !IPS_InstanceExists($calendarId)) {
-                continue;
-            }
-            $instance = IPS_GetInstance($calendarId);
-            return ($instance['ModuleInfo']['ModuleID'] ?? '') === self::CALENDAR_MODULE_ID;
-        }
-        return false;
-    }
-
-    /**
-     * Checks the already server-selected calendar without recursively loading the
-     * complete view selection. This is also used for non-secret UI capabilities.
-     */
-    private function selectedCalendarAllowsAttachments(int $calendarId, string $operation, string $destination): bool
-    {
-        $policy = new CalendarAttachmentPolicy(
-            $this->ReadPropertyInteger('AttachmentMode'),
-            $this->ReadPropertyBoolean('AttachmentAllowLocal'),
-            $this->ReadPropertyBoolean('AttachmentAllowProvider'),
-            $this->ReadPropertyInteger('AttachmentIdentityMode')
-        );
-        if (!$policy->allows($operation, $destination)) {
-            return false;
-        }
-        try {
-            return IPSKAL_CanAccessAttachments($calendarId, $operation, $destination);
-        } catch (Throwable) {
-            return false;
-        }
-    }
-
     /** Ensures provider state is available before the shared helper renders the page. */
     protected function PrepareIPSViewHTMLRegeneration(): bool
     {
@@ -1365,6 +1328,43 @@ class CalendarView extends IPSModuleStrict
         } catch (Throwable $exception) {
             $this->SendDebug('IPSViewAction', $exception->getMessage(), 0);
             $this->outputIPSViewResponse(['Error' => 'Action failed.'], 500);
+        }
+    }
+
+    /** Verifies view selection without loading status or attachment capabilities. */
+    private function isSelectedCalendarForAttachments(int $calendarId): bool
+    {
+        foreach ($this->effectiveCalendarConfiguration() as $row) {
+            if (!is_array($row) || !($row['Enabled'] ?? true)
+                || (int) ($row['InstanceID'] ?? 0) !== $calendarId
+                || !IPS_InstanceExists($calendarId)) {
+                continue;
+            }
+            $instance = IPS_GetInstance($calendarId);
+            return ($instance['ModuleInfo']['ModuleID'] ?? '') === self::CALENDAR_MODULE_ID;
+        }
+        return false;
+    }
+
+    /**
+     * Checks the already server-selected calendar without recursively loading the
+     * complete view selection. This is also used for non-secret UI capabilities.
+     */
+    private function selectedCalendarAllowsAttachments(int $calendarId, string $operation, string $destination): bool
+    {
+        $policy = new CalendarAttachmentPolicy(
+            $this->ReadPropertyInteger('AttachmentMode'),
+            $this->ReadPropertyBoolean('AttachmentAllowLocal'),
+            $this->ReadPropertyBoolean('AttachmentAllowProvider'),
+            $this->ReadPropertyInteger('AttachmentIdentityMode')
+        );
+        if (!$policy->allows($operation, $destination)) {
+            return false;
+        }
+        try {
+            return IPSKAL_CanAccessAttachments($calendarId, $operation, $destination);
+        } catch (Throwable) {
+            return false;
         }
     }
 
