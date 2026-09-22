@@ -12,6 +12,7 @@ use Throwable;
 require_once __DIR__ . '/CalendarHttpClient.php';
 require_once __DIR__ . '/MicrosoftTodoTaskProjection.php';
 require_once __DIR__ . '/MicrosoftAttachmentCollection.php';
+require_once __DIR__ . '/AttachmentUploadPolicy.php';
 
 final class MicrosoftTodoProviderException extends RuntimeException
 {
@@ -98,6 +99,29 @@ final class MicrosoftTodoProvider
             throw new MicrosoftTodoProviderException('Attachment content changed during download.');
         }
         return ['name' => $metadata['name'], 'contentType' => $metadata['contentType'], 'content' => $response->body];
+    }
+
+    /** Uploads one bounded file to the exact verified To Do task. */
+    public function uploadAttachment(string $listId, string $taskId, string $name, string $content): array
+    {
+        $listId = $this->requiredId($listId, 'task list');
+        $taskId = $this->requiredId($taskId, 'task');
+        $contentType = AttachmentUploadPolicy::validate($name, $content);
+        $url = self::API_URL . '/me/todo/lists/' . rawurlencode($listId) . '/tasks/' . rawurlencode($taskId);
+        $parent = $this->requestJsonUrl('GET', $url . '?$select=id', null, [200], MicrosoftAttachmentCollection::MAX_RESPONSE_BYTES);
+        if (($parent['id'] ?? null) !== $taskId) {
+            throw new MicrosoftTodoProviderException('The attachment task is no longer available.');
+        }
+        $created = $this->requestJsonUrl('POST', $url . '/attachments', [
+            '@odata.type' => '#microsoft.graph.taskFileAttachment',
+            'name' => $name,
+            'contentType' => $contentType,
+            'contentBytes' => $content
+        ], [201], MicrosoftAttachmentCollection::MAX_RESPONSE_BYTES);
+        if (!is_string($created['id'] ?? null) || $created['id'] === '') {
+            throw new MicrosoftTodoProviderException('The attachment upload was not confirmed.');
+        }
+        return ['uploaded' => true];
     }
 
     /** @return list<array<string, mixed>> */

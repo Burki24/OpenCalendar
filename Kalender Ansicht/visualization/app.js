@@ -96,6 +96,7 @@ const eventAttachmentsLoadButton = document.getElementById('details-load-attachm
 const eventAttachmentsAddButton = document.getElementById('details-add-attachment');
 const eventAttachmentsFileInput = document.getElementById('details-attachment-file');
 const eventAttachmentsLocalNote = document.getElementById('details-local-attachment-note');
+const eventAttachmentsProviderNote = document.getElementById('details-provider-attachment-note');
 const eventAttachmentsStatus = document.getElementById('details-attachments-status');
 const eventAttachmentsList = document.getElementById('details-attachments-list');
 const attachmentDeleteConfirmDialog = document.getElementById('attachment-delete-confirm-dialog');
@@ -3059,6 +3060,14 @@ function attachmentTransferValue(event, operation, data = {}) {
     };
 }
 
+function providerAttachmentUploadValue(event, data = {}) {
+    const calendar = calendarEntryByInstanceId(event?.calendarInstanceId);
+    if (!calendar || calendar.canManageProviderAttachments !== true) return null;
+    if (calendar.attachmentSelectorType === 'icalendar'
+        && String(event?.recurrenceType || '').toLowerCase() === 'occurrence') return null;
+    return attachmentTransferValue(event, 'upload', data);
+}
+
 function localAttachmentTransferValue(event, operation, data = {}) {
     const calendar = calendarEntryByInstanceId(event?.calendarInstanceId);
     const selector = localAttachmentSelector(event, calendar);
@@ -3123,8 +3132,11 @@ function resetAttachmentDetails(event = null) {
     eventAttachmentsFileInput.value = '';
     const value = selectedAttachmentTransferValue(event, 'list');
     const localUploadAvailable = localAttachmentTransferValue(event, 'upload') !== null;
-    eventAttachmentsAddButton.classList.toggle('hidden', !localUploadAvailable);
+    const providerUploadAvailable = providerAttachmentUploadValue(event) !== null;
+    eventAttachmentsAddButton.classList.toggle('hidden', !localUploadAvailable && !providerUploadAvailable);
+    eventAttachmentsAddButton.textContent = t(localUploadAvailable ? 'Save file on Symcon' : 'Upload to provider');
     eventAttachmentsLocalNote.classList.toggle('hidden', !localUploadAvailable);
+    eventAttachmentsProviderNote.classList.toggle('hidden', !providerUploadAvailable);
     eventAttachments.classList.toggle('hidden', !hasAttachmentTransferBridge() || value === null);
 }
 
@@ -3382,7 +3394,7 @@ async function localAttachmentFileContent(file) {
     return btoa(binary);
 }
 
-async function uploadSelectedLocalAttachment() {
+async function uploadSelectedAttachment() {
     const event = selectedEvent;
     const file = eventAttachmentsFileInput.files?.[0] || null;
     if (!event || !file) return;
@@ -3405,7 +3417,7 @@ async function uploadSelectedLocalAttachment() {
             name: file.name,
             content,
             requestId: localAttachmentRequestId()
-        });
+        }) || providerAttachmentUploadValue(event, {name: file.name, content});
         if (!value) throw new Error();
         await attachmentTransferRequest(value);
         if (revision !== attachmentDetailsRevision) return;
@@ -5441,7 +5453,7 @@ eventAttachmentsAddButton.addEventListener('click', () => {
     eventAttachmentsFileInput.value = '';
     eventAttachmentsFileInput.click();
 });
-eventAttachmentsFileInput.addEventListener('change', () => void uploadSelectedLocalAttachment());
+eventAttachmentsFileInput.addEventListener('change', () => void uploadSelectedAttachment());
 document.getElementById('attachment-delete-confirm-close').addEventListener('click', () => attachmentDeleteConfirmDialog.close());
 document.getElementById('attachment-delete-confirm-cancel').addEventListener('click', () => attachmentDeleteConfirmDialog.close());
 attachmentDeleteConfirmButton.addEventListener('click', () => void confirmLocalAttachmentDelete());
@@ -6291,6 +6303,7 @@ function applyStaticTranslations() {
     document.getElementById('details-dialog-title').textContent = t('Event details');
     document.getElementById('details-attachments-title').textContent = t('Attachments');
     eventAttachmentsLocalNote.textContent = t('Files added here are stored on the Symcon host, may be included in backups, and are available to everyone authorized for this view. They are not uploaded to the calendar provider.');
+    eventAttachmentsProviderNote.textContent = t("Files added here are uploaded to the calendar provider. Access and retention follow the provider's sharing settings.");
     document.getElementById('attachment-delete-confirm-dialog-title').textContent = t('Delete attachment');
     document.getElementById('attachment-delete-confirm-question').textContent = t('Do you really want to delete this attachment?');
     document.getElementById('edit-scope-dialog-title').textContent = t('Edit recurring event');

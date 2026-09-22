@@ -15,6 +15,8 @@ final class AttachmentMetadataGateway
     use Burki24\SymconModuleHelper\DataFlowHelper;
 
     private const PROVIDER_MICROSOFT = 3;
+    private const PROVIDER_APPLE = 0;
+    private const PROVIDER_CALDAV = 1;
     private const PROVIDER_GOOGLE = 2;
     private const PROVIDER_ICS = 4;
     private const DATA_ID_FROM_CHILD = '{4E535B1D-69C7-AC77-1372-0282B21BAEC9}';
@@ -117,6 +119,44 @@ $taskDownload = json_decode($calendar->DownloadProviderAttachment(json_encode([
 ], JSON_THROW_ON_ERROR)), true, 512, JSON_THROW_ON_ERROR);
 attachmentMetadataCheck(base64_decode($taskDownload['content'], true) === $taskContent, 'To Do attachment download routing failed.');
 
+$calendar->properties['AttachmentMode'] = 2;
+$calendar->properties['CanWrite'] = true;
+$upload = json_encode([
+    'selector' => ['eventReference' => 'evt'],
+    'name' => 'Proof.pdf',
+    'content' => base64_encode("%PDF-1.7\n%%EOF\n")
+], JSON_THROW_ON_ERROR);
+$http->responses = [[200, ['id' => 'evt']], [201, ['id' => 'uploaded']]];
+$uploaded = json_decode($calendar->UploadProviderAttachment($upload), true, 512, JSON_THROW_ON_ERROR);
+attachmentMetadataCheck($uploaded['result']['uploaded'] === true && count($http->responses) === 0,
+    'Calendar-to-account Microsoft event upload routing failed.');
+$taskUpload = json_encode([
+    'selector' => ['sourceType' => 'microsoft-todo', 'taskId' => 'task', 'taskListId' => 'list'],
+    'name' => 'Proof.pdf',
+    'content' => base64_encode("%PDF-1.7\n%%EOF\n")
+], JSON_THROW_ON_ERROR);
+$http->responses = [[200, ['id' => 'task']], [201, ['id' => 'task-file']]];
+$uploaded = json_decode($calendar->UploadProviderAttachment($taskUpload), true, 512, JSON_THROW_ON_ERROR);
+attachmentMetadataCheck($uploaded['result']['uploaded'] === true && count($http->responses) === 0,
+    'Calendar-to-account Microsoft To Do upload routing failed.');
+$calendar->properties['CanWrite'] = false;
+$count = count($http->requests);
+attachmentMetadataReject(fn () => $calendar->UploadProviderAttachment($upload));
+attachmentMetadataCheck(count($http->requests) === $count, 'Read-only calendar must not upload.');
+$calendar->properties['CanWrite'] = true;
+$calendar->properties['AttachmentMode'] = 1;
+attachmentMetadataReject(fn () => $calendar->UploadProviderAttachment($upload));
+attachmentMetadataCheck(count($http->requests) === $count, 'Read-only attachment mode must not upload.');
+$calendar->properties['AttachmentMode'] = 2;
+$http->responses = [[200, ['id' => 'evt']], [201, ['id' => 'uploaded']]];
+$calendar->afterReply = static function () use ($calendar): void {
+    $calendar->properties['AttachmentAllowProvider'] = false;
+};
+attachmentMetadataReject(fn () => $calendar->UploadProviderAttachment($upload));
+attachmentMetadataCheck(count($http->responses) === 0, 'Post-write revocation test did not reach the provider.');
+$calendar->afterReply = null;
+$calendar->properties['AttachmentAllowProvider'] = true;
+
 foreach (['policy', 'calendar', 'account', 'taskList'] as $change) {
     $calendar->properties['AttachmentAllowProvider'] = true;
     $calendar->properties['CalendarID'] = 'calendar42';
@@ -140,6 +180,8 @@ $gateway->provider = 2; // Google deferred; no HTTP or fallback to local storage
 $count = count($http->requests);
 attachmentMetadataReject(fn () => $calendar->ListProviderAttachments($selector));
 attachmentMetadataCheck(count($http->requests) === $count, 'Unsupported provider must not fetch attachments.');
+attachmentMetadataReject(fn () => $calendar->UploadProviderAttachment($upload));
+attachmentMetadataCheck(count($http->requests) === $count, 'Google must not receive a provider attachment upload.');
 
 $ical = "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nBEGIN:VEVENT\r\nUID:ics-event\r\nDTSTART:20260922T100000Z\r\nDTEND:20260922T110000Z\r\n" .
     "ATTACH;FMTTYPE=application/pdf;ENCODING=BASE64;VALUE=BINARY;FILENAME=ICS.pdf:SUNTIEZJTEU=\r\n" .

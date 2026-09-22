@@ -6,7 +6,7 @@
             "items": [
                 {
                     "type": "Label",
-                    "caption": "Existing provider attachments can be listed and downloaded on demand. Files can also be stored locally for Symcon calendar events. Local upload and delete require Manage attachments. Calendar and view permissions must both allow access."
+                    "caption": "Provider attachments can be listed and downloaded on demand. With Manage attachments, files can also be uploaded to Microsoft 365 and CalDAV/Apple events or Microsoft To Do tasks. Symcon calendar files are stored locally. Provider deletion and Google uploads are not available. Calendar and view permissions must both allow access."
                 },
                 {
                     "type": "Select",

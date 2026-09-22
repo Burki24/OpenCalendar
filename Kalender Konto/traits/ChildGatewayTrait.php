@@ -50,7 +50,7 @@ trait KalenderKontoChildGatewayTrait
 
             $operation = (string) ($request['Operation'] ?? '');
             $requestID = (string) ($request['RequestID'] ?? '');
-            $debugRequest = !in_array($operation, ['ReadEventsTransferPage', 'ListProviderAttachments', 'DownloadProviderAttachment'], true);
+            $debugRequest = !in_array($operation, ['ReadEventsTransferPage', 'ListProviderAttachments', 'DownloadProviderAttachment', 'UploadProviderAttachment'], true);
             if ($debugRequest) {
                 $this->SendSafeDebug('ChildRequest', [
                     'operation'         => $operation,
@@ -63,6 +63,7 @@ trait KalenderKontoChildGatewayTrait
             $payload = match ($operation) {
                 'ListProviderAttachments'    => $this->listProviderAttachmentsForChild($request),
                 'DownloadProviderAttachment' => $this->downloadProviderAttachmentForChild($request),
+                'UploadProviderAttachment'   => $this->uploadProviderAttachmentForChild($request),
                 'GetCalendars'               => json_decode($this->GetCalendars(), true, 512, JSON_THROW_ON_ERROR),
                 'GetTaskLists'               => json_decode($this->GetTaskLists(), true, 512, JSON_THROW_ON_ERROR),
                 'DiscoverCalendars'          => $this->discoverCalendars(),
@@ -99,7 +100,7 @@ trait KalenderKontoChildGatewayTrait
 
             return $this->encodeResponse(true, $operation, $requestID, $payload);
         } catch (Throwable $exception) {
-            if (in_array(($operation ?? ''), ['ListProviderAttachments', 'DownloadProviderAttachment'], true)) {
+            if (in_array(($operation ?? ''), ['ListProviderAttachments', 'DownloadProviderAttachment', 'UploadProviderAttachment'], true)) {
                 // Provider failures may contain private filenames or URLs. Do not log them.
                 return $this->encodeResponse(false, $operation, $requestID ?? '', null, 'Provider attachments are unavailable.');
             }
@@ -330,6 +331,58 @@ trait KalenderKontoChildGatewayTrait
             ));
         }
         throw new RuntimeException('This provider does not support attachment downloads yet.');
+    }
+
+    /** @param array<string,mixed> $request @return array{uploaded:bool} */
+    private function uploadProviderAttachmentForChild(array $request): array
+    {
+        $name = $request['AttachmentName'] ?? null;
+        $content = $request['AttachmentContent'] ?? null;
+        if (!is_string($name) || !is_string($content)) {
+            throw new InvalidArgumentException('Invalid attachment upload.');
+        }
+        // Revalidate at the account boundary before any provider I/O.
+        IPSKalender\AttachmentUploadPolicy::validate($name, $content);
+        $providerType = $this->ReadPropertyInteger('Provider');
+        if (isset($request['TaskID'])) {
+            if ($providerType !== self::PROVIDER_MICROSOFT) {
+                throw new RuntimeException('This provider does not support task attachments.');
+            }
+            return $this->microsoftTodoProvider()->uploadAttachment(
+                (string) ($request['TaskListID'] ?? ''),
+                (string) $request['TaskID'],
+                $name,
+                $content
+            );
+        }
+        $calendarId = (string) ($request['CalendarID'] ?? '');
+        $calendar = $this->resolveCalendar($calendarId);
+        if ($calendarId === '' || ($calendar['id'] ?? '') !== $calendarId) {
+            throw new RuntimeException('The attachment calendar could not be verified.');
+        }
+        $reference = $this->calendarReference($calendar);
+        if ($providerType === self::PROVIDER_MICROSOFT) {
+            $provider = new MicrosoftCalendarProvider(
+                $this->createTrustedCloudHttpClient(new MicrosoftGraphOriginPolicy()),
+                $this->getMicrosoftAccessToken()
+            );
+            return $provider->uploadAttachment($reference, (string) ($request['EventReference'] ?? ''), $name, $content);
+        }
+        if (!in_array($providerType, [self::PROVIDER_APPLE, self::PROVIDER_CALDAV], true)) {
+            throw new RuntimeException('This provider does not support attachment uploads.');
+        }
+        $provider = $this->createProvider();
+        if (!$provider instanceof CalDAVProvider) {
+            throw new RuntimeException('This provider does not support attachment uploads.');
+        }
+        return $provider->uploadAttachment(
+            $reference,
+            (string) ($request['UID'] ?? ''),
+            (string) ($request['RecurrenceID'] ?? ''),
+            (string) ($request['ResourceURL'] ?? ''),
+            $name,
+            $content
+        );
     }
 
     /** @param array<string,mixed> $file @return array{name:string,contentType:string,content:string} */

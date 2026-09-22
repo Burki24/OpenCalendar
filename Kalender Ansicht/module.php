@@ -7,6 +7,7 @@ use IPSKalender\CalendarAttachmentTransport;
 
 require_once __DIR__ . '/../libs/CalendarAttachmentPolicy.php';
 require_once __DIR__ . '/../libs/CalendarAttachmentTransport.php';
+require_once __DIR__ . '/../libs/AttachmentUploadPolicy.php';
 
 use Burki24\SymconModuleHelper\ConfigurationFormHelper;
 use Burki24\SymconModuleHelper\IPSViewHTMLPageHelper;
@@ -2751,9 +2752,10 @@ class CalendarView extends IPSModuleStrict
             $canWrite = (bool) ($calendarStatus['canWrite']
                 ?? IPS_GetProperty($instanceId, 'CanWrite'));
             $localCalendar = (bool) ($calendarStatus['localCalendar'] ?? false);
+            $providerKey = $localCalendar ? 'local' : $this->calendarProviderKey($instance);
             $attachmentSelectorType = $localCalendar
                 ? ''
-                : match ($this->calendarProviderKey($instance)) {
+                : match ($providerKey) {
                     'microsoft'              => 'event-reference',
                     'apple', 'caldav', 'ics' => 'icalendar',
                     default                  => ''
@@ -2798,6 +2800,10 @@ class CalendarView extends IPSModuleStrict
                 'canReadProviderAttachments'   => $attachmentSelectorType !== ''
                     && $this->selectedCalendarAllowsAttachments($instanceId, 'list', 'provider')
                     && $this->selectedCalendarAllowsAttachments($instanceId, 'download', 'provider'),
+                'canManageProviderAttachments' => in_array($providerKey, ['microsoft', 'apple', 'caldav'], true)
+                    && $canWrite
+                    && $this->selectedCalendarAllowsAttachments($instanceId, 'list', 'provider')
+                    && $this->selectedCalendarAllowsAttachments($instanceId, 'upload', 'provider'),
                 'canReadLocalAttachments'      => $localCalendar
                     && $this->selectedCalendarAllowsAttachments($instanceId, 'list', 'local')
                     && $this->selectedCalendarAllowsAttachments($instanceId, 'download', 'local'),
@@ -3440,6 +3446,7 @@ class CalendarView extends IPSModuleStrict
                 $providerFields = match ($value['operation']) {
                     'list'     => [],
                     'download' => ['id'],
+                    'upload'   => ['name', 'content'],
                     default    => throw new InvalidArgumentException('Unsupported provider attachment operation.')
                 };
                 if (array_diff(array_keys($value['data']), $providerFields) !== []
@@ -3451,6 +3458,12 @@ class CalendarView extends IPSModuleStrict
                     || preg_match('/[\x00-\x1f\x7f]/', $value['data']['id']))) {
                     throw new InvalidArgumentException('Invalid provider attachment identity.');
                 }
+                if ($value['operation'] === 'upload') {
+                    if (!is_string($value['data']['name'] ?? null) || !is_string($value['data']['content'] ?? null)) {
+                        throw new InvalidArgumentException('Invalid provider attachment upload.');
+                    }
+                    IPSKalender\AttachmentUploadPolicy::validate($value['data']['name'], $value['data']['content']);
+                }
             }
             $allowed = fn (): bool => hash_equals($this->ipsViewToken(), $request['token'])
                 && $this->CanAccessAttachments($value['calendarId'], $value['operation'], $value['destination']);
@@ -3460,11 +3473,16 @@ class CalendarView extends IPSModuleStrict
                 return;
             }
             $result = $value['destination'] === 'provider'
-                ? ($value['operation'] === 'list'
-                    ? IPSKAL_ListProviderAttachments($value['calendarId'], json_encode($value['selector'], JSON_THROW_ON_ERROR))
-                    : IPSKAL_DownloadProviderAttachment($value['calendarId'], json_encode([
+                ? match ($value['operation']) {
+                    'list' => IPSKAL_ListProviderAttachments($value['calendarId'], json_encode($value['selector'], JSON_THROW_ON_ERROR)),
+                    'download' => IPSKAL_DownloadProviderAttachment($value['calendarId'], json_encode([
                         'selector' => $value['selector'], 'id' => $value['data']['id']
-                    ], JSON_THROW_ON_ERROR)))
+                    ], JSON_THROW_ON_ERROR)),
+                    'upload' => IPSKAL_UploadProviderAttachment($value['calendarId'], json_encode([
+                        'selector' => $value['selector'], 'name' => $value['data']['name'],
+                        'content' => $value['data']['content']
+                    ], JSON_THROW_ON_ERROR))
+                }
                 : IPSKAL_TransferLocalAttachment($value['calendarId'], json_encode([
                     'operation' => $value['operation'], 'selector' => $value['selector'], 'data' => $value['data']
                 ], JSON_THROW_ON_ERROR));

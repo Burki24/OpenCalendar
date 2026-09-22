@@ -95,6 +95,39 @@ final class CalDAVProvider implements CalendarEventLookupProviderInterface, Cale
         return ICalendarCodec::attachmentContent($resource['ical'], $uid, $recurrenceId, $attachmentId);
     }
 
+    /** Writes one inline attachment using the current strong resource ETag. */
+    public function uploadAttachment(
+        string $calendarReference,
+        string $uid,
+        string $recurrenceId,
+        string $resourceReference,
+        string $name,
+        string $content
+    ): array {
+        if ($uid === '' || strlen($uid) > 2048 || preg_match('/[\x00-\x1f\x7f]/', $uid)) {
+            throw new CalDAVProviderException('Invalid attachment event identity.');
+        }
+        AttachmentUploadPolicy::validate($name, $content);
+        $calendarReference = $this->normalizeAbsoluteUrl($calendarReference);
+        $resource = $this->attachmentResource($calendarReference, $uid, $resourceReference);
+        $etag = $resource['etag'];
+        if (preg_match('/^"[^"\r\n]+"$/D', $etag) !== 1) {
+            throw new CalDAVProviderException('The attachment event has no strong ETag.');
+        }
+        $updated = ICalendarCodec::appendAttachment($resource['ical'], $uid, $recurrenceId, $name, $content);
+        if ($updated === $resource['ical']) {
+            return ['uploaded' => true];
+        }
+        $response = $this->httpClient->request('PUT', $resource['resourceUrl'], [
+            'Content-Type' => 'text/calendar; charset=utf-8',
+            'If-Match' => $etag
+        ], $updated, 65_536);
+        $this->assertResponseStatus($response, [200, 201, 204], 'attachment upload');
+        $effectiveUrl = $this->trustedEffectiveUrl($response, $resource['resourceUrl']);
+        $this->assertResourceBelongsToCalendar($calendarReference, $effectiveUrl);
+        return ['uploaded' => true];
+    }
+
     /** @inheritDoc */
     public function testConnection(): array
     {

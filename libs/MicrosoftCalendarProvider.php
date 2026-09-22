@@ -21,6 +21,7 @@ require_once __DIR__ . '/CalendarEventReminder.php';
 require_once __DIR__ . '/CalendarEventState.php';
 require_once __DIR__ . '/CalendarRecurrenceRule.php';
 require_once __DIR__ . '/MicrosoftAttachmentCollection.php';
+require_once __DIR__ . '/AttachmentUploadPolicy.php';
 
 final class MicrosoftCalendarProviderException extends RuntimeException
 {
@@ -102,6 +103,27 @@ final class MicrosoftCalendarProvider implements CalendarEventLookupProviderInte
             throw new MicrosoftCalendarProviderException('Attachment content changed during download.');
         }
         return ['name' => $metadata['name'], 'contentType' => $metadata['contentType'], 'content' => $content];
+    }
+
+    /** Uploads one bounded file to the exact verified event in the selected calendar. */
+    public function uploadAttachment(string $calendarReference, string $eventReference, string $name, string $content): array
+    {
+        $contentType = AttachmentUploadPolicy::validate($name, $content);
+        $url = $this->eventUrl($this->calendarId($calendarReference), $this->eventId($eventReference));
+        $parent = $this->requestJsonUrl('GET', $url . '?$select=id,isCancelled', null, [], [200], MicrosoftAttachmentCollection::MAX_RESPONSE_BYTES);
+        if (($parent['id'] ?? null) !== $this->eventId($eventReference) || ($parent['isCancelled'] ?? false) === true) {
+            throw new MicrosoftCalendarProviderException('The attachment event is no longer available.');
+        }
+        $created = $this->requestJsonUrl('POST', $url . '/attachments', [
+            '@odata.type' => '#microsoft.graph.fileAttachment',
+            'name' => $name,
+            'contentType' => $contentType,
+            'contentBytes' => $content
+        ], [], [201], MicrosoftAttachmentCollection::MAX_RESPONSE_BYTES);
+        if (!is_string($created['id'] ?? null) || $created['id'] === '') {
+            throw new MicrosoftCalendarProviderException('The attachment upload was not confirmed.');
+        }
+        return ['uploaded' => true];
     }
 
     /** @inheritDoc */

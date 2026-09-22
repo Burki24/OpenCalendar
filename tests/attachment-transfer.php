@@ -81,7 +81,7 @@ class ProviderAttachmentListView extends AttachmentAccessBaselineView
     public function CanAccessAttachments(int $CalendarID, string $Operation, string $Destination): bool
     {
         return $this->allowPolicy && $CalendarID === 42
-            && in_array($Operation, ['list', 'download'], true) && $Destination === 'provider';
+            && in_array($Operation, ['list', 'download', 'upload'], true) && $Destination === 'provider';
     }
 }
 function IPSKAL_ListProviderAttachments(int $id, string $selector): string
@@ -103,6 +103,14 @@ function IPSKAL_DownloadProviderAttachment(int $id, string $request): string
         'content' => base64_encode('PRIVATE PROVIDER DOWNLOAD')
     ], JSON_THROW_ON_ERROR);
 }
+function IPSKAL_UploadProviderAttachment(int $id, string $request): string
+{
+    ++$GLOBALS['providerAttachmentCalls'];
+    if ($GLOBALS['providerAttachmentRevoke']) {
+        $GLOBALS['providerAttachmentView']->allowPolicy = false;
+    }
+    return '{"result":{"uploaded":true}}';
+}
 $providerView = new ProviderAttachmentListView(99998);
 $GLOBALS['providerAttachmentView'] = $providerView;
 foreach ([
@@ -114,6 +122,9 @@ foreach ([
     ['on', $validToken, 42, 'download', [], false, 400, 0, ''],
     ['on', $validToken, 42, 'download', ['id' => "bad\r\nid"], false, 400, 0, ''],
     ['on', $validToken, 42, 'upload', [], false, 400, 0, ''],
+    ['on', $validToken, 42, 'upload', ['name' => 'Proof.pdf', 'content' => base64_encode("%PDF-1.7\n%%EOF\n")], false, 200, 1, 'uploaded'],
+    ['on', $validToken, 42, 'upload', ['name' => 'Proof.pdf', 'content' => base64_encode("%PDF-1.7\n%%EOF\n")], true, 400, 1, ''],
+    ['on', $validToken, 42, 'upload', ['name' => 'Proof.exe', 'content' => base64_encode('bad')], false, 400, 0, ''],
     ['on', $validToken, 42, 'list', ['url' => 'forged'], false, 400, 0, ''],
     ['on', $validToken, 42, 'list', [], true, 400, 1, ''],
     ['on', $validToken, 42, 'download', ['id' => 'file'], true, 400, 1, '']

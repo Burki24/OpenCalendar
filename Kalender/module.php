@@ -1459,6 +1459,39 @@ class Calendar extends IPSModuleStrict
     }
 
     /**
+     * Uploads one validated file to the selected provider event or To Do task.
+     * The browser cannot select a provider calendar, URL or account; those are
+     * resolved from this calendar instance and checked again after the write.
+     */
+    public function UploadProviderAttachment(string $Request): string
+    {
+        if (!$this->CanAccessAttachments('upload', 'provider') || strlen($Request) > 3_000_000) {
+            throw new RuntimeException('Provider attachment upload denied.');
+        }
+        $value = json_decode($Request, true, 8, JSON_THROW_ON_ERROR);
+        if (!is_array($value) || count($value) !== 3
+            || array_diff(array_keys($value), ['selector', 'name', 'content']) !== []
+            || !is_array($value['selector'] ?? null)
+            || !is_string($value['name'] ?? null) || !is_string($value['content'] ?? null)) {
+            throw new InvalidArgumentException('Invalid provider attachment upload.');
+        }
+        AttachmentUploadPolicy::validate($value['name'], $value['content']);
+        $request = $this->providerAttachmentRequest(json_encode($value['selector'], JSON_THROW_ON_ERROR));
+        $request['AttachmentName'] = $value['name'];
+        $request['AttachmentContent'] = $value['content'];
+        $calendarId = $this->effectiveCalendarId();
+        $connectionId = IPS_GetInstance($this->InstanceID)['ConnectionID'];
+        $result = $this->sendRequest('UploadProviderAttachment', $request);
+        if (!$this->CanAccessAttachments('upload', 'provider') || $calendarId !== $this->effectiveCalendarId()
+            || $connectionId !== IPS_GetInstance($this->InstanceID)['ConnectionID']
+            || (isset($request['TaskListID']) && $request['TaskListID'] !== trim($this->ReadPropertyString('MicrosoftTaskListID')))
+            || ($result['uploaded'] ?? null) !== true) {
+            throw new RuntimeException('Provider attachment upload could not be confirmed.');
+        }
+        return json_encode(['result' => ['uploaded' => true]], JSON_THROW_ON_ERROR);
+    }
+
+    /**
      * Lists local originals for trusted administrator scripts, including deleted-event files.
      * Deliberately works when calendar/view attachment access is disabled. Never expose
      * this recovery API through visualization actions, hooks or shared state.

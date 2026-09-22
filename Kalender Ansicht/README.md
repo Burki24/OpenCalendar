@@ -51,8 +51,14 @@ Vor dem Upload weist die Ansicht darauf hin, dass alle Berechtigten derselben
 Ansicht zugreifen können, Sicherungen die Dateien enthalten können und keine
 Übertragung zum Kalenderanbieter erfolgt.
 
-Anbieter-Uploads und -Löschungen sowie lokale Anhänge an Online-Termine folgen
-separat. Google bleibt bis zur Klärung der zusätzlichen Scopes zurückgestellt.
+Mit **Anhänge verwalten** und ausdrücklich erlaubtem Anbieterspeicher können
+TXT-, PDF-, PNG- und JPEG-Dateien bis 2 MiB auch zu Microsoft-365-Terminen,
+Microsoft-To-Do-Aufgaben sowie CalDAV-/Apple-Terminen hochgeladen werden. Der
+Button und ein Hinweis benennen den Speicherort vor dem Upload. Bei CalDAV
+werden Dateien als eingebettete iCalendar-Anhänge gespeichert; eine bloß
+berechnete Serieninstanz kann nicht einzeln ergänzt werden. Provider-Löschungen
+und lokale Anhänge an Online-Termine folgen separat. Google bleibt bis zur
+Klärung der zusätzlichen Scopes zurückgestellt.
 Persönliche IPSViewUsers-Rechte bleiben bis zur verifizierbaren Identitätsanbindung
 gesperrt. Änderungen an Einstellungen verschieben oder löschen keine Dateien.
 

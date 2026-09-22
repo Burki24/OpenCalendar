@@ -7,8 +7,9 @@ Für Termine eines Symcon-lokalen Kalenders können berechtigte Ansichten bereit
 TXT-, PDF-, PNG- und JPEG-Dateien bis 2 MiB lokal speichern, herunterladen und
 bewusst löschen. Die Verwaltungsfunktionen für Sicherung und Bereinigung sind unter
 [Lokale Dateianhänge sichern und aufräumen](../docs/attachments-administration.md)
-beschrieben. Anbieter-Uploads, lokale Anhänge an Online-Termine, Google und
-benutzerbezogene Rechte sind noch nicht freigegeben.
+beschrieben. Microsoft-365-Termine und To-Do-Aufgaben sowie CalDAV-/Apple-Termine
+unterstützen zusätzlich den Upload zum jeweiligen Anbieter. Lokale Anhänge an
+Online-Termine, Google und benutzerbezogene Rechte sind noch nicht freigegeben.
 
 ## Einrichtung
 

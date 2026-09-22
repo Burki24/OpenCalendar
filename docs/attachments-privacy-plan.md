@@ -1,6 +1,6 @@
 # Optional attachments: implementation and security plan
 
-Status: protected provider-read and local-calendar UI in progress, not a released complete attachment feature.
+Status: protected provider read/upload and local-calendar UI in progress, not a released complete attachment feature.
 Scope: `dev_9.1` only. No changes to `dev`, deployments or OAuth registrations.
 Google is deferred until its OAuth scopes are agreed with Symcon. Microsoft
 calendar events and native To Do tasks, CalDAV/Apple, read-only iCalendar feeds
@@ -343,12 +343,32 @@ the server remains authoritative for filename, content signature, quota and
 duplicate validation. Local list metadata is bounded and rendered as text. A
 stale file revision cannot delete a changed original.
 
-Opening details still performs no attachment request. Provider-side mutation,
+Opening details still performs no attachment request. Provider deletion,
 local annotations on online/read-only calendars, named-user identity, Google and
 live Windows/Android/backup validation remain open. Focused tests cover local
 selector bounds and occurrence identity, explicit destination, cryptographic retry
 identity, shared modal structure and the existing server-side ownership, storage,
 upload-policy and transfer protections.
+
+### Provider upload for Microsoft 365 and CalDAV/Apple (2026-09-22)
+
+With explicit provider destination and Manage permissions on both calendar and
+view, the same UI uploads TXT, PDF, PNG and JPEG files up to 2 MiB to Microsoft
+calendar events, Microsoft To Do tasks and writable CalDAV/Apple events. The
+button and note identify provider storage before transmission. Google and
+read-only ICS feeds offer no provider upload. Provider deletion is not enabled.
+
+The protected transfer hook validates the file and policy before delegating to
+the selected calendar. The calendar resolves account and event/task identity
+server-side, validates again, and rechecks selection and rights after the write.
+The account gateway repeats file validation and uses only its configured provider.
+Microsoft event and To Do uploads verify the exact parent with Graph before a
+bounded file-attachment POST. CalDAV/Apple fetches the exact resource, requires
+a strong ETag, and PUTs an inline ATTACH with If-Match. Generated series
+occurrences are not writable as individual attachment owners; existing exception
+components are. No file contents or names are added to shared calendar state.
+Tests cover direct provider writes, module routing, rights and post-write
+revocation. Live provider/client interoperability remains to be verified.
 
 ### Administrative local recovery and cleanup (2026-09-22)
 

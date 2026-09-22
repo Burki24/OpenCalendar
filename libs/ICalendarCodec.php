@@ -19,6 +19,7 @@ require_once __DIR__ . '/CalendarEventState.php';
 require_once __DIR__ . '/CalendarTaskEvent.php';
 require_once __DIR__ . '/CalendarRecurrenceRule.php';
 require_once __DIR__ . '/ICalendarAttachmentMetadata.php';
+require_once __DIR__ . '/AttachmentUploadPolicy.php';
 
 final class ICalendarCodec
 {
@@ -46,6 +47,47 @@ final class ICalendarCodec
             self::attachmentEventBlock($ical, $uid, $recurrenceId),
             $attachmentId
         );
+    }
+
+    /** Appends one inline attachment to an existing exact VEVENT component. */
+    public static function appendAttachment(string $ical, string $uid, string $recurrenceId, string $name, string $content): string
+    {
+        $contentType = AttachmentUploadPolicy::validate($name, $content);
+        // This validates the selected event and rejects cancelled or ambiguous owners.
+        self::attachmentEventBlock($ical, $uid, $recurrenceId);
+        $lines = self::unfoldLines($ical);
+        $target = null;
+        foreach (self::extractEventBlocksWithOffsets($lines) as $block) {
+            $properties = self::readTopLevelProperties($block['lines']);
+            if (self::propertyValue($properties, 'UID') === $uid
+                && self::propertyValue($properties, 'RECURRENCE-ID') === $recurrenceId) {
+                if ($target !== null) {
+                    throw new RuntimeException('Ambiguous attachment event identity.');
+                }
+                $target = $block;
+            }
+        }
+        // A generated recurrence occurrence may inherit the master for reads, but
+        // writing to the master would attach this file to the entire series.
+        if ($target === null) {
+            throw new RuntimeException('The selected occurrence has no writable component.');
+        }
+        $attachments = ICalendarAttachmentMetadata::read($target['lines']);
+        if (count($attachments) >= 100) {
+            throw new RuntimeException('The event has too many attachments.');
+        }
+        $safeName = str_replace('^', '^^', $name);
+        $line = 'ATTACH;FMTTYPE=' . $contentType . ';ENCODING=BASE64;VALUE=BINARY;FILENAME="'
+            . $safeName . '":' . $content;
+        if (in_array($line, $target['lines'], true)) {
+            return $ical;
+        }
+        array_splice($lines, $target['end'], 0, [$line]);
+        $updated = self::foldLines($lines);
+        if (strlen($updated) > ICalendarAttachmentMetadata::MAX_RESOURCE_BYTES) {
+            throw new RuntimeException('The calendar resource exceeds the attachment limit.');
+        }
+        return $updated;
     }
 
     /**

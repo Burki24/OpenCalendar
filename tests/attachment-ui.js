@@ -20,6 +20,15 @@ const context = vm.createContext({localAttachmentMaximumUploadBytes: 2 * 1024 * 
 for (const name of ['providerAttachmentSelector', 'localAttachmentSelector', 'normalizedAttachmentMetadata', 'normalizedLocalAttachmentMetadata', 'safeAttachmentDownloadName']) {
     vm.runInContext(functionSource(name), context);
 }
+context.calendarEntryByInstanceId = () => ({
+    instanceId: 42,
+    canReadProviderAttachments: true,
+    canManageProviderAttachments: true,
+    attachmentSelectorType: 'icalendar'
+});
+for (const name of ['attachmentTransferValue', 'providerAttachmentUploadValue']) {
+    vm.runInContext(functionSource(name), context);
+}
 
 const endpointContext = vm.createContext({
     URL,
@@ -67,6 +76,16 @@ assert.strictEqual(
     context.providerAttachmentSelector({uid: 'event'}, {canReadProviderAttachments: false, attachmentSelectorType: 'icalendar'}),
     null,
     'A disabled calendar capability must hide attachment access.'
+);
+assert.strictEqual(
+    context.providerAttachmentUploadValue({calendarInstanceId: 42, uid: 'series', recurrenceType: 'occurrence'}),
+    null,
+    'A generated CalDAV occurrence must not accidentally attach a file to the series.'
+);
+assert.deepStrictEqual(
+    JSON.parse(JSON.stringify(context.providerAttachmentUploadValue({calendarInstanceId: 42, uid: 'event'}, {name: 'Proof.pdf', content: 'JVBERg=='}))),
+    {calendarId: 42, operation: 'upload', destination: 'provider', selector: {uid: 'event'}, data: {name: 'Proof.pdf', content: 'JVBERg=='}},
+    'Provider upload must declare the selected owner and destination explicitly.'
 );
 
 assert.deepStrictEqual(
@@ -144,12 +163,14 @@ assert(source.includes('URL.revokeObjectURL(url)'));
 assert(html.includes('id="details-attachments"') && html.includes('id="details-load-attachments"'));
 assert(html.includes('id="details-add-attachment"') && html.includes('id="details-attachment-file"'));
 assert(html.includes('id="details-local-attachment-note"'));
+assert(html.includes('id="details-provider-attachment-note"'));
 assert(html.includes('id="attachment-delete-confirm-dialog"'));
 assert(source.includes("destination: 'local'"), 'Local transfers must declare their storage destination explicitly.');
 assert(source.includes("crypto.getRandomValues"), 'Upload retry identities must use cryptographic randomness.');
 assert(moduleSource.includes("'runtime'            => $runtime"));
 assert(moduleSource.includes("'canReadLocalAttachments'"));
 assert(moduleSource.includes("'canManageLocalAttachments'"));
+assert(moduleSource.includes("'canManageProviderAttachments'"));
 assert(!moduleSource.includes('$runtime = $ipsView\n'));
 
 console.log('Lazy attachment list and protected download UI tests passed.');
