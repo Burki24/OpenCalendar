@@ -56,11 +56,7 @@ final class CalendarVisualizationRenderer
                 ]
             ],
             'runtime'            => $ipsView
-                ? [
-                    'endpoint'         => '/hook/opencalendar/view/12345',
-                    'fallbackEndpoint' => 'https://example.ipmagic.de/hook/opencalendar/view/12345',
-                    'token'            => '0123456789abcdef0123456789abcdef'
-                ]
+                ? ['endpoint' => '/hook/opencalendar/view/12345', 'token' => '0123456789abcdef0123456789abcdef']
                 : null,
             'translations'       => ['Today' => 'Heute'],
             'options'            => [
@@ -1413,11 +1409,10 @@ foreach ([$native, $ipsView] as $html) {
     assertVisualization(
         str_contains($html, 'function calendarRuntimeEndpoint(runtime)')
             && str_contains($html, 'bases.push(document.referrer);')
-            && str_contains($html, "const fallbackEndpoint = String(runtime?.fallbackEndpoint || '').trim();")
-            && str_contains($html, "return fallback.protocol === 'https:' ? fallback.href : '';")
+            && str_contains($html, "return endpoint.startsWith('/') ? endpoint : '';")
             && str_contains($html, 'const endpoint = calendarRuntimeEndpoint(calendarIPSViewConfig);')
             && str_contains($html, 'const endpoint = calendarRuntimeEndpoint(calendarRuntime);'),
-        'IPSView actions and attachment transfers must resolve embedded pages and use the HTTPS Connect fallback in standalone IPSView.'
+        'IPSView actions and attachment transfers must resolve embedded pages and preserve the standalone IPSView hook fallback.'
     );
     assertVisualization(
         str_contains($html, 'function trustedMicrosoftReferenceUrl(value)')
@@ -1436,7 +1431,6 @@ assertVisualization(str_contains($ipsView, 'class="ipsview-mode"'), 'The IPSView
 assertVisualization(str_contains($ipsView, '"mode":"ipsview"'), 'The IPSView bootstrap mode must be explicit.');
 assertVisualization(
     str_contains($ipsView, '"endpoint":"/hook/opencalendar/view/12345"')
-        && str_contains($ipsView, '"fallbackEndpoint":"https://example.ipmagic.de/hook/opencalendar/view/12345"')
         && str_contains($ipsView, '"token":"0123456789abcdef0123456789abcdef"'),
     'The IPSView bootstrap must include its authenticated action bridge.'
 );

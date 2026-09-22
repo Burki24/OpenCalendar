@@ -43,7 +43,6 @@ class CalendarView extends IPSModuleStrict
 
     private const CALENDAR_MODULE_ID = '{227B63E4-4223-316B-76E9-FD3849689562}';
     private const CALENDAR_ACCOUNT_MODULE_ID = '{966D6119-7FF3-5CA5-06C3-536FBF8100C4}';
-    private const CONNECT_CONTROL_MODULE_ID = '{9486D575-BE8C-4ED8-B5B5-20930E26DE6F}';
     private const INITIALIZATION_DELAY_MS = 5_000;
     private const INITIALIZATION_REFRESH_DELAY_MS = 1_000;
     private const MAX_INITIALIZATION_REFRESH_ATTEMPTS = 30;
@@ -1264,7 +1263,7 @@ class CalendarView extends IPSModuleStrict
             return;
         }
         if ($attachmentAction) {
-            $this->allowOpaqueIPSViewAttachmentOrigin();
+            $this->allowAuthenticatedIPSViewAttachmentOrigin();
         }
 
         $rawClientContractVersion = $request['clientContractVersion'] ?? null;
@@ -1522,9 +1521,8 @@ class CalendarView extends IPSModuleStrict
         // tile and IPSView. File data must never travel through visualization
         // state updates, which are shared with every open client of this view.
         $runtime = [
-            'endpoint'         => '/hook/' . $this->ipsViewHookAddress(),
-            'fallbackEndpoint' => $ipsView ? $this->ipsViewConnectEndpoint() : '',
-            'token'            => $this->ipsViewToken()
+            'endpoint' => '/hook/' . $this->ipsViewHookAddress(),
+            'token'    => $this->ipsViewToken()
         ];
 
         return $this->RenderVisualizationHTMLPage($ipsView, [
@@ -3305,46 +3303,30 @@ class CalendarView extends IPSModuleStrict
     }
 
     /**
-     * Provides a configuration-free HTTPS endpoint for standalone IPSView apps.
-     * Embedded tile documents resolve the relative hook locally and do not use it.
+     * Allows the already authenticated IPSView WebView to read its attachment response.
+     * Android uses an opaque `null` origin while Windows can use an app-owned URL origin.
      */
-    private function ipsViewConnectEndpoint(): string
+    private function allowAuthenticatedIPSViewAttachmentOrigin(): void
     {
-        if (!function_exists('CC_GetConnectURL')) {
-            return '';
-        }
-        try {
-            foreach (IPS_GetInstanceListByModuleID(self::CONNECT_CONTROL_MODULE_ID) as $connectId) {
-                $instance = IPS_GetInstance($connectId);
-                if ((int) ($instance['InstanceStatus'] ?? 0) !== IS_ACTIVE) {
-                    continue;
-                }
-                $connectUrl = trim((string) CC_GetConnectURL($connectId));
-                $parts = parse_url($connectUrl);
-                if (!is_array($parts) || strtolower((string) ($parts['scheme'] ?? '')) !== 'https'
-                    || trim((string) ($parts['host'] ?? '')) === '' || isset($parts['user']) || isset($parts['pass'])
-                    || isset($parts['query']) || isset($parts['fragment'])
-                    || (isset($parts['port']) && (int) $parts['port'] !== 443)) {
-                    continue;
-                }
-                $origin = 'https://' . $parts['host'] . (isset($parts['port']) ? ':443' : '');
-                return $origin . '/hook/' . $this->ipsViewHookAddress();
-            }
-        } catch (Throwable $exception) {
-            $this->SendDebug('IPSViewConnectEndpoint', $exception->getMessage(), 0);
-        }
-
-        return '';
-    }
-
-    /** Allows the authenticated data: document used by IPSView to read attachment responses. */
-    private function allowOpaqueIPSViewAttachmentOrigin(): void
-    {
-        if (($_SERVER['HTTP_ORIGIN'] ?? null) !== 'null') {
+        $origin = $this->ipsViewAttachmentOrigin();
+        if ($origin === '') {
             return;
         }
-        header('Access-Control-Allow-Origin: null');
+        header('Access-Control-Allow-Origin: ' . $origin);
         header('Vary: Origin');
+    }
+
+    /** Returns only a serialized browser origin suitable for an exact CORS response. */
+    private function ipsViewAttachmentOrigin(): string
+    {
+        $origin = $_SERVER['HTTP_ORIGIN'] ?? null;
+        if (!is_string($origin) || $origin === '' || strlen($origin) > 2048 || $origin === '*'
+            || ($origin !== 'null' && $origin !== 'file://'
+                && preg_match('/^[a-z][a-z0-9+.-]*:\/\/[^\/?#\x00-\x20\x7f]+$/iD', $origin) !== 1)) {
+            return '';
+        }
+
+        return $origin;
     }
 
     private function ensureIPSViewToken(): void
@@ -3395,7 +3377,7 @@ class CalendarView extends IPSModuleStrict
      */
     private function checkAttachmentRequestAccess(array $request): void
     {
-        // Only the authenticated opaque IPSView document receives an explicit CORS grant.
+        // Only the authenticated IPSView WebView receives its exact CORS origin.
         header('Content-Type: application/json; charset=utf-8');
         header('Cache-Control: no-store');
         header('X-Content-Type-Options: nosniff');

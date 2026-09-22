@@ -38,6 +38,7 @@ class AttachmentAccessBaselineView extends CalendarView
 
 $view = new AttachmentAccessBaselineView(99999);
 $hook = new ReflectionMethod(CalendarView::class, 'ProcessHookData');
+$originMethod = new ReflectionMethod(CalendarView::class, 'ipsViewAttachmentOrigin');
 $validToken = str_repeat('00000001', 4);
 $savedServer = $_SERVER;
 $savedPost = $_POST;
@@ -51,6 +52,21 @@ $cases = [
     ['unknown action', true, 1, 'POST', $validToken, '{}', 400]
 ];
 try {
+    foreach ([
+        [null, ''],
+        ['null', 'null'],
+        ['file://', 'file://'],
+        ['https://appassets.example', 'https://appassets.example'],
+        ['ms-appx-web://microsoft.microsoftedge', 'ms-appx-web://microsoft.microsoftedge'],
+        ['*', ''],
+        ['https://example.invalid/path', ''],
+        ["https://example.invalid\r\nX-Test: injected", '']
+    ] as [$origin, $expectedOrigin]) {
+        $_SERVER = $origin === null ? [] : ['HTTP_ORIGIN' => $origin];
+        if ($originMethod->invoke($view) !== $expectedOrigin) {
+            throw new RuntimeException('IPSView attachment origins must be reflected exactly and reject unsafe values.');
+        }
+    }
     foreach ($cases as [$label, $enabled, $part, $method, $token, $value, $expected]) {
         $view->enabled = $enabled;
         $view->tokenPart = $part;

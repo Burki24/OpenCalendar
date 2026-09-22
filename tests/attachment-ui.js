@@ -28,19 +28,13 @@ const endpointContext = vm.createContext({
 });
 vm.runInContext(functionSource('calendarRuntimeEndpoint'), endpointContext);
 assert.strictEqual(
-    endpointContext.calendarRuntimeEndpoint({
-        endpoint: '/hook/opencalendar/view/12345',
-        fallbackEndpoint: 'https://example.ipmagic.de/hook/opencalendar/view/12345'
-    }),
-    'https://example.ipmagic.de/hook/opencalendar/view/12345',
-    'Standalone IPSView must use the automatically discovered HTTPS Connect endpoint.'
+    endpointContext.calendarRuntimeEndpoint({endpoint: '/hook/opencalendar/view/12345'}),
+    '/hook/opencalendar/view/12345',
+    'Standalone IPSView must preserve the hook path routed by its configured Symcon connection.'
 );
 endpointContext.document.referrer = 'http://192.168.178.6:3777/tile/';
 assert.strictEqual(
-    endpointContext.calendarRuntimeEndpoint({
-        endpoint: '/hook/opencalendar/view/12345',
-        fallbackEndpoint: 'https://example.ipmagic.de/hook/opencalendar/view/12345'
-    }),
+    endpointContext.calendarRuntimeEndpoint({endpoint: '/hook/opencalendar/view/12345'}),
     'http://192.168.178.6:3777/hook/opencalendar/view/12345',
     'Embedded IPSView must prefer its local Symcon origin.'
 );
