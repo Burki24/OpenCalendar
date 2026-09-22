@@ -115,9 +115,9 @@ final class MicrosoftCalendarProvider implements CalendarEventLookupProviderInte
             throw new MicrosoftCalendarProviderException('The attachment event is no longer available.');
         }
         $created = $this->requestJsonUrl('POST', $url . '/attachments', [
-            '@odata.type' => '#microsoft.graph.fileAttachment',
-            'name' => $name,
-            'contentType' => $contentType,
+            '@odata.type'  => '#microsoft.graph.fileAttachment',
+            'name'         => $name,
+            'contentType'  => $contentType,
             'contentBytes' => $content
         ], [], [201], MicrosoftAttachmentCollection::MAX_RESPONSE_BYTES);
         if (!is_string($created['id'] ?? null) || $created['id'] === '') {

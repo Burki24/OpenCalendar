@@ -123,22 +123,26 @@ $calendar->properties['AttachmentMode'] = 2;
 $calendar->properties['CanWrite'] = true;
 $upload = json_encode([
     'selector' => ['eventReference' => 'evt'],
-    'name' => 'Proof.pdf',
-    'content' => base64_encode("%PDF-1.7\n%%EOF\n")
+    'name'     => 'Proof.pdf',
+    'content'  => base64_encode("%PDF-1.7\n%%EOF\n")
 ], JSON_THROW_ON_ERROR);
 $http->responses = [[200, ['id' => 'evt']], [201, ['id' => 'uploaded']]];
 $uploaded = json_decode($calendar->UploadProviderAttachment($upload), true, 512, JSON_THROW_ON_ERROR);
-attachmentMetadataCheck($uploaded['result']['uploaded'] === true && count($http->responses) === 0,
-    'Calendar-to-account Microsoft event upload routing failed.');
+attachmentMetadataCheck(
+    $uploaded['result']['uploaded'] === true && count($http->responses) === 0,
+    'Calendar-to-account Microsoft event upload routing failed.'
+);
 $taskUpload = json_encode([
     'selector' => ['sourceType' => 'microsoft-todo', 'taskId' => 'task', 'taskListId' => 'list'],
-    'name' => 'Proof.pdf',
-    'content' => base64_encode("%PDF-1.7\n%%EOF\n")
+    'name'     => 'Proof.pdf',
+    'content'  => base64_encode("%PDF-1.7\n%%EOF\n")
 ], JSON_THROW_ON_ERROR);
 $http->responses = [[200, ['id' => 'task']], [201, ['id' => 'task-file']]];
 $uploaded = json_decode($calendar->UploadProviderAttachment($taskUpload), true, 512, JSON_THROW_ON_ERROR);
-attachmentMetadataCheck($uploaded['result']['uploaded'] === true && count($http->responses) === 0,
-    'Calendar-to-account Microsoft To Do upload routing failed.');
+attachmentMetadataCheck(
+    $uploaded['result']['uploaded'] === true && count($http->responses) === 0,
+    'Calendar-to-account Microsoft To Do upload routing failed.'
+);
 $calendar->properties['CanWrite'] = false;
 $count = count($http->requests);
 attachmentMetadataReject(fn () => $calendar->UploadProviderAttachment($upload));
@@ -149,7 +153,8 @@ attachmentMetadataReject(fn () => $calendar->UploadProviderAttachment($upload));
 attachmentMetadataCheck(count($http->requests) === $count, 'Read-only attachment mode must not upload.');
 $calendar->properties['AttachmentMode'] = 2;
 $http->responses = [[200, ['id' => 'evt']], [201, ['id' => 'uploaded']]];
-$calendar->afterReply = static function () use ($calendar): void {
+$calendar->afterReply = static function () use ($calendar): void
+{
     $calendar->properties['AttachmentAllowProvider'] = false;
 };
 attachmentMetadataReject(fn () => $calendar->UploadProviderAttachment($upload));

@@ -120,7 +120,7 @@ final class CalDAVProvider implements CalendarEventLookupProviderInterface, Cale
         }
         $response = $this->httpClient->request('PUT', $resource['resourceUrl'], [
             'Content-Type' => 'text/calendar; charset=utf-8',
-            'If-Match' => $etag
+            'If-Match'     => $etag
         ], $updated, 65_536);
         $this->assertResponseStatus($response, [200, 201, 204], 'attachment upload');
         $effectiveUrl = $this->trustedEffectiveUrl($response, $resource['resourceUrl']);

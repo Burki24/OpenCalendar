@@ -6,10 +6,10 @@ require_once __DIR__ . '/../libs/MicrosoftCalendarProvider.php';
 require_once __DIR__ . '/../libs/MicrosoftTodoProvider.php';
 require_once __DIR__ . '/../libs/CalDAVProvider.php';
 
-use IPSKalender\CalendarHttpClientInterface;
-use IPSKalender\CalendarHttpResponse;
 use IPSKalender\CalDAVOriginPolicy;
 use IPSKalender\CalDAVProvider;
+use IPSKalender\CalendarHttpClientInterface;
+use IPSKalender\CalendarHttpResponse;
 use IPSKalender\MicrosoftCalendarProvider;
 use IPSKalender\MicrosoftTodoProvider;
 
@@ -65,9 +65,11 @@ foreach ([false, true] as $task) {
     uploadCheck(count($http->requests) === 2 && $http->requests[0]['method'] === 'GET'
         && $http->requests[1]['method'] === 'POST', 'Microsoft parent must be verified before POST.');
     $body = json_decode($http->requests[1]['body'], true, 8, JSON_THROW_ON_ERROR);
-    uploadCheck(($body['name'] ?? '') === $name && ($body['contentBytes'] ?? '') === $content
+    uploadCheck(
+        ($body['name'] ?? '') === $name && ($body['contentBytes'] ?? '') === $content
         && ($body['@odata.type'] ?? '') === ($task ? '#microsoft.graph.taskFileAttachment' : '#microsoft.graph.fileAttachment'),
-        'Microsoft upload body or attachment kind is wrong.');
+        'Microsoft upload body or attachment kind is wrong.'
+    );
     uploadCheck(str_ends_with(parse_url($http->requests[1]['url'], PHP_URL_PATH), '/attachments'), 'Attachment POST changed its owner.');
     $denied = new AttachmentUploadHttp([[200, ['id' => 'wrong'], []]]);
     $provider = $task ? new MicrosoftTodoProvider($denied, 'secret') : new MicrosoftCalendarProvider($denied, 'secret');
@@ -89,8 +91,10 @@ $unfolded = preg_replace('/\r\n[ \t]/', '', $http->requests[1]['body']);
 uploadCheck(str_contains($unfolded, 'ATTACH;FMTTYPE=application/pdf;ENCODING=BASE64;VALUE=BINARY;FILENAME="Proof.pdf":' . $content)
     && str_contains($unfolded, 'SUMMARY:Test'), 'CalDAV upload must preserve the event and append inline ATTACH.');
 $listed = IPSKalender\ICalendarCodec::attachmentMetadata($http->requests[1]['body'], 'event');
-uploadCheck(count($listed) === 1 && $listed[0]['name'] === $name,
-    'Uploaded CalDAV attachment must be readable again by OpenCalendar.');
+uploadCheck(
+    count($listed) === 1 && $listed[0]['name'] === $name,
+    'Uploaded CalDAV attachment must be readable again by OpenCalendar.'
+);
 
 $http = new AttachmentUploadHttp([[200, $ical, []]]);
 $dav = new CalDAVProvider($http, 'https://dav.invalid/', new CalDAVOriginPolicy('https://dav.invalid/'));

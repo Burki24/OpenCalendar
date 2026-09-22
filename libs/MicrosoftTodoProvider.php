@@ -113,9 +113,9 @@ final class MicrosoftTodoProvider
             throw new MicrosoftTodoProviderException('The attachment task is no longer available.');
         }
         $created = $this->requestJsonUrl('POST', $url . '/attachments', [
-            '@odata.type' => '#microsoft.graph.taskFileAttachment',
-            'name' => $name,
-            'contentType' => $contentType,
+            '@odata.type'  => '#microsoft.graph.taskFileAttachment',
+            'name'         => $name,
+            'contentType'  => $contentType,
             'contentBytes' => $content
         ], [201], MicrosoftAttachmentCollection::MAX_RESPONSE_BYTES);
         if (!is_string($created['id'] ?? null) || $created['id'] === '') {

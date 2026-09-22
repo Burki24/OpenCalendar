@@ -3474,18 +3474,18 @@ class CalendarView extends IPSModuleStrict
             }
             $result = $value['destination'] === 'provider'
                 ? match ($value['operation']) {
-                    'list' => IPSKAL_ListProviderAttachments($value['calendarId'], json_encode($value['selector'], JSON_THROW_ON_ERROR)),
+                    'list'     => IPSKAL_ListProviderAttachments($value['calendarId'], json_encode($value['selector'], JSON_THROW_ON_ERROR)),
                     'download' => IPSKAL_DownloadProviderAttachment($value['calendarId'], json_encode([
                         'selector' => $value['selector'], 'id' => $value['data']['id']
                     ], JSON_THROW_ON_ERROR)),
                     'upload' => IPSKAL_UploadProviderAttachment($value['calendarId'], json_encode([
                         'selector' => $value['selector'], 'name' => $value['data']['name'],
-                        'content' => $value['data']['content']
+                        'content'  => $value['data']['content']
                     ], JSON_THROW_ON_ERROR))
                 }
-                : IPSKAL_TransferLocalAttachment($value['calendarId'], json_encode([
-                    'operation' => $value['operation'], 'selector' => $value['selector'], 'data' => $value['data']
-                ], JSON_THROW_ON_ERROR));
+            : IPSKAL_TransferLocalAttachment($value['calendarId'], json_encode([
+                'operation' => $value['operation'], 'selector' => $value['selector'], 'data' => $value['data']
+            ], JSON_THROW_ON_ERROR));
             if (!$allowed()) {
                 throw new RuntimeException('Access changed.');
             }
