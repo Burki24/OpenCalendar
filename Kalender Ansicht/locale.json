@@ -44,6 +44,8 @@
             "Files added here are stored on the Symcon host, may be included in backups, and are available to everyone authorized for this view. They are not uploaded to the calendar provider.": "Hier hinzugefügte Dateien werden auf dem Symcon-System gespeichert, können in Sicherungen enthalten sein und stehen allen für diese Ansicht berechtigten Personen zur Verfügung. Sie werden nicht zum Kalenderanbieter hochgeladen.",
             "Local attachment": "Lokal gespeicherter Anhang",
             "Uploading attachment…": "Anhang wird hochgeladen…",
+            "Provider accepted the upload. Waiting for the attachment list to update…": "Anbieter hat den Upload angenommen. Die Anhangsliste wird in Kürze aktualisiert…",
+            "Provider accepted the upload. If the file is not visible yet, refresh the list later.": "Anbieter hat den Upload angenommen. Falls die Datei noch nicht sichtbar ist, bitte die Liste später erneut aktualisieren.",
             "The upload result could not be confirmed. Check the refreshed list before retrying.": "Das Ergebnis des Uploads konnte nicht bestätigt werden. Bitte vor einem erneuten Versuch die aktualisierte Liste prüfen.",
             "Only TXT, PDF, PNG and JPEG files up to 2 MiB are allowed.": "Erlaubt sind nur TXT-, PDF-, PNG- und JPEG-Dateien bis 2 MiB.",
             "Delete attachment": "Anhang löschen",

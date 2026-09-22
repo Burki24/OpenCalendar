@@ -1488,7 +1488,10 @@ class Calendar extends IPSModuleStrict
             || ($result['uploaded'] ?? null) !== true) {
             throw new RuntimeException('Provider attachment upload could not be confirmed.');
         }
-        return json_encode(['result' => ['uploaded' => true]], JSON_THROW_ON_ERROR);
+        return json_encode(['result' => [
+            'uploaded' => true,
+            'pendingVerification' => ($result['pendingVerification'] ?? false) === true
+        ]], JSON_THROW_ON_ERROR);
     }
 
     /**

@@ -3450,9 +3450,18 @@ async function uploadSelectedAttachment() {
             requestId: localAttachmentRequestId()
         }) || providerAttachmentUploadValue(event, {name: file.name, content});
         if (!value) throw new Error();
-        await attachmentTransferRequest(value);
+        const uploadResponse = await attachmentTransferRequest(value);
         if (revision !== attachmentDetailsRevision) return;
-        await loadSelectedEventAttachments();
+        const pendingVerification = uploadResponse?.result?.pendingVerification === true;
+        if (pendingVerification) {
+            setAttachmentDetailsStatus(t('Provider accepted the upload. Waiting for the attachment list to update…'));
+            await new Promise(resolve => window.setTimeout(resolve, 4000));
+            if (revision !== attachmentDetailsRevision) return;
+        }
+        const refreshed = await loadSelectedEventAttachments();
+        if (pendingVerification && refreshed && selectedEvent === event && eventDetailsDialog.open) {
+            setAttachmentDetailsStatus(t('Provider accepted the upload. If the file is not visible yet, refresh the list later.'));
+        }
     } catch (_) {
         if (revision === attachmentDetailsRevision) {
             refreshedAfterFailure = await loadSelectedEventAttachments();

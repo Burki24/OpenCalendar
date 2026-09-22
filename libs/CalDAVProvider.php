@@ -177,8 +177,10 @@ final class CalDAVProvider implements CalendarEventLookupProviderInterface, Cale
             if ($managedId === '' || strlen($managedId) > 512 || preg_match('/[\x00-\x20\x7f]/', $managedId)) {
                 throw new CalDAVProviderException('The server did not confirm the managed attachment.');
             }
-            $this->verifyManagedUpload($calendarReference, $uid, $recurrenceId, $resource['resourceUrl'], $managedId);
-            return ['uploaded' => true];
+            $verified = $this->verifyManagedUpload(
+                $calendarReference, $uid, $recurrenceId, $resource['resourceUrl'], $managedId
+            );
+            return ['uploaded' => true, 'pendingVerification' => !$verified];
         }
         if ($this->originPolicy->isICloudAccount()) {
             throw new CalDAVProviderException('iCloud did not advertise managed attachments; upload was not attempted.');
@@ -841,28 +843,34 @@ final class CalDAVProvider implements CalendarEventLookupProviderInterface, Cale
         string $recurrenceId,
         string $resourceUrl,
         string $managedId
-    ): void {
-        $after = $this->attachmentResource($calendarReference, $uid, $resourceUrl);
+    ): bool {
+        // A successful RFC 8607 POST confirms storage, but the updated calendar
+        // resource can become visible later. The caller schedules a nonblocking refresh.
+        try {
+            $after = $this->attachmentResource($calendarReference, $uid, $resourceUrl);
+        } catch (CalDAVProviderException $exception) {
+            if (in_array($exception->httpStatus, [404, 503], true)) {
+                return false;
+            }
+            throw $exception;
+        }
         foreach (ICalendarCodec::attachmentMetadata($after['ical'], $uid, $recurrenceId) as $attachment) {
             if ($attachment['kind'] !== 'reference') {
                 continue;
             }
             try {
                 $reference = ICalendarCodec::managedAttachmentReference(
-                    $after['ical'],
-                    $uid,
-                    $recurrenceId,
-                    $attachment['id']
+                    $after['ical'], $uid, $recurrenceId, $attachment['id']
                 );
             } catch (RuntimeException) {
                 continue;
             }
             if (hash_equals($managedId, $reference['managedId'])
                 && $this->isTrustedManagedAttachmentUrl($reference['uri'])) {
-                return;
+                return true;
             }
         }
-        throw new CalDAVProviderException('The server did not retain the managed attachment.');
+        return false;
     }
 
     private function isTrustedManagedAttachmentUrl(string $url): bool

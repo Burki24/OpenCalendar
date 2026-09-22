@@ -24,6 +24,7 @@ $commands = [
     ['Verify private attachment transfers', [PHP_BINARY, 'tests/attachment-transfer.php']],
     ['Verify lazy attachment list and download UI', ['node', 'tests/attachment-ui.js']],
     ['Verify attachment save dialog and download fallback', ['node', 'tests/attachment-save-dialog.js']],
+    ['Verify delayed CalDAV attachment list refresh', ['node', 'tests/attachment-upload-wait.js']],
     ['Verify local attachment backup and cleanup', [PHP_BINARY, 'tests/local-attachment-maintenance.php']],
     ['Verify provider attachment access and Microsoft metadata', [PHP_BINARY, 'tests/provider-attachment-access.php']],
     ['Verify provider attachment uploads', [PHP_BINARY, 'tests/provider-attachment-upload.php']],
