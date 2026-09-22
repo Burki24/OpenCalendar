@@ -69,6 +69,12 @@ final class CalDAVOriginPolicy implements CalendarHttpOriginPolicyInterface
         return $this->serverUrl;
     }
 
+    /** Whether the configured account uses the trusted iCloud CalDAV host family. */
+    public function isICloudAccount(): bool
+    {
+        return $this->allowICloudShards;
+    }
+
     /**
      * Checks whether an absolute URL belongs to an origin trusted for this account.
      */
@@ -96,7 +102,9 @@ final class CalDAVOriginPolicy implements CalendarHttpOriginPolicyInterface
         return $this->allowICloudShards
             && $scheme === 'https'
             && $port === 443
-            && self::isICloudCalDAVHost($host);
+            && (self::isICloudCalDAVHost($host)
+                || ($host === 'gateway.icloud.com'
+                    && str_starts_with((string) ($parts['path'] ?? ''), '/caldav/')));
     }
 
     /** @inheritDoc */

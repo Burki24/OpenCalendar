@@ -76,7 +76,24 @@ final class CalDAVProvider implements CalendarEventLookupProviderInterface, Cale
         }
         $calendarReference = $this->normalizeAbsoluteUrl($calendarReference);
         $resource = $this->attachmentResource($calendarReference, $uid, $resourceReference);
-        return ICalendarCodec::attachmentMetadata($resource['ical'], $uid, $recurrenceId);
+        $attachments = ICalendarCodec::attachmentMetadata($resource['ical'], $uid, $recurrenceId);
+        foreach ($attachments as &$attachment) {
+            if ($attachment['kind'] !== 'reference') {
+                continue;
+            }
+            try {
+                $reference = ICalendarCodec::managedAttachmentReference(
+                    $resource['ical'], $uid, $recurrenceId, $attachment['id']
+                );
+                if ($this->isTrustedManagedAttachmentUrl($reference['uri'])) {
+                    $attachment['kind'] = 'file';
+                }
+            } catch (RuntimeException) {
+                // An untrusted or unmanaged URI remains an opaque external reference.
+            }
+        }
+        unset($attachment);
+        return $attachments;
     }
 
     /** @return array{name:string,contentType:string,content:string} Raw embedded attachment content. */
@@ -92,10 +109,30 @@ final class CalDAVProvider implements CalendarEventLookupProviderInterface, Cale
         }
         $calendarReference = $this->normalizeAbsoluteUrl($calendarReference);
         $resource = $this->attachmentResource($calendarReference, $uid, $resourceReference);
-        return ICalendarCodec::attachmentContent($resource['ical'], $uid, $recurrenceId, $attachmentId);
+        try {
+            return ICalendarCodec::attachmentContent($resource['ical'], $uid, $recurrenceId, $attachmentId);
+        } catch (RuntimeException $exception) {
+            $reference = ICalendarCodec::managedAttachmentReference(
+                $resource['ical'], $uid, $recurrenceId, $attachmentId
+            );
+            if (!$this->isTrustedManagedAttachmentUrl($reference['uri'])
+                || ($reference['size'] !== null && $reference['size'] > ICalendarAttachmentMetadata::MAX_DOWNLOAD_BYTES)) {
+                throw new CalDAVProviderException('Managed attachment is unavailable for download.', 0);
+            }
+            $response = $this->httpClient->request(
+                'GET', $reference['uri'], ['Accept' => $reference['contentType']], '',
+                ICalendarAttachmentMetadata::MAX_DOWNLOAD_BYTES
+            );
+            $this->assertResponseStatus($response, [200], 'managed attachment retrieval');
+            if (!$this->isTrustedManagedAttachmentUrl($this->trustedEffectiveUrl($response, $reference['uri']))
+                || strlen($response->body) > ICalendarAttachmentMetadata::MAX_DOWNLOAD_BYTES) {
+                throw new CalDAVProviderException('Managed attachment download was rejected.');
+            }
+            return ['name' => $reference['name'], 'contentType' => $reference['contentType'], 'content' => $response->body];
+        }
     }
 
-    /** Writes one inline attachment using the current strong resource ETag. */
+    /** Uploads through RFC 8607 where advertised; otherwise writes a verified inline ATTACH. */
     public function uploadAttachment(
         string $calendarReference,
         string $uid,
@@ -107,9 +144,36 @@ final class CalDAVProvider implements CalendarEventLookupProviderInterface, Cale
         if ($uid === '' || strlen($uid) > 2048 || preg_match('/[\x00-\x1f\x7f]/', $uid)) {
             throw new CalDAVProviderException('Invalid attachment event identity.');
         }
-        AttachmentUploadPolicy::validate($name, $content);
+        $contentType = AttachmentUploadPolicy::validate($name, $content);
         $calendarReference = $this->normalizeAbsoluteUrl($calendarReference);
         $resource = $this->attachmentResource($calendarReference, $uid, $resourceReference);
+        ICalendarCodec::attachmentMetadata($resource['ical'], $uid, $recurrenceId);
+        if ($this->supportsManagedAttachments($calendarReference)) {
+            $url = $resource['resourceUrl'] . (str_contains($resource['resourceUrl'], '?') ? '&' : '?')
+                . 'action=attachment-add';
+            if ($recurrenceId !== '') {
+                $url .= '&rid=' . rawurlencode($recurrenceId);
+            }
+            $response = $this->httpClient->request('POST', $url, [
+                'Content-Type' => $contentType,
+                'Content-Disposition' => 'attachment; filename="' . $name . '"',
+                'Prefer' => 'return=representation'
+            ], base64_decode($content, true), ICalendarAttachmentMetadata::MAX_RESOURCE_BYTES);
+            $this->assertResponseStatus($response, [200, 201, 204], 'managed attachment upload');
+            $this->assertResourceBelongsToCalendar(
+                $calendarReference,
+                preg_replace('/\?.*$/D', '', $this->trustedEffectiveUrl($response, $url))
+            );
+            $managedId = trim((string) ($response->headers['cal-managed-id'] ?? ''));
+            if ($managedId === '' || strlen($managedId) > 512 || preg_match('/[\x00-\x20\x7f]/', $managedId)) {
+                throw new CalDAVProviderException('The server did not confirm the managed attachment.');
+            }
+            $this->verifyManagedUpload($calendarReference, $uid, $recurrenceId, $resource['resourceUrl'], $managedId);
+            return ['uploaded' => true];
+        }
+        if ($this->originPolicy->isICloudAccount()) {
+            throw new CalDAVProviderException('iCloud did not advertise managed attachments; upload was not attempted.');
+        }
         $etag = $resource['etag'];
         if (preg_match('/^"[^"\r\n]+"$/D', $etag) !== 1) {
             throw new CalDAVProviderException('The attachment event has no strong ETag.');
@@ -125,6 +189,23 @@ final class CalDAVProvider implements CalendarEventLookupProviderInterface, Cale
         $this->assertResponseStatus($response, [200, 201, 204], 'attachment upload');
         $effectiveUrl = $this->trustedEffectiveUrl($response, $resource['resourceUrl']);
         $this->assertResourceBelongsToCalendar($calendarReference, $effectiveUrl);
+        $after = $this->attachmentResource($calendarReference, $uid, $resource['resourceUrl']);
+        $persisted = ICalendarCodec::attachmentMetadata($after['ical'], $uid, $recurrenceId);
+        $expected = hash('sha256', base64_decode($content, true));
+        $found = false;
+        foreach ($persisted as $attachment) {
+            if ($attachment['kind'] !== 'embedded' || $attachment['name'] !== $name) {
+                continue;
+            }
+            $file = ICalendarCodec::attachmentContent($after['ical'], $uid, $recurrenceId, $attachment['id']);
+            if (hash_equals($expected, hash('sha256', $file['content']))) {
+                $found = true;
+                break;
+            }
+        }
+        if (!$found) {
+            throw new CalDAVProviderException('The server did not retain the uploaded attachment.');
+        }
         return ['uploaded' => true];
     }
 
@@ -712,6 +793,79 @@ final class CalDAVProvider implements CalendarEventLookupProviderInterface, Cale
             'etag'        => trim((string) ($response->headers['etag'] ?? '')),
             'ical'        => $response->body
         ];
+    }
+
+    private function supportsManagedAttachments(string $calendarReference): bool
+    {
+        $calendarOptions = $this->httpClient->request('OPTIONS', $calendarReference, [], '', 65_536);
+        if (in_array($calendarOptions->statusCode, [401, 403], true)) {
+            $this->assertResponseStatus($calendarOptions, [200, 204], 'attachment capability discovery');
+        }
+        if (in_array($calendarOptions->statusCode, [200, 204], true)
+            && $this->hasManagedAttachmentCapability($calendarOptions)) {
+            return true;
+        }
+        // RFC 8607 requires the capability on the calendar home, not each calendar.
+        try {
+            $principal = $this->discoverPrincipal($calendarReference);
+            $home = $this->discoverCalendarHomeSet($principal);
+            $homeOptions = $this->httpClient->request('OPTIONS', $home, [], '', 65_536);
+            $this->assertResponseStatus($homeOptions, [200, 204], 'attachment capability discovery');
+            return $this->hasManagedAttachmentCapability($homeOptions);
+        } catch (CalDAVProviderException $exception) {
+            if ($this->originPolicy->isICloudAccount() || in_array($exception->httpStatus, [401, 403], true)) {
+                throw $exception;
+            }
+            return false;
+        }
+    }
+
+    private function hasManagedAttachmentCapability(CalendarHttpResponse $response): bool
+    {
+        $tokens = array_map('trim', explode(',', strtolower((string) ($response->headers['dav'] ?? ''))));
+        return in_array('calendar-managed-attachments', $tokens, true);
+    }
+
+    private function verifyManagedUpload(
+        string $calendarReference,
+        string $uid,
+        string $recurrenceId,
+        string $resourceUrl,
+        string $managedId
+    ): void {
+        $after = $this->attachmentResource($calendarReference, $uid, $resourceUrl);
+        foreach (ICalendarCodec::attachmentMetadata($after['ical'], $uid, $recurrenceId) as $attachment) {
+            if ($attachment['kind'] !== 'reference') {
+                continue;
+            }
+            try {
+                $reference = ICalendarCodec::managedAttachmentReference(
+                    $after['ical'], $uid, $recurrenceId, $attachment['id']
+                );
+            } catch (RuntimeException) {
+                continue;
+            }
+            if (hash_equals($managedId, $reference['managedId'])
+                && $this->isTrustedManagedAttachmentUrl($reference['uri'])) {
+                return;
+            }
+        }
+        throw new CalDAVProviderException('The server did not retain the managed attachment.');
+    }
+
+    private function isTrustedManagedAttachmentUrl(string $url): bool
+    {
+        $parts = parse_url($url);
+        if ($parts === false || !isset($parts['scheme'], $parts['host'])
+            || isset($parts['user']) || isset($parts['pass']) || isset($parts['fragment'])
+            || !$this->originPolicy->isAllowedUrl($url)) {
+            return false;
+        }
+        if (strtolower((string) $parts['host']) === 'gateway.icloud.com') {
+            return $this->originPolicy->isICloudAccount()
+                && str_starts_with((string) ($parts['path'] ?? ''), '/caldav/');
+        }
+        return true;
     }
 
     /**

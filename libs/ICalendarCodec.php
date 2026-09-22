@@ -49,6 +49,15 @@ final class ICalendarCodec
         );
     }
 
+    /** @return array{name:string,contentType:string,size:?int,uri:string,managedId:string} */
+    public static function managedAttachmentReference(string $ical, string $uid, string $recurrenceId, string $attachmentId): array
+    {
+        return ICalendarAttachmentMetadata::managedReference(
+            self::attachmentEventBlock($ical, $uid, $recurrenceId),
+            $attachmentId
+        );
+    }
+
     /** Appends one inline attachment to an existing exact VEVENT component. */
     public static function appendAttachment(string $ical, string $uid, string $recurrenceId, string $name, string $content): string
     {

@@ -22,7 +22,7 @@ final class ICalendarAttachmentMetadata
     {
         return array_map(static function (array $record): array
         {
-            unset($record['_content']);
+            unset($record['_content'], $record['_uri'], $record['_managedId']);
             return $record;
         }, self::records($block));
     }
@@ -49,6 +49,24 @@ final class ICalendarAttachmentMetadata
             return ['name' => $record['name'], 'contentType' => $record['contentType'], 'content' => $record['_content']];
         }
         throw new RuntimeException('Attachment is no longer available.');
+    }
+
+    /** @param list<string> $block @return array{name:string,contentType:string,size:?int,uri:string,managedId:string} */
+    public static function managedReference(array $block, string $attachmentId): array
+    {
+        if (preg_match('/^[a-f0-9]{64}$/D', $attachmentId) !== 1) {
+            throw new RuntimeException('Invalid attachment identity.');
+        }
+        foreach (self::records($block) as $record) {
+            if (hash_equals($attachmentId, $record['id']) && $record['kind'] === 'reference'
+                && $record['_managedId'] !== '' && $record['_uri'] !== '') {
+                return [
+                    'name' => $record['name'], 'contentType' => $record['contentType'],
+                    'size' => $record['size'], 'uri' => $record['_uri'], 'managedId' => $record['_managedId']
+                ];
+            }
+        }
+        throw new RuntimeException('Managed attachment is unavailable.');
     }
 
     /** @param list<string> $block @return list<array<string,mixed>> */
@@ -114,12 +132,14 @@ final class ICalendarAttachmentMetadata
                 $size = strlen($bytes);
                 $content = $bytes;
                 $kind = 'embedded';
+                $uri = '';
             } elseif ($type === 'URI' && !isset($params['ENCODING']) && $value !== ''
                 && strlen($value) <= 16_384 && preg_match('/[\x00-\x20\x7f]/', $value) !== 1
                 && preg_match('/^[a-zA-Z][a-zA-Z0-9+.-]*:/D', $value) === 1) {
                 // URI schemes, credentials and query tokens are intentionally opaque.
                 $kind = 'reference';
                 $content = null;
+                $uri = $value;
             } else {
                 throw new RuntimeException('Unsupported attachment property.');
             }
@@ -132,14 +152,23 @@ final class ICalendarAttachmentMetadata
             if (strlen($mime) > 255 || preg_match('/^[a-zA-Z0-9!#$&^_.+\-]+\/[a-zA-Z0-9!#$&^_.+\-]+$/D', $mime) !== 1) {
                 $mime = 'application/octet-stream';
             }
+            if ($kind === 'reference' && isset($params['SIZE'])
+                && preg_match('/^(?:0|[1-9][0-9]{0,8})$/D', $params['SIZE']) === 1) {
+                $size = (int) $params['SIZE'];
+            }
+            $managedId = $kind === 'reference' ? ($params['MANAGED-ID'] ?? '') : '';
+            if (strlen($managedId) > 512 || preg_match('/[\x00-\x20\x7f]/', $managedId)) {
+                $managedId = '';
+            }
             $record = [
                 'id'          => hash('sha256', count($files) . '|' . $line),
                 'name'        => $name !== '' ? $name : 'Attachment ' . (count($files) + 1),
                 'size'        => $size, 'contentType' => $mime, 'kind' => $kind,
-                'destination' => 'provider', 'isInline' => false, '_content' => $content
+                'destination' => 'provider', 'isInline' => false, '_content' => $content,
+                '_uri' => $uri, '_managedId' => $managedId
             ];
             $public = $record;
-            unset($public['_content']);
+            unset($public['_content'], $public['_uri'], $public['_managedId']);
             $metadataBytes += strlen(json_encode($public, JSON_THROW_ON_ERROR)) + 1;
             $files[] = $record;
             if (count($files) > 100 || $metadataBytes > 192 * 1024) {
