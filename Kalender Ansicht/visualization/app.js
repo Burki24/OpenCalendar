@@ -3031,6 +3031,10 @@ function providerAttachmentSelector(event, calendar) {
 
 function localAttachmentSelector(event, calendar) {
     if (!event || !calendar || calendar.canReadLocalAttachments !== true) return null;
+    if (calendar.attachmentLocalOwnerType === 'google') {
+        const eventReference = String(event.eventReference || '').trim();
+        return eventReference && eventReference.length <= 8192 ? {eventReference} : null;
+    }
     const uid = String(event.uid || '').trim();
     const startTimestamp = Number(event.startTimestamp);
     const endTimestamp = Number(event.endTimestamp);
@@ -3155,7 +3159,7 @@ function attachmentKindText(file) {
     return t('Provider attachment');
 }
 
-function normalizedAttachmentMetadata(file) {
+function normalizedAttachmentMetadata(file, referenceProvider = '') {
     if (!file || typeof file !== 'object') return null;
     const id = String(file.id || '');
     const name = String(file.name || '');
@@ -3164,8 +3168,10 @@ function normalizedAttachmentMetadata(file) {
     if (!id || id.length > 2048 || !name || name.length > 1024
         || !['file', 'embedded', 'reference', 'item', 'unsupported'].includes(kind)
         || (size !== null && (!Number.isInteger(size) || size < 0))) return null;
-    const url = kind === 'reference' ? trustedMicrosoftReferenceUrl(file.url) : '';
-    return {id, name, kind, size, url, destination: 'provider'};
+    const url = kind === 'reference'
+        ? (referenceProvider === 'google' ? trustedGoogleAttachmentUrl(file.url) : trustedMicrosoftReferenceUrl(file.url))
+        : '';
+    return {id, name, kind, size, url, destination: 'provider', referenceProvider};
 }
 
 function normalizedLocalAttachmentMetadata(file) {
@@ -3191,6 +3197,20 @@ function trustedMicrosoftReferenceUrl(value) {
             || host.endsWith('.sharepoint.com');
         if (url.protocol !== 'https:' || !trustedHost || url.username || url.password
             || (url.port && url.port !== '443')) return '';
+        return url.href;
+    } catch (_) {
+        return '';
+    }
+}
+
+function trustedGoogleAttachmentUrl(value) {
+    const raw = String(value || '').trim();
+    if (!raw || raw.length > 2048 || /[\\\u0000-\u001f\u007f]/.test(raw)) return '';
+    try {
+        const url = new URL(raw);
+        const host = url.hostname.toLowerCase().replace(/\.$/, '');
+        if (url.protocol !== 'https:' || !['drive.google.com', 'docs.google.com'].includes(host)
+            || url.username || url.password || (url.port && url.port !== '443')) return '';
         return url.href;
     } catch (_) {
         return '';
@@ -3347,8 +3367,9 @@ function renderAttachments(event, files, revision) {
             link.href = file.url;
             link.target = '_blank';
             link.rel = 'noopener noreferrer';
-            link.textContent = t('Open in provider');
-            link.setAttribute('aria-label', `${t('Open in provider')}: ${file.name}`);
+            const label = t(file.referenceProvider === 'google' ? 'Open in Google' : 'Open in provider');
+            link.textContent = label;
+            link.setAttribute('aria-label', `${label}: ${file.name}`);
             item.append(link);
         } else {
             parts.push(file.size !== null && file.size > providerAttachmentMaximumDownloadBytes
@@ -3372,8 +3393,9 @@ function renderAttachments(event, files, revision) {
 
 async function loadSelectedEventAttachments() {
     const event = selectedEvent;
-    const value = selectedAttachmentTransferValue(event, 'list');
-    if (!event || !value) return;
+    const localValue = localAttachmentTransferValue(event, 'list');
+    const providerValue = attachmentTransferValue(event, 'list');
+    if (!event || (!localValue && !providerValue)) return;
     const revision = ++attachmentDetailsRevision;
     eventAttachmentsLoadButton.disabled = true;
     eventAttachmentsLoadButton.textContent = t('Refresh attachments');
@@ -3381,16 +3403,26 @@ async function loadSelectedEventAttachments() {
     eventAttachmentsList.replaceChildren();
     eventAttachmentsList.classList.add('hidden');
     try {
-        const payload = await attachmentTransferRequest(value);
+        const responses = await Promise.allSettled([localValue, providerValue]
+            .filter(value => value !== null).map(value => attachmentTransferRequest(value)));
         if (revision !== attachmentDetailsRevision) return;
-        if (!Array.isArray(payload.result) || payload.result.length > 100) throw new Error();
-        const normalize = value.destination === 'local'
-            ? normalizedLocalAttachmentMetadata
-            : normalizedAttachmentMetadata;
-        const files = payload.result.map(normalize);
+        const calendar = calendarEntryByInstanceId(event.calendarInstanceId);
+        const values = [localValue, providerValue].filter(value => value !== null);
+        const failures = responses.filter(response => response.status === 'rejected').length;
+        if (failures === responses.length) throw new Error();
+        const files = responses.flatMap((response, index) => {
+            if (response.status === 'rejected') return [];
+            const payload = response.value;
+            if (!Array.isArray(payload.result) || payload.result.length > 100) throw new Error();
+            const normalize = values[index].destination === 'local'
+                ? normalizedLocalAttachmentMetadata
+                : file => normalizedAttachmentMetadata(file, calendar?.attachmentReferenceProvider || '');
+            return payload.result.map(normalize);
+        });
         if (files.some(file => file === null)) throw new Error();
         renderAttachments(event, files, revision);
-        setAttachmentDetailsStatus(files.length === 0 ? t('No attachments') : '');
+        setAttachmentDetailsStatus(failures > 0 ? t('Some attachments could not be loaded.')
+            : (files.length === 0 ? t('No attachments') : ''), failures > 0);
         return true;
     } catch (_) {
         if (revision === attachmentDetailsRevision) {

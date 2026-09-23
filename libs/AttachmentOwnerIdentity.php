@@ -24,7 +24,7 @@ final class AttachmentOwnerIdentity
             throw new InvalidArgumentException('Invalid attachment calendar instance.');
         }
         $provider = self::required($source, 'provider');
-        if (!in_array($provider, ['local', 'caldav', 'ical', 'microsoft'], true)) {
+        if (!in_array($provider, ['local', 'caldav', 'ical', 'microsoft', 'google'], true)) {
             throw new InvalidArgumentException('Unsupported attachment source.');
         }
         $scope = [$source['instanceId'], $provider, self::required($source, 'accountId'), self::required($source, 'calendarId')];
@@ -40,7 +40,7 @@ final class AttachmentOwnerIdentity
                 throw new InvalidArgumentException('Ambiguous attachment recurrence identity.');
             }
             $occurrence = in_array($type, ['occurrence', 'exception'], true);
-            if ($provider === 'microsoft') {
+            if (in_array($provider, ['microsoft', 'google'], true)) {
                 $parent = self::required($event, $occurrence ? 'seriesId' : 'eventReference');
                 $slot = $occurrence ? self::required($event, 'originalStart') : '';
             } else {

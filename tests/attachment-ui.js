@@ -16,8 +16,8 @@ function functionSource(name) {
     return source.slice(start, next < 0 ? source.length : next);
 }
 
-const context = vm.createContext({localAttachmentMaximumUploadBytes: 2 * 1024 * 1024});
-for (const name of ['providerAttachmentSelector', 'localAttachmentSelector', 'normalizedAttachmentMetadata', 'normalizedLocalAttachmentMetadata', 'safeAttachmentDownloadName']) {
+const context = vm.createContext({URL, localAttachmentMaximumUploadBytes: 2 * 1024 * 1024});
+for (const name of ['providerAttachmentSelector', 'localAttachmentSelector', 'trustedMicrosoftReferenceUrl', 'trustedGoogleAttachmentUrl', 'normalizedAttachmentMetadata', 'normalizedLocalAttachmentMetadata', 'safeAttachmentDownloadName']) {
     vm.runInContext(functionSource(name), context);
 }
 context.calendarEntryByInstanceId = () => ({
@@ -136,6 +136,31 @@ assert.strictEqual(
 assert.strictEqual(context.normalizedAttachmentMetadata({id: '1', name: 'x.pdf', kind: 'file', size: 12}).name, 'x.pdf');
 assert.strictEqual(context.normalizedAttachmentMetadata({id: '', name: 'x.pdf', kind: 'file', size: 12}), null);
 assert.strictEqual(context.normalizedAttachmentMetadata({id: '1', name: 'x.pdf', kind: 'unknown', size: 12}), null);
+const googleFile = {id: 'file-1', name: 'x.pdf', kind: 'reference', size: null, url: 'https://drive.google.com/file/d/file-1/view'};
+assert.strictEqual(context.normalizedAttachmentMetadata(googleFile, 'google').url, googleFile.url);
+assert.strictEqual(context.normalizedAttachmentMetadata({...googleFile, url: 'https://docs.google.com/document/d/file-1/edit'}, 'google').url,
+    'https://docs.google.com/document/d/file-1/edit');
+for (const url of ['https://drive.google.com.evil.invalid/file', 'https://user@drive.google.com/file',
+    'http://drive.google.com/file', 'https://drive.google.com:444/file', 'https://evil.invalid/file']) {
+    assert.strictEqual(context.normalizedAttachmentMetadata({...googleFile, url}, 'google').url, '', `Untrusted Google URL opened: ${url}`);
+}
+assert.strictEqual(context.normalizedAttachmentMetadata(googleFile, 'microsoft').url, '',
+    'A Google link must not bypass Microsoft URL validation.');
+context.calendarEntryByInstanceId = () => ({
+    instanceId: 42,
+    canReadProviderAttachments: true,
+    canManageProviderAttachments: false,
+    attachmentSelectorType: 'event-reference',
+    attachmentReferenceProvider: 'google'
+});
+assert.strictEqual(context.providerAttachmentUploadValue({calendarInstanceId: 42, eventReference: 'event-1'}), null,
+    'Google provider upload must remain unavailable without a Drive scope.');
+assert.deepStrictEqual(JSON.parse(JSON.stringify(context.localAttachmentSelector(
+    {eventReference: 'event-1'}, {canReadLocalAttachments: true, attachmentLocalOwnerType: 'google'}
+))), {eventReference: 'event-1'}, 'Google local files must use the exact provider event ID.');
+assert.strictEqual(context.localAttachmentSelector(
+    {uid: 'event-1'}, {canReadLocalAttachments: true, attachmentLocalOwnerType: 'google'}
+), null, 'Google local files must not be bound by a caller-supplied iCalendar UID.');
 assert.strictEqual(
     context.normalizedLocalAttachmentMetadata({
         id: 'a'.repeat(64), name: 'local.pdf', revision: 'b'.repeat(64), size: 12
@@ -158,6 +183,8 @@ assert(!openDetails.includes('loadSelectedEventAttachments('), 'Opening details 
 assert(source.includes("eventAttachmentsLoadButton.addEventListener('click', () => void loadSelectedEventAttachments())"));
 assert(source.includes("name.textContent = file.name;"), 'Untrusted filenames must be rendered as text.');
 assert(!source.includes('name.innerHTML = file.name'), 'Untrusted filenames must never be rendered as HTML.');
+assert(source.includes('Promise.allSettled([localValue, providerValue]'),
+    'Google events must load both local files and provider references independently.');
 assert(source.includes("body.set('action', 'TransferAttachment');"));
 assert(source.includes("attachmentResponseName(response, file.name)"));
 assert(source.includes('URL.revokeObjectURL(url)'));

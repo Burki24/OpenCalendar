@@ -47,6 +47,16 @@ ownerRejects(fn () => AttachmentOwnerIdentity::key($scope, array_replace($single
 ownerRejects(fn () => AttachmentOwnerIdentity::key(array_replace($scope, ['accountId' => '']), $single));
 ownerRejects(fn () => AttachmentOwnerIdentity::key(array_replace($scope, ['provider' => 'google']), $single));
 
+$google = array_replace($scope, ['provider' => 'google']);
+$googleEvent = ['eventReference' => 'event1', 'recurrenceType' => 'single'];
+$googleKey = AttachmentOwnerIdentity::key($google, $googleEvent);
+ownerCheck($googleKey === AttachmentOwnerIdentity::key($google, array_replace($googleEvent, ['summary' => 'changed'])));
+ownerCheck($googleKey !== AttachmentOwnerIdentity::key(array_replace($google, ['accountId' => 'other']), $googleEvent));
+ownerCheck($googleKey !== AttachmentOwnerIdentity::key($google, array_replace($googleEvent, ['eventReference' => 'event2'])));
+$googleOccurrence = ['seriesId' => 'series1', 'eventReference' => 'instance1', 'originalStart' => '2026-09-20T09:00:00Z', 'recurrenceType' => 'occurrence'];
+ownerCheck(AttachmentOwnerIdentity::key($google, $googleOccurrence) === AttachmentOwnerIdentity::key($google,
+    array_replace($googleOccurrence, ['recurrenceType' => 'exception', 'eventReference' => 'instance2'])));
+
 $ms = array_replace($scope, ['provider' => 'microsoft']);
 $event = ['eventReference' => 'event1', 'recurrenceType' => 'single'];
 $eventKey = AttachmentOwnerIdentity::key($ms, $event);

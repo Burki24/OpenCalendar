@@ -258,7 +258,11 @@ trait KalenderKontoChildGatewayTrait
             return $provider->getAttachmentMetadata($reference, (string) ($request['EventReference'] ?? ''));
         }
         if ($providerType === self::PROVIDER_GOOGLE) {
-            throw new RuntimeException('Google attachment access is not enabled.');
+            $provider = new GoogleCalendarProvider(
+                $this->createTrustedCloudHttpClient(new GoogleCalendarOriginPolicy()),
+                $this->getGoogleAccessToken()
+            );
+            return $provider->getAttachmentMetadata($reference, (string) ($request['EventReference'] ?? ''));
         }
         $uid = (string) ($request['UID'] ?? '');
         $recurrenceId = (string) ($request['RecurrenceID'] ?? '');

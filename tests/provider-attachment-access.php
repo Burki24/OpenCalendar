@@ -7,6 +7,7 @@ require_once __DIR__ . '/microsoft-attachment-metadata.php';
 require_once __DIR__ . '/../libs/ICalendarSubscriptionProvider.php';
 require_once __DIR__ . '/../libs/ICalendarFileProvider.php';
 require_once __DIR__ . '/../libs/CalDAVProvider.php';
+require_once __DIR__ . '/../libs/GoogleCalendarOriginPolicy.php';
 require_once __DIR__ . '/../Kalender Konto/traits/ChildGatewayTrait.php';
 
 final class AttachmentMetadataGateway
@@ -45,6 +46,11 @@ final class AttachmentMetadataGateway
     }
 
     private function getMicrosoftAccessToken(): string
+    {
+        return 'token';
+    }
+
+    private function getGoogleAccessToken(): string
     {
         return 'token';
     }
@@ -181,12 +187,29 @@ foreach (['policy', 'calendar', 'account', 'taskList'] as $change) {
 }
 $calendar->afterReply = null;
 $calendar->properties['CalendarID'] = 'calendar42';
-$gateway->provider = 2; // Google deferred; no HTTP or fallback to local storage.
+$gateway->provider = 2;
+$gateway->cachedCalendars = '[{"id":"calendar42","providerId":"primary","url":"https://www.googleapis.com/calendar/v3/calendars/primary"}]';
+$http->responses = [[200, [
+    'id' => 'evt', 'status' => 'confirmed',
+    'attachments' => [[
+        'fileId' => 'drive-file', 'fileUrl' => 'https://drive.google.com/file/d/drive-file/view',
+        'title' => 'Google.pdf'
+    ]]
+]]];
 $count = count($http->requests);
-attachmentMetadataReject(fn () => $calendar->ListProviderAttachments($selector));
-attachmentMetadataCheck(count($http->requests) === $count, 'Unsupported provider must not fetch attachments.');
+$googleFiles = json_decode($calendar->ListProviderAttachments($selector), true, 512, JSON_THROW_ON_ERROR)['result'];
+attachmentMetadataCheck(count($googleFiles) === 1 && $googleFiles[0]['kind'] === 'reference'
+    && $googleFiles[0]['url'] === 'https://drive.google.com/file/d/drive-file/view',
+    'Google attachments must be resolved through the protected calendar path.');
+attachmentMetadataCheck(count($http->requests) === $count + 1
+    && str_contains($http->requests[$count]['url'], 'www.googleapis.com/calendar/v3/'),
+    'Google listing must make only one Calendar API request.');
+$count = count($http->requests);
+attachmentMetadataReject(fn () => $calendar->DownloadProviderAttachment(json_encode([
+    'selector' => ['eventReference' => 'evt'], 'id' => $googleFiles[0]['id']
+], JSON_THROW_ON_ERROR)));
 attachmentMetadataReject(fn () => $calendar->UploadProviderAttachment($upload));
-attachmentMetadataCheck(count($http->requests) === $count, 'Google must not receive a provider attachment upload.');
+attachmentMetadataCheck(count($http->requests) === $count, 'Google must not receive provider attachment download or upload.');
 
 $ical = "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nBEGIN:VEVENT\r\nUID:ics-event\r\nDTSTART:20260922T100000Z\r\nDTEND:20260922T110000Z\r\n" .
     "ATTACH;FMTTYPE=application/pdf;ENCODING=BASE64;VALUE=BINARY;FILENAME=ICS.pdf:SUNTIEZJTEU=\r\n" .

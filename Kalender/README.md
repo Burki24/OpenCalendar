@@ -8,8 +8,11 @@ TXT-, PDF-, PNG- und JPEG-Dateien bis 2 MiB lokal speichern, herunterladen und
 bewusst löschen. Die Verwaltungsfunktionen für Sicherung und Bereinigung sind unter
 [Lokale Dateianhänge sichern und aufräumen](../docs/attachments-administration.md)
 beschrieben. Microsoft-365-Termine und To-Do-Aufgaben sowie CalDAV-/Apple-Termine
-unterstützen zusätzlich den Upload zum jeweiligen Anbieter. Lokale Anhänge an
-Online-Termine, Google und benutzerbezogene Rechte sind noch nicht freigegeben.
+unterstützen zusätzlich den Upload zum jeweiligen Anbieter. Google-Termine
+können vorhandene Google-Anlagen als sichere Verweise anzeigen; eigene Dateien
+lassen sich bei entsprechender Freigabe lokal in Symcon speichern, nicht zu
+Google hochladen. Lokale Anhänge an andere Online-Termine und benutzerbezogene
+Rechte sind noch nicht freigegeben.
 
 ## Einrichtung
 

@@ -269,6 +269,84 @@ final class GoogleCalendarProvider implements CalendarEventLookupProviderInterfa
         throw new GoogleCalendarProviderException('The selected event is no longer available.');
     }
 
+    /**
+     * Lists file references from one freshly verified Google Calendar event.
+     * File content stays in Google Drive; this method never calls the Drive API.
+     *
+     * @return list<array{id:string,name:string,size:null,kind:string,destination:string,url:string}>
+     */
+    public function getAttachmentMetadata(string $calendarReference, string $eventReference): array
+    {
+        $calendarId = $this->calendarId($calendarReference);
+        $eventId = $this->eventId($eventReference);
+        $query = http_build_query(
+            ['fields' => 'id,status,attachments(fileId,fileUrl,title,mimeType)'],
+            '',
+            '&',
+            PHP_QUERY_RFC3986
+        );
+        $item = $this->requestJson(
+            'GET',
+            '/calendars/' . rawurlencode($calendarId) . '/events/' . rawurlencode($eventId) . '?' . $query,
+            null,
+            [],
+            [200],
+            262_144
+        );
+        if (!is_string($item['id'] ?? null) || !hash_equals($eventId, $item['id'])
+            || ($item['status'] ?? '') === 'cancelled') {
+            throw new GoogleCalendarProviderException('The selected event is no longer available.');
+        }
+        $attachments = $item['attachments'] ?? [];
+        if (!is_array($attachments) || !array_is_list($attachments) || count($attachments) > 25) {
+            throw new GoogleCalendarProviderException('Google Calendar returned invalid attachment metadata.');
+        }
+        $files = [];
+        foreach ($attachments as $index => $attachment) {
+            if (!is_array($attachment)) {
+                throw new GoogleCalendarProviderException('Google Calendar returned invalid attachment metadata.');
+            }
+            $name = $attachment['title'] ?? '';
+            $rawUrl = $attachment['fileUrl'] ?? '';
+            $fileId = $attachment['fileId'] ?? '';
+            if (!is_string($name) || !is_string($rawUrl) || !is_string($fileId)
+                || strlen($name) > 1024 || strlen($rawUrl) > 2048 || strlen($fileId) > 2048
+                || preg_match('//u', $name) !== 1
+                || preg_match('/[\x00-\x1f\x7f]/', $name . $rawUrl . $fileId)) {
+                throw new GoogleCalendarProviderException('Google Calendar returned invalid attachment metadata.');
+            }
+            $name = trim($name) ?: 'Google attachment';
+            $files[] = [
+                'id'          => hash('sha256', 'google|' . $eventId . '|' . $index . '|' . $fileId . '|' . $rawUrl),
+                'name'        => $name,
+                'size'        => null,
+                'kind'        => 'reference',
+                'destination' => 'provider',
+                'url'         => self::safeGoogleAttachmentUrl($rawUrl)
+            ];
+        }
+        if (strlen(json_encode($files, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES)) > 192 * 1024) {
+            throw new GoogleCalendarProviderException('Google Calendar returned too much attachment metadata.');
+        }
+        return $files;
+    }
+
+    private static function safeGoogleAttachmentUrl(string $raw): string
+    {
+        if ($raw === '' || strlen($raw) > 2048) {
+            return '';
+        }
+        $parts = parse_url($raw);
+        if (!is_array($parts)
+            || strtolower((string) ($parts['scheme'] ?? '')) !== 'https'
+            || !in_array(strtolower((string) ($parts['host'] ?? '')), ['drive.google.com', 'docs.google.com'], true)
+            || isset($parts['user']) || isset($parts['pass'])
+            || (isset($parts['port']) && $parts['port'] !== 443)) {
+            return '';
+        }
+        return $raw;
+    }
+
     /** @inheritDoc */
     public function getRecurringSeries(
         string $calendarReference,
@@ -1243,7 +1321,8 @@ final class GoogleCalendarProvider implements CalendarEventLookupProviderInterfa
         string $path,
         ?array $body = null,
         array $headers = [],
-        array $expectedStatusCodes = [200]
+        array $expectedStatusCodes = [200],
+        int $maxResponseBytes = 67_108_864
     ): array {
         $headers['Accept'] = 'application/json';
         $headers['Authorization'] = 'Bearer ' . $this->accessToken;
@@ -1256,7 +1335,7 @@ final class GoogleCalendarProvider implements CalendarEventLookupProviderInterfa
             );
         }
 
-        $response = $this->httpClient->request($method, self::API_URL . $path, $headers, $encodedBody);
+        $response = $this->httpClient->request($method, self::API_URL . $path, $headers, $encodedBody, $maxResponseBytes);
         if (!in_array($response->statusCode, $expectedStatusCodes, true)) {
             $this->throwApiError($response);
         }

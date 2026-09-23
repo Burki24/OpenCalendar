@@ -36,6 +36,16 @@ Kalenderabruf, die Synchronisation und das Öffnen der Details laden weder
 Anhangslisten noch Dateiinhalte. Unterstützte Dateien können anschließend einzeln
 heruntergeladen werden. Externe iCalendar-Verweise, Microsoft-Elementanhänge und
 nicht unterstützte Typen werden nur kenntlich gemacht und nicht geöffnet.
+Bei Google-Terminen zeigt die Ansicht vorhandene Anhangsnamen auf Anfrage an und
+öffnet ausschließlich bestätigte Google-Drive- oder Google-Docs-Verweise mit
+**Bei Google öffnen** in einem neuen Fenster. OpenCalendar lädt deren Dateiinhalt
+nicht selbst herunter und bietet für Google keinen Anbieter-Upload an. Dafür
+werden keine zusätzlichen Google-Drive-Berechtigungen benötigt; ob sich die
+Datei öffnet, hängt von den Berechtigungen des Google-Kontos ab. Ist zusätzlich
+die **lokale Ablage** erlaubt, können Nutzer Dateien an denselben Google-Termin
+auch ausschließlich in ihrer Symcon-Installation speichern. Solche lokalen
+Dateien erscheinen nicht bei Google und werden dort nicht freigegeben. Die
+Ansicht kennzeichnet Anbieter-Verweise und lokale Dateien getrennt.
 Beim Download öffnet sich eine Zielauswahl, sofern der Client einen sicheren
 „Speichern unter“-Dialog unterstützt. Die Datei wird erst danach abgerufen.
 Kann die eingebettete App diesen Dialog nicht öffnen, bleibt der bisherige
@@ -49,7 +59,7 @@ Dateiinhalte, Anbieternamen, Downloadadressen und Zugriffstoken gelangen nicht i
 den gemeinsam verteilten Kalenderzustand. Rechte, Kalenderzugehörigkeit,
 Termin-/Aufgabenidentität und Transport werden bei jeder Anfrage erneut geprüft.
 
-Bei Terminen eines Symcon-lokalen Kalenders kann die Oberfläche zusätzlich
+Bei Terminen eines Symcon-lokalen Kalenders und Google-Terminen kann die Oberfläche zusätzlich
 TXT-, PDF-, PNG- und JPEG-Dateien bis 2 MiB auf dem Symcon-System speichern,
 auflisten, herunterladen und nach einer eigenen Bestätigung löschen. Dafür müssen
 Kalender und Ansicht **Anhänge verwalten** sowie den lokalen Speicher erlauben.
@@ -63,8 +73,8 @@ Microsoft-To-Do-Aufgaben sowie CalDAV-/Apple-Terminen hochgeladen werden. Der
 Button und ein Hinweis benennen den Speicherort vor dem Upload. Bei CalDAV
 werden Dateien als eingebettete iCalendar-Anhänge gespeichert; eine bloß
 berechnete Serieninstanz kann nicht einzeln ergänzt werden. Provider-Löschungen
-und lokale Anhänge an Online-Termine folgen separat. Google bleibt bis zur
-Klärung der zusätzlichen Scopes zurückgestellt.
+und lokale Anhänge an andere Online-Termine folgen separat. Ein Upload von
+Dateien zu Google bleibt bis zur Klärung zusätzlicher Scopes zurückgestellt.
 Persönliche IPSViewUsers-Rechte bleiben bis zur verifizierbaren Identitätsanbindung
 gesperrt. Änderungen an Einstellungen verschieben oder löschen keine Dateien.
 

@@ -2756,7 +2756,7 @@ class CalendarView extends IPSModuleStrict
             $attachmentSelectorType = $localCalendar
                 ? ''
                 : match ($providerKey) {
-                    'microsoft'              => 'event-reference',
+                    'microsoft', 'google'    => 'event-reference',
                     'apple', 'caldav', 'ics' => 'icalendar',
                     default                  => ''
                 };
@@ -2797,17 +2797,20 @@ class CalendarView extends IPSModuleStrict
                     CalendarEventState::TRANSP_OPAQUE
                 ),
                 'attachmentSelectorType'       => $attachmentSelectorType,
+                'attachmentReferenceProvider'  => in_array($providerKey, ['microsoft', 'google'], true) ? $providerKey : '',
+                'attachmentLocalOwnerType'     => $providerKey === 'google' ? 'google' : ($localCalendar ? 'local' : ''),
                 'canReadProviderAttachments'   => $attachmentSelectorType !== ''
                     && $this->selectedCalendarAllowsAttachments($instanceId, 'list', 'provider')
-                    && $this->selectedCalendarAllowsAttachments($instanceId, 'download', 'provider'),
+                    && ($providerKey === 'google'
+                        || $this->selectedCalendarAllowsAttachments($instanceId, 'download', 'provider')),
                 'canManageProviderAttachments' => in_array($providerKey, ['microsoft', 'apple', 'caldav'], true)
                     && $canWrite
                     && $this->selectedCalendarAllowsAttachments($instanceId, 'list', 'provider')
                     && $this->selectedCalendarAllowsAttachments($instanceId, 'upload', 'provider'),
-                'canReadLocalAttachments'      => $localCalendar
+                'canReadLocalAttachments'      => ($localCalendar || $providerKey === 'google')
                     && $this->selectedCalendarAllowsAttachments($instanceId, 'list', 'local')
                     && $this->selectedCalendarAllowsAttachments($instanceId, 'download', 'local'),
-                'canManageLocalAttachments'    => $localCalendar
+                'canManageLocalAttachments'    => ($localCalendar || $providerKey === 'google')
                     && $this->selectedCalendarAllowsAttachments($instanceId, 'list', 'local')
                     && $this->selectedCalendarAllowsAttachments($instanceId, 'download', 'local')
                     && $this->selectedCalendarAllowsAttachments($instanceId, 'upload', 'local')

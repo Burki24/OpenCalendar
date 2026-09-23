@@ -277,7 +277,9 @@
             "The selected file is not a valid single-event ICS file.": "Die ausgewählte Datei ist keine gültige ICS-Datei mit einem einzelnen Termin.",
             "This ICS file contains multiple events.": "Diese ICS-Datei enthält mehrere Termine.",
             "Recurring ICS invitations cannot be imported as a single event.": "Wiederkehrende ICS-Einladungen können hier nicht als Einzeltermin importiert werden.",
-            "Open in provider": "Extern öffnen"
+            "Open in provider": "Extern öffnen",
+            "Open in Google": "Bei Google öffnen",
+            "Some attachments could not be loaded.": "Einige Anhänge konnten nicht geladen werden."
         }
     }
 }

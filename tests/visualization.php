@@ -1417,8 +1417,14 @@ foreach ([$native, $ipsView] as $html) {
     );
     assertVisualization(
         str_contains($html, 'function trustedMicrosoftReferenceUrl(value)')
-            && str_contains($html, "link.textContent = t('Open in provider');"),
+            && str_contains($html, "file.referenceProvider === 'google' ? 'Open in Google' : 'Open in provider'")
+            && str_contains($html, 'link.textContent = label;'),
         'Trusted Microsoft cloud-file references must be exposed as explicit external links.'
+    );
+    assertVisualization(
+        str_contains($html, 'function trustedGoogleAttachmentUrl(value)')
+            && str_contains($html, "['drive.google.com', 'docs.google.com'].includes(host)"),
+        'Google attachment links must stay limited to trusted Drive and Docs hosts.'
     );
     assertVisualization(str_contains($html, '--agenda-color-bar-width'), 'Calendar-specific options must remain available through the shared bootstrap.');
 }

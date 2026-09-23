@@ -1741,6 +1741,9 @@ class Calendar extends IPSModuleStrict
      */
     private function verifiedLocalAttachmentOperation(string $operation, array $selector, array $request): array|string
     {
+        if (!$this->ReadPropertyBoolean('LocalCalendar') && array_keys($selector) === ['eventReference']) {
+            return $this->verifiedGoogleLocalAttachmentOperation($operation, $selector, $request);
+        }
         if (!$this->ReadPropertyBoolean('LocalCalendar') || !$this->CanAccessAttachments($operation, 'local')) {
             throw new RuntimeException('Local attachment access denied.');
         }
@@ -1797,6 +1800,53 @@ class Calendar extends IPSModuleStrict
         } finally {
             IPS_SemaphoreLeave($lock);
         }
+    }
+
+    /**
+     * Stores a local file only after resolving the exact Google event through the
+     * connected account. The browser provides no owner, account or calendar ID.
+     *
+     * @param array<string, mixed> $selector
+     * @param array<string, mixed> $request
+     * @return array<mixed>|string
+     */
+    private function verifiedGoogleLocalAttachmentOperation(string $operation, array $selector, array $request): array|string
+    {
+        $eventReference = $selector['eventReference'] ?? null;
+        if (!is_string($eventReference) || trim($eventReference) === '' || strlen($eventReference) > 8192
+            || preg_match('/[\x00-\x1f\x7f]/', $eventReference)
+            || !$this->CanAccessAttachments($operation, 'local')) {
+            throw new RuntimeException('Local attachment access denied.');
+        }
+        $connectionId = (int) (IPS_GetInstance($this->InstanceID)['ConnectionID'] ?? 0);
+        $calendarId = $this->effectiveCalendarId();
+        if ($connectionId <= 0 || $calendarId === '' || (int) IPS_GetProperty($connectionId, 'Provider') !== 2) {
+            throw new RuntimeException('Google calendar attachment access denied.');
+        }
+        $status = json_decode(IPSKALACC_GetAccountStatus($connectionId), true, 8, JSON_THROW_ON_ERROR);
+        $account = is_array($status) ? trim((string) ($status['account'] ?? '')) : '';
+        if ($account === '' || ($status['connected'] ?? false) !== true) {
+            throw new RuntimeException('Google calendar account is not connected.');
+        }
+        $event = $this->sendRequest('GetEventForEdit', ['EventReference' => $eventReference]);
+        if (!hash_equals($eventReference, (string) ($event['eventReference'] ?? ''))
+            || ($event['status'] ?? '') === 'cancelled') {
+            throw new RuntimeException('The attachment event is missing or ambiguous.');
+        }
+        $owner = AttachmentOwnerIdentity::key([
+            'instanceId' => $this->InstanceID, 'provider' => 'google',
+            'accountId'  => 'google:' . $connectionId . ':' . $account, 'calendarId' => $calendarId
+        ], $event);
+        $currentStatus = json_decode(IPSKALACC_GetAccountStatus($connectionId), true, 8, JSON_THROW_ON_ERROR);
+        if (!$this->CanAccessAttachments($operation, 'local')
+            || (int) (IPS_GetInstance($this->InstanceID)['ConnectionID'] ?? 0) !== $connectionId
+            || $this->effectiveCalendarId() !== $calendarId
+            || !is_array($currentStatus) || ($currentStatus['connected'] ?? false) !== true
+            || trim((string) ($currentStatus['account'] ?? '')) !== $account
+            || (int) IPS_GetProperty($connectionId, 'Provider') !== 2) {
+            throw new RuntimeException('Google calendar attachment access changed.');
+        }
+        return $this->localAttachmentOperation($operation, $owner, $request);
     }
 
     private function refreshCalendarMetadataSafely(): void

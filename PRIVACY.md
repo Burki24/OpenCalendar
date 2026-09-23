@@ -1,6 +1,6 @@
 # Datenschutzhinweise / Privacy Notice
 
-**Stand / Last updated: 14.09.2026**
+**Stand / Last updated: 23.09.2026**
 
 OpenCalendar ist eine quellverfügbare, unter der PolyForm Noncommercial License 1.0.0 bereitgestellte Bibliothek für Symcon. Die Kalenderverarbeitung findet grundsätzlich auf der Symcon-Installation des Anwenders statt. Der Modulautor betreibt keinen eigenen Kalender-Backenddienst und erhält über OpenCalendar keine Kalenderinhalte.
 
@@ -48,6 +48,7 @@ OpenCalendar fordert ausschließlich folgende Google-Berechtigungen an:
 - Ganztagsinformationen,
 - Wiederholungsinformationen,
 - technische Synchronisationsinformationen wie ETags,
+- auf ausdrückliches Abrufen vorhandener Google-Terminanlagen deren Dateinamen, technische Datei-IDs und Google-Verweise,
 - OAuth-Access- und Refresh-Tokens, die zur autorisierten Kommunikation mit Google erforderlich sind.
 
 OpenCalendar fordert keinen allgemeinen Zugriff auf das Google-Konto, Gmail, Google Drive, Kontakte oder andere nicht für die Kalenderfunktion erforderliche Google-Dienste an.
@@ -61,6 +62,8 @@ Hierzu gehören:
 - Auflisten der verfügbaren Google-Kalender,
 - Synchronisieren von Kalendern und Terminen,
 - Anzeigen von Terminen in OpenCalendar, Symcon und den zugehörigen Visualisierungen,
+- Anzeigen vorhandener Anlagen eines ausgewählten Google-Termins erst nach ausdrücklichem Klick bei freigegebener Anhangs-Leseberechtigung; bestätigte Google-Drive- und Google-Docs-Verweise können dann durch den Anwender im Browser geöffnet werden. OpenCalendar lädt dabei keine Dateiinhalte über die Google-Drive-API herunter und bietet keinen Google-Anhangs-Upload an,
+- optionales Speichern vom Anwender hinzugefügter Dateien ausschließlich auf seiner Symcon-Installation und Zuordnung zu einem bei Google frisch überprüften Termin, sofern die lokale Anhangsablage ausdrücklich freigegeben wurde; diese Dateien werden weder an Google übertragen noch dort synchronisiert,
 - Erstellen neuer Termine auf ausdrückliche Veranlassung des Anwenders,
 - Ändern bestehender Termine auf ausdrückliche Veranlassung des Anwenders,
 - Löschen bestehender Termine auf ausdrückliche Veranlassung des Anwenders,
@@ -233,7 +236,7 @@ Diese Datenschutzhinweise werden angepasst, wenn sich die Datenverarbeitung, die
 
 # Privacy Notice (English)
 
-**Last updated: 14 September 2026**
+**Last updated: 23 September 2026**
 
 OpenCalendar is a source-available library for Symcon distributed under the PolyForm Noncommercial License 1.0.0. Calendar processing generally takes place on the user's own Symcon installation. The module author does not operate a calendar backend service and does not receive calendar content through OpenCalendar.
 
@@ -283,6 +286,7 @@ This includes in particular:
 - all-day information,
 - recurrence information,
 - technical synchronization information such as ETags,
+- when existing attachments of a Google event are explicitly requested, their filenames, technical file IDs and Google links,
 - OAuth access and refresh tokens required for authorized communication with Google.
 
 OpenCalendar does not request general access to the user's Google Account, Gmail, Google Drive, contacts or other Google services that are not required for its calendar functionality.
@@ -296,6 +300,8 @@ This includes:
 - listing available Google calendars,
 - synchronizing calendars and events,
 - displaying events in OpenCalendar, Symcon and the associated visualizations,
+- showing existing attachments of a selected Google event only after an explicit click and when attachment read access is enabled; users may then open verified Google Drive or Docs links in their browser. OpenCalendar does not download file content through the Google Drive API or offer Google attachment uploads,
+- optionally storing user-added files solely on the user's Symcon installation and associating them with a freshly verified Google event when local attachment storage has been explicitly enabled; these files are neither transferred to nor synchronized with Google,
 - creating new events when explicitly initiated by the user,
 - updating existing events when explicitly initiated by the user,
 - deleting existing events when explicitly initiated by the user,

@@ -9,6 +9,7 @@ $GLOBALS['localConnections'] = [];
 $GLOBALS['localLocks'] = [];
 $GLOBALS['localLockDenied'] = false;
 $GLOBALS['localLockHook'] = null;
+$GLOBALS['localParentReply'] = null;
 function IPS_GetKernelRunlevel(): int
 {
     return KR_READY;
@@ -101,7 +102,10 @@ class IPSModuleStrict
             'GetBufferList'                                                                               => array_keys($this->buffers),
             'SetBuffer'                                                                                   => $this->buffers[$key] = $arguments[1],
             'Translate'                                                                                   => $key,
-            'HasActiveParent', 'SendDataToParent'                                                         => throw new RuntimeException('Local mode must never access an account.'),
+            'HasActiveParent'                                                                             => $GLOBALS['localParentReply'] !== null,
+            'SendDataToParent'                                                                            => $GLOBALS['localParentReply'] !== null
+                ? ($GLOBALS['localParentReply'])($arguments[0])
+                : throw new RuntimeException('Local mode must never access an account.'),
             default                                                                                       => throw new RuntimeException('Unimplemented platform boundary: ' . $method)
         };
     }
