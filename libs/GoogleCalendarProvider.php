@@ -331,22 +331,6 @@ final class GoogleCalendarProvider implements CalendarEventLookupProviderInterfa
         return $files;
     }
 
-    private static function safeGoogleAttachmentUrl(string $raw): string
-    {
-        if ($raw === '' || strlen($raw) > 2048) {
-            return '';
-        }
-        $parts = parse_url($raw);
-        if (!is_array($parts)
-            || strtolower((string) ($parts['scheme'] ?? '')) !== 'https'
-            || !in_array(strtolower((string) ($parts['host'] ?? '')), ['drive.google.com', 'docs.google.com'], true)
-            || isset($parts['user']) || isset($parts['pass'])
-            || (isset($parts['port']) && $parts['port'] !== 443)) {
-            return '';
-        }
-        return $raw;
-    }
-
     /** @inheritDoc */
     public function getRecurringSeries(
         string $calendarReference,
@@ -550,6 +534,22 @@ final class GoogleCalendarProvider implements CalendarEventLookupProviderInterfa
         );
 
         return true;
+    }
+
+    private static function safeGoogleAttachmentUrl(string $raw): string
+    {
+        if ($raw === '' || strlen($raw) > 2048) {
+            return '';
+        }
+        $parts = parse_url($raw);
+        if (!is_array($parts)
+            || strtolower((string) ($parts['scheme'] ?? '')) !== 'https'
+            || !in_array(strtolower((string) ($parts['host'] ?? '')), ['drive.google.com', 'docs.google.com'], true)
+            || isset($parts['user']) || isset($parts['pass'])
+            || (isset($parts['port']) && $parts['port'] !== 443)) {
+            return '';
+        }
+        return $raw;
     }
 
     /**

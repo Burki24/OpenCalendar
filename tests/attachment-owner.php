@@ -54,8 +54,10 @@ ownerCheck($googleKey === AttachmentOwnerIdentity::key($google, array_replace($g
 ownerCheck($googleKey !== AttachmentOwnerIdentity::key(array_replace($google, ['accountId' => 'other']), $googleEvent));
 ownerCheck($googleKey !== AttachmentOwnerIdentity::key($google, array_replace($googleEvent, ['eventReference' => 'event2'])));
 $googleOccurrence = ['seriesId' => 'series1', 'eventReference' => 'instance1', 'originalStart' => '2026-09-20T09:00:00Z', 'recurrenceType' => 'occurrence'];
-ownerCheck(AttachmentOwnerIdentity::key($google, $googleOccurrence) === AttachmentOwnerIdentity::key($google,
-    array_replace($googleOccurrence, ['recurrenceType' => 'exception', 'eventReference' => 'instance2'])));
+ownerCheck(AttachmentOwnerIdentity::key($google, $googleOccurrence) === AttachmentOwnerIdentity::key(
+    $google,
+    array_replace($googleOccurrence, ['recurrenceType' => 'exception', 'eventReference' => 'instance2'])
+));
 
 $ms = array_replace($scope, ['provider' => 'microsoft']);
 $event = ['eventReference' => 'event1', 'recurrenceType' => 'single'];

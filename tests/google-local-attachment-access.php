@@ -13,7 +13,7 @@ function IPSKALACC_GetAccountStatus(int $instanceId): string
 {
     return json_encode([
         'connected' => $GLOBALS['googleAccountConnected'][$instanceId] ?? false,
-        'account' => $GLOBALS['googleAccountName'][$instanceId] ?? ''
+        'account'   => $GLOBALS['googleAccountName'][$instanceId] ?? ''
     ], JSON_THROW_ON_ERROR);
 }
 
@@ -26,11 +26,14 @@ $GLOBALS['localConnections'][6044] = 900;
 $GLOBALS['googleAccountProvider'][900] = 2;
 $GLOBALS['googleAccountConnected'][900] = true;
 $GLOBALS['googleAccountName'][900] = 'tester@example.invalid';
-$GLOBALS['localParentReply'] = static function (string $json): string {
+$GLOBALS['localParentReply'] = static function (string $json): string
+{
     $request = json_decode($json, true, 8, JSON_THROW_ON_ERROR);
-    localModuleCheck($request['Operation'] === 'GetEventForEdit'
+    localModuleCheck(
+        $request['Operation'] === 'GetEventForEdit'
         && $request['CalendarID'] === 'https://www.googleapis.com/calendar/v3/calendars/primary',
-        'Google local storage must use the selected provider calendar.');
+        'Google local storage must use the selected provider calendar.'
+    );
     $eventId = (string) ($request['EventReference'] ?? '');
     $event = $eventId === 'event-1'
         ? ['eventReference' => 'event-1', 'recurrenceType' => 'single', 'status' => 'confirmed']
@@ -50,7 +53,8 @@ $download = json_decode($calendar->TransferLocalAttachment(json_encode([
     'operation' => 'download', 'selector' => $selector, 'data' => ['id' => $meta['id']]
 ], JSON_THROW_ON_ERROR)), true, 8, JSON_THROW_ON_ERROR)['content'];
 localModuleCheck(base64_decode($download, true) === 'PRIVATE', 'Google local download failed.');
-$reject = static function (callable $callback): void {
+$reject = static function (callable $callback): void
+{
     try {
         $callback();
     } catch (Throwable) {
@@ -64,14 +68,17 @@ $call = static fn (array $event): string => $calendar->TransferLocalAttachment(j
 $reject(fn () => $call(['eventReference' => 'missing']));
 $reject(fn () => $call($selector + ['account' => 'forged']));
 $GLOBALS['googleAccountName'][900] = 'another@example.invalid';
-localModuleCheck(json_decode($call($selector), true, 8, JSON_THROW_ON_ERROR)['result'] === [],
-    'A different Google account must not inherit the previous account files.');
+localModuleCheck(
+    json_decode($call($selector), true, 8, JSON_THROW_ON_ERROR)['result'] === [],
+    'A different Google account must not inherit the previous account files.'
+);
 $GLOBALS['googleAccountName'][900] = 'tester@example.invalid';
 $GLOBALS['googleAccountConnected'][900] = false;
 $reject(fn () => $call($selector));
 $GLOBALS['googleAccountConnected'][900] = true;
 $previousReply = $GLOBALS['localParentReply'];
-$GLOBALS['localParentReply'] = static function (string $json) use ($previousReply): string {
+$GLOBALS['localParentReply'] = static function (string $json) use ($previousReply): string
+{
     $GLOBALS['googleAccountName'][900] = 'switched@example.invalid';
     return $previousReply($json);
 };

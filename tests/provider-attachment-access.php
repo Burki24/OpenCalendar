@@ -190,20 +190,24 @@ $calendar->properties['CalendarID'] = 'calendar42';
 $gateway->provider = 2;
 $gateway->cachedCalendars = '[{"id":"calendar42","providerId":"primary","url":"https://www.googleapis.com/calendar/v3/calendars/primary"}]';
 $http->responses = [[200, [
-    'id' => 'evt', 'status' => 'confirmed',
+    'id'          => 'evt', 'status' => 'confirmed',
     'attachments' => [[
         'fileId' => 'drive-file', 'fileUrl' => 'https://drive.google.com/file/d/drive-file/view',
-        'title' => 'Google.pdf'
+        'title'  => 'Google.pdf'
     ]]
 ]]];
 $count = count($http->requests);
 $googleFiles = json_decode($calendar->ListProviderAttachments($selector), true, 512, JSON_THROW_ON_ERROR)['result'];
-attachmentMetadataCheck(count($googleFiles) === 1 && $googleFiles[0]['kind'] === 'reference'
+attachmentMetadataCheck(
+    count($googleFiles) === 1 && $googleFiles[0]['kind'] === 'reference'
     && $googleFiles[0]['url'] === 'https://drive.google.com/file/d/drive-file/view',
-    'Google attachments must be resolved through the protected calendar path.');
-attachmentMetadataCheck(count($http->requests) === $count + 1
+    'Google attachments must be resolved through the protected calendar path.'
+);
+attachmentMetadataCheck(
+    count($http->requests) === $count + 1
     && str_contains($http->requests[$count]['url'], 'www.googleapis.com/calendar/v3/'),
-    'Google listing must make only one Calendar API request.');
+    'Google listing must make only one Calendar API request.'
+);
 $count = count($http->requests);
 attachmentMetadataReject(fn () => $calendar->DownloadProviderAttachment(json_encode([
     'selector' => ['eventReference' => 'evt'], 'id' => $googleFiles[0]['id']

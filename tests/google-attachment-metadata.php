@@ -75,12 +75,16 @@ googleAttachmentCheck($files[0]['name'] === 'Report.pdf'
     && $files[0]['url'] === 'https://drive.google.com/file/d/file-1/view'
     && $files[0]['size'] === null, 'Drive file must remain an external reference without file content.');
 googleAttachmentCheck($files[1]['url'] === 'https://docs.google.com/document/d/file-2/edit', 'Google Docs link was lost.');
-googleAttachmentCheck(array_reduce(array_slice($files, 2), static fn (bool $safe, array $file): bool => $safe && $file['url'] === '', true),
-    'Untrusted URLs must not be opened from the view.');
-googleAttachmentCheck($http->requests[0]['method'] === 'GET'
+googleAttachmentCheck(
+    array_reduce(array_slice($files, 2), static fn (bool $safe, array $file): bool => $safe && $file['url'] === '', true),
+    'Untrusted URLs must not be opened from the view.'
+);
+googleAttachmentCheck(
+    $http->requests[0]['method'] === 'GET'
     && str_contains($http->requests[0]['url'], '/calendar/v3/calendars/primary/events/event-1?')
     && $http->requests[0]['maxResponseBytes'] <= 262_144,
-    'Attachment listing must read one bounded Calendar event, never Drive.');
+    'Attachment listing must read one bounded Calendar event, never Drive.'
+);
 googleAttachmentReject(fn () => $provider->getAttachmentMetadata('primary', 'event-1'));
 googleAttachmentReject(fn () => $provider->getAttachmentMetadata('primary', 'event-1'));
 googleAttachmentCheck(count($http->requests) === 3, 'Rejected events should require a fresh Calendar lookup.');
