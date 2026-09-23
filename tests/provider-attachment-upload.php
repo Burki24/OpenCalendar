@@ -151,13 +151,17 @@ $http = new AttachmentUploadHttp([
 ]);
 $dav = new CalDAVProvider($http, 'https://dav.invalid/', new CalDAVOriginPolicy('https://dav.invalid/'));
 $result = $dav->uploadAttachment('https://dav.invalid/calendar/', 'event', '', $url, $name, $content);
-uploadCheck(($result['uploaded'] ?? false) === true && ($result['pendingVerification'] ?? null) === true
+uploadCheck(
+    ($result['uploaded'] ?? false) === true && ($result['pendingVerification'] ?? null) === true
     && count($http->requests) === 4,
-    'An acknowledged managed attachment absent from the first read must be reported as pending without another upload.');
+    'An acknowledged managed attachment absent from the first read must be reported as pending without another upload.'
+);
 $eventuallyListed = $dav->getAttachmentMetadata('https://dav.invalid/calendar/', 'event', '', $url);
-uploadCheck(count($eventuallyListed) === 1 && $eventuallyListed[0]['kind'] === 'file'
+uploadCheck(
+    count($eventuallyListed) === 1 && $eventuallyListed[0]['kind'] === 'file'
     && count($http->requests) === 5,
-    'A later independent read must reveal the attachment without repeating the POST.');
+    'A later independent read must reveal the attachment without repeating the POST.'
+);
 
 $http = new AttachmentUploadHttp([
     [200, $ical, ['etag' => '"v1"']],
@@ -167,8 +171,10 @@ $http = new AttachmentUploadHttp([
 ]);
 $dav = new CalDAVProvider($http, 'https://dav.invalid/', new CalDAVOriginPolicy('https://dav.invalid/'));
 $result = $dav->uploadAttachment('https://dav.invalid/calendar/', 'event', '', $url, $name, $content);
-uploadCheck(($result['pendingVerification'] ?? null) === true && count($http->requests) === 4,
-    'A managed attachment missing on readback must remain visibly unverified.');
+uploadCheck(
+    ($result['pendingVerification'] ?? null) === true && count($http->requests) === 4,
+    'A managed attachment missing on readback must remain visibly unverified.'
+);
 
 $appleUrl = 'https://p01-caldav.icloud.com/123/calendars/abc/event.ics';
 $appleCalendar = 'https://p01-caldav.icloud.com/123/calendars/abc/';
