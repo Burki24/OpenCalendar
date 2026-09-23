@@ -449,13 +449,75 @@ foreach ([false, true] as $staleClearResponse) {
         assertMicrosoftTodo(str_ends_with($request['url'], '/tasks/reopen-task'), 'Reopening must never modify or delete a successor.');
     }
 }
-foreach (['active', 'missing-recurrence', 'clear-ignored', 'wrong-id', 'reopen-ignored', 'clear-failed'] as $failure) {
+$completedWithoutRecurrence = $completedSeries;
+unset($completedWithoutRecurrence['recurrence']);
+$openWithoutRecurrence = array_replace($completedWithoutRecurrence, ['status' => 'notStarted']);
+$omittedClient = new MicrosoftTodoTestHttpClient([
+    todoResponse(200, $completedWithoutRecurrence),
+    todoResponse(200, $completedWithoutRecurrence),
+    todoResponse(200, $openWithoutRecurrence),
+    todoResponse(200, $openWithoutRecurrence),
+    todoResponse(200, $openWithoutRecurrence)
+]);
+$omitted = (new MicrosoftTodoProvider($omittedClient, 'access-token'))->updateTask('list-1', 'reopen-task', [
+    'status' => 'notStarted', 'reopenAsSingle' => true
+]);
+$omittedWrites = array_values(array_filter($omittedClient->requests,
+    static fn (array $request): bool => $request['method'] !== 'GET'));
+assertMicrosoftTodo($omitted['status'] === 'notStarted' && $omitted['recurrence'] === null
+    && count($omittedWrites) === 1
+    && json_decode($omittedWrites[0]['body'], true, 512, JSON_THROW_ON_ERROR) === ['status' => 'notStarted'],
+    'A completed task whose Graph response omits recurrence must reopen without a recurrence write.');
+assertMicrosoftTodo(str_contains($omittedClient->requests[1]['url'], '$select=id,status,recurrence')
+    && str_contains($omittedClient->requests[4]['url'], '$select=id,status,recurrence'),
+    'Omitted recurrence must be checked by an explicit Graph selection before and after reopening.');
+
+$selectedRecurringClient = new MicrosoftTodoTestHttpClient([
+    todoResponse(200, $completedWithoutRecurrence), todoResponse(200, $completedSeries),
+    todoResponse(200, $completedSingle), todoResponse(200, $openSingle), todoResponse(200, $openSingle)
+]);
+$selectedRecurring = (new MicrosoftTodoProvider($selectedRecurringClient, 'access-token'))->updateTask('list-1', 'reopen-task', [
+    'status' => 'notStarted', 'reopenAsSingle' => true
+]);
+$selectedWrites = array_values(array_filter($selectedRecurringClient->requests,
+    static fn (array $request): bool => $request['method'] !== 'GET'));
+assertMicrosoftTodo($selectedRecurring['recurrence'] === null && count($selectedWrites) === 2
+    && json_decode($selectedWrites[0]['body'], true, 512, JSON_THROW_ON_ERROR) === ['recurrence' => null],
+    'A recurrence revealed by explicit selection must still be removed before reopening.');
+
+$changedIdentityClient = new MicrosoftTodoTestHttpClient([
+    todoResponse(200, $completedWithoutRecurrence),
+    todoResponse(200, array_replace($completedWithoutRecurrence, ['id' => 'successor']))
+]);
+$changedIdentity = false;
+try {
+    (new MicrosoftTodoProvider($changedIdentityClient, 'access-token'))->updateTask('list-1', 'reopen-task', [
+        'status' => 'notStarted', 'reopenAsSingle' => true
+    ]);
+} catch (MicrosoftTodoProviderException) {
+    $changedIdentity = true;
+}
+assertMicrosoftTodo($changedIdentity && count($changedIdentityClient->requests) === 2,
+    'A changed task identity during recurrence selection must prevent all writes.');
+
+$unconfirmedClient = new MicrosoftTodoTestHttpClient([
+    todoResponse(200, $completedSingle), todoResponse(200, $openWithoutRecurrence),
+    todoResponse(200, $openWithoutRecurrence), todoResponse(200, array_replace($completedSeries, ['status' => 'notStarted']))
+]);
+$unconfirmed = false;
+try {
+    (new MicrosoftTodoProvider($unconfirmedClient, 'access-token'))->updateTask('list-1', 'reopen-task', [
+        'status' => 'notStarted', 'reopenAsSingle' => true
+    ]);
+} catch (MicrosoftTodoProviderException) {
+    $unconfirmed = true;
+}
+assertMicrosoftTodo($unconfirmed, 'A recurrence still present on explicit read must never be reported as a single task.');
+
+foreach (['active', 'clear-ignored', 'wrong-id', 'reopen-ignored', 'clear-failed'] as $failure) {
     $current = $completedSeries;
     if ($failure === 'active') {
         $current['status'] = 'notStarted';
-    }
-    if ($failure === 'missing-recurrence') {
-        unset($current['recurrence']);
     }
     $badClear = $failure === 'wrong-id' ? array_replace($completedSingle, ['id' => 'successor']) : $completedSeries;
     $responses = [todoResponse(200, $current)];

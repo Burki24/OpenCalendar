@@ -335,14 +335,22 @@ final class MicrosoftTodoProvider
             throw new MicrosoftTodoProviderException('The task is no longer completed. Synchronize before reopening it as a single task.');
         }
         if (!array_key_exists('recurrence', $current)) {
-            throw new MicrosoftTodoProviderException('Microsoft To Do did not confirm the recurrence state. Synchronize and try again.');
+            // Graph can omit an unset recurrence, including on a completed task.
+            // Select it explicitly before deciding whether a series must be detached.
+            $current = $this->requestJson('GET', $path . '?$select=id,status,recurrence', null, [200]);
+            if (($current['id'] ?? '') !== $taskId || ($current['status'] ?? '') !== 'completed') {
+                throw new MicrosoftTodoProviderException('The task changed while checking its recurrence. Synchronize before reopening it.');
+            }
         }
-        if ($current['recurrence'] !== null) {
+        if (($current['recurrence'] ?? null) !== null && !is_array($current['recurrence'])) {
+            throw new MicrosoftTodoProviderException('Microsoft To Do returned an invalid recurrence state. Synchronize and try again.');
+        }
+        if (($current['recurrence'] ?? null) !== null) {
             $cleared = $this->requestJson('PATCH', $path, ['recurrence' => null], [200]);
-            if (!$this->isConfirmedSingleTask($cleared, $taskId, 'completed')) {
+            if (!$this->isConfirmedSingleTask($cleared, $taskId, 'completed', $path)) {
                 $cleared = $this->requestJson('GET', $path, null, [200]);
             }
-            if (!$this->isConfirmedSingleTask($cleared, $taskId, 'completed')) {
+            if (!$this->isConfirmedSingleTask($cleared, $taskId, 'completed', $path)) {
                 throw new MicrosoftTodoProviderException('Removing recurrence was not confirmed. The task was not reopened. Synchronize and check it in Microsoft To Do.');
             }
         }
@@ -350,7 +358,7 @@ final class MicrosoftTodoProvider
         // On a later failure the task may already be non-recurring; never restore a series blindly.
         $this->requestJson('PATCH', $path, $payload, [200]);
         $confirmed = $this->requestJson('GET', $path, null, [200]);
-        if (!$this->isConfirmedSingleTask($confirmed, $taskId, 'notStarted')) {
+        if (!$this->isConfirmedSingleTask($confirmed, $taskId, 'notStarted', $path)) {
             throw new MicrosoftTodoProviderException('Single-task reactivation was not confirmed. Changes may already be saved. Synchronize and check the task in Microsoft To Do.');
         }
         return $this->mapTask($listId, $confirmed)
@@ -358,10 +366,17 @@ final class MicrosoftTodoProvider
     }
 
     /** @param array<string, mixed> $task */
-    private function isConfirmedSingleTask(array $task, string $taskId, string $status): bool
+    private function isConfirmedSingleTask(array $task, string $taskId, string $status, string $path): bool
     {
-        return ($task['id'] ?? '') === $taskId && ($task['status'] ?? '') === $status
-            && array_key_exists('recurrence', $task) && $task['recurrence'] === null;
+        if (($task['id'] ?? '') !== $taskId || ($task['status'] ?? '') !== $status) {
+            return false;
+        }
+        if (array_key_exists('recurrence', $task)) {
+            return $task['recurrence'] === null;
+        }
+        $selected = $this->requestJson('GET', $path . '?$select=id,status,recurrence', null, [200]);
+        return ($selected['id'] ?? '') === $taskId && ($selected['status'] ?? '') === $status
+            && ($selected['recurrence'] ?? null) === null;
     }
 
     /** @param array<string, mixed> $task */
