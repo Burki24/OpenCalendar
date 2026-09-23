@@ -1027,6 +1027,16 @@ html.ipsview-mode .event-details-dialog { --dialog-width: 840px; }
 .event-attachment-meta { color: var(--cal-muted); font-size: var(--cal-dialog-meta-font-size); overflow-wrap: anywhere; }
 .event-attachment-item .secondary-button,
 .event-attachment-item .danger-button { display: inline-flex; flex: 0 0 auto; align-items: center; max-width: 100%; color: inherit; text-decoration: none; white-space: normal; overflow-wrap: anywhere; }
+.external-link-copy-input {
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+    padding: 8px 9px;
+    border: var(--cal-border-width, 1px) solid var(--cal-border);
+    border-radius: var(--cal-radius);
+    background: var(--cal-surface);
+    color: var(--cal-text);
+}
 
 .delete-confirm-body { gap: 8px; }
 .delete-confirm-summary { font-size: 1.02em; font-weight: 700; line-height: 1.35; overflow-wrap: anywhere; }

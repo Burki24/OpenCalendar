@@ -10,9 +10,12 @@ const html = fs.readFileSync(path.join(__dirname, '../Kalender Ansicht/visualiza
 const moduleSource = fs.readFileSync(path.join(__dirname, '../Kalender Ansicht/module.php'), 'utf8');
 
 function functionSource(name) {
-    const start = source.indexOf(`function ${name}(`);
+    const asyncStart = source.indexOf(`async function ${name}(`);
+    const start = asyncStart >= 0 ? asyncStart : source.indexOf(`function ${name}(`);
     assert(start >= 0, `Missing function: ${name}`);
-    const next = source.indexOf('\nfunction ', start + 1);
+    const following = /\n(?:async )?function /g;
+    following.lastIndex = start + 1;
+    const next = following.exec(source)?.index ?? -1;
     return source.slice(start, next < 0 ? source.length : next);
 }
 
@@ -185,6 +188,16 @@ assert(source.includes("name.textContent = file.name;"), 'Untrusted filenames mu
 assert(!source.includes('name.innerHTML = file.name'), 'Untrusted filenames must never be rendered as HTML.');
 assert(source.includes('Promise.allSettled([localValue, providerValue]'),
     'Google events must load both local files and provider references independently.');
+assert(source.includes("calendarVisualization.mode === 'ipsview'"),
+    'IPSView must have a distinct external-link behavior.');
+assert(source.includes("button.addEventListener('click', () => void copyExternalLink(file.url, event))"),
+    'IPSView reference attachments must copy their validated link instead of opening a blocked new window.');
+assert(source.includes("void copyExternalLink(url, selectedEvent);"),
+    'IPSView provider-event links must use the same copy behavior.');
+assert(source.includes("link.target = '_blank';"),
+    'Native browser views must retain direct external attachment links.');
+assert(html.includes('id="details-external-link-status"') && html.includes('id="details-external-link-input"'),
+    'If the host blocks clipboard access, the link must remain selectable in the details dialog.');
 assert(source.includes("body.set('action', 'TransferAttachment');"));
 assert(source.includes("attachmentResponseName(response, file.name)"));
 assert(source.includes('URL.revokeObjectURL(url)'));
@@ -201,4 +214,87 @@ assert(moduleSource.includes("'canManageLocalAttachments'"));
 assert(moduleSource.includes("'canManageProviderAttachments'"));
 assert(!moduleSource.includes('$runtime = $ipsView\n'));
 
-console.log('Lazy attachment list and protected download UI tests passed.');
+(async () => {
+    const labels = vm.createContext({calendarVisualization: {mode: 'ipsview'}, t: value => value});
+    vm.runInContext(functionSource('providerLinkText'), labels);
+    vm.runInContext(functionSource('externalLinkActionLabel'), labels);
+    assert.strictEqual(labels.externalLinkActionLabel('Open in provider'), 'Copy link');
+    labels.calendarVisualization.mode = 'symcon';
+    assert.strictEqual(labels.externalLinkActionLabel('Open in provider'), 'Open in provider',
+        'The native view must retain the existing external-opening label.');
+
+    const event = {url: 'https://calendar.google.com/calendar/u/0/r/eventedit/abc'};
+    const opened = [];
+    const requestedCopies = [];
+    const openContext = vm.createContext({
+        selectedEvent: event,
+        providerEventUrl: value => value.url,
+        calendarVisualization: {mode: 'ipsview'},
+        copyExternalLink: url => requestedCopies.push(url),
+        window: {open: url => opened.push(url)}
+    });
+    vm.runInContext(functionSource('openProviderEvent'), openContext);
+    openContext.openProviderEvent();
+    assert.deepStrictEqual(requestedCopies, [event.url]);
+    assert.deepStrictEqual(opened, [], 'IPSView must not request a blocked new window.');
+    openContext.calendarVisualization.mode = 'symcon';
+    openContext.openProviderEvent();
+    assert.deepStrictEqual(opened, [event.url], 'The native tile must retain direct provider opening.');
+
+    const status = {classList: {remove(name) { this.removed = name; }}};
+    const input = {
+        classList: {toggle(name, hidden) { this.hidden = hidden; }},
+        focus() { this.focused = true; },
+        select() { this.selected = true; }
+    };
+    const feedbackContext = vm.createContext({
+        document: {getElementById: id => id === 'details-external-link-status' ? status : input},
+        t: value => value
+    });
+    vm.runInContext(functionSource('showExternalLinkFeedback'), feedbackContext);
+    feedbackContext.showExternalLinkFeedback(event.url, false);
+    assert.strictEqual(input.value, event.url, 'A denied clipboard must leave the URL visibly selectable.');
+    assert.strictEqual(input.classList.hidden, false);
+    assert(input.focused && input.selected);
+    feedbackContext.showExternalLinkFeedback(event.url, true);
+    assert.strictEqual(input.value, '', 'A successful copy must not leave the private URL visible.');
+    assert.strictEqual(input.classList.hidden, true);
+
+    const results = [];
+    const copiedUrls = [];
+    let legacyAllowed = true;
+    let clipboardAllowed = true;
+    const copyContext = vm.createContext({
+        document: {
+            createElement: () => ({style: {}, select() {}, remove() {}}),
+            execCommand: () => legacyAllowed
+        },
+        navigator: {clipboard: {writeText: async url => {
+            copiedUrls.push(url);
+            if (!clipboardAllowed) throw new Error('Clipboard denied');
+        }}},
+        eventDetailsDialog: {open: true, append() {}},
+        selectedEvent: event,
+        showExternalLinkFeedback: (url, copied) => results.push({url, copied})
+    });
+    vm.runInContext(functionSource('copyExternalLink'), copyContext);
+    await copyContext.copyExternalLink(event.url, event);
+    assert.deepStrictEqual(results.pop(), {url: event.url, copied: true},
+        'IPSView must confirm a successful direct clipboard copy.');
+    assert.strictEqual(copiedUrls.length, 0, 'A working legacy clipboard command needs no second write.');
+
+    legacyAllowed = false;
+    await copyContext.copyExternalLink(event.url, event);
+    assert.deepStrictEqual(results.pop(), {url: event.url, copied: true},
+        'IPSView must try the modern Clipboard API when its legacy command is unavailable.');
+
+    clipboardAllowed = false;
+    await copyContext.copyExternalLink(event.url, event);
+    assert.deepStrictEqual(results.pop(), {url: event.url, copied: false},
+        'IPSView must display a selectable fallback when both clipboard methods are denied.');
+
+    copyContext.eventDetailsDialog.open = false;
+    await copyContext.copyExternalLink(event.url, event);
+    assert.strictEqual(results.length, 0, 'A closed details dialog must not show stale copy feedback.');
+    console.log('Lazy attachment list and protected download UI tests passed.');
+})().catch(error => { console.error(error); process.exitCode = 1; });

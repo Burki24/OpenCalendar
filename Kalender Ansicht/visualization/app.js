@@ -2443,6 +2443,10 @@ function providerLinkText(value) {
     return t(value);
 }
 
+function externalLinkActionLabel(value) {
+    return calendarVisualization.mode === 'ipsview' ? t('Copy link') : providerLinkText(value);
+}
+
 function providerEventUrl(event) {
     const value = String(event?.url || '').trim();
     if (!value) return '';
@@ -2468,7 +2472,56 @@ function openProviderEvent() {
     if (!selectedEvent) return;
     const url = providerEventUrl(selectedEvent);
     if (!url) return;
+    if (calendarVisualization.mode === 'ipsview') {
+        void copyExternalLink(url, selectedEvent);
+        return;
+    }
     window.open(url, '_blank', 'noopener,noreferrer');
+}
+
+function showExternalLinkFeedback(url, copied) {
+    const status = document.getElementById('details-external-link-status');
+    const input = document.getElementById('details-external-link-input');
+    status.textContent = t(copied
+        ? 'Link copied to clipboard.'
+        : 'Automatic copying is unavailable. Select this link and copy it manually.');
+    status.classList.remove('hidden');
+    input.value = copied ? '' : url;
+    input.classList.toggle('hidden', copied);
+    if (!copied) {
+        input.focus();
+        input.select();
+    }
+}
+
+async function copyExternalLink(url, event) {
+    if (!url) return;
+    const field = document.createElement('textarea');
+    field.value = url;
+    field.readOnly = true;
+    field.style.position = 'fixed';
+    field.style.opacity = '0';
+    eventDetailsDialog.append(field);
+    field.select();
+    let copied = false;
+    try {
+        copied = document.execCommand('copy');
+    } catch (_) {
+        // The IPSView client may not expose the legacy clipboard command.
+    } finally {
+        field.remove();
+    }
+    if (!copied && navigator.clipboard?.writeText) {
+        try {
+            await navigator.clipboard.writeText(url);
+            copied = true;
+        } catch (_) {
+            // Keep the validated URL selectable when clipboard access is denied.
+        }
+    }
+    if (eventDetailsDialog.open && selectedEvent === event) {
+        showExternalLinkFeedback(url, copied);
+    }
 }
 
 function unfoldIcsLines(value) {
@@ -3363,14 +3416,23 @@ function renderAttachments(event, files, revision) {
             button.addEventListener('click', () => void downloadAttachment(event, file, button, revision));
             item.append(button);
         } else if (file.kind === 'reference' && file.url) {
-            const link = element('a', 'secondary-button');
-            link.href = file.url;
-            link.target = '_blank';
-            link.rel = 'noopener noreferrer';
-            const label = t(file.referenceProvider === 'google' ? 'Open in Google' : 'Open in provider');
-            link.textContent = label;
-            link.setAttribute('aria-label', `${label}: ${file.name}`);
-            item.append(link);
+            if (calendarVisualization.mode === 'ipsview') {
+                const button = element('button', 'secondary-button');
+                button.type = 'button';
+                button.textContent = t('Copy link');
+                button.setAttribute('aria-label', `${t('Copy link')}: ${file.name}`);
+                button.addEventListener('click', () => void copyExternalLink(file.url, event));
+                item.append(button);
+            } else {
+                const link = element('a', 'secondary-button');
+                link.href = file.url;
+                link.target = '_blank';
+                link.rel = 'noopener noreferrer';
+                const label = t(file.referenceProvider === 'google' ? 'Open in Google' : 'Open in provider');
+                link.textContent = label;
+                link.setAttribute('aria-label', `${label}: ${file.name}`);
+                item.append(link);
+            }
         } else {
             parts.push(file.size !== null && file.size > providerAttachmentMaximumDownloadBytes
                 ? t('Too large to download')
@@ -3542,6 +3604,10 @@ function openEventDetails(event) {
     setOptionalDetail('location', event.location);
     setOptionalDetail('description', event.description);
     resetAttachmentDetails(event);
+    document.getElementById('details-external-link-status').classList.add('hidden');
+    const externalLinkInput = document.getElementById('details-external-link-input');
+    externalLinkInput.value = '';
+    externalLinkInput.classList.add('hidden');
     document.getElementById('details-provider-button').classList.toggle('hidden', providerEventUrl(event) === '');
     document.getElementById('details-edit-button').classList.toggle('hidden', !editable);
     document.getElementById('details-delete-button').classList.toggle('hidden', !deletable);
@@ -6360,11 +6426,12 @@ function applyStaticTranslations() {
         ['calendar-filter-cancel', 'Cancel'],
         ['calendar-filter-apply', 'Apply']
     ].forEach(([id, text]) => { document.getElementById(id).textContent = t(text); });
-    const providerButtonText = providerLinkText('Open in provider');
+    const providerButtonText = externalLinkActionLabel('Open in provider');
     const providerButton = document.getElementById('details-provider-button');
     providerButton.textContent = providerButtonText;
     providerButton.title = providerButtonText;
     providerButton.setAttribute('aria-label', providerButtonText);
+    document.getElementById('details-external-link-input').setAttribute('aria-label', t('External link'));
     icsImportButtonLabel.textContent = icsImportText('Import ICS');
     icsImportButton.title = icsImportText('Import ICS');
     icsImportFile.setAttribute('aria-label', icsImportText('Import ICS'));

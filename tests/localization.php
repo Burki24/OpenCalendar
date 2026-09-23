@@ -90,7 +90,10 @@ $requiredViewTranslations = [
         'Recurring ICS invitations cannot be imported as a single event.',
         'Wiederkehrende ICS-Einladungen können hier nicht als Einzeltermin importiert werden.'
     ],
-    ['Open in provider', 'Extern öffnen']
+    ['Open in provider', 'Extern öffnen'],
+    ['Copy link', 'Link kopieren'],
+    ['Link copied to clipboard.', 'Link in die Zwischenablage kopiert.'],
+    ['External link', 'Externer Link']
 ];
 
 foreach ($requiredViewTranslations as [$source, $translation]) {
