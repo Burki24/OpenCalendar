@@ -404,7 +404,9 @@ trait KalenderKontoChildGatewayTrait
                 throw new RuntimeException('This provider does not support task attachments.');
             }
             return $this->microsoftTodoProvider()->deleteAttachment(
-                (string) ($request['TaskListID'] ?? ''), (string) $request['TaskID'], $attachmentId
+                (string) ($request['TaskListID'] ?? ''),
+                (string) $request['TaskID'],
+                $attachmentId
             );
         }
         $calendarId = (string) ($request['CalendarID'] ?? '');

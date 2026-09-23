@@ -238,11 +238,16 @@ final class CalDAVProvider implements CalendarEventLookupProviderInterface, Cale
         $calendarReference = $this->normalizeAbsoluteUrl($calendarReference);
         $resource = $this->attachmentResource($calendarReference, $uid, $resourceReference);
         $expectedAttachmentCount = count(ICalendarCodec::attachmentMetadata(
-            $resource['ical'], $uid, $recurrenceId
+            $resource['ical'],
+            $uid,
+            $recurrenceId
         )) - 1;
         $removed = ICalendarCodec::removeAttachment($resource['ical'], $uid, $recurrenceId, $attachmentId);
         $remainingLineCount = ICalendarCodec::attachmentLineCount(
-            $resource['ical'], $uid, $recurrenceId, $removed['line']
+            $resource['ical'],
+            $uid,
+            $recurrenceId,
+            $removed['line']
         ) - 1;
         $etag = $resource['etag'];
         if (preg_match('/^"[^"\r\n]+"$/D', $etag) !== 1) {
@@ -250,7 +255,10 @@ final class CalDAVProvider implements CalendarEventLookupProviderInterface, Cale
         }
         if ($removed['managedId'] !== '') {
             $reference = ICalendarCodec::managedAttachmentReference(
-                $resource['ical'], $uid, $recurrenceId, $attachmentId
+                $resource['ical'],
+                $uid,
+                $recurrenceId,
+                $attachmentId
             );
             if (!$this->isTrustedManagedAttachmentUrl($reference['uri'])) {
                 throw new CalDAVProviderException('The managed attachment URL is not trusted.');
@@ -261,14 +269,24 @@ final class CalDAVProvider implements CalendarEventLookupProviderInterface, Cale
                 $url .= '&rid=' . rawurlencode($recurrenceId);
             }
             $response = $this->httpClient->request(
-                'POST', $url, ['If-Match' => $etag], '', ICalendarAttachmentMetadata::MAX_RESOURCE_BYTES
+                'POST',
+                $url,
+                ['If-Match' => $etag],
+                '',
+                ICalendarAttachmentMetadata::MAX_RESOURCE_BYTES
             );
             $this->assertResponseStatus($response, [200, 204], 'managed attachment deletion');
             $effectiveUrl = preg_replace('/\?.*$/D', '', $this->trustedEffectiveUrl($response, $url));
             $this->assertResourceBelongsToCalendar($calendarReference, $effectiveUrl);
             return ['deleted' => true, 'pendingVerification' => !$this->verifyAttachmentRemoval(
-                $calendarReference, $uid, $recurrenceId, $resource['resourceUrl'], $removed['line'], $remainingLineCount,
-                $expectedAttachmentCount, $removed['managedId']
+                $calendarReference,
+                $uid,
+                $recurrenceId,
+                $resource['resourceUrl'],
+                $removed['line'],
+                $remainingLineCount,
+                $expectedAttachmentCount,
+                $removed['managedId']
             )];
         }
         $response = $this->httpClient->request('PUT', $resource['resourceUrl'], [
@@ -277,59 +295,22 @@ final class CalDAVProvider implements CalendarEventLookupProviderInterface, Cale
         ], $removed['ical'], 65_536);
         $this->assertResponseStatus($response, [200, 204], 'attachment deletion');
         $this->assertResourceBelongsToCalendar(
-            $calendarReference, $this->trustedEffectiveUrl($response, $resource['resourceUrl'])
+            $calendarReference,
+            $this->trustedEffectiveUrl($response, $resource['resourceUrl'])
         );
         if (!$this->verifyAttachmentRemoval(
-            $calendarReference, $uid, $recurrenceId, $resource['resourceUrl'], $removed['line'], $remainingLineCount,
-            $expectedAttachmentCount, ''
+            $calendarReference,
+            $uid,
+            $recurrenceId,
+            $resource['resourceUrl'],
+            $removed['line'],
+            $remainingLineCount,
+            $expectedAttachmentCount,
+            ''
         )) {
             throw new CalDAVProviderException('The server did not retain the attachment deletion.');
         }
         return ['deleted' => true];
-    }
-
-    private function verifyAttachmentRemoval(
-        string $calendarReference,
-        string $uid,
-        string $recurrenceId,
-        string $resourceUrl,
-        string $removedLine,
-        int $remainingLineCount,
-        int $expectedAttachmentCount,
-        string $managedId
-    ): bool {
-        try {
-            $after = $this->attachmentResource($calendarReference, $uid, $resourceUrl);
-            $metadata = ICalendarCodec::attachmentMetadata($after['ical'], $uid, $recurrenceId);
-            if (count($metadata) > $expectedAttachmentCount) {
-                return false;
-            }
-            if ($managedId !== '') {
-                foreach ($metadata as $attachment) {
-                    if ($attachment['kind'] !== 'reference') {
-                        continue;
-                    }
-                    try {
-                        $reference = ICalendarCodec::managedAttachmentReference(
-                            $after['ical'], $uid, $recurrenceId, $attachment['id']
-                        );
-                        if (hash_equals($managedId, $reference['managedId'])) {
-                            return false;
-                        }
-                    } catch (RuntimeException) {
-                        continue;
-                    }
-                }
-            }
-            return ICalendarCodec::attachmentLineCount(
-                $after['ical'], $uid, $recurrenceId, $removedLine
-            ) <= $remainingLineCount;
-        } catch (CalDAVProviderException $exception) {
-            if (in_array($exception->httpStatus, [404, 503], true)) {
-                return false;
-            }
-            throw $exception;
-        }
     }
 
     /** @inheritDoc */
@@ -881,6 +862,56 @@ final class CalDAVProvider implements CalendarEventLookupProviderInterface, Cale
         }
 
         return $this->deleteResource($calendarUrl, $effectiveResourceUrl, $currentEtag, 'event deletion');
+    }
+
+    private function verifyAttachmentRemoval(
+        string $calendarReference,
+        string $uid,
+        string $recurrenceId,
+        string $resourceUrl,
+        string $removedLine,
+        int $remainingLineCount,
+        int $expectedAttachmentCount,
+        string $managedId
+    ): bool {
+        try {
+            $after = $this->attachmentResource($calendarReference, $uid, $resourceUrl);
+            $metadata = ICalendarCodec::attachmentMetadata($after['ical'], $uid, $recurrenceId);
+            if (count($metadata) > $expectedAttachmentCount) {
+                return false;
+            }
+            if ($managedId !== '') {
+                foreach ($metadata as $attachment) {
+                    if ($attachment['kind'] !== 'reference') {
+                        continue;
+                    }
+                    try {
+                        $reference = ICalendarCodec::managedAttachmentReference(
+                            $after['ical'],
+                            $uid,
+                            $recurrenceId,
+                            $attachment['id']
+                        );
+                        if (hash_equals($managedId, $reference['managedId'])) {
+                            return false;
+                        }
+                    } catch (RuntimeException) {
+                        continue;
+                    }
+                }
+            }
+            return ICalendarCodec::attachmentLineCount(
+                $after['ical'],
+                $uid,
+                $recurrenceId,
+                $removedLine
+            ) <= $remainingLineCount;
+        } catch (CalDAVProviderException $exception) {
+            if (in_array($exception->httpStatus, [404, 503], true)) {
+                return false;
+            }
+            throw $exception;
+        }
     }
 
     /** @return array{resourceUrl: string, etag: string, ical: string} */

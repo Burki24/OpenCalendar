@@ -124,7 +124,7 @@ final class ICalendarCodec
         if (strlen($updated) > ICalendarAttachmentMetadata::MAX_RESOURCE_BYTES) {
             throw new RuntimeException('The calendar resource exceeds the attachment limit.');
         }
-        return ['ical' => $updated, 'kind' => $removed['kind'],
+        return ['ical'  => $updated, 'kind' => $removed['kind'],
             'managedId' => $removed['managedId'], 'line' => $removed['line']];
     }
 

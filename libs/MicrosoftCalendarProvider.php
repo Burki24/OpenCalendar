@@ -142,8 +142,14 @@ final class MicrosoftCalendarProvider implements CalendarEventLookupProviderInte
         }
         $collection = $url . '/attachments';
         $metadata = MicrosoftAttachmentCollection::selectDelete($collection, $attachmentId, false, $request);
-        $this->requestJsonUrl('DELETE', $collection . '/' . rawurlencode($metadata['id']), null, [], [204],
-            MicrosoftAttachmentCollection::MAX_RESPONSE_BYTES);
+        $this->requestJsonUrl(
+            'DELETE',
+            $collection . '/' . rawurlencode($metadata['id']),
+            null,
+            [],
+            [204],
+            MicrosoftAttachmentCollection::MAX_RESPONSE_BYTES
+        );
         return ['deleted' => true];
     }
 

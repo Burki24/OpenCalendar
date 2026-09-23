@@ -1519,7 +1519,7 @@ class Calendar extends IPSModuleStrict
             throw new RuntimeException('Provider attachment deletion could not be confirmed.');
         }
         return json_encode(['result' => [
-            'deleted' => true,
+            'deleted'             => true,
             'pendingVerification' => ($result['pendingVerification'] ?? false) === true
         ]], JSON_THROW_ON_ERROR);
     }

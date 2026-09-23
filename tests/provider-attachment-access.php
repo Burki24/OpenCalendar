@@ -152,15 +152,19 @@ attachmentMetadataCheck(
 $deletion = json_encode(['selector' => ['eventReference' => 'evt'], 'id' => $file['id']], JSON_THROW_ON_ERROR);
 $http->responses = [[200, ['id' => 'evt']], [200, $file], [204, '']];
 $deleted = json_decode($calendar->DeleteProviderAttachment($deletion), true, 512, JSON_THROW_ON_ERROR);
-attachmentMetadataCheck($deleted['result']['deleted'] === true && count($http->responses) === 0
+attachmentMetadataCheck(
+    $deleted['result']['deleted'] === true && count($http->responses) === 0
     && $http->requests[array_key_last($http->requests)]['method'] === 'DELETE',
-    'Calendar-to-account Microsoft event deletion routing failed.');
+    'Calendar-to-account Microsoft event deletion routing failed.'
+);
 $taskDeletion = json_encode(['selector' => ['sourceType' => 'microsoft-todo',
-    'taskId' => 'task', 'taskListId' => 'list'], 'id' => 'task-file'], JSON_THROW_ON_ERROR);
+    'taskId'                                             => 'task', 'taskListId' => 'list'], 'id' => 'task-file'], JSON_THROW_ON_ERROR);
 $http->responses = [[200, ['id' => 'task']], [200, $taskFile], [204, '']];
 $deleted = json_decode($calendar->DeleteProviderAttachment($taskDeletion), true, 512, JSON_THROW_ON_ERROR);
-attachmentMetadataCheck($deleted['result']['deleted'] === true && count($http->responses) === 0,
-    'Calendar-to-account Microsoft To Do deletion routing failed.');
+attachmentMetadataCheck(
+    $deleted['result']['deleted'] === true && count($http->responses) === 0,
+    'Calendar-to-account Microsoft To Do deletion routing failed.'
+);
 $calendar->properties['CanWrite'] = false;
 $count = count($http->requests);
 attachmentMetadataReject(fn () => $calendar->UploadProviderAttachment($upload));

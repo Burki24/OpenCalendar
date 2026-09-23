@@ -6,13 +6,13 @@ require_once __DIR__ . '/../libs/MicrosoftCalendarProvider.php';
 require_once __DIR__ . '/../libs/MicrosoftTodoProvider.php';
 require_once __DIR__ . '/../libs/CalDAVProvider.php';
 
+use IPSKalender\CalDAVOriginPolicy;
+use IPSKalender\CalDAVProvider;
 use IPSKalender\CalendarHttpClientInterface;
 use IPSKalender\CalendarHttpResponse;
+use IPSKalender\ICalendarCodec;
 use IPSKalender\MicrosoftCalendarProvider;
 use IPSKalender\MicrosoftTodoProvider;
-use IPSKalender\CalDAVProvider;
-use IPSKalender\CalDAVOriginPolicy;
-use IPSKalender\ICalendarCodec;
 
 final class AttachmentDeleteHttp implements CalendarHttpClientInterface
 {
@@ -50,7 +50,7 @@ function deleteReject(callable $action): void
     throw new LogicException('Expected attachment deletion to be rejected.');
 }
 
-$file = ['id' => 'file-1', 'name' => 'Proof.pdf', 'size' => 12, 'contentType' => 'application/pdf',
+$file = ['id'     => 'file-1', 'name' => 'Proof.pdf', 'size' => 12, 'contentType' => 'application/pdf',
     '@odata.type' => '#microsoft.graph.fileAttachment', 'isInline' => false];
 foreach ([false, true] as $task) {
     $http = new AttachmentDeleteHttp([[200, ['id' => 'event']], [200, $file], [204, '']]);
@@ -59,10 +59,14 @@ foreach ([false, true] as $task) {
         ? $provider->deleteAttachment('list', 'event', 'file-1')
         : $provider->deleteAttachment('calendar', 'event', 'file-1');
     deleteCheck(($result['deleted'] ?? null) === true, 'Microsoft must confirm attachment deletion.');
-    deleteCheck(array_column($http->requests, 'method') === ['GET', 'GET', 'DELETE'],
-        'The exact owner and attachment must be rechecked before DELETE.');
-    deleteCheck(str_ends_with(parse_url($http->requests[2]['url'], PHP_URL_PATH), '/attachments/file-1'),
-        'DELETE must target only the selected attachment.');
+    deleteCheck(
+        array_column($http->requests, 'method') === ['GET', 'GET', 'DELETE'],
+        'The exact owner and attachment must be rechecked before DELETE.'
+    );
+    deleteCheck(
+        str_ends_with(parse_url($http->requests[2]['url'], PHP_URL_PATH), '/attachments/file-1'),
+        'DELETE must target only the selected attachment.'
+    );
     $wrong = new AttachmentDeleteHttp([[200, ['id' => 'other']]]);
     $provider = $task ? new MicrosoftTodoProvider($wrong, 'token') : new MicrosoftCalendarProvider($wrong, 'token');
     deleteReject(fn () => $task
@@ -94,9 +98,11 @@ $external = 'ATTACH;FILENAME="B.pdf":https://files.invalid/b.pdf';
 $withAttachments = str_replace('END:VEVENT', $inline . "\r\n" . $external . "\r\nEND:VEVENT", $base);
 $metadata = ICalendarCodec::attachmentMetadata($withAttachments, 'event');
 $removed = ICalendarCodec::removeAttachment($withAttachments, 'event', '', $metadata[0]['id']);
-deleteCheck(count(ICalendarCodec::attachmentMetadata($removed['ical'], 'event')) === 1
+deleteCheck(
+    count(ICalendarCodec::attachmentMetadata($removed['ical'], 'event')) === 1
     && str_contains($removed['ical'], $external) && str_contains($removed['ical'], 'SUMMARY:Keep me'),
-    'Removing one ATTACH must preserve other properties and attachments.');
+    'Removing one ATTACH must preserve other properties and attachments.'
+);
 deleteReject(fn () => ICalendarCodec::removeAttachment($withAttachments, 'event', '', str_repeat('0', 64)));
 $url = 'https://dav.invalid/calendar/event.ics';
 $calendar = 'https://dav.invalid/calendar/';
@@ -107,11 +113,13 @@ $http = new AttachmentDeleteHttp([
 ]);
 $dav = new CalDAVProvider($http, 'https://dav.invalid/', new CalDAVOriginPolicy('https://dav.invalid/'));
 $result = $dav->deleteAttachment($calendar, 'event', '', $url, $metadata[0]['id']);
-deleteCheck($result['deleted'] === true && array_column($http->requests, 'method') === ['GET', 'PUT', 'GET']
+deleteCheck(
+    $result['deleted'] === true && array_column($http->requests, 'method') === ['GET', 'PUT', 'GET']
     && ($http->requests[1]['headers']['If-Match'] ?? '') === '"v1"'
     && !str_contains($http->requests[1]['body'], $inline)
     && str_contains($http->requests[1]['body'], $external),
-    'Inline CalDAV deletion must use conditional PUT on the exact resource.');
+    'Inline CalDAV deletion must use conditional PUT on the exact resource.'
+);
 
 $withoutExternal = ICalendarCodec::removeAttachment($withAttachments, 'event', '', $metadata[1]['id']);
 $http = new AttachmentDeleteHttp([
@@ -119,10 +127,12 @@ $http = new AttachmentDeleteHttp([
     [200, $withoutExternal['ical'], ['etag' => '"v2"']]
 ]);
 $dav = new CalDAVProvider($http, 'https://dav.invalid/', new CalDAVOriginPolicy('https://dav.invalid/'));
-deleteCheck($dav->deleteAttachment($calendar, 'event', '', $url, $metadata[1]['id'])['deleted'] === true
+deleteCheck(
+    $dav->deleteAttachment($calendar, 'event', '', $url, $metadata[1]['id'])['deleted'] === true
     && $http->requests[1]['method'] === 'PUT'
     && $http->requests[1]['url'] === $url,
-    'An unmanaged external ATTACH must be removed from iCalendar, never fetched or deleted by URI.');
+    'An unmanaged external ATTACH must be removed from iCalendar, never fetched or deleted by URI.'
+);
 
 $managedLine = 'ATTACH;MANAGED-ID=server-123;FMTTYPE=application/pdf;FILENAME="A.pdf":https://dav.invalid/attachments/123';
 $managed = str_replace('END:VEVENT', $managedLine . "\r\nEND:VEVENT", $base);
@@ -134,16 +144,20 @@ foreach ([false, true] as $pending) {
     ]);
     $dav = new CalDAVProvider($http, 'https://dav.invalid/', new CalDAVOriginPolicy('https://dav.invalid/'));
     $result = $dav->deleteAttachment($calendar, 'event', '', $url, $managedId);
-    deleteCheck($result['deleted'] === true && ($result['pendingVerification'] ?? false) === $pending
+    deleteCheck(
+        $result['deleted'] === true && ($result['pendingVerification'] ?? false) === $pending
         && $http->requests[1]['method'] === 'POST'
         && $http->requests[1]['url'] === $url . '?action=attachment-remove&managed-id=server-123'
         && ($http->requests[1]['headers']['If-Match'] ?? '') === '"v1"',
-        'Managed deletion must POST the selected managed ID and handle delayed visibility.');
+        'Managed deletion must POST the selected managed ID and handle delayed visibility.'
+    );
 }
 $appleUrl = 'https://p01-caldav.icloud.com/123/calendars/abc/event.ics';
 $appleCalendar = 'https://p01-caldav.icloud.com/123/calendars/abc/';
 $appleManaged = str_replace(
-    'https://dav.invalid/attachments/123', 'https://gateway.icloud.com/caldav/123/attachments/456', $managed
+    'https://dav.invalid/attachments/123',
+    'https://gateway.icloud.com/caldav/123/attachments/456',
+    $managed
 );
 $appleId = ICalendarCodec::attachmentMetadata($appleManaged, 'event')[0]['id'];
 $http = new AttachmentDeleteHttp([
@@ -151,10 +165,12 @@ $http = new AttachmentDeleteHttp([
     [200, $base, ['etag' => '"v2"']]
 ]);
 $apple = new CalDAVProvider($http, 'https://caldav.icloud.com/', new CalDAVOriginPolicy('https://caldav.icloud.com/'));
-deleteCheck($apple->deleteAttachment($appleCalendar, 'event', '', $appleUrl, $appleId)['deleted'] === true
+deleteCheck(
+    $apple->deleteAttachment($appleCalendar, 'event', '', $appleUrl, $appleId)['deleted'] === true
     && $http->requests[1]['method'] === 'POST'
     && $http->requests[1]['url'] === $appleUrl . '?action=attachment-remove&managed-id=server-123',
-    'Apple managed attachments must be removed using the event resource, never the gateway file URL.');
+    'Apple managed attachments must be removed using the event resource, never the gateway file URL.'
+);
 
 foreach ([[], ['etag' => 'W/"v1"']] as $headers) {
     $http = new AttachmentDeleteHttp([[200, $withAttachments, $headers]]);

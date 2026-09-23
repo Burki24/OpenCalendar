@@ -137,8 +137,13 @@ final class MicrosoftTodoProvider
         }
         $collection = $url . '/attachments';
         $metadata = MicrosoftAttachmentCollection::selectDelete($collection, $attachmentId, true, $request);
-        $this->requestJsonUrl('DELETE', $collection . '/' . rawurlencode($metadata['id']), null, [204],
-            MicrosoftAttachmentCollection::MAX_RESPONSE_BYTES);
+        $this->requestJsonUrl(
+            'DELETE',
+            $collection . '/' . rawurlencode($metadata['id']),
+            null,
+            [204],
+            MicrosoftAttachmentCollection::MAX_RESPONSE_BYTES
+        );
         return ['deleted' => true];
     }
 
