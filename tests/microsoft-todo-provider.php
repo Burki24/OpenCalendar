@@ -462,15 +462,21 @@ $omittedClient = new MicrosoftTodoTestHttpClient([
 $omitted = (new MicrosoftTodoProvider($omittedClient, 'access-token'))->updateTask('list-1', 'reopen-task', [
     'status' => 'notStarted', 'reopenAsSingle' => true
 ]);
-$omittedWrites = array_values(array_filter($omittedClient->requests,
-    static fn (array $request): bool => $request['method'] !== 'GET'));
-assertMicrosoftTodo($omitted['status'] === 'notStarted' && $omitted['recurrence'] === null
+$omittedWrites = array_values(array_filter(
+    $omittedClient->requests,
+    static fn (array $request): bool => $request['method'] !== 'GET'
+));
+assertMicrosoftTodo(
+    $omitted['status'] === 'notStarted' && $omitted['recurrence'] === null
     && count($omittedWrites) === 1
     && json_decode($omittedWrites[0]['body'], true, 512, JSON_THROW_ON_ERROR) === ['status' => 'notStarted'],
-    'A completed task whose Graph response omits recurrence must reopen without a recurrence write.');
-assertMicrosoftTodo(str_contains($omittedClient->requests[1]['url'], '$select=id,status,recurrence')
+    'A completed task whose Graph response omits recurrence must reopen without a recurrence write.'
+);
+assertMicrosoftTodo(
+    str_contains($omittedClient->requests[1]['url'], '$select=id,status,recurrence')
     && str_contains($omittedClient->requests[4]['url'], '$select=id,status,recurrence'),
-    'Omitted recurrence must be checked by an explicit Graph selection before and after reopening.');
+    'Omitted recurrence must be checked by an explicit Graph selection before and after reopening.'
+);
 
 $selectedRecurringClient = new MicrosoftTodoTestHttpClient([
     todoResponse(200, $completedWithoutRecurrence), todoResponse(200, $completedSeries),
@@ -479,11 +485,15 @@ $selectedRecurringClient = new MicrosoftTodoTestHttpClient([
 $selectedRecurring = (new MicrosoftTodoProvider($selectedRecurringClient, 'access-token'))->updateTask('list-1', 'reopen-task', [
     'status' => 'notStarted', 'reopenAsSingle' => true
 ]);
-$selectedWrites = array_values(array_filter($selectedRecurringClient->requests,
-    static fn (array $request): bool => $request['method'] !== 'GET'));
-assertMicrosoftTodo($selectedRecurring['recurrence'] === null && count($selectedWrites) === 2
+$selectedWrites = array_values(array_filter(
+    $selectedRecurringClient->requests,
+    static fn (array $request): bool => $request['method'] !== 'GET'
+));
+assertMicrosoftTodo(
+    $selectedRecurring['recurrence'] === null && count($selectedWrites) === 2
     && json_decode($selectedWrites[0]['body'], true, 512, JSON_THROW_ON_ERROR) === ['recurrence' => null],
-    'A recurrence revealed by explicit selection must still be removed before reopening.');
+    'A recurrence revealed by explicit selection must still be removed before reopening.'
+);
 
 $changedIdentityClient = new MicrosoftTodoTestHttpClient([
     todoResponse(200, $completedWithoutRecurrence),
@@ -497,8 +507,10 @@ try {
 } catch (MicrosoftTodoProviderException) {
     $changedIdentity = true;
 }
-assertMicrosoftTodo($changedIdentity && count($changedIdentityClient->requests) === 2,
-    'A changed task identity during recurrence selection must prevent all writes.');
+assertMicrosoftTodo(
+    $changedIdentity && count($changedIdentityClient->requests) === 2,
+    'A changed task identity during recurrence selection must prevent all writes.'
+);
 
 $unconfirmedClient = new MicrosoftTodoTestHttpClient([
     todoResponse(200, $completedSingle), todoResponse(200, $openWithoutRecurrence),
