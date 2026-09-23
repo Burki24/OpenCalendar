@@ -29,7 +29,7 @@ context.calendarEntryByInstanceId = () => ({
     canManageProviderAttachments: true,
     attachmentSelectorType: 'icalendar'
 });
-for (const name of ['attachmentTransferValue', 'providerAttachmentUploadValue']) {
+for (const name of ['attachmentTransferValue', 'providerAttachmentUploadValue', 'providerAttachmentDeleteValue']) {
     vm.runInContext(functionSource(name), context);
 }
 
@@ -90,6 +90,25 @@ assert.deepStrictEqual(
     {calendarId: 42, operation: 'upload', destination: 'provider', selector: {uid: 'event'}, data: {name: 'Proof.pdf', content: 'JVBERg=='}},
     'Provider upload must declare the selected owner and destination explicitly.'
 );
+assert.deepStrictEqual(
+    JSON.parse(JSON.stringify(context.providerAttachmentDeleteValue(
+        {calendarInstanceId: 42, uid: 'event'}, {id: 'attached-file', kind: 'embedded', destination: 'provider'}
+    ))),
+    {calendarId: 42, operation: 'delete', destination: 'provider', selector: {uid: 'event'}, data: {id: 'attached-file'}},
+    'Provider deletion must target the selected event and exact file.'
+);
+assert.strictEqual(context.providerAttachmentDeleteValue(
+    {calendarInstanceId: 42, uid: 'series', recurrenceType: 'occurrence'},
+    {id: 'attached-file', kind: 'embedded', destination: 'provider'}
+), null, 'A generated CalDAV occurrence must not delete from the master.');
+assert.strictEqual(context.providerAttachmentDeleteValue(
+    {calendarInstanceId: 42, uid: 'event'},
+    {id: 'body-reference-' + 'a'.repeat(64), kind: 'reference', destination: 'provider'}
+), null, 'A description-only Outlook link must not expose provider deletion.');
+assert.strictEqual(context.providerAttachmentDeleteValue(
+    {calendarInstanceId: 42, uid: 'event'},
+    {id: 'graph-file', kind: 'file', destination: 'provider', isInline: true}
+), null, 'Inline Graph attachments must not expose provider deletion.');
 
 assert.deepStrictEqual(
     JSON.parse(JSON.stringify(context.localAttachmentSelector(

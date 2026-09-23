@@ -81,7 +81,7 @@ class ProviderAttachmentListView extends AttachmentAccessBaselineView
     public function CanAccessAttachments(int $CalendarID, string $Operation, string $Destination): bool
     {
         return $this->allowPolicy && $CalendarID === 42
-            && in_array($Operation, ['list', 'download', 'upload'], true) && $Destination === 'provider';
+            && in_array($Operation, ['list', 'download', 'upload', 'delete'], true) && $Destination === 'provider';
     }
 }
 function IPSKAL_ListProviderAttachments(int $id, string $selector): string
@@ -111,16 +111,28 @@ function IPSKAL_UploadProviderAttachment(int $id, string $request): string
     }
     return '{"result":{"uploaded":true}}';
 }
+function IPSKAL_DeleteProviderAttachment(int $id, string $request): string
+{
+    ++$GLOBALS['providerAttachmentCalls'];
+    if ($GLOBALS['providerAttachmentRevoke']) {
+        $GLOBALS['providerAttachmentView']->allowPolicy = false;
+    }
+    return '{"result":{"deleted":true}}';
+}
 $providerView = new ProviderAttachmentListView(99998);
 $GLOBALS['providerAttachmentView'] = $providerView;
 foreach ([
     ['on', $validToken, 42, 'list', [], false, 200, 1, 'PRIVATE_PROVIDER_NAME'],
     ['on', $validToken, 42, 'download', ['id' => 'file'], false, 200, 1, 'PRIVATE PROVIDER DOWNLOAD'],
+    ['on', $validToken, 42, 'delete', ['id' => 'file'], false, 200, 1, 'deleted'],
     ['', $validToken, 42, 'list', [], false, 403, 0, ''],
     ['on', 'wrong', 42, 'list', [], false, 403, 0, ''],
     ['on', $validToken, 43, 'list', [], false, 403, 0, ''],
     ['on', $validToken, 42, 'download', [], false, 400, 0, ''],
     ['on', $validToken, 42, 'download', ['id' => "bad\r\nid"], false, 400, 0, ''],
+    ['on', $validToken, 42, 'delete', [], false, 400, 0, ''],
+    ['on', $validToken, 42, 'delete', ['id' => "bad\r\nid"], false, 400, 0, ''],
+    ['on', $validToken, 42, 'delete', ['id' => 'file'], true, 400, 1, ''],
     ['on', $validToken, 42, 'upload', [], false, 400, 0, ''],
     ['on', $validToken, 42, 'upload', ['name' => 'Proof.pdf', 'content' => base64_encode("%PDF-1.7\n%%EOF\n")], false, 200, 1, 'uploaded'],
     ['on', $validToken, 42, 'upload', ['name' => 'Proof.pdf', 'content' => base64_encode("%PDF-1.7\n%%EOF\n")], true, 400, 1, ''],

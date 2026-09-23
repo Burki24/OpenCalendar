@@ -109,6 +109,25 @@ final class MicrosoftAttachmentCollection
         return $metadata;
     }
 
+    /** Confirms a real, non-inline attachment under the exact owner before deletion. */
+    public static function selectDelete(string $collectionUrl, string $attachmentId, bool $task, callable $request): array
+    {
+        self::assertCollection($collectionUrl);
+        if ($attachmentId === '' || strlen($attachmentId) > 2048
+            || preg_match('/[\x00-\x1f\x7f]/', $attachmentId)
+            || str_starts_with($attachmentId, 'body-reference-')) {
+            throw new RuntimeException('Invalid attachment identity.');
+        }
+        $select = 'id,name,size,contentType' . ($task ? '' : ',isInline');
+        $metadata = self::normalize($request($collectionUrl . '/' . rawurlencode($attachmentId)
+            . '?$select=' . rawurlencode($select)), $task);
+        if (!hash_equals($attachmentId, $metadata['id']) || $metadata['isInline']
+            || !in_array($metadata['kind'], $task ? ['file'] : ['file', 'item', 'reference'], true)) {
+            throw new RuntimeException('Attachment is unavailable for deletion.');
+        }
+        return $metadata;
+    }
+
     private static function assertCollection(string $collectionUrl): void
     {
         $policy = new MicrosoftGraphOriginPolicy();

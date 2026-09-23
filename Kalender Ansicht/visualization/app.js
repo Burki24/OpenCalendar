@@ -3125,6 +3125,16 @@ function providerAttachmentUploadValue(event, data = {}) {
     return attachmentTransferValue(event, 'upload', data);
 }
 
+function providerAttachmentDeleteValue(event, file) {
+    const calendar = calendarEntryByInstanceId(event?.calendarInstanceId);
+    if (!calendar || calendar.canManageProviderAttachments !== true || file?.destination !== 'provider'
+        || file.isInline === true || String(file.id || '').startsWith('body-reference-')
+        || !['file', 'embedded', 'reference', 'item'].includes(file.kind)) return null;
+    if (calendar.attachmentSelectorType === 'icalendar'
+        && String(event?.recurrenceType || '').toLowerCase() === 'occurrence') return null;
+    return attachmentTransferValue(event, 'delete', {id: file.id});
+}
+
 function localAttachmentTransferValue(event, operation, data = {}) {
     const calendar = calendarEntryByInstanceId(event?.calendarInstanceId);
     const selector = localAttachmentSelector(event, calendar);
@@ -3224,7 +3234,8 @@ function normalizedAttachmentMetadata(file, referenceProvider = '') {
     const url = kind === 'reference'
         ? (referenceProvider === 'google' ? trustedGoogleAttachmentUrl(file.url) : trustedMicrosoftReferenceUrl(file.url))
         : '';
-    return {id, name, kind, size, url, destination: 'provider', referenceProvider};
+    return {id, name, kind, size, url, destination: 'provider', referenceProvider,
+        isInline: file.isInline === true};
 }
 
 function normalizedLocalAttachmentMetadata(file) {
@@ -3351,24 +3362,30 @@ async function downloadAttachment(event, file, button, revision) {
 }
 
 function requestLocalAttachmentDelete(event, file, revision) {
-    if (revision !== attachmentDetailsRevision
-        || !localAttachmentTransferValue(event, 'delete', {id: file.id, revision: file.revision})) return;
+    const value = file.destination === 'local'
+        ? localAttachmentTransferValue(event, 'delete', {id: file.id, revision: file.revision})
+        : providerAttachmentDeleteValue(event, file);
+    if (revision !== attachmentDetailsRevision || !value) return;
     pendingAttachmentDelete = {event, file, revision};
     document.getElementById('attachment-delete-confirm-summary').textContent = file.name;
+    document.getElementById('attachment-delete-confirm-question').textContent = t(file.destination === 'local'
+        ? 'Do you really want to delete this attachment?'
+        : 'Remove this attachment from the event at the provider? This cannot be undone.');
     attachmentDeleteConfirmButton.disabled = false;
     attachmentDeleteConfirmDialog.showModal();
 }
 
-async function confirmLocalAttachmentDelete() {
+async function confirmAttachmentDelete() {
     const pending = pendingAttachmentDelete;
     if (!pending || pending.revision !== attachmentDetailsRevision) {
         attachmentDeleteConfirmDialog.close();
         return;
     }
-    const value = localAttachmentTransferValue(pending.event, 'delete', {
-        id: pending.file.id,
-        revision: pending.file.revision
-    });
+    const value = pending.file.destination === 'local'
+        ? localAttachmentTransferValue(pending.event, 'delete', {
+            id: pending.file.id, revision: pending.file.revision
+        })
+        : providerAttachmentDeleteValue(pending.event, pending.file);
     if (!value) {
         attachmentDeleteConfirmDialog.close();
         return;
@@ -3376,10 +3393,18 @@ async function confirmLocalAttachmentDelete() {
     attachmentDeleteConfirmButton.disabled = true;
     setAttachmentDetailsStatus(t('Deleting attachment…'));
     try {
-        await attachmentTransferRequest(value);
+        const response = await attachmentTransferRequest(value);
         if (pending.revision !== attachmentDetailsRevision) return;
         attachmentDeleteConfirmDialog.close();
+        if (response?.result?.pendingVerification === true) {
+            setAttachmentDetailsStatus(t('Provider accepted the deletion. Waiting for the attachment list to update…'));
+            await new Promise(resolve => window.setTimeout(resolve, 4000));
+            if (pending.revision !== attachmentDetailsRevision) return;
+        }
         await loadSelectedEventAttachments();
+        if (response?.result?.pendingVerification === true && selectedEvent === pending.event && eventDetailsDialog.open) {
+            setAttachmentDetailsStatus(t('Provider accepted the deletion. If the file is still visible, refresh the list later.'));
+        }
     } catch (_) {
         if (pending.revision === attachmentDetailsRevision) {
             attachmentDeleteConfirmDialog.close();
@@ -3438,8 +3463,9 @@ function renderAttachments(event, files, revision) {
                 ? t('Too large to download')
                 : t('Download unavailable'));
         }
-        if (file.destination === 'local'
-            && localAttachmentTransferValue(event, 'delete', {id: file.id, revision: file.revision})) {
+        if ((file.destination === 'local'
+            && localAttachmentTransferValue(event, 'delete', {id: file.id, revision: file.revision}))
+            || providerAttachmentDeleteValue(event, file)) {
             const deleteButton = element('button', 'danger-button');
             deleteButton.type = 'button';
             deleteButton.textContent = t('Delete');
@@ -5594,7 +5620,7 @@ eventAttachmentsAddButton.addEventListener('click', () => {
 eventAttachmentsFileInput.addEventListener('change', () => void uploadSelectedAttachment());
 document.getElementById('attachment-delete-confirm-close').addEventListener('click', () => attachmentDeleteConfirmDialog.close());
 document.getElementById('attachment-delete-confirm-cancel').addEventListener('click', () => attachmentDeleteConfirmDialog.close());
-attachmentDeleteConfirmButton.addEventListener('click', () => void confirmLocalAttachmentDelete());
+attachmentDeleteConfirmButton.addEventListener('click', () => void confirmAttachmentDelete());
 attachmentDeleteConfirmDialog.addEventListener('close', () => { pendingAttachmentDelete = null; });
 document.getElementById('details-edit-button').addEventListener('click', () => requestEdit(eventDetailsDialog));
 document.getElementById('details-task-toggle-button').addEventListener('click', toggleSelectedTaskCompletion);

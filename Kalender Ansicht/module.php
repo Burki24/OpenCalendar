@@ -2806,7 +2806,8 @@ class CalendarView extends IPSModuleStrict
                 'canManageProviderAttachments' => in_array($providerKey, ['microsoft', 'apple', 'caldav'], true)
                     && $canWrite
                     && $this->selectedCalendarAllowsAttachments($instanceId, 'list', 'provider')
-                    && $this->selectedCalendarAllowsAttachments($instanceId, 'upload', 'provider'),
+                    && $this->selectedCalendarAllowsAttachments($instanceId, 'upload', 'provider')
+                    && $this->selectedCalendarAllowsAttachments($instanceId, 'delete', 'provider'),
                 'canReadLocalAttachments'      => ($localCalendar || $providerKey === 'google')
                     && $this->selectedCalendarAllowsAttachments($instanceId, 'list', 'local')
                     && $this->selectedCalendarAllowsAttachments($instanceId, 'download', 'local'),
@@ -3450,13 +3451,14 @@ class CalendarView extends IPSModuleStrict
                     'list'     => [],
                     'download' => ['id'],
                     'upload'   => ['name', 'content'],
+                    'delete'   => ['id'],
                     default    => throw new InvalidArgumentException('Unsupported provider attachment operation.')
                 };
                 if (array_diff(array_keys($value['data']), $providerFields) !== []
                     || count($value['data']) !== count($providerFields)) {
                     throw new InvalidArgumentException('Invalid provider attachment fields.');
                 }
-                if ($value['operation'] === 'download' && (!is_string($value['data']['id'])
+                if (in_array($value['operation'], ['download', 'delete'], true) && (!is_string($value['data']['id'])
                     || $value['data']['id'] === '' || strlen($value['data']['id']) > 2048
                     || preg_match('/[\x00-\x1f\x7f]/', $value['data']['id']))) {
                     throw new InvalidArgumentException('Invalid provider attachment identity.');
@@ -3484,6 +3486,9 @@ class CalendarView extends IPSModuleStrict
                     'upload' => IPSKAL_UploadProviderAttachment($value['calendarId'], json_encode([
                         'selector' => $value['selector'], 'name' => $value['data']['name'],
                         'content'  => $value['data']['content']
+                    ], JSON_THROW_ON_ERROR)),
+                    'delete' => IPSKAL_DeleteProviderAttachment($value['calendarId'], json_encode([
+                        'selector' => $value['selector'], 'id' => $value['data']['id']
                     ], JSON_THROW_ON_ERROR))
                 }
             : IPSKAL_TransferLocalAttachment($value['calendarId'], json_encode([

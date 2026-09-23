@@ -29,6 +29,7 @@ $commands = [
     ['Verify provider attachment access and Microsoft metadata', [PHP_BINARY, 'tests/provider-attachment-access.php']],
     ['Verify Google Calendar attachment metadata and safe links', [PHP_BINARY, 'tests/google-attachment-metadata.php']],
     ['Verify provider attachment uploads', [PHP_BINARY, 'tests/provider-attachment-upload.php']],
+    ['Verify provider attachment deletion', [PHP_BINARY, 'tests/provider-attachment-delete.php']],
     ['Verify iCalendar and CalDAV attachment metadata', [PHP_BINARY, 'tests/icalendar-attachment-metadata.php']],
     ['Verify attachment upload admission', [PHP_BINARY, 'tests/attachment-upload-policy.php']],
     ['Verify authoritative local attachment access', [PHP_BINARY, 'tests/local-attachment-access.php']],

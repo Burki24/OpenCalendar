@@ -124,6 +124,24 @@ final class MicrosoftTodoProvider
         return ['uploaded' => true];
     }
 
+    /** Removes one freshly verified file attachment from the exact To Do task. */
+    public function deleteAttachment(string $listId, string $taskId, string $attachmentId): array
+    {
+        $listId = $this->requiredId($listId, 'task list');
+        $taskId = $this->requiredId($taskId, 'task');
+        $url = self::API_URL . '/me/todo/lists/' . rawurlencode($listId) . '/tasks/' . rawurlencode($taskId);
+        $request = fn (string $target): array => $this->requestJsonUrl('GET', $target, null, [200], MicrosoftAttachmentCollection::MAX_RESPONSE_BYTES);
+        $parent = $request($url . '?$select=id');
+        if (($parent['id'] ?? null) !== $taskId) {
+            throw new MicrosoftTodoProviderException('The attachment task is no longer available.');
+        }
+        $collection = $url . '/attachments';
+        $metadata = MicrosoftAttachmentCollection::selectDelete($collection, $attachmentId, true, $request);
+        $this->requestJsonUrl('DELETE', $collection . '/' . rawurlencode($metadata['id']), null, [204],
+            MicrosoftAttachmentCollection::MAX_RESPONSE_BYTES);
+        return ['deleted' => true];
+    }
+
     /** @return list<array<string, mixed>> */
     public function getTaskLists(): array
     {

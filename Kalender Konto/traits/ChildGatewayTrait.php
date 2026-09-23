@@ -50,7 +50,7 @@ trait KalenderKontoChildGatewayTrait
 
             $operation = (string) ($request['Operation'] ?? '');
             $requestID = (string) ($request['RequestID'] ?? '');
-            $debugRequest = !in_array($operation, ['ReadEventsTransferPage', 'ListProviderAttachments', 'DownloadProviderAttachment', 'UploadProviderAttachment'], true);
+            $debugRequest = !in_array($operation, ['ReadEventsTransferPage', 'ListProviderAttachments', 'DownloadProviderAttachment', 'UploadProviderAttachment', 'DeleteProviderAttachment'], true);
             if ($debugRequest) {
                 $this->SendSafeDebug('ChildRequest', [
                     'operation'         => $operation,
@@ -64,6 +64,7 @@ trait KalenderKontoChildGatewayTrait
                 'ListProviderAttachments'    => $this->listProviderAttachmentsForChild($request),
                 'DownloadProviderAttachment' => $this->downloadProviderAttachmentForChild($request),
                 'UploadProviderAttachment'   => $this->uploadProviderAttachmentForChild($request),
+                'DeleteProviderAttachment'   => $this->deleteProviderAttachmentForChild($request),
                 'GetCalendars'               => json_decode($this->GetCalendars(), true, 512, JSON_THROW_ON_ERROR),
                 'GetTaskLists'               => json_decode($this->GetTaskLists(), true, 512, JSON_THROW_ON_ERROR),
                 'DiscoverCalendars'          => $this->discoverCalendars(),
@@ -100,7 +101,7 @@ trait KalenderKontoChildGatewayTrait
 
             return $this->encodeResponse(true, $operation, $requestID, $payload);
         } catch (Throwable $exception) {
-            if (in_array(($operation ?? ''), ['ListProviderAttachments', 'DownloadProviderAttachment', 'UploadProviderAttachment'], true)) {
+            if (in_array(($operation ?? ''), ['ListProviderAttachments', 'DownloadProviderAttachment', 'UploadProviderAttachment', 'DeleteProviderAttachment'], true)) {
                 // Provider failures may contain private filenames or URLs. Do not log them.
                 return $this->encodeResponse(false, $operation, $requestID ?? '', null, 'Provider attachments are unavailable.');
             }
@@ -386,6 +387,52 @@ trait KalenderKontoChildGatewayTrait
             (string) ($request['ResourceURL'] ?? ''),
             $name,
             $content
+        );
+    }
+
+    /** @param array<string,mixed> $request @return array{deleted:bool,pendingVerification?:bool} */
+    private function deleteProviderAttachmentForChild(array $request): array
+    {
+        $attachmentId = $request['AttachmentID'] ?? null;
+        if (!is_string($attachmentId) || $attachmentId === '' || strlen($attachmentId) > 2048
+            || preg_match('/[\x00-\x1f\x7f]/', $attachmentId)) {
+            throw new InvalidArgumentException('Invalid attachment identity.');
+        }
+        $providerType = $this->ReadPropertyInteger('Provider');
+        if (isset($request['TaskID'])) {
+            if ($providerType !== self::PROVIDER_MICROSOFT) {
+                throw new RuntimeException('This provider does not support task attachments.');
+            }
+            return $this->microsoftTodoProvider()->deleteAttachment(
+                (string) ($request['TaskListID'] ?? ''), (string) $request['TaskID'], $attachmentId
+            );
+        }
+        $calendarId = (string) ($request['CalendarID'] ?? '');
+        $calendar = $this->resolveCalendar($calendarId);
+        if ($calendarId === '' || ($calendar['id'] ?? '') !== $calendarId) {
+            throw new RuntimeException('The attachment calendar could not be verified.');
+        }
+        $reference = $this->calendarReference($calendar);
+        if ($providerType === self::PROVIDER_MICROSOFT) {
+            $provider = new MicrosoftCalendarProvider(
+                $this->createTrustedCloudHttpClient(new MicrosoftGraphOriginPolicy()),
+                $this->getMicrosoftAccessToken()
+            );
+            return $provider->deleteAttachment($reference, (string) ($request['EventReference'] ?? ''), $attachmentId);
+        }
+        if (!in_array($providerType, [self::PROVIDER_APPLE, self::PROVIDER_CALDAV], true)) {
+            throw new RuntimeException('This provider does not support attachment deletion.');
+        }
+        $provider = $this->createProvider();
+        if (!$provider instanceof CalDAVProvider) {
+            throw new RuntimeException('This provider does not support attachment deletion.');
+        }
+        return $provider->deleteAttachment(
+            $reference,
+            (string) ($request['UID'] ?? ''),
+            (string) ($request['RecurrenceID'] ?? ''),
+            (string) ($request['ResourceURL'] ?? ''),
+            $attachmentId
         );
     }
 

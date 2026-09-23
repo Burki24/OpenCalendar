@@ -370,6 +370,19 @@ components are. No file contents or names are added to shared calendar state.
 Tests cover direct provider writes, module routing, rights and post-write
 revocation. Live provider/client interoperability remains to be verified.
 
+### Provider attachment deletion (2026-09-23)
+
+With Manage permissions on both calendar and view, a user can confirm deletion
+of one listed attachment on a Microsoft 365 event, Microsoft To Do task, or
+CalDAV/Apple event. The account rechecks the exact owner and attachment before
+issuing Microsoft Graph DELETE, CalDAV managed-attachment POST, or a conditional
+CalDAV iCalendar PUT. The latter removes only the selected ATTACH property;
+external target URLs are never fetched or deleted. Generated recurrence
+occurrences, Outlook description-only links, and Google/ICS provider attachments
+are not eligible. Failed or ambiguous responses prompt a refreshed list rather
+than an automatic retry. This deletes the provider's attachment association;
+provider-side retention and backups remain under the provider's control.
+
 ### Administrative local recovery and cleanup (2026-09-22)
 
 Trusted Symcon scripts can now inventory all local originals, start/read/finish

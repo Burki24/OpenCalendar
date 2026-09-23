@@ -1494,6 +1494,36 @@ class Calendar extends IPSModuleStrict
         ]], JSON_THROW_ON_ERROR);
     }
 
+    /** Deletes one exact provider attachment from its server-verified owner. */
+    public function DeleteProviderAttachment(string $Request): string
+    {
+        if (!$this->CanAccessAttachments('delete', 'provider') || strlen($Request) > 12_000) {
+            throw new RuntimeException('Provider attachment deletion denied.');
+        }
+        $value = json_decode($Request, true, 8, JSON_THROW_ON_ERROR);
+        if (!is_array($value) || count($value) !== 2 || array_diff(array_keys($value), ['selector', 'id']) !== []
+            || !is_array($value['selector'] ?? null)
+            || !is_string($value['id'] ?? null) || $value['id'] === '' || strlen($value['id']) > 2048
+            || preg_match('/[\x00-\x1f\x7f]/', $value['id'])) {
+            throw new InvalidArgumentException('Invalid provider attachment deletion.');
+        }
+        $request = $this->providerAttachmentRequest(json_encode($value['selector'], JSON_THROW_ON_ERROR));
+        $request['AttachmentID'] = $value['id'];
+        $calendarId = $this->effectiveCalendarId();
+        $connectionId = IPS_GetInstance($this->InstanceID)['ConnectionID'];
+        $result = $this->sendRequest('DeleteProviderAttachment', $request);
+        if (!$this->CanAccessAttachments('delete', 'provider') || $calendarId !== $this->effectiveCalendarId()
+            || $connectionId !== IPS_GetInstance($this->InstanceID)['ConnectionID']
+            || (isset($request['TaskListID']) && $request['TaskListID'] !== trim($this->ReadPropertyString('MicrosoftTaskListID')))
+            || ($result['deleted'] ?? null) !== true) {
+            throw new RuntimeException('Provider attachment deletion could not be confirmed.');
+        }
+        return json_encode(['result' => [
+            'deleted' => true,
+            'pendingVerification' => ($result['pendingVerification'] ?? false) === true
+        ]], JSON_THROW_ON_ERROR);
+    }
+
     /**
      * Lists local originals for trusted administrator scripts, including deleted-event files.
      * Deliberately works when calendar/view attachment access is disabled. Never expose

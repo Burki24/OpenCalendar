@@ -149,13 +149,27 @@ attachmentMetadataCheck(
     $uploaded['result']['uploaded'] === true && count($http->responses) === 0,
     'Calendar-to-account Microsoft To Do upload routing failed.'
 );
+$deletion = json_encode(['selector' => ['eventReference' => 'evt'], 'id' => $file['id']], JSON_THROW_ON_ERROR);
+$http->responses = [[200, ['id' => 'evt']], [200, $file], [204, '']];
+$deleted = json_decode($calendar->DeleteProviderAttachment($deletion), true, 512, JSON_THROW_ON_ERROR);
+attachmentMetadataCheck($deleted['result']['deleted'] === true && count($http->responses) === 0
+    && $http->requests[array_key_last($http->requests)]['method'] === 'DELETE',
+    'Calendar-to-account Microsoft event deletion routing failed.');
+$taskDeletion = json_encode(['selector' => ['sourceType' => 'microsoft-todo',
+    'taskId' => 'task', 'taskListId' => 'list'], 'id' => 'task-file'], JSON_THROW_ON_ERROR);
+$http->responses = [[200, ['id' => 'task']], [200, $taskFile], [204, '']];
+$deleted = json_decode($calendar->DeleteProviderAttachment($taskDeletion), true, 512, JSON_THROW_ON_ERROR);
+attachmentMetadataCheck($deleted['result']['deleted'] === true && count($http->responses) === 0,
+    'Calendar-to-account Microsoft To Do deletion routing failed.');
 $calendar->properties['CanWrite'] = false;
 $count = count($http->requests);
 attachmentMetadataReject(fn () => $calendar->UploadProviderAttachment($upload));
+attachmentMetadataReject(fn () => $calendar->DeleteProviderAttachment($deletion));
 attachmentMetadataCheck(count($http->requests) === $count, 'Read-only calendar must not upload.');
 $calendar->properties['CanWrite'] = true;
 $calendar->properties['AttachmentMode'] = 1;
 attachmentMetadataReject(fn () => $calendar->UploadProviderAttachment($upload));
+attachmentMetadataReject(fn () => $calendar->DeleteProviderAttachment($deletion));
 attachmentMetadataCheck(count($http->requests) === $count, 'Read-only attachment mode must not upload.');
 $calendar->properties['AttachmentMode'] = 2;
 $http->responses = [[200, ['id' => 'evt']], [201, ['id' => 'uploaded']]];
@@ -164,7 +178,17 @@ $calendar->afterReply = static function () use ($calendar): void
     $calendar->properties['AttachmentAllowProvider'] = false;
 };
 attachmentMetadataReject(fn () => $calendar->UploadProviderAttachment($upload));
+attachmentMetadataReject(fn () => $calendar->DeleteProviderAttachment($deletion));
 attachmentMetadataCheck(count($http->responses) === 0, 'Post-write revocation test did not reach the provider.');
+$calendar->afterReply = null;
+$calendar->properties['AttachmentAllowProvider'] = true;
+$http->responses = [[200, ['id' => 'evt']], [200, $file], [204, '']];
+$calendar->afterReply = static function () use ($calendar): void
+{
+    $calendar->properties['AttachmentAllowProvider'] = false;
+};
+attachmentMetadataReject(fn () => $calendar->DeleteProviderAttachment($deletion));
+attachmentMetadataCheck(count($http->responses) === 0, 'Post-delete revocation test did not reach the provider.');
 $calendar->afterReply = null;
 $calendar->properties['AttachmentAllowProvider'] = true;
 
@@ -214,6 +238,8 @@ attachmentMetadataReject(fn () => $calendar->DownloadProviderAttachment(json_enc
 ], JSON_THROW_ON_ERROR)));
 attachmentMetadataReject(fn () => $calendar->UploadProviderAttachment($upload));
 attachmentMetadataCheck(count($http->requests) === $count, 'Google must not receive provider attachment download or upload.');
+attachmentMetadataReject(fn () => $calendar->DeleteProviderAttachment($deletion));
+attachmentMetadataCheck(count($http->requests) === $count, 'Google must not receive provider attachment deletion.');
 
 $ical = "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nBEGIN:VEVENT\r\nUID:ics-event\r\nDTSTART:20260922T100000Z\r\nDTEND:20260922T110000Z\r\n" .
     "ATTACH;FMTTYPE=application/pdf;ENCODING=BASE64;VALUE=BINARY;FILENAME=ICS.pdf:SUNTIEZJTEU=\r\n" .

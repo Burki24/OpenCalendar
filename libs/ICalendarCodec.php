@@ -99,6 +99,47 @@ final class ICalendarCodec
         return $updated;
     }
 
+    /** Removes one exact ATTACH from a stored VEVENT, never an inherited occurrence. */
+    public static function removeAttachment(string $ical, string $uid, string $recurrenceId, string $attachmentId): array
+    {
+        self::attachmentEventBlock($ical, $uid, $recurrenceId);
+        $lines = self::unfoldLines($ical);
+        $target = null;
+        foreach (self::extractEventBlocksWithOffsets($lines) as $block) {
+            $properties = self::readTopLevelProperties($block['lines']);
+            if (self::propertyValue($properties, 'UID') === $uid
+                && self::propertyValue($properties, 'RECURRENCE-ID') === $recurrenceId) {
+                if ($target !== null) {
+                    throw new RuntimeException('Ambiguous attachment event identity.');
+                }
+                $target = $block;
+            }
+        }
+        if ($target === null) {
+            throw new RuntimeException('The selected occurrence has no writable component.');
+        }
+        $removed = ICalendarAttachmentMetadata::remove($target['lines'], $attachmentId);
+        array_splice($lines, $target['start'], $target['end'] - $target['start'] + 1, $removed['lines']);
+        $updated = self::foldLines($lines);
+        if (strlen($updated) > ICalendarAttachmentMetadata::MAX_RESOURCE_BYTES) {
+            throw new RuntimeException('The calendar resource exceeds the attachment limit.');
+        }
+        return ['ical' => $updated, 'kind' => $removed['kind'],
+            'managedId' => $removed['managedId'], 'line' => $removed['line']];
+    }
+
+    /** Counts an exact ATTACH property in the selected stored component. */
+    public static function attachmentLineCount(string $ical, string $uid, string $recurrenceId, string $line): int
+    {
+        $count = 0;
+        foreach (self::attachmentEventBlock($ical, $uid, $recurrenceId) as $candidate) {
+            if ($candidate === $line) {
+                $count++;
+            }
+        }
+        return $count;
+    }
+
     /**
      * Parses VEVENT components from an iCalendar resource into normalized event records.
      *

@@ -72,8 +72,14 @@ TXT-, PDF-, PNG- und JPEG-Dateien bis 2 MiB auch zu Microsoft-365-Terminen,
 Microsoft-To-Do-Aufgaben sowie CalDAV-/Apple-Terminen hochgeladen werden. Der
 Button und ein Hinweis benennen den Speicherort vor dem Upload. Bei CalDAV
 werden Dateien als eingebettete iCalendar-Anhänge gespeichert; eine bloß
-berechnete Serieninstanz kann nicht einzeln ergänzt werden. Provider-Löschungen
-und lokale Anhänge an andere Online-Termine folgen separat. Ein Upload von
+berechnete Serieninstanz kann nicht einzeln ergänzt oder gelöscht werden.
+Anbieter-Anhänge können nach einer ausdrücklichen Bestätigung einzeln aus
+Microsoft-365-Terminen, Microsoft-To-Do-Aufgaben und CalDAV-/Apple-Terminen
+entfernt werden. Bei CalDAV werden eingebettete und externe ATTACH-Einträge
+gezielt aus dem Termin entfernt; serververwaltete Anhänge über den CalDAV-
+Anhangsaufruf. Eine verlinkte externe Datei selbst wird nicht gelöscht.
+Outlook-Links, die nur im Beschreibungstext stehen, sind keine löschbaren
+Anbieter-Anhänge. Ein Upload von
 Dateien zu Google bleibt bis zur Klärung zusätzlicher Scopes zurückgestellt.
 Persönliche IPSViewUsers-Rechte bleiben bis zur verifizierbaren Identitätsanbindung
 gesperrt. Änderungen an Einstellungen verschieben oder löschen keine Dateien.

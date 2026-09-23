@@ -126,6 +126,27 @@ final class MicrosoftCalendarProvider implements CalendarEventLookupProviderInte
         return ['uploaded' => true];
     }
 
+    /** Removes one freshly verified, non-inline Graph attachment from the exact event. */
+    public function deleteAttachment(string $calendarReference, string $eventReference, string $attachmentId): array
+    {
+        if (str_starts_with($attachmentId, 'body-reference-')) {
+            throw new MicrosoftCalendarProviderException('Description links are not provider attachments.');
+        }
+        $calendarId = $this->calendarId($calendarReference);
+        $eventId = $this->eventId($eventReference);
+        $url = $this->eventUrl($calendarId, $eventId);
+        $request = fn (string $target): array => $this->requestJsonUrl('GET', $target, null, [], [200], MicrosoftAttachmentCollection::MAX_RESPONSE_BYTES);
+        $parent = $request($url . '?$select=id,isCancelled');
+        if (($parent['id'] ?? null) !== $eventId || ($parent['isCancelled'] ?? false) === true) {
+            throw new MicrosoftCalendarProviderException('The attachment event is no longer available.');
+        }
+        $collection = $url . '/attachments';
+        $metadata = MicrosoftAttachmentCollection::selectDelete($collection, $attachmentId, false, $request);
+        $this->requestJsonUrl('DELETE', $collection . '/' . rawurlencode($metadata['id']), null, [], [204],
+            MicrosoftAttachmentCollection::MAX_RESPONSE_BYTES);
+        return ['deleted' => true];
+    }
+
     /** @inheritDoc */
     public function testConnection(): array
     {

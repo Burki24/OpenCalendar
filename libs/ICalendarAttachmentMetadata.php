@@ -22,9 +22,26 @@ final class ICalendarAttachmentMetadata
     {
         return array_map(static function (array $record): array
         {
-            unset($record['_content'], $record['_uri'], $record['_managedId']);
+            unset($record['_content'], $record['_uri'], $record['_managedId'], $record['_lineIndex'], $record['_line']);
             return $record;
         }, self::records($block));
+    }
+
+    /** @param list<string> $block @return array{lines:list<string>,kind:string,managedId:string,line:string} */
+    public static function remove(array $block, string $attachmentId): array
+    {
+        if (preg_match('/^[a-f0-9]{64}$/D', $attachmentId) !== 1) {
+            throw new RuntimeException('Invalid attachment identity.');
+        }
+        foreach (self::records($block) as $record) {
+            if (!hash_equals($attachmentId, $record['id'])) {
+                continue;
+            }
+            array_splice($block, $record['_lineIndex'], 1);
+            return ['lines' => $block, 'kind' => $record['kind'],
+                'managedId' => $record['_managedId'], 'line' => $record['_line']];
+        }
+        throw new RuntimeException('Attachment is no longer available.');
     }
 
     /**
@@ -75,7 +92,7 @@ final class ICalendarAttachmentMetadata
         $files = [];
         $metadataBytes = 2;
         $depth = 0;
-        foreach ($block as $line) {
+        foreach ($block as $lineIndex => $line) {
             if (str_starts_with(strtoupper($line), 'BEGIN:')) {
                 $depth++;
                 continue;
@@ -165,10 +182,11 @@ final class ICalendarAttachmentMetadata
                 'name'        => $name !== '' ? $name : 'Attachment ' . (count($files) + 1),
                 'size'        => $size, 'contentType' => $mime, 'kind' => $kind,
                 'destination' => 'provider', 'isInline' => false, '_content' => $content,
-                '_uri'        => $uri, '_managedId' => $managedId
+                '_uri'        => $uri, '_managedId' => $managedId,
+                '_lineIndex'  => $lineIndex, '_line' => $line
             ];
             $public = $record;
-            unset($public['_content'], $public['_uri'], $public['_managedId']);
+            unset($public['_content'], $public['_uri'], $public['_managedId'], $public['_lineIndex'], $public['_line']);
             $metadataBytes += strlen(json_encode($public, JSON_THROW_ON_ERROR)) + 1;
             $files[] = $record;
             if (count($files) > 100 || $metadataBytes > 192 * 1024) {
