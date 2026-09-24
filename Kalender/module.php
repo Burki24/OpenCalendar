@@ -2602,16 +2602,15 @@ class Calendar extends IPSModuleStrict
         if ($displayDate->format('Y-m-d') === $date) {
             return $currentDueDateTime;
         }
-        // The editor changes a displayed local date, not the date component of Graph's UTC timestamp.
-        // Keep the local wall time while resolving the selected date's own daylight-saving offset.
-        $movedDate = $displayDate->setDate((int) $parsed->format('Y'), (int) $parsed->format('m'), (int) $parsed->format('d'));
-        $movedDate = $movedDate->setTimezone(MicrosoftTodoTaskProjection::timezone($timezone));
+        // Graph's due date is a date/time in the accompanying time zone. Send the
+        // selected local calendar day and wall-clock time together, not UTC time
+        // from the previous day (which To Do may normalize as that previous date).
         $fraction = preg_match('/(\.\d+)(?:Z|[+-]\d{2}:\d{2})?$/D', $currentValue, $matches) === 1
             ? $matches[1]
             : '';
         return [
-            'dateTime' => $movedDate->format('Y-m-d\TH:i:s') . $fraction,
-            'timeZone' => $timezone
+            'dateTime' => $date . $displayDate->format('\TH:i:s') . $fraction,
+            'timeZone' => date_default_timezone_get()
         ];
     }
 

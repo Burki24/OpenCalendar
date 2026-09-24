@@ -237,6 +237,8 @@ assertTodoWrite(
     'A selected Microsoft To Do list must not redirect ordinary calendar appointments.'
 );
 
+$previousTimezone = date_default_timezone_get();
+date_default_timezone_set('Europe/Berlin');
 $calendar = new MicrosoftTodoCalendarWriteHarness(todoWriteTask());
 $editable = json_decode(
     $calendar->GetEventForEdit(json_encode(todoWriteIdentity(), JSON_THROW_ON_ERROR)),
@@ -282,10 +284,10 @@ assertTodoWrite(
         && $calendar->requests[1]['Changes']['description'] === 'Changed description'
         && $calendar->requests[1]['Changes']['dueDateTime'] === [
             'dateTime' => '2026-09-22T17:30:00.0000000',
-            'timeZone' => 'W. Europe Standard Time'
+            'timeZone' => 'Europe/Berlin'
         ]
         && !isset($calendar->requests[1]['Changes']['status']),
-    'Editing a native task must preserve its due time and timezone without rewriting an unchanged completion state.'
+    'Editing a native task must preserve its local due time without rewriting an unchanged completion state.'
 );
 
 $calendar->responses[] = todoWriteSuccess(todoWriteTask('notStarted', 'Renamed', '2026-09-22T17:30:00.0000000'));
@@ -345,16 +347,33 @@ assertTodoWrite(
     'Deleting a virtual task must delete the native Microsoft task and remove it from the local cache.'
 );
 
-$previousTimezone = date_default_timezone_get();
-date_default_timezone_set('Europe/Berlin');
 try {
+    $completedRecurringTask = todoWriteTask('completed');
+    $completedRecurringTask['dueDateTime'] = [
+        'dateTime' => '2026-09-24T22:00:00.0000000',
+        'timeZone' => 'UTC'
+    ];
+    $completedMove = new MicrosoftTodoCalendarWriteHarness($completedRecurringTask);
+    $completedMove->echoTask = $completedRecurringTask;
+    $moveResult = json_decode($completedMove->UpdateEvent(json_encode(array_merge(todoWriteIdentity(), [
+        'changes' => ['start' => '2026-09-24', 'taskCompleted' => true]
+    ]), JSON_THROW_ON_ERROR)), true, 512, JSON_THROW_ON_ERROR);
+    assertTodoWrite(
+        $moveResult['success'] === true
+            && $moveResult['event']['start'] === '2026-09-24'
+            && $completedMove->requests[0]['Changes'] === [
+                'dueDateTime' => ['dateTime' => '2026-09-24T00:00:00.0000000', 'timeZone' => 'Europe/Berlin']
+            ],
+        'Moving a completed recurring task from tomorrow to today must send today in the local timezone without changing its completion or recurrence.'
+    );
+
     foreach ([
-        ['2026-09-16T22:00:00.0000000', '2026-09-17', '2026-09-16T22:00:00.0000000'],
-        ['2026-01-16T23:00:00.0000000', '2026-01-17', '2026-01-16T23:00:00.0000000'],
-        ['2026-09-16T22:00:00.0000000', '2026-09-20', '2026-09-19T22:00:00.0000000'],
-        ['2026-03-28T23:00:00.0000000', '2026-03-30', '2026-03-29T22:00:00.0000000'],
-        ['2026-10-24T22:00:00.0000000', '2026-10-26', '2026-10-25T23:00:00.0000000']
-    ] as [$originalDue, $selectedDate, $expectedDue]) {
+        ['2026-09-16T22:00:00.0000000', '2026-09-17', '2026-09-16T22:00:00.0000000', 'UTC'],
+        ['2026-01-16T23:00:00.0000000', '2026-01-17', '2026-01-16T23:00:00.0000000', 'UTC'],
+        ['2026-09-16T22:00:00.0000000', '2026-09-20', '2026-09-20T00:00:00.0000000', 'Europe/Berlin'],
+        ['2026-03-28T23:00:00.0000000', '2026-03-30', '2026-03-30T00:00:00.0000000', 'Europe/Berlin'],
+        ['2026-10-24T22:00:00.0000000', '2026-10-26', '2026-10-26T00:00:00.0000000', 'Europe/Berlin']
+    ] as [$originalDue, $selectedDate, $expectedDue, $expectedTimezone]) {
         $task = todoWriteTask();
         $task['dueDateTime'] = ['dateTime' => $originalDue, 'timeZone' => 'UTC'];
         $roundtrip = new MicrosoftTodoCalendarWriteHarness($task);
@@ -366,14 +385,14 @@ try {
         $resultingDue = $outgoing['dueDateTime'] ?? $task['dueDateTime'];
         assertTodoWrite(
             $result['success'] === true && $result['event']['start'] === $selectedDate
-            && $resultingDue === ['dateTime' => $expectedDue, 'timeZone' => 'UTC'],
+            && $resultingDue === ['dateTime' => $expectedDue, 'timeZone' => $expectedTimezone],
             'A native task due-date write must round-trip the selected local day across UTC offsets and DST: ' . $selectedDate
         );
         assertTodoWrite(
             !array_key_exists('reminderDateTime', $outgoing) && !array_key_exists('recurrence', $outgoing),
             'Moving a due date must not rewrite reminders or native recurrence.'
         );
-        if ($originalDue === $expectedDue) {
+        if ($expectedTimezone === 'UTC') {
             assertTodoWrite(
                 !isset($outgoing['dueDateTime']),
                 'Saving an unchanged displayed date alongside a title edit must preserve the original provider due date untouched.'
