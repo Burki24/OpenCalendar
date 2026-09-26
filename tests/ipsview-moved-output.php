@@ -23,9 +23,10 @@ function IPS_GetParent(int $id): int
 {
     return $GLOBALS['objects'][$id]['parent'];
 }
-function SetValueString(int $id, string $value): void
+function SetValueString(int $id, string $value): bool
 {
     $GLOBALS['objects'][$id]['value'] = $value;
+    return true;
 }
 function IPS_DeleteVariable(int $id): void
 {

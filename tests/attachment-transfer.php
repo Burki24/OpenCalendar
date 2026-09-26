@@ -124,7 +124,7 @@ $GLOBALS['providerAttachmentView'] = $providerView;
 foreach ([
     ['on', $validToken, 42, 'list', [], false, 200, 1, 'PRIVATE_PROVIDER_NAME'],
     ['on', $validToken, 42, 'download', ['id' => 'file'], false, 200, 1, 'PRIVATE PROVIDER DOWNLOAD'],
-    ['on', $validToken, 42, 'delete', ['id' => 'file'], false, 200, 1, 'deleted'],
+    ['on', $validToken, 42, 'delete', ['id'   => 'file'], false, 200, 1, 'deleted'],
     ['', $validToken, 42, 'list', [], false, 403, 0, ''],
     ['on', 'wrong', 42, 'list', [], false, 403, 0, ''],
     ['on', $validToken, 43, 'list', [], false, 403, 0, ''],
@@ -137,7 +137,7 @@ foreach ([
     ['on', $validToken, 42, 'upload', ['name' => 'Proof.pdf', 'content' => base64_encode("%PDF-1.7\n%%EOF\n")], false, 200, 1, 'uploaded'],
     ['on', $validToken, 42, 'upload', ['name' => 'Proof.pdf', 'content' => base64_encode("%PDF-1.7\n%%EOF\n")], true, 400, 1, ''],
     ['on', $validToken, 42, 'upload', ['name' => 'Proof.exe', 'content' => base64_encode('bad')], false, 400, 0, ''],
-    ['on', $validToken, 42, 'list', ['url' => 'forged'], false, 400, 0, ''],
+    ['on', $validToken, 42, 'list', ['url'    => 'forged'], false, 400, 0, ''],
     ['on', $validToken, 42, 'list', [], true, 400, 1, ''],
     ['on', $validToken, 42, 'download', ['id' => 'file'], true, 400, 1, '']
 ] as [$https, $token, $calendarId, $operation, $data, $revoke, $status, $calls, $expected]) {

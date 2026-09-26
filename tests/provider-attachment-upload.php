@@ -131,7 +131,7 @@ $managed = 'ATTACH;MANAGED-ID=server-123;FMTTYPE=application/pdf;SIZE=' . strlen
 $withManaged = str_replace('END:VEVENT', $managed . 'END:VEVENT', $ical);
 $http = new AttachmentUploadHttp([
     [200, $ical, ['etag' => '"v1"']],
-    [200, '', ['dav' => '1, calendar-access, calendar-managed-attachments']],
+    [200, '', ['dav'            => '1, calendar-access, calendar-managed-attachments']],
     [200, '', ['cal-managed-id' => 'server-123']],
     [200, $withManaged, ['etag' => '"v2"']]
 ]);
@@ -144,9 +144,9 @@ uploadCheck(($result['uploaded'] ?? false) === true && ($result['pendingVerifica
 
 $http = new AttachmentUploadHttp([
     [200, $ical, ['etag' => '"v1"']],
-    [200, '', ['dav' => 'calendar-managed-attachments']],
+    [200, '', ['dav'            => 'calendar-managed-attachments']],
     [200, '', ['cal-managed-id' => 'server-123']],
-    [200, $ical, ['etag' => '"v1"']],
+    [200, $ical, ['etag'        => '"v1"']],
     [200, $withManaged, ['etag' => '"v2"']]
 ]);
 $dav = new CalDAVProvider($http, 'https://dav.invalid/', new CalDAVOriginPolicy('https://dav.invalid/'));
@@ -165,9 +165,9 @@ uploadCheck(
 
 $http = new AttachmentUploadHttp([
     [200, $ical, ['etag' => '"v1"']],
-    [200, '', ['dav' => 'calendar-managed-attachments']],
+    [200, '', ['dav'            => 'calendar-managed-attachments']],
     [200, '', ['cal-managed-id' => 'server-123']],
-    [200, $ical, ['etag' => '"v2"']]
+    [200, $ical, ['etag'        => '"v2"']]
 ]);
 $dav = new CalDAVProvider($http, 'https://dav.invalid/', new CalDAVOriginPolicy('https://dav.invalid/'));
 $result = $dav->uploadAttachment('https://dav.invalid/calendar/', 'event', '', $url, $name, $content);
@@ -200,9 +200,9 @@ $http = new AttachmentUploadHttp([
     [200, '', ['dav' => 'calendar-access']],
     [207, $principalXml, []],
     [207, $homeXml, []],
-    [200, '', ['dav' => 'calendar-access, calendar-managed-attachments']],
+    [200, '', ['dav'            => 'calendar-access, calendar-managed-attachments']],
     [204, '', ['cal-managed-id' => 'apple-1']],
-    [200, $appleIcal, ['etag' => '"v2"']]
+    [200, $appleIcal, ['etag'   => '"v2"']]
 ]);
 $apple = new CalDAVProvider($http, 'https://caldav.icloud.com/', new CalDAVOriginPolicy('https://caldav.icloud.com/'));
 $result = $apple->uploadAttachment($appleCalendar, 'apple-event', '', $appleUrl, $name, $content);
