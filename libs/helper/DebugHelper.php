@@ -15,9 +15,10 @@ use Throwable;
  *
  * Intended for classes derived from IPSModule/IPSModuleStrict. The helper keeps
  * the native SendDebug() channel while normalizing structured data, masking
- * common secret fields and credentials, and limiting oversized messages.
+ * common secret fields and credentials (including JSON encoded as text), and
+ * limiting oversized messages unless the caller explicitly raises the limit.
  *
- * @version 1.0.1
+ * @version 1.0.2
  */
 trait DebugHelper
 {
@@ -156,6 +157,21 @@ trait DebugHelper
         }
 
         if (is_string($value)) {
+            $json = $this->SanitizeDebugJsonString($value, $sensitiveKeys, $depth);
+            if ($json !== null) {
+                return $json;
+            }
+
+            if (preg_match('/\A[A-Za-z0-9+\/]+={0,2}\z/D', $value) === 1) {
+                $decoded = base64_decode($value, true);
+                if ($decoded !== false) {
+                    $json = $this->SanitizeDebugJsonString($decoded, $sensitiveKeys, $depth);
+                    if ($json !== null) {
+                        return base64_encode($json);
+                    }
+                }
+            }
+
             return $this->SanitizeDebugText($value);
         }
         if ($value === null || is_bool($value) || is_int($value)) {
@@ -214,6 +230,33 @@ trait DebugHelper
         }
 
         return $sanitized;
+    }
+
+    /** @param array<string, true> $sensitiveKeys */
+    private function SanitizeDebugJsonString(string $text, array $sensitiveKeys, int $depth): ?string
+    {
+        $first = substr(ltrim($text), 0, 1);
+        if ($first !== '{' && $first !== '[') {
+            return null;
+        }
+
+        $decoded = json_decode($text, true);
+        if (json_last_error() !== JSON_ERROR_NONE || !is_array($decoded)) {
+            return null;
+        }
+
+        $sanitized = $this->SanitizeDebugValue($decoded, $sensitiveKeys, $depth + 1);
+        try {
+            return json_encode(
+                $sanitized,
+                JSON_UNESCAPED_SLASHES
+                    | JSON_UNESCAPED_UNICODE
+                    | JSON_PRESERVE_ZERO_FRACTION
+                    | JSON_THROW_ON_ERROR
+            );
+        } catch (JsonException) {
+            return null;
+        }
     }
 
     /** @param array<string, true> $sensitiveKeys */
