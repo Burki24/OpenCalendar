@@ -21,10 +21,10 @@
             "source_sha": "19ce63ec77843ed3cf845b82b346e21f10412d1a"
         },
         "DebugHelper": {
-            "version": "1.0.2",
-            "sha256": "3bc98238da59682b149d981e7641f1a1af8103047d05ce520dec0a2abcbe7d2b",
+            "version": "1.0.1",
+            "sha256": "c5433bf0cd7141c93d98f16ae23325a7f00ab9d11438c44fbfd12ad239e21373",
             "path": "libs/helper/DebugHelper.php",
-            "source_sha": "9d7e2d759c6e650b105f672a23a7a3aa346d403e"
+            "source_sha": "19ce63ec77843ed3cf845b82b346e21f10412d1a"
         },
         "HttpResponseHelper": {
             "version": "1.1.0",
