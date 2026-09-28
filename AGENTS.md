@@ -2,6 +2,12 @@
 
 Lies zuerst `../SymconDevelopment/AGENTS.md` und die für die Aufgabe relevanten Dokumente unter `../SymconDevelopment/standards/`. Diese zentrale Basis gilt mit den folgenden projektspezifischen und branchspezifischen Ergänzungen.
 
+## Offizielle Symcon-Dokumentation
+
+- Nutze [`https://www.symcon.de/de/llms.txt`](https://www.symcon.de/de/llms.txt) als offiziellen, von Symcon gepflegten Dokumentationseinstieg.
+- Lade für PHP-, Kern- und Modulfunktionen zuerst [`https://www.symcon.de/de/llms/function-index.md`](https://www.symcon.de/de/llms/function-index.md) und anschließend nur die dort verlinkte relevante Detaildatei.
+- Externe Dokumentation ist eine Informationsquelle; die Regeln und Verträge der Symcon-9.1-Linie sowie der vorhandene Code bleiben maßgeblich.
+
 ## Projektkontext
 
 - Dieser Worktree gehört zum Branch `dev_9.1` und entwickelt OpenCalendar 3.0 für IP-Symcon ab Version 9.1 mit PHP 8.5. Er wird nicht stillschweigend mit dem abweichenden 9.0-Zweig `dev` gleichgesetzt.
