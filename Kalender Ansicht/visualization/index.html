@@ -471,6 +471,14 @@ window.SYMC_VISUALIZATION = {{BOOTSTRAP_JSON}};
             .trim();
     }
 
+    function htmlDescriptionHasDisplayableContent(source) {
+        if (htmlDescriptionToPlainText(source) !== '') return true;
+        const parsed = new DOMParser().parseFromString(source, 'text/html');
+        if (parsed.body?.querySelector('hr')) return true;
+        return Array.from(parsed.body?.querySelectorAll('img[src]') || [])
+            .some(image => sanitizeImageSource(image.getAttribute('src')) !== '');
+    }
+
     function sanitizeLink(value) {
         const href = String(value || '').trim();
         return /^(?:https?:|mailto:)/i.test(href) ? href : '';
@@ -571,6 +579,11 @@ window.SYMC_VISUALIZATION = {{BOOTSTRAP_JSON}};
         if (!detailsTarget || detailsTarget.querySelector('.open-calendar-html-description')) return;
         const source = htmlDescriptionSource(detailsTarget.textContent);
         if (!source) return;
+        if (!htmlDescriptionHasDisplayableContent(source)) {
+            detailsTarget.textContent = '';
+            detailsTarget.parentElement?.classList.add('hidden');
+            return;
+        }
         renderHtmlDescription(source);
     }
 
