@@ -20,6 +20,7 @@ if (PHP_OS_FAMILY === 'Windows') {
 
 $commands = [
     ['Verify embedded dialog bounds and errors', ['node', 'tests/dialog-embedding.js']],
+    ['Verify empty HTML descriptions in event details', ['node', 'tests/empty-html-description.js']],
     ['Verify moved IPSView output identity', [PHP_BINARY, 'tests/ipsview-moved-output.php']],
     ['Verify private attachment transfers', [PHP_BINARY, 'tests/attachment-transfer.php']],
     ['Verify lazy attachment list and download UI', ['node', 'tests/attachment-ui.js']],

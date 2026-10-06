@@ -531,4 +531,5 @@ Drittanbieter.
   zusammen und stellt die ausgewählten Kalender zusätzlich providerübergreifend
   über PHP-Funktionen für Tages- und Datumsbereichsabfragen sowie für
   Jahresereignisse bereit. Neben der vollständigen Ausgabe stehen kompakte
-  Varianten für einfache Skripte zur Verfügung.
+  Varianten für einfache Skripte zur Verfügung. Leere HTML-Hüllen von
+  Anbieterbeschreibungen erscheinen in den Termindetails nicht als leere Fläche.
