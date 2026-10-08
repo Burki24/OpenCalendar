@@ -1225,9 +1225,19 @@ final class GoogleCalendarProvider implements CalendarEventLookupProviderInterfa
             if ($allDay) {
                 $payload['start'] = ['date' => $start->format('Y-m-d')];
                 $payload['end'] = ['date' => $end->format('Y-m-d')];
+                if (!$creating) {
+                    $payload['start']['dateTime'] = null;
+                    $payload['start']['timeZone'] = null;
+                    $payload['end']['dateTime'] = null;
+                    $payload['end']['timeZone'] = null;
+                }
             } else {
                 $payload['start'] = ['dateTime' => $start->format(DATE_RFC3339)];
                 $payload['end'] = ['dateTime' => $end->format(DATE_RFC3339)];
+                if (!$creating) {
+                    $payload['start']['date'] = null;
+                    $payload['end']['date'] = null;
+                }
                 if ($recurrence !== null || $allowRecurrenceUpdate) {
                     $payload['start']['timeZone'] = $eventTimezone;
                     $payload['end']['timeZone'] = $eventTimezone;

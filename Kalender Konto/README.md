@@ -120,6 +120,9 @@ als beschreibbar erkannt; `reader` wird schreibgeschützt angeboten.
 `freeBusyReader`-Einträge werden nicht angelegt, weil sie keine Termindetails
 liefern.
 
+In beschreibbaren Google-Kalendern können bestehende Termine auch zwischen
+Uhrzeit und ganztägig umgestellt werden.
+
 **Google-Konto trennen** widerruft den Token nach Möglichkeit bei Google und
 entfernt die lokal gespeicherten OAuth-Daten. Verbindungen aus älteren
 OpenCalendar-Versionen mit einer persönlichen Google-Client-ID müssen einmal neu
