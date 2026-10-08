@@ -620,6 +620,44 @@ assertTrueValue(
 );
 assertSameValue('DELETE', $writeClient->requests[2]['method'], 'Events must be deleted via DELETE.');
 
+$allDaySwitchClient = new FakeHttpClient([
+    response(200, ['id' => 'event-id', 'etag' => '"all-day"']),
+    response(200, ['id' => 'event-id', 'etag' => '"timed"'])
+]);
+$allDaySwitchProvider = new GoogleCalendarProvider($allDaySwitchClient, 'access-token');
+$allDaySwitchProvider->updateEvent('owner@example.com', 'event-id', '"timed"', '', [
+    'allDay' => true,
+    'start'  => '2026-07-20',
+    'end'    => '2026-07-21'
+]);
+$allDaySwitchProvider->updateEvent('owner@example.com', 'event-id', '"all-day"', '', [
+    'allDay' => false,
+    'start'  => '2026-07-20T09:00:00+02:00',
+    'end'    => '2026-07-20T10:00:00+02:00'
+]);
+$toAllDay = json_decode($allDaySwitchClient->requests[0]['body'], true, 512, JSON_THROW_ON_ERROR);
+$toTimed = json_decode($allDaySwitchClient->requests[1]['body'], true, 512, JSON_THROW_ON_ERROR);
+assertSameValue(
+    ['date' => '2026-07-20', 'dateTime' => null, 'timeZone' => null],
+    $toAllDay['start'],
+    'Converting a timed Google event to all-day must remove its former start time and timezone.'
+);
+assertSameValue(
+    ['date' => '2026-07-21', 'dateTime' => null, 'timeZone' => null],
+    $toAllDay['end'],
+    'Converting a timed Google event to all-day must keep the exclusive end date and clear the former end time.'
+);
+assertSameValue(
+    ['dateTime' => '2026-07-20T09:00:00+02:00', 'date' => null],
+    $toTimed['start'],
+    'Converting an all-day Google event to timed must remove its former start date.'
+);
+assertSameValue(
+    ['dateTime' => '2026-07-20T10:00:00+02:00', 'date' => null],
+    $toTimed['end'],
+    'Converting an all-day Google event to timed must remove its former end date.'
+);
+
 $occurrenceWriteClient = new FakeHttpClient([
     response(200, ['id' => 'instance-id', 'iCalUID' => 'series@example.com', 'etag' => '"occurrence-updated"']),
     response(200, ['id' => 'instance-id', 'status' => 'cancelled'])

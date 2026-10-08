@@ -39,6 +39,7 @@ beliebig verschoben oder vom Benutzer umbenannt werden.
 - providerneutrale, eintägige ganztägige Aufgabentermine und Aufgabenserien mit
   offenem oder erledigtem Status und automatischer Fortschreibung überfälliger Aufgaben
 - Ändern und Löschen einzelner Termine sowie einzelner Google-, Microsoft-, Apple-iCloud- und CalDAV-Serienvorkommnisse
+- Wechsel bestehender Google-Termine zwischen Uhrzeit und ganztägig
 - Bearbeiten einer vollständigen Google-, Microsoft-, Apple-iCloud- oder CalDAV-Terminserie
 - Bearbeiten oder Löschen eines Google-, Microsoft-, Apple-iCloud- oder CalDAV-Serienvorkommnisses **und aller folgenden Termine** durch sicheres Teilen bzw. Kürzen der Serie
 - Löschen einer vollständigen Google-, Microsoft-, Apple-iCloud- oder CalDAV-Terminserie über ein synchronisiertes Serienvorkommnis
