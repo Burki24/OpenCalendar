@@ -9,10 +9,10 @@
             "source_sha": "19ce63ec77843ed3cf845b82b346e21f10412d1a"
         },
         "ConfigurationFormHelper": {
-            "version": "1.0.0",
-            "sha256": "fa87dd4c67f43a3838fe87110387e4c1a1b98685c13403eeb52c189246045678",
+            "version": "1.0.1",
+            "sha256": "bd45f15a1c2f6e2800eff51eefeb3094f5745a3469434d6a57b98d54f30d363f",
             "path": "libs/helper/ConfigurationFormHelper.php",
-            "source_sha": "19ce63ec77843ed3cf845b82b346e21f10412d1a"
+            "source_sha": "85edd95c7344f3740058f19fa7672cbe2e2219c0"
         },
         "DataFlowHelper": {
             "version": "1.0.0",

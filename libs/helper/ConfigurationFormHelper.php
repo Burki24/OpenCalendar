@@ -16,7 +16,7 @@ use UnexpectedValueException;
  * resolves the directory of the concrete module class via reflection so a
  * vendored helper can reliably access that module's form.json file.
  *
- * @version 1.0.0
+ * @version 1.0.1
  */
 trait ConfigurationFormHelper
 {
@@ -94,6 +94,33 @@ trait ConfigurationFormHelper
         $value = $form === [] ? (object) [] : $form;
 
         return json_encode($value, self::CONFIGURATION_FORM_JSON_FLAGS);
+    }
+
+    /**
+     * Sets the visibility of named fields within nested configuration-form items.
+     *
+     * Unmatched items and other attributes are retained. The input array is not
+     * modified, so repeated calls with the same arguments are idempotent.
+     *
+     * @param list<array<string,mixed>> $items   Form elements or nested items.
+     * @param list<string>              $names   Exact field names to update.
+     * @param bool                      $visible Visibility assigned to matching fields.
+     *
+     * @return list<array<string,mixed>> Form items with updated visibility.
+     */
+    protected function SetFormFieldVisibility(array $items, array $names, bool $visible): array
+    {
+        foreach ($items as &$item) {
+            if (isset($item['name']) && in_array($item['name'], $names, true)) {
+                $item['visible'] = $visible;
+            }
+            if (isset($item['items']) && is_array($item['items'])) {
+                $item['items'] = $this->SetFormFieldVisibility($item['items'], $names, $visible);
+            }
+        }
+        unset($item);
+
+        return $items;
     }
 
     /**
