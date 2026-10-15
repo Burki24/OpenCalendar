@@ -19,7 +19,7 @@ require_once __DIR__ . '/HelperTranslationHelper.php';
  * visual implementation in style.css/app.js. The helper owns asset loading,
  * bootstrap encoding, page metadata, fixed placeholders and validation.
  *
- * @version 1.5.0
+ * @version 1.5.1
  */
 trait IPSViewHTMLPageHelper
 {
@@ -352,10 +352,21 @@ trait IPSViewHTMLPageHelper
 
         try {
             $variableID = $this->IPSViewHTMLVariableID($ident);
-            if ($variableID > 0) {
-                SetValueString($variableID, $html);
+            // IPSModuleStrict status variables require the module setter; moved outputs use their retained ID.
+            $moduleIdent = $variableID > 0
+                ? $this->IPSViewHTMLModuleVariableIdent($ident, $variableID)
+                : $ident;
+            if ($moduleIdent !== null) {
+                if ($this->SetValue($moduleIdent, $html) === false) {
+                    throw new RuntimeException('Unable to update the IPSView module variable.');
+                }
             } else {
-                $this->SetValue($ident, $html);
+                if (function_exists('IPS_GetObject') && (IPS_GetObject($variableID)['ObjectIsReadOnly'] ?? false)) {
+                    throw new RuntimeException('A moved read-only IPSView variable cannot be updated.');
+                }
+                if (!SetValueString($variableID, $html)) {
+                    throw new RuntimeException('Unable to update the moved IPSView variable.');
+                }
             }
 
             return true;
@@ -909,6 +920,30 @@ trait IPSViewHTMLPageHelper
             return @$this->GetIDForIdent($ident) === $variableID;
         } catch (Throwable) {
             return false;
+        }
+    }
+
+    /** Resolves an output still owned by this module, even if its ident changed. */
+    private function IPSViewHTMLModuleVariableIdent(string $ident, int $variableID): ?string
+    {
+        if ($this->IPSViewHTMLVariableHasOriginalIdent($ident, $variableID)) {
+            return $ident;
+        }
+        if (!isset($this->InstanceID) || !function_exists('IPS_GetObject')) {
+            return null;
+        }
+
+        $object = IPS_GetObject($variableID);
+        $currentIdent = $object['ObjectIdent'] ?? null;
+        if (($object['ParentID'] ?? null) !== $this->InstanceID
+            || !is_string($currentIdent) || $currentIdent === '') {
+            return null;
+        }
+
+        try {
+            return @$this->GetIDForIdent($currentIdent) === $variableID ? $currentIdent : null;
+        } catch (Throwable) {
+            return null;
         }
     }
 
