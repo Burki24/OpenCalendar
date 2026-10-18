@@ -230,6 +230,13 @@ spätere Anpassung einer Kalender Ansicht.
 6. Die Konfiguration übernehmen und **Kalender synchronisieren** ausführen.
 7. Die Instanz in der Symcon-Kachelvisualisierung platzieren.
 
+Ab Symcon 9.1 kann der Titel der Kalender-Ansicht in den Objekteinstellungen
+ausgeblendet werden. Nur dann entfällt der zusätzliche Freiraum oberhalb der
+Kalender-Bedienleiste. Bleibt der Maximieren-Button sichtbar, hält die Ansicht
+seine obere rechte Ecke frei; in schmalen Kacheln bleibt dafür der obere Abstand
+erhalten. Bei sichtbarem Titel sowie unter Symcon 9.0 bleibt der bisherige
+Abstand erhalten. Die IPSView-Ausgabe ist davon unabhängig.
+
 ### Kacheltitel und Maximieren-Button in Symcon 9.1
 
 Die Optionen **Kacheltitel anzeigen** und **Maximieren-Button anzeigen** verwenden

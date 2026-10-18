@@ -105,6 +105,11 @@ html.ipsview-mode {
     --cal-dialog-font-size: clamp(1rem, 0.96rem + 0.14vw, 1.06rem);
     --calendar-time-column-width: 5.25em;
 }
+html.tile-title-hidden { --tile-title-clearance: 0px; }
+html.tile-title-hidden.tile-maximize-visible {
+    --tile-title-clearance: 58px;
+    --tile-maximize-clearance: 48px;
+}
 html.ipsview-mode button:disabled,
 html.ipsview-mode [aria-disabled="true"] {
     color: var(--cal-text-inactive);
@@ -136,16 +141,19 @@ button { color: inherit; }
 }
 
 .toolbar {
+    --tile-toolbar-clearance: var(--tile-title-clearance);
     display: flex;
     align-items: center;
     gap: 7px;
-    min-height: calc(42px + var(--tile-title-clearance));
-    padding: calc(3px + var(--tile-title-clearance)) 10px 8px;
+    min-height: calc(42px + var(--tile-toolbar-clearance));
+    padding: calc(3px + var(--tile-toolbar-clearance)) 10px 8px;
     border-bottom: var(--cal-line-width, 1px) solid var(--cal-line, var(--cal-border));
 }
+html.tile-title-hidden.tile-maximize-visible .toolbar { --tile-toolbar-clearance: 0px; }
 
 .toolbar-group { display: flex; align-items: center; gap: 4px; }
 .toolbar-spacer { flex: 1; }
+.toolbar-actions { margin-right: var(--tile-maximize-clearance, 0px); }
 
 .toolbar-title {
     min-width: 0;
@@ -1214,11 +1222,15 @@ html.ipsview-mode .ips-date-actions button { flex: 1 1 auto; padding-inline: .5e
 :fullscreen {
     --tile-title-clearance: 0px;
 }
+html.tile-title-hidden.tile-maximize-visible:fullscreen {
+    --tile-title-clearance: 0px;
+    --tile-maximize-clearance: 0px;
+}
 
 @media (max-width: 560px) {
     .toolbar {
         gap: 4px;
-        min-height: calc(42px + var(--tile-title-clearance));
+        min-height: calc(42px + var(--tile-toolbar-clearance));
         padding-inline: 6px;
     }
     .toolbar-title { flex: 1 1 auto; padding-inline: 2px; font-size: .82em; }
@@ -1283,7 +1295,7 @@ html.ipsview-mode .ips-date-actions button { flex: 1 1 auto; padding-inline: .5e
 @container symcon-visualization (max-width: 35rem) {
     .toolbar {
         gap: 4px;
-        min-height: calc(42px + var(--tile-title-clearance));
+        min-height: calc(42px + var(--tile-toolbar-clearance));
         padding-inline: var(--symc-responsive-padding);
     }
     .toolbar-title { flex: 1 1 auto; padding-inline: 2px; font-size: .82em; }
@@ -1301,6 +1313,10 @@ html.ipsview-mode .ips-date-actions button { flex: 1 1 auto; padding-inline: .5e
 }
 
 @container symcon-visualization (max-width: 26rem) {
+    html.tile-title-hidden.tile-maximize-visible .toolbar {
+        --tile-toolbar-clearance: var(--tile-title-clearance);
+    }
+    html.tile-title-hidden.tile-maximize-visible .toolbar-actions { margin-right: 0; }
     .view-selector-label,
     .view-selector-chevron { display: none; }
     .view-selector-button { min-width: var(--symc-responsive-touch-target); min-height: var(--symc-responsive-touch-target); justify-content: center; padding-inline: 6px; }

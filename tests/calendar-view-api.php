@@ -472,6 +472,35 @@ $validateReminderMinutesWindowMethod->setAccessible(true);
 $validateVisualizationActionRangeMethod = new ReflectionMethod(CalendarView::class, 'validateVisualizationActionRange');
 $validateVisualizationActionRangeMethod->setAccessible(true);
 $calendarView = new CalendarView(1);
+$tileTitleLayoutClasses = new ReflectionMethod(CalendarView::class, 'tileTitleLayoutClasses');
+assertCalendarViewApi(
+    $tileTitleLayoutClasses->invoke(null, ['ObjectIsHiddenTitle' => true], '9.0') === [],
+    'Symcon 9.0 must retain the title clearance even if a newer object field is present.'
+);
+assertCalendarViewApi(
+    $tileTitleLayoutClasses->invoke(null, [], '9.0') === [],
+    'Symcon 9.0 object metadata without title visibility must retain the title clearance.'
+);
+assertCalendarViewApi(
+    $tileTitleLayoutClasses->invoke(null, ['ObjectIsHiddenTitle' => false], '9.1') === [],
+    'A visible title on Symcon 9.1 must retain the title clearance.'
+);
+assertCalendarViewApi(
+    $tileTitleLayoutClasses->invoke(null, ['ObjectIsHiddenTitle' => true, 'ObjectIsHiddenMaximize' => true], '9.1') === ['tile-title-hidden'],
+    'A hidden title and hidden maximize button on Symcon 9.1 need no host clearance.'
+);
+assertCalendarViewApi(
+    $tileTitleLayoutClasses->invoke(null, ['ObjectIsHiddenTitle' => true, 'ObjectIsHiddenMaximize' => false], '9.1') === ['tile-title-hidden', 'tile-maximize-visible'],
+    'A visible maximize button must keep its corner clear when the title is hidden.'
+);
+assertCalendarViewApi(
+    $tileTitleLayoutClasses->invoke(null, ['ObjectIsHiddenTitle' => true], '9.1') === ['tile-title-hidden', 'tile-maximize-visible'],
+    'Missing maximize metadata must conservatively reserve its corner.'
+);
+assertCalendarViewApi(
+    $tileTitleLayoutClasses->invoke(null, ['ObjectIsHiddenTitle' => true, 'ObjectIsHiddenMaximize' => true], '9.2') === ['tile-title-hidden'],
+    'Newer Symcon versions must retain support for hidden tile titles.'
+);
 $previousTimezone = date_default_timezone_get();
 date_default_timezone_set('Europe/Berlin');
 
