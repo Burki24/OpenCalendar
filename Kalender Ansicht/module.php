@@ -1356,7 +1356,9 @@ class CalendarView extends IPSModuleStrict
 
         return $this->RenderVisualizationHTMLPage($ipsView, [
             'language'           => $this->Translate('Today') === 'Heute' ? 'de' : 'en',
-            'classes'            => $ipsView ? ['ipsview-mode'] : [],
+            'classes'            => $ipsView
+                ? ['ipsview-mode']
+                : self::tileTitleLayoutClasses(IPS_GetObject($this->InstanceID), IPS_GetKernelVersion()),
             'rootFontSize'       => $ipsView
                 ? $this->IPSViewStyleRootFontSize()
                 : max(50, min(200, $this->ReadPropertyInteger('TileFontScale'))) . '%',
@@ -1376,6 +1378,18 @@ class CalendarView extends IPSModuleStrict
                     : 3
             ]
         ]);
+    }
+
+    /** @param array<string, mixed> $object @return list<string> */
+    private static function tileTitleLayoutClasses(array $object, string $kernelVersion): array
+    {
+        if (version_compare($kernelVersion, '9.1', '<') || ($object['ObjectIsHiddenTitle'] ?? false) !== true) {
+            return [];
+        }
+
+        return ($object['ObjectIsHiddenMaximize'] ?? false) === true
+            ? ['tile-title-hidden']
+            : ['tile-title-hidden', 'tile-maximize-visible'];
     }
 
     /**

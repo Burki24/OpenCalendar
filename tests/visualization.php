@@ -101,6 +101,16 @@ $localeData = json_decode($localeSource, true, 512, JSON_THROW_ON_ERROR);
 $germanTranslations = is_array($localeData['translations']['de'] ?? null)
     ? $localeData['translations']['de']
     : [];
+assertVisualization(
+    str_contains($style, '--tile-title-clearance: 58px;')
+        && str_contains($style, 'html.tile-title-hidden { --tile-title-clearance: 0px; }')
+        && str_contains($style, 'html.tile-title-hidden.tile-maximize-visible {')
+        && str_contains($style, '--tile-maximize-clearance: 48px;')
+        && str_contains($style, '.toolbar-actions { margin-right: var(--tile-maximize-clearance, 0px); }')
+        && str_contains($style, 'html.tile-title-hidden.tile-maximize-visible .toolbar-actions { margin-right: 0; }')
+        && str_contains($style, 'html.ipsview-mode {'),
+    'The native tile must distinguish a hidden title from a visible maximize button; IPSView retains its own layout.'
+);
 preg_match_all('/Translate\\(\'([^\']+)\'\\)/', $moduleSource, $moduleTranslationMatches);
 foreach (array_unique($moduleTranslationMatches[1] ?? []) as $translationKey) {
     assertVisualization(
