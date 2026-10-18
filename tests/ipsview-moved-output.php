@@ -23,9 +23,19 @@ function IPS_GetParent(int $id): int
 {
     return $GLOBALS['objects'][$id]['parent'];
 }
-function SetValueString(int $id, string $value): void
+function IPS_GetObject(int $id): array
 {
+    return [
+        'ParentID'         => $GLOBALS['objects'][$id]['parent'],
+        'ObjectIdent'      => $GLOBALS['objects'][$id]['ident'],
+        'ObjectIsReadOnly' => $GLOBALS['objects'][$id]['readOnly'] ?? false
+    ];
+}
+function SetValueString(int $id, string $value): bool
+{
+    if (($GLOBALS['objects'][$id]['readOnly'] ?? false) || ($GLOBALS['objects'][$id]['writeFails'] ?? false)) return false;
     $GLOBALS['objects'][$id]['value'] = $value;
+    return true;
 }
 function IPS_DeleteVariable(int $id): void
 {
@@ -103,7 +113,7 @@ final class MovableHTMLView
     }
     protected function SetValue(string $ident, string $value): void
     {
-        SetValueString($this->GetIDForIdent($ident), $value);
+        $GLOBALS['objects'][$this->GetIDForIdent($ident)]['value'] = $value;
     }
     protected function UnregisterVariable(string $ident): void
     {
@@ -114,6 +124,16 @@ function checkMoved(bool $ok, string $message): void
 {
     if (!$ok) throw new RuntimeException($message);
 }
+
+// IPSModuleStrict owns read-only status variables and must write them through SetValue().
+$objects[500] = ['parent'=>103, 'ident'=>'HTML', 'type'=>3, 'value'=>'before', 'readOnly'=>true];
+$strictView = new MovableHTMLView(103);
+checkMoved(!$strictView->maintain(), 'Adopt an existing read-only module variable');
+checkMoved($strictView->update('updated') && $objects[500]['value'] === 'updated', 'Update a read-only module variable');
+$objects[500]['ident'] = 'RenamedHTML';
+checkMoved($strictView->update('renamed') && $objects[500]['value'] === 'renamed', 'Update a renamed read-only module variable');
+checkMoved($strictView->regenerate() && $objects[500]['value'] === 'regenerated', 'Regenerate a read-only module variable');
+unset($objects[500], $attributes[103]);
 
 // Legacy output is adopted in place, without overwriting its content.
 $objects[501] = ['parent'=>101, 'ident'=>'HTML', 'type'=>3, 'value'=>'legacy'];
@@ -128,6 +148,12 @@ checkMoved(!$view->maintain() && count($objects) === 1, 'Moving must not create 
 checkMoved($view->update('new') && $objects[501]['value'] === 'new', 'Update moved and renamed output');
 checkMoved($view->regenerate() && $objects[501]['value'] === 'regenerated', 'Regenerate by persisted ID');
 checkMoved($objects[501]['parent'] === 999, 'Do not move the output back');
+$objects[501]['readOnly'] = true;
+checkMoved(!$view->update('blocked') && $objects[501]['value'] === 'regenerated', 'Reject an unwritable moved output');
+$objects[501]['readOnly'] = false;
+$objects[501]['writeFails'] = true;
+checkMoved(!$view->update('failed') && $objects[501]['value'] === 'regenerated', 'Report a failed moved-output write');
+unset($objects[501]['writeFails']);
 $view->enabled = false;
 checkMoved(!$view->update('disabled') && !$view->maintain() && $objects[501]['value'] === 'regenerated', 'Disabled output stays intact');
 $view->enabled = true;
