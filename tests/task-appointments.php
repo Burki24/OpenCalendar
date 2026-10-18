@@ -517,11 +517,13 @@ assertTaskAppointment(
 );
 
 $mergeIncrementalEvents = new ReflectionMethod(Calendar::class, 'mergeIncrementalEvents');
+$microsoftExceptionStart = new DateTimeImmutable('today -7 days');
+$microsoftExceptionEnd = $microsoftExceptionStart->modify('+1 day');
 $cachedMicrosoftException = array_merge(
     IPSKalender\CalendarEventRecurrence::occurrence(
         'microsoft-series',
         'microsoft-exception',
-        '2026-09-12',
+        $microsoftExceptionStart->format('Y-m-d'),
         '',
         true,
         true,
@@ -533,8 +535,8 @@ $cachedMicrosoftException = array_merge(
         'eventReference' => 'microsoft-exception',
         'summary'        => '[OC:TODO:FOLLOW] Microsoft task',
         'allDay'         => true,
-        'start'          => '2026-09-12',
-        'end'            => '2026-09-13'
+        'start'          => $microsoftExceptionStart->format('Y-m-d'),
+        'end'            => $microsoftExceptionEnd->format('Y-m-d')
     ]
 );
 $deltaMicrosoftException = $cachedMicrosoftException;
@@ -547,7 +549,7 @@ $mergedMicrosoftExceptions = $mergeIncrementalEvents->invoke(
 );
 assertTaskAppointment(
     count($mergedMicrosoftExceptions) === 1
-        && ($mergedMicrosoftExceptions[0]['originalStart'] ?? '') === '2026-09-12'
+        && ($mergedMicrosoftExceptions[0]['originalStart'] ?? '') === $microsoftExceptionStart->format('Y-m-d')
         && ($mergedMicrosoftExceptions[0]['canUpdateFollowing'] ?? false) === true,
     'A Microsoft delta exception without originalStart must retain the cached occurrence identity for following moves.'
 );
