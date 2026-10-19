@@ -1,9 +1,9 @@
 # Vendored Symcon Module Helpers
 
-Die Dateien in diesem Verzeichnis stammen aus dem gemeinsamen Repository
+The files in this directory are vendored from
 [`Burki24/Symcon_ModuleHelper`](https://github.com/Burki24/Symcon_ModuleHelper).
 
-| Datei | Upstream-Version | SHA-256 |
+| File | Upstream version | SHA-256 |
 | --- | --- | --- |
 | `ChunkedJsonTransferHelper.php` | 1.1.0 | `13e009dac28cda9bbf22638db00bd8d562a522a10fd592d9c770a7c5f22cf1fb` |
 | `ConfigurationFormHelper.php` | 1.0.1 | `bd45f15a1c2f6e2800eff51eefeb3094f5745a3469434d6a57b98d54f30d363f` |
@@ -27,4 +27,4 @@ Die Dateien in diesem Verzeichnis stammen aus dem gemeinsamen Repository
 | `VariableHelper.php` | 1.2.0 | `43b205a2ca87553a3a59a9e94f1c5c72fc4643cebedb080a9706139d98b30624` |
 | `VisualizationThemeHelper.php` | 1.1.0 | `29fe61a7eccafeb8b2beb77fe3f7a4896f43b3eaace9ebe428a4fc8250fd9088` |
 
-Die Kopien werden bewusst mit der Library ausgeliefert; zur Laufzeit besteht keine externe Abhängigkeit.
+The copies are shipped with the library deliberately; there is no external runtime dependency.
