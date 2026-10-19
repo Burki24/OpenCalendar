@@ -652,3 +652,9 @@ Terminfarben bleiben davon unabhängige fachliche Inhaltsfarben.
 ### Tagesübersicht der Kalenderansichten
 
 In der Monatsansicht öffnet ein Klick auf die Tageszahl oder einen freien Bereich der Tageszelle die Tagesübersicht; der Hinweis `+ weitere` bleibt ebenfalls direkt anklickbar. In der Tage-, Wochen- und Arbeitswochenansicht öffnet ein Klick auf einen freien Bereich des jeweiligen Tages dieselbe Tagesübersicht. In der Agenda öffnet die Tagesüberschrift die gleiche Übersicht und ist auch per Tastatur mit Eingabe- oder Leertaste bedienbar. Die Übersicht zeigt alle Termine des Tages, ganztägige zuerst und anschließend zeitgebundene chronologisch, sowie die Terminanzahl. Ein Klick auf einen Termin öffnet zunächst die Termindetail-Ansicht. Von dort kann ein schreibbarer Einzeltermin gezielt bearbeitet werden. Ist mindestens ein beschreibbarer Kalender verfügbar, kann über **Termin an diesem Tag erstellen** direkt ein neuer Termin für den ausgewählten Tag angelegt werden. Für einen zukünftigen ausgewählten Tag wird 09:00 Uhr vorgeschlagen; für den heutigen Tag wird nach Möglichkeit die nächste volle Stunde verwendet. Kurz vor Mitternacht bleibt der Start am aktuellen Tag, statt auf eine bereits vergangene Uhrzeit zurückzufallen. Der zusätzliche Floating-Button zum Erstellen eines Termins bleibt in Agenda und Liste als direkter Schnellzugriff sichtbar.
+
+## Debug-Ausgaben
+
+Der native Symcon-Debug zeigt deutsche Meldungen mit Funktion, Zeile, Vorgang
+und Ergebnis sowie Aktionen und Schnittstellenübergaben. Private Inhalte und
+Zugangsdaten bleiben geschützt. Details und Abnahme: [Debug-Aufbau](../docs/DEBUG_OUTPUT.md).

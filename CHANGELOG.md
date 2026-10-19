@@ -1,5 +1,9 @@
 # Unveröffentlicht
 
+## Neu
+
+- Alle vier Module erklären Abläufe im einheitlichen deutschen Debug-Aufbau mit Funktion, Zeile, Vorgangskennung, Ergebnis sowie geschützten Schnittstellen- und Fehlerdiagnosen.
+
 ## Fixes
 
 - Bei ausgeblendetem Instanztitel nutzt die Kalender-Kachel ab Symcon 9.1 den oberen Platz und hält einen sichtbaren Maximieren-Button frei. Schmale Kacheln mit Maximieren-Button, sichtbare Titel und Symcon 9.0 behalten den erforderlichen oberen Abstand.

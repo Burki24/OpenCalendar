@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+require_once __DIR__ . '/../libs/helper/DebugFlowHelper.php';
+
 use IPSKalender\CalendarHttpClientInterface;
 use IPSKalender\CalendarHttpResponse;
 use IPSKalender\MicrosoftCalendarIncrementalSync;
@@ -290,6 +292,7 @@ require_once __DIR__ . '/../Kalender Konto/traits/ChildGatewayTrait.php';
 
 final class MicrosoftEditIdentityTestHarness
 {
+    use \Burki24\SymconModuleHelper\DebugFlowHelper;
     use KalenderKontoChildGatewayTrait;
 
     /**

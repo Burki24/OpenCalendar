@@ -113,3 +113,9 @@ Der Konfigurator meldet eine fehlende Kontoverbindung | Über das Zahnrad und **
 Nach einem Gatewaywechsel ist die Liste leer | Das neue Konto synchronisieren und anschließend **Kalender aktualisieren**
 Ein bereits angelegter Kalender fehlt in der Liste | Prüfen, ob der Konfigurator aktuell mit demselben Kalender Konto wie die Kalender-Instanz verbunden ist
 Ein Kalender ist nur lesbar | Die vom Anbieter gemeldeten Kalenderrechte prüfen; ICS/Webcal ist grundsätzlich schreibgeschützt
+
+## Debug-Ausgaben
+
+Der native Symcon-Debug zeigt deutsche Meldungen mit Funktion, Zeile, Vorgang
+und Ergebnis sowie Aktionen und Schnittstellenübergaben. Private Inhalte und
+Zugangsdaten bleiben geschützt. Details und Abnahme: [Debug-Aufbau](../docs/DEBUG_OUTPUT.md).

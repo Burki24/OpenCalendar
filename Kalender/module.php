@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+require_once __DIR__ . '/../libs/helper/DebugFlowHelper.php';
+
 use Burki24\SymconModuleHelper\ChunkedJsonTransferHelper;
 use Burki24\SymconModuleHelper\ConfigurationFormHelper;
 use Burki24\SymconModuleHelper\DataFlowHelper;
@@ -34,10 +36,11 @@ require_once __DIR__ . '/../libs/SynchronizationSchedule.php';
 
 class Calendar extends IPSModuleStrict
 {
+    use \Burki24\SymconModuleHelper\DebugFlowHelper;
+
     use ChunkedJsonTransferHelper;
     use ConfigurationFormHelper;
     use DataFlowHelper;
-    use DebugHelper;
     use PersistentJsonCacheHelper;
     use VariableHelper;
 
@@ -69,72 +72,83 @@ class Calendar extends IPSModuleStrict
      */
     public function Create(): void
     {
-        parent::Create();
+        $debugFlowResult = null;
+        $debugFlowFailed = false;
+        $this->DebugFlowStart(__FUNCTION__, __LINE__);
+        try {
+            parent::Create();
 
-        $this->RegisterMessage(0, IPS_KERNELSTARTED);
-        $this->RegisterPropertyBoolean('Active', true);
-        $this->RegisterPropertyBoolean('LocalCalendar', false);
-        $this->RegisterPropertyString('CalendarID', '');
-        $this->RegisterPropertyString('ProviderCalendarID', '');
-        $this->RegisterPropertyString('CalendarURL', '');
-        $this->RegisterPropertyString('CalendarColor', '');
-        $this->RegisterPropertyBoolean('CanWrite', false);
-        $this->RegisterPropertyString('MicrosoftTaskListID', '');
-        $this->RegisterPropertyInteger('UpdateSchedule', SynchronizationSchedule::CUSTOM);
-        $this->RegisterPropertyInteger('UpdateInterval', 15);
-        $this->RegisterPropertyInteger('PastDays', 30);
-        $this->RegisterPropertyInteger('FutureDays', 365);
+            $this->RegisterMessage(0, IPS_KERNELSTARTED);
+            $this->RegisterPropertyBoolean('Active', true);
+            $this->RegisterPropertyBoolean('LocalCalendar', false);
+            $this->RegisterPropertyString('CalendarID', '');
+            $this->RegisterPropertyString('ProviderCalendarID', '');
+            $this->RegisterPropertyString('CalendarURL', '');
+            $this->RegisterPropertyString('CalendarColor', '');
+            $this->RegisterPropertyBoolean('CanWrite', false);
+            $this->RegisterPropertyString('MicrosoftTaskListID', '');
+            $this->RegisterPropertyInteger('UpdateSchedule', SynchronizationSchedule::CUSTOM);
+            $this->RegisterPropertyInteger('UpdateInterval', 15);
+            $this->RegisterPropertyInteger('PastDays', 30);
+            $this->RegisterPropertyInteger('FutureDays', 365);
 
-        $this->RegisterPersistentJsonCache('CachedEvents');
-        $this->RegisterPersistentJsonCache('CachedMicrosoftTasks');
-        $this->RegisterAttributeString('AnniversaryMetadata', '[]');
-        $this->RegisterAttributeString('BirthdayMetadata', '[]');
-        $this->RegisterAttributeString('PendingTaskSeries', '{}');
-        // Original calendar objects, never part of the disposable event cache.
-        $this->RegisterAttributeString('LocalCalendarResources', '{}');
-        $this->RegisterAttributeInteger('LastSynchronization', 0);
-        $this->RegisterAttributeString('LastError', '');
-        $this->RegisterAttributeString('IncrementalSyncToken', '');
-        $this->RegisterAttributeInteger('IncrementalSyncWindowStart', 0);
-        $this->RegisterAttributeInteger('IncrementalSyncWindowEnd', 0);
-        $this->RegisterAttributeString('IncrementalSyncCalendarID', '');
-        $this->RegisterAttributeString('MicrosoftTaskDeltaLink', '');
-        $this->RegisterAttributeString('MicrosoftTaskSyncListID', '');
-        $this->RegisterAttributeString('MicrosoftTaskLastError', '');
-        $this->RegisterAttributeBoolean('CalendarMetadataAvailable', false);
-        $this->RegisterAttributeString('ResolvedCalendarID', '');
-        $this->RegisterAttributeString('DetectedCalendarColor', '');
-        $this->RegisterAttributeBoolean('DetectedCanWrite', false);
-        $this->RegisterAttributeBoolean('DetectedCanCreateRecurrence', false);
-        $this->RegisterAttributeBoolean('DetectedCanUpdateRecurrence', false);
-        $this->RegisterAttributeBoolean('DetectedCanUpdateOccurrence', false);
-        $this->RegisterAttributeBoolean('DetectedCanDeleteOccurrence', false);
-        $this->RegisterAttributeBoolean('DetectedCanUpdateFollowing', false);
-        $this->RegisterAttributeBoolean('DetectedCanUpdateSeries', false);
-        $this->RegisterAttributeBoolean('DetectedCanDeleteSeries', false);
-        $this->RegisterAttributeBoolean('DetectedCanUseDefaultReminder', false);
-        $this->RegisterAttributeBoolean('DetectedCanCreateWithDefaultReminder', false);
-        $this->RegisterAttributeInteger('DetectedMaxReminders', 1);
-        $this->RegisterAttributeString('DetectedDefaultReminder', '{}');
-        $this->RegisterAttributeString('DetectedCalendarTimezone', '');
-        $this->RegisterAttributeBoolean('DetectedWriteAccessKnown', false);
-        $this->RegisterAttributeBoolean('RuntimeReady', false);
+            $this->RegisterPersistentJsonCache('CachedEvents');
+            $this->RegisterPersistentJsonCache('CachedMicrosoftTasks');
+            $this->RegisterAttributeString('AnniversaryMetadata', '[]');
+            $this->RegisterAttributeString('BirthdayMetadata', '[]');
+            $this->RegisterAttributeString('PendingTaskSeries', '{}');
+            // Original calendar objects, never part of the disposable event cache.
+            $this->RegisterAttributeString('LocalCalendarResources', '{}');
+            $this->RegisterAttributeInteger('LastSynchronization', 0);
+            $this->RegisterAttributeString('LastError', '');
+            $this->RegisterAttributeString('IncrementalSyncToken', '');
+            $this->RegisterAttributeInteger('IncrementalSyncWindowStart', 0);
+            $this->RegisterAttributeInteger('IncrementalSyncWindowEnd', 0);
+            $this->RegisterAttributeString('IncrementalSyncCalendarID', '');
+            $this->RegisterAttributeString('MicrosoftTaskDeltaLink', '');
+            $this->RegisterAttributeString('MicrosoftTaskSyncListID', '');
+            $this->RegisterAttributeString('MicrosoftTaskLastError', '');
+            $this->RegisterAttributeBoolean('CalendarMetadataAvailable', false);
+            $this->RegisterAttributeString('ResolvedCalendarID', '');
+            $this->RegisterAttributeString('DetectedCalendarColor', '');
+            $this->RegisterAttributeBoolean('DetectedCanWrite', false);
+            $this->RegisterAttributeBoolean('DetectedCanCreateRecurrence', false);
+            $this->RegisterAttributeBoolean('DetectedCanUpdateRecurrence', false);
+            $this->RegisterAttributeBoolean('DetectedCanUpdateOccurrence', false);
+            $this->RegisterAttributeBoolean('DetectedCanDeleteOccurrence', false);
+            $this->RegisterAttributeBoolean('DetectedCanUpdateFollowing', false);
+            $this->RegisterAttributeBoolean('DetectedCanUpdateSeries', false);
+            $this->RegisterAttributeBoolean('DetectedCanDeleteSeries', false);
+            $this->RegisterAttributeBoolean('DetectedCanUseDefaultReminder', false);
+            $this->RegisterAttributeBoolean('DetectedCanCreateWithDefaultReminder', false);
+            $this->RegisterAttributeInteger('DetectedMaxReminders', 1);
+            $this->RegisterAttributeString('DetectedDefaultReminder', '{}');
+            $this->RegisterAttributeString('DetectedCalendarTimezone', '');
+            $this->RegisterAttributeBoolean('DetectedWriteAccessKnown', false);
+            $this->RegisterAttributeBoolean('RuntimeReady', false);
 
-        $this->RegisterVariableInteger('EventCount', $this->Translate('Event count'), [], 10);
-        $this->RegisterVariableInteger('TodayEventCount', $this->Translate("Today's events"), [], 20);
-        $this->RegisterVariableInteger(
-            'LastSynchronization',
-            $this->Translate('Last synchronization'),
-            [
-                'PRESENTATION' => VARIABLE_PRESENTATION_DATE_TIME,
-                'TEMPLATE'     => VARIABLE_TEMPLATE_DATE_TIME
-            ],
-            30
-        );
+            $this->RegisterVariableInteger('EventCount', $this->Translate('Event count'), [], 10);
+            $this->RegisterVariableInteger('TodayEventCount', $this->Translate("Today's events"), [], 20);
+            $this->RegisterVariableInteger(
+                'LastSynchronization',
+                $this->Translate('Last synchronization'),
+                [
+                    'PRESENTATION' => VARIABLE_PRESENTATION_DATE_TIME,
+                    'TEMPLATE'     => VARIABLE_TEMPLATE_DATE_TIME
+                ],
+                30
+            );
 
-        $this->RegisterTimer('InitializationTimer', 0, 'IPSKAL_Initialize($_IPS[\'TARGET\']);');
-        $this->RegisterTimer('SynchronizationTimer', 0, 'IPSKAL_ScheduledSynchronize($_IPS[\'TARGET\']);');
-        $this->RegisterTimer('DayChangeTimer', 0, 'IPSKAL_RefreshTodayEventCount($_IPS[\'TARGET\']);');
+            $this->RegisterTimer('InitializationTimer', 0, 'IPSKAL_Initialize($_IPS[\'TARGET\']);');
+            $this->RegisterTimer('SynchronizationTimer', 0, 'IPSKAL_ScheduledSynchronize($_IPS[\'TARGET\']);');
+            $this->RegisterTimer('DayChangeTimer', 0, 'IPSKAL_RefreshTodayEventCount($_IPS[\'TARGET\']);');
+        } catch (\Throwable $debugFlowException) {
+            $debugFlowFailed = true;
+            $this->DebugFlowException(__FUNCTION__, __LINE__, $debugFlowException);
+            throw $debugFlowException;
+        } finally {
+            $this->DebugFlowEnd(__FUNCTION__, __LINE__, $debugFlowResult, $debugFlowFailed, true);
+        }
     }
 
     /**
@@ -144,51 +158,62 @@ class Calendar extends IPSModuleStrict
      */
     public function GetConfigurationForm(): string
     {
-        $form = $this->LoadConfigurationForm();
-        $customSchedule = $this->ReadPropertyInteger('UpdateSchedule') === SynchronizationSchedule::CUSTOM;
-        $local = $this->ReadPropertyBoolean('LocalCalendar');
-        $taskListOptions = $this->microsoftTaskListOptions();
-        foreach ($form['elements'] as &$element) {
-            if (($element['name'] ?? '') === 'UpdateInterval') {
-                $element['visible'] = !$local && $customSchedule;
+        $debugFlowResult = null;
+        $debugFlowFailed = false;
+        $this->DebugFlowStart(__FUNCTION__, __LINE__);
+        try {
+            $form = $this->LoadConfigurationForm();
+            $customSchedule = $this->ReadPropertyInteger('UpdateSchedule') === SynchronizationSchedule::CUSTOM;
+            $local = $this->ReadPropertyBoolean('LocalCalendar');
+            $taskListOptions = $this->microsoftTaskListOptions();
+            foreach ($form['elements'] as &$element) {
+                if (($element['name'] ?? '') === 'UpdateInterval') {
+                    $element['visible'] = !$local && $customSchedule;
+                }
+                if (($element['name'] ?? '') === 'UpdateSchedule') {
+                    $element['visible'] = !$local;
+                }
+                if (($element['name'] ?? '') === 'LocalCalendarNotice') {
+                    $element['visible'] = $local;
+                }
+                if (($element['name'] ?? '') === 'MicrosoftTaskListID') {
+                    $element['visible'] = !$local && count($taskListOptions) > 1;
+                    $element['options'] = $taskListOptions;
+                }
+                if (($element['caption'] ?? '') === 'Calendar identity') {
+                    foreach ($element['items'] as &$item) {
+                        if (($item['name'] ?? '') === 'CalendarColor') {
+                            $item['enabled'] = $local;
+                        }
+                    }
+                    unset($item);
+                }
             }
-            if (($element['name'] ?? '') === 'UpdateSchedule') {
-                $element['visible'] = !$local;
-            }
-            if (($element['name'] ?? '') === 'LocalCalendarNotice') {
-                $element['visible'] = $local;
-            }
-            if (($element['name'] ?? '') === 'MicrosoftTaskListID') {
-                $element['visible'] = !$local && count($taskListOptions) > 1;
-                $element['options'] = $taskListOptions;
-            }
-            if (($element['caption'] ?? '') === 'Calendar identity') {
-                foreach ($element['items'] as &$item) {
-                    if (($item['name'] ?? '') === 'CalendarColor') {
-                        $item['enabled'] = $local;
+            unset($element);
+
+            if ($local) {
+                foreach ($form['actions'] as &$action) {
+                    if (($action['caption'] ?? '') === 'Synchronize now') {
+                        $action['caption'] = 'Refresh local calendar';
+                    }
+                    if (($action['name'] ?? '') === 'SynchronizationSuccessPopup') {
+                        $action['popup']['items'][0]['caption'] = 'Local calendar refreshed.';
+                    }
+                    if (($action['name'] ?? '') === 'SynchronizationFailurePopup') {
+                        $action['popup']['items'][0]['caption'] = 'Local calendar refresh failed. Please check the instance status for details.';
                     }
                 }
-                unset($item);
+                unset($action);
             }
-        }
-        unset($element);
 
-        if ($local) {
-            foreach ($form['actions'] as &$action) {
-                if (($action['caption'] ?? '') === 'Synchronize now') {
-                    $action['caption'] = 'Refresh local calendar';
-                }
-                if (($action['name'] ?? '') === 'SynchronizationSuccessPopup') {
-                    $action['popup']['items'][0]['caption'] = 'Local calendar refreshed.';
-                }
-                if (($action['name'] ?? '') === 'SynchronizationFailurePopup') {
-                    $action['popup']['items'][0]['caption'] = 'Local calendar refresh failed. Please check the instance status for details.';
-                }
-            }
-            unset($action);
+            return $debugFlowResult = $this->EncodeConfigurationForm($form);
+        } catch (\Throwable $debugFlowException) {
+            $debugFlowFailed = true;
+            $this->DebugFlowException(__FUNCTION__, __LINE__, $debugFlowException);
+            throw $debugFlowException;
+        } finally {
+            $this->DebugFlowEnd(__FUNCTION__, __LINE__, $debugFlowResult, $debugFlowFailed, false);
         }
-
-        return $this->EncodeConfigurationForm($form);
     }
 
     /**
@@ -196,11 +221,22 @@ class Calendar extends IPSModuleStrict
      */
     public function UpdateScheduleForm(int $schedule): void
     {
-        $this->UpdateFormField(
-            'UpdateInterval',
-            'visible',
-            $schedule === SynchronizationSchedule::CUSTOM
-        );
+        $debugFlowResult = null;
+        $debugFlowFailed = false;
+        $this->DebugFlowStart(__FUNCTION__, __LINE__);
+        try {
+            $this->UpdateFormField(
+                'UpdateInterval',
+                'visible',
+                $schedule === SynchronizationSchedule::CUSTOM
+            );
+        } catch (\Throwable $debugFlowException) {
+            $debugFlowFailed = true;
+            $this->DebugFlowException(__FUNCTION__, __LINE__, $debugFlowException);
+            throw $debugFlowException;
+        } finally {
+            $this->DebugFlowEnd(__FUNCTION__, __LINE__, $debugFlowResult, $debugFlowFailed, true);
+        }
     }
 
     /**
@@ -211,17 +247,29 @@ class Calendar extends IPSModuleStrict
      */
     public function RequestAction(string $Ident, mixed $Value): void
     {
-        switch ($Ident) {
-            case 'FormSynchronize':
-                $this->UpdateFormField(
-                    $this->Synchronize() ? 'SynchronizationSuccessPopup' : 'SynchronizationFailurePopup',
-                    'visible',
-                    true
-                );
-                break;
+        $debugFlowResult = null;
+        $debugFlowFailed = false;
+        $this->DebugFlowStart(__FUNCTION__, __LINE__, ['Aktion' => $Ident]);
+        try {
+            $this->DebugFlowEvent(__FUNCTION__, __LINE__, 'AKTION', 'Bedienaktion angefordert; übergebene Nutzdaten bleiben geschützt.', ['Aktion' => $Ident]);
+            switch ($Ident) {
+                case 'FormSynchronize':
+                    $this->UpdateFormField(
+                        $this->Synchronize() ? 'SynchronizationSuccessPopup' : 'SynchronizationFailurePopup',
+                        'visible',
+                        true
+                    );
+                    break;
 
-            default:
-                throw new InvalidArgumentException('Unsupported form action: ' . $Ident);
+                default:
+                    throw new InvalidArgumentException('Unsupported form action: ' . $Ident);
+            }
+        } catch (\Throwable $debugFlowException) {
+            $debugFlowFailed = true;
+            $this->DebugFlowException(__FUNCTION__, __LINE__, $debugFlowException);
+            throw $debugFlowException;
+        } finally {
+            $this->DebugFlowEnd(__FUNCTION__, __LINE__, $debugFlowResult, $debugFlowFailed, true);
         }
     }
 
@@ -230,39 +278,50 @@ class Calendar extends IPSModuleStrict
      */
     public function ApplyChanges(): void
     {
-        parent::ApplyChanges();
+        $debugFlowResult = null;
+        $debugFlowFailed = false;
+        $this->DebugFlowStart(__FUNCTION__, __LINE__);
+        try {
+            parent::ApplyChanges();
 
-        $this->removeLegacyEventsVariable();
-        $this->WriteAttributeBoolean('RuntimeReady', false);
-        $this->clearIncrementalSyncState();
-        $this->resetMicrosoftTaskSyncForSelection();
-        $this->RegisterMessage(0, IPS_KERNELSTARTED);
-        $this->SetTimerInterval('InitializationTimer', 0);
-        $this->SetTimerInterval('SynchronizationTimer', 0);
-        $this->SetTimerInterval('DayChangeTimer', 0);
-        $this->updateEventCounters($this->readEvents());
+            $this->removeLegacyEventsVariable();
+            $this->WriteAttributeBoolean('RuntimeReady', false);
+            $this->clearIncrementalSyncState();
+            $this->resetMicrosoftTaskSyncForSelection();
+            $this->RegisterMessage(0, IPS_KERNELSTARTED);
+            $this->SetTimerInterval('InitializationTimer', 0);
+            $this->SetTimerInterval('SynchronizationTimer', 0);
+            $this->SetTimerInterval('DayChangeTimer', 0);
+            $this->updateEventCounters($this->readEvents());
 
-        if (IPS_GetKernelRunlevel() === KR_READY) {
-            $this->scheduleTodayEventCountRefresh();
+            if (IPS_GetKernelRunlevel() === KR_READY) {
+                $this->scheduleTodayEventCountRefresh();
+            }
+
+            $validationError = $this->validateConfiguration();
+            if ($validationError !== '') {
+                $this->WriteAttributeString('LastError', $validationError);
+                $this->SetStatus(self::STATUS_CONFIGURATION_MISSING);
+                return;
+            }
+
+            if (!$this->ReadPropertyBoolean('Active')) {
+                $this->SetStatus(IS_INACTIVE);
+                return;
+            }
+
+            if (IPS_GetKernelRunlevel() !== KR_READY) {
+                return;
+            }
+
+            $this->scheduleInitialization();
+        } catch (\Throwable $debugFlowException) {
+            $debugFlowFailed = true;
+            $this->DebugFlowException(__FUNCTION__, __LINE__, $debugFlowException);
+            throw $debugFlowException;
+        } finally {
+            $this->DebugFlowEnd(__FUNCTION__, __LINE__, $debugFlowResult, $debugFlowFailed, true);
         }
-
-        $validationError = $this->validateConfiguration();
-        if ($validationError !== '') {
-            $this->WriteAttributeString('LastError', $validationError);
-            $this->SetStatus(self::STATUS_CONFIGURATION_MISSING);
-            return;
-        }
-
-        if (!$this->ReadPropertyBoolean('Active')) {
-            $this->SetStatus(IS_INACTIVE);
-            return;
-        }
-
-        if (IPS_GetKernelRunlevel() !== KR_READY) {
-            return;
-        }
-
-        $this->scheduleInitialization();
     }
 
     /**
@@ -272,9 +331,20 @@ class Calendar extends IPSModuleStrict
      */
     public function MessageSink(int $TimeStamp, int $SenderID, int $Message, array $Data): void
     {
-        if ($SenderID === 0 && $Message === IPS_KERNELSTARTED) {
-            $this->scheduleInitialization();
-            $this->scheduleTodayEventCountRefresh();
+        $debugFlowResult = null;
+        $debugFlowFailed = false;
+        $this->DebugFlowStart(__FUNCTION__, __LINE__, ['Quelle' => $SenderID, 'Nachricht' => $Message]);
+        try {
+            if ($SenderID === 0 && $Message === IPS_KERNELSTARTED) {
+                $this->scheduleInitialization();
+                $this->scheduleTodayEventCountRefresh();
+            }
+        } catch (\Throwable $debugFlowException) {
+            $debugFlowFailed = true;
+            $this->DebugFlowException(__FUNCTION__, __LINE__, $debugFlowException);
+            throw $debugFlowException;
+        } finally {
+            $this->DebugFlowEnd(__FUNCTION__, __LINE__, $debugFlowResult, $debugFlowFailed, true);
         }
     }
 
@@ -285,31 +355,42 @@ class Calendar extends IPSModuleStrict
      */
     public function Initialize(): bool
     {
-        $this->SetTimerInterval('InitializationTimer', 0);
-        if (IPS_GetKernelRunlevel() !== KR_READY
-            || !$this->ReadPropertyBoolean('Active')
-            || $this->validateConfiguration() !== '') {
-            return false;
+        $debugFlowResult = null;
+        $debugFlowFailed = false;
+        $this->DebugFlowStart(__FUNCTION__, __LINE__);
+        try {
+            $this->SetTimerInterval('InitializationTimer', 0);
+            if (IPS_GetKernelRunlevel() !== KR_READY
+                || !$this->ReadPropertyBoolean('Active')
+                || $this->validateConfiguration() !== '') {
+                return $debugFlowResult = false;
+            }
+
+            $this->WriteAttributeBoolean('RuntimeReady', true);
+            $this->SetTimerInterval(
+                'SynchronizationTimer',
+                $this->ReadPropertyBoolean('LocalCalendar') ? 0 : SynchronizationSchedule::timerInterval(
+                    $this->ReadPropertyInteger('UpdateSchedule'),
+                    $this->ReadPropertyInteger('UpdateInterval')
+                )
+            );
+            $this->refreshCalendarMetadataSafely();
+            $this->updateEventCounters($this->readEvents());
+            $this->scheduleTodayEventCountRefresh();
+            $this->SetStatus(IS_ACTIVE);
+
+            if ($this->ReadPropertyBoolean('LocalCalendar')) {
+                return $debugFlowResult = $this->Synchronize();
+            }
+
+            return $debugFlowResult = true;
+        } catch (\Throwable $debugFlowException) {
+            $debugFlowFailed = true;
+            $this->DebugFlowException(__FUNCTION__, __LINE__, $debugFlowException);
+            throw $debugFlowException;
+        } finally {
+            $this->DebugFlowEnd(__FUNCTION__, __LINE__, $debugFlowResult, $debugFlowFailed, false);
         }
-
-        $this->WriteAttributeBoolean('RuntimeReady', true);
-        $this->SetTimerInterval(
-            'SynchronizationTimer',
-            $this->ReadPropertyBoolean('LocalCalendar') ? 0 : SynchronizationSchedule::timerInterval(
-                $this->ReadPropertyInteger('UpdateSchedule'),
-                $this->ReadPropertyInteger('UpdateInterval')
-            )
-        );
-        $this->refreshCalendarMetadataSafely();
-        $this->updateEventCounters($this->readEvents());
-        $this->scheduleTodayEventCountRefresh();
-        $this->SetStatus(IS_ACTIVE);
-
-        if ($this->ReadPropertyBoolean('LocalCalendar')) {
-            return $this->Synchronize();
-        }
-
-        return true;
     }
 
     /**
@@ -319,15 +400,26 @@ class Calendar extends IPSModuleStrict
      */
     public function ScheduledSynchronize(): bool
     {
-        if (!SynchronizationSchedule::isDue(
-            $this->ReadPropertyInteger('UpdateSchedule'),
-            $this->ReadPropertyInteger('UpdateInterval'),
-            $this->ReadAttributeInteger('LastSynchronization')
-        )) {
-            return true;
-        }
+        $debugFlowResult = null;
+        $debugFlowFailed = false;
+        $this->DebugFlowStart(__FUNCTION__, __LINE__);
+        try {
+            if (!SynchronizationSchedule::isDue(
+                $this->ReadPropertyInteger('UpdateSchedule'),
+                $this->ReadPropertyInteger('UpdateInterval'),
+                $this->ReadAttributeInteger('LastSynchronization')
+            )) {
+                return $debugFlowResult = true;
+            }
 
-        return $this->Synchronize();
+            return $debugFlowResult = $this->Synchronize();
+        } catch (\Throwable $debugFlowException) {
+            $debugFlowFailed = true;
+            $this->DebugFlowException(__FUNCTION__, __LINE__, $debugFlowException);
+            throw $debugFlowException;
+        } finally {
+            $this->DebugFlowEnd(__FUNCTION__, __LINE__, $debugFlowResult, $debugFlowFailed, false);
+        }
     }
 
     /**
@@ -340,33 +432,44 @@ class Calendar extends IPSModuleStrict
      */
     public function RefreshTodayEventCount(): bool
     {
-        $this->SetTimerInterval('DayChangeTimer', 0);
-        if (IPS_GetKernelRunlevel() !== KR_READY) {
-            return false;
-        }
-        if (!$this->ReadPropertyBoolean('Active') || !$this->isRuntimeReady()) {
-            $this->updateEventCounters($this->readEvents());
-            $this->scheduleTodayEventCountRefresh();
-            return true;
-        }
-
+        $debugFlowResult = null;
+        $debugFlowFailed = false;
+        $this->DebugFlowStart(__FUNCTION__, __LINE__);
         try {
-            if ($this->ReadPropertyBoolean('LocalCalendar')) {
-                return $this->Synchronize();
+            $this->SetTimerInterval('DayChangeTimer', 0);
+            if (IPS_GetKernelRunlevel() !== KR_READY) {
+                return $debugFlowResult = false;
             }
-            $moved = 0;
-            $events = $this->rollForwardTaskEvents($this->readEvents(), $moved);
-            if ($moved > 0) {
-                $this->storeEventsAfterWrite($events);
-            } else {
-                $this->updateEventCounters($events);
+            if (!$this->ReadPropertyBoolean('Active') || !$this->isRuntimeReady()) {
+                $this->updateEventCounters($this->readEvents());
+                $this->scheduleTodayEventCountRefresh();
+                return $debugFlowResult = true;
             }
-            return true;
-        } catch (Throwable $exception) {
-            $this->handleError($exception);
-            return false;
+
+            try {
+                if ($this->ReadPropertyBoolean('LocalCalendar')) {
+                    return $debugFlowResult = $this->Synchronize();
+                }
+                $moved = 0;
+                $events = $this->rollForwardTaskEvents($this->readEvents(), $moved);
+                if ($moved > 0) {
+                    $this->storeEventsAfterWrite($events);
+                } else {
+                    $this->updateEventCounters($events);
+                }
+                return $debugFlowResult = true;
+            } catch (Throwable $exception) {
+                $this->handleError($exception);
+                return $debugFlowResult = false;
+            } finally {
+                $this->scheduleTodayEventCountRefresh();
+            }
+        } catch (\Throwable $debugFlowException) {
+            $debugFlowFailed = true;
+            $this->DebugFlowException(__FUNCTION__, __LINE__, $debugFlowException);
+            throw $debugFlowException;
         } finally {
-            $this->scheduleTodayEventCountRefresh();
+            $this->DebugFlowEnd(__FUNCTION__, __LINE__, $debugFlowResult, $debugFlowFailed, false);
         }
     }
 
@@ -378,20 +481,31 @@ class Calendar extends IPSModuleStrict
      */
     public function ReceiveData(string $JSONString): string
     {
-        if ($this->ReadPropertyBoolean('LocalCalendar')) {
-            return '';
-        }
+        $debugFlowResult = null;
+        $debugFlowFailed = false;
+        $this->DebugFlowStart(__FUNCTION__, __LINE__);
         try {
-            $message = $this->DecodeDataFlowMessage($JSONString, self::DATA_ID_FROM_PARENT);
-            if (($message['Operation'] ?? '') === 'CalendarsUpdated'
-                && is_array($message['Payload'] ?? null)) {
-                $this->applyCalendarMetadata($message['Payload']);
+            if ($this->ReadPropertyBoolean('LocalCalendar')) {
+                return $debugFlowResult = '';
             }
-        } catch (Throwable $exception) {
-            $this->SendSafeDebugException('CalendarMetadataError', $exception);
-        }
+            try {
+                $message = $this->DecodeDataFlowMessage($JSONString, self::DATA_ID_FROM_PARENT);
+                if (($message['Operation'] ?? '') === 'CalendarsUpdated'
+                    && is_array($message['Payload'] ?? null)) {
+                    $this->applyCalendarMetadata($message['Payload']);
+                }
+            } catch (Throwable $exception) {
+                $this->DebugFlowException(__FUNCTION__, __LINE__, $exception);
+            }
 
-        return '';
+            return $debugFlowResult = '';
+        } catch (\Throwable $debugFlowException) {
+            $debugFlowFailed = true;
+            $this->DebugFlowException(__FUNCTION__, __LINE__, $debugFlowException);
+            throw $debugFlowException;
+        } finally {
+            $this->DebugFlowEnd(__FUNCTION__, __LINE__, $debugFlowResult, $debugFlowFailed, false);
+        }
     }
 
     /**
@@ -401,32 +515,43 @@ class Calendar extends IPSModuleStrict
      */
     public function Synchronize(): bool
     {
-        if (!$this->ReadPropertyBoolean('Active')) {
-            return false;
-        }
-
-        $startedAt = microtime(true);
-        $this->SendSafeDebug('SynchronizationStart', [
-            'pastDays'   => max(0, min(1095, $this->ReadPropertyInteger('PastDays'))),
-            'futureDays' => max(1, min(1095, $this->ReadPropertyInteger('FutureDays')))
-        ]);
-
+        $debugFlowResult = null;
+        $debugFlowFailed = false;
+        $this->DebugFlowStart(__FUNCTION__, __LINE__);
         try {
-            $this->refreshCalendarMetadataSafely();
-            $events = $this->rollForwardTaskEvents($this->requestEvents());
-            $this->storeEvents($events);
-            $taskCount = $this->synchronizeMicrosoftTasksSafely();
-            $this->WriteAttributeString('LastError', '');
-            $this->SetStatus(IS_ACTIVE);
-            $this->SendSafeDebug('SynchronizationCompleted', [
-                'eventCount' => count($events),
-                'taskCount'  => $taskCount,
-                'durationMs' => (int) round((microtime(true) - $startedAt) * 1000)
+            if (!$this->ReadPropertyBoolean('Active')) {
+                return $debugFlowResult = false;
+            }
+
+            $startedAt = microtime(true);
+            $this->DebugFlowEvent(__FUNCTION__, __LINE__, 'AKTION', 'Kalendersynchronisation angefordert.', [
+                'VergangeneTage'   => max(0, min(1095, $this->ReadPropertyInteger('PastDays'))),
+                'ZukünftigeTage'   => max(1, min(1095, $this->ReadPropertyInteger('FutureDays')))
             ]);
-            return true;
-        } catch (Throwable $exception) {
-            $this->handleError($exception);
-            return false;
+
+            try {
+                $this->refreshCalendarMetadataSafely();
+                $events = $this->rollForwardTaskEvents($this->requestEvents());
+                $this->storeEvents($events);
+                $taskCount = $this->synchronizeMicrosoftTasksSafely();
+                $this->WriteAttributeString('LastError', '');
+                $this->SetStatus(IS_ACTIVE);
+                $this->DebugFlowEvent(__FUNCTION__, __LINE__, 'AKTION', 'Kalendersynchronisation abgeschlossen.', [
+                    'Terminanzahl'       => count($events),
+                    'Aufgabenanzahl'     => $taskCount,
+                    'DauerMillisekunden' => (int) round((microtime(true) - $startedAt) * 1000)
+                ]);
+                return $debugFlowResult = true;
+            } catch (Throwable $exception) {
+                $this->handleError($exception);
+                return $debugFlowResult = false;
+            }
+        } catch (\Throwable $debugFlowException) {
+            $debugFlowFailed = true;
+            $this->DebugFlowException(__FUNCTION__, __LINE__, $debugFlowException);
+            throw $debugFlowException;
+        } finally {
+            $this->DebugFlowEnd(__FUNCTION__, __LINE__, $debugFlowResult, $debugFlowFailed, false);
         }
     }
 
@@ -437,13 +562,24 @@ class Calendar extends IPSModuleStrict
      */
     public function GetEvents(): string
     {
-        return json_encode(
-            $this->readEvents(),
-            JSON_UNESCAPED_SLASHES
-                | JSON_UNESCAPED_UNICODE
-                | JSON_PRESERVE_ZERO_FRACTION
-                | JSON_THROW_ON_ERROR
-        );
+        $debugFlowResult = null;
+        $debugFlowFailed = false;
+        $this->DebugFlowStart(__FUNCTION__, __LINE__);
+        try {
+            return $debugFlowResult = json_encode(
+                $this->readEvents(),
+                JSON_UNESCAPED_SLASHES
+                    | JSON_UNESCAPED_UNICODE
+                    | JSON_PRESERVE_ZERO_FRACTION
+                    | JSON_THROW_ON_ERROR
+            );
+        } catch (\Throwable $debugFlowException) {
+            $debugFlowFailed = true;
+            $this->DebugFlowException(__FUNCTION__, __LINE__, $debugFlowException);
+            throw $debugFlowException;
+        } finally {
+            $this->DebugFlowEnd(__FUNCTION__, __LINE__, $debugFlowResult, $debugFlowFailed, false);
+        }
     }
 
     /**
@@ -453,13 +589,24 @@ class Calendar extends IPSModuleStrict
      */
     public function GetMicrosoftTasks(): string
     {
-        return json_encode(
-            $this->readMicrosoftTasks(),
-            JSON_UNESCAPED_SLASHES
-                | JSON_UNESCAPED_UNICODE
-                | JSON_PRESERVE_ZERO_FRACTION
-                | JSON_THROW_ON_ERROR
-        );
+        $debugFlowResult = null;
+        $debugFlowFailed = false;
+        $this->DebugFlowStart(__FUNCTION__, __LINE__);
+        try {
+            return $debugFlowResult = json_encode(
+                $this->readMicrosoftTasks(),
+                JSON_UNESCAPED_SLASHES
+                    | JSON_UNESCAPED_UNICODE
+                    | JSON_PRESERVE_ZERO_FRACTION
+                    | JSON_THROW_ON_ERROR
+            );
+        } catch (\Throwable $debugFlowException) {
+            $debugFlowFailed = true;
+            $this->DebugFlowException(__FUNCTION__, __LINE__, $debugFlowException);
+            throw $debugFlowException;
+        } finally {
+            $this->DebugFlowEnd(__FUNCTION__, __LINE__, $debugFlowResult, $debugFlowFailed, false);
+        }
     }
 
     /**
@@ -475,61 +622,72 @@ class Calendar extends IPSModuleStrict
      */
     public function GetAnniversaryList(int $Days = 0, string $Type = ''): string
     {
-        if ($Days < 0) {
-            throw new InvalidArgumentException('Annual-event look-ahead days must not be negative.');
+        $debugFlowResult = null;
+        $debugFlowFailed = false;
+        $this->DebugFlowStart(__FUNCTION__, __LINE__);
+        try {
+            if ($Days < 0) {
+                throw new InvalidArgumentException('Annual-event look-ahead days must not be negative.');
+            }
+            $type = $this->normalizeAnniversaryType($Type, true);
+
+            $today = new DateTimeImmutable('today');
+            $entries = [];
+            foreach ($this->readAnniversaryMetadata() as $metadata) {
+                if ($type !== '' && $metadata['type'] !== $type) {
+                    continue;
+                }
+                $anniversaryDate = $this->normalizeAnniversaryDate((string) ($metadata['date'] ?? ''));
+                if ($anniversaryDate === '') {
+                    continue;
+                }
+                $nextDate = $this->nextAnniversaryDate($anniversaryDate, $today);
+                $daysUntil = (int) $today->diff($nextDate)->format('%a');
+                if ($Days > 0 && $daysUntil > $Days) {
+                    continue;
+                }
+
+                $startYear = (int) substr($anniversaryDate, 0, 4);
+                $years = max(0, (int) $nextDate->format('Y') - $startYear);
+                $name = trim((string) ($metadata['summary'] ?? ''));
+                $entry = [
+                    'name'            => $name,
+                    'anniversaryType' => $metadata['type'],
+                    'anniversaryDate' => $anniversaryDate,
+                    'nextDate'        => $nextDate->format('Y-m-d'),
+                    'years'           => $years,
+                    'displayName'     => $name !== '' ? sprintf('%s (%dJ)', $name, $years) : sprintf('(%dJ)', $years),
+                    'daysUntil'       => $daysUntil
+                ];
+                if ($metadata['type'] === self::ANNIVERSARY_TYPE_BIRTHDAY) {
+                    $entry['birthDate'] = $anniversaryDate;
+                    $entry['nextBirthday'] = $entry['nextDate'];
+                    $entry['age'] = $years;
+                }
+                $entries[] = $entry;
+            }
+
+            usort(
+                $entries,
+                static fn (array $left, array $right): int => ((int) $left['daysUntil'] <=> (int) $right['daysUntil'])
+                    ?: strcasecmp((string) $left['name'], (string) $right['name'])
+                    ?: strcasecmp((string) $left['anniversaryType'], (string) $right['anniversaryType'])
+            );
+
+            return $debugFlowResult = json_encode(
+                $entries,
+                JSON_UNESCAPED_SLASHES
+                    | JSON_UNESCAPED_UNICODE
+                    | JSON_PRESERVE_ZERO_FRACTION
+                    | JSON_THROW_ON_ERROR
+            );
+        } catch (\Throwable $debugFlowException) {
+            $debugFlowFailed = true;
+            $this->DebugFlowException(__FUNCTION__, __LINE__, $debugFlowException);
+            throw $debugFlowException;
+        } finally {
+            $this->DebugFlowEnd(__FUNCTION__, __LINE__, $debugFlowResult, $debugFlowFailed, false);
         }
-        $type = $this->normalizeAnniversaryType($Type, true);
-
-        $today = new DateTimeImmutable('today');
-        $entries = [];
-        foreach ($this->readAnniversaryMetadata() as $metadata) {
-            if ($type !== '' && $metadata['type'] !== $type) {
-                continue;
-            }
-            $anniversaryDate = $this->normalizeAnniversaryDate((string) ($metadata['date'] ?? ''));
-            if ($anniversaryDate === '') {
-                continue;
-            }
-            $nextDate = $this->nextAnniversaryDate($anniversaryDate, $today);
-            $daysUntil = (int) $today->diff($nextDate)->format('%a');
-            if ($Days > 0 && $daysUntil > $Days) {
-                continue;
-            }
-
-            $startYear = (int) substr($anniversaryDate, 0, 4);
-            $years = max(0, (int) $nextDate->format('Y') - $startYear);
-            $name = trim((string) ($metadata['summary'] ?? ''));
-            $entry = [
-                'name'            => $name,
-                'anniversaryType' => $metadata['type'],
-                'anniversaryDate' => $anniversaryDate,
-                'nextDate'        => $nextDate->format('Y-m-d'),
-                'years'           => $years,
-                'displayName'     => $name !== '' ? sprintf('%s (%dJ)', $name, $years) : sprintf('(%dJ)', $years),
-                'daysUntil'       => $daysUntil
-            ];
-            if ($metadata['type'] === self::ANNIVERSARY_TYPE_BIRTHDAY) {
-                $entry['birthDate'] = $anniversaryDate;
-                $entry['nextBirthday'] = $entry['nextDate'];
-                $entry['age'] = $years;
-            }
-            $entries[] = $entry;
-        }
-
-        usort(
-            $entries,
-            static fn (array $left, array $right): int => ((int) $left['daysUntil'] <=> (int) $right['daysUntil'])
-                ?: strcasecmp((string) $left['name'], (string) $right['name'])
-                ?: strcasecmp((string) $left['anniversaryType'], (string) $right['anniversaryType'])
-        );
-
-        return json_encode(
-            $entries,
-            JSON_UNESCAPED_SLASHES
-                | JSON_UNESCAPED_UNICODE
-                | JSON_PRESERVE_ZERO_FRACTION
-                | JSON_THROW_ON_ERROR
-        );
     }
 
     /**
@@ -542,7 +700,18 @@ class Calendar extends IPSModuleStrict
      */
     public function GetBirthdayList(int $Days = 0): string
     {
-        return $this->GetAnniversaryList($Days, self::ANNIVERSARY_TYPE_BIRTHDAY);
+        $debugFlowResult = null;
+        $debugFlowFailed = false;
+        $this->DebugFlowStart(__FUNCTION__, __LINE__);
+        try {
+            return $debugFlowResult = $this->GetAnniversaryList($Days, self::ANNIVERSARY_TYPE_BIRTHDAY);
+        } catch (\Throwable $debugFlowException) {
+            $debugFlowFailed = true;
+            $this->DebugFlowException(__FUNCTION__, __LINE__, $debugFlowException);
+            throw $debugFlowException;
+        } finally {
+            $this->DebugFlowEnd(__FUNCTION__, __LINE__, $debugFlowResult, $debugFlowFailed, false);
+        }
     }
 
     /**
@@ -559,31 +728,42 @@ class Calendar extends IPSModuleStrict
      */
     public function SetAnniversary(string $EventJSON, string $Type, string $Date): bool
     {
-        $event = $this->decodeObject($EventJSON, 'event');
-        $type = $this->normalizeAnniversaryType($Type, true);
-        $date = $this->normalizeAnniversaryDate($Date);
-        if ($type === '') {
-            throw new InvalidArgumentException('The annual-event type is missing.');
-        }
-        if ($date === '' || $date > date('Y-m-d')) {
-            throw new InvalidArgumentException('The annual-event date is invalid.');
-        }
-        $recurrence = CalendarEventRecurrence::fromEvent($event);
-        if (!(bool) ($recurrence['recurring'] ?? false)
-            && trim((string) ($event['seriesId'] ?? '')) === '') {
-            throw new InvalidArgumentException('Annual-event metadata requires a recurring series.');
-        }
+        $debugFlowResult = null;
+        $debugFlowFailed = false;
+        $this->DebugFlowStart(__FUNCTION__, __LINE__);
+        try {
+            $event = $this->decodeObject($EventJSON, 'event');
+            $type = $this->normalizeAnniversaryType($Type, true);
+            $date = $this->normalizeAnniversaryDate($Date);
+            if ($type === '') {
+                throw new InvalidArgumentException('The annual-event type is missing.');
+            }
+            if ($date === '' || $date > date('Y-m-d')) {
+                throw new InvalidArgumentException('The annual-event date is invalid.');
+            }
+            $recurrence = CalendarEventRecurrence::fromEvent($event);
+            if (!(bool) ($recurrence['recurring'] ?? false)
+                && trim((string) ($event['seriesId'] ?? '')) === '') {
+                throw new InvalidArgumentException('Annual-event metadata requires a recurring series.');
+            }
 
-        $this->upsertAnniversaryMetadata(
-            $event,
-            $type,
-            $date,
-            trim((string) ($event['summary'] ?? ''))
-        );
-        $events = $this->enrichAnniversaryEvents($this->readEvents());
-        $this->WritePersistentJsonCache('CachedEvents', $events);
+            $this->upsertAnniversaryMetadata(
+                $event,
+                $type,
+                $date,
+                trim((string) ($event['summary'] ?? ''))
+            );
+            $events = $this->enrichAnniversaryEvents($this->readEvents());
+            $this->WritePersistentJsonCache('CachedEvents', $events);
 
-        return true;
+            return $debugFlowResult = true;
+        } catch (\Throwable $debugFlowException) {
+            $debugFlowFailed = true;
+            $this->DebugFlowException(__FUNCTION__, __LINE__, $debugFlowException);
+            throw $debugFlowException;
+        } finally {
+            $this->DebugFlowEnd(__FUNCTION__, __LINE__, $debugFlowResult, $debugFlowFailed, false);
+        }
     }
 
     /**
@@ -598,52 +778,63 @@ class Calendar extends IPSModuleStrict
      */
     public function GetEventForEdit(string $EventJSON): string
     {
+        $debugFlowResult = null;
+        $debugFlowFailed = false;
+        $this->DebugFlowStart(__FUNCTION__, __LINE__);
         try {
-            $event = $this->decodeObject($EventJSON, 'event');
-            if ($this->isMicrosoftTodoEvent($event)) {
-                return json_encode(
-                    $this->microsoftTodoEventForEdit($event),
+            try {
+                $event = $this->decodeObject($EventJSON, 'event');
+                if ($this->isMicrosoftTodoEvent($event)) {
+                    return $debugFlowResult = json_encode(
+                        $this->microsoftTodoEventForEdit($event),
+                        JSON_UNESCAPED_SLASHES
+                            | JSON_UNESCAPED_UNICODE
+                            | JSON_PRESERVE_ZERO_FRACTION
+                            | JSON_THROW_ON_ERROR
+                    );
+                }
+                $startTimestamp = (int) ($event['startTimestamp'] ?? 0);
+                $endTimestamp = (int) ($event['endTimestamp'] ?? 0);
+                if ($startTimestamp <= 0) {
+                    throw new InvalidArgumentException('The selected event start is invalid.');
+                }
+
+                try {
+                    $currentEvent = $this->sendRequest('GetEventForEdit', [
+                        'ResourceURL'    => trim((string) ($event['resourceUrl'] ?? '')),
+                        'EventReference' => trim((string) ($event['eventReference'] ?? '')),
+                        'UID'            => trim((string) ($event['uid'] ?? '')),
+                        'SeriesID'       => trim((string) ($event['seriesId'] ?? '')),
+                        'OccurrenceID'   => trim((string) ($event['occurrenceId'] ?? '')),
+                        'OriginalStart'  => trim((string) ($event['originalStart'] ?? '')),
+                        'RecurrenceID'   => trim((string) ($event['recurrenceId'] ?? '')),
+                        'Start'          => $startTimestamp,
+                        'End'            => $endTimestamp
+                    ]);
+                } catch (Throwable $exception) {
+                    $currentEvent = $this->cachedTaskEventForEdit($event, $exception);
+                    if ($currentEvent === null) {
+                        throw $exception;
+                    }
+                }
+                $currentEvent = $this->enrichAnniversaryEvent(CalendarTaskEvent::enrich($currentEvent));
+
+                return $debugFlowResult = json_encode(
+                    $currentEvent,
                     JSON_UNESCAPED_SLASHES
                         | JSON_UNESCAPED_UNICODE
                         | JSON_PRESERVE_ZERO_FRACTION
                         | JSON_THROW_ON_ERROR
                 );
-            }
-            $startTimestamp = (int) ($event['startTimestamp'] ?? 0);
-            $endTimestamp = (int) ($event['endTimestamp'] ?? 0);
-            if ($startTimestamp <= 0) {
-                throw new InvalidArgumentException('The selected event start is invalid.');
-            }
-
-            try {
-                $currentEvent = $this->sendRequest('GetEventForEdit', [
-                    'ResourceURL'    => trim((string) ($event['resourceUrl'] ?? '')),
-                    'EventReference' => trim((string) ($event['eventReference'] ?? '')),
-                    'UID'            => trim((string) ($event['uid'] ?? '')),
-                    'SeriesID'       => trim((string) ($event['seriesId'] ?? '')),
-                    'OccurrenceID'   => trim((string) ($event['occurrenceId'] ?? '')),
-                    'OriginalStart'  => trim((string) ($event['originalStart'] ?? '')),
-                    'RecurrenceID'   => trim((string) ($event['recurrenceId'] ?? '')),
-                    'Start'          => $startTimestamp,
-                    'End'            => $endTimestamp
-                ]);
             } catch (Throwable $exception) {
-                $currentEvent = $this->cachedTaskEventForEdit($event, $exception);
-                if ($currentEvent === null) {
-                    throw $exception;
-                }
+                throw new RuntimeException($this->handleError($exception), 0, $exception);
             }
-            $currentEvent = $this->enrichAnniversaryEvent(CalendarTaskEvent::enrich($currentEvent));
-
-            return json_encode(
-                $currentEvent,
-                JSON_UNESCAPED_SLASHES
-                    | JSON_UNESCAPED_UNICODE
-                    | JSON_PRESERVE_ZERO_FRACTION
-                    | JSON_THROW_ON_ERROR
-            );
-        } catch (Throwable $exception) {
-            throw new RuntimeException($this->handleError($exception), 0, $exception);
+        } catch (\Throwable $debugFlowException) {
+            $debugFlowFailed = true;
+            $this->DebugFlowException(__FUNCTION__, __LINE__, $debugFlowException);
+            throw $debugFlowException;
+        } finally {
+            $this->DebugFlowEnd(__FUNCTION__, __LINE__, $debugFlowResult, $debugFlowFailed, false);
         }
     }
 
@@ -656,36 +847,47 @@ class Calendar extends IPSModuleStrict
      */
     public function GetRecurringSeries(string $SeriesID, string $ResourceURL = ''): string
     {
+        $debugFlowResult = null;
+        $debugFlowFailed = false;
+        $this->DebugFlowStart(__FUNCTION__, __LINE__);
         try {
-            $seriesId = trim($SeriesID);
-            if ($seriesId === '') {
-                throw new InvalidArgumentException('The recurring series ID is missing.');
-            }
-            if (!$this->ReadAttributeBoolean('CalendarMetadataAvailable')
-                || !$this->ReadAttributeBoolean('DetectedCanUpdateSeries')) {
-                $this->refreshCalendarMetadataSafely();
-            }
-            if (!$this->ReadAttributeBoolean('DetectedCanUpdateSeries')) {
-                throw new InvalidArgumentException('Recurring series updates are not supported by this calendar.');
-            }
+            try {
+                $seriesId = trim($SeriesID);
+                if ($seriesId === '') {
+                    throw new InvalidArgumentException('The recurring series ID is missing.');
+                }
+                if (!$this->ReadAttributeBoolean('CalendarMetadataAvailable')
+                    || !$this->ReadAttributeBoolean('DetectedCanUpdateSeries')) {
+                    $this->refreshCalendarMetadataSafely();
+                }
+                if (!$this->ReadAttributeBoolean('DetectedCanUpdateSeries')) {
+                    throw new InvalidArgumentException('Recurring series updates are not supported by this calendar.');
+                }
 
-            $series = $this->sendRequest(
-                'GetRecurringSeries',
-                [
-                    'SeriesID'    => $seriesId,
-                    'ResourceURL' => trim($ResourceURL)
-                ]
-            );
-            $series = $this->enrichAnniversaryEvent(CalendarTaskEvent::enrich($series));
-            return json_encode(
-                $series,
-                JSON_UNESCAPED_SLASHES
-                    | JSON_UNESCAPED_UNICODE
-                    | JSON_PRESERVE_ZERO_FRACTION
-                    | JSON_THROW_ON_ERROR
-            );
-        } catch (Throwable $exception) {
-            throw new RuntimeException($this->handleError($exception), 0, $exception);
+                $series = $this->sendRequest(
+                    'GetRecurringSeries',
+                    [
+                        'SeriesID'    => $seriesId,
+                        'ResourceURL' => trim($ResourceURL)
+                    ]
+                );
+                $series = $this->enrichAnniversaryEvent(CalendarTaskEvent::enrich($series));
+                return $debugFlowResult = json_encode(
+                    $series,
+                    JSON_UNESCAPED_SLASHES
+                        | JSON_UNESCAPED_UNICODE
+                        | JSON_PRESERVE_ZERO_FRACTION
+                        | JSON_THROW_ON_ERROR
+                );
+            } catch (Throwable $exception) {
+                throw new RuntimeException($this->handleError($exception), 0, $exception);
+            }
+        } catch (\Throwable $debugFlowException) {
+            $debugFlowFailed = true;
+            $this->DebugFlowException(__FUNCTION__, __LINE__, $debugFlowException);
+            throw $debugFlowException;
+        } finally {
+            $this->DebugFlowEnd(__FUNCTION__, __LINE__, $debugFlowResult, $debugFlowFailed, false);
         }
     }
 
@@ -704,40 +906,51 @@ class Calendar extends IPSModuleStrict
         string $OriginalStart,
         string $ResourceURL = ''
     ): string {
+        $debugFlowResult = null;
+        $debugFlowFailed = false;
+        $this->DebugFlowStart(__FUNCTION__, __LINE__);
         try {
-            $seriesId = trim($SeriesID);
-            $occurrenceId = trim($OccurrenceID);
-            $originalStart = trim($OriginalStart);
-            if ($seriesId === '' || $occurrenceId === '' || $originalStart === '') {
-                throw new InvalidArgumentException('The recurring occurrence identity is incomplete.');
-            }
-            if (!$this->ReadAttributeBoolean('CalendarMetadataAvailable')
-                || !$this->ReadAttributeBoolean('DetectedCanUpdateFollowing')) {
-                $this->refreshCalendarMetadataSafely();
-            }
-            if (!$this->ReadAttributeBoolean('DetectedCanUpdateFollowing')) {
-                throw new InvalidArgumentException('This and following updates are not supported by this calendar.');
-            }
+            try {
+                $seriesId = trim($SeriesID);
+                $occurrenceId = trim($OccurrenceID);
+                $originalStart = trim($OriginalStart);
+                if ($seriesId === '' || $occurrenceId === '' || $originalStart === '') {
+                    throw new InvalidArgumentException('The recurring occurrence identity is incomplete.');
+                }
+                if (!$this->ReadAttributeBoolean('CalendarMetadataAvailable')
+                    || !$this->ReadAttributeBoolean('DetectedCanUpdateFollowing')) {
+                    $this->refreshCalendarMetadataSafely();
+                }
+                if (!$this->ReadAttributeBoolean('DetectedCanUpdateFollowing')) {
+                    throw new InvalidArgumentException('This and following updates are not supported by this calendar.');
+                }
 
-            $following = $this->sendRequest(
-                'GetRecurringFollowing',
-                [
-                    'SeriesID'      => $seriesId,
-                    'OccurrenceID'  => $occurrenceId,
-                    'OriginalStart' => $originalStart,
-                    'ResourceURL'   => trim($ResourceURL)
-                ]
-            );
-            $following = $this->enrichAnniversaryEvent(CalendarTaskEvent::enrich($following));
-            return json_encode(
-                $following,
-                JSON_UNESCAPED_SLASHES
-                    | JSON_UNESCAPED_UNICODE
-                    | JSON_PRESERVE_ZERO_FRACTION
-                    | JSON_THROW_ON_ERROR
-            );
-        } catch (Throwable $exception) {
-            throw new RuntimeException($this->handleError($exception), 0, $exception);
+                $following = $this->sendRequest(
+                    'GetRecurringFollowing',
+                    [
+                        'SeriesID'      => $seriesId,
+                        'OccurrenceID'  => $occurrenceId,
+                        'OriginalStart' => $originalStart,
+                        'ResourceURL'   => trim($ResourceURL)
+                    ]
+                );
+                $following = $this->enrichAnniversaryEvent(CalendarTaskEvent::enrich($following));
+                return $debugFlowResult = json_encode(
+                    $following,
+                    JSON_UNESCAPED_SLASHES
+                        | JSON_UNESCAPED_UNICODE
+                        | JSON_PRESERVE_ZERO_FRACTION
+                        | JSON_THROW_ON_ERROR
+                );
+            } catch (Throwable $exception) {
+                throw new RuntimeException($this->handleError($exception), 0, $exception);
+            }
+        } catch (\Throwable $debugFlowException) {
+            $debugFlowFailed = true;
+            $this->DebugFlowException(__FUNCTION__, __LINE__, $debugFlowException);
+            throw $debugFlowException;
+        } finally {
+            $this->DebugFlowEnd(__FUNCTION__, __LINE__, $debugFlowResult, $debugFlowFailed, false);
         }
     }
 
@@ -753,36 +966,47 @@ class Calendar extends IPSModuleStrict
      */
     public function BeginEventsTransfer(int $StartTimestamp, int $EndTimestamp): string
     {
-        if ($StartTimestamp <= 0 || $EndTimestamp <= $StartTimestamp) {
-            throw new InvalidArgumentException('The requested event time range is invalid.');
-        }
-        if (($EndTimestamp - $StartTimestamp) > 6 * 366 * 86400) {
-            throw new InvalidArgumentException('The requested event time range is too large.');
-        }
-
-        $events = array_values(array_filter(
-            array_merge(
-                $this->readEvents(),
-                MicrosoftTodoTaskProjection::project($this->readMicrosoftTasks())
-            ),
-            static function (array $event) use ($StartTimestamp, $EndTimestamp): bool
-            {
-                $startTimestamp = (int) ($event['startTimestamp'] ?? 0);
-                $endTimestamp = (int) ($event['endTimestamp'] ?? $startTimestamp);
-
-                return $startTimestamp > 0
-                    && $endTimestamp >= $StartTimestamp
-                    && $startTimestamp < $EndTimestamp;
+        $debugFlowResult = null;
+        $debugFlowFailed = false;
+        $this->DebugFlowStart(__FUNCTION__, __LINE__);
+        try {
+            if ($StartTimestamp <= 0 || $EndTimestamp <= $StartTimestamp) {
+                throw new InvalidArgumentException('The requested event time range is invalid.');
             }
-        ));
+            if (($EndTimestamp - $StartTimestamp) > 6 * 366 * 86400) {
+                throw new InvalidArgumentException('The requested event time range is too large.');
+            }
 
-        return json_encode(
-            $this->CreateChunkedJsonTransfer(self::EVENT_TRANSFER_SCOPE, $events),
-            JSON_UNESCAPED_SLASHES
-                | JSON_UNESCAPED_UNICODE
-                | JSON_PRESERVE_ZERO_FRACTION
-                | JSON_THROW_ON_ERROR
-        );
+            $events = array_values(array_filter(
+                array_merge(
+                    $this->readEvents(),
+                    MicrosoftTodoTaskProjection::project($this->readMicrosoftTasks())
+                ),
+                static function (array $event) use ($StartTimestamp, $EndTimestamp): bool
+                {
+                    $startTimestamp = (int) ($event['startTimestamp'] ?? 0);
+                    $endTimestamp = (int) ($event['endTimestamp'] ?? $startTimestamp);
+
+                    return $startTimestamp > 0
+                        && $endTimestamp >= $StartTimestamp
+                        && $startTimestamp < $EndTimestamp;
+                }
+            ));
+
+            return $debugFlowResult = json_encode(
+                $this->CreateChunkedJsonTransfer(self::EVENT_TRANSFER_SCOPE, $events),
+                JSON_UNESCAPED_SLASHES
+                    | JSON_UNESCAPED_UNICODE
+                    | JSON_PRESERVE_ZERO_FRACTION
+                    | JSON_THROW_ON_ERROR
+            );
+        } catch (\Throwable $debugFlowException) {
+            $debugFlowFailed = true;
+            $this->DebugFlowException(__FUNCTION__, __LINE__, $debugFlowException);
+            throw $debugFlowException;
+        } finally {
+            $this->DebugFlowEnd(__FUNCTION__, __LINE__, $debugFlowResult, $debugFlowFailed, false);
+        }
     }
 
     /**
@@ -794,13 +1018,24 @@ class Calendar extends IPSModuleStrict
      */
     public function ReadEventsTransferPage(string $Token, int $Page): string
     {
-        return json_encode(
-            $this->ReadChunkedJsonTransferPage(self::EVENT_TRANSFER_SCOPE, $Token, $Page),
-            JSON_UNESCAPED_SLASHES
-                | JSON_UNESCAPED_UNICODE
-                | JSON_PRESERVE_ZERO_FRACTION
-                | JSON_THROW_ON_ERROR
-        );
+        $debugFlowResult = null;
+        $debugFlowFailed = false;
+        $this->DebugFlowStart(__FUNCTION__, __LINE__);
+        try {
+            return $debugFlowResult = json_encode(
+                $this->ReadChunkedJsonTransferPage(self::EVENT_TRANSFER_SCOPE, $Token, $Page),
+                JSON_UNESCAPED_SLASHES
+                    | JSON_UNESCAPED_UNICODE
+                    | JSON_PRESERVE_ZERO_FRACTION
+                    | JSON_THROW_ON_ERROR
+            );
+        } catch (\Throwable $debugFlowException) {
+            $debugFlowFailed = true;
+            $this->DebugFlowException(__FUNCTION__, __LINE__, $debugFlowException);
+            throw $debugFlowException;
+        } finally {
+            $this->DebugFlowEnd(__FUNCTION__, __LINE__, $debugFlowResult, $debugFlowFailed, false);
+        }
     }
 
     /**
@@ -811,7 +1046,18 @@ class Calendar extends IPSModuleStrict
      */
     public function FinishEventsTransfer(string $Token): bool
     {
-        return $this->ClearChunkedJsonTransfer(self::EVENT_TRANSFER_SCOPE, $Token);
+        $debugFlowResult = null;
+        $debugFlowFailed = false;
+        $this->DebugFlowStart(__FUNCTION__, __LINE__);
+        try {
+            return $debugFlowResult = $this->ClearChunkedJsonTransfer(self::EVENT_TRANSFER_SCOPE, $Token);
+        } catch (\Throwable $debugFlowException) {
+            $debugFlowFailed = true;
+            $this->DebugFlowException(__FUNCTION__, __LINE__, $debugFlowException);
+            throw $debugFlowException;
+        } finally {
+            $this->DebugFlowEnd(__FUNCTION__, __LINE__, $debugFlowResult, $debugFlowFailed, false);
+        }
     }
 
     /**
@@ -823,88 +1069,99 @@ class Calendar extends IPSModuleStrict
      */
     public function CreateEvent(string $EventJSON): string
     {
-        $writeConfirmed = false;
-        $created = [];
+        $debugFlowResult = null;
+        $debugFlowFailed = false;
+        $this->DebugFlowStart(__FUNCTION__, __LINE__);
         try {
-            $event = $this->decodeObject($EventJSON, 'event');
-            if ($this->mustCreateMicrosoftTodoTask($event)) {
-                $created = $this->createMicrosoftTodoTask($event);
-                $writeConfirmed = true;
-                $this->storeMicrosoftTaskAfterWrite($created);
-                $projected = MicrosoftTodoTaskProjection::project([$created]);
-                if ($projected === []) {
-                    throw new UnexpectedValueException('The calendar account returned invalid Microsoft task data.');
-                }
-
-                return $this->encodeResult(true, $projected[0]);
-            }
-            $anniversary = $this->anniversaryInput($event);
-            if ($anniversary !== null && $anniversary['enabled']) {
-                $recurrenceInput = $event['recurrence'] ?? null;
-                if (!is_array($recurrenceInput) || $recurrenceInput === []) {
-                    $this->applyAnniversaryEventDefaults($event, $anniversary['date']);
-                } else {
-                    $this->assertAnniversaryRecurrence($event);
-                }
-            }
-            $event = CalendarTaskEvent::prepareWrite($event);
-            $recurrence = $event['recurrence'] ?? null;
-            if ($recurrence !== null && $recurrence !== []) {
-                if (!is_array($recurrence) || array_is_list($recurrence)) {
-                    throw new InvalidArgumentException('The recurrence settings are invalid.');
-                }
-                if (!$this->ReadAttributeBoolean('CalendarMetadataAvailable')
-                    || !$this->ReadAttributeBoolean('DetectedCanCreateRecurrence')) {
-                    $this->refreshCalendarMetadataSafely();
-                }
-                if (!$this->ReadAttributeBoolean('DetectedCanCreateRecurrence')) {
-                    throw new InvalidArgumentException('Recurring event creation is not supported by this calendar.');
-                }
-                if (trim((string) ($event['timezone'] ?? '')) === '') {
-                    $timezone = trim($this->ReadAttributeString('DetectedCalendarTimezone'));
-                    if ($timezone === '') {
-                        $timezone = date_default_timezone_get();
+            $writeConfirmed = false;
+            $created = [];
+            try {
+                $event = $this->decodeObject($EventJSON, 'event');
+                if ($this->mustCreateMicrosoftTodoTask($event)) {
+                    $created = $this->createMicrosoftTodoTask($event);
+                    $writeConfirmed = true;
+                    $this->storeMicrosoftTaskAfterWrite($created);
+                    $projected = MicrosoftTodoTaskProjection::project([$created]);
+                    if ($projected === []) {
+                        throw new UnexpectedValueException('The calendar account returned invalid Microsoft task data.');
                     }
-                    $event['timezone'] = $timezone;
-                }
-            }
-            $providerEvent = $event;
-            unset(
-                $providerEvent['anniversaryType'],
-                $providerEvent['anniversaryDate'],
-                $providerEvent['birthday'],
-                $providerEvent['birthDate']
-            );
-            $this->SendSafeDebug('EventCreate', [
-                'allDay'      => (bool) ($event['allDay'] ?? false),
-                'recurring'   => is_array($recurrence) && $recurrence !== [],
-                'frequency'   => is_array($recurrence)
-                    ? strtoupper(trim((string) ($recurrence['frequency'] ?? '')))
-                    : '',
-                'timezone'    => trim((string) ($event['timezone'] ?? '')),
-                'annualEvent' => $anniversary !== null && $anniversary['enabled']
-            ]);
-            $created = $this->sendRequest('CreateEvent', ['Event' => $providerEvent]);
-            $writeConfirmed = true;
-            if ($anniversary !== null && $anniversary['enabled']) {
-                $this->upsertAnniversaryMetadata(
-                    array_merge($event, is_array($created) ? $created : []),
-                    $anniversary['type'],
-                    $anniversary['date'],
-                    trim((string) ($event['summary'] ?? ''))
-                );
-            }
-            $simpleSingleWrite = ($recurrence === null || $recurrence === [])
-                && ($anniversary === null || !$anniversary['enabled']);
-            if (!$simpleSingleWrite
-                || !$this->refreshSingleEventAfterWrite(array_merge($event, $created))) {
-                $this->refreshAfterWrite();
-            }
 
-            return $this->encodeResult(true, $created);
-        } catch (Throwable $exception) {
-            $error = $this->handleError($exception);
-            return $this->encodeResult($writeConfirmed, $writeConfirmed ? $created : null, $error);
+                    return $debugFlowResult = $this->encodeResult(true, $projected[0]);
+                }
+                $anniversary = $this->anniversaryInput($event);
+                if ($anniversary !== null && $anniversary['enabled']) {
+                    $recurrenceInput = $event['recurrence'] ?? null;
+                    if (!is_array($recurrenceInput) || $recurrenceInput === []) {
+                        $this->applyAnniversaryEventDefaults($event, $anniversary['date']);
+                    } else {
+                        $this->assertAnniversaryRecurrence($event);
+                    }
+                }
+                $event = CalendarTaskEvent::prepareWrite($event);
+                $recurrence = $event['recurrence'] ?? null;
+                if ($recurrence !== null && $recurrence !== []) {
+                    if (!is_array($recurrence) || array_is_list($recurrence)) {
+                        throw new InvalidArgumentException('The recurrence settings are invalid.');
+                    }
+                    if (!$this->ReadAttributeBoolean('CalendarMetadataAvailable')
+                        || !$this->ReadAttributeBoolean('DetectedCanCreateRecurrence')) {
+                        $this->refreshCalendarMetadataSafely();
+                    }
+                    if (!$this->ReadAttributeBoolean('DetectedCanCreateRecurrence')) {
+                        throw new InvalidArgumentException('Recurring event creation is not supported by this calendar.');
+                    }
+                    if (trim((string) ($event['timezone'] ?? '')) === '') {
+                        $timezone = trim($this->ReadAttributeString('DetectedCalendarTimezone'));
+                        if ($timezone === '') {
+                            $timezone = date_default_timezone_get();
+                        }
+                        $event['timezone'] = $timezone;
+                    }
+                }
+                $providerEvent = $event;
+                unset(
+                    $providerEvent['anniversaryType'],
+                    $providerEvent['anniversaryDate'],
+                    $providerEvent['birthday'],
+                    $providerEvent['birthDate']
+                );
+                $this->DebugFlowEvent(__FUNCTION__, __LINE__, 'AKTION', 'Termin zum Anlegen vorbereitet; Schnittstellenbestätigung folgt.', [
+                    'Ganztägig'      => (bool) ($event['allDay'] ?? false),
+                    'Serientermin'   => is_array($recurrence) && $recurrence !== [],
+                    'Wiederholung'   => is_array($recurrence)
+                        ? strtoupper(trim((string) ($recurrence['frequency'] ?? '')))
+                        : '',
+                    'Zeitzone'    => trim((string) ($event['timezone'] ?? '')),
+                    'Jahrestag'   => $anniversary !== null && $anniversary['enabled']
+                ]);
+                $created = $this->sendRequest('CreateEvent', ['Event' => $providerEvent]);
+                $writeConfirmed = true;
+                if ($anniversary !== null && $anniversary['enabled']) {
+                    $this->upsertAnniversaryMetadata(
+                        array_merge($event, is_array($created) ? $created : []),
+                        $anniversary['type'],
+                        $anniversary['date'],
+                        trim((string) ($event['summary'] ?? ''))
+                    );
+                }
+                $simpleSingleWrite = ($recurrence === null || $recurrence === [])
+                    && ($anniversary === null || !$anniversary['enabled']);
+                if (!$simpleSingleWrite
+                    || !$this->refreshSingleEventAfterWrite(array_merge($event, $created))) {
+                    $this->refreshAfterWrite();
+                }
+
+                return $debugFlowResult = $this->encodeResult(true, $created);
+            } catch (Throwable $exception) {
+                $error = $this->handleError($exception);
+                return $debugFlowResult = $this->encodeResult($writeConfirmed, $writeConfirmed ? $created : null, $error);
+            }
+        } catch (\Throwable $debugFlowException) {
+            $debugFlowFailed = true;
+            $this->DebugFlowException(__FUNCTION__, __LINE__, $debugFlowException);
+            throw $debugFlowException;
+        } finally {
+            $this->DebugFlowEnd(__FUNCTION__, __LINE__, $debugFlowResult, $debugFlowFailed, false);
         }
     }
 
@@ -917,200 +1174,211 @@ class Calendar extends IPSModuleStrict
      */
     public function UpdateEvent(string $EventJSON): string
     {
-        $writeConfirmed = false;
-        $updated = [];
+        $debugFlowResult = null;
+        $debugFlowFailed = false;
+        $this->DebugFlowStart(__FUNCTION__, __LINE__);
         try {
-            $event = $this->decodeObject($EventJSON, 'event');
-            $changes = $event['changes'] ?? $event;
-            if (!is_array($changes)) {
-                throw new InvalidArgumentException('The event changes are invalid.');
-            }
-            if ($this->isMicrosoftTodoEvent($event)) {
-                $updated = $this->updateMicrosoftTodoEvent($event, $changes);
-                $writeConfirmed = true;
-                $this->storeMicrosoftTaskAfterWrite($updated);
-                return $this->encodeResult(true, MicrosoftTodoTaskProjection::project([$updated])[0] ?? $updated);
-            }
-            $recurrence = $this->resolveWriteRecurrence($event, true);
-            $anniversary = $this->anniversaryInput($changes);
-            $existingAnniversary = $this->anniversaryMetadataForEvent($event);
-            $writeScope = (string) ($recurrence['writeScope'] ?? '');
-            if ($anniversary !== null && $anniversary['enabled']) {
-                if (in_array(
-                    $writeScope,
-                    [CalendarEventRecurrence::WRITE_SCOPE_OCCURRENCE, CalendarEventRecurrence::WRITE_SCOPE_FOLLOWING],
-                    true
-                )) {
-                    throw new InvalidArgumentException('Annual-event settings can only be changed for a complete recurring series.');
+            $writeConfirmed = false;
+            $updated = [];
+            try {
+                $event = $this->decodeObject($EventJSON, 'event');
+                $changes = $event['changes'] ?? $event;
+                if (!is_array($changes)) {
+                    throw new InvalidArgumentException('The event changes are invalid.');
                 }
-                $this->applyAnniversaryEventDefaults($changes, $anniversary['date']);
-            }
-            $taskSource = $event;
-            if (array_key_exists('task', $changes)
-                || array_key_exists('taskCompleted', $changes)
-                || array_key_exists('taskStatus', $changes)
-                || array_key_exists('taskFollowPlanned', $changes)
-                || array_key_exists('taskRollForwardScope', $changes)) {
-                $cachedEvent = $this->cachedEventForIdentity($event);
-                if ($cachedEvent !== null) {
-                    $taskSource = array_merge($cachedEvent, $event);
+                if ($this->isMicrosoftTodoEvent($event)) {
+                    $updated = $this->updateMicrosoftTodoEvent($event, $changes);
+                    $writeConfirmed = true;
+                    $this->storeMicrosoftTaskAfterWrite($updated);
+                    return $debugFlowResult = $this->encodeResult(true, MicrosoftTodoTaskProjection::project([$updated])[0] ?? $updated);
                 }
-            }
-            $changes = CalendarTaskEvent::prepareWrite($changes, $taskSource);
-            $taskAfterWrite = CalendarTaskEvent::enrich(array_merge($taskSource, $changes));
-            if (CalendarEventRecurrence::isOccurrence($recurrence)
-                && $writeScope === CalendarEventRecurrence::WRITE_SCOPE_OCCURRENCE
-                && (bool) ($taskAfterWrite['taskFollowPlanned'] ?? false)
-                && array_key_exists('start', $changes)) {
-                if (!(bool) ($recurrence['canUpdateFollowing'] ?? false)) {
-                    throw new InvalidArgumentException('This and following updates are not supported by this calendar.');
-                }
-                $followingChanges = $changes;
-                $following = $this->prepareTaskFollowingMove(array_merge($taskSource, $recurrence), $followingChanges);
-                $followingTask = CalendarTaskEvent::enrich($following);
-                if ((bool) ($taskAfterWrite['task'] ?? false)
-                    && (bool) ($followingTask['task'] ?? false)
-                    && (bool) ($taskAfterWrite['taskCompleted'] ?? false) !== (bool) ($followingTask['taskCompleted'] ?? false)) {
-                    // A completed first occurrence is a detached task-state override.
-                    // Reanchoring the series must not turn every following task into a
-                    // completed task when that override is removed with the former start.
-                    $followingChanges['task'] = true;
-                    $followingChanges['taskCompleted'] = (bool) $followingTask['taskCompleted'];
-                    $followingChanges['taskStatus'] = (bool) $followingTask['taskCompleted'] ? 'completed' : 'open';
-                    $followingChanges['taskFollowPlanned'] = (bool) ($followingTask['taskFollowPlanned'] ?? false);
-                    $followingChanges['taskRollForwardScope'] = (string) (
-                        $followingTask['taskRollForwardScope'] ?? CalendarTaskEvent::ROLL_FORWARD_SCOPE_OCCURRENCE
-                    );
-                    $followingChanges = CalendarTaskEvent::prepareWrite($followingChanges, $following);
-                }
-                $providerStart = $this->taskEventDate($following, 'start');
-                if ($providerStart === null) {
-                    throw new InvalidArgumentException('The task series contains an invalid occurrence date.');
-                }
-                if ($this->taskEventDate($changes, 'start') != $providerStart) {
-                    $event = $following;
-                    $changes = $followingChanges;
-                    $recurrence = CalendarEventRecurrence::fromEvent($event);
-                    $writeScope = (string) $recurrence['writeScope'];
-                }
-            }
-            $requestedRecurrence = $changes['recurrence'] ?? null;
-            $recurrenceType = (string) ($recurrence['recurrenceType'] ?? CalendarEventRecurrence::SINGLE);
-            $convertingSingleToSeries = $recurrenceType === CalendarEventRecurrence::SINGLE
-                && is_array($requestedRecurrence)
-                && $requestedRecurrence !== [];
-            if ($convertingSingleToSeries) {
-                if (!$this->ReadAttributeBoolean('CalendarMetadataAvailable')
-                    || !$this->ReadAttributeBoolean('DetectedCanUpdateRecurrence')) {
-                    $this->refreshCalendarMetadataSafely();
-                }
-                if (!$this->ReadAttributeBoolean('DetectedCanUpdateRecurrence')) {
-                    throw new InvalidArgumentException(
-                        'Converting this event into a recurring series is not supported by this calendar.'
-                    );
-                }
-                if (trim((string) ($changes['timezone'] ?? '')) === '') {
-                    $timezone = trim($this->ReadAttributeString('DetectedCalendarTimezone'));
-                    if ($timezone === '') {
-                        $timezone = date_default_timezone_get();
+                $recurrence = $this->resolveWriteRecurrence($event, true);
+                $anniversary = $this->anniversaryInput($changes);
+                $existingAnniversary = $this->anniversaryMetadataForEvent($event);
+                $writeScope = (string) ($recurrence['writeScope'] ?? '');
+                if ($anniversary !== null && $anniversary['enabled']) {
+                    if (in_array(
+                        $writeScope,
+                        [CalendarEventRecurrence::WRITE_SCOPE_OCCURRENCE, CalendarEventRecurrence::WRITE_SCOPE_FOLLOWING],
+                        true
+                    )) {
+                        throw new InvalidArgumentException('Annual-event settings can only be changed for a complete recurring series.');
                     }
-                    $changes['timezone'] = $timezone;
+                    $this->applyAnniversaryEventDefaults($changes, $anniversary['date']);
                 }
-            }
-            foreach ([
-                'uid',
-                'resourceUrl',
-                'etag',
-                'recurrenceType',
-                'seriesId',
-                'occurrenceId',
-                'originalStart',
-                'recurrenceId',
-                'recurring',
-                'canUpdateOccurrence',
-                'canDeleteOccurrence',
-                'canUpdateFollowing',
-                'canUpdateSeries',
-                'canDeleteSeries',
-                'writeScope',
-                'changes'
-            ] as $metadataKey) {
-                unset($changes[$metadataKey]);
-            }
-            $anniversaryEnabled = $anniversary !== null && $anniversary['enabled'];
-            $anniversaryDisabled = $anniversary !== null && !$anniversary['enabled'];
-            $anniversaryType = $anniversaryEnabled
-                ? $anniversary['type']
-                : (string) ($existingAnniversary['type'] ?? '');
-            $anniversaryDate = $anniversaryEnabled
-                ? $anniversary['date']
-                : (string) ($existingAnniversary['date'] ?? '');
-            unset($changes['anniversaryType'], $changes['anniversaryDate'], $changes['birthday'], $changes['birthDate']);
-            if ($changes === [] && !$anniversaryDisabled) {
-                throw new InvalidArgumentException('No event changes were supplied.');
-            }
-            $simpleSingleWrite = $recurrenceType === CalendarEventRecurrence::SINGLE
-                && !$convertingSingleToSeries
-                && $anniversary === null
-                && $existingAnniversary === null;
-            $microsoftOccurrenceWrite = $writeScope === CalendarEventRecurrence::WRITE_SCOPE_OCCURRENCE
-                && $this->isMicrosoftCalendarOccurrence($event);
-            $directEventWrite = $simpleSingleWrite || $microsoftOccurrenceWrite;
-            $cachedEvent = $directEventWrite ? $this->cachedEventForIdentity($event) : null;
-
-            $this->SendSafeDebug('EventUpdate', [
-                'recurrenceType'     => $recurrenceType,
-                'writeScope'         => $writeScope,
-                'convertingToSeries' => $convertingSingleToSeries,
-                'changedFields'      => array_values(array_keys($changes)),
-                'annualEventChange'  => $anniversary !== null
-            ]);
-
-            $updated = $changes === []
-                ? []
-                : $this->sendRequest(
-                    'UpdateEvent',
-                    [
-                        'UID'         => trim((string) ($event['uid'] ?? '')),
-                        'ResourceURL' => trim((string) ($event['resourceUrl'] ?? '')),
-                        'ETag'        => trim((string) ($event['etag'] ?? '')),
-                        'Event'       => $changes,
-                        'Recurrence'  => $recurrence
-                    ]
-                );
-            $writeConfirmed = true;
-
-            if (array_key_exists('summary', $changes)) {
-                $task = CalendarTaskEvent::enrich($changes);
-                if (!(bool) ($task['task'] ?? false) || (bool) ($task['taskCompleted'] ?? false)) {
-                    $this->forgetPendingTask($event);
+                $taskSource = $event;
+                if (array_key_exists('task', $changes)
+                    || array_key_exists('taskCompleted', $changes)
+                    || array_key_exists('taskStatus', $changes)
+                    || array_key_exists('taskFollowPlanned', $changes)
+                    || array_key_exists('taskRollForwardScope', $changes)) {
+                    $cachedEvent = $this->cachedEventForIdentity($event);
+                    if ($cachedEvent !== null) {
+                        $taskSource = array_merge($cachedEvent, $event);
+                    }
                 }
-            }
-            if ($anniversaryDisabled) {
-                $this->removeAnniversaryMetadata($event);
-            } elseif ($anniversaryEnabled || $existingAnniversary !== null) {
-                $summary = trim((string) ($changes['summary'] ?? $existingAnniversary['summary'] ?? $event['summary'] ?? ''));
-                $this->upsertAnniversaryMetadata(
-                    array_merge($event, is_array($updated) ? $updated : []),
-                    $anniversaryType,
-                    $anniversaryDate,
-                    $summary,
-                    $event
-                );
-            }
-            if (!$directEventWrite
-                || $cachedEvent === null
-                || !$this->refreshSingleEventAfterWrite(
-                    array_merge($cachedEvent, $changes, $updated),
-                    $event
-                )) {
-                $this->refreshAfterWrite();
-            }
+                $changes = CalendarTaskEvent::prepareWrite($changes, $taskSource);
+                $taskAfterWrite = CalendarTaskEvent::enrich(array_merge($taskSource, $changes));
+                if (CalendarEventRecurrence::isOccurrence($recurrence)
+                    && $writeScope === CalendarEventRecurrence::WRITE_SCOPE_OCCURRENCE
+                    && (bool) ($taskAfterWrite['taskFollowPlanned'] ?? false)
+                    && array_key_exists('start', $changes)) {
+                    if (!(bool) ($recurrence['canUpdateFollowing'] ?? false)) {
+                        throw new InvalidArgumentException('This and following updates are not supported by this calendar.');
+                    }
+                    $followingChanges = $changes;
+                    $following = $this->prepareTaskFollowingMove(array_merge($taskSource, $recurrence), $followingChanges);
+                    $followingTask = CalendarTaskEvent::enrich($following);
+                    if ((bool) ($taskAfterWrite['task'] ?? false)
+                        && (bool) ($followingTask['task'] ?? false)
+                        && (bool) ($taskAfterWrite['taskCompleted'] ?? false) !== (bool) ($followingTask['taskCompleted'] ?? false)) {
+                        // A completed first occurrence is a detached task-state override.
+                        // Reanchoring the series must not turn every following task into a
+                        // completed task when that override is removed with the former start.
+                        $followingChanges['task'] = true;
+                        $followingChanges['taskCompleted'] = (bool) $followingTask['taskCompleted'];
+                        $followingChanges['taskStatus'] = (bool) $followingTask['taskCompleted'] ? 'completed' : 'open';
+                        $followingChanges['taskFollowPlanned'] = (bool) ($followingTask['taskFollowPlanned'] ?? false);
+                        $followingChanges['taskRollForwardScope'] = (string) (
+                            $followingTask['taskRollForwardScope'] ?? CalendarTaskEvent::ROLL_FORWARD_SCOPE_OCCURRENCE
+                        );
+                        $followingChanges = CalendarTaskEvent::prepareWrite($followingChanges, $following);
+                    }
+                    $providerStart = $this->taskEventDate($following, 'start');
+                    if ($providerStart === null) {
+                        throw new InvalidArgumentException('The task series contains an invalid occurrence date.');
+                    }
+                    if ($this->taskEventDate($changes, 'start') != $providerStart) {
+                        $event = $following;
+                        $changes = $followingChanges;
+                        $recurrence = CalendarEventRecurrence::fromEvent($event);
+                        $writeScope = (string) $recurrence['writeScope'];
+                    }
+                }
+                $requestedRecurrence = $changes['recurrence'] ?? null;
+                $recurrenceType = (string) ($recurrence['recurrenceType'] ?? CalendarEventRecurrence::SINGLE);
+                $convertingSingleToSeries = $recurrenceType === CalendarEventRecurrence::SINGLE
+                    && is_array($requestedRecurrence)
+                    && $requestedRecurrence !== [];
+                if ($convertingSingleToSeries) {
+                    if (!$this->ReadAttributeBoolean('CalendarMetadataAvailable')
+                        || !$this->ReadAttributeBoolean('DetectedCanUpdateRecurrence')) {
+                        $this->refreshCalendarMetadataSafely();
+                    }
+                    if (!$this->ReadAttributeBoolean('DetectedCanUpdateRecurrence')) {
+                        throw new InvalidArgumentException(
+                            'Converting this event into a recurring series is not supported by this calendar.'
+                        );
+                    }
+                    if (trim((string) ($changes['timezone'] ?? '')) === '') {
+                        $timezone = trim($this->ReadAttributeString('DetectedCalendarTimezone'));
+                        if ($timezone === '') {
+                            $timezone = date_default_timezone_get();
+                        }
+                        $changes['timezone'] = $timezone;
+                    }
+                }
+                foreach ([
+                    'uid',
+                    'resourceUrl',
+                    'etag',
+                    'recurrenceType',
+                    'seriesId',
+                    'occurrenceId',
+                    'originalStart',
+                    'recurrenceId',
+                    'recurring',
+                    'canUpdateOccurrence',
+                    'canDeleteOccurrence',
+                    'canUpdateFollowing',
+                    'canUpdateSeries',
+                    'canDeleteSeries',
+                    'writeScope',
+                    'changes'
+                ] as $metadataKey) {
+                    unset($changes[$metadataKey]);
+                }
+                $anniversaryEnabled = $anniversary !== null && $anniversary['enabled'];
+                $anniversaryDisabled = $anniversary !== null && !$anniversary['enabled'];
+                $anniversaryType = $anniversaryEnabled
+                    ? $anniversary['type']
+                    : (string) ($existingAnniversary['type'] ?? '');
+                $anniversaryDate = $anniversaryEnabled
+                    ? $anniversary['date']
+                    : (string) ($existingAnniversary['date'] ?? '');
+                unset($changes['anniversaryType'], $changes['anniversaryDate'], $changes['birthday'], $changes['birthDate']);
+                if ($changes === [] && !$anniversaryDisabled) {
+                    throw new InvalidArgumentException('No event changes were supplied.');
+                }
+                $simpleSingleWrite = $recurrenceType === CalendarEventRecurrence::SINGLE
+                    && !$convertingSingleToSeries
+                    && $anniversary === null
+                    && $existingAnniversary === null;
+                $microsoftOccurrenceWrite = $writeScope === CalendarEventRecurrence::WRITE_SCOPE_OCCURRENCE
+                    && $this->isMicrosoftCalendarOccurrence($event);
+                $directEventWrite = $simpleSingleWrite || $microsoftOccurrenceWrite;
+                $cachedEvent = $directEventWrite ? $this->cachedEventForIdentity($event) : null;
 
-            return $this->encodeResult(true, $updated);
-        } catch (Throwable $exception) {
-            $error = $this->handleError($exception);
-            return $this->encodeResult($writeConfirmed, $writeConfirmed ? $updated : null, $error);
+                $this->DebugFlowEvent(__FUNCTION__, __LINE__, 'AKTION', 'Terminänderung vorbereitet; Schnittstellenbestätigung folgt.', [
+                    'Serientyp'              => $recurrenceType,
+                    'Schreibbereich'         => $writeScope,
+                    'UmwandlungInSerie'      => $convertingSingleToSeries,
+                    'GeänderteFelder'        => array_values(array_keys($changes)),
+                    'JahrestagGeändert'      => $anniversary !== null
+                ]);
+
+                $updated = $changes === []
+                    ? []
+                    : $this->sendRequest(
+                        'UpdateEvent',
+                        [
+                            'UID'         => trim((string) ($event['uid'] ?? '')),
+                            'ResourceURL' => trim((string) ($event['resourceUrl'] ?? '')),
+                            'ETag'        => trim((string) ($event['etag'] ?? '')),
+                            'Event'       => $changes,
+                            'Recurrence'  => $recurrence
+                        ]
+                    );
+                $writeConfirmed = true;
+
+                if (array_key_exists('summary', $changes)) {
+                    $task = CalendarTaskEvent::enrich($changes);
+                    if (!(bool) ($task['task'] ?? false) || (bool) ($task['taskCompleted'] ?? false)) {
+                        $this->forgetPendingTask($event);
+                    }
+                }
+                if ($anniversaryDisabled) {
+                    $this->removeAnniversaryMetadata($event);
+                } elseif ($anniversaryEnabled || $existingAnniversary !== null) {
+                    $summary = trim((string) ($changes['summary'] ?? $existingAnniversary['summary'] ?? $event['summary'] ?? ''));
+                    $this->upsertAnniversaryMetadata(
+                        array_merge($event, is_array($updated) ? $updated : []),
+                        $anniversaryType,
+                        $anniversaryDate,
+                        $summary,
+                        $event
+                    );
+                }
+                if (!$directEventWrite
+                    || $cachedEvent === null
+                    || !$this->refreshSingleEventAfterWrite(
+                        array_merge($cachedEvent, $changes, $updated),
+                        $event
+                    )) {
+                    $this->refreshAfterWrite();
+                }
+
+                return $debugFlowResult = $this->encodeResult(true, $updated);
+            } catch (Throwable $exception) {
+                $error = $this->handleError($exception);
+                return $debugFlowResult = $this->encodeResult($writeConfirmed, $writeConfirmed ? $updated : null, $error);
+            }
+        } catch (\Throwable $debugFlowException) {
+            $debugFlowFailed = true;
+            $this->DebugFlowException(__FUNCTION__, __LINE__, $debugFlowException);
+            throw $debugFlowException;
+        } finally {
+            $this->DebugFlowEnd(__FUNCTION__, __LINE__, $debugFlowResult, $debugFlowFailed, false);
         }
     }
 
@@ -1122,60 +1390,71 @@ class Calendar extends IPSModuleStrict
      */
     public function DeleteEvent(string $EventJSON): bool
     {
-        $writeConfirmed = false;
+        $debugFlowResult = null;
+        $debugFlowFailed = false;
+        $this->DebugFlowStart(__FUNCTION__, __LINE__);
         try {
-            $event = $this->decodeObject($EventJSON, 'event');
-            if ($this->isMicrosoftTodoEvent($event)) {
-                [$listId, $taskId] = $this->microsoftTodoIdentity($event);
-                $result = $this->sendRequest('DeleteTask', [
-                    'TaskListID' => $listId,
-                    'TaskID'     => $taskId
-                ]);
-                if (!(bool) ($result['success'] ?? false)) {
-                    throw new RuntimeException('The calendar account did not confirm the Microsoft task deletion.');
+            $writeConfirmed = false;
+            try {
+                $event = $this->decodeObject($EventJSON, 'event');
+                if ($this->isMicrosoftTodoEvent($event)) {
+                    [$listId, $taskId] = $this->microsoftTodoIdentity($event);
+                    $result = $this->sendRequest('DeleteTask', [
+                        'TaskListID' => $listId,
+                        'TaskID'     => $taskId
+                    ]);
+                    if (!(bool) ($result['success'] ?? false)) {
+                        throw new RuntimeException('The calendar account did not confirm the Microsoft task deletion.');
+                    }
+                    $writeConfirmed = true;
+                    $this->removeMicrosoftTaskFromCache($listId, $taskId);
+                    return $debugFlowResult = true;
                 }
+                $recurrence = $this->resolveWriteRecurrence($event, false);
+                $writeScope = (string) ($recurrence['writeScope'] ?? '');
+                $recurrenceType = (string) ($recurrence['recurrenceType'] ?? CalendarEventRecurrence::SINGLE);
+                $this->DebugFlowEvent(__FUNCTION__, __LINE__, 'AKTION', 'Terminlöschung angefordert; Schnittstellenbestätigung folgt.', [
+                    'Serientyp'          => $recurrenceType,
+                    'Schreibbereich'     => $writeScope
+                ]);
+                $result = $this->sendRequest(
+                    'DeleteEvent',
+                    [
+                        'ResourceURL'  => trim((string) ($event['resourceUrl'] ?? '')),
+                        'ETag'         => trim((string) ($event['etag'] ?? '')),
+                        'RecurrenceID' => trim((string) ($recurrence['recurrenceId'] ?? '')),
+                        'Recurrence'   => $recurrence
+                    ]
+                );
+                if (!(bool) ($result['success'] ?? false)) {
+                    throw new RuntimeException('The calendar account did not confirm the deletion.');
+                }
+                // A later cache failure must never make a caller undo a confirmed move.
                 $writeConfirmed = true;
-                $this->removeMicrosoftTaskFromCache($listId, $taskId);
-                return true;
+                $this->forgetPendingTask($event);
+                if (!CalendarEventRecurrence::isOccurrence($recurrence)
+                    || in_array(
+                        $writeScope,
+                        [CalendarEventRecurrence::WRITE_SCOPE_FOLLOWING, CalendarEventRecurrence::WRITE_SCOPE_SERIES],
+                        true
+                    )) {
+                    $this->removeAnniversaryMetadata($event);
+                }
+                if ($recurrenceType !== CalendarEventRecurrence::SINGLE
+                    || !$this->removeSingleEventFromCache($event)) {
+                    $this->refreshAfterWrite();
+                }
+                return $debugFlowResult = true;
+            } catch (Throwable $exception) {
+                $this->handleError($exception);
+                return $debugFlowResult = $writeConfirmed;
             }
-            $recurrence = $this->resolveWriteRecurrence($event, false);
-            $writeScope = (string) ($recurrence['writeScope'] ?? '');
-            $recurrenceType = (string) ($recurrence['recurrenceType'] ?? CalendarEventRecurrence::SINGLE);
-            $this->SendSafeDebug('EventDelete', [
-                'recurrenceType' => $recurrenceType,
-                'writeScope'     => $writeScope
-            ]);
-            $result = $this->sendRequest(
-                'DeleteEvent',
-                [
-                    'ResourceURL'  => trim((string) ($event['resourceUrl'] ?? '')),
-                    'ETag'         => trim((string) ($event['etag'] ?? '')),
-                    'RecurrenceID' => trim((string) ($recurrence['recurrenceId'] ?? '')),
-                    'Recurrence'   => $recurrence
-                ]
-            );
-            if (!(bool) ($result['success'] ?? false)) {
-                throw new RuntimeException('The calendar account did not confirm the deletion.');
-            }
-            // A later cache failure must never make a caller undo a confirmed move.
-            $writeConfirmed = true;
-            $this->forgetPendingTask($event);
-            if (!CalendarEventRecurrence::isOccurrence($recurrence)
-                || in_array(
-                    $writeScope,
-                    [CalendarEventRecurrence::WRITE_SCOPE_FOLLOWING, CalendarEventRecurrence::WRITE_SCOPE_SERIES],
-                    true
-                )) {
-                $this->removeAnniversaryMetadata($event);
-            }
-            if ($recurrenceType !== CalendarEventRecurrence::SINGLE
-                || !$this->removeSingleEventFromCache($event)) {
-                $this->refreshAfterWrite();
-            }
-            return true;
-        } catch (Throwable $exception) {
-            $this->handleError($exception);
-            return $writeConfirmed;
+        } catch (\Throwable $debugFlowException) {
+            $debugFlowFailed = true;
+            $this->DebugFlowException(__FUNCTION__, __LINE__, $debugFlowException);
+            throw $debugFlowException;
+        } finally {
+            $this->DebugFlowEnd(__FUNCTION__, __LINE__, $debugFlowResult, $debugFlowFailed, false);
         }
     }
 
@@ -1184,13 +1463,24 @@ class Calendar extends IPSModuleStrict
      */
     public function ClearCache(): void
     {
-        $this->clearIncrementalSyncState();
-        $this->clearMicrosoftTaskSyncState();
-        $this->ClearPersistentJsonCache('CachedMicrosoftTasks');
-        $this->storeEvents([]);
-        $this->WriteAttributeInteger('LastSynchronization', 0);
-        $this->SetValue('LastSynchronization', 0);
-        $this->WriteAttributeString('LastError', '');
+        $debugFlowResult = null;
+        $debugFlowFailed = false;
+        $this->DebugFlowStart(__FUNCTION__, __LINE__);
+        try {
+            $this->clearIncrementalSyncState();
+            $this->clearMicrosoftTaskSyncState();
+            $this->ClearPersistentJsonCache('CachedMicrosoftTasks');
+            $this->storeEvents([]);
+            $this->WriteAttributeInteger('LastSynchronization', 0);
+            $this->DebugFlowWriteValue('LastSynchronization', 0, __FUNCTION__, __LINE__, false);
+            $this->WriteAttributeString('LastError', '');
+        } catch (\Throwable $debugFlowException) {
+            $debugFlowFailed = true;
+            $this->DebugFlowException(__FUNCTION__, __LINE__, $debugFlowException);
+            throw $debugFlowException;
+        } finally {
+            $this->DebugFlowEnd(__FUNCTION__, __LINE__, $debugFlowResult, $debugFlowFailed, true);
+        }
     }
 
     /**
@@ -1206,27 +1496,38 @@ class Calendar extends IPSModuleStrict
      */
     public function ExportLocalCalendar(string $fileName, bool $overwrite = false): string
     {
-        if (!$this->ReadPropertyBoolean('LocalCalendar')) {
-            throw new LogicException('Only local calendars can be exported.');
-        }
-        if (!$this->isValidLocalCalendarExportFileName($fileName)) {
-            throw new InvalidArgumentException('The ICS export file name is invalid.');
-        }
+        $debugFlowResult = null;
+        $debugFlowFailed = false;
+        $this->DebugFlowStart(__FUNCTION__, __LINE__);
+        try {
+            if (!$this->ReadPropertyBoolean('LocalCalendar')) {
+                throw new LogicException('Only local calendars can be exported.');
+            }
+            if (!$this->isValidLocalCalendarExportFileName($fileName)) {
+                throw new InvalidArgumentException('The ICS export file name is invalid.');
+            }
 
-        $directory = rtrim(IPS_GetKernelDir(), '/\\') . DIRECTORY_SEPARATOR . self::LOCAL_EXPORT_DIRECTORY;
-        if (!is_dir($directory) && !mkdir($directory, 0775, true) && !is_dir($directory)) {
-            throw new RuntimeException('The local calendar export directory could not be created.');
-        }
+            $directory = rtrim(IPS_GetKernelDir(), '/\\') . DIRECTORY_SEPARATOR . self::LOCAL_EXPORT_DIRECTORY;
+            if (!is_dir($directory) && !mkdir($directory, 0775, true) && !is_dir($directory)) {
+                throw new RuntimeException('The local calendar export directory could not be created.');
+            }
 
-        $path = $directory . DIRECTORY_SEPARATOR . $fileName;
-        if (file_exists($path) && !$overwrite) {
-            throw new RuntimeException('The ICS export file already exists.');
-        }
-        if (file_put_contents($path, $this->localCalendarExportContent(), LOCK_EX) === false) {
-            throw new RuntimeException('The local calendar could not be exported.');
-        }
+            $path = $directory . DIRECTORY_SEPARATOR . $fileName;
+            if (file_exists($path) && !$overwrite) {
+                throw new RuntimeException('The ICS export file already exists.');
+            }
+            if (file_put_contents($path, $this->localCalendarExportContent(), LOCK_EX) === false) {
+                throw new RuntimeException('The local calendar could not be exported.');
+            }
 
-        return $path;
+            return $debugFlowResult = $path;
+        } catch (\Throwable $debugFlowException) {
+            $debugFlowFailed = true;
+            $this->DebugFlowException(__FUNCTION__, __LINE__, $debugFlowException);
+            throw $debugFlowException;
+        } finally {
+            $this->DebugFlowEnd(__FUNCTION__, __LINE__, $debugFlowResult, $debugFlowFailed, false);
+        }
     }
 
     /**
@@ -1236,71 +1537,112 @@ class Calendar extends IPSModuleStrict
      */
     public function GetCalendarStatus(): string
     {
-        if ($this->isRuntimeReady()) {
-            $this->refreshCalendarMetadataSafely();
-        }
-        $metadataAvailable = $this->ReadAttributeBoolean('CalendarMetadataAvailable');
-        $writeAccessKnown = $metadataAvailable
-            && $this->ReadAttributeBoolean('DetectedWriteAccessKnown');
-        $detectedColor = $this->ReadAttributeString('DetectedCalendarColor');
-        $defaultReminder = json_decode($this->ReadAttributeString('DetectedDefaultReminder'), true);
-        if (!is_array($defaultReminder) || array_is_list($defaultReminder)) {
-            $defaultReminder = [];
-        }
-        $events = $this->readEvents();
+        $debugFlowResult = null;
+        $debugFlowFailed = false;
+        $this->DebugFlowStart(__FUNCTION__, __LINE__);
+        try {
+            if ($this->isRuntimeReady()) {
+                $this->refreshCalendarMetadataSafely();
+            }
+            $metadataAvailable = $this->ReadAttributeBoolean('CalendarMetadataAvailable');
+            $writeAccessKnown = $metadataAvailable
+                && $this->ReadAttributeBoolean('DetectedWriteAccessKnown');
+            $detectedColor = $this->ReadAttributeString('DetectedCalendarColor');
+            $defaultReminder = json_decode($this->ReadAttributeString('DetectedDefaultReminder'), true);
+            if (!is_array($defaultReminder) || array_is_list($defaultReminder)) {
+                $defaultReminder = [];
+            }
+            $events = $this->readEvents();
 
-        return json_encode(
-            [
-                'localCalendar'                => $this->ReadPropertyBoolean('LocalCalendar'),
-                'calendarId'                   => $this->effectiveCalendarId(),
-                'calendarColor'                => $metadataAvailable && $detectedColor !== ''
-                    ? $detectedColor
-                    : $this->ReadPropertyString('CalendarColor'),
-                'canWrite'                     => $metadataAvailable
-                    ? ($writeAccessKnown
-                        ? $this->ReadAttributeBoolean('DetectedCanWrite')
-                        : $this->ReadAttributeBoolean('DetectedCanWrite')
-                            || $this->ReadPropertyBoolean('CanWrite'))
-                    : $this->ReadPropertyBoolean('CanWrite'),
-                'timezone'                     => $metadataAvailable
-                    ? $this->ReadAttributeString('DetectedCalendarTimezone')
-                    : '',
-                'canCreateRecurrence'          => $metadataAvailable
-                    && $this->ReadAttributeBoolean('DetectedCanCreateRecurrence'),
-                'canUpdateRecurrence'          => $metadataAvailable
-                    && $this->ReadAttributeBoolean('DetectedCanUpdateRecurrence'),
-                'canUpdateOccurrence'          => $metadataAvailable
-                    && $this->ReadAttributeBoolean('DetectedCanUpdateOccurrence'),
-                'canDeleteOccurrence'          => $metadataAvailable
-                    && $this->ReadAttributeBoolean('DetectedCanDeleteOccurrence'),
-                'canUpdateFollowing'           => $metadataAvailable
-                    && $this->ReadAttributeBoolean('DetectedCanUpdateFollowing'),
-                'canUpdateSeries'              => $metadataAvailable
-                    && $this->ReadAttributeBoolean('DetectedCanUpdateSeries'),
-                'canDeleteSeries'              => $metadataAvailable
-                    && $this->ReadAttributeBoolean('DetectedCanDeleteSeries'),
-                'canUseDefaultReminder'        => $metadataAvailable
-                    && $this->ReadAttributeBoolean('DetectedCanUseDefaultReminder'),
-                'canCreateWithDefaultReminder' => $metadataAvailable
-                    && $this->ReadAttributeBoolean('DetectedCanCreateWithDefaultReminder'),
-                'defaultReminder'              => $metadataAvailable ? $defaultReminder : [],
-                'maxReminders'                 => $metadataAvailable
-                    ? max(1, min(5, $this->ReadAttributeInteger('DetectedMaxReminders')))
-                    : 1,
-                'eventCount'                   => count($events),
-                'microsoftTaskListId'          => trim($this->ReadPropertyString('MicrosoftTaskListID')),
-                'microsoftTaskCount'           => count($this->readMicrosoftTasks()),
-                'microsoftTaskLastError'       => $this->ReadAttributeString('MicrosoftTaskLastError'),
-                'todayEventCount'              => CalendarEventCounter::countForDay(
-                    $events,
-                    new DateTimeImmutable('today')
-                ),
-                'runtimeReady'                 => $this->isRuntimeReady(),
-                'lastSynchronization'          => $this->ReadAttributeInteger('LastSynchronization'),
-                'lastError'                    => $this->ReadAttributeString('LastError')
-            ],
-            JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR
-        );
+            return $debugFlowResult = json_encode(
+                [
+                    'localCalendar'                => $this->ReadPropertyBoolean('LocalCalendar'),
+                    'calendarId'                   => $this->effectiveCalendarId(),
+                    'calendarColor'                => $metadataAvailable && $detectedColor !== ''
+                        ? $detectedColor
+                        : $this->ReadPropertyString('CalendarColor'),
+                    'canWrite'                     => $metadataAvailable
+                        ? ($writeAccessKnown
+                            ? $this->ReadAttributeBoolean('DetectedCanWrite')
+                            : $this->ReadAttributeBoolean('DetectedCanWrite')
+                                || $this->ReadPropertyBoolean('CanWrite'))
+                        : $this->ReadPropertyBoolean('CanWrite'),
+                    'timezone'                     => $metadataAvailable
+                        ? $this->ReadAttributeString('DetectedCalendarTimezone')
+                        : '',
+                    'canCreateRecurrence'          => $metadataAvailable
+                        && $this->ReadAttributeBoolean('DetectedCanCreateRecurrence'),
+                    'canUpdateRecurrence'          => $metadataAvailable
+                        && $this->ReadAttributeBoolean('DetectedCanUpdateRecurrence'),
+                    'canUpdateOccurrence'          => $metadataAvailable
+                        && $this->ReadAttributeBoolean('DetectedCanUpdateOccurrence'),
+                    'canDeleteOccurrence'          => $metadataAvailable
+                        && $this->ReadAttributeBoolean('DetectedCanDeleteOccurrence'),
+                    'canUpdateFollowing'           => $metadataAvailable
+                        && $this->ReadAttributeBoolean('DetectedCanUpdateFollowing'),
+                    'canUpdateSeries'              => $metadataAvailable
+                        && $this->ReadAttributeBoolean('DetectedCanUpdateSeries'),
+                    'canDeleteSeries'              => $metadataAvailable
+                        && $this->ReadAttributeBoolean('DetectedCanDeleteSeries'),
+                    'canUseDefaultReminder'        => $metadataAvailable
+                        && $this->ReadAttributeBoolean('DetectedCanUseDefaultReminder'),
+                    'canCreateWithDefaultReminder' => $metadataAvailable
+                        && $this->ReadAttributeBoolean('DetectedCanCreateWithDefaultReminder'),
+                    'defaultReminder'              => $metadataAvailable ? $defaultReminder : [],
+                    'maxReminders'                 => $metadataAvailable
+                        ? max(1, min(5, $this->ReadAttributeInteger('DetectedMaxReminders')))
+                        : 1,
+                    'eventCount'                   => count($events),
+                    'microsoftTaskListId'          => trim($this->ReadPropertyString('MicrosoftTaskListID')),
+                    'microsoftTaskCount'           => count($this->readMicrosoftTasks()),
+                    'microsoftTaskLastError'       => $this->ReadAttributeString('MicrosoftTaskLastError'),
+                    'todayEventCount'              => CalendarEventCounter::countForDay(
+                        $events,
+                        new DateTimeImmutable('today')
+                    ),
+                    'runtimeReady'                 => $this->isRuntimeReady(),
+                    'lastSynchronization'          => $this->ReadAttributeInteger('LastSynchronization'),
+                    'lastError'                    => $this->ReadAttributeString('LastError')
+                ],
+                JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR
+            );
+        } catch (\Throwable $debugFlowException) {
+            $debugFlowFailed = true;
+            $this->DebugFlowException(__FUNCTION__, __LINE__, $debugFlowException);
+            throw $debugFlowException;
+        } finally {
+            $this->DebugFlowEnd(__FUNCTION__, __LINE__, $debugFlowResult, $debugFlowFailed, false);
+        }
+    }
+
+    /**
+     * Überführt ältere Helper-Diagnosen ohne deren Rohdaten in den gemeinsamen Debug-Aufbau.
+     *
+     * @param string $Message Native Debug-Kategorie
+     * @param string $Data Geschützte native Diagnose
+     * @param int $Format Natives Datenformat
+     * @return bool Ergebnis des nativen Debug-Kanals
+     */
+    protected function SendDebug(string $Message, string $Data, int $Format): bool
+    {
+        if (str_starts_with($Message, static::class . ' | ')) {
+            return parent::SendDebug($Message, $Data, $Format);
+        }
+        $trace = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 2);
+        $standalone = $this->debugFlowCalls === [];
+        if ($standalone) {
+            $this->DebugFlowStart(__FUNCTION__, __LINE__);
+        }
+        try {
+            $this->DebugFlowEvent($trace[1]['function'] ?? 'Modulhilfe', (int) ($trace[0]['line'] ?? __LINE__), 'FEHLER', 'Die gemeinsame Modulhilfe meldet einen nicht abgeschlossenen Vorgang; Rohdaten bleiben geschützt.', [
+                'Quelldatei' => basename((string) ($trace[0]['file'] ?? 'module.php'))
+            ]);
+        } finally {
+            if ($standalone) {
+                $this->DebugFlowEnd(__FUNCTION__, __LINE__);
+            }
+        }
+        return true;
     }
 
     private function refreshCalendarMetadataSafely(): void
@@ -1308,7 +1650,7 @@ class Calendar extends IPSModuleStrict
         try {
             $this->applyCalendarMetadata($this->sendRequest('GetCalendars'));
         } catch (Throwable $exception) {
-            $this->SendSafeDebugException('CalendarMetadataError', $exception);
+            $this->DebugFlowException(__FUNCTION__, __LINE__, $exception);
         }
     }
 
@@ -1348,10 +1690,7 @@ class Calendar extends IPSModuleStrict
                 ) === 0
             ));
             if (count($nameMatches) === 1) {
-                $this->SendSafeDebug(
-                    'CalendarResolution',
-                    'Recovered the calendar identity from the unique instance name.'
-                );
+                $this->DebugFlowEvent(__FUNCTION__, __LINE__, 'AKTION', 'Kalenderzuordnung anhand eindeutiger vorhandener Zuordnung wiederhergestellt.', []);
                 $this->storeCalendarMetadata($nameMatches[0]);
                 return;
             }
@@ -1437,19 +1776,19 @@ class Calendar extends IPSModuleStrict
         $this->WriteAttributeString('DetectedCalendarTimezone', $timezone);
         $this->WriteAttributeBoolean('DetectedWriteAccessKnown', $writeAccessKnown);
         $this->WriteAttributeBoolean('CalendarMetadataAvailable', true);
-        $this->SendSafeDebug('CalendarMetadata', [
-            'canWrite'                 => $canWrite,
-            'writeAccessKnown'         => $writeAccessKnown,
-            'timezone'                 => $timezone,
-            'canCreateRecurrence'      => $canCreateRecurrence,
-            'canUpdateRecurrence'      => $canUpdateRecurrence,
-            'canUpdateOccurrence'      => $canUpdateOccurrence,
-            'canUpdateFollowing'       => $canUpdateFollowing,
-            'canUpdateSeries'          => $canUpdateSeries,
-            'canDeleteSeries'          => $canDeleteSeries,
-            'maxReminders'             => $maxReminders,
-            'canUseDefaultReminder'    => $canUseDefaultReminder,
-            'canCreateDefaultReminder' => $canCreateWithDefaultReminder
+        $this->DebugFlowEvent(__FUNCTION__, __LINE__, 'AKTION', 'Kalenderfähigkeiten übernommen.', [
+            'SchreibenErlaubt'                 => $canWrite,
+            'SchreibrechtBekannt'              => $writeAccessKnown,
+            'Zeitzone'                         => $timezone,
+            'SerienAnlegen'                    => $canCreateRecurrence,
+            'SerienÄndern'                     => $canUpdateRecurrence,
+            'EinzelvorkommenÄndern'            => $canUpdateOccurrence,
+            'FolgendeVorkommenÄndern'          => $canUpdateFollowing,
+            'GesamteSerieÄndern'               => $canUpdateSeries,
+            'GesamteSerieLöschen'              => $canDeleteSeries,
+            'MaximaleErinnerungen'             => $maxReminders,
+            'StandarderinnerungNutzen'         => $canUseDefaultReminder,
+            'MitStandarderinnerungAnlegen'     => $canCreateWithDefaultReminder
         ]);
     }
 
@@ -1458,111 +1797,122 @@ class Calendar extends IPSModuleStrict
      */
     private function requestEvents(): array
     {
-        $pastDays = max(0, min(1095, $this->ReadPropertyInteger('PastDays')));
-        $futureDays = max(1, min(1095, $this->ReadPropertyInteger('FutureDays')));
-        $today = new DateTimeImmutable('today');
-        $start = $today->modify('-' . $pastDays . ' days');
-        $end = $today->modify('+' . ($futureDays + 1) . ' days');
-        $startTimestamp = $start->getTimestamp();
-        $endTimestamp = $end->getTimestamp();
-        $syncToken = $this->incrementalSyncTokenForWindow($startTimestamp, $endTimestamp);
-        $startedAt = microtime(true);
-        $this->SendSafeDebug('EventTransferStart', [
-            'start'                => $start->format(DATE_ATOM),
-            'end'                  => $end->format(DATE_ATOM),
-            'incrementalRequested' => $syncToken !== ''
-        ]);
-        $transfer = $this->sendRequest(
-            'BeginEventsTransfer',
-            [
-                'Start'     => $startTimestamp,
-                'End'       => $endTimestamp,
-                'SyncToken' => $syncToken
-            ]
-        );
-        $token = trim((string) ($transfer['Token'] ?? ''));
-        $pageCount = (int) ($transfer['PageCount'] ?? 0);
-        $itemCount = (int) ($transfer['ItemCount'] ?? -1);
-        $nextSyncToken = trim((string) ($transfer['SyncToken'] ?? ''));
-        $incremental = (bool) ($transfer['Incremental'] ?? false);
-        if ($incremental && $syncToken === '') {
-            throw new UnexpectedValueException('The calendar account returned an unexpected incremental event transfer.');
-        }
-        if (preg_match('/^[a-f0-9]{32}$/D', $token) !== 1
-            || $pageCount < 1
-            || $pageCount > 10_000
-            || $itemCount < 0) {
-            throw new UnexpectedValueException('The calendar account returned invalid event transfer metadata.');
-        }
-        $this->SendSafeDebug('EventTransferMetadata', [
-            'pageCount'   => $pageCount,
-            'itemCount'   => $itemCount,
-            'incremental' => $incremental
-        ]);
-
-        $transferredEvents = [];
+        $debugFlowResult = null;
+        $debugFlowFailed = false;
+        $this->DebugFlowStart(__FUNCTION__, __LINE__);
         try {
-            for ($page = 0; $page < $pageCount; ++$page) {
-                $payload = $this->sendRequest(
-                    'ReadEventsTransferPage',
-                    ['Token' => $token, 'Page' => $page]
-                );
-                if (($payload['Token'] ?? null) !== $token
-                    || (int) ($payload['Page'] ?? -1) !== $page
-                    || (int) ($payload['PageCount'] ?? 0) !== $pageCount
-                    || (int) ($payload['ItemCount'] ?? -1) !== $itemCount
-                    || (bool) ($payload['Complete'] ?? false) !== ($page === $pageCount - 1)
-                    || !is_array($payload['Items'] ?? null)
-                    || !array_is_list($payload['Items'])) {
-                    throw new UnexpectedValueException('The calendar account returned an invalid event transfer page.');
-                }
+            $pastDays = max(0, min(1095, $this->ReadPropertyInteger('PastDays')));
+            $futureDays = max(1, min(1095, $this->ReadPropertyInteger('FutureDays')));
+            $today = new DateTimeImmutable('today');
+            $start = $today->modify('-' . $pastDays . ' days');
+            $end = $today->modify('+' . ($futureDays + 1) . ' days');
+            $startTimestamp = $start->getTimestamp();
+            $endTimestamp = $end->getTimestamp();
+            $syncToken = $this->incrementalSyncTokenForWindow($startTimestamp, $endTimestamp);
+            $startedAt = microtime(true);
+            $this->DebugFlowEvent(__FUNCTION__, __LINE__, 'AKTION', 'Seitenweise Terminübertragung angefordert.', [
+                'Abfragebeginn'                => $start->format(DATE_ATOM),
+                'Abfrageende'                  => $end->format(DATE_ATOM),
+                'InkrementellAngefordert'      => $syncToken !== ''
+            ]);
+            $transfer = $this->sendRequest(
+                'BeginEventsTransfer',
+                [
+                    'Start'     => $startTimestamp,
+                    'End'       => $endTimestamp,
+                    'SyncToken' => $syncToken
+                ]
+            );
+            $token = trim((string) ($transfer['Token'] ?? ''));
+            $pageCount = (int) ($transfer['PageCount'] ?? 0);
+            $itemCount = (int) ($transfer['ItemCount'] ?? -1);
+            $nextSyncToken = trim((string) ($transfer['SyncToken'] ?? ''));
+            $incremental = (bool) ($transfer['Incremental'] ?? false);
+            if ($incremental && $syncToken === '') {
+                throw new UnexpectedValueException('The calendar account returned an unexpected incremental event transfer.');
+            }
+            if (preg_match('/^[a-f0-9]{32}$/D', $token) !== 1
+                || $pageCount < 1
+                || $pageCount > 10_000
+                || $itemCount < 0) {
+                throw new UnexpectedValueException('The calendar account returned invalid event transfer metadata.');
+            }
+            $this->DebugFlowEvent(__FUNCTION__, __LINE__, 'EMPFANG', 'Umfang der Terminübertragung empfangen.', [
+                'Seitenanzahl'     => $pageCount,
+                'Eintragsanzahl'   => $itemCount,
+                'Inkrementell'     => $incremental
+            ]);
 
-                foreach ($payload['Items'] as $event) {
-                    if (!is_array($event) || array_is_list($event)) {
-                        throw new UnexpectedValueException('The calendar account returned invalid event data.');
+            $transferredEvents = [];
+            try {
+                for ($page = 0; $page < $pageCount; ++$page) {
+                    $payload = $this->sendRequest(
+                        'ReadEventsTransferPage',
+                        ['Token' => $token, 'Page' => $page]
+                    );
+                    if (($payload['Token'] ?? null) !== $token
+                        || (int) ($payload['Page'] ?? -1) !== $page
+                        || (int) ($payload['PageCount'] ?? 0) !== $pageCount
+                        || (int) ($payload['ItemCount'] ?? -1) !== $itemCount
+                        || (bool) ($payload['Complete'] ?? false) !== ($page === $pageCount - 1)
+                        || !is_array($payload['Items'] ?? null)
+                        || !array_is_list($payload['Items'])) {
+                        throw new UnexpectedValueException('The calendar account returned an invalid event transfer page.');
                     }
-                    $transferredEvents[] = $event;
+
+                    foreach ($payload['Items'] as $event) {
+                        if (!is_array($event) || array_is_list($event)) {
+                            throw new UnexpectedValueException('The calendar account returned invalid event data.');
+                        }
+                        $transferredEvents[] = $event;
+                    }
+                }
+            } finally {
+                $this->finishEventTransfer($token);
+            }
+
+            if (count($transferredEvents) !== $itemCount) {
+                throw new UnexpectedValueException('The calendar account returned an incomplete event transfer.');
+            }
+
+            $cachedEvents = $this->readEvents();
+            $events = $incremental
+                ? $this->mergeIncrementalEvents($cachedEvents, $transferredEvents)
+                : array_values(array_filter(
+                    $transferredEvents,
+                    static fn (array $event): bool => !($event['_syncDeleted'] ?? false)
+                ));
+            $this->reconcileAnniversaryMetadataAfterSynchronization($events, $cachedEvents);
+            $events = CalendarTaskEvent::preservePendingSeries($events, $cachedEvents, $today);
+            // Commit the received data before advancing its delta cursor. Task writes
+            // happen afterwards and may fail independently of a successful read.
+            $this->storeEvents($events);
+            foreach ($transferredEvents as $transferredEvent) {
+                if ((bool) ($transferredEvent['_syncDeleted'] ?? false)) {
+                    $this->forgetPendingTask($transferredEvent);
                 }
             }
-        } finally {
-            $this->finishEventTransfer($token);
-        }
-
-        if (count($transferredEvents) !== $itemCount) {
-            throw new UnexpectedValueException('The calendar account returned an incomplete event transfer.');
-        }
-
-        $cachedEvents = $this->readEvents();
-        $events = $incremental
-            ? $this->mergeIncrementalEvents($cachedEvents, $transferredEvents)
-            : array_values(array_filter(
-                $transferredEvents,
-                static fn (array $event): bool => !($event['_syncDeleted'] ?? false)
-            ));
-        $this->reconcileAnniversaryMetadataAfterSynchronization($events, $cachedEvents);
-        $events = CalendarTaskEvent::preservePendingSeries($events, $cachedEvents, $today);
-        // Commit the received data before advancing its delta cursor. Task writes
-        // happen afterwards and may fail independently of a successful read.
-        $this->storeEvents($events);
-        foreach ($transferredEvents as $transferredEvent) {
-            if ((bool) ($transferredEvent['_syncDeleted'] ?? false)) {
-                $this->forgetPendingTask($transferredEvent);
+            if ($nextSyncToken !== '') {
+                $this->storeIncrementalSyncState($nextSyncToken, $startTimestamp, $endTimestamp);
+            } else {
+                $this->clearIncrementalSyncState();
             }
-        }
-        if ($nextSyncToken !== '') {
-            $this->storeIncrementalSyncState($nextSyncToken, $startTimestamp, $endTimestamp);
-        } else {
-            $this->clearIncrementalSyncState();
-        }
 
-        $this->SendSafeDebug('EventTransferCompleted', [
-            'eventCount'        => count($events),
-            'transferredCount'  => count($transferredEvents),
-            'incremental'       => $incremental,
-            'durationMs'        => (int) round((microtime(true) - $startedAt) * 1000)
-        ]);
+            $this->DebugFlowEvent(__FUNCTION__, __LINE__, 'AKTION', 'Terminübertragung abgeschlossen.', [
+                'Terminanzahl'              => count($events),
+                'ÜbertrageneEinträge'       => count($transferredEvents),
+                'Inkrementell'              => $incremental,
+                'DauerMillisekunden'        => (int) round((microtime(true) - $startedAt) * 1000)
+            ]);
 
-        return $events;
+            return $debugFlowResult = $events;
+        } catch (\Throwable $debugFlowException) {
+            $debugFlowFailed = true;
+            $this->DebugFlowException(__FUNCTION__, __LINE__, $debugFlowException);
+            throw $debugFlowException;
+        } finally {
+            $this->DebugFlowEnd(__FUNCTION__, __LINE__, $debugFlowResult, $debugFlowFailed, false);
+        }
     }
 
     private function incrementalSyncTokenForWindow(int $startTimestamp, int $endTimestamp): string
@@ -1619,7 +1969,7 @@ class Calendar extends IPSModuleStrict
                 $message = 'Microsoft To Do synchronization failed.';
             }
             $this->WriteAttributeString('MicrosoftTaskLastError', $this->Translate($message));
-            $this->SendSafeDebugException('MicrosoftTaskSynchronizationError', $exception);
+            $this->DebugFlowException(__FUNCTION__, __LINE__, $exception);
             return count($this->readMicrosoftTasks());
         }
     }
@@ -1629,39 +1979,50 @@ class Calendar extends IPSModuleStrict
      */
     private function synchronizeMicrosoftTasks(string $listId): array
     {
-        $sameList = hash_equals($this->ReadAttributeString('MicrosoftTaskSyncListID'), $listId);
-        $deltaLink = $sameList ? trim($this->ReadAttributeString('MicrosoftTaskDeltaLink')) : '';
-        $result = $this->sendRequest('SynchronizeTasks', [
-            'TaskListID' => $listId,
-            'DeltaLink'  => $deltaLink
-        ]);
-        if (!isset($result['tasks']) || !is_array($result['tasks']) || !array_is_list($result['tasks'])) {
-            throw new UnexpectedValueException('The calendar account returned invalid Microsoft task data.');
-        }
-        $nextDeltaLink = trim((string) ($result['deltaLink'] ?? ''));
-        if ($nextDeltaLink === '') {
-            throw new UnexpectedValueException('The calendar account returned no Microsoft task delta link.');
-        }
-        $fullSnapshot = (bool) ($result['fullSnapshot'] ?? false);
-
-        $changes = [];
-        foreach ($result['tasks'] as $task) {
-            if (!is_array($task) || array_is_list($task) || trim((string) ($task['id'] ?? '')) === '') {
+        $debugFlowResult = null;
+        $debugFlowFailed = false;
+        $this->DebugFlowStart(__FUNCTION__, __LINE__);
+        try {
+            $sameList = hash_equals($this->ReadAttributeString('MicrosoftTaskSyncListID'), $listId);
+            $deltaLink = $sameList ? trim($this->ReadAttributeString('MicrosoftTaskDeltaLink')) : '';
+            $result = $this->sendRequest('SynchronizeTasks', [
+                'TaskListID' => $listId,
+                'DeltaLink'  => $deltaLink
+            ]);
+            if (!isset($result['tasks']) || !is_array($result['tasks']) || !array_is_list($result['tasks'])) {
                 throw new UnexpectedValueException('The calendar account returned invalid Microsoft task data.');
             }
-            $changes[] = $task;
+            $nextDeltaLink = trim((string) ($result['deltaLink'] ?? ''));
+            if ($nextDeltaLink === '') {
+                throw new UnexpectedValueException('The calendar account returned no Microsoft task delta link.');
+            }
+            $fullSnapshot = (bool) ($result['fullSnapshot'] ?? false);
+
+            $changes = [];
+            foreach ($result['tasks'] as $task) {
+                if (!is_array($task) || array_is_list($task) || trim((string) ($task['id'] ?? '')) === '') {
+                    throw new UnexpectedValueException('The calendar account returned invalid Microsoft task data.');
+                }
+                $changes[] = $task;
+            }
+
+            $tasks = $deltaLink === '' || $fullSnapshot ? $this->activeMicrosoftTasks($changes) : $this->mergeMicrosoftTaskChanges(
+                $sameList ? $this->readMicrosoftTasks() : [],
+                $changes
+            );
+            // Persist task data before advancing the Graph delta cursor.
+            $this->WritePersistentJsonCache('CachedMicrosoftTasks', $tasks);
+            $this->WriteAttributeString('MicrosoftTaskSyncListID', $listId);
+            $this->WriteAttributeString('MicrosoftTaskDeltaLink', $nextDeltaLink);
+
+            return $debugFlowResult = $tasks;
+        } catch (\Throwable $debugFlowException) {
+            $debugFlowFailed = true;
+            $this->DebugFlowException(__FUNCTION__, __LINE__, $debugFlowException);
+            throw $debugFlowException;
+        } finally {
+            $this->DebugFlowEnd(__FUNCTION__, __LINE__, $debugFlowResult, $debugFlowFailed, false);
         }
-
-        $tasks = $deltaLink === '' || $fullSnapshot ? $this->activeMicrosoftTasks($changes) : $this->mergeMicrosoftTaskChanges(
-            $sameList ? $this->readMicrosoftTasks() : [],
-            $changes
-        );
-        // Persist task data before advancing the Graph delta cursor.
-        $this->WritePersistentJsonCache('CachedMicrosoftTasks', $tasks);
-        $this->WriteAttributeString('MicrosoftTaskSyncListID', $listId);
-        $this->WriteAttributeString('MicrosoftTaskDeltaLink', $nextDeltaLink);
-
-        return $tasks;
     }
 
     /**
@@ -1962,7 +2323,7 @@ class Calendar extends IPSModuleStrict
         $this->WriteAttributeString('MicrosoftTaskLastError', '');
         $this->WriteAttributeString('LastError', '');
         $this->SetStatus($this->ReadPropertyBoolean('Active') ? IS_ACTIVE : IS_INACTIVE);
-        $this->SetValue('LastSynchronization', $this->ReadAttributeInteger('LastSynchronization'));
+        $this->DebugFlowWriteValue('LastSynchronization', $this->ReadAttributeInteger('LastSynchronization'), __FUNCTION__, __LINE__, false);
     }
 
     /**
@@ -1987,7 +2348,7 @@ class Calendar extends IPSModuleStrict
                 $options[] = ['caption' => $name !== '' ? $name : $id, 'value' => $id];
             }
         } catch (Throwable $exception) {
-            $this->SendSafeDebugException('MicrosoftTaskListDiscoveryError', $exception);
+            $this->DebugFlowException(__FUNCTION__, __LINE__, $exception);
         }
 
         return $this->appendMissingMicrosoftTaskListOption($options, $selectedListId);
@@ -2228,7 +2589,7 @@ class Calendar extends IPSModuleStrict
         try {
             $this->sendRequest('FinishEventsTransfer', ['Token' => $token]);
         } catch (Throwable $exception) {
-            $this->SendSafeDebugException('EventTransferCleanupError', $exception);
+            $this->DebugFlowException(__FUNCTION__, __LINE__, $exception);
         }
     }
 
@@ -2238,46 +2599,59 @@ class Calendar extends IPSModuleStrict
      */
     private function sendRequest(string $operation, array $additionalData = []): array
     {
-        if (!$this->isRuntimeReady()) {
-            throw new RuntimeException('The calendar instance is still initializing.');
-        }
-        if ($this->ReadPropertyBoolean('LocalCalendar')) {
-            $error = $this->validateConfiguration();
-            if ($error !== '') {
-                throw new RuntimeException($error);
+        $debugFlowResult = null;
+        $debugFlowFailed = false;
+        $this->DebugFlowStart(__FUNCTION__, __LINE__);
+        try {
+            $this->DebugFlowEvent(__FUNCTION__, __LINE__, 'SENDEN', 'Kalenderoperation angefordert; Nutzdaten und Kalenderidentitäten bleiben geschützt.', ['Operation' => $operation, 'Schnittstelle' => 'Kalender Konto']);
+            if (!$this->isRuntimeReady()) {
+                throw new RuntimeException('The calendar instance is still initializing.');
             }
-            return $this->sendLocalRequest($operation, $additionalData);
-        }
-        if (!$this->HasActiveParent()) {
-            throw new RuntimeException('No active calendar account is connected.');
-        }
+            if ($this->ReadPropertyBoolean('LocalCalendar')) {
+                $error = $this->validateConfiguration();
+                if ($error !== '') {
+                    throw new RuntimeException($error);
+                }
+                return $debugFlowResult = $this->sendLocalRequest($operation, $additionalData);
+            }
+            if (!$this->HasActiveParent()) {
+                throw new RuntimeException('No active calendar account is connected.');
+            }
 
-        $request = array_merge(
-            [
-                'Operation'  => $operation,
-                'RequestID'  => bin2hex(random_bytes(8)),
-                'CalendarID' => $this->effectiveCalendarId()
-            ],
-            $additionalData
-        );
-        $responseJson = $this->SendDataToParent(
-            $this->EncodeDataFlowMessage(self::DATA_ID_TO_PARENT, $request)
-        );
-        if ($responseJson === '') {
-            throw new RuntimeException('The calendar account did not return a response.');
-        }
+            $request = array_merge(
+                [
+                    'Operation'  => $operation,
+                    'RequestID'  => bin2hex(random_bytes(8)),
+                    'CalendarID' => $this->effectiveCalendarId()
+                ],
+                $additionalData
+            );
+            $responseJson = $this->SendDataToParent(
+                $this->EncodeDataFlowMessage(self::DATA_ID_TO_PARENT, $request)
+            );
+            if ($responseJson === '') {
+                throw new RuntimeException('The calendar account did not return a response.');
+            }
 
-        $response = json_decode($responseJson, true, 512, JSON_THROW_ON_ERROR);
-        if (!is_array($response) || !($response['Success'] ?? false)) {
-            $error = is_array($response) ? trim((string) ($response['Error'] ?? '')) : '';
-            throw new RuntimeException($error !== '' ? $error : 'The calendar account rejected the request.');
-        }
-        $payload = $response['Payload'] ?? null;
-        if (!is_array($payload)) {
-            throw new UnexpectedValueException('The calendar account returned invalid data.');
-        }
+            $response = json_decode($responseJson, true, 512, JSON_THROW_ON_ERROR);
+            if (!is_array($response) || !($response['Success'] ?? false)) {
+                $error = is_array($response) ? trim((string) ($response['Error'] ?? '')) : '';
+                throw new RuntimeException($error !== '' ? $error : 'The calendar account rejected the request.');
+            }
+            $payload = $response['Payload'] ?? null;
+            if (!is_array($payload)) {
+                throw new UnexpectedValueException('The calendar account returned invalid data.');
+            }
 
-        return $payload;
+            $this->DebugFlowEvent(__FUNCTION__, __LINE__, 'EMPFANG', 'Gültige Antwort des Kalenderkontos übernommen; fachliches Ergebnis steht in der Antwort.', ['Schnittstelle' => 'Parent', 'Einträge' => count($payload)]);
+            return $debugFlowResult = $payload;
+        } catch (\Throwable $debugFlowException) {
+            $debugFlowFailed = true;
+            $this->DebugFlowException(__FUNCTION__, __LINE__, $debugFlowException);
+            throw $debugFlowException;
+        } finally {
+            $this->DebugFlowEnd(__FUNCTION__, __LINE__, $debugFlowResult, $debugFlowFailed, false);
+        }
     }
 
     /**
@@ -2289,95 +2663,107 @@ class Calendar extends IPSModuleStrict
      */
     private function sendLocalRequest(string $operation, array $request): array
     {
-        $lock = 'OpenCalendar.LocalCalendar.' . $this->InstanceID;
-        if (!IPS_SemaphoreEnter($lock, 5000)) {
-            throw new RuntimeException('The local calendar is busy. Please try again.');
-        }
-
+        $debugFlowResult = null;
+        $debugFlowFailed = false;
+        $this->DebugFlowStart(__FUNCTION__, __LINE__);
         try {
-            $resources = json_decode($this->ReadAttributeString('LocalCalendarResources'), true, 512, JSON_THROW_ON_ERROR);
-            if (!is_array($resources) || ($resources !== [] && array_is_list($resources))) {
-                throw new UnexpectedValueException('The local calendar original data is invalid. Restore a backup; do not clear it.');
+            $this->DebugFlowEvent(__FUNCTION__, __LINE__, 'AKTION', 'Lokale Kalenderoperation unter Instanzsperre wird ausgeführt.', ['Operation' => $operation]);
+            $lock = 'OpenCalendar.LocalCalendar.' . $this->InstanceID;
+            if (!IPS_SemaphoreEnter($lock, 5000)) {
+                throw new RuntimeException('The local calendar is busy. Please try again.');
             }
-            $reference = $this->effectiveCalendarId();
-            $provider = new LocalCalendarProvider($resources, $reference);
-            $identity = [
-                'eventReference' => trim((string) ($request['EventReference'] ?? '')),
-                'resourceUrl'    => trim((string) ($request['ResourceURL'] ?? '')),
-                'uid'            => trim((string) ($request['UID'] ?? '')),
-                'seriesId'       => trim((string) ($request['SeriesID'] ?? '')),
-                'occurrenceId'   => trim((string) ($request['OccurrenceID'] ?? '')),
-                'originalStart'  => trim((string) ($request['OriginalStart'] ?? '')),
-                'recurrenceId'   => trim((string) ($request['RecurrenceID'] ?? '')),
-                'startTimestamp' => (int) ($request['Start'] ?? 0),
-                'endTimestamp'   => (int) ($request['End'] ?? 0)
-            ];
-            $result = match ($operation) {
-                'GetCalendars'        => $provider->getCalendars(),
-                'BeginEventsTransfer' => $this->CreateChunkedJsonTransfer(
-                    self::LOCAL_EVENT_TRANSFER_SCOPE,
-                    $provider->getEventsWithOverdueTasks(
-                        $reference,
-                        new DateTimeImmutable('@' . (int) ($request['Start'] ?? 0)),
-                        new DateTimeImmutable('@' . (int) ($request['End'] ?? 0)),
-                        new DateTimeImmutable('today')
-                    )
-                ),
-                'ReadEventsTransferPage' => $this->ReadChunkedJsonTransferPage(
-                    self::LOCAL_EVENT_TRANSFER_SCOPE,
-                    (string) ($request['Token'] ?? ''),
-                    (int) ($request['Page'] ?? -1)
-                ),
-                'FinishEventsTransfer' => ['success' => $this->ClearChunkedJsonTransfer(
-                    self::LOCAL_EVENT_TRANSFER_SCOPE,
-                    (string) ($request['Token'] ?? '')
-                )],
-                'GetEventForEdit'       => $provider->getEventForIdentity($reference, $identity),
-                'CheckPendingTask'      => $this->checkLocalPendingTask($provider, $reference, $identity),
-                'CheckRecurringSeries'  => $this->checkLocalRecurringSeries($provider, $reference, $identity),
-                'GetRecurringSeries'    => $provider->getRecurringSeries($reference, $identity['seriesId'], $identity['resourceUrl']),
-                'GetRecurringFollowing' => $provider->getRecurringFollowing(
-                    $reference,
-                    $identity['seriesId'],
-                    $identity['occurrenceId'],
-                    $identity['originalStart'],
-                    $identity['resourceUrl']
-                ),
-                'CreateEvent' => $provider->createEvent($reference, $request['Event'] ?? []),
-                'UpdateEvent' => $provider->updateEvent(
-                    $reference,
-                    $identity['resourceUrl'],
-                    (string) ($request['ETag'] ?? ''),
-                    $identity['uid'],
-                    $request['Event'] ?? [],
-                    $request['Recurrence'] ?? []
-                ),
-                'DeleteEvent' => ['success' => $provider->deleteEvent(
-                    $reference,
-                    $identity['resourceUrl'],
-                    (string) ($request['ETag'] ?? ''),
-                    $identity['recurrenceId'],
-                    $request['Recurrence'] ?? []
-                )],
-                default => throw new InvalidArgumentException('Unsupported local calendar operation: ' . $operation)
-            };
 
-            if ($operation === 'GetCalendars' && trim($this->ReadPropertyString('CalendarColor')) !== '') {
-                foreach ($result as &$calendar) {
-                    $calendar['color'] = trim($this->ReadPropertyString('CalendarColor'));
+            try {
+                $resources = json_decode($this->ReadAttributeString('LocalCalendarResources'), true, 512, JSON_THROW_ON_ERROR);
+                if (!is_array($resources) || ($resources !== [] && array_is_list($resources))) {
+                    throw new UnexpectedValueException('The local calendar original data is invalid. Restore a backup; do not clear it.');
                 }
-                unset($calendar);
-            }
-            $updatedResources = $provider->exportResources();
-            if ($updatedResources !== $resources) {
-                $encoded = json_encode((object) $updatedResources, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
-                if (!$this->WriteAttributeString('LocalCalendarResources', $encoded)) {
-                    throw new RuntimeException('The local calendar original data could not be saved.');
+                $reference = $this->effectiveCalendarId();
+                $provider = new LocalCalendarProvider($resources, $reference);
+                $identity = [
+                    'eventReference' => trim((string) ($request['EventReference'] ?? '')),
+                    'resourceUrl'    => trim((string) ($request['ResourceURL'] ?? '')),
+                    'uid'            => trim((string) ($request['UID'] ?? '')),
+                    'seriesId'       => trim((string) ($request['SeriesID'] ?? '')),
+                    'occurrenceId'   => trim((string) ($request['OccurrenceID'] ?? '')),
+                    'originalStart'  => trim((string) ($request['OriginalStart'] ?? '')),
+                    'recurrenceId'   => trim((string) ($request['RecurrenceID'] ?? '')),
+                    'startTimestamp' => (int) ($request['Start'] ?? 0),
+                    'endTimestamp'   => (int) ($request['End'] ?? 0)
+                ];
+                $result = match ($operation) {
+                    'GetCalendars'        => $provider->getCalendars(),
+                    'BeginEventsTransfer' => $this->CreateChunkedJsonTransfer(
+                        self::LOCAL_EVENT_TRANSFER_SCOPE,
+                        $provider->getEventsWithOverdueTasks(
+                            $reference,
+                            new DateTimeImmutable('@' . (int) ($request['Start'] ?? 0)),
+                            new DateTimeImmutable('@' . (int) ($request['End'] ?? 0)),
+                            new DateTimeImmutable('today')
+                        )
+                    ),
+                    'ReadEventsTransferPage' => $this->ReadChunkedJsonTransferPage(
+                        self::LOCAL_EVENT_TRANSFER_SCOPE,
+                        (string) ($request['Token'] ?? ''),
+                        (int) ($request['Page'] ?? -1)
+                    ),
+                    'FinishEventsTransfer' => ['success' => $this->ClearChunkedJsonTransfer(
+                        self::LOCAL_EVENT_TRANSFER_SCOPE,
+                        (string) ($request['Token'] ?? '')
+                    )],
+                    'GetEventForEdit'       => $provider->getEventForIdentity($reference, $identity),
+                    'CheckPendingTask'      => $this->checkLocalPendingTask($provider, $reference, $identity),
+                    'CheckRecurringSeries'  => $this->checkLocalRecurringSeries($provider, $reference, $identity),
+                    'GetRecurringSeries'    => $provider->getRecurringSeries($reference, $identity['seriesId'], $identity['resourceUrl']),
+                    'GetRecurringFollowing' => $provider->getRecurringFollowing(
+                        $reference,
+                        $identity['seriesId'],
+                        $identity['occurrenceId'],
+                        $identity['originalStart'],
+                        $identity['resourceUrl']
+                    ),
+                    'CreateEvent' => $provider->createEvent($reference, $request['Event'] ?? []),
+                    'UpdateEvent' => $provider->updateEvent(
+                        $reference,
+                        $identity['resourceUrl'],
+                        (string) ($request['ETag'] ?? ''),
+                        $identity['uid'],
+                        $request['Event'] ?? [],
+                        $request['Recurrence'] ?? []
+                    ),
+                    'DeleteEvent' => ['success' => $provider->deleteEvent(
+                        $reference,
+                        $identity['resourceUrl'],
+                        (string) ($request['ETag'] ?? ''),
+                        $identity['recurrenceId'],
+                        $request['Recurrence'] ?? []
+                    )],
+                    default => throw new InvalidArgumentException('Unsupported local calendar operation: ' . $operation)
+                };
+
+                if ($operation === 'GetCalendars' && trim($this->ReadPropertyString('CalendarColor')) !== '') {
+                    foreach ($result as &$calendar) {
+                        $calendar['color'] = trim($this->ReadPropertyString('CalendarColor'));
+                    }
+                    unset($calendar);
                 }
+                $updatedResources = $provider->exportResources();
+                if ($updatedResources !== $resources) {
+                    $encoded = json_encode((object) $updatedResources, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+                    if (!$this->WriteAttributeString('LocalCalendarResources', $encoded)) {
+                        throw new RuntimeException('The local calendar original data could not be saved.');
+                    }
+                }
+                return $debugFlowResult = $result;
+            } finally {
+                IPS_SemaphoreLeave($lock);
             }
-            return $result;
+        } catch (\Throwable $debugFlowException) {
+            $debugFlowFailed = true;
+            $this->DebugFlowException(__FUNCTION__, __LINE__, $debugFlowException);
+            throw $debugFlowException;
         } finally {
-            IPS_SemaphoreLeave($lock);
+            $this->DebugFlowEnd(__FUNCTION__, __LINE__, $debugFlowResult, $debugFlowFailed, false);
         }
     }
 
@@ -2500,16 +2886,19 @@ class Calendar extends IPSModuleStrict
         $this->WritePersistentJsonCache('CachedEvents', $events);
         $this->WriteAttributeInteger('LastSynchronization', $timestamp);
         $this->updateEventCounters($events);
-        $this->SetValue('LastSynchronization', $timestamp);
+        $this->DebugFlowWriteValue('LastSynchronization', $timestamp, __FUNCTION__, __LINE__, false);
     }
 
     /** @param list<array<string, mixed>> $events */
     private function updateEventCounters(array $events): void
     {
-        $this->SetValue('EventCount', count($events));
-        $this->SetValue(
+        $this->DebugFlowWriteValue('EventCount', count($events), __FUNCTION__, __LINE__, true);
+        $this->DebugFlowWriteValue(
             'TodayEventCount',
-            CalendarEventCounter::countForDay($events, new DateTimeImmutable('today'))
+            CalendarEventCounter::countForDay($events, new DateTimeImmutable('today')),
+            __FUNCTION__,
+            __LINE__,
+            false
         );
     }
 
@@ -2774,9 +3163,9 @@ class Calendar extends IPSModuleStrict
         }
 
         $this->writeAnniversaryMetadata($retained);
-        $this->SendSafeDebug('AnniversaryMetadataCleanup', [
-            'removed'   => $removed,
-            'remaining' => count($retained)
+        $this->DebugFlowEvent(__FUNCTION__, __LINE__, 'AKTION', 'Nicht mehr benötigte Jahrestagsmetadaten entfernt.', [
+            'EntfernteEinträge'    => $removed,
+            'VerbleibendeEinträge' => count($retained)
         ]);
     }
 
@@ -2860,7 +3249,7 @@ class Calendar extends IPSModuleStrict
                     'ResourceURL' => $candidate['resourceUrl']
                 ]);
             } catch (Throwable $exception) {
-                $this->SendSafeDebugException('AnniversaryMetadataVerificationError', $exception);
+                $this->DebugFlowException(__FUNCTION__, __LINE__, $exception);
                 $unknown = true;
                 continue;
             }
@@ -3253,7 +3642,7 @@ class Calendar extends IPSModuleStrict
                     ['EventReference' => $eventReference]
                 );
             } catch (Throwable $exception) {
-                $this->SendSafeDebugException('EventDirectCacheRefreshFallback', $exception);
+                $this->DebugFlowException(__FUNCTION__, __LINE__, $exception);
             }
         }
 
@@ -3273,7 +3662,7 @@ class Calendar extends IPSModuleStrict
                     ]
                 );
             } catch (Throwable $exception) {
-                $this->SendSafeDebugException('EventCacheRefreshFallback', $exception);
+                $this->DebugFlowException(__FUNCTION__, __LINE__, $exception);
                 return false;
             }
         }
@@ -3397,11 +3786,7 @@ class Calendar extends IPSModuleStrict
             return null;
         }
 
-        $this->SendSafeDebug('TaskEventEditCacheFallback', [
-            'reason'            => $exception->getMessage(),
-            'hasEventReference' => trim((string) ($event['eventReference'] ?? '')) !== '',
-            'hasResourceUrl'    => trim((string) ($event['resourceUrl'] ?? '')) !== ''
-        ]);
+        $this->DebugFlowException(__FUNCTION__, __LINE__, $exception);
 
         return $event;
     }
@@ -3498,7 +3883,7 @@ class Calendar extends IPSModuleStrict
         $this->SetStatus($this->ReadPropertyBoolean('Active') ? IS_ACTIVE : IS_INACTIVE);
 
         // Notify Calendar View instances without changing the true synchronization timestamp.
-        $this->SetValue('LastSynchronization', $this->ReadAttributeInteger('LastSynchronization'));
+        $this->DebugFlowWriteValue('LastSynchronization', $this->ReadAttributeInteger('LastSynchronization'), __FUNCTION__, __LINE__, false);
     }
 
     private function refreshAfterWrite(): void
@@ -3614,9 +3999,9 @@ class Calendar extends IPSModuleStrict
         }
 
         if ($moved > 0) {
-            $this->SendSafeDebug('TaskAppointmentsRolledForward', [
-                'count' => $moved,
-                'date'  => $today->format('Y-m-d')
+            $this->DebugFlowEvent(__FUNCTION__, __LINE__, 'AKTION', 'Offene Aufgabentermine auf aktuellen Tag verschoben.', [
+                'Anzahl' => $moved,
+                'Datum'  => $today->format('Y-m-d')
             ]);
         }
 
@@ -3757,7 +4142,7 @@ class Calendar extends IPSModuleStrict
                     'Recurrence'   => CalendarEventRecurrence::single()
                 ]);
             } catch (Throwable $cleanupException) {
-                $this->SendSafeDebugException('DetachedTaskCleanupError', $cleanupException);
+                $this->DebugFlowException(__FUNCTION__, __LINE__, $cleanupException);
             }
             throw $exception;
         }
@@ -3881,7 +4266,7 @@ class Calendar extends IPSModuleStrict
             $task = CalendarTaskEvent::enrich($result['event']);
             return !(bool) ($task['task'] ?? false) || (bool) ($task['taskCompleted'] ?? false);
         } catch (Throwable $exception) {
-            $this->SendSafeDebugException('PendingTaskLookupDeferred', $exception);
+            $this->DebugFlowException(__FUNCTION__, __LINE__, $exception);
             return false;
         }
     }
@@ -4059,11 +4444,12 @@ class Calendar extends IPSModuleStrict
             ? $this->Translate('Invalid JSON data.')
             : $this->translateErrorMessage($rawMessage);
         $this->WriteAttributeString('LastError', $message);
-        $this->SendSafeDebug('CalendarError', [
-            'type'    => $exception::class,
-            'message' => $rawMessage,
-            'code'    => $exception->getCode()
-        ]);
+        $this->DebugFlowEvent(__FUNCTION__, __LINE__, 'FEHLER', match (true) {
+            $exception instanceof JsonException                                => 'Kalenderdaten enthalten ungültiges JSON; Operation abgebrochen.',
+            $exception instanceof InvalidArgumentException                     => 'Kalenderoperation wegen ungültiger Eingaben abgelehnt.',
+            str_contains(strtolower($rawMessage), 'changed by another client') => 'Schreibkonflikt: Kalenderdaten wurden zwischenzeitlich von einem anderen Client geändert.',
+            default                                                            => 'Kalenderoperation fehlgeschlagen; vorhandene Fehlerbehandlung und Statusaktualisierung bleiben wirksam.'
+        }, ['Fehlertyp'                                                        => $exception::class]);
 
         return $message;
     }

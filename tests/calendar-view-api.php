@@ -82,6 +82,9 @@ try {
 $moduleSource = (string) file_get_contents(__DIR__ . '/../Kalender Ansicht/module.php');
 $calendarModuleSource = (string) file_get_contents(__DIR__ . '/../Kalender/module.php');
 $readmeSource = (string) file_get_contents(__DIR__ . '/../Kalender Ansicht/README.md');
+// Source contracts ignore result capture; runtime debug tests verify behavior.
+$moduleSource = str_replace('return $debugFlowResult = ', 'return ', $moduleSource);
+$calendarModuleSource = str_replace('return $debugFlowResult = ', 'return ', $calendarModuleSource);
 $moduleMetadata = json_decode(
     (string) file_get_contents(__DIR__ . '/../Kalender Ansicht/module.json'),
     true,

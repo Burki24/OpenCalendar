@@ -3953,7 +3953,7 @@ assertTrueValue(
     is_string($calendarModuleSource)
         && str_contains($calendarModuleSource, "RegisterAttributeString('ResolvedCalendarID', '')")
         && str_contains($calendarModuleSource, 'private function effectiveCalendarId(): string')
-        && str_contains($calendarModuleSource, 'Recovered the calendar identity from the unique instance name.'),
+        && str_contains($calendarModuleSource, 'Kalenderzuordnung anhand eindeutiger vorhandener Zuordnung wiederhergestellt.'),
     'Existing calendar instances with a missing ID must recover an unambiguous identity without recreation.'
 );
 assertTrueValue(
@@ -3962,7 +3962,7 @@ assertTrueValue(
         && str_contains($calendarModuleSource, "array_key_exists('writeAccessKnown', \$calendar)")
         && !str_contains($calendarModuleSource, ": array_key_exists('create', \$capabilities)")
         && str_contains($calendarModuleSource, "\$this->ReadAttributeBoolean('DetectedCanWrite')
-                            || \$this->ReadPropertyBoolean('CanWrite')"),
+                                || \$this->ReadPropertyBoolean('CanWrite')"),
     'Calendar instances must preserve writable operation for legacy caches and incomplete DAV privilege metadata.'
 );
 assertTrueValue(
@@ -4071,11 +4071,11 @@ assertTrueValue(
     is_string($viewModuleSource)
         && str_contains($viewModuleSource, '$this->HandleIPSViewHTMLPageAction($Ident, $Value)')
         && str_contains($viewModuleSource, 'public function RegenerateIPSViewHTML(): bool')
-        && str_contains($viewModuleSource, 'return $this->RegenerateIPSViewHTMLPages();')
+        && str_contains($viewModuleSource, 'return $debugFlowResult = $this->RegenerateIPSViewHTMLPages();')
         && str_contains($htmlPageHelperSource, "private const IPSVIEW_HTML_REGENERATE_ACTION = 'IPSViewHTMLRegenerateVariables';")
         && str_contains($viewModuleSource, 'private function renderNonEmptyIPSViewHTML(array $state, string $debugContext): ?string')
         && str_contains($viewModuleSource, 'private function existingIPSViewHTML(): string')
-        && str_contains($viewModuleSource, "'Rendering returned an empty document; preserving the existing IPSView HTML.'")
+        && str_contains($viewModuleSource, "'Darstellung lieferte ein leeres Dokument; vorhandene IPSView-Ausgabe bleibt erhalten.'")
         && !str_contains($viewModuleSource, "UnregisterVariable('IPSViewCalendar')"),
     'IPSView regeneration must preserve the object ID and must never replace valid WebContent with an empty render result.'
 );

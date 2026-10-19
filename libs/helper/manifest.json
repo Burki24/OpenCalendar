@@ -409,6 +409,21 @@
             "sha256": "29fe61a7eccafeb8b2beb77fe3f7a4896f43b3eaace9ebe428a4fc8250fd9088",
             "path": "libs/helper/VisualizationThemeHelper.php",
             "source_sha": "82a13d236b430c0ffbcb714aed56d9e52c344ff2"
+        },
+        "DebugFlowHelper": {
+            "version": "1.0.0",
+            "sha256": "7acb9342e958a867d17ce53c96a69a176a4f28886875b64166372f15eddd11d8",
+            "path": "libs/helper/DebugFlowHelper.php",
+            "source_sha": "working-tree",
+            "dependencies": [
+                {
+                    "name": "DebugHelper",
+                    "version": "1.0.2",
+                    "sha256": "3bc98238da59682b149d981e7641f1a1af8103047d05ce520dec0a2abcbe7d2b",
+                    "path": "libs/helper/DebugHelper.php",
+                    "source_sha": "working-tree"
+                }
+            ]
         }
     }
 }

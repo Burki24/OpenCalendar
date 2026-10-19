@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+require_once __DIR__ . '/../libs/helper/DebugFlowHelper.php';
+
 use IPSKalender\CalendarEventRecurrence;
 
 require_once __DIR__ . '/stubs/autoload.php';
@@ -19,6 +21,7 @@ final class RecoveryHttpException extends RuntimeException
 /** Keep the real gateway classification; replace only the direct provider lookup. */
 final class RecoveryGateway
 {
+    use \Burki24\SymconModuleHelper\DebugFlowHelper;
     use KalenderKontoChildGatewayTrait {
         checkPendingTaskForChild as public check;
     }

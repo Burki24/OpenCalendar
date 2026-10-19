@@ -359,3 +359,9 @@ Keine Termine sichtbar | Zeitraum für vergangene und zukünftige Termine prüfe
 Kalender ist schreibgeschützt | Schreibrechte beim Anbieter prüfen; ICS/Webcal-Abonnements sind immer schreibgeschützt
 Ändern oder Löschen wird bei einem Serientermin verweigert | Google, Microsoft und unterstützte Apple/CalDAV-RRULEs erlauben Vorkommnis, dieses und folgende sowie vollständige Serie; komplexe Wiederholungsregeln werden nicht verlustbehaftet geteilt
 Schreibkonflikt | Kalender erneut synchronisieren; der ETag-Schutz verhindert das Überschreiben einer zwischenzeitlich geänderten Serverversion
+
+## Debug-Ausgaben
+
+Der native Symcon-Debug zeigt deutsche Meldungen mit Funktion, Zeile, Vorgang
+und Ergebnis sowie Aktionen und Schnittstellenübergaben. Private Inhalte und
+Zugangsdaten bleiben geschützt. Details und Abnahme: [Debug-Aufbau](../docs/DEBUG_OUTPUT.md).

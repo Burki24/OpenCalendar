@@ -378,3 +378,9 @@ bool IPSKALACC_DisconnectMicrosoft(int $InstanzID);
 ```
 
 Methoden mit komplexen Rückgabewerten liefern JSON.
+
+## Debug-Ausgaben
+
+Der native Symcon-Debug zeigt deutsche Meldungen mit Funktion, Zeile, Vorgang
+und Ergebnis sowie Aktionen und Schnittstellenübergaben. Private Inhalte und
+Zugangsdaten bleiben geschützt. Details und Abnahme: [Debug-Aufbau](../docs/DEBUG_OUTPUT.md).

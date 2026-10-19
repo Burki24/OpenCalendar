@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+require_once __DIR__ . '/../libs/helper/DebugFlowHelper.php';
+
 use Burki24\SymconModuleHelper\ConfigurationFormHelper;
 use Burki24\SymconModuleHelper\IPSViewHTMLPageHelper;
 use Burki24\SymconModuleHelper\IPSViewStyleConfigurationHelper;
@@ -26,6 +28,8 @@ require_once __DIR__ . '/../libs/helper/VisualizationThemeHelper.php';
 
 class CalendarView extends IPSModuleStrict
 {
+    use \Burki24\SymconModuleHelper\DebugFlowHelper;
+
     use ConfigurationFormHelper;
     use IPSViewHTMLPageHelper;
     use IPSViewStyleConfigurationHelper;
@@ -105,70 +109,81 @@ class CalendarView extends IPSModuleStrict
      */
     public function Create(): void
     {
-        parent::Create();
+        $debugFlowResult = null;
+        $debugFlowFailed = false;
+        $this->DebugFlowStart(__FUNCTION__, __LINE__);
+        try {
+            parent::Create();
 
-        $this->RegisterMessage(0, IPS_KERNELSTARTED);
-        $this->RegisterPropertyString('Calendars', '[]');
-        $this->RegisterPropertyInteger('DefaultCalendarInstanceID', 0);
-        $this->RegisterPropertyInteger('DefaultView', 0);
-        $this->RegisterPropertyInteger('TileWeekOrientation', 0);
-        $this->RegisterPropertyInteger('TileFontScale', 100);
-        $this->RegisterPropertyInteger('PastDays', 0);
-        $this->RegisterPropertyInteger('FutureDays', 31);
-        $this->RegisterPropertyInteger('MaxEvents', 250);
-        $this->RegisterPropertyInteger('AgendaPeriodDays', 14);
-        $this->RegisterPropertyInteger('ListPeriodDays', 14);
-        $this->RegisterPropertyInteger('ThreeDaysPeriodDays', 3);
-        $this->RegisterPropertyInteger('WeekPeriodWeeks', 1);
-        $this->RegisterPropertyInteger('MonthPeriodMonths', 1);
-        $this->RegisterPropertyBoolean('ShowWeekends', true);
-        $this->RegisterPropertyBoolean('ShowAgendaEventCount', true);
-        $this->RegisterPropertyBoolean('ShowThreeDaysEventCount', true);
-        $this->RegisterPropertyBoolean('ShowWeekEventCount', true);
-        $this->RegisterPropertyBoolean('ShowAgendaCalendarWeek', false);
-        $this->RegisterPropertyBoolean('ShowListCalendarWeek', false);
-        $this->RegisterPropertyBoolean('ShowThreeDaysCalendarWeek', false);
-        $this->RegisterPropertyBoolean('ShowWeekCalendarWeek', true);
-        $this->RegisterPropertyBoolean('ShowMonthCalendarWeek', false);
-        $this->RegisterPropertyBoolean('ShowMonthOverflowDays', false);
-        $this->RegisterPropertyBoolean('ShowAgendaDayOfYear', true);
-        $this->RegisterPropertyBoolean('ShowListDayOfYear', false);
-        $this->RegisterPropertyBoolean('ShowThreeDaysDayOfYear', true);
-        $this->RegisterPropertyBoolean('ShowWeekDayOfYear', true);
-        $this->RegisterPropertyBoolean('ShowMonthDayOfYear', true);
-        $this->RegisterPropertyBoolean('ShowListDate', true);
-        $this->RegisterPropertyBoolean('ShowListStart', true);
-        $this->RegisterPropertyBoolean('ShowListEnd', true);
-        $this->RegisterPropertyBoolean('ShowListTitle', true);
-        $this->RegisterPropertyBoolean('ShowListCalendarName', true);
-        $this->RegisterPropertyBoolean('ShowListAnniversaryType', true);
-        $this->RegisterPropertyBoolean('ShowListLocation', false);
-        $this->RegisterPropertyBoolean('ShowListDescription', false);
-        $this->RegisterPropertyBoolean('ShowListControls', true);
-        $this->RegisterPropertyBoolean('ShowCalendarName', true);
-        $this->RegisterPropertyBoolean('ShowAnniversaryType', true);
-        $this->RegisterPropertyBoolean('ShowLocation', true);
-        $this->RegisterPropertyBoolean('ShowDescription', false);
-        $this->RegisterIPSViewHTMLPageProperties();
-        $this->RegisterPropertyInteger('IPSViewColorBarWidth', 7);
-        $this->RegisterPropertyInteger('IPSViewWeekOrientation', 0);
-        $this->RegisterIPSViewStyleProperties();
-        $this->RegisterAttributeBoolean('RuntimeReady', false);
-        $this->RegisterAttributeString('CalendarSelectionBackup', '[]');
-        $this->RegisterAttributeInteger('InitializationRefreshAttempts', 0);
-        $this->RegisterAttributeInteger(self::ATTRIBUTE_IPSVIEW_TOKEN_1, 0);
-        $this->RegisterAttributeInteger(self::ATTRIBUTE_IPSVIEW_TOKEN_2, 0);
-        $this->RegisterAttributeInteger(self::ATTRIBUTE_IPSVIEW_TOKEN_3, 0);
-        $this->RegisterAttributeInteger(self::ATTRIBUTE_IPSVIEW_TOKEN_4, 0);
-        $this->ensureIPSViewToken();
+            $this->RegisterMessage(0, IPS_KERNELSTARTED);
+            $this->RegisterPropertyString('Calendars', '[]');
+            $this->RegisterPropertyInteger('DefaultCalendarInstanceID', 0);
+            $this->RegisterPropertyInteger('DefaultView', 0);
+            $this->RegisterPropertyInteger('TileWeekOrientation', 0);
+            $this->RegisterPropertyInteger('TileFontScale', 100);
+            $this->RegisterPropertyInteger('PastDays', 0);
+            $this->RegisterPropertyInteger('FutureDays', 31);
+            $this->RegisterPropertyInteger('MaxEvents', 250);
+            $this->RegisterPropertyInteger('AgendaPeriodDays', 14);
+            $this->RegisterPropertyInteger('ListPeriodDays', 14);
+            $this->RegisterPropertyInteger('ThreeDaysPeriodDays', 3);
+            $this->RegisterPropertyInteger('WeekPeriodWeeks', 1);
+            $this->RegisterPropertyInteger('MonthPeriodMonths', 1);
+            $this->RegisterPropertyBoolean('ShowWeekends', true);
+            $this->RegisterPropertyBoolean('ShowAgendaEventCount', true);
+            $this->RegisterPropertyBoolean('ShowThreeDaysEventCount', true);
+            $this->RegisterPropertyBoolean('ShowWeekEventCount', true);
+            $this->RegisterPropertyBoolean('ShowAgendaCalendarWeek', false);
+            $this->RegisterPropertyBoolean('ShowListCalendarWeek', false);
+            $this->RegisterPropertyBoolean('ShowThreeDaysCalendarWeek', false);
+            $this->RegisterPropertyBoolean('ShowWeekCalendarWeek', true);
+            $this->RegisterPropertyBoolean('ShowMonthCalendarWeek', false);
+            $this->RegisterPropertyBoolean('ShowMonthOverflowDays', false);
+            $this->RegisterPropertyBoolean('ShowAgendaDayOfYear', true);
+            $this->RegisterPropertyBoolean('ShowListDayOfYear', false);
+            $this->RegisterPropertyBoolean('ShowThreeDaysDayOfYear', true);
+            $this->RegisterPropertyBoolean('ShowWeekDayOfYear', true);
+            $this->RegisterPropertyBoolean('ShowMonthDayOfYear', true);
+            $this->RegisterPropertyBoolean('ShowListDate', true);
+            $this->RegisterPropertyBoolean('ShowListStart', true);
+            $this->RegisterPropertyBoolean('ShowListEnd', true);
+            $this->RegisterPropertyBoolean('ShowListTitle', true);
+            $this->RegisterPropertyBoolean('ShowListCalendarName', true);
+            $this->RegisterPropertyBoolean('ShowListAnniversaryType', true);
+            $this->RegisterPropertyBoolean('ShowListLocation', false);
+            $this->RegisterPropertyBoolean('ShowListDescription', false);
+            $this->RegisterPropertyBoolean('ShowListControls', true);
+            $this->RegisterPropertyBoolean('ShowCalendarName', true);
+            $this->RegisterPropertyBoolean('ShowAnniversaryType', true);
+            $this->RegisterPropertyBoolean('ShowLocation', true);
+            $this->RegisterPropertyBoolean('ShowDescription', false);
+            $this->RegisterIPSViewHTMLPageProperties();
+            $this->RegisterPropertyInteger('IPSViewColorBarWidth', 7);
+            $this->RegisterPropertyInteger('IPSViewWeekOrientation', 0);
+            $this->RegisterIPSViewStyleProperties();
+            $this->RegisterAttributeBoolean('RuntimeReady', false);
+            $this->RegisterAttributeString('CalendarSelectionBackup', '[]');
+            $this->RegisterAttributeInteger('InitializationRefreshAttempts', 0);
+            $this->RegisterAttributeInteger(self::ATTRIBUTE_IPSVIEW_TOKEN_1, 0);
+            $this->RegisterAttributeInteger(self::ATTRIBUTE_IPSVIEW_TOKEN_2, 0);
+            $this->RegisterAttributeInteger(self::ATTRIBUTE_IPSVIEW_TOKEN_3, 0);
+            $this->RegisterAttributeInteger(self::ATTRIBUTE_IPSVIEW_TOKEN_4, 0);
+            $this->ensureIPSViewToken();
 
-        if (method_exists($this, 'RegisterHook')) {
-            $this->RegisterHook($this->ipsViewHookAddress());
+            if (method_exists($this, 'RegisterHook')) {
+                $this->RegisterHook($this->ipsViewHookAddress());
+            }
+
+            $this->SetVisualizationType(1);
+            $this->RegisterTimer('InitializationTimer', 0, 'IPSKALVIEW_Initialize($_IPS[\'TARGET\']);');
+            $this->RegisterTimer('InitializationRefreshTimer', 0, 'IPSKALVIEW_RefreshInitialization($_IPS[\'TARGET\']);');
+        } catch (\Throwable $debugFlowException) {
+            $debugFlowFailed = true;
+            $this->DebugFlowException(__FUNCTION__, __LINE__, $debugFlowException);
+            throw $debugFlowException;
+        } finally {
+            $this->DebugFlowEnd(__FUNCTION__, __LINE__, $debugFlowResult, $debugFlowFailed, true);
         }
-
-        $this->SetVisualizationType(1);
-        $this->RegisterTimer('InitializationTimer', 0, 'IPSKALVIEW_Initialize($_IPS[\'TARGET\']);');
-        $this->RegisterTimer('InitializationRefreshTimer', 0, 'IPSKALVIEW_RefreshInitialization($_IPS[\'TARGET\']);');
     }
 
     /**
@@ -178,35 +193,46 @@ class CalendarView extends IPSModuleStrict
      */
     public function GetConfigurationForm(): string
     {
-        $form = $this->LoadConfigurationForm();
-        $configured = $this->decodeCalendarConfiguration($this->ReadPropertyString('Calendars'));
-        $calendarConfiguration = $configured;
-        if ($configured === []) {
-            $backup = $this->decodeCalendarConfiguration($this->ReadAttributeString('CalendarSelectionBackup'));
-            if ($backup !== []) {
-                $calendarConfiguration = $backup;
+        $debugFlowResult = null;
+        $debugFlowFailed = false;
+        $this->DebugFlowStart(__FUNCTION__, __LINE__);
+        try {
+            $form = $this->LoadConfigurationForm();
+            $configured = $this->decodeCalendarConfiguration($this->ReadPropertyString('Calendars'));
+            $calendarConfiguration = $configured;
+            if ($configured === []) {
+                $backup = $this->decodeCalendarConfiguration($this->ReadAttributeString('CalendarSelectionBackup'));
+                if ($backup !== []) {
+                    $calendarConfiguration = $backup;
+                    foreach ($form['elements'] as &$element) {
+                        if (($element['name'] ?? '') === 'Calendars') {
+                            $element['values'] = $backup;
+                            break;
+                        }
+                    }
+                    unset($element);
+                }
+            }
+            if (isset($form['elements']) && is_array($form['elements'])) {
                 foreach ($form['elements'] as &$element) {
-                    if (($element['name'] ?? '') === 'Calendars') {
-                        $element['values'] = $backup;
+                    if (($element['name'] ?? '') === 'DefaultCalendarInstanceID') {
+                        $element['options'] = $this->defaultCalendarOptions($calendarConfiguration);
                         break;
                     }
                 }
                 unset($element);
+                $this->InsertIPSViewHTMLPageFormItems($form['elements']);
+                $this->InsertIPSViewStyleFormItems($form['elements'], colorWidth: '220px');
             }
-        }
-        if (isset($form['elements']) && is_array($form['elements'])) {
-            foreach ($form['elements'] as &$element) {
-                if (($element['name'] ?? '') === 'DefaultCalendarInstanceID') {
-                    $element['options'] = $this->defaultCalendarOptions($calendarConfiguration);
-                    break;
-                }
-            }
-            unset($element);
-            $this->InsertIPSViewHTMLPageFormItems($form['elements']);
-            $this->InsertIPSViewStyleFormItems($form['elements'], colorWidth: '220px');
-        }
 
-        return $this->EncodeConfigurationForm($form);
+            return $debugFlowResult = $this->EncodeConfigurationForm($form);
+        } catch (\Throwable $debugFlowException) {
+            $debugFlowFailed = true;
+            $this->DebugFlowException(__FUNCTION__, __LINE__, $debugFlowException);
+            throw $debugFlowException;
+        } finally {
+            $this->DebugFlowEnd(__FUNCTION__, __LINE__, $debugFlowResult, $debugFlowFailed, false);
+        }
     }
 
     /**
@@ -214,112 +240,123 @@ class CalendarView extends IPSModuleStrict
      */
     public function Migrate(string $JSONData): string
     {
-        parent::Migrate($JSONData);
-
+        $debugFlowResult = null;
+        $debugFlowFailed = false;
+        $this->DebugFlowStart(__FUNCTION__, __LINE__);
         try {
-            $persistence = json_decode($JSONData, true, 512, JSON_THROW_ON_ERROR);
-        } catch (JsonException) {
-            return '';
-        }
+            parent::Migrate($JSONData);
 
-        if (
-            !is_array($persistence)
-            || !isset($persistence['configuration'])
-            || !is_array($persistence['configuration'])
-        ) {
-            return '';
-        }
-
-        $configuration = &$persistence['configuration'];
-        $changed = false;
-
-        if (array_key_exists('ShowDayOfYear', $configuration)) {
-            $legacyShowDayOfYear = (bool) $configuration['ShowDayOfYear'];
-            foreach ([
-                'ShowAgendaDayOfYear',
-                'ShowThreeDaysDayOfYear',
-                'ShowWeekDayOfYear',
-                'ShowMonthDayOfYear'
-            ] as $dayOfYearProperty) {
-                if (!array_key_exists($dayOfYearProperty, $configuration)) {
-                    $configuration[$dayOfYearProperty] = $legacyShowDayOfYear;
-                }
-            }
-            unset($configuration['ShowDayOfYear']);
-            $changed = true;
-        }
-
-        foreach (self::LEGACY_IPSVIEW_STRING_COLOR_PROPERTIES as $legacyProperty => $integerProperty) {
-            if (!array_key_exists($legacyProperty, $configuration)) {
-                continue;
+            try {
+                $persistence = json_decode($JSONData, true, 512, JSON_THROW_ON_ERROR);
+            } catch (JsonException) {
+                return $debugFlowResult = '';
             }
 
-            $legacyValue = $configuration[$legacyProperty];
-            if (is_string($legacyValue) && preg_match('/^#?([0-9a-fA-F]{6})$/', trim($legacyValue), $matches)) {
-                $configuration[$integerProperty] = hexdec($matches[1]);
+            if (
+                !is_array($persistence)
+                || !isset($persistence['configuration'])
+                || !is_array($persistence['configuration'])
+            ) {
+                return $debugFlowResult = '';
             }
 
-            unset($configuration[$legacyProperty]);
-            $changed = true;
-        }
+            $configuration = &$persistence['configuration'];
+            $changed = false;
 
-        $legacyTheme = $configuration['IPSViewTheme'] ?? null;
-        if (is_int($legacyTheme) && !array_key_exists('IPSViewStyleSource', $configuration)) {
-            $configuration['IPSViewStyleSource'] = match ($legacyTheme) {
-                1       => self::IPSVIEW_STYLE_SOURCE_LIGHT,
-                2       => self::IPSVIEW_STYLE_SOURCE_DARK,
-                default => self::IPSVIEW_STYLE_SOURCE_CUSTOM
-            };
-        }
-        if (array_key_exists('IPSViewTheme', $configuration)) {
-            unset($configuration['IPSViewTheme']);
-            $changed = true;
-        }
-
-        foreach ([
-            'IPSViewTransparent' => 'IPSViewStyleTransparentBackground',
-            'IPSViewFontScale'   => 'IPSViewStyleFontScale'
-        ] as $legacyProperty => $styleProperty) {
-            if (!array_key_exists($legacyProperty, $configuration)) {
-                continue;
-            }
-
-            if (!array_key_exists($styleProperty, $configuration)) {
-                $configuration[$styleProperty] = $configuration[$legacyProperty];
-            }
-            unset($configuration[$legacyProperty]);
-            $changed = true;
-        }
-
-        foreach (self::LEGACY_IPSVIEW_STYLE_PROPERTIES as $legacyProperty => $styleProperties) {
-            if (!array_key_exists($legacyProperty, $configuration)) {
-                continue;
-            }
-
-            $value = $configuration[$legacyProperty];
-            if (is_int($value) && $value >= 0 && $value <= 0xFFFFFF) {
-                foreach ($styleProperties as $styleProperty) {
-                    if (!array_key_exists($styleProperty, $configuration)) {
-                        $configuration[$styleProperty] = $value;
+            if (array_key_exists('ShowDayOfYear', $configuration)) {
+                $legacyShowDayOfYear = (bool) $configuration['ShowDayOfYear'];
+                foreach ([
+                    'ShowAgendaDayOfYear',
+                    'ShowThreeDaysDayOfYear',
+                    'ShowWeekDayOfYear',
+                    'ShowMonthDayOfYear'
+                ] as $dayOfYearProperty) {
+                    if (!array_key_exists($dayOfYearProperty, $configuration)) {
+                        $configuration[$dayOfYearProperty] = $legacyShowDayOfYear;
                     }
                 }
+                unset($configuration['ShowDayOfYear']);
+                $changed = true;
             }
 
-            unset($configuration[$legacyProperty]);
-            $changed = true;
-        }
+            foreach (self::LEGACY_IPSVIEW_STRING_COLOR_PROPERTIES as $legacyProperty => $integerProperty) {
+                if (!array_key_exists($legacyProperty, $configuration)) {
+                    continue;
+                }
 
-        if (!$changed) {
-            return '';
-        }
+                $legacyValue = $configuration[$legacyProperty];
+                if (is_string($legacyValue) && preg_match('/^#?([0-9a-fA-F]{6})$/', trim($legacyValue), $matches)) {
+                    $configuration[$integerProperty] = hexdec($matches[1]);
+                }
 
-        try {
-            return json_encode(
-                $persistence,
-                JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE
-            );
-        } catch (JsonException) {
-            return '';
+                unset($configuration[$legacyProperty]);
+                $changed = true;
+            }
+
+            $legacyTheme = $configuration['IPSViewTheme'] ?? null;
+            if (is_int($legacyTheme) && !array_key_exists('IPSViewStyleSource', $configuration)) {
+                $configuration['IPSViewStyleSource'] = match ($legacyTheme) {
+                    1       => self::IPSVIEW_STYLE_SOURCE_LIGHT,
+                    2       => self::IPSVIEW_STYLE_SOURCE_DARK,
+                    default => self::IPSVIEW_STYLE_SOURCE_CUSTOM
+                };
+            }
+            if (array_key_exists('IPSViewTheme', $configuration)) {
+                unset($configuration['IPSViewTheme']);
+                $changed = true;
+            }
+
+            foreach ([
+                'IPSViewTransparent' => 'IPSViewStyleTransparentBackground',
+                'IPSViewFontScale'   => 'IPSViewStyleFontScale'
+            ] as $legacyProperty => $styleProperty) {
+                if (!array_key_exists($legacyProperty, $configuration)) {
+                    continue;
+                }
+
+                if (!array_key_exists($styleProperty, $configuration)) {
+                    $configuration[$styleProperty] = $configuration[$legacyProperty];
+                }
+                unset($configuration[$legacyProperty]);
+                $changed = true;
+            }
+
+            foreach (self::LEGACY_IPSVIEW_STYLE_PROPERTIES as $legacyProperty => $styleProperties) {
+                if (!array_key_exists($legacyProperty, $configuration)) {
+                    continue;
+                }
+
+                $value = $configuration[$legacyProperty];
+                if (is_int($value) && $value >= 0 && $value <= 0xFFFFFF) {
+                    foreach ($styleProperties as $styleProperty) {
+                        if (!array_key_exists($styleProperty, $configuration)) {
+                            $configuration[$styleProperty] = $value;
+                        }
+                    }
+                }
+
+                unset($configuration[$legacyProperty]);
+                $changed = true;
+            }
+
+            if (!$changed) {
+                return $debugFlowResult = '';
+            }
+
+            try {
+                return $debugFlowResult = json_encode(
+                    $persistence,
+                    JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE
+                );
+            } catch (JsonException) {
+                return $debugFlowResult = '';
+            }
+        } catch (\Throwable $debugFlowException) {
+            $debugFlowFailed = true;
+            $this->DebugFlowException(__FUNCTION__, __LINE__, $debugFlowException);
+            throw $debugFlowException;
+        } finally {
+            $this->DebugFlowEnd(__FUNCTION__, __LINE__, $debugFlowResult, $debugFlowFailed, false);
         }
     }
 
@@ -328,32 +365,43 @@ class CalendarView extends IPSModuleStrict
      */
     public function ApplyChanges(): void
     {
-        parent::ApplyChanges();
+        $debugFlowResult = null;
+        $debugFlowFailed = false;
+        $this->DebugFlowStart(__FUNCTION__, __LINE__);
+        try {
+            parent::ApplyChanges();
 
-        $this->SetVisualizationType(1);
-        $preservedIPSViewHTML = $this->existingIPSViewHTML();
-        $this->ensureIPSViewToken();
-        $this->WriteAttributeBoolean('RuntimeReady', false);
-        $configured = $this->decodeCalendarConfiguration($this->ReadPropertyString('Calendars'));
-        if ($configured !== []) {
-            $this->storeCalendarSelectionBackup($configured);
+            $this->SetVisualizationType(1);
+            $preservedIPSViewHTML = $this->existingIPSViewHTML();
+            $this->ensureIPSViewToken();
+            $this->WriteAttributeBoolean('RuntimeReady', false);
+            $configured = $this->decodeCalendarConfiguration($this->ReadPropertyString('Calendars'));
+            if ($configured !== []) {
+                $this->storeCalendarSelectionBackup($configured);
+            }
+            $this->RegisterMessage(0, IPS_KERNELSTARTED);
+            $this->RegisterIPSViewStyleMediaMessages();
+            $this->SetTimerInterval('InitializationTimer', 0);
+            $this->SetTimerInterval('InitializationRefreshTimer', 0);
+            $this->MaintainIPSViewHTMLVariable(
+                'IPSViewCalendar',
+                $this->Translate('IPSView calendar'),
+                10,
+                $preservedIPSViewHTML
+            );
+
+            if (IPS_GetKernelRunlevel() !== KR_READY) {
+                return;
+            }
+
+            $this->scheduleInitialization();
+        } catch (\Throwable $debugFlowException) {
+            $debugFlowFailed = true;
+            $this->DebugFlowException(__FUNCTION__, __LINE__, $debugFlowException);
+            throw $debugFlowException;
+        } finally {
+            $this->DebugFlowEnd(__FUNCTION__, __LINE__, $debugFlowResult, $debugFlowFailed, true);
         }
-        $this->RegisterMessage(0, IPS_KERNELSTARTED);
-        $this->RegisterIPSViewStyleMediaMessages();
-        $this->SetTimerInterval('InitializationTimer', 0);
-        $this->SetTimerInterval('InitializationRefreshTimer', 0);
-        $this->MaintainIPSViewHTMLVariable(
-            'IPSViewCalendar',
-            $this->Translate('IPSView calendar'),
-            10,
-            $preservedIPSViewHTML
-        );
-
-        if (IPS_GetKernelRunlevel() !== KR_READY) {
-            return;
-        }
-
-        $this->scheduleInitialization();
     }
 
     /**
@@ -363,45 +411,56 @@ class CalendarView extends IPSModuleStrict
      */
     public function Initialize(): bool
     {
-        $this->SetTimerInterval('InitializationTimer', 0);
-        if (IPS_GetKernelRunlevel() !== KR_READY) {
-            return false;
-        }
-
-        $this->recoverCalendarSelectionFromMessages();
-        foreach ($this->GetMessageList() as $senderId => $messageIds) {
-            foreach ($messageIds as $messageId) {
-                if ((int) $senderId === 0 && (int) $messageId === IPS_KERNELSTARTED) {
-                    continue;
-                }
-                $this->UnregisterMessage($senderId, $messageId);
-            }
-        }
-        $this->RegisterIPSViewStyleMediaMessages();
-
-        $this->WriteAttributeBoolean('RuntimeReady', true);
+        $debugFlowResult = null;
+        $debugFlowFailed = false;
+        $this->DebugFlowStart(__FUNCTION__, __LINE__);
         try {
-            $calendars = $this->loadSelectedCalendars();
-            foreach ($calendars as $calendar) {
-                $instanceId = $calendar['instanceId'];
-                $this->RegisterMessage($instanceId, OM_CHANGENAME);
-                $synchronizationVariableId = $this->GetVariableIDByIdent('LastSynchronization', $instanceId);
-                if ($synchronizationVariableId > 0) {
-                    $this->RegisterMessage($synchronizationVariableId, VM_UPDATE);
-                }
+            $this->SetTimerInterval('InitializationTimer', 0);
+            if (IPS_GetKernelRunlevel() !== KR_READY) {
+                return $debugFlowResult = false;
             }
 
-            $this->SetStatus($calendars === [] ? self::STATUS_NO_CALENDARS : IS_ACTIVE);
-        } catch (Throwable $exception) {
-            $this->SendDebug('Configuration', $exception->getMessage(), 0);
-            $this->SetStatus(self::STATUS_INVALID_CONFIGURATION);
+            $this->recoverCalendarSelectionFromMessages();
+            foreach ($this->GetMessageList() as $senderId => $messageIds) {
+                foreach ($messageIds as $messageId) {
+                    if ((int) $senderId === 0 && (int) $messageId === IPS_KERNELSTARTED) {
+                        continue;
+                    }
+                    $this->UnregisterMessage($senderId, $messageId);
+                }
+            }
+            $this->RegisterIPSViewStyleMediaMessages();
+
+            $this->WriteAttributeBoolean('RuntimeReady', true);
+            try {
+                $calendars = $this->loadSelectedCalendars();
+                foreach ($calendars as $calendar) {
+                    $instanceId = $calendar['instanceId'];
+                    $this->RegisterMessage($instanceId, OM_CHANGENAME);
+                    $synchronizationVariableId = $this->GetVariableIDByIdent('LastSynchronization', $instanceId);
+                    if ($synchronizationVariableId > 0) {
+                        $this->RegisterMessage($synchronizationVariableId, VM_UPDATE);
+                    }
+                }
+
+                $this->SetStatus($calendars === [] ? self::STATUS_NO_CALENDARS : IS_ACTIVE);
+            } catch (Throwable $exception) {
+                $this->DebugFlowException(__FUNCTION__, __LINE__, $exception);
+                $this->SetStatus(self::STATUS_INVALID_CONFIGURATION);
+            }
+
+            $this->broadcastState(null, true);
+            $this->WriteAttributeInteger('InitializationRefreshAttempts', 0);
+            $this->scheduleInitializationRefresh();
+
+            return $debugFlowResult = true;
+        } catch (\Throwable $debugFlowException) {
+            $debugFlowFailed = true;
+            $this->DebugFlowException(__FUNCTION__, __LINE__, $debugFlowException);
+            throw $debugFlowException;
+        } finally {
+            $this->DebugFlowEnd(__FUNCTION__, __LINE__, $debugFlowResult, $debugFlowFailed, false);
         }
-
-        $this->broadcastState(null, true);
-        $this->WriteAttributeInteger('InitializationRefreshAttempts', 0);
-        $this->scheduleInitializationRefresh();
-
-        return true;
     }
 
     /**
@@ -411,30 +470,37 @@ class CalendarView extends IPSModuleStrict
      */
     public function RefreshInitialization(): bool
     {
-        $this->SetTimerInterval('InitializationRefreshTimer', 0);
-        if (!$this->isRuntimeReady()) {
-            return false;
-        }
-
-        if ($this->hasPendingSelectedCalendarInitialization()) {
-            $attempts = $this->ReadAttributeInteger('InitializationRefreshAttempts') + 1;
-            $this->WriteAttributeInteger('InitializationRefreshAttempts', $attempts);
-            if ($attempts < self::MAX_INITIALIZATION_REFRESH_ATTEMPTS) {
-                $this->scheduleInitializationRefresh();
-
-                return false;
+        $debugFlowResult = null;
+        $debugFlowFailed = false;
+        $this->DebugFlowStart(__FUNCTION__, __LINE__);
+        try {
+            $this->SetTimerInterval('InitializationRefreshTimer', 0);
+            if (!$this->isRuntimeReady()) {
+                return $debugFlowResult = false;
             }
 
-            $this->SendDebug(
-                'Initialization',
-                'Selected calendar instances did not finish initialization before the refresh limit.',
-                0
-            );
+            if ($this->hasPendingSelectedCalendarInitialization()) {
+                $attempts = $this->ReadAttributeInteger('InitializationRefreshAttempts') + 1;
+                $this->WriteAttributeInteger('InitializationRefreshAttempts', $attempts);
+                if ($attempts < self::MAX_INITIALIZATION_REFRESH_ATTEMPTS) {
+                    $this->scheduleInitializationRefresh();
+
+                    return $debugFlowResult = false;
+                }
+
+                $this->DebugFlowEvent(__FUNCTION__, __LINE__, 'AKTION', 'Kalender nach maximaler Wartezeit noch nicht initialisiert.', []);
+            }
+
+            $this->broadcastState(null, true);
+
+            return $debugFlowResult = true;
+        } catch (\Throwable $debugFlowException) {
+            $debugFlowFailed = true;
+            $this->DebugFlowException(__FUNCTION__, __LINE__, $debugFlowException);
+            throw $debugFlowException;
+        } finally {
+            $this->DebugFlowEnd(__FUNCTION__, __LINE__, $debugFlowResult, $debugFlowFailed, false);
         }
-
-        $this->broadcastState(null, true);
-
-        return true;
     }
 
     /**
@@ -444,24 +510,35 @@ class CalendarView extends IPSModuleStrict
      */
     public function MessageSink(int $TimeStamp, int $SenderID, int $Message, array $Data): void
     {
-        if ($SenderID === 0 && $Message === IPS_KERNELSTARTED) {
-            $this->WriteAttributeInteger('InitializationRefreshAttempts', 0);
-            $this->SetTimerInterval('InitializationRefreshTimer', 0);
-            $this->scheduleInitialization();
-            return;
-        }
-        if ($this->IsIPSViewStyleMediaUpdate($SenderID, $Message)) {
-            if ($this->isRuntimeReady()) {
-                $this->broadcastState(null, true);
+        $debugFlowResult = null;
+        $debugFlowFailed = false;
+        $this->DebugFlowStart(__FUNCTION__, __LINE__, ['Quelle' => $SenderID, 'Nachricht' => $Message]);
+        try {
+            if ($SenderID === 0 && $Message === IPS_KERNELSTARTED) {
+                $this->WriteAttributeInteger('InitializationRefreshAttempts', 0);
+                $this->SetTimerInterval('InitializationRefreshTimer', 0);
+                $this->scheduleInitialization();
+                return;
+            }
+            if ($this->IsIPSViewStyleMediaUpdate($SenderID, $Message)) {
+                if ($this->isRuntimeReady()) {
+                    $this->broadcastState(null, true);
+                }
+
+                return;
+            }
+            if (!$this->isRuntimeReady()) {
+                return;
             }
 
-            return;
+            $this->broadcastStateInvalidation();
+        } catch (\Throwable $debugFlowException) {
+            $debugFlowFailed = true;
+            $this->DebugFlowException(__FUNCTION__, __LINE__, $debugFlowException);
+            throw $debugFlowException;
+        } finally {
+            $this->DebugFlowEnd(__FUNCTION__, __LINE__, $debugFlowResult, $debugFlowFailed, true);
         }
-        if (!$this->isRuntimeReady()) {
-            return;
-        }
-
-        $this->broadcastStateInvalidation();
     }
 
     /**
@@ -471,7 +548,18 @@ class CalendarView extends IPSModuleStrict
      */
     public function GetVisualizationTile(): string
     {
-        return $this->renderCalendarHtml($this->buildTileBootstrapState(), false);
+        $debugFlowResult = null;
+        $debugFlowFailed = false;
+        $this->DebugFlowStart(__FUNCTION__, __LINE__);
+        try {
+            return $debugFlowResult = $this->renderCalendarHtml($this->buildTileBootstrapState(), false);
+        } catch (\Throwable $debugFlowException) {
+            $debugFlowFailed = true;
+            $this->DebugFlowException(__FUNCTION__, __LINE__, $debugFlowException);
+            throw $debugFlowException;
+        } finally {
+            $this->DebugFlowEnd(__FUNCTION__, __LINE__, $debugFlowResult, $debugFlowFailed, false);
+        }
     }
 
     /**
@@ -482,42 +570,54 @@ class CalendarView extends IPSModuleStrict
      */
     public function RequestAction(string $Ident, mixed $Value): void
     {
-        if ($this->HandleIPSViewHTMLPageAction($Ident, $Value)) {
-            return;
-        }
-
+        $debugFlowResult = null;
+        $debugFlowFailed = false;
+        $this->DebugFlowStart(__FUNCTION__, __LINE__, ['Aktion' => $Ident]);
         try {
-            switch ($Ident) {
-                case 'FormSynchronizeCalendars':
-                    $this->UpdateFormField(
-                        $this->SynchronizeCalendars() ? 'SynchronizationSuccessPopup' : 'SynchronizationFailurePopup',
-                        'visible',
-                        true
-                    );
-                    break;
-
-                case 'FormRestoreCalendars':
-                    $this->UpdateFormField(
-                        $this->SelectAllCalendars() ? 'CalendarSelectionRestoredPopup' : 'NoCalendarInstancesPopup',
-                        'visible',
-                        true
-                    );
-                    break;
-
-                default:
-                    $result = $this->executeVisualizationAction($Ident, $Value);
-                    $toast = $result['message'] !== ''
-                        ? [
-                            'level'   => $result['level'],
-                            'message' => $result['message']
-                        ]
-                        : null;
-                    $this->UpdateVisualizationValue($this->getFullUpdateMessage($result['state'], $toast));
-                    break;
+            $this->DebugFlowEvent(__FUNCTION__, __LINE__, 'AKTION', 'Bedienaktion angefordert; übergebene Nutzdaten bleiben geschützt.', ['Aktion' => $Ident]);
+            if ($this->HandleIPSViewHTMLPageAction($Ident, $Value)) {
+                return;
             }
-        } catch (Throwable $exception) {
-            $this->SendDebug('VisualizationAction', $exception->getMessage(), 0);
-            $this->sendToast('error', $exception->getMessage());
+
+            try {
+                switch ($Ident) {
+                    case 'FormSynchronizeCalendars':
+                        $this->UpdateFormField(
+                            $this->SynchronizeCalendars() ? 'SynchronizationSuccessPopup' : 'SynchronizationFailurePopup',
+                            'visible',
+                            true
+                        );
+                        break;
+
+                    case 'FormRestoreCalendars':
+                        $this->UpdateFormField(
+                            $this->SelectAllCalendars() ? 'CalendarSelectionRestoredPopup' : 'NoCalendarInstancesPopup',
+                            'visible',
+                            true
+                        );
+                        break;
+
+                    default:
+                        $result = $this->executeVisualizationAction($Ident, $Value);
+                        $toast = $result['message'] !== ''
+                            ? [
+                                'level'   => $result['level'],
+                                'message' => $result['message']
+                            ]
+                            : null;
+                        $this->UpdateVisualizationValue($this->getFullUpdateMessage($result['state'], $toast));
+                        break;
+                }
+            } catch (Throwable $exception) {
+                $this->DebugFlowException(__FUNCTION__, __LINE__, $exception);
+                $this->sendToast('error', $exception->getMessage());
+            }
+        } catch (\Throwable $debugFlowException) {
+            $debugFlowFailed = true;
+            $this->DebugFlowException(__FUNCTION__, __LINE__, $debugFlowException);
+            throw $debugFlowException;
+        } finally {
+            $this->DebugFlowEnd(__FUNCTION__, __LINE__, $debugFlowResult, $debugFlowFailed, true);
         }
     }
 
@@ -528,10 +628,21 @@ class CalendarView extends IPSModuleStrict
      */
     public function SynchronizeCalendars(): bool
     {
-        $success = $this->synchronizeSelectedCalendars() === [];
-        $this->broadcastStateInvalidation();
+        $debugFlowResult = null;
+        $debugFlowFailed = false;
+        $this->DebugFlowStart(__FUNCTION__, __LINE__);
+        try {
+            $success = $this->synchronizeSelectedCalendars() === [];
+            $this->broadcastStateInvalidation();
 
-        return $success;
+            return $debugFlowResult = $success;
+        } catch (\Throwable $debugFlowException) {
+            $debugFlowFailed = true;
+            $this->DebugFlowException(__FUNCTION__, __LINE__, $debugFlowException);
+            throw $debugFlowException;
+        } finally {
+            $this->DebugFlowEnd(__FUNCTION__, __LINE__, $debugFlowResult, $debugFlowFailed, false);
+        }
     }
 
     /**
@@ -544,27 +655,38 @@ class CalendarView extends IPSModuleStrict
      */
     public function SelectAllCalendars(): bool
     {
-        $selection = array_map(
-            static fn (int $instanceId): array => [
-                'InstanceID' => $instanceId,
-                'Enabled'    => true
-            ],
-            IPS_GetInstanceListByModuleID(self::CALENDAR_MODULE_ID)
-        );
-        if ($selection === []) {
-            return false;
+        $debugFlowResult = null;
+        $debugFlowFailed = false;
+        $this->DebugFlowStart(__FUNCTION__, __LINE__);
+        try {
+            $selection = array_map(
+                static fn (int $instanceId): array => [
+                    'InstanceID' => $instanceId,
+                    'Enabled'    => true
+                ],
+                IPS_GetInstanceListByModuleID(self::CALENDAR_MODULE_ID)
+            );
+            if ($selection === []) {
+                return $debugFlowResult = false;
+            }
+
+            $this->UpdateFormField(
+                'Calendars',
+                'values',
+                json_encode(
+                    $selection,
+                    JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR
+                )
+            );
+
+            return $debugFlowResult = true;
+        } catch (\Throwable $debugFlowException) {
+            $debugFlowFailed = true;
+            $this->DebugFlowException(__FUNCTION__, __LINE__, $debugFlowException);
+            throw $debugFlowException;
+        } finally {
+            $this->DebugFlowEnd(__FUNCTION__, __LINE__, $debugFlowResult, $debugFlowFailed, false);
         }
-
-        $this->UpdateFormField(
-            'Calendars',
-            'values',
-            json_encode(
-                $selection,
-                JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR
-            )
-        );
-
-        return true;
     }
 
     /**
@@ -574,10 +696,21 @@ class CalendarView extends IPSModuleStrict
      */
     public function GetAggregatedEvents(): string
     {
-        return json_encode(
-            $this->buildState(),
-            JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR
-        );
+        $debugFlowResult = null;
+        $debugFlowFailed = false;
+        $this->DebugFlowStart(__FUNCTION__, __LINE__);
+        try {
+            return $debugFlowResult = json_encode(
+                $this->buildState(),
+                JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR
+            );
+        } catch (\Throwable $debugFlowException) {
+            $debugFlowFailed = true;
+            $this->DebugFlowException(__FUNCTION__, __LINE__, $debugFlowException);
+            throw $debugFlowException;
+        } finally {
+            $this->DebugFlowEnd(__FUNCTION__, __LINE__, $debugFlowResult, $debugFlowFailed, false);
+        }
     }
 
     /**
@@ -593,7 +726,18 @@ class CalendarView extends IPSModuleStrict
      */
     public function GetDayAppointments(string $Date, int $CalendarInstanceID = 0): string
     {
-        return $this->GetAppointments($Date, $Date, $CalendarInstanceID);
+        $debugFlowResult = null;
+        $debugFlowFailed = false;
+        $this->DebugFlowStart(__FUNCTION__, __LINE__);
+        try {
+            return $debugFlowResult = $this->GetAppointments($Date, $Date, $CalendarInstanceID);
+        } catch (\Throwable $debugFlowException) {
+            $debugFlowFailed = true;
+            $this->DebugFlowException(__FUNCTION__, __LINE__, $debugFlowException);
+            throw $debugFlowException;
+        } finally {
+            $this->DebugFlowEnd(__FUNCTION__, __LINE__, $debugFlowResult, $debugFlowFailed, false);
+        }
     }
 
     /**
@@ -611,59 +755,70 @@ class CalendarView extends IPSModuleStrict
      */
     public function GetAnniversaryList(int $CalendarInstanceID = 0, int $Days = 0, string $Type = ''): string
     {
-        if ($Days < 0) {
-            throw new InvalidArgumentException('Annual-event look-ahead days must not be negative.');
-        }
-        $type = strtolower(trim($Type));
-        if ($type !== '' && !in_array($type, ['birthday', 'anniversary', 'wedding', 'death'], true)) {
-            throw new InvalidArgumentException('The annual-event type is invalid.');
-        }
+        $debugFlowResult = null;
+        $debugFlowFailed = false;
+        $this->DebugFlowStart(__FUNCTION__, __LINE__);
+        try {
+            if ($Days < 0) {
+                throw new InvalidArgumentException('Annual-event look-ahead days must not be negative.');
+            }
+            $type = strtolower(trim($Type));
+            if ($type !== '' && !in_array($type, ['birthday', 'anniversary', 'wedding', 'death'], true)) {
+                throw new InvalidArgumentException('The annual-event type is invalid.');
+            }
 
-        $entries = [];
-        foreach ($this->loadSelectedCalendars() as $calendar) {
-            if ($CalendarInstanceID !== 0 && $calendar['instanceId'] !== $CalendarInstanceID) {
-                continue;
-            }
-            try {
-                $calendarEntries = json_decode(
-                    IPSKAL_GetAnniversaryList($calendar['instanceId'], $Days, $type),
-                    true,
-                    512,
-                    JSON_THROW_ON_ERROR
-                );
-            } catch (Throwable $exception) {
-                $this->SendDebug('AnniversaryList', $exception->getMessage(), 0);
-                continue;
-            }
-            if (!is_array($calendarEntries) || !array_is_list($calendarEntries)) {
-                continue;
-            }
-            foreach ($calendarEntries as $entry) {
-                if (!is_array($entry)) {
+            $entries = [];
+            foreach ($this->loadSelectedCalendars() as $calendar) {
+                if ($CalendarInstanceID !== 0 && $calendar['instanceId'] !== $CalendarInstanceID) {
                     continue;
                 }
-                $entry['calendarInstanceId'] = $calendar['instanceId'];
-                $entry['calendarName'] = $calendar['name'];
-                $entry['calendarColor'] = $calendar['color'];
-                $entries[] = $entry;
+                try {
+                    $calendarEntries = json_decode(
+                        IPSKAL_GetAnniversaryList($calendar['instanceId'], $Days, $type),
+                        true,
+                        512,
+                        JSON_THROW_ON_ERROR
+                    );
+                } catch (Throwable $exception) {
+                    $this->DebugFlowException(__FUNCTION__, __LINE__, $exception);
+                    continue;
+                }
+                if (!is_array($calendarEntries) || !array_is_list($calendarEntries)) {
+                    continue;
+                }
+                foreach ($calendarEntries as $entry) {
+                    if (!is_array($entry)) {
+                        continue;
+                    }
+                    $entry['calendarInstanceId'] = $calendar['instanceId'];
+                    $entry['calendarName'] = $calendar['name'];
+                    $entry['calendarColor'] = $calendar['color'];
+                    $entries[] = $entry;
+                }
             }
+
+            usort(
+                $entries,
+                static fn (array $left, array $right): int => ((int) ($left['daysUntil'] ?? PHP_INT_MAX)
+                    <=> (int) ($right['daysUntil'] ?? PHP_INT_MAX))
+                    ?: strcasecmp((string) ($left['name'] ?? ''), (string) ($right['name'] ?? ''))
+                    ?: strcasecmp((string) ($left['calendarName'] ?? ''), (string) ($right['calendarName'] ?? ''))
+            );
+
+            return $debugFlowResult = json_encode(
+                $entries,
+                JSON_UNESCAPED_SLASHES
+                    | JSON_UNESCAPED_UNICODE
+                    | JSON_PRESERVE_ZERO_FRACTION
+                    | JSON_THROW_ON_ERROR
+            );
+        } catch (\Throwable $debugFlowException) {
+            $debugFlowFailed = true;
+            $this->DebugFlowException(__FUNCTION__, __LINE__, $debugFlowException);
+            throw $debugFlowException;
+        } finally {
+            $this->DebugFlowEnd(__FUNCTION__, __LINE__, $debugFlowResult, $debugFlowFailed, false);
         }
-
-        usort(
-            $entries,
-            static fn (array $left, array $right): int => ((int) ($left['daysUntil'] ?? PHP_INT_MAX)
-                <=> (int) ($right['daysUntil'] ?? PHP_INT_MAX))
-                ?: strcasecmp((string) ($left['name'] ?? ''), (string) ($right['name'] ?? ''))
-                ?: strcasecmp((string) ($left['calendarName'] ?? ''), (string) ($right['calendarName'] ?? ''))
-        );
-
-        return json_encode(
-            $entries,
-            JSON_UNESCAPED_SLASHES
-                | JSON_UNESCAPED_UNICODE
-                | JSON_PRESERVE_ZERO_FRACTION
-                | JSON_THROW_ON_ERROR
-        );
     }
 
     /**
@@ -677,7 +832,18 @@ class CalendarView extends IPSModuleStrict
      */
     public function GetBirthdayList(int $CalendarInstanceID = 0, int $Days = 0): string
     {
-        return $this->GetAnniversaryList($CalendarInstanceID, $Days, 'birthday');
+        $debugFlowResult = null;
+        $debugFlowFailed = false;
+        $this->DebugFlowStart(__FUNCTION__, __LINE__);
+        try {
+            return $debugFlowResult = $this->GetAnniversaryList($CalendarInstanceID, $Days, 'birthday');
+        } catch (\Throwable $debugFlowException) {
+            $debugFlowFailed = true;
+            $this->DebugFlowException(__FUNCTION__, __LINE__, $debugFlowException);
+            throw $debugFlowException;
+        } finally {
+            $this->DebugFlowEnd(__FUNCTION__, __LINE__, $debugFlowResult, $debugFlowFailed, false);
+        }
     }
 
     /**
@@ -694,12 +860,23 @@ class CalendarView extends IPSModuleStrict
      */
     public function GetAppointments(string $From, string $To, int $CalendarInstanceID = 0): string
     {
-        [$rangeStart, $rangeEnd] = CalendarAppointmentRange::fromInclusiveDates($From, $To);
-        $appointments = $this->collectAppointmentsForRange($rangeStart, $rangeEnd);
+        $debugFlowResult = null;
+        $debugFlowFailed = false;
+        $this->DebugFlowStart(__FUNCTION__, __LINE__);
+        try {
+            [$rangeStart, $rangeEnd] = CalendarAppointmentRange::fromInclusiveDates($From, $To);
+            $appointments = $this->collectAppointmentsForRange($rangeStart, $rangeEnd);
 
-        return $this->encodeAppointmentList(
-            $this->filterAppointmentsByCalendarInstanceId($appointments, $CalendarInstanceID)
-        );
+            return $debugFlowResult = $this->encodeAppointmentList(
+                $this->filterAppointmentsByCalendarInstanceId($appointments, $CalendarInstanceID)
+            );
+        } catch (\Throwable $debugFlowException) {
+            $debugFlowFailed = true;
+            $this->DebugFlowException(__FUNCTION__, __LINE__, $debugFlowException);
+            throw $debugFlowException;
+        } finally {
+            $this->DebugFlowEnd(__FUNCTION__, __LINE__, $debugFlowResult, $debugFlowFailed, false);
+        }
     }
 
     /**
@@ -716,7 +893,18 @@ class CalendarView extends IPSModuleStrict
      */
     public function GetDayAppointmentsCompact(string $Date, int $CalendarInstanceID = 0): string
     {
-        return $this->GetAppointmentsCompact($Date, $Date, $CalendarInstanceID);
+        $debugFlowResult = null;
+        $debugFlowFailed = false;
+        $this->DebugFlowStart(__FUNCTION__, __LINE__);
+        try {
+            return $debugFlowResult = $this->GetAppointmentsCompact($Date, $Date, $CalendarInstanceID);
+        } catch (\Throwable $debugFlowException) {
+            $debugFlowFailed = true;
+            $this->DebugFlowException(__FUNCTION__, __LINE__, $debugFlowException);
+            throw $debugFlowException;
+        } finally {
+            $this->DebugFlowEnd(__FUNCTION__, __LINE__, $debugFlowResult, $debugFlowFailed, false);
+        }
     }
 
     /**
@@ -732,12 +920,23 @@ class CalendarView extends IPSModuleStrict
      */
     public function GetAppointmentsCompact(string $From, string $To, int $CalendarInstanceID = 0): string
     {
-        [$rangeStart, $rangeEnd] = CalendarAppointmentRange::fromInclusiveDates($From, $To);
-        $appointments = $this->collectAppointmentsForRange($rangeStart, $rangeEnd, true);
+        $debugFlowResult = null;
+        $debugFlowFailed = false;
+        $this->DebugFlowStart(__FUNCTION__, __LINE__);
+        try {
+            [$rangeStart, $rangeEnd] = CalendarAppointmentRange::fromInclusiveDates($From, $To);
+            $appointments = $this->collectAppointmentsForRange($rangeStart, $rangeEnd, true);
 
-        return $this->encodeCompactAppointmentList(
-            $this->filterAppointmentsByCalendarInstanceId($appointments, $CalendarInstanceID)
-        );
+            return $debugFlowResult = $this->encodeCompactAppointmentList(
+                $this->filterAppointmentsByCalendarInstanceId($appointments, $CalendarInstanceID)
+            );
+        } catch (\Throwable $debugFlowException) {
+            $debugFlowFailed = true;
+            $this->DebugFlowException(__FUNCTION__, __LINE__, $debugFlowException);
+            throw $debugFlowException;
+        } finally {
+            $this->DebugFlowEnd(__FUNCTION__, __LINE__, $debugFlowResult, $debugFlowFailed, false);
+        }
     }
 
     /**
@@ -749,7 +948,18 @@ class CalendarView extends IPSModuleStrict
      */
     public function GetDayAppointmentCount(string $Date, int $CalendarInstanceID = 0): int
     {
-        return $this->GetAppointmentCount($Date, $Date, $CalendarInstanceID);
+        $debugFlowResult = null;
+        $debugFlowFailed = false;
+        $this->DebugFlowStart(__FUNCTION__, __LINE__);
+        try {
+            return $debugFlowResult = $this->GetAppointmentCount($Date, $Date, $CalendarInstanceID);
+        } catch (\Throwable $debugFlowException) {
+            $debugFlowFailed = true;
+            $this->DebugFlowException(__FUNCTION__, __LINE__, $debugFlowException);
+            throw $debugFlowException;
+        } finally {
+            $this->DebugFlowEnd(__FUNCTION__, __LINE__, $debugFlowResult, $debugFlowFailed, false);
+        }
     }
 
     /**
@@ -762,10 +972,21 @@ class CalendarView extends IPSModuleStrict
      */
     public function GetAppointmentCount(string $From, string $To, int $CalendarInstanceID = 0): int
     {
-        [$rangeStart, $rangeEnd] = CalendarAppointmentRange::fromInclusiveDates($From, $To);
-        $appointments = $this->collectAppointmentsForRange($rangeStart, $rangeEnd);
+        $debugFlowResult = null;
+        $debugFlowFailed = false;
+        $this->DebugFlowStart(__FUNCTION__, __LINE__);
+        try {
+            [$rangeStart, $rangeEnd] = CalendarAppointmentRange::fromInclusiveDates($From, $To);
+            $appointments = $this->collectAppointmentsForRange($rangeStart, $rangeEnd);
 
-        return count($this->filterAppointmentsByCalendarInstanceId($appointments, $CalendarInstanceID));
+            return $debugFlowResult = count($this->filterAppointmentsByCalendarInstanceId($appointments, $CalendarInstanceID));
+        } catch (\Throwable $debugFlowException) {
+            $debugFlowFailed = true;
+            $this->DebugFlowException(__FUNCTION__, __LINE__, $debugFlowException);
+            throw $debugFlowException;
+        } finally {
+            $this->DebugFlowEnd(__FUNCTION__, __LINE__, $debugFlowResult, $debugFlowFailed, false);
+        }
     }
 
     /**
@@ -779,17 +1000,28 @@ class CalendarView extends IPSModuleStrict
      */
     public function GetRemainingDayAppointments(int $CalendarInstanceID = 0): string
     {
-        $now = new DateTimeImmutable('now');
-        [$rangeStart, $rangeEnd] = CalendarAppointmentRange::fromInclusiveDates(
-            $now->format('Y-m-d'),
-            $now->format('Y-m-d')
-        );
-        $appointments = $this->collectAppointmentsForRange($rangeStart, $rangeEnd);
-        $appointments = $this->filterAppointmentsByCalendarInstanceId($appointments, $CalendarInstanceID);
+        $debugFlowResult = null;
+        $debugFlowFailed = false;
+        $this->DebugFlowStart(__FUNCTION__, __LINE__);
+        try {
+            $now = new DateTimeImmutable('now');
+            [$rangeStart, $rangeEnd] = CalendarAppointmentRange::fromInclusiveDates(
+                $now->format('Y-m-d'),
+                $now->format('Y-m-d')
+            );
+            $appointments = $this->collectAppointmentsForRange($rangeStart, $rangeEnd);
+            $appointments = $this->filterAppointmentsByCalendarInstanceId($appointments, $CalendarInstanceID);
 
-        return $this->encodeAppointmentList(
-            $this->filterRemainingAppointments($appointments, $now->getTimestamp())
-        );
+            return $debugFlowResult = $this->encodeAppointmentList(
+                $this->filterRemainingAppointments($appointments, $now->getTimestamp())
+            );
+        } catch (\Throwable $debugFlowException) {
+            $debugFlowFailed = true;
+            $this->DebugFlowException(__FUNCTION__, __LINE__, $debugFlowException);
+            throw $debugFlowException;
+        } finally {
+            $this->DebugFlowEnd(__FUNCTION__, __LINE__, $debugFlowResult, $debugFlowFailed, false);
+        }
     }
 
     /**
@@ -803,15 +1035,26 @@ class CalendarView extends IPSModuleStrict
      */
     public function GetRemainingDayAppointmentCount(int $CalendarInstanceID = 0): int
     {
-        $now = new DateTimeImmutable('now');
-        [$rangeStart, $rangeEnd] = CalendarAppointmentRange::fromInclusiveDates(
-            $now->format('Y-m-d'),
-            $now->format('Y-m-d')
-        );
-        $appointments = $this->collectAppointmentsForRange($rangeStart, $rangeEnd);
-        $appointments = $this->filterAppointmentsByCalendarInstanceId($appointments, $CalendarInstanceID);
+        $debugFlowResult = null;
+        $debugFlowFailed = false;
+        $this->DebugFlowStart(__FUNCTION__, __LINE__);
+        try {
+            $now = new DateTimeImmutable('now');
+            [$rangeStart, $rangeEnd] = CalendarAppointmentRange::fromInclusiveDates(
+                $now->format('Y-m-d'),
+                $now->format('Y-m-d')
+            );
+            $appointments = $this->collectAppointmentsForRange($rangeStart, $rangeEnd);
+            $appointments = $this->filterAppointmentsByCalendarInstanceId($appointments, $CalendarInstanceID);
 
-        return count($this->filterRemainingAppointments($appointments, $now->getTimestamp()));
+            return $debugFlowResult = count($this->filterRemainingAppointments($appointments, $now->getTimestamp()));
+        } catch (\Throwable $debugFlowException) {
+            $debugFlowFailed = true;
+            $this->DebugFlowException(__FUNCTION__, __LINE__, $debugFlowException);
+            throw $debugFlowException;
+        } finally {
+            $this->DebugFlowEnd(__FUNCTION__, __LINE__, $debugFlowResult, $debugFlowFailed, false);
+        }
     }
 
     /**
@@ -826,20 +1069,31 @@ class CalendarView extends IPSModuleStrict
      */
     public function GetNextAppointment(int $CalendarInstanceID = 0): string
     {
-        $now = new DateTimeImmutable('now');
-        $today = $now->format('Y-m-d');
-        $lastDay = $now->modify('+' . self::APPOINTMENT_LOOKAHEAD_DAYS . ' days')->format('Y-m-d');
-        [$rangeStart, $rangeEnd] = CalendarAppointmentRange::fromInclusiveDates($today, $lastDay);
-        $appointments = $this->collectAppointmentsForRange($rangeStart, $rangeEnd);
-        $appointments = $this->filterAppointmentsByCalendarInstanceId($appointments, $CalendarInstanceID);
+        $debugFlowResult = null;
+        $debugFlowFailed = false;
+        $this->DebugFlowStart(__FUNCTION__, __LINE__);
+        try {
+            $now = new DateTimeImmutable('now');
+            $today = $now->format('Y-m-d');
+            $lastDay = $now->modify('+' . self::APPOINTMENT_LOOKAHEAD_DAYS . ' days')->format('Y-m-d');
+            [$rangeStart, $rangeEnd] = CalendarAppointmentRange::fromInclusiveDates($today, $lastDay);
+            $appointments = $this->collectAppointmentsForRange($rangeStart, $rangeEnd);
+            $appointments = $this->filterAppointmentsByCalendarInstanceId($appointments, $CalendarInstanceID);
 
-        return json_encode(
-            $this->findNextAppointment($appointments, $now->getTimestamp()),
-            JSON_UNESCAPED_SLASHES
-                | JSON_UNESCAPED_UNICODE
-                | JSON_PRESERVE_ZERO_FRACTION
-                | JSON_THROW_ON_ERROR
-        );
+            return $debugFlowResult = json_encode(
+                $this->findNextAppointment($appointments, $now->getTimestamp()),
+                JSON_UNESCAPED_SLASHES
+                    | JSON_UNESCAPED_UNICODE
+                    | JSON_PRESERVE_ZERO_FRACTION
+                    | JSON_THROW_ON_ERROR
+            );
+        } catch (\Throwable $debugFlowException) {
+            $debugFlowFailed = true;
+            $this->DebugFlowException(__FUNCTION__, __LINE__, $debugFlowException);
+            throw $debugFlowException;
+        } finally {
+            $this->DebugFlowEnd(__FUNCTION__, __LINE__, $debugFlowResult, $debugFlowFailed, false);
+        }
     }
 
     /**
@@ -852,17 +1106,28 @@ class CalendarView extends IPSModuleStrict
      */
     public function GetCurrentAppointments(int $CalendarInstanceID = 0): string
     {
-        $now = new DateTimeImmutable('now');
-        [$rangeStart, $rangeEnd] = CalendarAppointmentRange::fromInclusiveDates(
-            $now->format('Y-m-d'),
-            $now->format('Y-m-d')
-        );
-        $appointments = $this->collectAppointmentsForRange($rangeStart, $rangeEnd);
-        $appointments = $this->filterAppointmentsByCalendarInstanceId($appointments, $CalendarInstanceID);
+        $debugFlowResult = null;
+        $debugFlowFailed = false;
+        $this->DebugFlowStart(__FUNCTION__, __LINE__);
+        try {
+            $now = new DateTimeImmutable('now');
+            [$rangeStart, $rangeEnd] = CalendarAppointmentRange::fromInclusiveDates(
+                $now->format('Y-m-d'),
+                $now->format('Y-m-d')
+            );
+            $appointments = $this->collectAppointmentsForRange($rangeStart, $rangeEnd);
+            $appointments = $this->filterAppointmentsByCalendarInstanceId($appointments, $CalendarInstanceID);
 
-        return $this->encodeAppointmentList(
-            $this->filterCurrentAppointments($appointments, $now->getTimestamp())
-        );
+            return $debugFlowResult = $this->encodeAppointmentList(
+                $this->filterCurrentAppointments($appointments, $now->getTimestamp())
+            );
+        } catch (\Throwable $debugFlowException) {
+            $debugFlowFailed = true;
+            $this->DebugFlowException(__FUNCTION__, __LINE__, $debugFlowException);
+            throw $debugFlowException;
+        } finally {
+            $this->DebugFlowEnd(__FUNCTION__, __LINE__, $debugFlowResult, $debugFlowFailed, false);
+        }
     }
 
     /**
@@ -875,15 +1140,26 @@ class CalendarView extends IPSModuleStrict
      */
     public function GetCurrentAppointmentCount(int $CalendarInstanceID = 0): int
     {
-        $now = new DateTimeImmutable('now');
-        [$rangeStart, $rangeEnd] = CalendarAppointmentRange::fromInclusiveDates(
-            $now->format('Y-m-d'),
-            $now->format('Y-m-d')
-        );
-        $appointments = $this->collectAppointmentsForRange($rangeStart, $rangeEnd);
-        $appointments = $this->filterAppointmentsByCalendarInstanceId($appointments, $CalendarInstanceID);
+        $debugFlowResult = null;
+        $debugFlowFailed = false;
+        $this->DebugFlowStart(__FUNCTION__, __LINE__);
+        try {
+            $now = new DateTimeImmutable('now');
+            [$rangeStart, $rangeEnd] = CalendarAppointmentRange::fromInclusiveDates(
+                $now->format('Y-m-d'),
+                $now->format('Y-m-d')
+            );
+            $appointments = $this->collectAppointmentsForRange($rangeStart, $rangeEnd);
+            $appointments = $this->filterAppointmentsByCalendarInstanceId($appointments, $CalendarInstanceID);
 
-        return count($this->filterCurrentAppointments($appointments, $now->getTimestamp()));
+            return $debugFlowResult = count($this->filterCurrentAppointments($appointments, $now->getTimestamp()));
+        } catch (\Throwable $debugFlowException) {
+            $debugFlowFailed = true;
+            $this->DebugFlowException(__FUNCTION__, __LINE__, $debugFlowException);
+            throw $debugFlowException;
+        } finally {
+            $this->DebugFlowEnd(__FUNCTION__, __LINE__, $debugFlowResult, $debugFlowFailed, false);
+        }
     }
 
     /**
@@ -898,20 +1174,31 @@ class CalendarView extends IPSModuleStrict
      */
     public function GetUpcomingAppointments(int $Hours, int $CalendarInstanceID = 0): string
     {
-        $this->validateUpcomingHours($Hours);
+        $debugFlowResult = null;
+        $debugFlowFailed = false;
+        $this->DebugFlowStart(__FUNCTION__, __LINE__);
+        try {
+            $this->validateUpcomingHours($Hours);
 
-        $now = new DateTimeImmutable('now');
-        $until = $now->modify('+' . $Hours . ' hours');
-        [$rangeStart, $rangeEnd] = CalendarAppointmentRange::fromInclusiveDates(
-            $now->format('Y-m-d'),
-            $until->format('Y-m-d')
-        );
-        $appointments = $this->collectAppointmentsForRange($rangeStart, $rangeEnd);
-        $appointments = $this->filterAppointmentsByCalendarInstanceId($appointments, $CalendarInstanceID);
+            $now = new DateTimeImmutable('now');
+            $until = $now->modify('+' . $Hours . ' hours');
+            [$rangeStart, $rangeEnd] = CalendarAppointmentRange::fromInclusiveDates(
+                $now->format('Y-m-d'),
+                $until->format('Y-m-d')
+            );
+            $appointments = $this->collectAppointmentsForRange($rangeStart, $rangeEnd);
+            $appointments = $this->filterAppointmentsByCalendarInstanceId($appointments, $CalendarInstanceID);
 
-        return $this->encodeAppointmentList(
-            $this->filterUpcomingAppointments($appointments, $now->getTimestamp(), $until->getTimestamp())
-        );
+            return $debugFlowResult = $this->encodeAppointmentList(
+                $this->filterUpcomingAppointments($appointments, $now->getTimestamp(), $until->getTimestamp())
+            );
+        } catch (\Throwable $debugFlowException) {
+            $debugFlowFailed = true;
+            $this->DebugFlowException(__FUNCTION__, __LINE__, $debugFlowException);
+            throw $debugFlowException;
+        } finally {
+            $this->DebugFlowEnd(__FUNCTION__, __LINE__, $debugFlowResult, $debugFlowFailed, false);
+        }
     }
 
     /**
@@ -926,24 +1213,35 @@ class CalendarView extends IPSModuleStrict
      */
     public function GetUpcomingAppointmentsCompact(int $Hours, int $CalendarInstanceID = 0): string
     {
-        $this->validateUpcomingHours($Hours);
+        $debugFlowResult = null;
+        $debugFlowFailed = false;
+        $this->DebugFlowStart(__FUNCTION__, __LINE__);
+        try {
+            $this->validateUpcomingHours($Hours);
 
-        $now = new DateTimeImmutable('now');
-        $until = $now->modify('+' . $Hours . ' hours');
-        [$rangeStart, $rangeEnd] = CalendarAppointmentRange::fromInclusiveDates(
-            $now->format('Y-m-d'),
-            $until->format('Y-m-d')
-        );
-        $appointments = $this->collectAppointmentsForRange($rangeStart, $rangeEnd, true);
-        $appointments = $this->filterAppointmentsByCalendarInstanceId($appointments, $CalendarInstanceID);
+            $now = new DateTimeImmutable('now');
+            $until = $now->modify('+' . $Hours . ' hours');
+            [$rangeStart, $rangeEnd] = CalendarAppointmentRange::fromInclusiveDates(
+                $now->format('Y-m-d'),
+                $until->format('Y-m-d')
+            );
+            $appointments = $this->collectAppointmentsForRange($rangeStart, $rangeEnd, true);
+            $appointments = $this->filterAppointmentsByCalendarInstanceId($appointments, $CalendarInstanceID);
 
-        return $this->encodeCompactAppointmentList(
-            $this->filterUpcomingAppointments(
-                $appointments,
-                $now->getTimestamp(),
-                $until->getTimestamp()
-            )
-        );
+            return $debugFlowResult = $this->encodeCompactAppointmentList(
+                $this->filterUpcomingAppointments(
+                    $appointments,
+                    $now->getTimestamp(),
+                    $until->getTimestamp()
+                )
+            );
+        } catch (\Throwable $debugFlowException) {
+            $debugFlowFailed = true;
+            $this->DebugFlowException(__FUNCTION__, __LINE__, $debugFlowException);
+            throw $debugFlowException;
+        } finally {
+            $this->DebugFlowEnd(__FUNCTION__, __LINE__, $debugFlowResult, $debugFlowFailed, false);
+        }
     }
 
     /**
@@ -957,22 +1255,33 @@ class CalendarView extends IPSModuleStrict
      */
     public function GetUpcomingAppointmentCount(int $Hours, int $CalendarInstanceID = 0): int
     {
-        $this->validateUpcomingHours($Hours);
+        $debugFlowResult = null;
+        $debugFlowFailed = false;
+        $this->DebugFlowStart(__FUNCTION__, __LINE__);
+        try {
+            $this->validateUpcomingHours($Hours);
 
-        $now = new DateTimeImmutable('now');
-        $until = $now->modify('+' . $Hours . ' hours');
-        [$rangeStart, $rangeEnd] = CalendarAppointmentRange::fromInclusiveDates(
-            $now->format('Y-m-d'),
-            $until->format('Y-m-d')
-        );
-        $appointments = $this->collectAppointmentsForRange($rangeStart, $rangeEnd);
-        $appointments = $this->filterAppointmentsByCalendarInstanceId($appointments, $CalendarInstanceID);
+            $now = new DateTimeImmutable('now');
+            $until = $now->modify('+' . $Hours . ' hours');
+            [$rangeStart, $rangeEnd] = CalendarAppointmentRange::fromInclusiveDates(
+                $now->format('Y-m-d'),
+                $until->format('Y-m-d')
+            );
+            $appointments = $this->collectAppointmentsForRange($rangeStart, $rangeEnd);
+            $appointments = $this->filterAppointmentsByCalendarInstanceId($appointments, $CalendarInstanceID);
 
-        return count($this->filterUpcomingAppointments(
-            $appointments,
-            $now->getTimestamp(),
-            $until->getTimestamp()
-        ));
+            return $debugFlowResult = count($this->filterUpcomingAppointments(
+                $appointments,
+                $now->getTimestamp(),
+                $until->getTimestamp()
+            ));
+        } catch (\Throwable $debugFlowException) {
+            $debugFlowFailed = true;
+            $this->DebugFlowException(__FUNCTION__, __LINE__, $debugFlowException);
+            throw $debugFlowException;
+        } finally {
+            $this->DebugFlowEnd(__FUNCTION__, __LINE__, $debugFlowResult, $debugFlowFailed, false);
+        }
     }
 
     /**
@@ -987,18 +1296,29 @@ class CalendarView extends IPSModuleStrict
      */
     public function GetNextAppointments(int $Count, int $CalendarInstanceID = 0): string
     {
-        $this->validateAppointmentCount($Count);
+        $debugFlowResult = null;
+        $debugFlowFailed = false;
+        $this->DebugFlowStart(__FUNCTION__, __LINE__);
+        try {
+            $this->validateAppointmentCount($Count);
 
-        $now = new DateTimeImmutable('now');
-        $today = $now->format('Y-m-d');
-        $lastDay = $now->modify('+' . self::APPOINTMENT_LOOKAHEAD_DAYS . ' days')->format('Y-m-d');
-        [$rangeStart, $rangeEnd] = CalendarAppointmentRange::fromInclusiveDates($today, $lastDay);
-        $appointments = $this->collectAppointmentsForRange($rangeStart, $rangeEnd);
-        $appointments = $this->filterAppointmentsByCalendarInstanceId($appointments, $CalendarInstanceID);
+            $now = new DateTimeImmutable('now');
+            $today = $now->format('Y-m-d');
+            $lastDay = $now->modify('+' . self::APPOINTMENT_LOOKAHEAD_DAYS . ' days')->format('Y-m-d');
+            [$rangeStart, $rangeEnd] = CalendarAppointmentRange::fromInclusiveDates($today, $lastDay);
+            $appointments = $this->collectAppointmentsForRange($rangeStart, $rangeEnd);
+            $appointments = $this->filterAppointmentsByCalendarInstanceId($appointments, $CalendarInstanceID);
 
-        return $this->encodeAppointmentList(
-            array_slice($this->filterFutureAppointments($appointments, $now->getTimestamp()), 0, $Count)
-        );
+            return $debugFlowResult = $this->encodeAppointmentList(
+                array_slice($this->filterFutureAppointments($appointments, $now->getTimestamp()), 0, $Count)
+            );
+        } catch (\Throwable $debugFlowException) {
+            $debugFlowFailed = true;
+            $this->DebugFlowException(__FUNCTION__, __LINE__, $debugFlowException);
+            throw $debugFlowException;
+        } finally {
+            $this->DebugFlowEnd(__FUNCTION__, __LINE__, $debugFlowResult, $debugFlowFailed, false);
+        }
     }
 
     /**
@@ -1013,22 +1333,33 @@ class CalendarView extends IPSModuleStrict
      */
     public function GetNextAppointmentsCompact(int $Count, int $CalendarInstanceID = 0): string
     {
-        $this->validateAppointmentCount($Count);
+        $debugFlowResult = null;
+        $debugFlowFailed = false;
+        $this->DebugFlowStart(__FUNCTION__, __LINE__);
+        try {
+            $this->validateAppointmentCount($Count);
 
-        $now = new DateTimeImmutable('now');
-        $today = $now->format('Y-m-d');
-        $lastDay = $now->modify('+' . self::APPOINTMENT_LOOKAHEAD_DAYS . ' days')->format('Y-m-d');
-        [$rangeStart, $rangeEnd] = CalendarAppointmentRange::fromInclusiveDates($today, $lastDay);
-        $appointments = $this->collectAppointmentsForRange($rangeStart, $rangeEnd, true);
-        $appointments = $this->filterAppointmentsByCalendarInstanceId($appointments, $CalendarInstanceID);
+            $now = new DateTimeImmutable('now');
+            $today = $now->format('Y-m-d');
+            $lastDay = $now->modify('+' . self::APPOINTMENT_LOOKAHEAD_DAYS . ' days')->format('Y-m-d');
+            [$rangeStart, $rangeEnd] = CalendarAppointmentRange::fromInclusiveDates($today, $lastDay);
+            $appointments = $this->collectAppointmentsForRange($rangeStart, $rangeEnd, true);
+            $appointments = $this->filterAppointmentsByCalendarInstanceId($appointments, $CalendarInstanceID);
 
-        return $this->encodeCompactAppointmentList(
-            array_slice(
-                $this->filterFutureAppointments($appointments, $now->getTimestamp()),
-                0,
-                $Count
-            )
-        );
+            return $debugFlowResult = $this->encodeCompactAppointmentList(
+                array_slice(
+                    $this->filterFutureAppointments($appointments, $now->getTimestamp()),
+                    0,
+                    $Count
+                )
+            );
+        } catch (\Throwable $debugFlowException) {
+            $debugFlowFailed = true;
+            $this->DebugFlowException(__FUNCTION__, __LINE__, $debugFlowException);
+            throw $debugFlowException;
+        } finally {
+            $this->DebugFlowEnd(__FUNCTION__, __LINE__, $debugFlowResult, $debugFlowFailed, false);
+        }
     }
 
     /**
@@ -1043,7 +1374,18 @@ class CalendarView extends IPSModuleStrict
      */
     public function GetDayReminders(string $Date, int $CalendarInstanceID = 0): string
     {
-        return $this->GetReminders($Date, $Date, $CalendarInstanceID);
+        $debugFlowResult = null;
+        $debugFlowFailed = false;
+        $this->DebugFlowStart(__FUNCTION__, __LINE__);
+        try {
+            return $debugFlowResult = $this->GetReminders($Date, $Date, $CalendarInstanceID);
+        } catch (\Throwable $debugFlowException) {
+            $debugFlowFailed = true;
+            $this->DebugFlowException(__FUNCTION__, __LINE__, $debugFlowException);
+            throw $debugFlowException;
+        } finally {
+            $this->DebugFlowEnd(__FUNCTION__, __LINE__, $debugFlowResult, $debugFlowFailed, false);
+        }
     }
 
     /**
@@ -1061,13 +1403,24 @@ class CalendarView extends IPSModuleStrict
      */
     public function GetReminders(string $From, string $To, int $CalendarInstanceID = 0): string
     {
-        [$rangeStart, $rangeEnd] = CalendarAppointmentRange::fromInclusiveDates($From, $To);
+        $debugFlowResult = null;
+        $debugFlowFailed = false;
+        $this->DebugFlowStart(__FUNCTION__, __LINE__);
+        try {
+            [$rangeStart, $rangeEnd] = CalendarAppointmentRange::fromInclusiveDates($From, $To);
 
-        return $this->encodeReminderList($this->collectRemindersForTimestampRange(
-            $rangeStart->getTimestamp(),
-            $rangeEnd->getTimestamp() - 1,
-            $CalendarInstanceID
-        ));
+            return $debugFlowResult = $this->encodeReminderList($this->collectRemindersForTimestampRange(
+                $rangeStart->getTimestamp(),
+                $rangeEnd->getTimestamp() - 1,
+                $CalendarInstanceID
+            ));
+        } catch (\Throwable $debugFlowException) {
+            $debugFlowFailed = true;
+            $this->DebugFlowException(__FUNCTION__, __LINE__, $debugFlowException);
+            throw $debugFlowException;
+        } finally {
+            $this->DebugFlowEnd(__FUNCTION__, __LINE__, $debugFlowResult, $debugFlowFailed, false);
+        }
     }
 
     /**
@@ -1081,15 +1434,26 @@ class CalendarView extends IPSModuleStrict
      */
     public function GetUpcomingReminders(int $Minutes, int $CalendarInstanceID = 0): string
     {
-        $this->validateReminderMinutesWindow($Minutes);
+        $debugFlowResult = null;
+        $debugFlowFailed = false;
+        $this->DebugFlowStart(__FUNCTION__, __LINE__);
+        try {
+            $this->validateReminderMinutesWindow($Minutes);
 
-        $now = new DateTimeImmutable('now');
+            $now = new DateTimeImmutable('now');
 
-        return $this->encodeReminderList($this->collectRemindersForTimestampRange(
-            $now->getTimestamp(),
-            $now->getTimestamp() + ($Minutes * 60),
-            $CalendarInstanceID
-        ));
+            return $debugFlowResult = $this->encodeReminderList($this->collectRemindersForTimestampRange(
+                $now->getTimestamp(),
+                $now->getTimestamp() + ($Minutes * 60),
+                $CalendarInstanceID
+            ));
+        } catch (\Throwable $debugFlowException) {
+            $debugFlowFailed = true;
+            $this->DebugFlowException(__FUNCTION__, __LINE__, $debugFlowException);
+            throw $debugFlowException;
+        } finally {
+            $this->DebugFlowEnd(__FUNCTION__, __LINE__, $debugFlowResult, $debugFlowFailed, false);
+        }
     }
 
     /**
@@ -1103,21 +1467,32 @@ class CalendarView extends IPSModuleStrict
      */
     public function GetNextReminder(int $CalendarInstanceID = 0): string
     {
-        $now = new DateTimeImmutable('now');
-        $until = $now->modify('+' . self::APPOINTMENT_LOOKAHEAD_DAYS . ' days')->getTimestamp();
-        $reminders = $this->collectRemindersForTimestampRange(
-            $now->getTimestamp(),
-            $until,
-            $CalendarInstanceID
-        );
+        $debugFlowResult = null;
+        $debugFlowFailed = false;
+        $this->DebugFlowStart(__FUNCTION__, __LINE__);
+        try {
+            $now = new DateTimeImmutable('now');
+            $until = $now->modify('+' . self::APPOINTMENT_LOOKAHEAD_DAYS . ' days')->getTimestamp();
+            $reminders = $this->collectRemindersForTimestampRange(
+                $now->getTimestamp(),
+                $until,
+                $CalendarInstanceID
+            );
 
-        return json_encode(
-            $reminders[0] ?? null,
-            JSON_UNESCAPED_SLASHES
-                | JSON_UNESCAPED_UNICODE
-                | JSON_PRESERVE_ZERO_FRACTION
-                | JSON_THROW_ON_ERROR
-        );
+            return $debugFlowResult = json_encode(
+                $reminders[0] ?? null,
+                JSON_UNESCAPED_SLASHES
+                    | JSON_UNESCAPED_UNICODE
+                    | JSON_PRESERVE_ZERO_FRACTION
+                    | JSON_THROW_ON_ERROR
+            );
+        } catch (\Throwable $debugFlowException) {
+            $debugFlowFailed = true;
+            $this->DebugFlowException(__FUNCTION__, __LINE__, $debugFlowException);
+            throw $debugFlowException;
+        } finally {
+            $this->DebugFlowEnd(__FUNCTION__, __LINE__, $debugFlowResult, $debugFlowFailed, false);
+        }
     }
 
     /**
@@ -1133,15 +1508,26 @@ class CalendarView extends IPSModuleStrict
      */
     public function GetDueReminders(int $ToleranceMinutes = 1, int $CalendarInstanceID = 0): string
     {
-        $this->validateReminderMinutesWindow($ToleranceMinutes);
+        $debugFlowResult = null;
+        $debugFlowFailed = false;
+        $this->DebugFlowStart(__FUNCTION__, __LINE__);
+        try {
+            $this->validateReminderMinutesWindow($ToleranceMinutes);
 
-        $now = new DateTimeImmutable('now');
+            $now = new DateTimeImmutable('now');
 
-        return $this->encodeReminderList($this->collectRemindersForTimestampRange(
-            $now->getTimestamp() - ($ToleranceMinutes * 60),
-            $now->getTimestamp(),
-            $CalendarInstanceID
-        ));
+            return $debugFlowResult = $this->encodeReminderList($this->collectRemindersForTimestampRange(
+                $now->getTimestamp() - ($ToleranceMinutes * 60),
+                $now->getTimestamp(),
+                $CalendarInstanceID
+            ));
+        } catch (\Throwable $debugFlowException) {
+            $debugFlowFailed = true;
+            $this->DebugFlowException(__FUNCTION__, __LINE__, $debugFlowException);
+            throw $debugFlowException;
+        } finally {
+            $this->DebugFlowEnd(__FUNCTION__, __LINE__, $debugFlowResult, $debugFlowFailed, false);
+        }
     }
 
     /**
@@ -1155,12 +1541,23 @@ class CalendarView extends IPSModuleStrict
      */
     public function GetSelectedCalendars(): string
     {
-        return json_encode(
-            $this->loadSelectedCalendars(true),
-            JSON_UNESCAPED_SLASHES
-                | JSON_UNESCAPED_UNICODE
-                | JSON_THROW_ON_ERROR
-        );
+        $debugFlowResult = null;
+        $debugFlowFailed = false;
+        $this->DebugFlowStart(__FUNCTION__, __LINE__);
+        try {
+            return $debugFlowResult = json_encode(
+                $this->loadSelectedCalendars(true),
+                JSON_UNESCAPED_SLASHES
+                    | JSON_UNESCAPED_UNICODE
+                    | JSON_THROW_ON_ERROR
+            );
+        } catch (\Throwable $debugFlowException) {
+            $debugFlowFailed = true;
+            $this->DebugFlowException(__FUNCTION__, __LINE__, $debugFlowException);
+            throw $debugFlowException;
+        } finally {
+            $this->DebugFlowEnd(__FUNCTION__, __LINE__, $debugFlowResult, $debugFlowFailed, false);
+        }
     }
 
     /**
@@ -1170,7 +1567,18 @@ class CalendarView extends IPSModuleStrict
      */
     public function GetIPSViewHTML(): string
     {
-        return $this->renderCalendarHtml($this->buildState(), true);
+        $debugFlowResult = null;
+        $debugFlowFailed = false;
+        $this->DebugFlowStart(__FUNCTION__, __LINE__);
+        try {
+            return $debugFlowResult = $this->renderCalendarHtml($this->buildState(), true);
+        } catch (\Throwable $debugFlowException) {
+            $debugFlowFailed = true;
+            $this->DebugFlowException(__FUNCTION__, __LINE__, $debugFlowException);
+            throw $debugFlowException;
+        } finally {
+            $this->DebugFlowEnd(__FUNCTION__, __LINE__, $debugFlowResult, $debugFlowFailed, false);
+        }
     }
 
     /**
@@ -1180,7 +1588,18 @@ class CalendarView extends IPSModuleStrict
      */
     public function RegenerateIPSViewHTML(): bool
     {
-        return $this->RegenerateIPSViewHTMLPages();
+        $debugFlowResult = null;
+        $debugFlowFailed = false;
+        $this->DebugFlowStart(__FUNCTION__, __LINE__);
+        try {
+            return $debugFlowResult = $this->RegenerateIPSViewHTMLPages();
+        } catch (\Throwable $debugFlowException) {
+            $debugFlowFailed = true;
+            $this->DebugFlowException(__FUNCTION__, __LINE__, $debugFlowException);
+            throw $debugFlowException;
+        } finally {
+            $this->DebugFlowEnd(__FUNCTION__, __LINE__, $debugFlowResult, $debugFlowFailed, false);
+        }
     }
 
     /** Ensures provider state is available before the shared helper renders the page. */
@@ -1194,78 +1613,119 @@ class CalendarView extends IPSModuleStrict
      */
     protected function ProcessHookData(): void
     {
-        if (!$this->IsIPSViewHTMLPageEnabled()) {
-            $this->outputIPSViewResponse(['Error' => 'IPSView is disabled.'], 404);
-
-            return;
-        }
-
-        if (strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? '')) !== 'POST') {
-            $this->outputIPSViewResponse(['Error' => 'Method not allowed.'], 405);
-
-            return;
-        }
-
-        $request = $_POST;
-        if ($request === []) {
-            parse_str((string) file_get_contents('php://input'), $request);
-        }
-
-        $token = is_string($request['token'] ?? null) ? $request['token'] : '';
-        if ($token === '' || !hash_equals($this->ipsViewToken(), $token)) {
-            $this->outputIPSViewResponse(['Error' => 'Unauthorized.'], 403);
-
-            return;
-        }
-
-        $action = is_string($request['action'] ?? null) ? $request['action'] : '';
-        if ($action === 'GetState') {
-            try {
-                $this->outputIPSViewResponse([
-                    'type'    => 'state',
-                    'payload' => $this->buildState()
-                ]);
-            } catch (Throwable $exception) {
-                $this->SendDebug('IPSViewAction', $exception->getMessage(), 0);
-                $this->outputIPSViewResponse(['Error' => 'State retrieval failed.'], 500);
-            }
-
-            return;
-        }
-
-        $rawValue = $request['value'] ?? 'null';
-        $value = null;
-        if (is_string($rawValue)) {
-            try {
-                $value = json_decode($rawValue, true, 64, JSON_THROW_ON_ERROR);
-            } catch (JsonException) {
-                $this->outputIPSViewResponse(['Error' => 'Invalid value.'], 400);
+        $debugFlowResult = null;
+        $debugFlowFailed = false;
+        $this->DebugFlowStart(__FUNCTION__, __LINE__);
+        try {
+            if (!$this->IsIPSViewHTMLPageEnabled()) {
+                $this->outputIPSViewResponse(['Error' => 'IPSView is disabled.'], 404);
 
                 return;
             }
-        }
 
-        try {
-            $result = $this->executeVisualizationAction($action, $value);
-            $response = [
-                'type'    => 'state',
-                'payload' => $result['state']
-            ];
-            if ($result['message'] !== '') {
-                $response['toast'] = [
-                    'level'   => $result['level'],
-                    'message' => $result['message']
-                ];
+            if (strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? '')) !== 'POST') {
+                $this->outputIPSViewResponse(['Error' => 'Method not allowed.'], 405);
+
+                return;
             }
-            $this->outputIPSViewResponse($response);
-        } catch (InvalidArgumentException $exception) {
-            $this->outputIPSViewResponse(['Error' => $exception->getMessage()], 400);
-        } catch (RuntimeException $exception) {
-            $this->outputIPSViewResponse(['Error' => $exception->getMessage()], 400);
-        } catch (Throwable $exception) {
-            $this->SendDebug('IPSViewAction', $exception->getMessage(), 0);
-            $this->outputIPSViewResponse(['Error' => 'Action failed.'], 500);
+
+            $request = $_POST;
+            if ($request === []) {
+                parse_str((string) file_get_contents('php://input'), $request);
+            }
+
+            $token = is_string($request['token'] ?? null) ? $request['token'] : '';
+            if ($token === '' || !hash_equals($this->ipsViewToken(), $token)) {
+                $this->outputIPSViewResponse(['Error' => 'Unauthorized.'], 403);
+
+                return;
+            }
+
+            $action = is_string($request['action'] ?? null) ? $request['action'] : '';
+            if ($action === 'GetState') {
+                try {
+                    $this->outputIPSViewResponse([
+                        'type'    => 'state',
+                        'payload' => $this->buildState()
+                    ]);
+                } catch (Throwable $exception) {
+                    $this->DebugFlowException(__FUNCTION__, __LINE__, $exception);
+                    $this->outputIPSViewResponse(['Error' => 'State retrieval failed.'], 500);
+                }
+
+                return;
+            }
+
+            $rawValue = $request['value'] ?? 'null';
+            $value = null;
+            if (is_string($rawValue)) {
+                try {
+                    $value = json_decode($rawValue, true, 64, JSON_THROW_ON_ERROR);
+                } catch (JsonException) {
+                    $this->outputIPSViewResponse(['Error' => 'Invalid value.'], 400);
+
+                    return;
+                }
+            }
+
+            try {
+                $result = $this->executeVisualizationAction($action, $value);
+                $response = [
+                    'type'    => 'state',
+                    'payload' => $result['state']
+                ];
+                if ($result['message'] !== '') {
+                    $response['toast'] = [
+                        'level'   => $result['level'],
+                        'message' => $result['message']
+                    ];
+                }
+                $this->outputIPSViewResponse($response);
+            } catch (InvalidArgumentException $exception) {
+                $this->outputIPSViewResponse(['Error' => $exception->getMessage()], 400);
+            } catch (RuntimeException $exception) {
+                $this->outputIPSViewResponse(['Error' => $exception->getMessage()], 400);
+            } catch (Throwable $exception) {
+                $this->DebugFlowException(__FUNCTION__, __LINE__, $exception);
+                $this->outputIPSViewResponse(['Error' => 'Action failed.'], 500);
+            }
+        } catch (\Throwable $debugFlowException) {
+            $debugFlowFailed = true;
+            $this->DebugFlowException(__FUNCTION__, __LINE__, $debugFlowException);
+            throw $debugFlowException;
+        } finally {
+            $this->DebugFlowEnd(__FUNCTION__, __LINE__, $debugFlowResult, $debugFlowFailed, true);
         }
+    }
+
+    /**
+     * Überführt ältere Helper-Diagnosen ohne deren Rohdaten in den gemeinsamen Debug-Aufbau.
+     *
+     * @param string $Message Native Debug-Kategorie
+     * @param string $Data Geschützte native Diagnose
+     * @param int $Format Natives Datenformat
+     * @return bool Ergebnis des nativen Debug-Kanals
+     */
+    protected function SendDebug(string $Message, string $Data, int $Format): bool
+    {
+        if (str_starts_with($Message, static::class . ' | ')) {
+            return parent::SendDebug($Message, $Data, $Format);
+        }
+        $trace = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 2);
+        $standalone = $this->debugFlowCalls === [];
+        if ($standalone) {
+            $this->DebugFlowStart(__FUNCTION__, __LINE__);
+        }
+        try {
+            $this->DebugFlowEvent($trace[1]['function'] ?? 'Modulhilfe', (int) ($trace[0]['line'] ?? __LINE__), 'FEHLER', 'Die gemeinsame Modulhilfe meldet einen nicht abgeschlossenen Vorgang; Rohdaten bleiben geschützt.', [
+                'Quelldatei' => basename((string) ($trace[0]['file'] ?? 'module.php'))
+            ]);
+        } finally {
+            if ($standalone) {
+                $this->DebugFlowEnd(__FUNCTION__, __LINE__);
+            }
+        }
+        return true;
     }
 
     private function broadcastStateInvalidation(): void
@@ -1280,41 +1740,53 @@ class CalendarView extends IPSModuleStrict
                 JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR
             ));
         } catch (Throwable $exception) {
-            $this->SendDebug('VisualizationUpdate', $exception->getMessage(), 0);
+            $this->DebugFlowException(__FUNCTION__, __LINE__, $exception);
         }
     }
 
     private function broadcastState(?array $state = null, bool $updateIPSViewHTML = false): void
     {
-        if (!$this->isRuntimeReady()) {
-            return;
-        }
-
-        if ($state === null) {
-            try {
-                $state = $this->buildState();
-            } catch (Throwable $exception) {
-                $this->SendDebug('CalendarState', $exception->getMessage(), 0);
-
+        $debugFlowResult = null;
+        $debugFlowFailed = false;
+        $this->DebugFlowStart(__FUNCTION__, __LINE__);
+        try {
+            $this->DebugFlowEvent(__FUNCTION__, __LINE__, 'SENDEN', 'Kalenderansicht wird an die Visualisierung übergeben; Inhalte bleiben geschützt.', ['Schnittstelle' => 'Symcon-Visualisierung', 'IPSViewAktualisieren' => $updateIPSViewHTML]);
+            if (!$this->isRuntimeReady()) {
                 return;
             }
-        }
 
-        try {
-            $this->UpdateVisualizationValue($this->getFullUpdateMessage($state));
-        } catch (Throwable $exception) {
-            $this->SendDebug('VisualizationUpdate', $exception->getMessage(), 0);
-        }
+            if ($state === null) {
+                try {
+                    $state = $this->buildState();
+                } catch (Throwable $exception) {
+                    $this->DebugFlowException(__FUNCTION__, __LINE__, $exception);
 
-        if ($updateIPSViewHTML && $this->IsIPSViewHTMLPageEnabled()) {
-            try {
-                $html = $this->renderNonEmptyIPSViewHTML($state, 'IPSViewUpdate');
-                if ($html !== null) {
-                    $this->UpdateIPSViewHTMLVariable('IPSViewCalendar', $html);
+                    return;
                 }
-            } catch (Throwable $exception) {
-                $this->SendDebug('IPSViewUpdate', $exception->getMessage(), 0);
             }
+
+            try {
+                $this->UpdateVisualizationValue($this->getFullUpdateMessage($state));
+            } catch (Throwable $exception) {
+                $this->DebugFlowException(__FUNCTION__, __LINE__, $exception);
+            }
+
+            if ($updateIPSViewHTML && $this->IsIPSViewHTMLPageEnabled()) {
+                try {
+                    $html = $this->renderNonEmptyIPSViewHTML($state, 'IPSViewUpdate');
+                    if ($html !== null) {
+                        $this->UpdateIPSViewHTMLVariable('IPSViewCalendar', $html);
+                    }
+                } catch (Throwable $exception) {
+                    $this->DebugFlowException(__FUNCTION__, __LINE__, $exception);
+                }
+            }
+        } catch (\Throwable $debugFlowException) {
+            $debugFlowFailed = true;
+            $this->DebugFlowException(__FUNCTION__, __LINE__, $debugFlowException);
+            throw $debugFlowException;
+        } finally {
+            $this->DebugFlowEnd(__FUNCTION__, __LINE__, $debugFlowResult, $debugFlowFailed, true);
         }
     }
 
@@ -1408,11 +1880,7 @@ class CalendarView extends IPSModuleStrict
             return $html;
         }
 
-        $this->SendDebug(
-            $debugContext,
-            'Rendering returned an empty document; preserving the existing IPSView HTML.',
-            0
-        );
+        $this->DebugFlowEvent(__FUNCTION__, __LINE__, 'AKTION', 'Darstellung lieferte ein leeres Dokument; vorhandene IPSView-Ausgabe bleibt erhalten.', []);
 
         return null;
     }
@@ -1591,7 +2059,7 @@ class CalendarView extends IPSModuleStrict
                         $queryEnd
                     );
                 } catch (Throwable $exception) {
-                    $this->SendDebug('CalendarData', $exception->getMessage(), 0);
+                    $this->DebugFlowException(__FUNCTION__, __LINE__, $exception);
                     continue;
                 }
 
@@ -2348,66 +2816,78 @@ class CalendarView extends IPSModuleStrict
      */
     private function readCalendarEventsForRange(int $instanceId, int $rangeStart, int $rangeEnd): array
     {
-        $metadata = json_decode(
-            IPSKAL_BeginEventsTransfer($instanceId, $rangeStart, $rangeEnd),
-            true,
-            512,
-            JSON_THROW_ON_ERROR
-        );
-        if (!is_array($metadata)) {
-            throw new UnexpectedValueException('The calendar returned invalid event transfer metadata.');
-        }
-
-        $token = trim((string) ($metadata['Token'] ?? ''));
-        $pageCount = (int) ($metadata['PageCount'] ?? 0);
-        $itemCount = (int) ($metadata['ItemCount'] ?? -1);
-        if (preg_match('/^[a-f0-9]{32}$/D', $token) !== 1
-            || $pageCount < 1
-            || $pageCount > 10_000
-            || $itemCount < 0) {
-            throw new UnexpectedValueException('The calendar returned invalid event transfer metadata.');
-        }
-
-        $events = [];
+        $debugFlowResult = null;
+        $debugFlowFailed = false;
+        $this->DebugFlowStart(__FUNCTION__, __LINE__);
         try {
-            for ($page = 0; $page < $pageCount; ++$page) {
-                $payload = json_decode(
-                    IPSKAL_ReadEventsTransferPage($instanceId, $token, $page),
-                    true,
-                    512,
-                    JSON_THROW_ON_ERROR
-                );
-                if (!is_array($payload)
-                    || ($payload['Token'] ?? null) !== $token
-                    || (int) ($payload['Page'] ?? -1) !== $page
-                    || (int) ($payload['PageCount'] ?? 0) !== $pageCount
-                    || (int) ($payload['ItemCount'] ?? -1) !== $itemCount
-                    || (bool) ($payload['Complete'] ?? false) !== ($page === $pageCount - 1)
-                    || !is_array($payload['Items'] ?? null)
-                    || !array_is_list($payload['Items'])) {
-                    throw new UnexpectedValueException('The calendar returned an invalid event transfer page.');
-                }
-
-                foreach ($payload['Items'] as $event) {
-                    if (!is_array($event) || array_is_list($event)) {
-                        throw new UnexpectedValueException('The calendar returned invalid event data.');
-                    }
-                    $events[] = $event;
-                }
+            $this->DebugFlowEvent(__FUNCTION__, __LINE__, 'SENDEN', 'Terminübertragung von einer Kalenderinstanz angefordert.', ['Quelle' => $instanceId]);
+            $metadata = json_decode(
+                IPSKAL_BeginEventsTransfer($instanceId, $rangeStart, $rangeEnd),
+                true,
+                512,
+                JSON_THROW_ON_ERROR
+            );
+            if (!is_array($metadata)) {
+                throw new UnexpectedValueException('The calendar returned invalid event transfer metadata.');
             }
-        } finally {
+
+            $token = trim((string) ($metadata['Token'] ?? ''));
+            $pageCount = (int) ($metadata['PageCount'] ?? 0);
+            $itemCount = (int) ($metadata['ItemCount'] ?? -1);
+            if (preg_match('/^[a-f0-9]{32}$/D', $token) !== 1
+                || $pageCount < 1
+                || $pageCount > 10_000
+                || $itemCount < 0) {
+                throw new UnexpectedValueException('The calendar returned invalid event transfer metadata.');
+            }
+
+            $events = [];
             try {
-                IPSKAL_FinishEventsTransfer($instanceId, $token);
-            } catch (Throwable $exception) {
-                $this->SendDebug('EventTransferCleanup', $exception->getMessage(), 0);
+                for ($page = 0; $page < $pageCount; ++$page) {
+                    $payload = json_decode(
+                        IPSKAL_ReadEventsTransferPage($instanceId, $token, $page),
+                        true,
+                        512,
+                        JSON_THROW_ON_ERROR
+                    );
+                    if (!is_array($payload)
+                        || ($payload['Token'] ?? null) !== $token
+                        || (int) ($payload['Page'] ?? -1) !== $page
+                        || (int) ($payload['PageCount'] ?? 0) !== $pageCount
+                        || (int) ($payload['ItemCount'] ?? -1) !== $itemCount
+                        || (bool) ($payload['Complete'] ?? false) !== ($page === $pageCount - 1)
+                        || !is_array($payload['Items'] ?? null)
+                        || !array_is_list($payload['Items'])) {
+                        throw new UnexpectedValueException('The calendar returned an invalid event transfer page.');
+                    }
+
+                    foreach ($payload['Items'] as $event) {
+                        if (!is_array($event) || array_is_list($event)) {
+                            throw new UnexpectedValueException('The calendar returned invalid event data.');
+                        }
+                        $events[] = $event;
+                    }
+                }
+            } finally {
+                try {
+                    IPSKAL_FinishEventsTransfer($instanceId, $token);
+                } catch (Throwable $exception) {
+                    $this->DebugFlowException(__FUNCTION__, __LINE__, $exception);
+                }
             }
-        }
 
-        if (count($events) !== $itemCount) {
-            throw new UnexpectedValueException('The calendar returned an incomplete event transfer.');
-        }
+            if (count($events) !== $itemCount) {
+                throw new UnexpectedValueException('The calendar returned an incomplete event transfer.');
+            }
 
-        return $events;
+            return $debugFlowResult = $events;
+        } catch (\Throwable $debugFlowException) {
+            $debugFlowFailed = true;
+            $this->DebugFlowException(__FUNCTION__, __LINE__, $debugFlowException);
+            throw $debugFlowException;
+        } finally {
+            $this->DebugFlowEnd(__FUNCTION__, __LINE__, $debugFlowResult, $debugFlowFailed, false);
+        }
     }
 
     /**
@@ -2546,7 +3026,7 @@ class CalendarView extends IPSModuleStrict
                     return true;
                 }
             } catch (Throwable $exception) {
-                $this->SendDebug('CalendarInitialization', $exception->getMessage(), 0);
+                $this->DebugFlowException(__FUNCTION__, __LINE__, $exception);
 
                 return true;
             }
@@ -2590,7 +3070,7 @@ class CalendarView extends IPSModuleStrict
                     $calendarStatus = $decodedStatus;
                 }
             } catch (Throwable $exception) {
-                $this->SendDebug('CalendarStatus', $exception->getMessage(), 0);
+                $this->DebugFlowException(__FUNCTION__, __LINE__, $exception);
             }
 
             $color = strtoupper(trim((string) ($calendarStatus['calendarColor']
@@ -2726,11 +3206,7 @@ class CalendarView extends IPSModuleStrict
         }
 
         if ($selection !== []) {
-            $this->SendDebug(
-                'CalendarSelection',
-                'Recovered the calendar selection from existing message subscriptions.',
-                0
-            );
+            $this->DebugFlowEvent(__FUNCTION__, __LINE__, 'AKTION', 'Kalenderauswahl aus vorhandenen Nachrichtenabonnements wiederhergestellt.', []);
             $this->storeCalendarSelectionBackup($selection);
         }
     }
@@ -3432,7 +3908,7 @@ class CalendarView extends IPSModuleStrict
                 )
             );
         } catch (Throwable $exception) {
-            $this->SendDebug('MoveRollback', $exception->getMessage(), 0);
+            $this->DebugFlowException(__FUNCTION__, __LINE__, $exception);
             return false;
         }
     }

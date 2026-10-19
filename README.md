@@ -385,3 +385,9 @@ Drittanbieter.
   Jahresereignisse bereit. Neben der vollständigen Ausgabe stehen kompakte
   Varianten für einfache Skripte zur Verfügung. Leere HTML-Hüllen von
   Anbieterbeschreibungen erscheinen in den Termindetails nicht als leere Fläche.
+
+## Debug-Ausgaben
+
+Der native Symcon-Debug zeigt deutsche Meldungen mit Funktion, Zeile, Vorgang
+und Ergebnis sowie Aktionen und Schnittstellenübergaben. Private Inhalte und
+Zugangsdaten bleiben geschützt. Details und Abnahme: [Debug-Aufbau](docs/DEBUG_OUTPUT.md).

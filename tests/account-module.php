@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+require_once __DIR__ . '/../libs/helper/DebugFlowHelper.php';
+
 if (!class_exists('IPSModuleStrict')) {
     class IPSModuleStrict
     {
@@ -12,6 +14,7 @@ require_once __DIR__ . '/../Kalender Konto/module.php';
 
 final class CalendarAccountGatewayRecurrenceProbe
 {
+    use \Burki24\SymconModuleHelper\DebugFlowHelper;
     use KalenderKontoChildGatewayTrait;
 
     /** @var list<array<string, mixed>> */
@@ -505,7 +508,7 @@ assertAccountStructure(
         && str_contains($accountSource, 'foreach ([self::GOOGLE_OAUTH_IDENTIFIER, self::MICROSOFT_OAUTH_IDENTIFIER] as $identifier)')
         && str_contains($accountSource, 'if (!$this->RegisterOAuth($identifier))')
         && str_contains($accountSource, 'catch (Throwable $exception)')
-        && str_contains($accountSource, "'OAuthRegistration'"),
+        && str_contains($accountSource, 'OAuth-Handler konnte nicht registriert werden.'),
     'A temporarily unavailable OAuth control must not abort account or library initialization.'
 );
 
@@ -557,11 +560,11 @@ assertAccountStructure(
 );
 assertAccountStructure(
     is_string($accountSource)
-        && str_contains($accountSource, '$rawMessage = $this->sanitizeError($exception->getMessage());')
-        && str_contains($accountSource, '$this->SendSafeDebug(\'ProviderError\', [')
-        && str_contains($accountSource, '\'message\'    => $rawMessage')
-        && !str_contains($accountSource, '\'message\'    => $exception->getMessage()'),
-    'Provider debug output must only receive sanitized exception messages.'
+        && str_contains($accountSource, 'Kommunikation mit dem Kalenderanbieter fehlgeschlagen')
+        && str_contains($accountSource, "'HTTPStatus' => \$httpStatus")
+        && !str_contains($accountSource, 'SendSafeDebug(')
+        && !str_contains($accountSource, 'SendSafeDebugException('),
+    'Provider diagnostics must use safe causes and status without arbitrary exception messages.'
 );
 
 fwrite(STDOUT, "CalendarAccount structure tests passed.\n");

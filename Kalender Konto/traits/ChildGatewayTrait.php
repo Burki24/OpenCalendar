@@ -37,76 +37,84 @@ trait KalenderKontoChildGatewayTrait
      */
     public function ForwardData(string $JSONString): string
     {
-        $startedAt = microtime(true);
-
+        $debugFlowResult = null;
+        $debugFlowFailed = false;
+        $this->DebugFlowStart(__FUNCTION__, __LINE__);
         try {
-            $request = $this->DecodeDataFlowMessage($JSONString, self::DATA_ID_FROM_CHILD);
+            $startedAt = microtime(true);
 
-            $operation = (string) ($request['Operation'] ?? '');
-            $requestID = (string) ($request['RequestID'] ?? '');
-            $debugRequest = $operation !== 'ReadEventsTransferPage';
-            if ($debugRequest) {
-                $this->SendSafeDebug('ChildRequest', [
-                    'operation'         => $operation,
-                    'provider'          => $this->getProviderName($this->ReadPropertyInteger('Provider')),
-                    'calendarSpecified' => trim((string) ($request['CalendarID'] ?? '')) !== '',
-                    'requestFields'     => array_values(array_keys($request))
-                ]);
+            try {
+                $request = $this->DecodeDataFlowMessage($JSONString, self::DATA_ID_FROM_CHILD);
+
+                $operation = (string) ($request['Operation'] ?? '');
+                $requestID = (string) ($request['RequestID'] ?? '');
+                $debugRequest = $operation !== 'ReadEventsTransferPage';
+                if ($debugRequest) {
+                    $this->DebugFlowEvent(__FUNCTION__, __LINE__, 'EMPFANG', 'Anfrage eines Kindmoduls empfangen; Inhalte bleiben geschützt.', [
+                        'Operation'         => in_array($operation, ['GetCalendars', 'GetTaskLists', 'DiscoverCalendars', 'GetEvents', 'BeginEventsTransfer', 'ReadEventsTransferPage', 'FinishEventsTransfer', 'success', 'GetEventForEdit', 'GetEventAfterWrite', 'CheckPendingTask', 'CheckRecurringSeries', 'GetRecurringSeries', 'GetRecurringFollowing', 'CreateEvent', 'UpdateEvent', 'DeleteEvent', 'SynchronizeTasks', 'CreateTask', 'UpdateTask', 'DeleteTask', 'Synchronize', 'TestConnection'], true) ? $operation : '[Unbekannte Operation geschützt]',
+                        'Anbieter'          => $this->getProviderName($this->ReadPropertyInteger('Provider')),
+                        'KalenderAngegeben' => trim((string) ($request['CalendarID'] ?? '')) !== '',
+                        'Anfragefelder'     => count($request)
+                    ]);
+                }
+
+                $payload = match ($operation) {
+                    'GetCalendars'           => json_decode($this->GetCalendars(), true, 512, JSON_THROW_ON_ERROR),
+                    'GetTaskLists'           => json_decode($this->GetTaskLists(), true, 512, JSON_THROW_ON_ERROR),
+                    'DiscoverCalendars'      => $this->discoverCalendars(),
+                    'GetEvents'              => $this->getEventsForChild($request),
+                    'BeginEventsTransfer'    => $this->beginEventsTransferForChild($request),
+                    'ReadEventsTransferPage' => $this->readEventsTransferPageForChild($request),
+                    'FinishEventsTransfer'   => [
+                        'success' => $this->finishEventsTransferForChild($request)
+                    ],
+                    'GetEventForEdit'        => $this->getEventForEditForChild($request),
+                    'GetEventAfterWrite'     => $this->getEventAfterWriteForChild($request),
+                    'CheckPendingTask'       => $this->checkPendingTaskForChild($request),
+                    'CheckRecurringSeries'   => $this->checkRecurringSeriesForChild($request),
+                    'GetRecurringSeries'     => $this->getRecurringSeriesForChild($request),
+                    'GetRecurringFollowing'  => $this->getRecurringFollowingForChild($request),
+                    'CreateEvent'            => $this->createEventForChild($request),
+                    'UpdateEvent'            => $this->updateEventForChild($request),
+                    'DeleteEvent'            => ['success' => $this->deleteEventForChild($request)],
+                    'SynchronizeTasks'       => $this->synchronizeTasksForChild($request),
+                    'CreateTask'             => $this->createTaskForChild($request),
+                    'UpdateTask'             => $this->updateTaskForChild($request),
+                    'DeleteTask'             => ['success' => $this->deleteTaskForChild($request)],
+                    'Synchronize'            => ['success' => $this->Synchronize()],
+                    'TestConnection'         => json_decode($this->TestConnection(), true, 512, JSON_THROW_ON_ERROR),
+                    default                  => throw new InvalidArgumentException('Unsupported operation: ' . $operation)
+                };
+
+                if ($debugRequest) {
+                    $this->DebugFlowEvent(__FUNCTION__, __LINE__, 'AKTION', 'Anfrage verarbeitet; fachliches Ergebnis und Umfang stehen im Bezug.', [
+                        'Fachergebnis'       => is_array($payload) && array_key_exists('success', $payload) ? (bool) $payload['success'] : null,
+                        'Einträge'           => is_array($payload) ? count($payload) : null,
+                        'Operation'          => $operation,
+                        'DauerMillisekunden' => (int) round((microtime(true) - $startedAt) * 1000)
+                    ]);
+                }
+
+                return $debugFlowResult = $this->encodeResponse(true, $operation, $requestID, $payload);
+            } catch (Throwable $exception) {
+                $this->DebugFlowException(__FUNCTION__, __LINE__, $exception);
+
+                return $debugFlowResult = $this->encodeResponse(
+                    false,
+                    isset($operation) ? $operation : '',
+                    isset($requestID) ? $requestID : '',
+                    null,
+                    $exception instanceof JsonException
+                        ? $this->Translate('Invalid JSON data.')
+                        : $this->translateErrorMessage($exception->getMessage())
+                );
             }
-
-            $payload = match ($operation) {
-                'GetCalendars'           => json_decode($this->GetCalendars(), true, 512, JSON_THROW_ON_ERROR),
-                'GetTaskLists'           => json_decode($this->GetTaskLists(), true, 512, JSON_THROW_ON_ERROR),
-                'DiscoverCalendars'      => $this->discoverCalendars(),
-                'GetEvents'              => $this->getEventsForChild($request),
-                'BeginEventsTransfer'    => $this->beginEventsTransferForChild($request),
-                'ReadEventsTransferPage' => $this->readEventsTransferPageForChild($request),
-                'FinishEventsTransfer'   => [
-                    'success' => $this->finishEventsTransferForChild($request)
-                ],
-                'GetEventForEdit'        => $this->getEventForEditForChild($request),
-                'GetEventAfterWrite'     => $this->getEventAfterWriteForChild($request),
-                'CheckPendingTask'       => $this->checkPendingTaskForChild($request),
-                'CheckRecurringSeries'   => $this->checkRecurringSeriesForChild($request),
-                'GetRecurringSeries'     => $this->getRecurringSeriesForChild($request),
-                'GetRecurringFollowing'  => $this->getRecurringFollowingForChild($request),
-                'CreateEvent'            => $this->createEventForChild($request),
-                'UpdateEvent'            => $this->updateEventForChild($request),
-                'DeleteEvent'            => ['success' => $this->deleteEventForChild($request)],
-                'SynchronizeTasks'       => $this->synchronizeTasksForChild($request),
-                'CreateTask'             => $this->createTaskForChild($request),
-                'UpdateTask'             => $this->updateTaskForChild($request),
-                'DeleteTask'             => ['success' => $this->deleteTaskForChild($request)],
-                'Synchronize'            => ['success' => $this->Synchronize()],
-                'TestConnection'         => json_decode($this->TestConnection(), true, 512, JSON_THROW_ON_ERROR),
-                default                  => throw new InvalidArgumentException('Unsupported operation: ' . $operation)
-            };
-
-            if ($debugRequest) {
-                $this->SendSafeDebug('ChildRequestCompleted', [
-                    'operation'  => $operation,
-                    'durationMs' => (int) round((microtime(true) - $startedAt) * 1000)
-                ]);
-            }
-
-            return $this->encodeResponse(true, $operation, $requestID, $payload);
-        } catch (Throwable $exception) {
-            $this->SendSafeDebug('ChildRequestError', [
-                'operation' => isset($operation) ? $operation : '',
-                'type'      => $exception::class,
-                'message'   => $this->sanitizeError($exception->getMessage()),
-                'code'      => $exception->getCode()
-            ]);
-
-            return $this->encodeResponse(
-                false,
-                isset($operation) ? $operation : '',
-                isset($requestID) ? $requestID : '',
-                null,
-                $exception instanceof JsonException
-                    ? $this->Translate('Invalid JSON data.')
-                    : $this->translateErrorMessage($exception->getMessage())
-            );
+        } catch (\Throwable $debugFlowException) {
+            $debugFlowFailed = true;
+            $this->DebugFlowException(__FUNCTION__, __LINE__, $debugFlowException);
+            throw $debugFlowException;
+        } finally {
+            $this->DebugFlowEnd(__FUNCTION__, __LINE__, $debugFlowResult, $debugFlowFailed, false);
         }
     }
 
@@ -116,53 +124,65 @@ trait KalenderKontoChildGatewayTrait
      */
     private function getEventsForChild(array $request): array
     {
-        $calendar = $this->resolveCalendar((string) ($request['CalendarID'] ?? ''));
-        $startTimestamp = (int) ($request['Start'] ?? 0);
-        $endTimestamp = (int) ($request['End'] ?? 0);
-        if ($startTimestamp <= 0 || $endTimestamp <= $startTimestamp) {
-            throw new InvalidArgumentException('The requested event time range is invalid.');
-        }
-        if (($endTimestamp - $startTimestamp) > 6 * 366 * 86400) {
-            throw new InvalidArgumentException('The requested event time range is too large.');
-        }
-
-        $startedAt = microtime(true);
-        $providerType = $this->ReadPropertyInteger('Provider');
-        $microsoftDebugClient = null;
-        if ($providerType === self::PROVIDER_MICROSOFT) {
-            $microsoftDebugClient = new MicrosoftCalendarDebugHttpClient(
-                $this->createTrustedCloudHttpClient(new MicrosoftGraphOriginPolicy())
-            );
-            $provider = new MicrosoftCalendarProvider(
-                $microsoftDebugClient,
-                $this->getMicrosoftAccessToken()
-            );
-        } else {
-            $provider = $this->createProvider();
-        }
-        $events = $provider->getEvents(
-            $this->calendarReference($calendar),
-            new DateTimeImmutable('@' . $startTimestamp),
-            new DateTimeImmutable('@' . $endTimestamp)
-        );
-        $this->SendSafeDebug('ProviderEvents', [
-            'provider'   => $this->getProviderName($this->ReadPropertyInteger('Provider')),
-            'start'      => (new DateTimeImmutable('@' . $startTimestamp))->format(DATE_ATOM),
-            'end'        => (new DateTimeImmutable('@' . $endTimestamp))->format(DATE_ATOM),
-            'eventCount' => count($events),
-            'durationMs' => (int) round((microtime(true) - $startedAt) * 1000)
-        ]);
-        if ($providerType === self::PROVIDER_MICROSOFT && $microsoftDebugClient !== null) {
-            $this->SendSafeDebug('MicrosoftGraphCalendarView', $microsoftDebugClient->diagnostics());
-            $this->SendSafeDebug('MicrosoftMappedEvents', $this->microsoftMappedEventDiagnostics($events));
-        } elseif ($providerType === self::PROVIDER_ICS) {
-            $recurrenceDiagnostics = ICalendarRecurrence::diagnostics($events);
-            if ($recurrenceDiagnostics['seriesCount'] > 0) {
-                $this->SendSafeDebug('RecurrenceExpansion', $recurrenceDiagnostics);
+        $debugFlowResult = null;
+        $debugFlowFailed = false;
+        $this->DebugFlowStart(__FUNCTION__, __LINE__);
+        try {
+            $this->DebugFlowEvent(__FUNCTION__, __LINE__, 'SENDEN', 'Kalenderanbieter verarbeitet die angeforderte Operation; Inhalte bleiben geschützt.', ['Operation' => __FUNCTION__]);
+            $calendar = $this->resolveCalendar((string) ($request['CalendarID'] ?? ''));
+            $startTimestamp = (int) ($request['Start'] ?? 0);
+            $endTimestamp = (int) ($request['End'] ?? 0);
+            if ($startTimestamp <= 0 || $endTimestamp <= $startTimestamp) {
+                throw new InvalidArgumentException('The requested event time range is invalid.');
             }
-        }
+            if (($endTimestamp - $startTimestamp) > 6 * 366 * 86400) {
+                throw new InvalidArgumentException('The requested event time range is too large.');
+            }
 
-        return $events;
+            $startedAt = microtime(true);
+            $providerType = $this->ReadPropertyInteger('Provider');
+            $microsoftDebugClient = null;
+            if ($providerType === self::PROVIDER_MICROSOFT) {
+                $microsoftDebugClient = new MicrosoftCalendarDebugHttpClient(
+                    $this->createTrustedCloudHttpClient(new MicrosoftGraphOriginPolicy())
+                );
+                $provider = new MicrosoftCalendarProvider(
+                    $microsoftDebugClient,
+                    $this->getMicrosoftAccessToken()
+                );
+            } else {
+                $provider = $this->createProvider();
+            }
+            $events = $provider->getEvents(
+                $this->calendarReference($calendar),
+                new DateTimeImmutable('@' . $startTimestamp),
+                new DateTimeImmutable('@' . $endTimestamp)
+            );
+            $this->DebugFlowEvent(__FUNCTION__, __LINE__, 'EMPFANG', 'Termine vom Kalenderanbieter empfangen.', [
+                'Anbieter'           => $this->getProviderName($this->ReadPropertyInteger('Provider')),
+                'Abfragebeginn'      => (new DateTimeImmutable('@' . $startTimestamp))->format(DATE_ATOM),
+                'Abfrageende'        => (new DateTimeImmutable('@' . $endTimestamp))->format(DATE_ATOM),
+                'Terminanzahl'       => count($events),
+                'DauerMillisekunden' => (int) round((microtime(true) - $startedAt) * 1000)
+            ]);
+            if ($providerType === self::PROVIDER_MICROSOFT && $microsoftDebugClient !== null) {
+                $this->DebugFlowEvent(__FUNCTION__, __LINE__, 'AKTION', 'Microsoft-Transportdiagnose erfasst; Inhalte bleiben geschützt.', []);
+                $this->DebugFlowEvent(__FUNCTION__, __LINE__, 'AKTION', 'Microsoft-Termine verarbeitet; Inhalte bleiben geschützt.', ['Anzahl' => count($events)]);
+            } elseif ($providerType === self::PROVIDER_ICS) {
+                $recurrenceDiagnostics = ICalendarRecurrence::diagnostics($events);
+                if ($recurrenceDiagnostics['seriesCount'] > 0) {
+                    $this->DebugFlowEvent(__FUNCTION__, __LINE__, 'AKTION', 'Serientermine lokal erweitert.', $recurrenceDiagnostics);
+                }
+            }
+
+            return $debugFlowResult = $events;
+        } catch (\Throwable $debugFlowException) {
+            $debugFlowFailed = true;
+            $this->DebugFlowException(__FUNCTION__, __LINE__, $debugFlowException);
+            throw $debugFlowException;
+        } finally {
+            $this->DebugFlowEnd(__FUNCTION__, __LINE__, $debugFlowResult, $debugFlowFailed, false);
+        }
     }
 
     /** @param array<string, mixed> $request @return array{tasks:list<array<string,mixed>>,deltaLink:string,fullSnapshot:bool} */
@@ -178,40 +198,76 @@ trait KalenderKontoChildGatewayTrait
     /** @param array<string, mixed> $request @return array<string, mixed> */
     private function createTaskForChild(array $request): array
     {
-        $this->assertMicrosoftTaskOperation();
-        $task = $request['Task'] ?? null;
-        if (!is_array($task) || array_is_list($task)) {
-            throw new InvalidArgumentException('The Microsoft task data is invalid.');
+        $debugFlowResult = null;
+        $debugFlowFailed = false;
+        $this->DebugFlowStart(__FUNCTION__, __LINE__);
+        try {
+            $this->DebugFlowEvent(__FUNCTION__, __LINE__, 'SENDEN', 'Kalenderanbieter verarbeitet die angeforderte Operation; Inhalte bleiben geschützt.', ['Operation' => __FUNCTION__]);
+            $this->assertMicrosoftTaskOperation();
+            $task = $request['Task'] ?? null;
+            if (!is_array($task) || array_is_list($task)) {
+                throw new InvalidArgumentException('The Microsoft task data is invalid.');
+            }
+            return $debugFlowResult = $this->microsoftTodoProvider()->createTask(
+                trim((string) ($request['TaskListID'] ?? '')),
+                $task
+            );
+        } catch (\Throwable $debugFlowException) {
+            $debugFlowFailed = true;
+            $this->DebugFlowException(__FUNCTION__, __LINE__, $debugFlowException);
+            throw $debugFlowException;
+        } finally {
+            $this->DebugFlowEnd(__FUNCTION__, __LINE__, $debugFlowResult, $debugFlowFailed, false);
         }
-        return $this->microsoftTodoProvider()->createTask(
-            trim((string) ($request['TaskListID'] ?? '')),
-            $task
-        );
     }
 
     /** @param array<string, mixed> $request @return array<string, mixed> */
     private function updateTaskForChild(array $request): array
     {
-        $this->assertMicrosoftTaskOperation();
-        $changes = $request['Changes'] ?? null;
-        if (!is_array($changes) || array_is_list($changes)) {
-            throw new InvalidArgumentException('The Microsoft task changes are invalid.');
+        $debugFlowResult = null;
+        $debugFlowFailed = false;
+        $this->DebugFlowStart(__FUNCTION__, __LINE__);
+        try {
+            $this->DebugFlowEvent(__FUNCTION__, __LINE__, 'SENDEN', 'Kalenderanbieter verarbeitet die angeforderte Operation; Inhalte bleiben geschützt.', ['Operation' => __FUNCTION__]);
+            $this->assertMicrosoftTaskOperation();
+            $changes = $request['Changes'] ?? null;
+            if (!is_array($changes) || array_is_list($changes)) {
+                throw new InvalidArgumentException('The Microsoft task changes are invalid.');
+            }
+            return $debugFlowResult = $this->microsoftTodoProvider()->updateTask(
+                trim((string) ($request['TaskListID'] ?? '')),
+                trim((string) ($request['TaskID'] ?? '')),
+                $changes
+            );
+        } catch (\Throwable $debugFlowException) {
+            $debugFlowFailed = true;
+            $this->DebugFlowException(__FUNCTION__, __LINE__, $debugFlowException);
+            throw $debugFlowException;
+        } finally {
+            $this->DebugFlowEnd(__FUNCTION__, __LINE__, $debugFlowResult, $debugFlowFailed, false);
         }
-        return $this->microsoftTodoProvider()->updateTask(
-            trim((string) ($request['TaskListID'] ?? '')),
-            trim((string) ($request['TaskID'] ?? '')),
-            $changes
-        );
     }
 
     /** @param array<string, mixed> $request */
     private function deleteTaskForChild(array $request): bool
     {
-        $this->assertMicrosoftTaskOperation();
-        return $this->microsoftTodoProvider()->deleteTask(
-            trim((string) ($request['TaskListID'] ?? '')),
-            trim((string) ($request['TaskID'] ?? ''))
-        );
+        $debugFlowResult = null;
+        $debugFlowFailed = false;
+        $this->DebugFlowStart(__FUNCTION__, __LINE__);
+        try {
+            $this->DebugFlowEvent(__FUNCTION__, __LINE__, 'SENDEN', 'Kalenderanbieter verarbeitet die angeforderte Operation; Inhalte bleiben geschützt.', ['Operation' => __FUNCTION__]);
+            $this->assertMicrosoftTaskOperation();
+            return $debugFlowResult = $this->microsoftTodoProvider()->deleteTask(
+                trim((string) ($request['TaskListID'] ?? '')),
+                trim((string) ($request['TaskID'] ?? ''))
+            );
+        } catch (\Throwable $debugFlowException) {
+            $debugFlowFailed = true;
+            $this->DebugFlowException(__FUNCTION__, __LINE__, $debugFlowException);
+            throw $debugFlowException;
+        } finally {
+            $this->DebugFlowEnd(__FUNCTION__, __LINE__, $debugFlowResult, $debugFlowFailed, false);
+        }
     }
 
     private function assertMicrosoftTaskOperation(): void
@@ -310,110 +366,122 @@ trait KalenderKontoChildGatewayTrait
      */
     private function beginEventsTransferForChild(array $request): array
     {
-        $providerType = $this->ReadPropertyInteger('Provider');
-        if (!in_array(
-            $providerType,
-            [self::PROVIDER_APPLE, self::PROVIDER_CALDAV, self::PROVIDER_GOOGLE, self::PROVIDER_MICROSOFT],
-            true
-        )) {
-            return $this->CreateChunkedJsonTransfer(
-                self::EVENT_TRANSFER_SCOPE,
-                $this->getEventsForChild($request)
-            );
-        }
-
-        $calendar = $this->resolveCalendar((string) ($request['CalendarID'] ?? ''));
-        $startTimestamp = (int) ($request['Start'] ?? 0);
-        $endTimestamp = (int) ($request['End'] ?? 0);
-        if ($startTimestamp <= 0 || $endTimestamp <= $startTimestamp) {
-            throw new InvalidArgumentException('The requested event time range is invalid.');
-        }
-        if (($endTimestamp - $startTimestamp) > 6 * 366 * 86400) {
-            throw new InvalidArgumentException('The requested event time range is too large.');
-        }
-
-        $startedAt = microtime(true);
-        $calendarReference = $this->calendarReference($calendar);
-        $start = new DateTimeImmutable('@' . $startTimestamp);
-        $end = new DateTimeImmutable('@' . $endTimestamp);
-        $syncToken = trim((string) ($request['SyncToken'] ?? ''));
-        $microsoftDebugClient = null;
-        if ($providerType === self::PROVIDER_MICROSOFT) {
-            $microsoftDebugClient = new MicrosoftCalendarDebugHttpClient(
-                $this->createTrustedCloudHttpClient(new MicrosoftGraphOriginPolicy())
-            );
-            $synchronizer = new MicrosoftCalendarIncrementalSync(
-                $microsoftDebugClient,
-                $this->getMicrosoftAccessToken()
-            );
-            $debugName = 'MicrosoftEventSynchronization';
-        } elseif ($providerType === self::PROVIDER_GOOGLE) {
-            $accessToken = $this->getGoogleAccessToken();
-            $httpClient = $this->createTrustedCloudHttpClient(new GoogleCalendarOriginPolicy());
-            $provider = new GoogleCalendarProvider($httpClient, $accessToken);
-            $synchronizer = new GoogleCalendarIncrementalSync($provider, $httpClient, $accessToken);
-            $debugName = 'GoogleEventSynchronization';
-        } else {
-            $serverUrl = $providerType === self::PROVIDER_APPLE
-                ? self::APPLE_CALDAV_URL
-                : trim($this->ReadPropertyString('ServerURL'));
-            $originPolicy = new CalDAVOriginPolicy($serverUrl);
-            $httpClient = new CalendarHttpClient(
-                max(5, min(120, $this->ReadPropertyInteger('RequestTimeout'))),
-                $providerType === self::PROVIDER_APPLE ? true : $this->ReadPropertyBoolean('VerifyTLS'),
-                trim($this->ReadPropertyString('Username')),
-                $this->ReadPropertyString('Password'),
-                $originPolicy
-            );
-            $provider = new CalDAVProvider($httpClient, $serverUrl, $originPolicy);
-            $synchronizer = new CalDAVIncrementalSync($provider, $httpClient, $originPolicy);
-            $debugName = 'CalDAVEventSynchronization';
-        }
-        $result = $synchronizer->synchronize($calendarReference, $start, $end, $syncToken);
-        $nextSyncToken = trim((string) ($result['syncToken'] ?? ''));
-        $items = $result['items'];
-        $deletedCount = count(array_filter(
-            $items,
-            static fn (mixed $item): bool => is_array($item)
-                && (bool) ($item['_syncDeleted'] ?? false)
-        ));
-        $recurringCount = count(array_filter(
-            $items,
-            static fn (mixed $item): bool => is_array($item)
-                && ((bool) ($item['recurring'] ?? false)
-                    || trim((string) ($item['seriesId'] ?? '')) !== '')
-        ));
-        $syncTokenAdvanced = $nextSyncToken !== ''
-            && ($syncToken === '' || !hash_equals($syncToken, $nextSyncToken));
-
-        $transfer = $this->CreateChunkedJsonTransfer(self::EVENT_TRANSFER_SCOPE, $items);
-        $transfer['SyncToken'] = $nextSyncToken;
-        $transfer['Incremental'] = $result['incremental'];
-        $this->SendSafeDebug($debugName, [
-            'requestedIncremental' => $syncToken !== '',
-            'incremental'          => $result['incremental'],
-            'fallbackToFull'       => $syncToken !== '' && !$result['incremental'],
-            'itemCount'            => count($items),
-            'deletedCount'         => $deletedCount,
-            'recurringCount'       => $recurringCount,
-            'syncTokenAvailable'   => $nextSyncToken !== '',
-            'syncTokenAdvanced'    => $syncTokenAdvanced,
-            'durationMs'           => (int) round((microtime(true) - $startedAt) * 1000)
-        ]);
-        if ($providerType === self::PROVIDER_MICROSOFT && $microsoftDebugClient !== null) {
-            $graphDiagnostics = $microsoftDebugClient->diagnostics();
-            if ((int) ($graphDiagnostics['requestCount'] ?? 0) > 0) {
-                $this->SendSafeDebug('MicrosoftGraphCalendarView', $graphDiagnostics);
+        $debugFlowResult = null;
+        $debugFlowFailed = false;
+        $this->DebugFlowStart(__FUNCTION__, __LINE__);
+        try {
+            $this->DebugFlowEvent(__FUNCTION__, __LINE__, 'SENDEN', 'Kalenderanbieter verarbeitet die angeforderte Operation; Inhalte bleiben geschützt.', ['Operation' => __FUNCTION__]);
+            $providerType = $this->ReadPropertyInteger('Provider');
+            if (!in_array(
+                $providerType,
+                [self::PROVIDER_APPLE, self::PROVIDER_CALDAV, self::PROVIDER_GOOGLE, self::PROVIDER_MICROSOFT],
+                true
+            )) {
+                return $debugFlowResult = $this->CreateChunkedJsonTransfer(
+                    self::EVENT_TRANSFER_SCOPE,
+                    $this->getEventsForChild($request)
+                );
             }
-            $mappedItems = array_values(array_filter(
+
+            $calendar = $this->resolveCalendar((string) ($request['CalendarID'] ?? ''));
+            $startTimestamp = (int) ($request['Start'] ?? 0);
+            $endTimestamp = (int) ($request['End'] ?? 0);
+            if ($startTimestamp <= 0 || $endTimestamp <= $startTimestamp) {
+                throw new InvalidArgumentException('The requested event time range is invalid.');
+            }
+            if (($endTimestamp - $startTimestamp) > 6 * 366 * 86400) {
+                throw new InvalidArgumentException('The requested event time range is too large.');
+            }
+
+            $startedAt = microtime(true);
+            $calendarReference = $this->calendarReference($calendar);
+            $start = new DateTimeImmutable('@' . $startTimestamp);
+            $end = new DateTimeImmutable('@' . $endTimestamp);
+            $syncToken = trim((string) ($request['SyncToken'] ?? ''));
+            $microsoftDebugClient = null;
+            if ($providerType === self::PROVIDER_MICROSOFT) {
+                $microsoftDebugClient = new MicrosoftCalendarDebugHttpClient(
+                    $this->createTrustedCloudHttpClient(new MicrosoftGraphOriginPolicy())
+                );
+                $synchronizer = new MicrosoftCalendarIncrementalSync(
+                    $microsoftDebugClient,
+                    $this->getMicrosoftAccessToken()
+                );
+                $debugName = 'MicrosoftEventSynchronization';
+            } elseif ($providerType === self::PROVIDER_GOOGLE) {
+                $accessToken = $this->getGoogleAccessToken();
+                $httpClient = $this->createTrustedCloudHttpClient(new GoogleCalendarOriginPolicy());
+                $provider = new GoogleCalendarProvider($httpClient, $accessToken);
+                $synchronizer = new GoogleCalendarIncrementalSync($provider, $httpClient, $accessToken);
+                $debugName = 'GoogleEventSynchronization';
+            } else {
+                $serverUrl = $providerType === self::PROVIDER_APPLE
+                    ? self::APPLE_CALDAV_URL
+                    : trim($this->ReadPropertyString('ServerURL'));
+                $originPolicy = new CalDAVOriginPolicy($serverUrl);
+                $httpClient = new CalendarHttpClient(
+                    max(5, min(120, $this->ReadPropertyInteger('RequestTimeout'))),
+                    $providerType === self::PROVIDER_APPLE ? true : $this->ReadPropertyBoolean('VerifyTLS'),
+                    trim($this->ReadPropertyString('Username')),
+                    $this->ReadPropertyString('Password'),
+                    $originPolicy
+                );
+                $provider = new CalDAVProvider($httpClient, $serverUrl, $originPolicy);
+                $synchronizer = new CalDAVIncrementalSync($provider, $httpClient, $originPolicy);
+                $debugName = 'CalDAVEventSynchronization';
+            }
+            $result = $synchronizer->synchronize($calendarReference, $start, $end, $syncToken);
+            $nextSyncToken = trim((string) ($result['syncToken'] ?? ''));
+            $items = $result['items'];
+            $deletedCount = count(array_filter(
                 $items,
                 static fn (mixed $item): bool => is_array($item)
-                    && !(bool) ($item['_syncDeleted'] ?? false)
+                    && (bool) ($item['_syncDeleted'] ?? false)
             ));
-            $this->SendSafeDebug('MicrosoftMappedEvents', $this->microsoftMappedEventDiagnostics($mappedItems));
-        }
+            $recurringCount = count(array_filter(
+                $items,
+                static fn (mixed $item): bool => is_array($item)
+                    && ((bool) ($item['recurring'] ?? false)
+                        || trim((string) ($item['seriesId'] ?? '')) !== '')
+            ));
+            $syncTokenAdvanced = $nextSyncToken !== ''
+                && ($syncToken === '' || !hash_equals($syncToken, $nextSyncToken));
 
-        return $transfer;
+            $transfer = $this->CreateChunkedJsonTransfer(self::EVENT_TRANSFER_SCOPE, $items);
+            $transfer['SyncToken'] = $nextSyncToken;
+            $transfer['Incremental'] = $result['incremental'];
+            $this->DebugFlowEvent(__FUNCTION__, __LINE__, 'AKTION', 'Inkrementelle Synchronisation ausgewertet.', [
+                'InkrementellAngefordert'                   => $syncToken !== '',
+                'Inkrementell'                              => $result['incremental'],
+                'VollabgleichAlsFallback'                   => $syncToken !== '' && !$result['incremental'],
+                'Eintragsanzahl'                            => count($items),
+                'GelöschteEinträge'                         => $deletedCount,
+                'Serieneinträge'                            => $recurringCount,
+                'SynchronisationskennungVorhanden'          => $nextSyncToken !== '',
+                'SynchronisationskennungFortgeschritten'    => $syncTokenAdvanced,
+                'DauerMillisekunden'                        => (int) round((microtime(true) - $startedAt) * 1000)
+            ]);
+            if ($providerType === self::PROVIDER_MICROSOFT && $microsoftDebugClient !== null) {
+                $graphDiagnostics = $microsoftDebugClient->diagnostics();
+                if ((int) ($graphDiagnostics['requestCount'] ?? 0) > 0) {
+                    $this->DebugFlowEvent(__FUNCTION__, __LINE__, 'AKTION', 'Microsoft-Transportdiagnose erfasst; Inhalte bleiben geschützt.', []);
+                }
+                $mappedItems = array_values(array_filter(
+                    $items,
+                    static fn (mixed $item): bool => is_array($item)
+                        && !(bool) ($item['_syncDeleted'] ?? false)
+                ));
+                $this->DebugFlowEvent(__FUNCTION__, __LINE__, 'AKTION', 'Microsoft-Termine verarbeitet; Inhalte bleiben geschützt.', ['Anzahl' => count($mappedItems)]);
+            }
+
+            return $debugFlowResult = $transfer;
+        } catch (\Throwable $debugFlowException) {
+            $debugFlowFailed = true;
+            $this->DebugFlowException(__FUNCTION__, __LINE__, $debugFlowException);
+            throw $debugFlowException;
+        } finally {
+            $this->DebugFlowEnd(__FUNCTION__, __LINE__, $debugFlowResult, $debugFlowFailed, false);
+        }
     }
 
     /**
@@ -860,13 +928,25 @@ trait KalenderKontoChildGatewayTrait
      */
     private function createEventForChild(array $request): array
     {
-        $calendar = $this->resolveCalendar((string) ($request['CalendarID'] ?? ''));
-        $event = $request['Event'] ?? null;
-        if (!is_array($event)) {
-            throw new InvalidArgumentException('The event data is invalid.');
-        }
+        $debugFlowResult = null;
+        $debugFlowFailed = false;
+        $this->DebugFlowStart(__FUNCTION__, __LINE__);
+        try {
+            $this->DebugFlowEvent(__FUNCTION__, __LINE__, 'SENDEN', 'Kalenderanbieter verarbeitet die angeforderte Operation; Inhalte bleiben geschützt.', ['Operation' => __FUNCTION__]);
+            $calendar = $this->resolveCalendar((string) ($request['CalendarID'] ?? ''));
+            $event = $request['Event'] ?? null;
+            if (!is_array($event)) {
+                throw new InvalidArgumentException('The event data is invalid.');
+            }
 
-        return $this->createProvider()->createEvent($this->calendarReference($calendar), $event);
+            return $debugFlowResult = $this->createProvider()->createEvent($this->calendarReference($calendar), $event);
+        } catch (\Throwable $debugFlowException) {
+            $debugFlowFailed = true;
+            $this->DebugFlowException(__FUNCTION__, __LINE__, $debugFlowException);
+            throw $debugFlowException;
+        } finally {
+            $this->DebugFlowEnd(__FUNCTION__, __LINE__, $debugFlowResult, $debugFlowFailed, false);
+        }
     }
 
     /**
@@ -875,22 +955,34 @@ trait KalenderKontoChildGatewayTrait
      */
     private function updateEventForChild(array $request): array
     {
-        $calendar = $this->resolveCalendar((string) ($request['CalendarID'] ?? ''));
-        $event = $request['Event'] ?? null;
-        if (!is_array($event)) {
-            throw new InvalidArgumentException('The event data is invalid.');
-        }
+        $debugFlowResult = null;
+        $debugFlowFailed = false;
+        $this->DebugFlowStart(__FUNCTION__, __LINE__);
+        try {
+            $this->DebugFlowEvent(__FUNCTION__, __LINE__, 'SENDEN', 'Kalenderanbieter verarbeitet die angeforderte Operation; Inhalte bleiben geschützt.', ['Operation' => __FUNCTION__]);
+            $calendar = $this->resolveCalendar((string) ($request['CalendarID'] ?? ''));
+            $event = $request['Event'] ?? null;
+            if (!is_array($event)) {
+                throw new InvalidArgumentException('The event data is invalid.');
+            }
 
-        return $this->createProvider()->updateEvent(
-            $this->calendarReference($calendar),
-            trim((string) ($request['ResourceURL'] ?? '')),
-            trim((string) ($request['ETag'] ?? '')),
-            trim((string) ($request['UID'] ?? '')),
-            $event,
-            CalendarEventRecurrence::fromEvent(
-                is_array($request['Recurrence'] ?? null) ? $request['Recurrence'] : []
-            )
-        );
+            return $debugFlowResult = $this->createProvider()->updateEvent(
+                $this->calendarReference($calendar),
+                trim((string) ($request['ResourceURL'] ?? '')),
+                trim((string) ($request['ETag'] ?? '')),
+                trim((string) ($request['UID'] ?? '')),
+                $event,
+                CalendarEventRecurrence::fromEvent(
+                    is_array($request['Recurrence'] ?? null) ? $request['Recurrence'] : []
+                )
+            );
+        } catch (\Throwable $debugFlowException) {
+            $debugFlowFailed = true;
+            $this->DebugFlowException(__FUNCTION__, __LINE__, $debugFlowException);
+            throw $debugFlowException;
+        } finally {
+            $this->DebugFlowEnd(__FUNCTION__, __LINE__, $debugFlowResult, $debugFlowFailed, false);
+        }
     }
 
     /**
@@ -898,17 +990,29 @@ trait KalenderKontoChildGatewayTrait
      */
     private function deleteEventForChild(array $request): bool
     {
-        $calendar = $this->resolveCalendar((string) ($request['CalendarID'] ?? ''));
+        $debugFlowResult = null;
+        $debugFlowFailed = false;
+        $this->DebugFlowStart(__FUNCTION__, __LINE__);
+        try {
+            $this->DebugFlowEvent(__FUNCTION__, __LINE__, 'SENDEN', 'Kalenderanbieter verarbeitet die angeforderte Operation; Inhalte bleiben geschützt.', ['Operation' => __FUNCTION__]);
+            $calendar = $this->resolveCalendar((string) ($request['CalendarID'] ?? ''));
 
-        return $this->createProvider()->deleteEvent(
-            $this->calendarReference($calendar),
-            trim((string) ($request['ResourceURL'] ?? '')),
-            trim((string) ($request['ETag'] ?? '')),
-            trim((string) ($request['RecurrenceID'] ?? '')),
-            CalendarEventRecurrence::fromEvent(
-                is_array($request['Recurrence'] ?? null) ? $request['Recurrence'] : []
-            )
-        );
+            return $debugFlowResult = $this->createProvider()->deleteEvent(
+                $this->calendarReference($calendar),
+                trim((string) ($request['ResourceURL'] ?? '')),
+                trim((string) ($request['ETag'] ?? '')),
+                trim((string) ($request['RecurrenceID'] ?? '')),
+                CalendarEventRecurrence::fromEvent(
+                    is_array($request['Recurrence'] ?? null) ? $request['Recurrence'] : []
+                )
+            );
+        } catch (\Throwable $debugFlowException) {
+            $debugFlowFailed = true;
+            $this->DebugFlowException(__FUNCTION__, __LINE__, $debugFlowException);
+            throw $debugFlowException;
+        } finally {
+            $this->DebugFlowEnd(__FUNCTION__, __LINE__, $debugFlowResult, $debugFlowFailed, false);
+        }
     }
 
     /**
@@ -976,10 +1080,7 @@ trait KalenderKontoChildGatewayTrait
             return null;
         }
 
-        $this->SendSafeDebug(
-            'CalendarResolution',
-            'Using the only calendar exposed by the ICS/Webcal account because the stored calendar ID is missing or no longer matches.'
-        );
+        $this->DebugFlowEvent(__FUNCTION__, __LINE__, 'AKTION', 'Kalenderzuordnung anhand eindeutiger vorhandener Zuordnung wiederhergestellt.', []);
 
         return $available[0];
     }

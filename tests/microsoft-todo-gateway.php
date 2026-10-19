@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+require_once __DIR__ . '/../libs/helper/DebugFlowHelper.php';
+
 use IPSKalender\CalendarHttpClientInterface;
 use IPSKalender\CalendarHttpOriginPolicyInterface;
 use IPSKalender\CalendarHttpResponse;
@@ -32,6 +34,7 @@ final class MicrosoftTodoGatewayHttpClient implements CalendarHttpClientInterfac
 
 final class MicrosoftTodoGatewayHarness
 {
+    use \Burki24\SymconModuleHelper\DebugFlowHelper;
     use KalenderKontoChildGatewayTrait;
 
     private const PROVIDER_MICROSOFT = 3;

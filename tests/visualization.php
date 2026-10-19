@@ -95,6 +95,8 @@ $script = (string) file_get_contents(__DIR__ . '/../Kalender Ansicht/visualizati
 $indexSource = (string) file_get_contents(__DIR__ . '/../Kalender Ansicht/visualization/index.html');
 $style = (string) file_get_contents(__DIR__ . '/../Kalender Ansicht/visualization/style.css');
 $moduleSource = (string) file_get_contents(__DIR__ . '/../Kalender Ansicht/module.php');
+// Return-value capture is covered by runtime debug tests, not this source contract.
+$moduleSource = str_replace('return $debugFlowResult = ', 'return ', $moduleSource);
 $formSource = (string) file_get_contents(__DIR__ . '/../Kalender Ansicht/form.json');
 $localeSource = (string) file_get_contents(__DIR__ . '/../Kalender Ansicht/locale.json');
 $localeData = json_decode($localeSource, true, 512, JSON_THROW_ON_ERROR);
@@ -418,6 +420,8 @@ assertVisualization(
 
 $formSource = (string) file_get_contents(__DIR__ . '/../Kalender Ansicht/form.json');
 $moduleSource = (string) file_get_contents(__DIR__ . '/../Kalender Ansicht/module.php');
+// Return-value capture is covered by runtime debug tests, not this source contract.
+$moduleSource = str_replace('return $debugFlowResult = ', 'return ', $moduleSource);
 assertVisualization(
     str_contains($moduleSource, '\'Events with complex reminder settings cannot be moved safely.\'')
         && str_contains($moduleSource, '($sourceReminder[\'mode\'] ?? \'\') === \'complex\'')

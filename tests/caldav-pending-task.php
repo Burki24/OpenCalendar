@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+require_once __DIR__ . '/../libs/helper/DebugFlowHelper.php';
+
 use IPSKalender\CalDAVProvider;
 use IPSKalender\CalendarHttpClientInterface;
 use IPSKalender\CalendarHttpResponse;
@@ -28,6 +30,7 @@ final class PendingTaskHttpClient implements CalendarHttpClientInterface
 /** Exercise the real child gateway and CalDAV parser; fake only HTTP transport. */
 final class PendingTaskGateway
 {
+    use \Burki24\SymconModuleHelper\DebugFlowHelper;
     use KalenderKontoChildGatewayTrait {
         checkPendingTaskForChild as public check;
     }

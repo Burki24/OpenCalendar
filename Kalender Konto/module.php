@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+require_once __DIR__ . '/../libs/helper/DebugFlowHelper.php';
+
 use Burki24\SymconModuleHelper\ChunkedJsonTransferHelper;
 use Burki24\SymconModuleHelper\ConfigurationFormHelper;
 use Burki24\SymconModuleHelper\DataFlowHelper;
@@ -66,10 +68,11 @@ require_once __DIR__ . '/traits/ChildGatewayTrait.php';
 
 class CalendarAccount extends IPSModuleStrict
 {
+    use \Burki24\SymconModuleHelper\DebugFlowHelper;
+
     use ChunkedJsonTransferHelper;
     use ConfigurationFormHelper;
     use DataFlowHelper;
-    use DebugHelper;
     use HttpResponseHelper;
     use KalenderKontoSymconOAuthTrait;
     use KalenderKontoGoogleOAuthTrait;
@@ -106,44 +109,55 @@ class CalendarAccount extends IPSModuleStrict
      */
     public function Create(): void
     {
-        parent::Create();
+        $debugFlowResult = null;
+        $debugFlowFailed = false;
+        $this->DebugFlowStart(__FUNCTION__, __LINE__);
+        try {
+            parent::Create();
 
-        $this->RegisterMessage(0, IPS_KERNELSTARTED);
-        $this->RegisterPropertyBoolean('Active', false);
-        $this->RegisterPropertyInteger('Provider', self::PROVIDER_APPLE);
-        $this->RegisterPropertyString('ServerURL', self::APPLE_CALDAV_URL);
-        $this->RegisterPropertyString('Username', '');
-        $this->RegisterPropertyString('Password', '');
-        $this->RegisterPropertyString('CalendarName', '');
-        $this->RegisterPropertyString('LocalCalendarName', 'Local Calendar');
-        $this->RegisterPropertyInteger('LocalCalendarColor', 0x4FB286);
-        $this->RegisterPropertyInteger('ICalendarAuthenticationMode', ICalendarAuthentication::AUTOMATIC);
-        $this->RegisterPropertyInteger('ICalendarTranslationProfile', CalendarEventTranslation::NONE);
-        $this->RegisterPropertyString('ICalendarFeeds', '[]');
-        $this->RegisterPropertyString('ICalendarFiles', '[]');
-        $this->RegisterPropertyInteger('UpdateSchedule', SynchronizationSchedule::CUSTOM);
-        $this->RegisterPropertyInteger('UpdateInterval', 15);
-        $this->RegisterPropertyBoolean('VerifyTLS', true);
-        $this->RegisterPropertyInteger('RequestTimeout', 30);
+            $this->RegisterMessage(0, IPS_KERNELSTARTED);
+            $this->RegisterPropertyBoolean('Active', false);
+            $this->RegisterPropertyInteger('Provider', self::PROVIDER_APPLE);
+            $this->RegisterPropertyString('ServerURL', self::APPLE_CALDAV_URL);
+            $this->RegisterPropertyString('Username', '');
+            $this->RegisterPropertyString('Password', '');
+            $this->RegisterPropertyString('CalendarName', '');
+            $this->RegisterPropertyString('LocalCalendarName', 'Local Calendar');
+            $this->RegisterPropertyInteger('LocalCalendarColor', 0x4FB286);
+            $this->RegisterPropertyInteger('ICalendarAuthenticationMode', ICalendarAuthentication::AUTOMATIC);
+            $this->RegisterPropertyInteger('ICalendarTranslationProfile', CalendarEventTranslation::NONE);
+            $this->RegisterPropertyString('ICalendarFeeds', '[]');
+            $this->RegisterPropertyString('ICalendarFiles', '[]');
+            $this->RegisterPropertyInteger('UpdateSchedule', SynchronizationSchedule::CUSTOM);
+            $this->RegisterPropertyInteger('UpdateInterval', 15);
+            $this->RegisterPropertyBoolean('VerifyTLS', true);
+            $this->RegisterPropertyInteger('RequestTimeout', 30);
 
-        $this->RegisterAttributeString('CachedCalendars', '[]');
-        $this->RegisterAttributeString('ICalendarFeedCache', '{}');
-        $this->RegisterAttributeInteger('LastSynchronization', 0);
-        $this->RegisterAttributeString('LastError', '');
-        $this->RegisterAttributeString('GoogleRefreshToken', '');
-        $this->RegisterAttributeString('GoogleAccount', '');
-        // Legacy marker used to require one reconnect after migrating from personal Google OAuth.
-        $this->RegisterAttributeString('GoogleTokenClientID', '');
-        $this->RegisterAttributeString('MicrosoftRefreshToken', '');
-        $this->RegisterAttributeString('MicrosoftAccount', '');
-        $this->RegisterAttributeString('CachedMicrosoftTaskLists', '[]');
-        $this->RegisterAttributeBoolean('MicrosoftTasksAvailable', false);
-        $this->RegisterAttributeInteger('PendingOAuthProvider', -1);
-        $this->RegisterAttributeInteger('PendingOAuthInstanceID', 0);
-        $this->RegisterAttributeInteger('PendingOAuthStartedAt', 0);
+            $this->RegisterAttributeString('CachedCalendars', '[]');
+            $this->RegisterAttributeString('ICalendarFeedCache', '{}');
+            $this->RegisterAttributeInteger('LastSynchronization', 0);
+            $this->RegisterAttributeString('LastError', '');
+            $this->RegisterAttributeString('GoogleRefreshToken', '');
+            $this->RegisterAttributeString('GoogleAccount', '');
+            // Legacy marker used to require one reconnect after migrating from personal Google OAuth.
+            $this->RegisterAttributeString('GoogleTokenClientID', '');
+            $this->RegisterAttributeString('MicrosoftRefreshToken', '');
+            $this->RegisterAttributeString('MicrosoftAccount', '');
+            $this->RegisterAttributeString('CachedMicrosoftTaskLists', '[]');
+            $this->RegisterAttributeBoolean('MicrosoftTasksAvailable', false);
+            $this->RegisterAttributeInteger('PendingOAuthProvider', -1);
+            $this->RegisterAttributeInteger('PendingOAuthInstanceID', 0);
+            $this->RegisterAttributeInteger('PendingOAuthStartedAt', 0);
 
-        $this->RegisterTimer('SynchronizationTimer', 0, 'IPSKALACC_ScheduledSynchronize($_IPS[\'TARGET\']);');
-        $this->RegisterTimer('OAuthRegistrationTimer', 0, 'IPSKALACC_InitializeOAuth($_IPS[\'TARGET\']);');
+            $this->RegisterTimer('SynchronizationTimer', 0, 'IPSKALACC_ScheduledSynchronize($_IPS[\'TARGET\']);');
+            $this->RegisterTimer('OAuthRegistrationTimer', 0, 'IPSKALACC_InitializeOAuth($_IPS[\'TARGET\']);');
+        } catch (\Throwable $debugFlowException) {
+            $debugFlowFailed = true;
+            $this->DebugFlowException(__FUNCTION__, __LINE__, $debugFlowException);
+            throw $debugFlowException;
+        } finally {
+            $this->DebugFlowEnd(__FUNCTION__, __LINE__, $debugFlowResult, $debugFlowFailed, true);
+        }
     }
 
     /**
@@ -153,101 +167,112 @@ class CalendarAccount extends IPSModuleStrict
      */
     public function GetConfigurationForm(): string
     {
-        $form = $this->LoadConfigurationForm();
-        $provider = $this->ReadPropertyInteger('Provider');
-        $isPasswordProvider = in_array($provider, [self::PROVIDER_APPLE, self::PROVIDER_CALDAV, self::PROVIDER_ICS], true);
-        $iCalendarAuthenticationMode = $this->ReadPropertyInteger('ICalendarAuthenticationMode');
-        $showIcsCredentials = $iCalendarAuthenticationMode === ICalendarAuthentication::USERNAME_PASSWORD
-            || ($iCalendarAuthenticationMode === ICalendarAuthentication::AUTOMATIC
-                && (trim($this->ReadPropertyString('Username')) !== '' || $this->ReadPropertyString('Password') !== ''));
-        $isGoogle = $provider === self::PROVIDER_GOOGLE;
-        $isMicrosoft = $provider === self::PROVIDER_MICROSOFT;
-        $isIcs = $provider === self::PROVIDER_ICS;
-        $isLocal = $provider === self::PROVIDER_LOCAL;
-        $canConfigureTls = in_array($provider, [self::PROVIDER_CALDAV, self::PROVIDER_ICS], true);
+        $debugFlowResult = null;
+        $debugFlowFailed = false;
+        $this->DebugFlowStart(__FUNCTION__, __LINE__);
+        try {
+            $form = $this->LoadConfigurationForm();
+            $provider = $this->ReadPropertyInteger('Provider');
+            $isPasswordProvider = in_array($provider, [self::PROVIDER_APPLE, self::PROVIDER_CALDAV, self::PROVIDER_ICS], true);
+            $iCalendarAuthenticationMode = $this->ReadPropertyInteger('ICalendarAuthenticationMode');
+            $showIcsCredentials = $iCalendarAuthenticationMode === ICalendarAuthentication::USERNAME_PASSWORD
+                || ($iCalendarAuthenticationMode === ICalendarAuthentication::AUTOMATIC
+                    && (trim($this->ReadPropertyString('Username')) !== '' || $this->ReadPropertyString('Password') !== ''));
+            $isGoogle = $provider === self::PROVIDER_GOOGLE;
+            $isMicrosoft = $provider === self::PROVIDER_MICROSOFT;
+            $isIcs = $provider === self::PROVIDER_ICS;
+            $isLocal = $provider === self::PROVIDER_LOCAL;
+            $canConfigureTls = in_array($provider, [self::PROVIDER_CALDAV, self::PROVIDER_ICS], true);
 
-        foreach ($form['elements'] as &$element) {
-            $name = (string) ($element['name'] ?? '');
-            if ($name === 'ServerURL') {
-                $element['visible'] = $isPasswordProvider;
-                $element['enabled'] = in_array($provider, [self::PROVIDER_CALDAV, self::PROVIDER_ICS], true);
-                $element['caption'] = $isIcs ? $this->Translate('iCalendar URL') : $this->Translate('Server URL');
-                if ($provider === self::PROVIDER_APPLE) {
-                    $element['value'] = self::APPLE_CALDAV_URL;
-                }
-            } elseif ($name === 'PrivacyNotice') {
-                $element['visible'] = !$isLocal;
-            } elseif ($name === 'ICalendarAuthenticationMode') {
-                $element['visible'] = $isIcs;
-            } elseif (in_array($name, ['Username', 'Password'], true)) {
-                $element['visible'] = in_array($provider, [self::PROVIDER_APPLE, self::PROVIDER_CALDAV], true)
-                    || ($isIcs && $showIcsCredentials);
-            } elseif (in_array($name, ['CalendarName', 'ICalendarTranslationProfile'], true)) {
-                $element['visible'] = $isIcs;
-            } elseif (in_array($name, ['LocalCalendarHint', 'LocalCalendarName', 'LocalCalendarColor'], true)) {
-                $element['visible'] = $isLocal;
-            } elseif (in_array($name, ['ICalendarSubscriptionsPanel', 'ICalendarFilesPanel'], true)) {
-                $element['visible'] = $isIcs;
-            } elseif ($name === 'UpdateSchedule') {
-                $element['visible'] = !$isLocal;
-                $element['caption'] = $isIcs
-                    ? $this->Translate('Account discovery schedule')
-                    : $this->Translate('Synchronization schedule');
-            } elseif ($name === 'UpdateInterval') {
-                $element['visible'] = !$isLocal
-                    && $this->ReadPropertyInteger('UpdateSchedule') === SynchronizationSchedule::CUSTOM;
-                $element['caption'] = $isIcs
-                    ? $this->Translate('Account custom interval')
-                    : $this->Translate('Custom interval');
-            } elseif ($name === 'VerifyTLS') {
-                $element['visible'] = $canConfigureTls;
-            } elseif ($name === 'RequestTimeout') {
-                $element['visible'] = !$isLocal;
-            } elseif (in_array($name, [
-                'GoogleOAuthHint',
-                'GoogleConnectHint',
-                'GoogleStatus',
-                'GoogleConnect',
-                'GoogleDisconnect'
-            ], true)) {
-                $element['visible'] = $isGoogle;
-                if ($name === 'GoogleStatus') {
-                    $element['caption'] = $this->googleStatusText();
-                } elseif ($name === 'GoogleConnect') {
-                    $element['visible'] = $isGoogle && !$this->isGoogleConnected();
-                } elseif ($name === 'GoogleDisconnect') {
-                    $element['visible'] = $isGoogle && $this->isGoogleConnected();
-                }
-            } elseif (in_array($name, [
-                'MicrosoftOAuthHint',
-                'MicrosoftConnectHint',
-                'MicrosoftStatus',
-                'MicrosoftConnect',
-                'MicrosoftDisconnect'
-            ], true)) {
-                $element['visible'] = $isMicrosoft;
-                if ($name === 'MicrosoftStatus') {
-                    $element['caption'] = $this->microsoftStatusText();
-                } elseif ($name === 'MicrosoftConnect') {
-                    $element['visible'] = $isMicrosoft && !$this->isMicrosoftConnected();
-                } elseif ($name === 'MicrosoftDisconnect') {
-                    $element['visible'] = $isMicrosoft && $this->isMicrosoftConnected();
+            foreach ($form['elements'] as &$element) {
+                $name = (string) ($element['name'] ?? '');
+                if ($name === 'ServerURL') {
+                    $element['visible'] = $isPasswordProvider;
+                    $element['enabled'] = in_array($provider, [self::PROVIDER_CALDAV, self::PROVIDER_ICS], true);
+                    $element['caption'] = $isIcs ? $this->Translate('iCalendar URL') : $this->Translate('Server URL');
+                    if ($provider === self::PROVIDER_APPLE) {
+                        $element['value'] = self::APPLE_CALDAV_URL;
+                    }
+                } elseif ($name === 'PrivacyNotice') {
+                    $element['visible'] = !$isLocal;
+                } elseif ($name === 'ICalendarAuthenticationMode') {
+                    $element['visible'] = $isIcs;
+                } elseif (in_array($name, ['Username', 'Password'], true)) {
+                    $element['visible'] = in_array($provider, [self::PROVIDER_APPLE, self::PROVIDER_CALDAV], true)
+                        || ($isIcs && $showIcsCredentials);
+                } elseif (in_array($name, ['CalendarName', 'ICalendarTranslationProfile'], true)) {
+                    $element['visible'] = $isIcs;
+                } elseif (in_array($name, ['LocalCalendarHint', 'LocalCalendarName', 'LocalCalendarColor'], true)) {
+                    $element['visible'] = $isLocal;
+                } elseif (in_array($name, ['ICalendarSubscriptionsPanel', 'ICalendarFilesPanel'], true)) {
+                    $element['visible'] = $isIcs;
+                } elseif ($name === 'UpdateSchedule') {
+                    $element['visible'] = !$isLocal;
+                    $element['caption'] = $isIcs
+                        ? $this->Translate('Account discovery schedule')
+                        : $this->Translate('Synchronization schedule');
+                } elseif ($name === 'UpdateInterval') {
+                    $element['visible'] = !$isLocal
+                        && $this->ReadPropertyInteger('UpdateSchedule') === SynchronizationSchedule::CUSTOM;
+                    $element['caption'] = $isIcs
+                        ? $this->Translate('Account custom interval')
+                        : $this->Translate('Custom interval');
+                } elseif ($name === 'VerifyTLS') {
+                    $element['visible'] = $canConfigureTls;
+                } elseif ($name === 'RequestTimeout') {
+                    $element['visible'] = !$isLocal;
+                } elseif (in_array($name, [
+                    'GoogleOAuthHint',
+                    'GoogleConnectHint',
+                    'GoogleStatus',
+                    'GoogleConnect',
+                    'GoogleDisconnect'
+                ], true)) {
+                    $element['visible'] = $isGoogle;
+                    if ($name === 'GoogleStatus') {
+                        $element['caption'] = $this->googleStatusText();
+                    } elseif ($name === 'GoogleConnect') {
+                        $element['visible'] = $isGoogle && !$this->isGoogleConnected();
+                    } elseif ($name === 'GoogleDisconnect') {
+                        $element['visible'] = $isGoogle && $this->isGoogleConnected();
+                    }
+                } elseif (in_array($name, [
+                    'MicrosoftOAuthHint',
+                    'MicrosoftConnectHint',
+                    'MicrosoftStatus',
+                    'MicrosoftConnect',
+                    'MicrosoftDisconnect'
+                ], true)) {
+                    $element['visible'] = $isMicrosoft;
+                    if ($name === 'MicrosoftStatus') {
+                        $element['caption'] = $this->microsoftStatusText();
+                    } elseif ($name === 'MicrosoftConnect') {
+                        $element['visible'] = $isMicrosoft && !$this->isMicrosoftConnected();
+                    } elseif ($name === 'MicrosoftDisconnect') {
+                        $element['visible'] = $isMicrosoft && $this->isMicrosoftConnected();
+                    }
                 }
             }
+            unset($element);
+
+            foreach ($form['actions'] as &$action) {
+                if (($action['name'] ?? '') === 'TestConnectionButton' && $isLocal) {
+                    $action['caption'] = $this->Translate('Check local calendar');
+                }
+                if (($action['name'] ?? '') === 'SynchronizationButton') {
+                    $action['visible'] = !$isLocal;
+                }
+            }
+            unset($action);
+
+            return $debugFlowResult = $this->EncodeConfigurationForm($form);
+        } catch (\Throwable $debugFlowException) {
+            $debugFlowFailed = true;
+            $this->DebugFlowException(__FUNCTION__, __LINE__, $debugFlowException);
+            throw $debugFlowException;
+        } finally {
+            $this->DebugFlowEnd(__FUNCTION__, __LINE__, $debugFlowResult, $debugFlowFailed, false);
         }
-        unset($element);
-
-        foreach ($form['actions'] as &$action) {
-            if (($action['name'] ?? '') === 'TestConnectionButton' && $isLocal) {
-                $action['caption'] = $this->Translate('Check local calendar');
-            }
-            if (($action['name'] ?? '') === 'SynchronizationButton') {
-                $action['visible'] = !$isLocal;
-            }
-        }
-        unset($action);
-
-        return $this->EncodeConfigurationForm($form);
     }
 
     /**
@@ -255,98 +280,109 @@ class CalendarAccount extends IPSModuleStrict
      */
     public function UpdateProviderForm(int $provider): void
     {
-        $isPasswordProvider = in_array($provider, [self::PROVIDER_APPLE, self::PROVIDER_CALDAV, self::PROVIDER_ICS], true);
-        $isGoogle = $provider === self::PROVIDER_GOOGLE;
-        $isMicrosoft = $provider === self::PROVIDER_MICROSOFT;
-        $isIcs = $provider === self::PROVIDER_ICS;
-        $isLocal = $provider === self::PROVIDER_LOCAL;
-        $iCalendarAuthenticationMode = $this->ReadPropertyInteger('ICalendarAuthenticationMode');
-        $showIcsCredentials = $iCalendarAuthenticationMode === ICalendarAuthentication::USERNAME_PASSWORD
-            || ($iCalendarAuthenticationMode === ICalendarAuthentication::AUTOMATIC
-                && (trim($this->ReadPropertyString('Username')) !== '' || $this->ReadPropertyString('Password') !== ''));
-        $canConfigureTls = in_array($provider, [self::PROVIDER_CALDAV, self::PROVIDER_ICS], true);
-        $this->UpdateFormField('ServerURL', 'visible', $isPasswordProvider);
-        $this->UpdateFormField('PrivacyNotice', 'visible', !$isLocal);
-        $this->UpdateFormField('ServerURL', 'caption', $isIcs ? $this->Translate('iCalendar URL') : $this->Translate('Server URL'));
-        $this->UpdateFormField('ICalendarAuthenticationMode', 'visible', $isIcs);
-        $showCredentials = in_array($provider, [self::PROVIDER_APPLE, self::PROVIDER_CALDAV], true)
-            || ($isIcs && $showIcsCredentials);
-        $this->UpdateFormField('Username', 'visible', $showCredentials);
-        $this->UpdateFormField('Password', 'visible', $showCredentials);
-        $this->UpdateFormField('CalendarName', 'visible', $isIcs);
-        $this->UpdateFormField('LocalCalendarHint', 'visible', $isLocal);
-        $this->UpdateFormField('LocalCalendarName', 'visible', $isLocal);
-        $this->UpdateFormField('LocalCalendarColor', 'visible', $isLocal);
-        $this->UpdateFormField('ICalendarTranslationProfile', 'visible', $isIcs);
-        $this->UpdateFormField('ICalendarSubscriptionsPanel', 'visible', $isIcs);
-        $this->UpdateFormField('ICalendarFilesPanel', 'visible', $isIcs);
-        $this->UpdateFormField('VerifyTLS', 'visible', $canConfigureTls);
-        $this->UpdateFormField('RequestTimeout', 'visible', !$isLocal);
-        $this->UpdateFormField(
-            'TestConnectionButton',
-            'caption',
-            $isLocal ? $this->Translate('Check local calendar') : $this->Translate('Test connection')
-        );
-        $this->UpdateFormField('SynchronizationButton', 'visible', !$isLocal);
-        $this->UpdateFormField(
-            'UpdateSchedule',
-            'visible',
-            !$isLocal
-        );
-        $this->UpdateFormField(
-            'UpdateSchedule',
-            'caption',
-            $isIcs ? $this->Translate('Account discovery schedule') : $this->Translate('Synchronization schedule')
-        );
-        $this->UpdateFormField(
-            'UpdateInterval',
-            'visible',
-            !$isLocal && $this->ReadPropertyInteger('UpdateSchedule') === SynchronizationSchedule::CUSTOM
-        );
-        $this->UpdateFormField(
-            'UpdateInterval',
-            'caption',
-            $isIcs ? $this->Translate('Account custom interval') : $this->Translate('Custom interval')
-        );
-        $this->UpdateFormField('GoogleStatus', 'visible', $isGoogle);
-        $this->UpdateFormField('GoogleOAuthHint', 'visible', $isGoogle);
-        $this->UpdateFormField('GoogleConnectHint', 'visible', $isGoogle);
-        $this->UpdateFormField('GoogleConnect', 'visible', $isGoogle && !$this->isGoogleConnected());
-        $this->UpdateFormField('GoogleDisconnect', 'visible', $isGoogle && $this->isGoogleConnected());
-        $this->UpdateFormField('MicrosoftOAuthHint', 'visible', $isMicrosoft);
-        $this->UpdateFormField('MicrosoftConnectHint', 'visible', $isMicrosoft);
-        $this->UpdateFormField('MicrosoftStatus', 'visible', $isMicrosoft);
-        $this->UpdateFormField('MicrosoftStatus', 'caption', $this->microsoftStatusText());
-        $this->UpdateFormField('MicrosoftConnect', 'visible', $isMicrosoft && !$this->isMicrosoftConnected());
-        $this->UpdateFormField('MicrosoftDisconnect', 'visible', $isMicrosoft && $this->isMicrosoftConnected());
+        $debugFlowResult = null;
+        $debugFlowFailed = false;
+        $this->DebugFlowStart(__FUNCTION__, __LINE__);
+        try {
+            $isPasswordProvider = in_array($provider, [self::PROVIDER_APPLE, self::PROVIDER_CALDAV, self::PROVIDER_ICS], true);
+            $isGoogle = $provider === self::PROVIDER_GOOGLE;
+            $isMicrosoft = $provider === self::PROVIDER_MICROSOFT;
+            $isIcs = $provider === self::PROVIDER_ICS;
+            $isLocal = $provider === self::PROVIDER_LOCAL;
+            $iCalendarAuthenticationMode = $this->ReadPropertyInteger('ICalendarAuthenticationMode');
+            $showIcsCredentials = $iCalendarAuthenticationMode === ICalendarAuthentication::USERNAME_PASSWORD
+                || ($iCalendarAuthenticationMode === ICalendarAuthentication::AUTOMATIC
+                    && (trim($this->ReadPropertyString('Username')) !== '' || $this->ReadPropertyString('Password') !== ''));
+            $canConfigureTls = in_array($provider, [self::PROVIDER_CALDAV, self::PROVIDER_ICS], true);
+            $this->UpdateFormField('ServerURL', 'visible', $isPasswordProvider);
+            $this->UpdateFormField('PrivacyNotice', 'visible', !$isLocal);
+            $this->UpdateFormField('ServerURL', 'caption', $isIcs ? $this->Translate('iCalendar URL') : $this->Translate('Server URL'));
+            $this->UpdateFormField('ICalendarAuthenticationMode', 'visible', $isIcs);
+            $showCredentials = in_array($provider, [self::PROVIDER_APPLE, self::PROVIDER_CALDAV], true)
+                || ($isIcs && $showIcsCredentials);
+            $this->UpdateFormField('Username', 'visible', $showCredentials);
+            $this->UpdateFormField('Password', 'visible', $showCredentials);
+            $this->UpdateFormField('CalendarName', 'visible', $isIcs);
+            $this->UpdateFormField('LocalCalendarHint', 'visible', $isLocal);
+            $this->UpdateFormField('LocalCalendarName', 'visible', $isLocal);
+            $this->UpdateFormField('LocalCalendarColor', 'visible', $isLocal);
+            $this->UpdateFormField('ICalendarTranslationProfile', 'visible', $isIcs);
+            $this->UpdateFormField('ICalendarSubscriptionsPanel', 'visible', $isIcs);
+            $this->UpdateFormField('ICalendarFilesPanel', 'visible', $isIcs);
+            $this->UpdateFormField('VerifyTLS', 'visible', $canConfigureTls);
+            $this->UpdateFormField('RequestTimeout', 'visible', !$isLocal);
+            $this->UpdateFormField(
+                'TestConnectionButton',
+                'caption',
+                $isLocal ? $this->Translate('Check local calendar') : $this->Translate('Test connection')
+            );
+            $this->UpdateFormField('SynchronizationButton', 'visible', !$isLocal);
+            $this->UpdateFormField(
+                'UpdateSchedule',
+                'visible',
+                !$isLocal
+            );
+            $this->UpdateFormField(
+                'UpdateSchedule',
+                'caption',
+                $isIcs ? $this->Translate('Account discovery schedule') : $this->Translate('Synchronization schedule')
+            );
+            $this->UpdateFormField(
+                'UpdateInterval',
+                'visible',
+                !$isLocal && $this->ReadPropertyInteger('UpdateSchedule') === SynchronizationSchedule::CUSTOM
+            );
+            $this->UpdateFormField(
+                'UpdateInterval',
+                'caption',
+                $isIcs ? $this->Translate('Account custom interval') : $this->Translate('Custom interval')
+            );
+            $this->UpdateFormField('GoogleStatus', 'visible', $isGoogle);
+            $this->UpdateFormField('GoogleOAuthHint', 'visible', $isGoogle);
+            $this->UpdateFormField('GoogleConnectHint', 'visible', $isGoogle);
+            $this->UpdateFormField('GoogleConnect', 'visible', $isGoogle && !$this->isGoogleConnected());
+            $this->UpdateFormField('GoogleDisconnect', 'visible', $isGoogle && $this->isGoogleConnected());
+            $this->UpdateFormField('MicrosoftOAuthHint', 'visible', $isMicrosoft);
+            $this->UpdateFormField('MicrosoftConnectHint', 'visible', $isMicrosoft);
+            $this->UpdateFormField('MicrosoftStatus', 'visible', $isMicrosoft);
+            $this->UpdateFormField('MicrosoftStatus', 'caption', $this->microsoftStatusText());
+            $this->UpdateFormField('MicrosoftConnect', 'visible', $isMicrosoft && !$this->isMicrosoftConnected());
+            $this->UpdateFormField('MicrosoftDisconnect', 'visible', $isMicrosoft && $this->isMicrosoftConnected());
 
-        if ($provider === self::PROVIDER_APPLE) {
-            $this->UpdateFormField('ServerURL', 'value', self::APPLE_CALDAV_URL);
+            if ($provider === self::PROVIDER_APPLE) {
+                $this->UpdateFormField('ServerURL', 'value', self::APPLE_CALDAV_URL);
+                $this->UpdateFormField('ServerURL', 'enabled', false);
+                return;
+            }
+
+            if ($provider === self::PROVIDER_CALDAV) {
+                $storedProvider = $this->ReadPropertyInteger('Provider');
+                $storedServerUrl = trim($this->ReadPropertyString('ServerURL'));
+                if ($storedProvider === self::PROVIDER_APPLE || $storedServerUrl === self::APPLE_CALDAV_URL) {
+                    $this->UpdateFormField('ServerURL', 'value', '');
+                }
+                $this->UpdateFormField('ServerURL', 'enabled', true);
+                return;
+            }
+
+            if ($provider === self::PROVIDER_ICS) {
+                $storedProvider = $this->ReadPropertyInteger('Provider');
+                $storedServerUrl = trim($this->ReadPropertyString('ServerURL'));
+                if ($storedProvider === self::PROVIDER_APPLE || $storedServerUrl === self::APPLE_CALDAV_URL) {
+                    $this->UpdateFormField('ServerURL', 'value', '');
+                }
+                $this->UpdateFormField('ServerURL', 'enabled', true);
+                return;
+            }
+
             $this->UpdateFormField('ServerURL', 'enabled', false);
-            return;
+        } catch (\Throwable $debugFlowException) {
+            $debugFlowFailed = true;
+            $this->DebugFlowException(__FUNCTION__, __LINE__, $debugFlowException);
+            throw $debugFlowException;
+        } finally {
+            $this->DebugFlowEnd(__FUNCTION__, __LINE__, $debugFlowResult, $debugFlowFailed, true);
         }
-
-        if ($provider === self::PROVIDER_CALDAV) {
-            $storedProvider = $this->ReadPropertyInteger('Provider');
-            $storedServerUrl = trim($this->ReadPropertyString('ServerURL'));
-            if ($storedProvider === self::PROVIDER_APPLE || $storedServerUrl === self::APPLE_CALDAV_URL) {
-                $this->UpdateFormField('ServerURL', 'value', '');
-            }
-            $this->UpdateFormField('ServerURL', 'enabled', true);
-            return;
-        }
-
-        if ($provider === self::PROVIDER_ICS) {
-            $storedProvider = $this->ReadPropertyInteger('Provider');
-            $storedServerUrl = trim($this->ReadPropertyString('ServerURL'));
-            if ($storedProvider === self::PROVIDER_APPLE || $storedServerUrl === self::APPLE_CALDAV_URL) {
-                $this->UpdateFormField('ServerURL', 'value', '');
-            }
-            $this->UpdateFormField('ServerURL', 'enabled', true);
-            return;
-        }
-
-        $this->UpdateFormField('ServerURL', 'enabled', false);
     }
 
     /**
@@ -354,11 +390,22 @@ class CalendarAccount extends IPSModuleStrict
      */
     public function UpdateICalendarAuthenticationForm(int $authenticationMode): void
     {
-        $showCredentials = $authenticationMode === ICalendarAuthentication::USERNAME_PASSWORD
-            || ($authenticationMode === ICalendarAuthentication::AUTOMATIC
-                && (trim($this->ReadPropertyString('Username')) !== '' || $this->ReadPropertyString('Password') !== ''));
-        $this->UpdateFormField('Username', 'visible', $showCredentials);
-        $this->UpdateFormField('Password', 'visible', $showCredentials);
+        $debugFlowResult = null;
+        $debugFlowFailed = false;
+        $this->DebugFlowStart(__FUNCTION__, __LINE__);
+        try {
+            $showCredentials = $authenticationMode === ICalendarAuthentication::USERNAME_PASSWORD
+                || ($authenticationMode === ICalendarAuthentication::AUTOMATIC
+                    && (trim($this->ReadPropertyString('Username')) !== '' || $this->ReadPropertyString('Password') !== ''));
+            $this->UpdateFormField('Username', 'visible', $showCredentials);
+            $this->UpdateFormField('Password', 'visible', $showCredentials);
+        } catch (\Throwable $debugFlowException) {
+            $debugFlowFailed = true;
+            $this->DebugFlowException(__FUNCTION__, __LINE__, $debugFlowException);
+            throw $debugFlowException;
+        } finally {
+            $this->DebugFlowEnd(__FUNCTION__, __LINE__, $debugFlowResult, $debugFlowFailed, true);
+        }
     }
 
     /**
@@ -366,11 +413,22 @@ class CalendarAccount extends IPSModuleStrict
      */
     public function UpdateScheduleForm(int $schedule): void
     {
-        $this->UpdateFormField(
-            'UpdateInterval',
-            'visible',
-            $schedule === SynchronizationSchedule::CUSTOM
-        );
+        $debugFlowResult = null;
+        $debugFlowFailed = false;
+        $this->DebugFlowStart(__FUNCTION__, __LINE__);
+        try {
+            $this->UpdateFormField(
+                'UpdateInterval',
+                'visible',
+                $schedule === SynchronizationSchedule::CUSTOM
+            );
+        } catch (\Throwable $debugFlowException) {
+            $debugFlowFailed = true;
+            $this->DebugFlowException(__FUNCTION__, __LINE__, $debugFlowException);
+            throw $debugFlowException;
+        } finally {
+            $this->DebugFlowEnd(__FUNCTION__, __LINE__, $debugFlowResult, $debugFlowFailed, true);
+        }
     }
 
     /**
@@ -380,10 +438,21 @@ class CalendarAccount extends IPSModuleStrict
      */
     public function MessageSink(int $TimeStamp, int $SenderID, int $Message, array $Data): void
     {
-        if ($SenderID === 0
-            && $Message === IPS_KERNELSTARTED
-            && $this->ReadPropertyInteger('Provider') !== self::PROVIDER_LOCAL) {
-            $this->scheduleOAuthRegistration();
+        $debugFlowResult = null;
+        $debugFlowFailed = false;
+        $this->DebugFlowStart(__FUNCTION__, __LINE__, ['Quelle' => $SenderID, 'Nachricht' => $Message]);
+        try {
+            if ($SenderID === 0
+                && $Message === IPS_KERNELSTARTED
+                && $this->ReadPropertyInteger('Provider') !== self::PROVIDER_LOCAL) {
+                $this->scheduleOAuthRegistration();
+            }
+        } catch (\Throwable $debugFlowException) {
+            $debugFlowFailed = true;
+            $this->DebugFlowException(__FUNCTION__, __LINE__, $debugFlowException);
+            throw $debugFlowException;
+        } finally {
+            $this->DebugFlowEnd(__FUNCTION__, __LINE__, $debugFlowResult, $debugFlowFailed, true);
         }
     }
 
@@ -395,53 +464,65 @@ class CalendarAccount extends IPSModuleStrict
      */
     public function RequestAction(string $Ident, mixed $Value): void
     {
-        switch ($Ident) {
-            case 'FormTestConnection':
-                $result = json_decode($this->TestConnection(), true);
-                $this->UpdateFormField(
-                    is_array($result) && ($result['success'] ?? false)
-                        ? 'ConnectionSuccessPopup'
-                        : 'ConnectionFailurePopup',
-                    'visible',
-                    true
-                );
-                break;
+        $debugFlowResult = null;
+        $debugFlowFailed = false;
+        $this->DebugFlowStart(__FUNCTION__, __LINE__, ['Aktion' => $Ident]);
+        try {
+            $this->DebugFlowEvent(__FUNCTION__, __LINE__, 'AKTION', 'Bedienaktion angefordert; übergebene Nutzdaten bleiben geschützt.', ['Aktion' => $Ident]);
+            switch ($Ident) {
+                case 'FormTestConnection':
+                    $result = json_decode($this->TestConnection(), true);
+                    $this->UpdateFormField(
+                        is_array($result) && ($result['success'] ?? false)
+                            ? 'ConnectionSuccessPopup'
+                            : 'ConnectionFailurePopup',
+                        'visible',
+                        true
+                    );
+                    break;
 
-            case 'FormSynchronize':
-                $this->UpdateFormField(
-                    $this->Synchronize() ? 'SynchronizationSuccessPopup' : 'SynchronizationFailurePopup',
-                    'visible',
-                    true
-                );
-                break;
+                case 'FormSynchronize':
+                    $this->UpdateFormField(
+                        $this->Synchronize() ? 'SynchronizationSuccessPopup' : 'SynchronizationFailurePopup',
+                        'visible',
+                        true
+                    );
+                    break;
 
-            case 'FormClearCache':
-                $this->ClearCache();
-                $this->UpdateFormField('CacheClearedPopup', 'visible', true);
-                break;
+                case 'FormClearCache':
+                    $this->ClearCache();
+                    $this->UpdateFormField('CacheClearedPopup', 'visible', true);
+                    break;
 
-            case 'FormGoogleAuthorizationFailed':
-                $this->UpdateFormField('GoogleAuthorizationFailedPopup', 'visible', true);
-                break;
+                case 'FormGoogleAuthorizationFailed':
+                    $this->UpdateFormField('GoogleAuthorizationFailedPopup', 'visible', true);
+                    break;
 
-            case 'FormMicrosoftAuthorizationFailed':
-                $this->UpdateFormField('MicrosoftAuthorizationFailedPopup', 'visible', true);
-                break;
+                case 'FormMicrosoftAuthorizationFailed':
+                    $this->UpdateFormField('MicrosoftAuthorizationFailedPopup', 'visible', true);
+                    break;
 
-            case 'InternalOAuthBegin':
-                $this->beginOAuthDispatch($Value);
-                break;
+                case 'InternalOAuthBegin':
+                    $this->beginOAuthDispatch($Value);
+                    break;
 
-            case 'InternalOAuthCancel':
-                $this->cancelOAuthDispatch($Value);
-                break;
+                case 'InternalOAuthCancel':
+                    $this->cancelOAuthDispatch($Value);
+                    break;
 
-            case 'InternalOAuthComplete':
-                $this->completeOAuthDispatch($Value);
-                break;
+                case 'InternalOAuthComplete':
+                    $this->completeOAuthDispatch($Value);
+                    break;
 
-            default:
-                throw new InvalidArgumentException('Unsupported form action: ' . $Ident);
+                default:
+                    throw new InvalidArgumentException('Unsupported form action: ' . $Ident);
+            }
+        } catch (\Throwable $debugFlowException) {
+            $debugFlowFailed = true;
+            $this->DebugFlowException(__FUNCTION__, __LINE__, $debugFlowException);
+            throw $debugFlowException;
+        } finally {
+            $this->DebugFlowEnd(__FUNCTION__, __LINE__, $debugFlowResult, $debugFlowFailed, true);
         }
     }
 
@@ -450,47 +531,58 @@ class CalendarAccount extends IPSModuleStrict
      */
     public function ApplyChanges(): void
     {
-        parent::ApplyChanges();
+        $debugFlowResult = null;
+        $debugFlowFailed = false;
+        $this->DebugFlowStart(__FUNCTION__, __LINE__);
+        try {
+            parent::ApplyChanges();
 
-        $this->migrateLegacyLocalCalendarColor();
+            $this->migrateLegacyLocalCalendarColor();
 
-        $providerName = $this->getProviderName($this->ReadPropertyInteger('Provider'));
-        $username = match ($this->ReadPropertyInteger('Provider')) {
-            self::PROVIDER_GOOGLE    => trim($this->ReadAttributeString('GoogleAccount')),
-            self::PROVIDER_MICROSOFT => trim($this->ReadAttributeString('MicrosoftAccount')),
-            self::PROVIDER_ICS       => $this->iCalendarSummary(),
-            default                  => trim($this->ReadPropertyString('Username'))
-        };
-        $this->SetSummary($username !== '' ? $providerName . ' – ' . $username : $providerName);
+            $providerName = $this->getProviderName($this->ReadPropertyInteger('Provider'));
+            $username = match ($this->ReadPropertyInteger('Provider')) {
+                self::PROVIDER_GOOGLE    => trim($this->ReadAttributeString('GoogleAccount')),
+                self::PROVIDER_MICROSOFT => trim($this->ReadAttributeString('MicrosoftAccount')),
+                self::PROVIDER_ICS       => $this->iCalendarSummary(),
+                default                  => trim($this->ReadPropertyString('Username'))
+            };
+            $this->SetSummary($username !== '' ? $providerName . ' – ' . $username : $providerName);
 
-        $this->SetTimerInterval('OAuthRegistrationTimer', 0);
-        if ($this->ReadPropertyInteger('Provider') !== self::PROVIDER_LOCAL
-            && IPS_GetKernelRunlevel() === KR_READY) {
-            $this->scheduleOAuthRegistration();
+            $this->SetTimerInterval('OAuthRegistrationTimer', 0);
+            if ($this->ReadPropertyInteger('Provider') !== self::PROVIDER_LOCAL
+                && IPS_GetKernelRunlevel() === KR_READY) {
+                $this->scheduleOAuthRegistration();
+            }
+
+            if (!$this->ReadPropertyBoolean('Active')) {
+                $this->SetTimerInterval('SynchronizationTimer', 0);
+                $this->SetStatus(IS_INACTIVE);
+                return;
+            }
+
+            $validationError = $this->validateConfiguration();
+            if ($validationError !== '') {
+                $this->SetTimerInterval('SynchronizationTimer', 0);
+                $this->WriteAttributeString('LastError', $validationError);
+                $this->SetStatus(self::STATUS_CONFIGURATION_MISSING);
+                return;
+            }
+
+            $this->SetTimerInterval(
+                'SynchronizationTimer',
+                $this->ReadPropertyInteger('Provider') === self::PROVIDER_LOCAL ? 0 : SynchronizationSchedule::timerInterval(
+                    $this->ReadPropertyInteger('UpdateSchedule'),
+                    $this->ReadPropertyInteger('UpdateInterval')
+                )
+            );
+            $this->SetStatus(IS_ACTIVE);
+        } catch (\Throwable $debugFlowException) {
+            $debugFlowFailed = true;
+            $this->DebugFlowException(__FUNCTION__, __LINE__, $debugFlowException);
+            throw $debugFlowException;
+        } finally {
+            $this->DebugFlowEnd(__FUNCTION__, __LINE__, $debugFlowResult, $debugFlowFailed, true);
         }
-
-        if (!$this->ReadPropertyBoolean('Active')) {
-            $this->SetTimerInterval('SynchronizationTimer', 0);
-            $this->SetStatus(IS_INACTIVE);
-            return;
-        }
-
-        $validationError = $this->validateConfiguration();
-        if ($validationError !== '') {
-            $this->SetTimerInterval('SynchronizationTimer', 0);
-            $this->WriteAttributeString('LastError', $validationError);
-            $this->SetStatus(self::STATUS_CONFIGURATION_MISSING);
-            return;
-        }
-
-        $this->SetTimerInterval(
-            'SynchronizationTimer',
-            $this->ReadPropertyInteger('Provider') === self::PROVIDER_LOCAL ? 0 : SynchronizationSchedule::timerInterval(
-                $this->ReadPropertyInteger('UpdateSchedule'),
-                $this->ReadPropertyInteger('UpdateInterval')
-            )
-        );
-        $this->SetStatus(IS_ACTIVE);
     }
 
     /**
@@ -500,21 +592,32 @@ class CalendarAccount extends IPSModuleStrict
      */
     public function InitializeOAuth(): bool
     {
-        $this->SetTimerInterval('OAuthRegistrationTimer', 0);
-        if ($this->ReadPropertyInteger('Provider') === self::PROVIDER_LOCAL) {
-            return true;
-        }
-        if (IPS_GetKernelRunlevel() !== KR_READY) {
-            return false;
-        }
+        $debugFlowResult = null;
+        $debugFlowFailed = false;
+        $this->DebugFlowStart(__FUNCTION__, __LINE__);
+        try {
+            $this->SetTimerInterval('OAuthRegistrationTimer', 0);
+            if ($this->ReadPropertyInteger('Provider') === self::PROVIDER_LOCAL) {
+                return $debugFlowResult = true;
+            }
+            if (IPS_GetKernelRunlevel() !== KR_READY) {
+                return $debugFlowResult = false;
+            }
 
-        if (!$this->isOAuthDispatcher()) {
-            $this->SetTimerInterval('OAuthRegistrationTimer', self::OAUTH_DISPATCHER_RECHECK_MS);
-            return false;
-        }
+            if (!$this->isOAuthDispatcher()) {
+                $this->SetTimerInterval('OAuthRegistrationTimer', self::OAUTH_DISPATCHER_RECHECK_MS);
+                return $debugFlowResult = false;
+            }
 
-        $this->registerOAuthHandlers();
-        return true;
+            $this->registerOAuthHandlers();
+            return $debugFlowResult = true;
+        } catch (\Throwable $debugFlowException) {
+            $debugFlowFailed = true;
+            $this->DebugFlowException(__FUNCTION__, __LINE__, $debugFlowException);
+            throw $debugFlowException;
+        } finally {
+            $this->DebugFlowEnd(__FUNCTION__, __LINE__, $debugFlowResult, $debugFlowFailed, false);
+        }
     }
 
     /**
@@ -524,18 +627,29 @@ class CalendarAccount extends IPSModuleStrict
      */
     public function ScheduledSynchronize(): bool
     {
-        if ($this->ReadPropertyInteger('Provider') === self::PROVIDER_LOCAL) {
-            return true;
-        }
-        if (!SynchronizationSchedule::isDue(
-            $this->ReadPropertyInteger('UpdateSchedule'),
-            $this->ReadPropertyInteger('UpdateInterval'),
-            $this->ReadAttributeInteger('LastSynchronization')
-        )) {
-            return true;
-        }
+        $debugFlowResult = null;
+        $debugFlowFailed = false;
+        $this->DebugFlowStart(__FUNCTION__, __LINE__);
+        try {
+            if ($this->ReadPropertyInteger('Provider') === self::PROVIDER_LOCAL) {
+                return $debugFlowResult = true;
+            }
+            if (!SynchronizationSchedule::isDue(
+                $this->ReadPropertyInteger('UpdateSchedule'),
+                $this->ReadPropertyInteger('UpdateInterval'),
+                $this->ReadAttributeInteger('LastSynchronization')
+            )) {
+                return $debugFlowResult = true;
+            }
 
-        return $this->Synchronize();
+            return $debugFlowResult = $this->Synchronize();
+        } catch (\Throwable $debugFlowException) {
+            $debugFlowFailed = true;
+            $this->DebugFlowException(__FUNCTION__, __LINE__, $debugFlowException);
+            throw $debugFlowException;
+        } finally {
+            $this->DebugFlowEnd(__FUNCTION__, __LINE__, $debugFlowResult, $debugFlowFailed, false);
+        }
     }
 
     /**
@@ -545,58 +659,69 @@ class CalendarAccount extends IPSModuleStrict
      */
     public function TestConnection(): string
     {
-        $validationError = $this->validateConfiguration();
-        if ($validationError !== '') {
-            $this->WriteAttributeString('LastError', $validationError);
-            $this->SetStatus(self::STATUS_CONFIGURATION_MISSING);
-
-            return json_encode(
-                ['success' => false, 'message' => $validationError],
-                JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR
-            );
-        }
-
-        $providerName = $this->getProviderName($this->ReadPropertyInteger('Provider'));
-        if ($this->ReadPropertyInteger('Provider') === self::PROVIDER_LOCAL) {
-            $this->WriteAttributeString('LastError', '');
-            $this->SetStatus($this->ReadPropertyBoolean('Active') ? IS_ACTIVE : IS_INACTIVE);
-            return json_encode(
-                ['success' => true, 'message' => $this->Translate('Local calendar is ready.')],
-                JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR
-            );
-        }
-        $startedAt = microtime(true);
-        $this->SendSafeDebug('ConnectionTestStart', [
-            'provider'       => $providerName,
-            'timeoutSeconds' => max(5, min(120, $this->ReadPropertyInteger('RequestTimeout')))
-        ]);
-
+        $debugFlowResult = null;
+        $debugFlowFailed = false;
+        $this->DebugFlowStart(__FUNCTION__, __LINE__);
         try {
-            $provider = $this->createProvider();
-            $result = $provider->testConnection();
-            if ($this->ReadPropertyInteger('Provider') === self::PROVIDER_MICROSOFT
-                && (bool) ($result['success'] ?? true)) {
-                $this->synchronizeMicrosoftTaskLists();
+            $validationError = $this->validateConfiguration();
+            if ($validationError !== '') {
+                $this->WriteAttributeString('LastError', $validationError);
+                $this->SetStatus(self::STATUS_CONFIGURATION_MISSING);
+
+                return $debugFlowResult = json_encode(
+                    ['success' => false, 'message' => $validationError],
+                    JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR
+                );
             }
-            if (isset($result['message']) && is_string($result['message'])) {
-                $result['message'] = $this->Translate($result['message']);
+
+            $providerName = $this->getProviderName($this->ReadPropertyInteger('Provider'));
+            if ($this->ReadPropertyInteger('Provider') === self::PROVIDER_LOCAL) {
+                $this->WriteAttributeString('LastError', '');
+                $this->SetStatus($this->ReadPropertyBoolean('Active') ? IS_ACTIVE : IS_INACTIVE);
+                return $debugFlowResult = json_encode(
+                    ['success' => true, 'message' => $this->Translate('Local calendar is ready.')],
+                    JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR
+                );
             }
-            $this->WriteAttributeString('LastError', '');
-            $this->SetStatus($this->ReadPropertyBoolean('Active') ? IS_ACTIVE : IS_INACTIVE);
-            $this->SendSafeDebug('ConnectionTestCompleted', [
-                'provider'   => $providerName,
-                'success'    => (bool) ($result['success'] ?? true),
-                'durationMs' => (int) round((microtime(true) - $startedAt) * 1000)
+            $startedAt = microtime(true);
+            $this->DebugFlowEvent(__FUNCTION__, __LINE__, 'AKTION', 'Verbindungstest zum Kalenderanbieter gestartet.', [
+                'Anbieter'          => $providerName,
+                'ZeitlimitSekunden' => max(5, min(120, $this->ReadPropertyInteger('RequestTimeout')))
             ]);
 
-            return json_encode($result, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
-        } catch (Throwable $exception) {
-            $message = $this->handleProviderError($exception);
+            try {
+                $provider = $this->createProvider();
+                $result = $provider->testConnection();
+                if ($this->ReadPropertyInteger('Provider') === self::PROVIDER_MICROSOFT
+                    && (bool) ($result['success'] ?? true)) {
+                    $this->synchronizeMicrosoftTaskLists();
+                }
+                if (isset($result['message']) && is_string($result['message'])) {
+                    $result['message'] = $this->Translate($result['message']);
+                }
+                $this->WriteAttributeString('LastError', '');
+                $this->SetStatus($this->ReadPropertyBoolean('Active') ? IS_ACTIVE : IS_INACTIVE);
+                $this->DebugFlowEvent(__FUNCTION__, __LINE__, 'AKTION', 'Verbindungstest beendet; fachliches Ergebnis steht im Bezug.', [
+                    'Anbieter'           => $providerName,
+                    'Erfolgreich'        => isset($result['success']) ? (bool) $result['success'] : null,
+                    'DauerMillisekunden' => (int) round((microtime(true) - $startedAt) * 1000)
+                ]);
 
-            return json_encode(
-                ['success' => false, 'message' => $message],
-                JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR
-            );
+                return $debugFlowResult = json_encode($result, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
+            } catch (Throwable $exception) {
+                $message = $this->handleProviderError($exception);
+
+                return $debugFlowResult = json_encode(
+                    ['success' => false, 'message' => $message],
+                    JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR
+                );
+            }
+        } catch (\Throwable $debugFlowException) {
+            $debugFlowFailed = true;
+            $this->DebugFlowException(__FUNCTION__, __LINE__, $debugFlowException);
+            throw $debugFlowException;
+        } finally {
+            $this->DebugFlowEnd(__FUNCTION__, __LINE__, $debugFlowResult, $debugFlowFailed, false);
         }
     }
 
@@ -607,45 +732,56 @@ class CalendarAccount extends IPSModuleStrict
      */
     public function Synchronize(): bool
     {
-        if (!$this->ReadPropertyBoolean('Active')) {
-            return false;
-        }
-
-        $validationError = $this->validateConfiguration();
-        if ($validationError !== '') {
-            $this->WriteAttributeString('LastError', $validationError);
-            $this->SetStatus(self::STATUS_CONFIGURATION_MISSING);
-            return false;
-        }
-
-        $providerName = $this->getProviderName($this->ReadPropertyInteger('Provider'));
-        $startedAt = microtime(true);
-        $this->SendSafeDebug('AccountSynchronizationStart', ['provider' => $providerName]);
-
+        $debugFlowResult = null;
+        $debugFlowFailed = false;
+        $this->DebugFlowStart(__FUNCTION__, __LINE__);
         try {
-            $calendars = $this->discoverCalendars();
-            $taskLists = json_decode($this->GetTaskLists(), true, 512, JSON_THROW_ON_ERROR);
-            $this->SetStatus(IS_ACTIVE);
+            if (!$this->ReadPropertyBoolean('Active')) {
+                return $debugFlowResult = false;
+            }
 
-            $this->SendDataToChildren($this->EncodeDataFlowMessage(
-                self::DATA_ID_TO_CHILD,
-                [
-                    'Operation' => 'CalendarsUpdated',
-                    'Payload'   => $calendars
-                ]
-            ));
+            $validationError = $this->validateConfiguration();
+            if ($validationError !== '') {
+                $this->WriteAttributeString('LastError', $validationError);
+                $this->SetStatus(self::STATUS_CONFIGURATION_MISSING);
+                return $debugFlowResult = false;
+            }
 
-            $this->SendSafeDebug('AccountSynchronizationCompleted', [
-                'provider'      => $providerName,
-                'calendarCount' => count($calendars),
-                'taskListCount' => count($taskLists),
-                'durationMs'    => (int) round((microtime(true) - $startedAt) * 1000)
-            ]);
+            $providerName = $this->getProviderName($this->ReadPropertyInteger('Provider'));
+            $startedAt = microtime(true);
+            $this->DebugFlowEvent(__FUNCTION__, __LINE__, 'AKTION', 'Kontosynchronisation angefordert.', ['Anbieter' => $providerName]);
 
-            return true;
-        } catch (Throwable $exception) {
-            $this->handleProviderError($exception);
-            return false;
+            try {
+                $calendars = $this->discoverCalendars();
+                $taskLists = json_decode($this->GetTaskLists(), true, 512, JSON_THROW_ON_ERROR);
+                $this->SetStatus(IS_ACTIVE);
+
+                $this->SendDataToChildren($this->EncodeDataFlowMessage(
+                    self::DATA_ID_TO_CHILD,
+                    [
+                        'Operation' => 'CalendarsUpdated',
+                        'Payload'   => $calendars
+                    ]
+                ));
+
+                $this->DebugFlowEvent(__FUNCTION__, __LINE__, 'AKTION', 'Kalender- und Aufgabenlisten des Kontos übernommen.', [
+                    'Anbieter'              => $providerName,
+                    'Kalenderanzahl'        => count($calendars),
+                    'Aufgabenlistenanzahl'  => count($taskLists),
+                    'DauerMillisekunden'    => (int) round((microtime(true) - $startedAt) * 1000)
+                ]);
+
+                return $debugFlowResult = true;
+            } catch (Throwable $exception) {
+                $this->handleProviderError($exception);
+                return $debugFlowResult = false;
+            }
+        } catch (\Throwable $debugFlowException) {
+            $debugFlowFailed = true;
+            $this->DebugFlowException(__FUNCTION__, __LINE__, $debugFlowException);
+            throw $debugFlowException;
+        } finally {
+            $this->DebugFlowEnd(__FUNCTION__, __LINE__, $debugFlowResult, $debugFlowFailed, false);
         }
     }
 
@@ -656,34 +792,45 @@ class CalendarAccount extends IPSModuleStrict
      */
     public function GetCalendars(): string
     {
-        $cachedCalendars = $this->ReadAttributeString('CachedCalendars');
-        $provider = $this->ReadPropertyInteger('Provider');
-        if ($provider === self::PROVIDER_LOCAL) {
-            return json_encode(
-                [$this->localCalendarDefinition()],
-                JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR
-            );
-        }
-        if (!in_array(
-            $provider,
-            [self::PROVIDER_APPLE, self::PROVIDER_CALDAV, self::PROVIDER_GOOGLE, self::PROVIDER_MICROSOFT],
-            true
-        )) {
-            return $cachedCalendars;
-        }
-
+        $debugFlowResult = null;
+        $debugFlowFailed = false;
+        $this->DebugFlowStart(__FUNCTION__, __LINE__);
         try {
-            $calendars = json_decode($cachedCalendars, true, 512, JSON_THROW_ON_ERROR);
-            if (!is_array($calendars) || !array_is_list($calendars)) {
-                return $cachedCalendars;
+            $cachedCalendars = $this->ReadAttributeString('CachedCalendars');
+            $provider = $this->ReadPropertyInteger('Provider');
+            if ($provider === self::PROVIDER_LOCAL) {
+                return $debugFlowResult = json_encode(
+                    [$this->localCalendarDefinition()],
+                    JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR
+                );
+            }
+            if (!in_array(
+                $provider,
+                [self::PROVIDER_APPLE, self::PROVIDER_CALDAV, self::PROVIDER_GOOGLE, self::PROVIDER_MICROSOFT],
+                true
+            )) {
+                return $debugFlowResult = $cachedCalendars;
             }
 
-            return json_encode(
-                self::normalizeCachedCalendarCapabilities($calendars, $provider),
-                JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR
-            );
-        } catch (JsonException) {
-            return $cachedCalendars;
+            try {
+                $calendars = json_decode($cachedCalendars, true, 512, JSON_THROW_ON_ERROR);
+                if (!is_array($calendars) || !array_is_list($calendars)) {
+                    return $debugFlowResult = $cachedCalendars;
+                }
+
+                return $debugFlowResult = json_encode(
+                    self::normalizeCachedCalendarCapabilities($calendars, $provider),
+                    JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR
+                );
+            } catch (JsonException) {
+                return $debugFlowResult = $cachedCalendars;
+            }
+        } catch (\Throwable $debugFlowException) {
+            $debugFlowFailed = true;
+            $this->DebugFlowException(__FUNCTION__, __LINE__, $debugFlowException);
+            throw $debugFlowException;
+        } finally {
+            $this->DebugFlowEnd(__FUNCTION__, __LINE__, $debugFlowResult, $debugFlowFailed, false);
         }
     }
 
@@ -694,11 +841,22 @@ class CalendarAccount extends IPSModuleStrict
      */
     public function GetTaskLists(): string
     {
-        if ($this->ReadPropertyInteger('Provider') !== self::PROVIDER_MICROSOFT) {
-            return '[]';
-        }
+        $debugFlowResult = null;
+        $debugFlowFailed = false;
+        $this->DebugFlowStart(__FUNCTION__, __LINE__);
+        try {
+            if ($this->ReadPropertyInteger('Provider') !== self::PROVIDER_MICROSOFT) {
+                return $debugFlowResult = '[]';
+            }
 
-        return $this->ReadAttributeString('CachedMicrosoftTaskLists');
+            return $debugFlowResult = $this->ReadAttributeString('CachedMicrosoftTaskLists');
+        } catch (\Throwable $debugFlowException) {
+            $debugFlowFailed = true;
+            $this->DebugFlowException(__FUNCTION__, __LINE__, $debugFlowException);
+            throw $debugFlowException;
+        } finally {
+            $this->DebugFlowEnd(__FUNCTION__, __LINE__, $debugFlowResult, $debugFlowFailed, false);
+        }
     }
 
     /**
@@ -708,35 +866,46 @@ class CalendarAccount extends IPSModuleStrict
      */
     public function GetAccountStatus(): string
     {
-        return json_encode(
-            [
-                'provider'            => $this->getProviderName($this->ReadPropertyInteger('Provider')),
-                'connected'           => match ($this->ReadPropertyInteger('Provider')) {
-                    self::PROVIDER_GOOGLE    => $this->isGoogleConnected(),
-                    self::PROVIDER_MICROSOFT => $this->isMicrosoftConnected(),
-                    default                  => true
-                },
-                'account'             => match ($this->ReadPropertyInteger('Provider')) {
-                    self::PROVIDER_GOOGLE    => $this->ReadAttributeString('GoogleAccount'),
-                    self::PROVIDER_MICROSOFT => $this->ReadAttributeString('MicrosoftAccount'),
-                    self::PROVIDER_ICS       => $this->iCalendarSummary(),
-                    self::PROVIDER_LOCAL     => trim($this->ReadPropertyString('LocalCalendarName')),
-                    default                  => trim($this->ReadPropertyString('Username'))
-                },
-                'lastSynchronization' => $this->ReadAttributeInteger('LastSynchronization'),
-                'lastError'           => $this->ReadAttributeString('LastError'),
-                'subscriptionCache'   => $this->ReadPropertyInteger('Provider') === self::PROVIDER_ICS
-                    ? $this->iCalendarCacheStatus()
-                    : [],
-                'microsoftTasks'      => $this->ReadPropertyInteger('Provider') === self::PROVIDER_MICROSOFT
-                    ? [
-                        'available' => $this->ReadAttributeBoolean('MicrosoftTasksAvailable'),
-                        'listCount' => count(json_decode($this->GetTaskLists(), true, 512, JSON_THROW_ON_ERROR))
-                    ]
-                    : []
-            ],
-            JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR
-        );
+        $debugFlowResult = null;
+        $debugFlowFailed = false;
+        $this->DebugFlowStart(__FUNCTION__, __LINE__);
+        try {
+            return $debugFlowResult = json_encode(
+                [
+                    'provider'            => $this->getProviderName($this->ReadPropertyInteger('Provider')),
+                    'connected'           => match ($this->ReadPropertyInteger('Provider')) {
+                        self::PROVIDER_GOOGLE    => $this->isGoogleConnected(),
+                        self::PROVIDER_MICROSOFT => $this->isMicrosoftConnected(),
+                        default                  => true
+                    },
+                    'account'             => match ($this->ReadPropertyInteger('Provider')) {
+                        self::PROVIDER_GOOGLE    => $this->ReadAttributeString('GoogleAccount'),
+                        self::PROVIDER_MICROSOFT => $this->ReadAttributeString('MicrosoftAccount'),
+                        self::PROVIDER_ICS       => $this->iCalendarSummary(),
+                        self::PROVIDER_LOCAL     => trim($this->ReadPropertyString('LocalCalendarName')),
+                        default                  => trim($this->ReadPropertyString('Username'))
+                    },
+                    'lastSynchronization' => $this->ReadAttributeInteger('LastSynchronization'),
+                    'lastError'           => $this->ReadAttributeString('LastError'),
+                    'subscriptionCache'   => $this->ReadPropertyInteger('Provider') === self::PROVIDER_ICS
+                        ? $this->iCalendarCacheStatus()
+                        : [],
+                    'microsoftTasks'      => $this->ReadPropertyInteger('Provider') === self::PROVIDER_MICROSOFT
+                        ? [
+                            'available' => $this->ReadAttributeBoolean('MicrosoftTasksAvailable'),
+                            'listCount' => count(json_decode($this->GetTaskLists(), true, 512, JSON_THROW_ON_ERROR))
+                        ]
+                        : []
+                ],
+                JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR
+            );
+        } catch (\Throwable $debugFlowException) {
+            $debugFlowFailed = true;
+            $this->DebugFlowException(__FUNCTION__, __LINE__, $debugFlowException);
+            throw $debugFlowException;
+        } finally {
+            $this->DebugFlowEnd(__FUNCTION__, __LINE__, $debugFlowResult, $debugFlowFailed, false);
+        }
     }
 
     /**
@@ -744,12 +913,23 @@ class CalendarAccount extends IPSModuleStrict
      */
     public function ClearCache(): void
     {
-        $this->WriteAttributeString('CachedCalendars', '[]');
-        $this->WriteAttributeString('ICalendarFeedCache', '{}');
-        $this->WriteAttributeString('CachedMicrosoftTaskLists', '[]');
-        $this->WriteAttributeBoolean('MicrosoftTasksAvailable', false);
-        $this->WriteAttributeInteger('LastSynchronization', 0);
-        $this->WriteAttributeString('LastError', '');
+        $debugFlowResult = null;
+        $debugFlowFailed = false;
+        $this->DebugFlowStart(__FUNCTION__, __LINE__);
+        try {
+            $this->WriteAttributeString('CachedCalendars', '[]');
+            $this->WriteAttributeString('ICalendarFeedCache', '{}');
+            $this->WriteAttributeString('CachedMicrosoftTaskLists', '[]');
+            $this->WriteAttributeBoolean('MicrosoftTasksAvailable', false);
+            $this->WriteAttributeInteger('LastSynchronization', 0);
+            $this->WriteAttributeString('LastError', '');
+        } catch (\Throwable $debugFlowException) {
+            $debugFlowFailed = true;
+            $this->DebugFlowException(__FUNCTION__, __LINE__, $debugFlowException);
+            throw $debugFlowException;
+        } finally {
+            $this->DebugFlowEnd(__FUNCTION__, __LINE__, $debugFlowResult, $debugFlowFailed, true);
+        }
     }
 
     /**
@@ -757,40 +937,81 @@ class CalendarAccount extends IPSModuleStrict
      */
     protected function ProcessOAuthData(): void
     {
-        if (!$this->isOAuthDispatcher()) {
-            $this->SendHtmlTextResponse(409, $this->Translate('The OAuth callback was received by the wrong account instance.'));
-            return;
-        }
-
-        $targetInstanceId = $this->ReadAttributeInteger('PendingOAuthInstanceID');
-        $provider = $this->ReadAttributeInteger('PendingOAuthProvider');
-        $startedAt = $this->ReadAttributeInteger('PendingOAuthStartedAt');
-        $this->clearOAuthDispatch();
-
-        if (!$this->isValidOAuthProvider($provider)
-            || $targetInstanceId <= 0
-            || time() - $startedAt > self::OAUTH_PENDING_TIMEOUT_SECONDS
-            || !$this->isCalendarAccountInstance($targetInstanceId)) {
-            $this->SendHtmlTextResponse(400, $this->Translate('The pending calendar authorization is missing or expired.'));
-            return;
-        }
-
+        $debugFlowResult = null;
+        $debugFlowFailed = false;
+        $this->DebugFlowStart(__FUNCTION__, __LINE__);
         try {
-            IPS_RequestAction(
-                $targetInstanceId,
-                'InternalOAuthComplete',
-                json_encode(
-                    ['provider' => $provider, 'data' => $this->readSymconOAuthData()],
-                    JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE
-                )
-            );
-        } catch (Throwable $exception) {
-            $this->SendHtmlTextResponse(
-                400,
-                $this->Translate('Calendar authorization could not be completed') . ': '
-                    . $this->sanitizeError($exception->getMessage())
-            );
+            if (!$this->isOAuthDispatcher()) {
+                $this->SendHtmlTextResponse(409, $this->Translate('The OAuth callback was received by the wrong account instance.'));
+                return;
+            }
+
+            $targetInstanceId = $this->ReadAttributeInteger('PendingOAuthInstanceID');
+            $provider = $this->ReadAttributeInteger('PendingOAuthProvider');
+            $startedAt = $this->ReadAttributeInteger('PendingOAuthStartedAt');
+            $this->clearOAuthDispatch();
+
+            if (!$this->isValidOAuthProvider($provider)
+                || $targetInstanceId <= 0
+                || time() - $startedAt > self::OAUTH_PENDING_TIMEOUT_SECONDS
+                || !$this->isCalendarAccountInstance($targetInstanceId)) {
+                $this->SendHtmlTextResponse(400, $this->Translate('The pending calendar authorization is missing or expired.'));
+                return;
+            }
+
+            try {
+                IPS_RequestAction(
+                    $targetInstanceId,
+                    'InternalOAuthComplete',
+                    json_encode(
+                        ['provider' => $provider, 'data' => $this->readSymconOAuthData()],
+                        JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE
+                    )
+                );
+            } catch (Throwable $exception) {
+                $this->SendHtmlTextResponse(
+                    400,
+                    $this->Translate('Calendar authorization could not be completed') . ': '
+                        . $this->sanitizeError($exception->getMessage())
+                );
+            }
+        } catch (\Throwable $debugFlowException) {
+            $debugFlowFailed = true;
+            $this->DebugFlowException(__FUNCTION__, __LINE__, $debugFlowException);
+            throw $debugFlowException;
+        } finally {
+            $this->DebugFlowEnd(__FUNCTION__, __LINE__, $debugFlowResult, $debugFlowFailed, true);
         }
+    }
+
+    /**
+     * Überführt ältere Helper-Diagnosen ohne deren Rohdaten in den gemeinsamen Debug-Aufbau.
+     *
+     * @param string $Message Native Debug-Kategorie
+     * @param string $Data Geschützte native Diagnose
+     * @param int $Format Natives Datenformat
+     * @return bool Ergebnis des nativen Debug-Kanals
+     */
+    protected function SendDebug(string $Message, string $Data, int $Format): bool
+    {
+        if (str_starts_with($Message, static::class . ' | ')) {
+            return parent::SendDebug($Message, $Data, $Format);
+        }
+        $trace = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 2);
+        $standalone = $this->debugFlowCalls === [];
+        if ($standalone) {
+            $this->DebugFlowStart(__FUNCTION__, __LINE__);
+        }
+        try {
+            $this->DebugFlowEvent($trace[1]['function'] ?? 'Modulhilfe', (int) ($trace[0]['line'] ?? __LINE__), 'FEHLER', 'Die gemeinsame Modulhilfe meldet einen nicht abgeschlossenen Vorgang; Rohdaten bleiben geschützt.', [
+                'Quelldatei' => basename((string) ($trace[0]['file'] ?? 'module.php'))
+            ]);
+        } finally {
+            if ($standalone) {
+                $this->DebugFlowEnd(__FUNCTION__, __LINE__);
+            }
+        }
+        return true;
     }
 
     /**
@@ -925,17 +1146,10 @@ class CalendarAccount extends IPSModuleStrict
         foreach ([self::GOOGLE_OAUTH_IDENTIFIER, self::MICROSOFT_OAUTH_IDENTIFIER] as $identifier) {
             try {
                 if (!$this->RegisterOAuth($identifier)) {
-                    $this->SendSafeDebug(
-                        'OAuthRegistration',
-                        sprintf('OAuth handler "%s" could not be registered.', $identifier)
-                    );
+                    $this->DebugFlowEvent(__FUNCTION__, __LINE__, 'AKTION', 'OAuth-Handler konnte nicht registriert werden.', []);
                 }
             } catch (Throwable $exception) {
-                $this->SendSafeDebug('OAuthRegistrationError', [
-                    'type'    => $exception::class,
-                    'message' => $this->sanitizeError($exception->getMessage()),
-                    'code'    => $exception->getCode()
-                ]);
+                $this->DebugFlowException(__FUNCTION__, __LINE__, $exception);
             }
         }
     }
@@ -1096,74 +1310,85 @@ class CalendarAccount extends IPSModuleStrict
      */
     private function discoverCalendars(): array
     {
-        $validationError = $this->validateConfiguration();
-        if ($validationError !== '') {
-            throw new InvalidArgumentException($validationError);
-        }
+        $debugFlowResult = null;
+        $debugFlowFailed = false;
+        $this->DebugFlowStart(__FUNCTION__, __LINE__);
+        try {
+            $validationError = $this->validateConfiguration();
+            if ($validationError !== '') {
+                throw new InvalidArgumentException($validationError);
+            }
 
-        $providerName = $this->getProviderName($this->ReadPropertyInteger('Provider'));
-        $startedAt = microtime(true);
-        $this->SendSafeDebug('CalendarDiscoveryStart', ['provider' => $providerName]);
-        $calendars = $this->ReadPropertyInteger('Provider') === self::PROVIDER_LOCAL
-            ? [$this->localCalendarDefinition()]
-            : $this->createProvider()->getCalendars();
-        if ($this->ReadPropertyInteger('Provider') === self::PROVIDER_ICS) {
-            $this->pruneICalendarFeedCache(array_map(
-                static fn (array $calendar): string => (string) ($calendar['id'] ?? ''),
-                $calendars
-            ));
-        }
-        if ($this->ReadPropertyInteger('Provider') === self::PROVIDER_GOOGLE) {
-            foreach ($calendars as $calendar) {
-                if ((bool) ($calendar['primary'] ?? false)) {
-                    $account = trim((string) ($calendar['providerId'] ?? ''));
-                    $this->WriteAttributeString('GoogleAccount', $account);
-                    if ($account !== '') {
-                        $this->SetSummary($this->getProviderName(self::PROVIDER_GOOGLE) . ' – ' . $account);
+            $providerName = $this->getProviderName($this->ReadPropertyInteger('Provider'));
+            $startedAt = microtime(true);
+            $this->DebugFlowEvent(__FUNCTION__, __LINE__, 'AKTION', 'Verfügbare Kalender werden beim Anbieter abgefragt.', ['Anbieter' => $providerName]);
+            $calendars = $this->ReadPropertyInteger('Provider') === self::PROVIDER_LOCAL
+                ? [$this->localCalendarDefinition()]
+                : $this->createProvider()->getCalendars();
+            if ($this->ReadPropertyInteger('Provider') === self::PROVIDER_ICS) {
+                $this->pruneICalendarFeedCache(array_map(
+                    static fn (array $calendar): string => (string) ($calendar['id'] ?? ''),
+                    $calendars
+                ));
+            }
+            if ($this->ReadPropertyInteger('Provider') === self::PROVIDER_GOOGLE) {
+                foreach ($calendars as $calendar) {
+                    if ((bool) ($calendar['primary'] ?? false)) {
+                        $account = trim((string) ($calendar['providerId'] ?? ''));
+                        $this->WriteAttributeString('GoogleAccount', $account);
+                        if ($account !== '') {
+                            $this->SetSummary($this->getProviderName(self::PROVIDER_GOOGLE) . ' – ' . $account);
+                        }
+                        break;
                     }
-                    break;
                 }
             }
-        }
-        if ($this->ReadPropertyInteger('Provider') === self::PROVIDER_MICROSOFT) {
-            $account = '';
-            foreach ($calendars as $calendar) {
-                $owner = trim((string) ($calendar['owner'] ?? ''));
-                if ($owner !== '' && ((bool) ($calendar['primary'] ?? false) || $account === '')) {
-                    $account = $owner;
+            if ($this->ReadPropertyInteger('Provider') === self::PROVIDER_MICROSOFT) {
+                $account = '';
+                foreach ($calendars as $calendar) {
+                    $owner = trim((string) ($calendar['owner'] ?? ''));
+                    if ($owner !== '' && ((bool) ($calendar['primary'] ?? false) || $account === '')) {
+                        $account = $owner;
+                    }
+                    if ($owner !== '' && (bool) ($calendar['primary'] ?? false)) {
+                        break;
+                    }
                 }
-                if ($owner !== '' && (bool) ($calendar['primary'] ?? false)) {
-                    break;
+                $this->WriteAttributeString('MicrosoftAccount', $account);
+                if ($account !== '') {
+                    $this->SetSummary($this->getProviderName(self::PROVIDER_MICROSOFT) . ' – ' . $account);
                 }
             }
-            $this->WriteAttributeString('MicrosoftAccount', $account);
-            if ($account !== '') {
-                $this->SetSummary($this->getProviderName(self::PROVIDER_MICROSOFT) . ' – ' . $account);
-            }
-        }
-        $this->WriteAttributeString(
-            'CachedCalendars',
-            json_encode(
-                $calendars,
-                JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR
-            )
-        );
-        // Discovery is also used by the configurator before a scheduled sync.
-        $this->synchronizeMicrosoftTaskLists();
-        $this->WriteAttributeInteger('LastSynchronization', time());
-        $this->WriteAttributeString(
-            'LastError',
-            $this->ReadPropertyInteger('Provider') === self::PROVIDER_ICS
-                ? $this->iCalendarCacheWarning()
-                : ''
-        );
-        $this->SendSafeDebug('CalendarDiscoveryCompleted', [
-            'provider'      => $providerName,
-            'calendarCount' => count($calendars),
-            'durationMs'    => (int) round((microtime(true) - $startedAt) * 1000)
-        ]);
+            $this->WriteAttributeString(
+                'CachedCalendars',
+                json_encode(
+                    $calendars,
+                    JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR
+                )
+            );
+            // Discovery is also used by the configurator before a scheduled sync.
+            $this->synchronizeMicrosoftTaskLists();
+            $this->WriteAttributeInteger('LastSynchronization', time());
+            $this->WriteAttributeString(
+                'LastError',
+                $this->ReadPropertyInteger('Provider') === self::PROVIDER_ICS
+                    ? $this->iCalendarCacheWarning()
+                    : ''
+            );
+            $this->DebugFlowEvent(__FUNCTION__, __LINE__, 'EMPFANG', 'Kalenderliste vom Anbieter empfangen.', [
+                'Anbieter'              => $providerName,
+                'Kalenderanzahl'        => count($calendars),
+                'DauerMillisekunden'    => (int) round((microtime(true) - $startedAt) * 1000)
+            ]);
 
-        return $calendars;
+            return $debugFlowResult = $calendars;
+        } catch (\Throwable $debugFlowException) {
+            $debugFlowFailed = true;
+            $this->DebugFlowException(__FUNCTION__, __LINE__, $debugFlowException);
+            throw $debugFlowException;
+        } finally {
+            $this->DebugFlowEnd(__FUNCTION__, __LINE__, $debugFlowResult, $debugFlowFailed, false);
+        }
     }
 
     /** @return list<array<string, mixed>> */
@@ -1187,9 +1412,9 @@ class CalendarAccount extends IPSModuleStrict
             if (in_array($exception->httpStatus, [401, 403], true)) {
                 $this->WriteAttributeString('CachedMicrosoftTaskLists', '[]');
                 $this->WriteAttributeBoolean('MicrosoftTasksAvailable', false);
-                $this->SendSafeDebug('MicrosoftTasksUnavailable', [
-                    'httpStatus' => $exception->httpStatus,
-                    'errorCode'  => $exception->errorCode
+                $this->DebugFlowEvent(__FUNCTION__, __LINE__, 'AKTION', 'Microsoft-Aufgabenlisten nicht verfügbar; Kalenderverarbeitung läuft weiter.', [
+                    'HTTPStatus'     => $exception->httpStatus,
+                    'Fehlerkennung'  => $exception->errorCode
                 ]);
                 return [];
             }
@@ -1204,10 +1429,10 @@ class CalendarAccount extends IPSModuleStrict
             self::PROVIDER_APPLE, self::PROVIDER_GOOGLE, self::PROVIDER_MICROSOFT => true,
             default                                                               => $this->ReadPropertyBoolean('VerifyTLS')
         };
-        $this->SendSafeDebug('ProviderCreate', [
-            'provider'       => $this->getProviderName($provider),
-            'timeoutSeconds' => max(5, min(120, $this->ReadPropertyInteger('RequestTimeout'))),
-            'verifyTLS'      => $verifyTls
+        $this->DebugFlowEvent(__FUNCTION__, __LINE__, 'AKTION', 'Kalenderanbieter für die Kommunikation vorbereitet.', [
+            'Anbieter'          => $this->getProviderName($provider),
+            'ZeitlimitSekunden' => max(5, min(120, $this->ReadPropertyInteger('RequestTimeout'))),
+            'TLSPrüfen'         => $verifyTls
         ]);
 
         if ($provider === self::PROVIDER_GOOGLE) {
@@ -1580,12 +1805,7 @@ class CalendarAccount extends IPSModuleStrict
             $exception instanceof ICalendarFileProviderException => $exception->httpStatus,
             default                                              => 0
         };
-        $this->SendSafeDebug('ProviderError', [
-            'provider'   => $this->getProviderName($this->ReadPropertyInteger('Provider')),
-            'type'       => $exception::class,
-            'httpStatus' => $httpStatus,
-            'message'    => $rawMessage
-        ]);
+        $this->DebugFlowEvent(__FUNCTION__, __LINE__, 'FEHLER', 'Kommunikation mit dem Kalenderanbieter fehlgeschlagen; Status und vorhandene Fehlerbehandlung werden aktualisiert.', ['HTTPStatus' => $httpStatus, 'Fehlertyp' => $exception::class]);
 
         return $message;
     }

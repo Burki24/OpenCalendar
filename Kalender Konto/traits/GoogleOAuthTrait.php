@@ -14,19 +14,30 @@ trait KalenderKontoGoogleOAuthTrait
      */
     public function ConnectGoogle(): string
     {
+        $debugFlowResult = null;
+        $debugFlowFailed = false;
+        $this->DebugFlowStart(__FUNCTION__, __LINE__);
         try {
-            $this->assertSymconConnectAvailable();
-            $this->SetBuffer('GoogleAccessToken', '');
-            $this->requestOAuthDispatch(self::PROVIDER_GOOGLE);
+            try {
+                $this->assertSymconConnectAvailable();
+                $this->SetBuffer('GoogleAccessToken', '');
+                $this->requestOAuthDispatch(self::PROVIDER_GOOGLE);
 
-            return $this->createSymconOAuthClient(
-                self::GOOGLE_OAUTH_IDENTIFIER,
-                'Google Calendar'
-            )->getAuthorizationUrl((string) IPS_GetLicensee());
-        } catch (Throwable $exception) {
-            $this->releaseOAuthDispatch();
-            return $this->Translate('Google authorization could not be started') . ': '
-                . $this->handleProviderError($exception);
+                return $debugFlowResult = $this->createSymconOAuthClient(
+                    self::GOOGLE_OAUTH_IDENTIFIER,
+                    'Google Calendar'
+                )->getAuthorizationUrl((string) IPS_GetLicensee());
+            } catch (Throwable $exception) {
+                $this->releaseOAuthDispatch();
+                return $debugFlowResult = $this->Translate('Google authorization could not be started') . ': '
+                    . $this->handleProviderError($exception);
+            }
+        } catch (\Throwable $debugFlowException) {
+            $debugFlowFailed = true;
+            $this->DebugFlowException(__FUNCTION__, __LINE__, $debugFlowException);
+            throw $debugFlowException;
+        } finally {
+            $this->DebugFlowEnd(__FUNCTION__, __LINE__, $debugFlowResult, $debugFlowFailed, false);
         }
     }
 
@@ -37,31 +48,42 @@ trait KalenderKontoGoogleOAuthTrait
      */
     public function DisconnectGoogle(): bool
     {
-        $refreshToken = $this->ReadAttributeString('GoogleRefreshToken');
-        if ($refreshToken !== '') {
-            try {
-                $client = $this->createTrustedCloudHttpClient(new GoogleOAuthOriginPolicy());
-                $client->request(
-                    'POST',
-                    'https://oauth2.googleapis.com/revoke',
-                    ['Content-Type' => 'application/x-www-form-urlencoded'],
-                    http_build_query(['token' => $refreshToken], '', '&', PHP_QUERY_RFC3986)
-                );
-            } catch (Throwable $exception) {
-                $this->SendDebug('GoogleOAuthRevoke', $this->sanitizeError($exception->getMessage()), 0);
+        $debugFlowResult = null;
+        $debugFlowFailed = false;
+        $this->DebugFlowStart(__FUNCTION__, __LINE__);
+        try {
+            $refreshToken = $this->ReadAttributeString('GoogleRefreshToken');
+            if ($refreshToken !== '') {
+                try {
+                    $client = $this->createTrustedCloudHttpClient(new GoogleOAuthOriginPolicy());
+                    $client->request(
+                        'POST',
+                        'https://oauth2.googleapis.com/revoke',
+                        ['Content-Type' => 'application/x-www-form-urlencoded'],
+                        http_build_query(['token' => $refreshToken], '', '&', PHP_QUERY_RFC3986)
+                    );
+                } catch (Throwable $exception) {
+                    $this->DebugFlowException(__FUNCTION__, __LINE__, $exception);
+                }
             }
+
+            $this->WriteAttributeString('GoogleRefreshToken', '');
+            $this->WriteAttributeString('GoogleAccount', '');
+            $this->WriteAttributeString('GoogleTokenClientID', '');
+            $this->releaseOAuthDispatch();
+            $this->SetBuffer('GoogleAccessToken', '');
+            $this->ClearCache();
+            $this->SetStatus($this->ReadPropertyBoolean('Active') ? self::STATUS_CONFIGURATION_MISSING : IS_INACTIVE);
+            $this->ReloadForm();
+
+            return $debugFlowResult = true;
+        } catch (\Throwable $debugFlowException) {
+            $debugFlowFailed = true;
+            $this->DebugFlowException(__FUNCTION__, __LINE__, $debugFlowException);
+            throw $debugFlowException;
+        } finally {
+            $this->DebugFlowEnd(__FUNCTION__, __LINE__, $debugFlowResult, $debugFlowFailed, false);
         }
-
-        $this->WriteAttributeString('GoogleRefreshToken', '');
-        $this->WriteAttributeString('GoogleAccount', '');
-        $this->WriteAttributeString('GoogleTokenClientID', '');
-        $this->releaseOAuthDispatch();
-        $this->SetBuffer('GoogleAccessToken', '');
-        $this->ClearCache();
-        $this->SetStatus($this->ReadPropertyBoolean('Active') ? self::STATUS_CONFIGURATION_MISSING : IS_INACTIVE);
-        $this->ReloadForm();
-
-        return true;
     }
 
     /**
@@ -69,56 +91,78 @@ trait KalenderKontoGoogleOAuthTrait
      */
     private function processGoogleOAuthData(array $oauthData): void
     {
+        $debugFlowResult = null;
+        $debugFlowFailed = false;
+        $this->DebugFlowStart(__FUNCTION__, __LINE__);
         try {
-            $error = trim((string) ($oauthData['error_description'] ?? $oauthData['error'] ?? ''));
-            if ($error !== '') {
-                throw new SymconOAuthException($error);
+            try {
+                $error = trim((string) ($oauthData['error_description'] ?? $oauthData['error'] ?? ''));
+                if ($error !== '') {
+                    throw new SymconOAuthException($error);
+                }
+
+                $tokens = $this->createSymconOAuthClient(
+                    self::GOOGLE_OAUTH_IDENTIFIER,
+                    'Google Calendar'
+                )->exchangeAuthorizationCode((string) ($oauthData['code'] ?? ''));
+                $this->storeGoogleTokens($tokens);
+                $this->WriteAttributeString('GoogleAccount', '');
+                $this->WriteAttributeString('LastError', '');
+                $this->ClearCache();
+                $this->SetStatus($this->ReadPropertyBoolean('Active') ? IS_ACTIVE : IS_INACTIVE);
+                $this->ReloadForm();
+
+                $this->SendHtmlTextResponse(
+                    200,
+                    $this->Translate('Google Calendar was connected successfully. You can close this window.')
+                );
+            } catch (Throwable $exception) {
+                $message = $this->handleProviderError($exception);
+                $this->SendHtmlTextResponse(
+                    400,
+                    $this->Translate('Google Calendar could not be connected') . ': ' . $message
+                );
             }
-
-            $tokens = $this->createSymconOAuthClient(
-                self::GOOGLE_OAUTH_IDENTIFIER,
-                'Google Calendar'
-            )->exchangeAuthorizationCode((string) ($oauthData['code'] ?? ''));
-            $this->storeGoogleTokens($tokens);
-            $this->WriteAttributeString('GoogleAccount', '');
-            $this->WriteAttributeString('LastError', '');
-            $this->ClearCache();
-            $this->SetStatus($this->ReadPropertyBoolean('Active') ? IS_ACTIVE : IS_INACTIVE);
-            $this->ReloadForm();
-
-            $this->SendHtmlTextResponse(
-                200,
-                $this->Translate('Google Calendar was connected successfully. You can close this window.')
-            );
-        } catch (Throwable $exception) {
-            $message = $this->handleProviderError($exception);
-            $this->SendHtmlTextResponse(
-                400,
-                $this->Translate('Google Calendar could not be connected') . ': ' . $message
-            );
+        } catch (\Throwable $debugFlowException) {
+            $debugFlowFailed = true;
+            $this->DebugFlowException(__FUNCTION__, __LINE__, $debugFlowException);
+            throw $debugFlowException;
+        } finally {
+            $this->DebugFlowEnd(__FUNCTION__, __LINE__, $debugFlowResult, $debugFlowFailed, true);
         }
     }
 
     private function getGoogleAccessToken(): string
     {
-        if (!$this->isGoogleConnected()) {
-            throw new SymconOAuthException('Google Calendar is not connected yet.');
+        $debugFlowResult = null;
+        $debugFlowFailed = false;
+        $this->DebugFlowStart(__FUNCTION__, __LINE__);
+        try {
+            if (!$this->isGoogleConnected()) {
+                throw new SymconOAuthException('Google Calendar is not connected yet.');
+            }
+
+            $cached = json_decode($this->GetBuffer('GoogleAccessToken'), true);
+            if (is_array($cached)
+                && trim((string) ($cached['token'] ?? '')) !== ''
+                && (int) ($cached['expiresAt'] ?? 0) > time() + 60) {
+                return $debugFlowResult = (string) $cached['token'];
+            }
+
+            $tokens = $this->createSymconOAuthClient(
+                self::GOOGLE_OAUTH_IDENTIFIER,
+                'Google Calendar'
+            )->refreshAccessToken($this->ReadAttributeString('GoogleRefreshToken'));
+            $this->storeGoogleTokens($tokens);
+
+            return $debugFlowResult = $tokens['accessToken'];
+        } catch (\Throwable $debugFlowException) {
+            $debugFlowFailed = true;
+            $this->DebugFlowException(__FUNCTION__, __LINE__, $debugFlowException);
+            throw $debugFlowException;
+        } finally {
+            $this->DebugFlowEnd(__FUNCTION__, __LINE__, $debugFlowResult, $debugFlowFailed, false);
         }
-
-        $cached = json_decode($this->GetBuffer('GoogleAccessToken'), true);
-        if (is_array($cached)
-            && trim((string) ($cached['token'] ?? '')) !== ''
-            && (int) ($cached['expiresAt'] ?? 0) > time() + 60) {
-            return (string) $cached['token'];
-        }
-
-        $tokens = $this->createSymconOAuthClient(
-            self::GOOGLE_OAUTH_IDENTIFIER,
-            'Google Calendar'
-        )->refreshAccessToken($this->ReadAttributeString('GoogleRefreshToken'));
-        $this->storeGoogleTokens($tokens);
-
-        return $tokens['accessToken'];
     }
 
     /**

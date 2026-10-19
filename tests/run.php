@@ -19,6 +19,7 @@ if (PHP_OS_FAMILY === 'Windows') {
 }
 
 $commands = [
+    ['Verify debug flow and confidentiality', [PHP_BINARY, 'tests/debug-output.php']],
     ['Verify moved IPSView output identity', [PHP_BINARY, 'tests/ipsview-moved-output.php']],
     ['Verify embedded dialog bounds and errors', ['node', 'tests/dialog-embedding.js']],
     ['Verify empty HTML descriptions in event details', ['node', 'tests/empty-html-description.js']],

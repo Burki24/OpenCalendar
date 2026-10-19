@@ -46,11 +46,11 @@ microsoftFullSyncRoutingExpect(
     'Microsoft 365 must route event transfers through the Microsoft incremental synchronizer.'
 );
 microsoftFullSyncRoutingExpect(
-    str_contains($transferMethod, "'requestedIncremental' => \$syncToken !== ''")
-        && str_contains($transferMethod, "'fallbackToFull'       => \$syncToken !== '' && !\$result['incremental']")
-        && str_contains($transferMethod, "'deletedCount'         => \$deletedCount")
-        && str_contains($transferMethod, "'recurringCount'       => \$recurringCount")
-        && str_contains($transferMethod, "'syncTokenAdvanced'    => \$syncTokenAdvanced"),
+    str_contains($transferMethod, "'InkrementellAngefordert'                   => \$syncToken !== ''")
+        && str_contains($transferMethod, "'VollabgleichAlsFallback'                   => \$syncToken !== '' && !\$result['incremental']")
+        && str_contains($transferMethod, "'GelöschteEinträge'                         => \$deletedCount")
+        && str_contains($transferMethod, "'Serieneinträge'                            => \$recurringCount")
+        && str_contains($transferMethod, "'SynchronisationskennungFortgeschritten'    => \$syncTokenAdvanced"),
     'Incremental transfer diagnostics must report request mode, fallback, changes, and token progress.'
 );
 microsoftFullSyncRoutingExpect(

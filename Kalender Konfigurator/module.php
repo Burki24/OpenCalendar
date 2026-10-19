@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+require_once __DIR__ . '/../libs/helper/DebugFlowHelper.php';
+
 use Burki24\SymconModuleHelper\ConfigurationFormHelper;
 use Burki24\SymconModuleHelper\DataFlowHelper;
 use Burki24\SymconModuleHelper\ParentConnectionHelper;
@@ -12,6 +14,8 @@ require_once __DIR__ . '/../libs/helper/ConfigurationFormHelper.php';
 
 class CalendarConfigurator extends IPSModuleStrict
 {
+    use \Burki24\SymconModuleHelper\DebugFlowHelper;
+
     use DataFlowHelper;
     use ParentConnectionHelper;
     use ConfigurationFormHelper;
@@ -28,13 +32,24 @@ class CalendarConfigurator extends IPSModuleStrict
      */
     public function Create(): void
     {
-        parent::Create();
+        $debugFlowResult = null;
+        $debugFlowFailed = false;
+        $this->DebugFlowStart(__FUNCTION__, __LINE__);
+        try {
+            parent::Create();
 
-        $this->RegisterAttributeString('CachedCalendars', '[]');
-        $this->RegisterAttributeInteger('CachedCalendarParentID', 0);
-        $this->RegisterAttributeString('LastError', '');
-        $this->RegisterMessage(0, IPS_KERNELSTARTED);
-        $this->RegisterTimer('InitializationTimer', 0, 'IPSKALCFG_Initialize($_IPS[\'TARGET\']);');
+            $this->RegisterAttributeString('CachedCalendars', '[]');
+            $this->RegisterAttributeInteger('CachedCalendarParentID', 0);
+            $this->RegisterAttributeString('LastError', '');
+            $this->RegisterMessage(0, IPS_KERNELSTARTED);
+            $this->RegisterTimer('InitializationTimer', 0, 'IPSKALCFG_Initialize($_IPS[\'TARGET\']);');
+        } catch (\Throwable $debugFlowException) {
+            $debugFlowFailed = true;
+            $this->DebugFlowException(__FUNCTION__, __LINE__, $debugFlowException);
+            throw $debugFlowException;
+        } finally {
+            $this->DebugFlowEnd(__FUNCTION__, __LINE__, $debugFlowResult, $debugFlowFailed, true);
+        }
     }
 
     /**
@@ -42,18 +57,29 @@ class CalendarConfigurator extends IPSModuleStrict
      */
     public function ApplyChanges(): void
     {
-        parent::ApplyChanges();
+        $debugFlowResult = null;
+        $debugFlowFailed = false;
+        $this->DebugFlowStart(__FUNCTION__, __LINE__);
+        try {
+            parent::ApplyChanges();
 
-        $this->synchronizeCalendarCacheParent();
-        $this->RegisterMessage(0, IPS_KERNELSTARTED);
-        $this->SetTimerInterval('InitializationTimer', 0);
-        $this->SetStatus(IS_INACTIVE);
+            $this->synchronizeCalendarCacheParent();
+            $this->RegisterMessage(0, IPS_KERNELSTARTED);
+            $this->SetTimerInterval('InitializationTimer', 0);
+            $this->SetStatus(IS_INACTIVE);
 
-        if (IPS_GetKernelRunlevel() !== KR_READY) {
-            return;
+            if (IPS_GetKernelRunlevel() !== KR_READY) {
+                return;
+            }
+
+            $this->scheduleInitialization();
+        } catch (\Throwable $debugFlowException) {
+            $debugFlowFailed = true;
+            $this->DebugFlowException(__FUNCTION__, __LINE__, $debugFlowException);
+            throw $debugFlowException;
+        } finally {
+            $this->DebugFlowEnd(__FUNCTION__, __LINE__, $debugFlowResult, $debugFlowFailed, true);
         }
-
-        $this->scheduleInitialization();
     }
 
     /**
@@ -63,16 +89,27 @@ class CalendarConfigurator extends IPSModuleStrict
      */
     public function Initialize(): bool
     {
-        $this->SetTimerInterval('InitializationTimer', 0);
-        if (IPS_GetKernelRunlevel() !== KR_READY) {
-            return false;
+        $debugFlowResult = null;
+        $debugFlowFailed = false;
+        $this->DebugFlowStart(__FUNCTION__, __LINE__);
+        try {
+            $this->SetTimerInterval('InitializationTimer', 0);
+            if (IPS_GetKernelRunlevel() !== KR_READY) {
+                return $debugFlowResult = false;
+            }
+
+            $parentError = $this->parentConnectionError();
+            $this->WriteAttributeString('LastError', $parentError);
+            $this->SetStatus($parentError === '' ? IS_ACTIVE : self::STATUS_PARENT_MISSING);
+
+            return $debugFlowResult = true;
+        } catch (\Throwable $debugFlowException) {
+            $debugFlowFailed = true;
+            $this->DebugFlowException(__FUNCTION__, __LINE__, $debugFlowException);
+            throw $debugFlowException;
+        } finally {
+            $this->DebugFlowEnd(__FUNCTION__, __LINE__, $debugFlowResult, $debugFlowFailed, false);
         }
-
-        $parentError = $this->parentConnectionError();
-        $this->WriteAttributeString('LastError', $parentError);
-        $this->SetStatus($parentError === '' ? IS_ACTIVE : self::STATUS_PARENT_MISSING);
-
-        return true;
     }
 
     /**
@@ -82,8 +119,19 @@ class CalendarConfigurator extends IPSModuleStrict
      */
     public function MessageSink(int $TimeStamp, int $SenderID, int $Message, array $Data): void
     {
-        if ($SenderID === 0 && $Message === IPS_KERNELSTARTED) {
-            $this->scheduleInitialization();
+        $debugFlowResult = null;
+        $debugFlowFailed = false;
+        $this->DebugFlowStart(__FUNCTION__, __LINE__, ['Quelle' => $SenderID, 'Nachricht' => $Message]);
+        try {
+            if ($SenderID === 0 && $Message === IPS_KERNELSTARTED) {
+                $this->scheduleInitialization();
+            }
+        } catch (\Throwable $debugFlowException) {
+            $debugFlowFailed = true;
+            $this->DebugFlowException(__FUNCTION__, __LINE__, $debugFlowException);
+            throw $debugFlowException;
+        } finally {
+            $this->DebugFlowEnd(__FUNCTION__, __LINE__, $debugFlowResult, $debugFlowFailed, true);
         }
     }
 
@@ -94,31 +142,42 @@ class CalendarConfigurator extends IPSModuleStrict
      */
     public function GetConfigurationForm(): string
     {
-        $form = $this->LoadConfigurationForm();
-
+        $debugFlowResult = null;
+        $debugFlowFailed = false;
+        $this->DebugFlowStart(__FUNCTION__, __LINE__);
         try {
-            $calendars = $this->requestCalendars();
-            $this->cacheCalendars($calendars);
-            $this->WriteAttributeString('LastError', '');
-            $this->SetStatus(IS_ACTIVE);
-        } catch (Throwable $exception) {
-            $message = $this->sanitizeError($exception->getMessage());
-            $this->WriteAttributeString('LastError', $message);
-            $this->SetStatus(
-                $this->parentConnectionError() !== ''
-                    ? self::STATUS_PARENT_MISSING
-                    : self::STATUS_DISCOVERY_FAILED
-            );
-            $calendars = $this->readCachedCalendars();
-            $form['actions'][] = [
-                'type'    => 'Label',
-                'caption' => $this->Translate('Calendar discovery failed') . ': ' . $message
-            ];
+            $form = $this->LoadConfigurationForm();
+
+            try {
+                $calendars = $this->requestCalendars();
+                $this->cacheCalendars($calendars);
+                $this->WriteAttributeString('LastError', '');
+                $this->SetStatus(IS_ACTIVE);
+            } catch (Throwable $exception) {
+                $message = $this->sanitizeError($exception->getMessage());
+                $this->WriteAttributeString('LastError', $message);
+                $this->SetStatus(
+                    $this->parentConnectionError() !== ''
+                        ? self::STATUS_PARENT_MISSING
+                        : self::STATUS_DISCOVERY_FAILED
+                );
+                $calendars = $this->readCachedCalendars();
+                $form['actions'][] = [
+                    'type'    => 'Label',
+                    'caption' => $this->Translate('Calendar discovery failed') . ': ' . $message
+                ];
+            }
+
+            $form['elements'][0]['values'] = $this->buildConfiguratorValues($calendars);
+
+            return $debugFlowResult = $this->EncodeConfigurationForm($form);
+        } catch (\Throwable $debugFlowException) {
+            $debugFlowFailed = true;
+            $this->DebugFlowException(__FUNCTION__, __LINE__, $debugFlowException);
+            throw $debugFlowException;
+        } finally {
+            $this->DebugFlowEnd(__FUNCTION__, __LINE__, $debugFlowResult, $debugFlowFailed, false);
         }
-
-        $form['elements'][0]['values'] = $this->buildConfiguratorValues($calendars);
-
-        return $this->EncodeConfigurationForm($form);
     }
 
     /**
@@ -129,19 +188,31 @@ class CalendarConfigurator extends IPSModuleStrict
      */
     public function RequestAction(string $Ident, mixed $Value): void
     {
-        switch ($Ident) {
-            case 'FormRefreshCalendars':
-                $this->RefreshCalendars();
-                $status = IPS_GetInstance($this->InstanceID)['InstanceStatus'] ?? 0;
-                $this->UpdateFormField(
-                    $status === IS_ACTIVE ? 'RefreshSuccessPopup' : 'RefreshFailurePopup',
-                    'visible',
-                    true
-                );
-                break;
+        $debugFlowResult = null;
+        $debugFlowFailed = false;
+        $this->DebugFlowStart(__FUNCTION__, __LINE__, ['Aktion' => $Ident]);
+        try {
+            $this->DebugFlowEvent(__FUNCTION__, __LINE__, 'AKTION', 'Bedienaktion angefordert; übergebene Nutzdaten bleiben geschützt.', ['Aktion' => $Ident]);
+            switch ($Ident) {
+                case 'FormRefreshCalendars':
+                    $this->RefreshCalendars();
+                    $status = IPS_GetInstance($this->InstanceID)['InstanceStatus'] ?? 0;
+                    $this->UpdateFormField(
+                        $status === IS_ACTIVE ? 'RefreshSuccessPopup' : 'RefreshFailurePopup',
+                        'visible',
+                        true
+                    );
+                    break;
 
-            default:
-                throw new InvalidArgumentException('Unsupported form action: ' . $Ident);
+                default:
+                    throw new InvalidArgumentException('Unsupported form action: ' . $Ident);
+            }
+        } catch (\Throwable $debugFlowException) {
+            $debugFlowFailed = true;
+            $this->DebugFlowException(__FUNCTION__, __LINE__, $debugFlowException);
+            throw $debugFlowException;
+        } finally {
+            $this->DebugFlowEnd(__FUNCTION__, __LINE__, $debugFlowResult, $debugFlowFailed, true);
         }
     }
 
@@ -152,32 +223,73 @@ class CalendarConfigurator extends IPSModuleStrict
      */
     public function RefreshCalendars(): string
     {
+        $debugFlowResult = null;
+        $debugFlowFailed = false;
+        $this->DebugFlowStart(__FUNCTION__, __LINE__);
         try {
-            $calendars = $this->requestCalendars();
-            $this->cacheCalendars($calendars);
-            $this->WriteAttributeString('LastError', '');
-            $this->SetStatus(IS_ACTIVE);
-            $this->UpdateFormField(
-                'Calendars',
-                'values',
-                json_encode(
-                    $this->buildConfiguratorValues($calendars),
-                    JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR
-                )
-            );
+            try {
+                $calendars = $this->requestCalendars();
+                $this->cacheCalendars($calendars);
+                $this->WriteAttributeString('LastError', '');
+                $this->SetStatus(IS_ACTIVE);
+                $this->UpdateFormField(
+                    'Calendars',
+                    'values',
+                    json_encode(
+                        $this->buildConfiguratorValues($calendars),
+                        JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR
+                    )
+                );
 
-            return sprintf($this->Translate('%d calendars found.'), count($calendars));
-        } catch (Throwable $exception) {
-            $message = $this->sanitizeError($exception->getMessage());
-            $this->WriteAttributeString('LastError', $message);
-            $this->SetStatus(
-                $this->parentConnectionError() !== ''
-                    ? self::STATUS_PARENT_MISSING
-                    : self::STATUS_DISCOVERY_FAILED
-            );
+                return $debugFlowResult = sprintf($this->Translate('%d calendars found.'), count($calendars));
+            } catch (Throwable $exception) {
+                $message = $this->sanitizeError($exception->getMessage());
+                $this->WriteAttributeString('LastError', $message);
+                $this->SetStatus(
+                    $this->parentConnectionError() !== ''
+                        ? self::STATUS_PARENT_MISSING
+                        : self::STATUS_DISCOVERY_FAILED
+                );
 
-            return $this->Translate('Calendar discovery failed') . ': ' . $message;
+                return $debugFlowResult = $this->Translate('Calendar discovery failed') . ': ' . $message;
+            }
+        } catch (\Throwable $debugFlowException) {
+            $debugFlowFailed = true;
+            $this->DebugFlowException(__FUNCTION__, __LINE__, $debugFlowException);
+            throw $debugFlowException;
+        } finally {
+            $this->DebugFlowEnd(__FUNCTION__, __LINE__, $debugFlowResult, $debugFlowFailed, false);
         }
+    }
+
+    /**
+     * Überführt ältere Helper-Diagnosen ohne deren Rohdaten in den gemeinsamen Debug-Aufbau.
+     *
+     * @param string $Message Native Debug-Kategorie
+     * @param string $Data Geschützte native Diagnose
+     * @param int $Format Natives Datenformat
+     * @return bool Ergebnis des nativen Debug-Kanals
+     */
+    protected function SendDebug(string $Message, string $Data, int $Format): bool
+    {
+        if (str_starts_with($Message, static::class . ' | ')) {
+            return parent::SendDebug($Message, $Data, $Format);
+        }
+        $trace = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 2);
+        $standalone = $this->debugFlowCalls === [];
+        if ($standalone) {
+            $this->DebugFlowStart(__FUNCTION__, __LINE__);
+        }
+        try {
+            $this->DebugFlowEvent($trace[1]['function'] ?? 'Modulhilfe', (int) ($trace[0]['line'] ?? __LINE__), 'FEHLER', 'Die gemeinsame Modulhilfe meldet einen nicht abgeschlossenen Vorgang; Rohdaten bleiben geschützt.', [
+                'Quelldatei' => basename((string) ($trace[0]['file'] ?? 'module.php'))
+            ]);
+        } finally {
+            if ($standalone) {
+                $this->DebugFlowEnd(__FUNCTION__, __LINE__);
+            }
+        }
+        return true;
     }
 
     /**
@@ -185,35 +297,48 @@ class CalendarConfigurator extends IPSModuleStrict
      */
     private function requestCalendars(): array
     {
-        $parentError = $this->parentConnectionError();
-        if ($parentError !== '') {
-            throw new RuntimeException($parentError);
+        $debugFlowResult = null;
+        $debugFlowFailed = false;
+        $this->DebugFlowStart(__FUNCTION__, __LINE__);
+        try {
+            $this->DebugFlowEvent(__FUNCTION__, __LINE__, 'SENDEN', 'Kalendererkennung beim verbundenen Konto angefordert.', ['Schnittstelle' => 'Kalender Konto', 'Operation' => 'DiscoverCalendars']);
+            $parentError = $this->parentConnectionError();
+            if ($parentError !== '') {
+                throw new RuntimeException($parentError);
+            }
+
+            $responseJson = $this->SendDataToParent($this->EncodeDataFlowMessage(
+                self::DATA_ID_TO_PARENT,
+                [
+                    'Operation' => 'DiscoverCalendars',
+                    'RequestID' => bin2hex(random_bytes(8))
+                ]
+            ));
+
+            if (!is_string($responseJson) || $responseJson === '') {
+                throw new RuntimeException('The calendar account did not return a response.');
+            }
+
+            $response = json_decode($responseJson, true, 512, JSON_THROW_ON_ERROR);
+            if (!is_array($response) || !($response['Success'] ?? false)) {
+                $error = is_array($response) ? (string) ($response['Error'] ?? '') : '';
+                throw new RuntimeException($error !== '' ? $error : 'The calendar account rejected the request.');
+            }
+
+            $calendars = $response['Payload'] ?? null;
+            if (!is_array($calendars)) {
+                throw new UnexpectedValueException('The calendar account returned invalid calendar data.');
+            }
+
+            $this->DebugFlowEvent(__FUNCTION__, __LINE__, 'EMPFANG', 'Kalenderliste vom Konto übernommen.', ['Schnittstelle' => 'Parent', 'Kalenderanzahl' => count($calendars)]);
+            return $debugFlowResult = array_values(array_filter($calendars, 'is_array'));
+        } catch (\Throwable $debugFlowException) {
+            $debugFlowFailed = true;
+            $this->DebugFlowException(__FUNCTION__, __LINE__, $debugFlowException);
+            throw $debugFlowException;
+        } finally {
+            $this->DebugFlowEnd(__FUNCTION__, __LINE__, $debugFlowResult, $debugFlowFailed, false);
         }
-
-        $responseJson = $this->SendDataToParent($this->EncodeDataFlowMessage(
-            self::DATA_ID_TO_PARENT,
-            [
-                'Operation' => 'DiscoverCalendars',
-                'RequestID' => bin2hex(random_bytes(8))
-            ]
-        ));
-
-        if (!is_string($responseJson) || $responseJson === '') {
-            throw new RuntimeException('The calendar account did not return a response.');
-        }
-
-        $response = json_decode($responseJson, true, 512, JSON_THROW_ON_ERROR);
-        if (!is_array($response) || !($response['Success'] ?? false)) {
-            $error = is_array($response) ? (string) ($response['Error'] ?? '') : '';
-            throw new RuntimeException($error !== '' ? $error : 'The calendar account rejected the request.');
-        }
-
-        $calendars = $response['Payload'] ?? null;
-        if (!is_array($calendars)) {
-            throw new UnexpectedValueException('The calendar account returned invalid calendar data.');
-        }
-
-        return array_values(array_filter($calendars, 'is_array'));
     }
 
     /**
