@@ -19,7 +19,7 @@ require_once __DIR__ . '/HelperTranslationHelper.php';
  * visual implementation in style.css/app.js. The helper owns asset loading,
  * bootstrap encoding, page metadata, fixed placeholders and validation.
  *
- * @version 1.5.1
+ * @version 1.5.2
  */
 trait IPSViewHTMLPageHelper
 {
@@ -382,6 +382,9 @@ trait IPSViewHTMLPageHelper
     /**
      * Renders a complete visualization document from index.html, style.css and app.js.
      *
+     * Replacement values are inserted once and are never interpreted as template syntax.
+     * Unknown placeholders are rejected in the template itself, not in rendered payloads.
+     *
      * Required template placeholders:
      * {{HTML_LANGUAGE}}, {{HTML_CLASSES}}, {{VIEWPORT_CONTENT}},
      * {{ROOT_FONT_SIZE}}, {{VISUALIZATION_THEME}}, {{MODULE_STYLE}},
@@ -457,12 +460,16 @@ trait IPSViewHTMLPageHelper
             $replacements[$placeholder] = $value;
         }
 
-        $html = str_replace(array_keys($replacements), array_values($replacements), $template);
-        if (preg_match('/\{\{[A-Z][A-Z0-9_]*\}\}/', $html, $match) === 1) {
-            throw new RuntimeException('Unresolved visualization placeholder: ' . $match[0]);
+        // Validate only the template: marker-shaped device names and other payloads are data.
+        preg_match_all('/\{\{[A-Z][A-Z0-9_]*\}\}/', $template, $matches);
+        foreach ($matches[0] as $placeholder) {
+            if (!array_key_exists($placeholder, $replacements)) {
+                throw new RuntimeException('Unresolved visualization placeholder: ' . $placeholder);
+            }
         }
 
-        return $html;
+        // A single pass must never expand placeholders introduced by a replacement value.
+        return strtr($template, $replacements);
     }
 
     /**
