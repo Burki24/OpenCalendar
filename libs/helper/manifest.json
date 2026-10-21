@@ -381,10 +381,10 @@
             "source_sha": "82a13d236b430c0ffbcb714aed56d9e52c344ff2"
         },
         "ResponsiveVisualizationHelper": {
-            "version": "1.0.0",
-            "sha256": "0cebd0f08e6416a6d7d4d5fdbb19bf96d457d3e2d51fcf2a1d3e6adf5e967451",
+            "version": "1.0.1",
+            "sha256": "9b8f708fe4de4271310a50c1ac2f09166ba731f540eb829f46ad15b805f9f220",
             "path": "libs/helper/ResponsiveVisualizationHelper.php",
-            "source_sha": "2b37799d66a2c3395ddc5c8998c3b6859c2367e5"
+            "source_sha": "323c57d615e52b73cb2225c3d3af5ef6b52abcc9"
         },
         "SymconOAuthHelper": {
             "version": "1.0.0",
