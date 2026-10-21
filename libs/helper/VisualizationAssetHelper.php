@@ -15,7 +15,7 @@ use RuntimeException;
  * vendored helper can reliably access files from that module's visualization
  * directory.
  *
- * @version 1.0.0
+ * @version 1.0.1
  */
 trait VisualizationAssetHelper
 {
@@ -30,7 +30,7 @@ trait VisualizationAssetHelper
      */
     protected function VisualizationAsset(string $filename): string
     {
-        $path = $this->ResolveVisualizationAssetPath($filename);
+        $path = $this->VisualizationAssetDirectory() . DIRECTORY_SEPARATOR . $filename;
         $content = @file_get_contents($path);
         if ($content === false) {
             $this->SendDebug(__FUNCTION__, 'Visualization asset could not be loaded: ' . $path, 0);
@@ -41,16 +41,27 @@ trait VisualizationAssetHelper
         return $content;
     }
 
+    /** Returns the shared HTTP origin resolver for embedded HTML documents. */
+    protected function VisualizationHTTPOriginScript(): string
+    {
+        $script = file_get_contents(__DIR__ . '/visualization/http-origin.js');
+        if ($script === false) {
+            throw new RuntimeException('The HTTP origin resolver asset could not be loaded.');
+        }
+        return $script;
+    }
+
     /**
      * Resolves an asset path relative to the concrete module class.
      *
-     * @param string $filename File name relative to the module's visualization directory.
+     * Override with __DIR__ . "/visualization" in the consumer when Symcon evaluates
+     * the module class in a WebHook context with a synthetic reflection filename.
      *
-     * @return string Absolute path to the requested visualization asset.
+     * @return string Absolute path to the module visualization directory.
      *
      * @throws RuntimeException If the concrete module file cannot be determined.
      */
-    private function ResolveVisualizationAssetPath(string $filename): string
+    protected function VisualizationAssetDirectory(): string
     {
         $reflection = new ReflectionClass($this);
         $moduleFile = $reflection->getFileName();
@@ -60,8 +71,6 @@ trait VisualizationAssetHelper
 
         return dirname($moduleFile)
             . DIRECTORY_SEPARATOR
-            . 'visualization'
-            . DIRECTORY_SEPARATOR
-            . $filename;
+            . 'visualization';
     }
 }
