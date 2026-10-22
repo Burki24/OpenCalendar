@@ -33,10 +33,10 @@
             "source_sha": "19ce63ec77843ed3cf845b82b346e21f10412d1a"
         },
         "IPSViewHTMLPageHelper": {
-            "version": "1.5.2",
-            "sha256": "cc29a1f8225dcdbc6c420b3f35851b7d5fb066567728aa34296261b8ae8fc86f",
+            "version": "1.5.3",
+            "sha256": "e03d0bf8118c550026a84b271ce17a6c48f489cf5c33b50da0e9c41daa653a2a",
             "path": "libs/helper/IPSViewHTMLPageHelper.php",
-            "source_sha": "f700fb8c719c939937ab023e60ba0d260f3d7140",
+            "source_sha": "91ed2bf3426e4e7700bf79f1cda495cb9b70cb92",
             "assets": [
                 {
                     "path": "libs/helper/translations/IPSViewHTMLPageHelper.json",
@@ -53,14 +53,22 @@
                 },
                 {
                     "name": "VisualizationAssetHelper",
-                    "version": "1.0.1",
-                    "sha256": "ef3adcd38be489ea129bf2e95ad15d32673879e90bf4da8f1272fbf958a0513c",
+                    "version": "1.0.2",
+                    "sha256": "d8d64bce04b48c089eb024758a135bfce1c85c4939e452ce82ae49f0e645b37e",
                     "path": "libs/helper/VisualizationAssetHelper.php",
-                    "source_sha": "a724b8954e32a97c3446a78939a3108d4aaa5996",
+                    "source_sha": "91ed2bf3426e4e7700bf79f1cda495cb9b70cb92",
                     "assets": [
                         {
                             "path": "libs/helper/visualization/http-origin.js",
                             "sha256": "2ae76879f0597414bc60511d9d36c93f1993aec336cb711067ee8925d560be58"
+                        },
+                        {
+                            "path": "libs/helper/visualization/interaction.js",
+                            "sha256": "830baf8049e7274d3796386d93186c45bcb65102e4bf4a8a704171187fb22c96"
+                        },
+                        {
+                            "path": "libs/helper/visualization/interaction.min.js",
+                            "sha256": "851bb2e77a7111da86fbcd0dc0acb554fd68c6cffa826b1af132eb6847d65959"
                         }
                     ]
                 }
@@ -399,14 +407,22 @@
             "source_sha": "82a13d236b430c0ffbcb714aed56d9e52c344ff2"
         },
         "VisualizationAssetHelper": {
-            "version": "1.0.1",
-            "sha256": "ef3adcd38be489ea129bf2e95ad15d32673879e90bf4da8f1272fbf958a0513c",
+            "version": "1.0.2",
+            "sha256": "d8d64bce04b48c089eb024758a135bfce1c85c4939e452ce82ae49f0e645b37e",
             "path": "libs/helper/VisualizationAssetHelper.php",
-            "source_sha": "a724b8954e32a97c3446a78939a3108d4aaa5996",
+            "source_sha": "91ed2bf3426e4e7700bf79f1cda495cb9b70cb92",
             "assets": [
                 {
                     "path": "libs/helper/visualization/http-origin.js",
                     "sha256": "2ae76879f0597414bc60511d9d36c93f1993aec336cb711067ee8925d560be58"
+                },
+                {
+                    "path": "libs/helper/visualization/interaction.js",
+                    "sha256": "830baf8049e7274d3796386d93186c45bcb65102e4bf4a8a704171187fb22c96"
+                },
+                {
+                    "path": "libs/helper/visualization/interaction.min.js",
+                    "sha256": "851bb2e77a7111da86fbcd0dc0acb554fd68c6cffa826b1af132eb6847d65959"
                 }
             ]
         },

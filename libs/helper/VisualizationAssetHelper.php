@@ -15,7 +15,7 @@ use RuntimeException;
  * vendored helper can reliably access files from that module's visualization
  * directory.
  *
- * @version 1.0.1
+ * @version 1.0.2
  */
 trait VisualizationAssetHelper
 {
@@ -47,6 +47,16 @@ trait VisualizationAssetHelper
         $script = file_get_contents(__DIR__ . '/visualization/http-origin.js');
         if ($script === false) {
             throw new RuntimeException('The HTTP origin resolver asset could not be loaded.');
+        }
+        return $script;
+    }
+
+    /** Returns shared wheel routing, scrolling and direct iframe UI forwarding. */
+    protected function VisualizationInteractionScript(): string
+    {
+        $script = file_get_contents(__DIR__ . '/visualization/interaction.min.js');
+        if ($script === false) {
+            throw new RuntimeException('The visualization interaction asset could not be loaded.');
         }
         return $script;
     }

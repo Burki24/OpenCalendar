@@ -11,6 +11,7 @@ use RuntimeException;
 use Throwable;
 
 require_once __DIR__ . '/HelperTranslationHelper.php';
+require_once __DIR__ . '/VisualizationAssetHelper.php';
 
 /**
  * Renders native and IPSView HTML pages through one shared asset contract.
@@ -19,11 +20,12 @@ require_once __DIR__ . '/HelperTranslationHelper.php';
  * visual implementation in style.css/app.js. The helper owns asset loading,
  * bootstrap encoding, page metadata, fixed placeholders and validation.
  *
- * @version 1.5.2
+ * @version 1.5.3
  */
 trait IPSViewHTMLPageHelper
 {
     use HelperTranslationHelper;
+    use VisualizationAssetHelper;
 
     public const IPSVIEW_HTML_CONTRACT_VERSION = 1;
 
@@ -438,6 +440,11 @@ trait IPSViewHTMLPageHelper
         $visualizationTheme = $this->IPSViewHTMLStringOption($configuration, 'visualizationTheme', '');
         $ipsViewStyle = $this->IPSViewHTMLStringOption($configuration, 'ipsViewStyle', '');
         $bootstrap = $this->BuildVisualizationHTMLBootstrap($ipsView, $configuration);
+        $interactionURL = method_exists($this, 'VisualizationInteractionScriptURL') ? $this->VisualizationInteractionScriptURL() : '';
+        if (!is_string($interactionURL) || ($interactionURL !== '' && (preg_match('#^/hook/[A-Za-z0-9/_.-]+$#D', $interactionURL) !== 1 || str_contains($interactionURL, '..')))) {
+            throw new InvalidArgumentException('The interaction asset must use a fixed same-origin hook path.');
+        }
+        $externalInteraction = $interactionURL !== '' && str_contains($template, '{{INTERACTION_SCRIPT}}');
 
         $replacements = [
             '{{HTML_LANGUAGE}}'       => htmlspecialchars($language, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'),
@@ -449,7 +456,8 @@ trait IPSViewHTMLPageHelper
             '{{MODULE_STYLE}}'        => $moduleStyle,
             '{{IPSVIEW_STYLE}}'       => $ipsView ? $ipsViewStyle : '',
             '{{BOOTSTRAP_JSON}}'      => $this->EncodeVisualizationHTMLJSON($bootstrap),
-            '{{MODULE_SCRIPT}}'       => $moduleScript
+            '{{MODULE_SCRIPT}}'       => $moduleScript,
+            '{{INTERACTION_SCRIPT}}'  => $externalInteraction ? '<script src="' . htmlspecialchars($interactionURL, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '"></script>' : ''
         ];
 
         foreach ($this->NormalizeIPSViewHTMLReplacements($configuration['replacements'] ?? []) as $placeholder => $value) {
@@ -458,6 +466,10 @@ trait IPSViewHTMLPageHelper
             }
 
             $replacements[$placeholder] = $value;
+        }
+
+        if (!$externalInteraction) {
+            $replacements['{{MODULE_SCRIPT}}'] = $this->VisualizationInteractionScript() . "\n" . $replacements['{{MODULE_SCRIPT}}'];
         }
 
         // Validate only the template: marker-shaped device names and other payloads are data.
