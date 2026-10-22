@@ -58,7 +58,6 @@ let toastTimer = null;
 let monthLayoutFrame = null;
 let selectedDayEventsDate = null;
 let swipeGesture = null;
-let pickerMousePosition = null;
 let pickerTouchScroll = null;
 let suppressSwipeClickUntil = 0;
 let deferredCalendarState = null;
@@ -4917,23 +4916,13 @@ function calendarDialogIsOpen() {
 }
 
 function clearPickerMousePosition() {
-    pickerMousePosition = null;
+    window.SymconVisualizationInteraction.clearPointer();
 }
 function rememberPickerMousePosition(event) {
-    if (event.pointerType !== 'mouse' || !eventDialog.open
-        || !Number.isFinite(event.clientX) || !Number.isFinite(event.clientY)) {
-        clearPickerMousePosition();
-        return;
-    }
-    pickerMousePosition = {clientX: event.clientX, clientY: event.clientY};
+    window.SymconVisualizationInteraction.rememberPointer(event);
 }
 function pickerHitTestPoint(event) {
-    // IPSView can deliver wheel input to the dialog with (0, 0) instead of
-    // the mouse coordinates. Resolve against the last real mouse movement.
-    if (['wheel', 'mousewheel'].includes(event.type) && eventDialog.open
-        && event.target === eventDialog && event.clientX === 0 && event.clientY === 0
-        && pickerMousePosition) return pickerMousePosition;
-    return event;
+    return window.SymconVisualizationInteraction.point(event);
 }
 function pickerScrollTarget(event) {
     // Embedded hosts can retarget an event; prefer its original DOM path.
@@ -4990,21 +4979,7 @@ function containWheelInsideTile(event) {
     const scrollTarget = calendarOptionList
         || openDialog?.querySelector('.dialog-layout, .dialog-body')
         || content;
-    const factor = event.deltaMode === WheelEvent.DOM_DELTA_LINE
-        ? 16
-        : (event.deltaMode === WheelEvent.DOM_DELTA_PAGE ? scrollTarget.clientHeight : 1);
-    const deltaX = event.deltaX * factor;
-    const deltaY = event.deltaY * factor;
-
-    if (event.shiftKey && deltaX === 0) {
-        scrollTarget.scrollLeft += deltaY;
-    } else {
-        scrollTarget.scrollLeft += deltaX;
-        scrollTarget.scrollTop += deltaY;
-    }
-
-    event.preventDefault();
-    event.stopImmediatePropagation();
+    window.SymconVisualizationInteraction.scroll(event, scrollTarget);
 }
 
 function visibleViewRange() {

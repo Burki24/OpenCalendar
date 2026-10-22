@@ -658,3 +658,7 @@ In der Monatsansicht öffnet ein Klick auf die Tageszahl oder einen freien Berei
 Der native Symcon-Debug zeigt deutsche Meldungen mit Funktion, Zeile, Vorgang
 und Ergebnis sowie Aktionen und Schnittstellenübergaben. Private Inhalte und
 Zugangsdaten bleiben geschützt. Details und Abnahme: [Debug-Aufbau](../docs/DEBUG_OUTPUT.md).
+
+### Mausradbedienung in IPSView
+
+Kachel und IPSView-Ausgabe nutzen die gemeinsame Eingabebehandlung aus `Symcon_ModuleHelper`. Sie normalisiert Mausrad-Deltas und ermittelt bei von IPSView umadressierten Ereignissen den Bereich unter der letzten tatsächlichen Mausposition. Listen und Dialoginhalte scrollen innerhalb ihres Bereichs; vorhandener Karten-/Diagrammzoom bleibt komponentenspezifisch. Verschachtelte teilnehmende HTML-Frames geben ausschließlich UI-Eingaben über den zentralen Vertrag weiter. Ctrl-/Meta-Mausrad bleibt beim Host. Eine vollständige Funktionsprüfung unterscheidet den IPSView-Webclient von der nativen IPSView-App.

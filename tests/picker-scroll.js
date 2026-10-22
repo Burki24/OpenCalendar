@@ -20,6 +20,8 @@ const context = vm.createContext({Element, eventDialog, content, pickerMousePosi
     document: {elementFromPoint: (x, y) => { hitQueries++; assert.strictEqual(x, 120); assert.strictEqual(y, 240); return hit; }},
     eventDetailsDialog: {}, editScopeDialog: {}, deleteConfirmDialog: {}, dayEventsDialog: {}, viewSelectorDialog: {}, calendarFilterDialog: {},
     WheelEvent: {DOM_DELTA_LINE: 1, DOM_DELTA_PAGE: 2}, pickerTouchScroll: null});
+const {createRouter} = require('../libs/helper/visualization/interaction.js');
+context.window = {SymconVisualizationInteraction: createRouter({document: context.document})};
 function load(name) {
     const start = source.indexOf('function ' + name + '(');
     assert(start >= 0, 'Missing handler: ' + name);
@@ -114,7 +116,7 @@ context.pickerScrollTarget(event({type: 'touchstart', target: body, clientX: 120
 assert.strictEqual(hitQueries, queriesBefore, 'Invalid coordinates and touch must not use mouse hit-testing');
 // Observed in IPSView: every wheel reports DIALOG and (0, 0), while
 // pointer movements carry the actual viewport coordinates.
-context.pickerMousePosition = {clientX: 120, clientY: 240};
+context.window.SymconVisualizationInteraction.rememberPointer({pointerType: 'mouse', clientX: 120, clientY: 240});
 hit = option;
 list.scrollTop = 0;
 const previousForm = body.scrollTop;
@@ -123,9 +125,9 @@ assert.strictEqual(list.scrollTop, 40, 'Zero-coordinate dialog wheels must use t
 assert.strictEqual(body.scrollTop, previousForm);
 for (const name of ['rememberPickerMousePosition', 'clearPickerMousePosition']) load(name);
 context.clearPickerMousePosition();
-assert.strictEqual(context.pickerMousePosition, null);
+assert.strictEqual(context.window.SymconVisualizationInteraction.point({clientX: 0, clientY: 0}).clientX, 0);
 context.rememberPickerMousePosition({pointerType: 'mouse', clientX: 120, clientY: 240});
-assert.strictEqual(context.pickerMousePosition.clientX, 120);
+assert.strictEqual(context.window.SymconVisualizationInteraction.point({clientX: 0, clientY: 0}).clientX, 120);
 context.rememberPickerMousePosition({pointerType: 'touch', clientX: 10, clientY: 20});
-assert.strictEqual(context.pickerMousePosition, null, 'Touch input must discard the remembered mouse position');
+assert.strictEqual(context.window.SymconVisualizationInteraction.point({clientX: 0, clientY: 0}).clientX, 0, 'Touch input must discard the remembered mouse position');
 console.log('Picker wheel and touch scroll tests passed.');

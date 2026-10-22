@@ -2,6 +2,8 @@
 
 ## Neu
 
+- Gemeinsame Mausrad-, Scroll- und Frame-Unterstützung aus Symcon_ModuleHelper eingebunden; IPSView-Ereignisse mit umadressiertem Ziel werden zentral behandelt.
+
 - Alle vier Module erklären Abläufe im einheitlichen deutschen Debug-Aufbau mit Funktion, Zeile, Vorgangskennung, Ergebnis sowie geschützten Schnittstellen- und Fehlerdiagnosen.
 
 ## Fixes
