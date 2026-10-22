@@ -11,9 +11,9 @@ The files in this directory are vendored from
 | `DebugFlowHelper.php` | 1.0.0 | `7acb9342e958a867d17ce53c96a69a176a4f28886875b64166372f15eddd11d8` |
 | `DebugHelper.php` | 1.0.2 | `3bc98238da59682b149d981e7641f1a1af8103047d05ce520dec0a2abcbe7d2b` |
 | `HttpResponseHelper.php` | 1.1.0 | `be4fae4c23f757ab462237d8e74d2a9dca1b504937ed4d4b51c7ff76004cf1cd` |
-| `IPSViewHTMLPageHelper.php` | 1.5.2 | `cc29a1f8225dcdbc6c420b3f35851b7d5fb066567728aa34296261b8ae8fc86f` |
+| `IPSViewHTMLPageHelper.php` | 1.5.3 | `e03d0bf8118c550026a84b271ce17a6c48f489cf5c33b50da0e9c41daa653a2a` |
 | `HelperTranslationHelper.php` | 1.0.0 | `d3deee581eca9f8eb11e9adce060170227a2dc836ee898bd134f93d27604f639` |
-| `VisualizationAssetHelper.php` | 1.0.1 | `ef3adcd38be489ea129bf2e95ad15d32673879e90bf4da8f1272fbf958a0513c` |
+| `VisualizationAssetHelper.php` | 1.0.2 | `d8d64bce04b48c089eb024758a135bfce1c85c4939e452ce82ae49f0e645b37e` |
 | `IPSViewStyleConfigurationHelper.php` | 1.1.0 | `e6f558a0dee301d251d2f5845ebdedb765dc07ca5352427d1e08792d940629b7` |
 | `IPSViewStylePresetHelper.php` | 1.0.1 | `770bfc48051a908b55e931f6d4eba6e8984ba73b4aa78cd987470006c7b3a9e7` |
 | `IPSViewControlThemeHelper.php` | 1.0.3 | `7be5f3300ebf0562f818b050a53cfa67d7631a30e3d62f1ab41525501604fac6` |
