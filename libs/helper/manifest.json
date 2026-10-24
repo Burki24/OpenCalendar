@@ -53,14 +53,14 @@
                 },
                 {
                     "name": "VisualizationAssetHelper",
-                    "version": "1.0.2",
-                    "sha256": "d8d64bce04b48c089eb024758a135bfce1c85c4939e452ce82ae49f0e645b37e",
+                    "version": "1.1.0",
+                    "sha256": "a9f5e0c8ea21c021646189fedda6757724b7897b539ead378c2a2f012895e1ee",
                     "path": "libs/helper/VisualizationAssetHelper.php",
-                    "source_sha": "91ed2bf3426e4e7700bf79f1cda495cb9b70cb92",
+                    "source_sha": "8bd47d7b96f01a12858758cf9db69a95f51658dc",
                     "assets": [
                         {
                             "path": "libs/helper/visualization/http-origin.js",
-                            "sha256": "2ae76879f0597414bc60511d9d36c93f1993aec336cb711067ee8925d560be58"
+                            "sha256": "c6c8dd8355b426ddaa38d1789164aac06b4d7d0ccfb8196fcaa88b2ebc2c0456"
                         },
                         {
                             "path": "libs/helper/visualization/interaction.js",
@@ -413,14 +413,14 @@
             "source_sha": "82a13d236b430c0ffbcb714aed56d9e52c344ff2"
         },
         "VisualizationAssetHelper": {
-            "version": "1.0.2",
-            "sha256": "d8d64bce04b48c089eb024758a135bfce1c85c4939e452ce82ae49f0e645b37e",
+            "version": "1.1.0",
+            "sha256": "a9f5e0c8ea21c021646189fedda6757724b7897b539ead378c2a2f012895e1ee",
             "path": "libs/helper/VisualizationAssetHelper.php",
-            "source_sha": "91ed2bf3426e4e7700bf79f1cda495cb9b70cb92",
+            "source_sha": "8bd47d7b96f01a12858758cf9db69a95f51658dc",
             "assets": [
                 {
                     "path": "libs/helper/visualization/http-origin.js",
-                    "sha256": "2ae76879f0597414bc60511d9d36c93f1993aec336cb711067ee8925d560be58"
+                    "sha256": "c6c8dd8355b426ddaa38d1789164aac06b4d7d0ccfb8196fcaa88b2ebc2c0456"
                 },
                 {
                     "path": "libs/helper/visualization/interaction.js",
