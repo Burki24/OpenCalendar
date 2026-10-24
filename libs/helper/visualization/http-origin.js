@@ -12,6 +12,10 @@
         const location = environment.location || {};
         let origin = httpOrigin(location.origin) || httpOrigin(location.href);
         if (origin) return origin;
+        // Native IPSView HTMLBoxes can be opaque data documents with only an
+        // injected <base href="http(s)://symcon/..."> and no browser ancestry.
+        origin = httpOrigin((environment.document || {}).baseURI);
+        if (origin) return origin;
         // Accessible parents also cover about:blank/srcdoc documents.
         try {
             const parent = environment.parent;
