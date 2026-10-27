@@ -15,10 +15,11 @@ use Throwable;
  *
  * Intended for classes derived from IPSModule/IPSModuleStrict. The helper keeps
  * the native SendDebug() channel while normalizing structured data, masking
- * common secret fields and credentials (including JSON encoded as text), and
+ * common secret fields and credentials (including German Passwort fields,
+ * quoted/plain text assignments and JSON encoded as text), and
  * limiting oversized messages unless the caller explicitly raises the limit.
  *
- * @version 1.0.2
+ * @version 1.0.3
  */
 trait DebugHelper
 {
@@ -36,6 +37,7 @@ trait DebugHelper
         'cookie',
         'idtoken',
         'password',
+        'passwort',
         'passwd',
         'privatekey',
         'proxyauthorization',
@@ -53,7 +55,7 @@ trait DebugHelper
      * @param string       $message                 Debug message/category shown by Symcon.
      * @param mixed        $data                    Text, scalar, array, object, or exception to log.
      * @param int          $maxLength               Maximum UTF-8 byte length of the rendered payload.
-     * @param list<string> $additionalSensitiveKeys Optional module-specific keys that must be masked.
+     * @param list<string> $additionalSensitiveKeys Optional module-specific keys masked in structures and text assignments.
      */
     protected function SendSafeDebug(
         string $message,
@@ -172,7 +174,7 @@ trait DebugHelper
                 }
             }
 
-            return $this->SanitizeDebugText($value);
+            return $this->SanitizeDebugText($value, $sensitiveKeys);
         }
         if ($value === null || is_bool($value) || is_int($value)) {
             return $value;
@@ -204,7 +206,7 @@ trait DebugHelper
             return $value->format(DATE_ATOM);
         }
         if ($value instanceof Stringable) {
-            return $this->SanitizeDebugText((string) $value);
+            return $this->SanitizeDebugText((string) $value, $sensitiveKeys);
         }
         if (is_resource($value)) {
             return sprintf('[resource:%s]', get_resource_type($value));
@@ -271,6 +273,7 @@ trait DebugHelper
         }
 
         return str_ends_with($normalized, 'password')
+            || str_ends_with($normalized, 'passwort')
             || str_ends_with($normalized, 'secret')
             || str_ends_with($normalized, 'token')
             || str_ends_with($normalized, 'apikey');
@@ -281,7 +284,8 @@ trait DebugHelper
         return strtolower((string) preg_replace('/[^a-z0-9]+/i', '', trim($key)));
     }
 
-    private function SanitizeDebugText(string $text): string
+    /** @param array<string, true> $sensitiveKeys */
+    private function SanitizeDebugText(string $text, array $sensitiveKeys): string
     {
         if ($text === '') {
             return '';
@@ -310,25 +314,61 @@ trait DebugHelper
             [
                 '/(?i)(:\/\/[^:\/\s]+:)[^@\s]+@/',
                 '$1' . self::DEBUG_MASK . '@'
-            ],
-            [
-                '/(?i)([?&](?:access_token|refresh_token|id_token|client_secret|api_key|apikey|password|passwd|pwd)=)[^&#\s]+/',
-                '$1' . self::DEBUG_MASK
-            ],
-            [
-                '/(?i)\b(access[_-]?token|refresh[_-]?token|id[_-]?token|client[_-]?secret|api[_-]?key|password|passwd|pwd)\b(\s*[:=]\s*)(["\']?)[^,\s}"\']+\3/',
-                '$1$2$3' . self::DEBUG_MASK . '$3'
             ]
         ];
 
         foreach ($patterns as [$pattern, $replacement]) {
             $sanitized = preg_replace($pattern, $replacement, $text);
-            if (is_string($sanitized)) {
-                $text = $sanitized;
+            if (!is_string($sanitized)) {
+                return '[debug data withheld: sanitization failed]';
             }
+            $text = $sanitized;
         }
 
-        return $text;
+        // Query values have explicit field boundaries, including encoded values.
+        $text = preg_replace_callback(
+            '/([?&])([^=&#\s]+)=([^&#\s]*)/',
+            function (array $match) use ($sensitiveKeys): string
+            {
+                return $this->IsSensitiveDebugKey(rawurldecode($match[2]), $sensitiveKeys)
+                    ? $match[1] . $match[2] . '=' . self::DEBUG_MASK
+                    : $match[0];
+            },
+            $text
+        );
+        if (!is_string($text)) {
+            return '[debug data withheld: sanitization failed]';
+        }
+
+        $keyPatterns = [];
+        foreach (array_keys($sensitiveKeys) as $key) {
+            $keyPatterns[] = implode('[-_.]*', str_split($key));
+        }
+        $keyPatterns[] = '[A-Za-z_][A-Za-z0-9_.-]*(?:password|passwort|secret|token|api[-_.]*key)';
+        $keyPattern = '(?:' . implode('|', $keyPatterns) . ')';
+        $valuePattern = <<<'REGEX'
+(?<value>
+    "(?:\\[\s\S]|[^"\\])*+(?:"|\\?\z)
+  | '(?:\\[\s\S]|[^'\\])*+(?:'|\\?\z)
+  | [^\r\n]*?(?=(?:[,;&]?[ \t]+|[,&;])["']?[A-Za-z_][A-Za-z0-9_.-]*["']?[ \t]*[:=]|[\r\n]|\z)
+)
+REGEX;
+        // Match only sensitive keys so unrelated quoted text cannot hide a later secret.
+        // Unterminated quoted values are masked through the end; plain values through
+        // the next explicit assignment or line end, including spaces and punctuation.
+        $pattern = '~(?<![A-Za-z0-9_.-])(?<prefix>(?<keyQuote>["\']?)'
+            . $keyPattern . '\k<keyQuote>[ \t]*[:=][ \t]*)' . $valuePattern . '~ix';
+
+        return preg_replace_callback($pattern, static function (array $match): string
+        {
+            $value = $match['value'];
+            $quote = substr($value, 0, 1);
+            if ($quote === '"' || $quote === "'") {
+                return $match['prefix'] . $quote . self::DEBUG_MASK . $quote;
+            }
+            preg_match('/[ \t]*$/', $value, $trailingSpace);
+            return $match['prefix'] . self::DEBUG_MASK . ($trailingSpace[0] ?? '');
+        }, $text) ?? '[debug data withheld: sanitization failed]';
     }
 
     private function LimitDebugText(string $text, int $maxLength): string
