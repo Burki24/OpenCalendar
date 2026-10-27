@@ -13,7 +13,7 @@ require_once __DIR__ . '/DebugHelper.php';
  * Callers select safe domain context; request bodies, credentials and arbitrary exceptions
  * must never be passed as context. Pure getters need no separate flow.
  *
- * @version 1.0.0
+ * @version 1.1.0
  */
 trait DebugFlowHelper
 {
@@ -23,6 +23,33 @@ trait DebugFlowHelper
     private array $debugFlowCalls = [];
     private string $debugFlowOperation = '';
     private int $debugFlowSequence = 0;
+
+    /**
+     * Runs an entry with balanced output, including early returns and exceptions.
+     * Results are summarized by type/size only; exceptions are rethrown unchanged.
+     * Callers must supply safe context and may explain false/true by their domain contract.
+     *
+     * @param array{0:string,1:string}|null $booleanResults Fixed descriptions for false and true.
+     */
+    protected function DebugFlowCall(string $function, int $line, \Closure $operation, bool $withoutReturnValue = false, array $context = [], ?array $booleanResults = null): mixed
+    {
+        $this->DebugFlowStart($function, $line, $context);
+        $result = null;
+        $failed = false;
+        try {
+            $result = $operation();
+            if (is_bool($result) && $booleanResults !== null) {
+                $this->DebugFlowEvent($function, $line, 'AKTION', $booleanResults[(int) $result]);
+            }
+            return $result;
+        } catch (Throwable $exception) {
+            $failed = true;
+            $this->DebugFlowException($function, $line, $exception);
+            throw $exception;
+        } finally {
+            $this->DebugFlowEnd($function, $line, $result, $failed, $withoutReturnValue);
+        }
+    }
 
     /** Starts a call; pair it with DebugFlowEnd() in a finally block. */
     protected function DebugFlowStart(string $function, int $line, array $context = []): void
@@ -51,6 +78,9 @@ trait DebugFlowHelper
         };
         $this->DebugFlowEvent($function, $line, 'ENDE', 'Funktion beendet.', ['Ergebnis' => $description]);
         array_pop($this->debugFlowCalls);
+        if ($this->debugFlowCalls === []) {
+            $this->debugFlowOperation = '';
+        }
     }
 
     /** Emits a German domain explanation. Debug failures never affect module behavior. */
@@ -61,7 +91,7 @@ trait DebugFlowHelper
                 sprintf('%s | %s | %s:%d', static::class, $event, $function, $line),
                 [
                     'Instanz' => $this->InstanceID ?? 0,
-                    'Vorgang' => $this->debugFlowOperation,
+                    'Vorgang' => $this->debugFlowOperation ?: uniqid(strtolower(static::class) . '-'),
                     'Aufruf'  => end($this->debugFlowCalls) ?: 0,
                     'Meldung' => $message,
                     'Bezug'   => $context
@@ -101,10 +131,10 @@ trait DebugFlowHelper
     }
 
     /** Preserves the native write result. Callers must exclude private identifiers/payloads. */
-    protected function DebugFlowWriteValue(string $ident, mixed $value, string $function, int $line, bool $includeValue = true): mixed
+    protected function DebugFlowWriteValue(string $ident, mixed $value, string $function, int $line, bool $includeValue = true, array $context = []): mixed
     {
         $result = $this->SetValue($ident, $value);
-        $this->DebugFlowEvent($function, $line, 'SENDEN', 'Statuswert an Symcon übergeben.', ['Ziel' => $ident, 'Wert' => $includeValue ? $value : '[Inhalt geschützt]']);
+        $this->DebugFlowEvent($function, $line, 'SENDEN', 'Statuswert an Symcon übergeben.', ['Ziel' => $ident, 'Wert' => $includeValue ? $value : '[Inhalt geschützt]'] + $context);
         return $result;
     }
 

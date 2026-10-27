@@ -439,10 +439,10 @@
             "source_sha": "82a13d236b430c0ffbcb714aed56d9e52c344ff2"
         },
         "DebugFlowHelper": {
-            "version": "1.0.0",
-            "sha256": "7acb9342e958a867d17ce53c96a69a176a4f28886875b64166372f15eddd11d8",
+            "version": "1.1.0",
+            "sha256": "ee763d210b8883c5e8a483e51f6a87e9cefeee73a89f6ef7bc7b4cfd61e28005",
             "path": "libs/helper/DebugFlowHelper.php",
-            "source_sha": "working-tree",
+            "source_sha": "a80c7b9fc1d943651a37128d174ee56be0cb275f",
             "dependencies": [
                 {
                     "name": "DebugHelper",
