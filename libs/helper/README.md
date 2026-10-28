@@ -22,7 +22,7 @@ The files in this directory are vendored from
 | `IPSViewStyleHelper.php` | 1.6.9 | `44140d34f866a59808948d29849de23a5bc2b1441df1fdc92df6f39d97e90e21` |
 | `ParentConnectionHelper.php` | 1.0.0 | `d4f01dee721aa32e64410979ca15b2795a0fcc59c0232c0ad69e4702d9ff573c` |
 | `PersistentJsonCacheHelper.php` | 1.0.0 | `adbc7680abe814dc6c15a9cda1312cc30023073595052006662716bc0d65f2a4` |
-| `ResponsiveVisualizationHelper.php` | 1.0.1 | `9b8f708fe4de4271310a50c1ac2f09166ba731f540eb829f46ad15b805f9f220` |
+| `ResponsiveVisualizationHelper.php` | 1.0.2 | `158d643156820c7c1e6979d4b28099b6b0e2f71eafbd8c6a7feb717200b6c700` |
 | `SymconOAuthHelper.php` | 1.0.0 | `d9053bfd083a581b96f8526cbb05e8568a6ad24a81cafa3e9b05108343bf2a65` |
 | `VariableHelper.php` | 1.2.0 | `43b205a2ca87553a3a59a9e94f1c5c72fc4643cebedb080a9706139d98b30624` |
 | `VisualizationThemeHelper.php` | 1.1.0 | `29fe61a7eccafeb8b2beb77fe3f7a4896f43b3eaace9ebe428a4fc8250fd9088` |

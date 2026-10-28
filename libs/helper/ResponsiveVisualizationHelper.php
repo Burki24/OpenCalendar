@@ -15,7 +15,7 @@ use Throwable;
  * tokens and an optional viewport frame with native tile heading metadata, so
  * layouts adapt to the available tile dimensions in every Symcon client.
  *
- * @version 1.0.1
+ * @version 1.0.2
  */
 trait ResponsiveVisualizationHelper
 {
@@ -28,6 +28,8 @@ trait ResponsiveVisualizationHelper
      * Set $fillViewport to opt into a full-height flex frame. Apply the inset
      * from ResponsiveVisualizationLayoutOptions() to --symc-tile-header-inset;
      * the root then reserves that space once as its top padding.
+     * Mark the top toolbar with data-symc-tile-toolbar and forward tileActionInset
+     * to --symc-tile-action-inset to keep native overlay controls unobstructed.
      */
     protected function ResponsiveVisualizationCSS(string $rootSelector, string $containerName = 'symcon-visualization', bool $fillViewport = false): string
     {
@@ -73,6 +75,10 @@ html, body {
     padding-top: calc(var(--symc-responsive-padding, 12px) + var(--symc-tile-header-inset, 0px));
     overflow: hidden;
 }
+{$rootSelector} [data-symc-tile-toolbar] {
+    box-sizing: border-box;
+    padding-right: var(--symc-tile-action-inset, 0px);
+}
 CSS;
         }
 
@@ -85,21 +91,31 @@ CSS;
      * Native tiles reserve 58px when their object title is visible. An absent
      * object field or a failed object lookup conservatively keeps that space.
      * IPSView/standalone pages pass false and do not query the Symcon object.
+     * A hidden title with a visible maximize button reserves 44px on the right
+     * of an opted-in toolbar only; content height and workspace width stay free.
      * This is presentation metadata only; consumers forward it to their client.
      *
-     * @return array{tileHeaderVisible: bool, tileHeaderInset: int}
+     * @return array{tileHeaderVisible: bool, tileHeaderInset: int, tileMaximizeVisible: bool, tileActionInset: int}
      */
     protected function ResponsiveVisualizationLayoutOptions(bool $nativeTile = true): array
     {
         $visible = $nativeTile;
+        $maximizeVisible = $nativeTile;
         if ($nativeTile) {
             try {
-                $visible = !(IPS_GetObject($this->InstanceID)['ObjectIsHiddenTitle'] ?? false);
+                $object = IPS_GetObject($this->InstanceID);
+                $visible = !($object['ObjectIsHiddenTitle'] ?? false);
+                $maximizeVisible = !($object['ObjectIsHiddenMaximize'] ?? false);
             } catch (Throwable) {
                 $visible = true;
             }
         }
 
-        return ['tileHeaderVisible' => $visible, 'tileHeaderInset' => $visible ? 58 : 0];
+        return [
+            'tileHeaderVisible'   => $visible,
+            'tileHeaderInset'     => $visible ? 58 : 0,
+            'tileMaximizeVisible' => $maximizeVisible,
+            'tileActionInset'     => !$visible && $maximizeVisible ? 44 : 0
+        ];
     }
 }
