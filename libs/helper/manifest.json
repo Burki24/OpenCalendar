@@ -395,10 +395,10 @@
             "source_sha": "82a13d236b430c0ffbcb714aed56d9e52c344ff2"
         },
         "ResponsiveVisualizationHelper": {
-            "version": "1.0.1",
-            "sha256": "9b8f708fe4de4271310a50c1ac2f09166ba731f540eb829f46ad15b805f9f220",
+            "version": "1.0.2",
+            "sha256": "158d643156820c7c1e6979d4b28099b6b0e2f71eafbd8c6a7feb717200b6c700",
             "path": "libs/helper/ResponsiveVisualizationHelper.php",
-            "source_sha": "323c57d615e52b73cb2225c3d3af5ef6b52abcc9"
+            "source_sha": "d7d96ace1c7285b6cd670d36a74b3fa8a5e7dc95"
         },
         "SymconOAuthHelper": {
             "version": "1.0.0",
