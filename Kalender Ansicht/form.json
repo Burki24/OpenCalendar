@@ -132,12 +132,30 @@
                     "edit": {
                         "type": "Select",
                         "options": [
-                            {"caption": "Agenda", "value": 0},
-                            {"caption": "List", "value": 4},
-                            {"caption": "Days", "value": 3},
-                            {"caption": "Full week", "value": 1},
-                            {"caption": "Work week", "value": 5},
-                            {"caption": "Month", "value": 2}
+                            {
+                                "caption": "Agenda",
+                                "value": 0
+                            },
+                            {
+                                "caption": "List",
+                                "value": 4
+                            },
+                            {
+                                "caption": "Days",
+                                "value": 3
+                            },
+                            {
+                                "caption": "Full week",
+                                "value": 1
+                            },
+                            {
+                                "caption": "Work week",
+                                "value": 5
+                            },
+                            {
+                                "caption": "Month",
+                                "value": 2
+                            }
                         ]
                     }
                 },
