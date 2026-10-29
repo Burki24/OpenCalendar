@@ -1281,8 +1281,6 @@ html.tile-title-hidden.tile-maximize-visible:fullscreen {
 }
 
 @media (max-width: 720px) {
-    .toolbar.has-quick-views { flex-wrap: wrap; }
-    .toolbar.has-quick-views .quick-view-buttons { order: 10; flex-basis: 100%; }
     .period-title-wide { display: none; }
     .period-title-compact { display: inline; }
 }
@@ -1329,8 +1327,37 @@ html.tile-title-hidden.tile-maximize-visible:fullscreen {
 }
 
 @container symcon-visualization (max-width: 45rem) {
-    .toolbar.has-quick-views { flex-wrap: wrap; }
-    .toolbar.has-quick-views .quick-view-buttons { order: 10; flex-basis: 100%; }
+    .toolbar.has-quick-views {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr) auto;
+        grid-template-areas: "navigation period view" "quick quick actions";
+        column-gap: 4px;
+        row-gap: 5px;
+    }
+    .toolbar.has-quick-views > .toolbar-group:first-child { grid-area: navigation; }
+    .toolbar.has-quick-views .toolbar-title { grid-area: period; }
+    .toolbar.has-quick-views .toolbar-spacer { display: none; }
+    .toolbar.has-quick-views .quick-view-buttons {
+        grid-area: quick;
+        min-width: 0;
+        overflow-x: auto;
+        overflow-y: hidden;
+        flex-wrap: nowrap;
+        scrollbar-width: thin;
+    }
+    .toolbar.has-quick-views .quick-view-button { flex: 0 0 auto; }
+    .toolbar.has-quick-views .view-selector-button { grid-area: view; }
+    .toolbar.has-quick-views .toolbar-actions { grid-area: actions; justify-self: end; }
+    html.ipsview-mode .toolbar.has-quick-views .floating-add {
+        position: absolute;
+        right: 12px;
+        bottom: 12px;
+        width: 48px;
+        height: 48px;
+        min-width: 48px;
+        padding: 0;
+        border-radius: 50%;
+    }
     .period-title-wide { display: none; }
     .period-title-compact { display: inline; }
 }

@@ -269,8 +269,10 @@ Sicherung wiederhergestellt, soweit diese verfügbar ist.
 
 - Agenda-, Listen-, Tage-, Wochen- und Monatsansicht
 - optionale Schnellansichten mit frei gewählten Buchstaben direkt in der
-  Kopfzeile von Kachel und IPSView; auf schmalen Anzeigen stehen sie in einer
-  zweiten Zeile. Das Auswahlmenü mit allen sechs Ansichten bleibt verfügbar.
+  Kopfzeile von Kachel und IPSView; auf schmalen Anzeigen stehen Navigation,
+  Datum und Ansichtsauswahl oben, Schnellansichten sowie Filter und Aktualisieren
+  darunter. Bei Platzmangel lassen sich die Schnellansichten seitlich wischen.
+  Das Auswahlmenü mit allen sechs Ansichten bleibt verfügbar.
   Der Wechsel speichert die aktive Ansicht wie bisher nur auf dem jeweiligen
   Client und ändert nicht die Standardansicht der Instanz.
 - kompakte numerische Datumsangaben in schmalen Kacheln und mobilen
