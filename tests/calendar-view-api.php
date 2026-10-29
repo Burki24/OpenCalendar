@@ -472,6 +472,27 @@ $validateReminderMinutesWindowMethod->setAccessible(true);
 $validateVisualizationActionRangeMethod = new ReflectionMethod(CalendarView::class, 'validateVisualizationActionRange');
 $validateVisualizationActionRangeMethod->setAccessible(true);
 $calendarView = new CalendarView(1);
+$quickViewButtonsMethod = new ReflectionMethod(CalendarView::class, 'quickViewButtonsFromProperty');
+assertCalendarViewApi(
+    $quickViewButtonsMethod->invoke(null, json_encode([
+        ['View' => 3, 'Label' => 'T'],
+        ['View' => 5, 'Label' => 'A'],
+        ['View' => 1, 'Label' => 'W'],
+        ['View' => 1, 'Label' => 'X'],
+        ['View' => 99, 'Label' => 'Z'],
+        ['View' => 2, 'Label' => '<']
+    ], JSON_THROW_ON_ERROR)) === [
+        ['view' => 'threeDays', 'label' => 'T'],
+        ['view' => 'workWeek', 'label' => 'A'],
+        ['view' => 'week', 'label' => 'W']
+    ],
+    'Quick-view settings must preserve order while rejecting duplicate views and invalid buttons.'
+);
+assertCalendarViewApi(
+    $quickViewButtonsMethod->invoke(null, 'invalid') === []
+        && $quickViewButtonsMethod->invoke(null, '[]') === [],
+    'Absent and malformed quick-view settings must leave the toolbar unchanged.'
+);
 $tileTitleLayoutClasses = new ReflectionMethod(CalendarView::class, 'tileTitleLayoutClasses');
 assertCalendarViewApi(
     $tileTitleLayoutClasses->invoke(null, ['ObjectIsHiddenTitle' => true], '9.0') === [],

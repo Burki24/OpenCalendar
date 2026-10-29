@@ -116,6 +116,44 @@
             ]
         },
         {
+            "type": "List",
+            "name": "QuickViewButtons",
+            "caption": "Quick view buttons",
+            "rowCount": 5,
+            "add": true,
+            "delete": true,
+            "changeOrder": true,
+            "columns": [
+                {
+                    "caption": "View",
+                    "name": "View",
+                    "width": "auto",
+                    "add": 0,
+                    "edit": {
+                        "type": "Select",
+                        "options": [
+                            {"caption": "Agenda", "value": 0},
+                            {"caption": "List", "value": 4},
+                            {"caption": "Days", "value": 3},
+                            {"caption": "Full week", "value": 1},
+                            {"caption": "Work week", "value": 5},
+                            {"caption": "Month", "value": 2}
+                        ]
+                    }
+                },
+                {
+                    "caption": "Button letter",
+                    "name": "Label",
+                    "width": "110px",
+                    "add": "",
+                    "edit": {
+                        "type": "ValidationTextBox",
+                        "validate": "^[A-Za-zÄÖÜäöü]$"
+                    }
+                }
+            ]
+        },
+        {
             "type": "NumberSpinner",
             "name": "TileFontScale",
             "caption": "Tile font size (%)",

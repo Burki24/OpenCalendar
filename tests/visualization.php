@@ -1011,6 +1011,28 @@ assertVisualization(
 );
 
 assertVisualization(
+    str_contains($indexSource, 'id="quick-view-buttons"')
+        && str_contains($formSource, '"name": "QuickViewButtons"')
+        && str_contains($formSource, '"rowCount": 5')
+        && str_contains($moduleSource, "'quickViewButtons'          =>")
+        && str_contains($script, 'function selectCalendarView(view, closeDialog = false)')
+        && str_contains($script, 'selectCalendarView(button.dataset.view, true)')
+        && str_contains($script, 'selectCalendarView(button.dataset.view)')
+        && str_contains($style, '.quick-view-buttons')
+        && str_contains($style, 'flex-basis: 100%'),
+    'Optional quick-view buttons must share the client-local view switch and move to a second toolbar row in narrow layouts.'
+);
+
+assertVisualization(
+    str_contains($indexSource, 'id="period-title-wide"')
+        && str_contains($indexSource, 'id="period-title-compact"')
+        && str_contains($script, 'formatCompactRange(')
+        && str_contains($style, '.period-title-compact { display: none; }')
+        && str_contains($style, '.period-title-compact { display: inline; }'),
+    'Narrow tile and IPSView toolbars must display a compact numeric date range while retaining the full desktop label.'
+);
+
+assertVisualization(
     str_contains($indexSource, 'id="delete-confirm-summary"')
         && str_contains($indexSource, 'id="delete-confirm-period"')
         && str_contains($indexSource, 'id="delete-confirm-question"')

@@ -221,6 +221,12 @@ spätere Anpassung einer Kalender Ansicht.
    maximale Terminanzahl festlegen. Die Kachel-Schriftgröße
    kann zwischen 50 und 200 Prozent eingestellt werden; 100 Prozent entspricht
    der bisherigen Darstellung.
+   Unter **Schnellansichten** können zusätzlich beispielsweise fünf häufig
+   genutzte Ansichten mit je einem Buchstaben als direkte Schaltflächen in der
+   Kalender-Kopfzeile eingerichtet werden, etwa **T** für Tage, **A** für
+   Arbeitswoche und **W** für Ganze Woche. Die Reihenfolge der Listeneinträge
+   bestimmt die Reihenfolge der Schaltflächen. Ohne Einträge bleibt die
+   bisherige Kopfzeile unverändert.
 4. Den aufklappbaren Bereich **Anzeigeoptionen** öffnen. Dort sind die
    allgemeinen Zusatzinformationen wie Wochenenden, Kalendername, Ort und
    Beschreibung sowie die ansichtsspezifische Matrix für Terminanzahl,
@@ -262,6 +268,14 @@ Sicherung wiederhergestellt, soweit diese verfügbar ist.
 ## Funktionsumfang
 
 - Agenda-, Listen-, Tage-, Wochen- und Monatsansicht
+- optionale Schnellansichten mit frei gewählten Buchstaben direkt in der
+  Kopfzeile von Kachel und IPSView; auf schmalen Anzeigen stehen sie in einer
+  zweiten Zeile. Das Auswahlmenü mit allen sechs Ansichten bleibt verfügbar.
+  Der Wechsel speichert die aktive Ansicht wie bisher nur auf dem jeweiligen
+  Client und ändert nicht die Standardansicht der Instanz.
+- kompakte numerische Datumsangaben in schmalen Kacheln und mobilen
+  IPSView-Ansichten, zum Beispiel **1.–7.10.26** statt ausgeschriebener
+  Monatsnamen; auf breiten Anzeigen bleibt die ausführliche Überschrift erhalten
 - Wochenansicht als festes Wochenraster: In **Arbeitswoche** stehen Montag bis
   Freitag nebeneinander, in **Ganze Woche** Montag bis Sonntag; mehrere sichtbare
   Wochen werden vollständig untereinander angeordnet
@@ -316,6 +330,7 @@ Eigenschaft | Beschreibung
 --- | ---
 Kalender | Ausgewählte Kalender-Instanzen und ihre Aktivierung
 Standardansicht | Agenda, Liste, Tage, Woche oder Monat; wird nur verwendet, solange der jeweilige Client noch keinen eigenen Ansichtsstand gespeichert hat
+Schnellansichten | Frei sortierbare Buchstaben-Schaltflächen für ausgewählte Ansichten; das Formular zeigt fünf Zeilen, die Auswahl bleibt clientlokal
 Kacheltitel anzeigen | Steuert die native Symcon-9.1-Einstellung für den Kacheltitel der Kalender Ansicht und vorhandener Links auf diese Instanz
 Maximieren-Button anzeigen | Steuert die native Symcon-9.1-Einstellung für den Maximieren-Button der Kalender Ansicht und vorhandener Links auf diese Instanz
 Vergangene/Zukünftige Tage | Datenzeitraum, aus dem Termine für alle Darstellungen geladen und zusammengeführt werden

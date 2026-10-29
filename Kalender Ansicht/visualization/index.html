@@ -33,8 +33,12 @@
             <button class="icon-button" id="today-button" type="button" title="Today" aria-label="Today" aria-controls="calendar-content">●</button>
             <button class="icon-button" id="next-button" type="button" title="Next" aria-label="Next" aria-controls="calendar-content">›</button>
         </div>
-        <div class="toolbar-title" id="period-title"></div>
+        <div class="toolbar-title" id="period-title">
+            <span class="period-title-wide" id="period-title-wide"></span>
+            <span class="period-title-compact" id="period-title-compact"></span>
+        </div>
         <div class="toolbar-spacer"></div>
+        <div class="quick-view-buttons hidden" id="quick-view-buttons" role="group" aria-label="Quick views"></div>
         <button class="view-selector-button" id="view-selector-button" type="button" aria-haspopup="dialog"
             aria-controls="view-selector-dialog" aria-expanded="false">
             <svg class="view-selector-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
