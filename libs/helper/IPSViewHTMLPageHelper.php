@@ -6,7 +6,6 @@ namespace Burki24\SymconModuleHelper;
 
 use InvalidArgumentException;
 use JsonException;
-use ReflectionClass;
 use RuntimeException;
 use Throwable;
 
@@ -20,7 +19,7 @@ require_once __DIR__ . '/VisualizationAssetHelper.php';
  * visual implementation in style.css/app.js. The helper owns asset loading,
  * bootstrap encoding, page metadata, fixed placeholders and validation.
  *
- * @version 1.5.4
+ * @version 1.5.5
  */
 trait IPSViewHTMLPageHelper
 {
@@ -1017,12 +1016,6 @@ trait IPSViewHTMLPageHelper
 
     private function ResolveIPSViewHTMLModuleDirectory(): string
     {
-        $reflection = new ReflectionClass($this);
-        $moduleFile = $reflection->getFileName();
-        if (!is_string($moduleFile) || $moduleFile === '') {
-            throw new RuntimeException('The module file path could not be determined.');
-        }
-
-        return dirname($moduleFile);
+        return dirname($this->VisualizationAssetDirectory());
     }
 }
