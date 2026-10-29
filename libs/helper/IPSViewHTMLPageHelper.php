@@ -20,7 +20,7 @@ require_once __DIR__ . '/VisualizationAssetHelper.php';
  * visual implementation in style.css/app.js. The helper owns asset loading,
  * bootstrap encoding, page metadata, fixed placeholders and validation.
  *
- * @version 1.5.3
+ * @version 1.5.4
  */
 trait IPSViewHTMLPageHelper
 {
@@ -521,11 +521,22 @@ trait IPSViewHTMLPageHelper
     protected function IPSViewTranslationsFromLocale(array $additionalKeys = []): array
     {
         $keys = $this->NormalizeIPSViewHTMLTranslationKeys($additionalKeys);
+        $activeTranslations = [];
+        $language = $this->NormalizeHelperTranslationLanguage($this->ResolveHelperTranslationLanguage());
         $localePath = $this->ResolveIPSViewHTMLModuleDirectory() . DIRECTORY_SEPARATOR . 'locale.json';
         if (is_file($localePath)) {
             try {
                 $locale = json_decode((string) file_get_contents($localePath), true, 512, JSON_THROW_ON_ERROR);
                 if (is_array($locale) && isset($locale['translations']) && is_array($locale['translations'])) {
+                    $selectedTranslations = $locale['translations'][$language] ?? null;
+                    if (is_array($selectedTranslations)) {
+                        foreach ($selectedTranslations as $source => $translation) {
+                            if (is_string($source) && $source !== '' && is_string($translation)) {
+                                $activeTranslations[$source] = $translation;
+                            }
+                        }
+                    }
+
                     foreach ($locale['translations'] as $translations) {
                         if (!is_array($translations)) {
                             continue;
@@ -543,7 +554,10 @@ trait IPSViewHTMLPageHelper
             }
         }
 
-        return $this->TranslateIPSViewHTMLKeys(array_values(array_unique($keys)));
+        return $this->TranslateIPSViewHTMLLocaleKeys(
+            array_values(array_unique($keys)),
+            $activeTranslations
+        );
     }
 
     /**
@@ -786,6 +800,24 @@ trait IPSViewHTMLPageHelper
         foreach ($keys as $key) {
             $translation = $this->Translate($key);
             $translations[$key] = is_string($translation) ? $translation : $key;
+        }
+
+        return $translations;
+    }
+
+    /**
+     * @param list<string>        $keys
+     * @param array<string,string> $activeTranslations
+     *
+     * @return array<string,string>
+     */
+    private function TranslateIPSViewHTMLLocaleKeys(array $keys, array $activeTranslations): array
+    {
+        sort($keys, SORT_STRING);
+
+        $translations = [];
+        foreach ($keys as $key) {
+            $translations[$key] = $activeTranslations[$key] ?? $key;
         }
 
         return $translations;
