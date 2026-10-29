@@ -62,6 +62,7 @@ let pickerTouchScroll = null;
 let suppressSwipeClickUntil = 0;
 let deferredCalendarState = null;
 let calendarStateSignature = '';
+let quickViewButtonsSignature = '';
 let eventEditingActive = false;
 let eventEditingRevision = 0;
 let eventDialogLoadingMode = '';
@@ -81,6 +82,8 @@ const monthEventData = new WeakMap();
 
 const content = document.getElementById('calendar-content');
 const periodTitle = document.getElementById('period-title');
+const periodTitleWide = document.getElementById('period-title-wide');
+const periodTitleCompact = document.getElementById('period-title-compact');
 const eventDialog = document.getElementById('event-dialog');
 const eventDetailsDialog = document.getElementById('event-details-dialog');
 const editScopeDialog = document.getElementById('edit-scope-dialog');
@@ -129,6 +132,7 @@ const dayEventsDialog = document.getElementById('day-events-dialog');
 const viewSelectorDialog = document.getElementById('view-selector-dialog');
 const viewSelectorButton = document.getElementById('view-selector-button');
 const viewSelectorLabel = document.getElementById('view-selector-label');
+const quickViewButtons = document.getElementById('quick-view-buttons');
 const calendarFilterDialog = document.getElementById('calendar-filter-dialog');
 const calendarFilterOptions = document.getElementById('calendar-filter-options');
 const monthResizeObserver = typeof ResizeObserver === 'function'
@@ -680,6 +684,57 @@ function openViewSelector() {
     }
 }
 
+function configuredQuickViewButtons() {
+    const entries = Array.isArray(calendarState.settings.quickViewButtons)
+        ? calendarState.settings.quickViewButtons
+        : [];
+    const usedViews = new Set();
+    return entries.filter(entry => {
+        if (!entry || !calendarViews.has(entry.view) || usedViews.has(entry.view)
+            || typeof entry.label !== 'string' || !/^[A-Za-zÄÖÜäöü]$/u.test(entry.label)) return false;
+        usedViews.add(entry.view);
+        return true;
+    });
+}
+
+function updateQuickViewButtons() {
+    const entries = configuredQuickViewButtons();
+    const signature = JSON.stringify(entries);
+    if (signature !== quickViewButtonsSignature) {
+        quickViewButtons.textContent = '';
+        entries.forEach(entry => {
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'icon-button quick-view-button';
+            button.dataset.view = entry.view;
+            button.textContent = entry.label;
+            button.addEventListener('click', () => selectCalendarView(button.dataset.view));
+            quickViewButtons.appendChild(button);
+        });
+        quickViewButtonsSignature = signature;
+    }
+    quickViewButtons.classList.toggle('hidden', entries.length === 0);
+    quickViewButtons.parentElement.classList.toggle('has-quick-views', entries.length > 0);
+    quickViewButtons.setAttribute('aria-label', t('Quick views'));
+    Array.from(quickViewButtons.children).forEach(button => {
+        const view = button.dataset.view;
+        const label = t(calendarViewLabels[view] || view);
+        button.title = label;
+        button.setAttribute('aria-label', label);
+        button.setAttribute('aria-pressed', String(view === activeView));
+        button.classList.toggle('active', view === activeView);
+    });
+}
+
+function selectCalendarView(view, closeDialog = false) {
+    if (!calendarViews.has(view)) return;
+    activeView = view;
+    clampCurrentCursorDate();
+    persistClientViewState();
+    if (closeDialog) viewSelectorDialog.close();
+    render();
+}
+
 function updateToolbar() {
     const showControls = listControlsVisible();
     document.getElementById('previous-button').parentElement.classList.toggle('hidden', !showControls);
@@ -688,6 +743,7 @@ function updateToolbar() {
     viewSelectorLabel.textContent = activeViewLabel;
     viewSelectorButton.title = `${t('View')}: ${activeViewLabel}`;
     viewSelectorButton.setAttribute('aria-label', `${t('View')}: ${activeViewLabel}`);
+    updateQuickViewButtons();
     updateViewSelectorOptions();
     [
         ['previous-button', 'Previous'],
@@ -701,13 +757,18 @@ function updateToolbar() {
         button.setAttribute('aria-label', t(text));
     });
 
+    let wideTitle;
+    let compactTitle;
     if (activeView === 'month') {
         const monthCount = viewPeriod('month');
         const start = new Date(cursorDate.getFullYear(), cursorDate.getMonth(), 1);
         const end = new Date(start.getFullYear(), start.getMonth() + monthCount - 1, 1);
-        periodTitle.textContent = monthCount === 1
+        wideTitle = monthCount === 1
             ? formatMonth(start)
             : `${formatMonth(start)} – ${formatMonth(end)}`;
+        compactTitle = monthCount === 1
+            ? formatCompactMonth(start)
+            : `${formatCompactMonth(start)}–${formatCompactMonth(end)}`;
     } else if (activeView === 'week' || activeView === 'workWeek') {
         const days = weekViewDays(activeView === 'workWeek');
         const start = days[0] || startOfWeek(cursorDate);
@@ -715,18 +776,24 @@ function updateToolbar() {
         const calendarWeek = calendarState.settings.showWeekCalendarWeek !== false
             ? `${formatCalendarWeekLabel(days)} · `
             : '';
-        periodTitle.textContent = calendarWeek + formatRange(start, end);
+        wideTitle = calendarWeek + formatRange(start, end);
+        compactTitle = calendarWeek + formatCompactRange(start, end);
     } else if (activeView === 'threeDays') {
         const days = getVisibleDays(cursorDate, viewPeriod('threeDays'));
         const calendarWeek = calendarState.settings.showThreeDaysCalendarWeek === true
             ? `${formatCalendarWeekLabel(days)} · `
             : '';
-        periodTitle.textContent = calendarWeek + formatRange(days[0], days[days.length - 1]);
+        wideTitle = calendarWeek + formatRange(days[0], days[days.length - 1]);
+        compactTitle = calendarWeek + formatCompactRange(days[0], days[days.length - 1]);
     } else {
         const days = viewPeriod(activeView === 'list' ? 'list' : 'agenda');
         const end = addDays(cursorDate, days - 1);
-        periodTitle.textContent = formatRange(cursorDate, end);
+        wideTitle = formatRange(cursorDate, end);
+        compactTitle = formatCompactRange(cursorDate, end);
     }
+    periodTitleWide.textContent = wideTitle;
+    periodTitleCompact.textContent = compactTitle;
+    periodTitle.title = wideTitle;
 }
 
 function renderAgenda() {
@@ -4788,12 +4855,7 @@ document.getElementById('today-button').addEventListener('click', () => {
 document.getElementById('previous-button').addEventListener('click', () => navigate(-1));
 document.getElementById('next-button').addEventListener('click', () => navigate(1));
 document.querySelectorAll('.view-selector-option').forEach(button => button.addEventListener('click', () => {
-    if (!calendarViews.has(button.dataset.view)) return;
-    activeView = button.dataset.view;
-    clampCurrentCursorDate();
-    persistClientViewState();
-    viewSelectorDialog.close();
-    render();
+    selectCalendarView(button.dataset.view, true);
 }));
 window.addEventListener('resize', () => {
     updateEventDialogViewportBounds();
@@ -5698,6 +5760,28 @@ function formatMonth(date) {
     return new Intl.DateTimeFormat(undefined, { month: 'long', year: 'numeric' }).format(date);
 }
 function formatRange(start, end) { return new Intl.DateTimeFormat(undefined, { day: '2-digit', month: 'short' }).format(start) + ' – ' + new Intl.DateTimeFormat(undefined, { day: '2-digit', month: 'short', year: 'numeric' }).format(end); }
+function formatCompactRange(start, end) {
+    if (!document.documentElement.lang.toLowerCase().startsWith('de')) {
+        return new Intl.DateTimeFormat(undefined, {day: 'numeric', month: 'numeric', year: '2-digit'}).formatRange(start, end);
+    }
+
+    const compactDate = date => `${date.getDate()}.${date.getMonth() + 1}.${String(date.getFullYear()).slice(-2)}`;
+    if (start.getFullYear() === end.getFullYear() && start.getMonth() === end.getMonth()) {
+        return start.getDate() === end.getDate()
+            ? compactDate(end)
+            : `${start.getDate()}.–${compactDate(end)}`;
+    }
+    if (start.getFullYear() === end.getFullYear()) {
+        return `${start.getDate()}.${start.getMonth() + 1}.–${compactDate(end)}`;
+    }
+    return `${compactDate(start)}–${compactDate(end)}`;
+}
+function formatCompactMonth(date) {
+    if (document.documentElement.lang.toLowerCase().startsWith('de')) {
+        return `${date.getMonth() + 1}.${String(date.getFullYear()).slice(-2)}`;
+    }
+    return new Intl.DateTimeFormat(undefined, {month: 'numeric', year: '2-digit'}).format(date);
+}
 function safeColor(value) {
     if (/^#[0-9a-f]{6}$/i.test(value || '')) return value;
     return getComputedStyle(document.documentElement).getPropertyValue('--cal-accent').trim() || 'currentColor';

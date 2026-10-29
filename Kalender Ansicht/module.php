@@ -119,6 +119,7 @@ class CalendarView extends IPSModuleStrict
             $this->RegisterPropertyString('Calendars', '[]');
             $this->RegisterPropertyInteger('DefaultCalendarInstanceID', 0);
             $this->RegisterPropertyInteger('DefaultView', 0);
+            $this->RegisterPropertyString('QuickViewButtons', '[]');
             $this->RegisterPropertyInteger('TileWeekOrientation', 0);
             $this->RegisterPropertyInteger('TileFontScale', 100);
             $this->RegisterPropertyInteger('PastDays', 0);
@@ -1914,6 +1915,7 @@ class CalendarView extends IPSModuleStrict
             'Weeks',
             'Full week',
             'Work week',
+            'Quick views',
             'Month',
             'Months',
             'CW',
@@ -2919,6 +2921,7 @@ class CalendarView extends IPSModuleStrict
                 5       => 'workWeek',
                 default => 'agenda'
             },
+            'quickViewButtons'          => self::quickViewButtonsFromProperty($this->ReadPropertyString('QuickViewButtons')),
             'pastDays'                  => max(0, min(1095, $this->ReadPropertyInteger('PastDays'))),
             'futureDays'                => max(1, min(1095, $this->ReadPropertyInteger('FutureDays'))),
             'agendaPeriodDays'          => max(1, min(366, $this->ReadPropertyInteger('AgendaPeriodDays'))),
@@ -2956,6 +2959,44 @@ class CalendarView extends IPSModuleStrict
             'showDescription'           => $this->ReadPropertyBoolean('ShowDescription'),
             'tileFontScale'             => max(50, min(200, $this->ReadPropertyInteger('TileFontScale')))
         ];
+    }
+
+    /**
+     * @return list<array{view: string, label: string}>
+     */
+    private static function quickViewButtonsFromProperty(string $configuration): array
+    {
+        $rows = json_decode($configuration, true);
+        if (!is_array($rows) || !array_is_list($rows)) {
+            return [];
+        }
+
+        $views = [
+            0 => 'agenda',
+            1 => 'week',
+            2 => 'month',
+            3 => 'threeDays',
+            4 => 'list',
+            5 => 'workWeek'
+        ];
+        $buttons = [];
+        $usedViews = [];
+        foreach ($rows as $row) {
+            if (!is_array($row) || !is_int($row['View'] ?? null)) {
+                continue;
+            }
+
+            $view = $views[$row['View']] ?? null;
+            $label = is_string($row['Label'] ?? null) ? trim($row['Label']) : '';
+            if ($view === null || isset($usedViews[$view]) || preg_match('/^[A-Za-zÄÖÜäöü]$/u', $label) !== 1) {
+                continue;
+            }
+
+            $buttons[] = ['view' => $view, 'label' => $label];
+            $usedViews[$view] = true;
+        }
+
+        return $buttons;
     }
 
     /**

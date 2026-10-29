@@ -31,6 +31,12 @@ geraten und fehlgeschlagene Schreibzugriffe nicht automatisch wiederholt.
    OpenCalendar automatisch den ersten beschreibbaren Kalender. Die Kachel-Schriftgröße
    kann zwischen 50 und 200 Prozent eingestellt werden; 100 Prozent entspricht
    der bisherigen Darstellung.
+   Unter **Schnellansichten** können zusätzlich beispielsweise fünf häufig
+   genutzte Ansichten mit je einem
+   Buchstaben als direkte Schaltflächen in der Kalender-Kopfzeile eingerichtet
+   werden, zum Beispiel **T** für Tage, **A** für Arbeitswoche und **W** für
+   Ganze Woche. Die Reihenfolge der Listeneinträge bestimmt die Reihenfolge der
+   Schaltflächen. Ohne Einträge bleibt die bisherige Kopfzeile unverändert.
 4. Den aufklappbaren Bereich **Anzeigeoptionen** öffnen. Dort sind die
    allgemeinen Zusatzinformationen wie Wochenenden, Kalendername, Ort und
    Beschreibung sowie die ansichtsspezifische Matrix für Terminanzahl,
@@ -59,6 +65,14 @@ Sicherung wiederhergestellt, soweit diese verfügbar ist.
 ## Funktionsumfang
 
 - Agenda-, Listen-, Tage-, Wochen- und Monatsansicht
+- optionale Schnellansichten mit frei gewählten Buchstaben direkt in der
+  Kopfzeile von Kachel und IPSView; auf schmalen Anzeigen stehen sie in einer
+  zweiten Zeile. Das Auswahlmenü mit allen sechs Ansichten bleibt verfügbar.
+  Der Wechsel speichert die aktive Ansicht wie bisher nur auf dem jeweiligen
+  Client und ändert nicht die Standardansicht der Instanz.
+- kompakte numerische Datumsangaben in schmalen Kacheln und mobilen
+  IPSView-Ansichten, zum Beispiel **1.–7.10.26** statt ausgeschriebener
+  Monatsnamen; auf breiten Anzeigen bleibt die ausführliche Überschrift erhalten
 - Wochenansicht als festes Wochenraster: In **Arbeitswoche** stehen Montag bis
   Freitag nebeneinander, in **Ganze Woche** Montag bis Sonntag; mehrere sichtbare
   Wochen werden vollständig untereinander angeordnet

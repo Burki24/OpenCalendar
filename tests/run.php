@@ -23,6 +23,8 @@ $commands = [
     ['Verify moved IPSView output identity', [PHP_BINARY, 'tests/ipsview-moved-output.php']],
     ['Verify embedded dialog bounds and errors', ['node', 'tests/dialog-embedding.js']],
     ['Verify empty HTML descriptions in event details', ['node', 'tests/empty-html-description.js']],
+    ['Verify configurable quick-view buttons', ['node', 'tests/quick-view-buttons.js']],
+    ['Verify compact toolbar dates', ['node', 'tests/compact-toolbar-date.js']],
     ['Verify IPSView endpoint resolution', ['node', 'tests/ipsview-endpoint.js']],
     ['Verify CalDAV cache resource identity', [PHP_BINARY, 'tests/caldav-resource-identity.php']],
     ['Verify IPSView bundled fonts', [PHP_BINARY, 'tests/ipsview-font-assets.php']],
