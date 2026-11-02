@@ -13,7 +13,7 @@ The files in this directory are vendored from
 | `HttpResponseHelper.php` | 1.1.0 | `be4fae4c23f757ab462237d8e74d2a9dca1b504937ed4d4b51c7ff76004cf1cd` |
 | `IPSViewHTMLPageHelper.php` | 1.5.5 | `83b049678e9901514101e74c9e2d9a247adac0b05d1ed5e0c3f368e6be5e9d05` |
 | `HelperTranslationHelper.php` | 1.0.0 | `d3deee581eca9f8eb11e9adce060170227a2dc836ee898bd134f93d27604f639` |
-| `VisualizationAssetHelper.php` | 1.1.0 | `a9f5e0c8ea21c021646189fedda6757724b7897b539ead378c2a2f012895e1ee` |
+| `VisualizationAssetHelper.php` | 1.1.1 | `5df251b5ceb7a9867f2330de6b0476b0c11f1762aeda7c03f08d3ad66f4433d6` |
 | `IPSViewStyleConfigurationHelper.php` | 1.1.0 | `e6f558a0dee301d251d2f5845ebdedb765dc07ca5352427d1e08792d940629b7` |
 | `IPSViewStylePresetHelper.php` | 1.0.1 | `770bfc48051a908b55e931f6d4eba6e8984ba73b4aa78cd987470006c7b3a9e7` |
 | `IPSViewControlThemeHelper.php` | 1.0.3 | `7be5f3300ebf0562f818b050a53cfa67d7631a30e3d62f1ab41525501604fac6` |
