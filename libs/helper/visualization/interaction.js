@@ -19,13 +19,17 @@
         function blur() {
             const active = document.activeElement;
             // Focusing our child iframe is not leaving this visualization.
-            if (active && active.tagName === 'IFRAME' && children.has(active.contentWindow)
+            if (active && active.tagName === 'IFRAME' && active.name === channel && children.has(active.contentWindow)
                 && typeof document.hasFocus === 'function' && document.hasFocus()) return;
             clearPointer();
         }
         function sendParent(type, x, y) {
             try {
-                if (environment.parent && environment.parent !== environment) environment.parent.postMessage([channel, type, x, y], '*');
+                // Only an owned loader sets this browsing-context name. Foreign
+                // hosts may interpret every postMessage as their own protocol.
+                if (environment.name === channel && environment.parent && environment.parent !== environment) {
+                    environment.parent.postMessage([channel, type, x, y], '*');
+                }
             } catch (_) { /* A host without a frame bridge keeps local interaction. */ }
         }
         function rememberPointer(event) {
@@ -90,7 +94,7 @@
             let target = resolve(event);
             const hit = target;
             while (target && target !== document) {
-                if (target.tagName === 'IFRAME' && children.has(target.contentWindow)) {
+                if (target.tagName === 'IFRAME' && target.name === channel && children.has(target.contentWindow)) {
                     const p = point(event), box = target.getBoundingClientRect();
                     if (finite(p.clientX) && finite(p.clientY) && box.width > 0 && box.height > 0) {
                         if (p.clientX < box.left || p.clientX > box.left + box.width || p.clientY < box.top || p.clientY > box.top + box.height) return false;
@@ -130,7 +134,7 @@
             const [, type, x, y, deltaX, deltaY] = data;
             // Only the actual direct parent or an opted-in direct child may send UI input.
             if (environment.parent && event.source === environment.parent && environment.parent !== environment) {
-                if (type !== 'wheel' || !finite(x) || !finite(y) || x < 0 || x > 1 || y < 0 || y > 1
+                if (environment.name !== channel || type !== 'wheel' || !finite(x) || !finite(y) || x < 0 || x > 1 || y < 0 || y > 1
                     || !finite(deltaX) || !finite(deltaY) || Math.abs(deltaX) > 100000 || Math.abs(deltaY) > 100000) return;
                 handle({type: 'wheel', clientX: x * environment.innerWidth, clientY: y * environment.innerHeight,
                     deltaX: deltaX, deltaY: deltaY, deltaMode: 0});
@@ -138,7 +142,7 @@
             }
             const frame = typeof document.querySelectorAll === 'function'
                 ? Array.from(document.querySelectorAll('iframe')).find(item => item.contentWindow === event.source) : null;
-            if (!frame) return;
+            if (!frame || frame.name !== channel) return;
             if (type === 'ready') children.add(event.source);
             if (type === 'pointer' && children.has(event.source) && finite(x) && finite(y) && x >= 0 && x <= 1 && y >= 0 && y <= 1) {
                 const box = frame.getBoundingClientRect();

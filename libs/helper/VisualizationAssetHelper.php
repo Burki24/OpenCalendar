@@ -15,7 +15,7 @@ use RuntimeException;
  * vendored helper can reliably access files from that module's visualization
  * directory.
  *
- * @version 1.1.0
+ * @version 1.1.1
  */
 trait VisualizationAssetHelper
 {
@@ -51,7 +51,7 @@ trait VisualizationAssetHelper
         return $script;
     }
 
-    /** Returns shared wheel routing, scrolling and direct iframe UI forwarding. */
+    /** Returns local wheel routing and UI forwarding for explicitly named own child frames. */
     protected function VisualizationInteractionScript(): string
     {
         $script = file_get_contents(__DIR__ . '/visualization/interaction.min.js');

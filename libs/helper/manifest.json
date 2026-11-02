@@ -53,10 +53,10 @@
                 },
                 {
                     "name": "VisualizationAssetHelper",
-                    "version": "1.1.0",
-                    "sha256": "a9f5e0c8ea21c021646189fedda6757724b7897b539ead378c2a2f012895e1ee",
+                    "version": "1.1.1",
+                    "sha256": "5df251b5ceb7a9867f2330de6b0476b0c11f1762aeda7c03f08d3ad66f4433d6",
                     "path": "libs/helper/VisualizationAssetHelper.php",
-                    "source_sha": "8bd47d7b96f01a12858758cf9db69a95f51658dc",
+                    "source_sha": "b70deba539c9b7ed0c758320d9d4ef52eb9ebfc1",
                     "assets": [
                         {
                             "path": "libs/helper/visualization/http-origin.js",
@@ -64,11 +64,11 @@
                         },
                         {
                             "path": "libs/helper/visualization/interaction.js",
-                            "sha256": "830baf8049e7274d3796386d93186c45bcb65102e4bf4a8a704171187fb22c96"
+                            "sha256": "ed03a790da87ccaf747dac426107bf9b9b57a54c5bcab2281b199d662cbaa3ed"
                         },
                         {
                             "path": "libs/helper/visualization/interaction.min.js",
-                            "sha256": "851bb2e77a7111da86fbcd0dc0acb554fd68c6cffa826b1af132eb6847d65959"
+                            "sha256": "0bd1aa60899bd9859a26943a9506b5b52126f45f9cd19532a573e6cb0cb28289"
                         }
                     ]
                 }
@@ -407,10 +407,10 @@
             "source_sha": "82a13d236b430c0ffbcb714aed56d9e52c344ff2"
         },
         "VisualizationAssetHelper": {
-            "version": "1.1.0",
-            "sha256": "a9f5e0c8ea21c021646189fedda6757724b7897b539ead378c2a2f012895e1ee",
+            "version": "1.1.1",
+            "sha256": "5df251b5ceb7a9867f2330de6b0476b0c11f1762aeda7c03f08d3ad66f4433d6",
             "path": "libs/helper/VisualizationAssetHelper.php",
-            "source_sha": "8bd47d7b96f01a12858758cf9db69a95f51658dc",
+            "source_sha": "b70deba539c9b7ed0c758320d9d4ef52eb9ebfc1",
             "assets": [
                 {
                     "path": "libs/helper/visualization/http-origin.js",
@@ -418,11 +418,11 @@
                 },
                 {
                     "path": "libs/helper/visualization/interaction.js",
-                    "sha256": "830baf8049e7274d3796386d93186c45bcb65102e4bf4a8a704171187fb22c96"
+                    "sha256": "ed03a790da87ccaf747dac426107bf9b9b57a54c5bcab2281b199d662cbaa3ed"
                 },
                 {
                     "path": "libs/helper/visualization/interaction.min.js",
-                    "sha256": "851bb2e77a7111da86fbcd0dc0acb554fd68c6cffa826b1af132eb6847d65959"
+                    "sha256": "0bd1aa60899bd9859a26943a9506b5b52126f45f9cd19532a573e6cb0cb28289"
                 }
             ]
         },
