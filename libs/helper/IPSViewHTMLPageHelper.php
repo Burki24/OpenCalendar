@@ -19,7 +19,7 @@ require_once __DIR__ . '/VisualizationAssetHelper.php';
  * visual implementation in style.css/app.js. The helper owns asset loading,
  * bootstrap encoding, page metadata, fixed placeholders and validation.
  *
- * @version 1.5.5
+ * @version 1.5.6
  */
 trait IPSViewHTMLPageHelper
 {
@@ -1011,7 +1011,7 @@ trait IPSViewHTMLPageHelper
     {
         $fallback = self::IPSVIEW_HTML_TRANSLATION_SOURCES[$key] ?? $key;
 
-        return $this->TranslateHelperText('IPSViewHTMLPageHelper', $key, $fallback);
+        return $this->TranslateHelperTextFromDirectory(__DIR__ . '/translations', 'IPSViewHTMLPageHelper', $key, $fallback);
     }
 
     private function ResolveIPSViewHTMLModuleDirectory(): string

@@ -7,6 +7,11 @@ namespace Burki24\SymconModuleHelper;
 use ReflectionClass;
 use RuntimeException;
 
+// Different Symcon libraries vendor separate copies of this shared declaration.
+if (trait_exists(VisualizationAssetHelper::class, false)) {
+    return;
+}
+
 /**
  * Loads visualization assets relative to the concrete Symcon module.
  *
@@ -15,7 +20,7 @@ use RuntimeException;
  * vendored helper can reliably access files from that module's visualization
  * directory.
  *
- * @version 1.1.1
+ * @version 1.1.2
  */
 trait VisualizationAssetHelper
 {

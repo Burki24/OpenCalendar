@@ -19,7 +19,7 @@ require_once __DIR__ . '/IPSViewControlThemeHelper.php';
  * collapsed advanced section exposes all known native IPSView color fields grouped by family.
  * Disabled native overrides always inherit their current semantic base color.
  *
- * @version 1.1.0
+ * @version 1.1.1
  */
 trait IPSViewStyleConfigurationHelper
 {
@@ -651,7 +651,8 @@ trait IPSViewStyleConfigurationHelper
      */
     private function IPSViewStyleConfigurationText(string $key, string $fallback): string
     {
-        return $this->TranslateHelperText(
+        return $this->TranslateHelperTextFromDirectory(
+            __DIR__ . '/translations',
             'IPSViewStyleConfigurationHelper',
             $key,
             $fallback
