@@ -7,6 +7,11 @@ namespace Burki24\SymconModuleHelper;
 use InvalidArgumentException;
 use Throwable;
 
+// Different Symcon libraries vendor separate copies of this shared declaration.
+if (trait_exists(ResponsiveVisualizationHelper::class, false)) {
+    return;
+}
+
 /**
  * Establishes a container-query contract for responsive HTML-SDK visualizations.
  *
@@ -15,7 +20,7 @@ use Throwable;
  * tokens and an optional viewport frame with native tile heading metadata, so
  * layouts adapt to the available tile dimensions in every Symcon client.
  *
- * @version 1.0.2
+ * @version 1.0.3
  */
 trait ResponsiveVisualizationHelper
 {
