@@ -4,6 +4,11 @@ declare(strict_types=1);
 
 namespace Burki24\SymconModuleHelper;
 
+// Different Symcon libraries vendor separate copies of this shared declaration.
+if (trait_exists(VisualizationThemeHelper::class, false)) {
+    return;
+}
+
 /**
  * Provides shared CSS design tokens for Symcon HTML-SDK visualizations.
  *
@@ -11,7 +16,7 @@ namespace Burki24\SymconModuleHelper;
  * light/dark fallbacks when a host does not provide them. Module-specific
  * components deliberately remain outside this helper.
  *
- * @version 1.1.0
+ * @version 1.1.1
  */
 trait VisualizationThemeHelper
 {
