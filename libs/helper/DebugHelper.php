@@ -10,6 +10,11 @@ use JsonException;
 use Stringable;
 use Throwable;
 
+// Different Symcon libraries vendor separate copies of this shared declaration.
+if (trait_exists(DebugHelper::class, false)) {
+    return;
+}
+
 /**
  * Provides privacy-conscious debug output for Symcon modules.
  *
@@ -19,7 +24,7 @@ use Throwable;
  * quoted/plain text assignments and JSON encoded as text), and
  * limiting oversized messages unless the caller explicitly raises the limit.
  *
- * @version 1.0.3
+ * @version 1.0.4
  */
 trait DebugHelper
 {
