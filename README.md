@@ -15,9 +15,10 @@ Die gefundenen Kalender können einzeln synchronisiert, in einer gemeinsamen Kac
 In der Kalender Ansicht lassen sich optionale Buchstaben-Schaltflächen für
 häufig verwendete Ansichten direkt in der Kopfzeile konfigurieren. Sie schalten
 Kachel und IPSView ohne Auswahlmenü um; die Wahl bleibt pro Client gespeichert.
-In schmalen Ansichten verwendet die Kopfzeile kurze numerische Datumsangaben
-und zwei feste Bedienreihen. Bei Platzmangel lassen sich die Schnellansichten
-seitlich wischen.
+In schmalen Ansichten verwendet die Kopfzeile kurze numerische Datumsangaben.
+Bis 560 CSS-Pixel Kachelbreite stehen die Bedienelemente in zwei Reihen; auf
+breiteren Tablets bleiben sie in einer Reihe. Bei Platzmangel lassen sich die
+Schnellansichten seitlich wischen.
 
 Ab Version 3.0 steht zusätzlich die **Kalender Einrichtung** als zentraler
 Einrichtungsassistent zur Verfügung. Sie führt vom Kalenderanbieter über das
