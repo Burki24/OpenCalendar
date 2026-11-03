@@ -19,7 +19,7 @@ require_once __DIR__ . '/IPSViewStyleProfileHelper.php';
  * their components, but do not define module-specific colors, gradients,
  * typography, borders or shadows.
  *
- * @version 1.6.9
+ * @version 1.6.10
  */
 trait IPSViewStyleHelper
 {
@@ -1089,7 +1089,7 @@ trait IPSViewStyleHelper
     {
         $fallback = self::IPSVIEW_STYLE_TRANSLATION_SOURCES[$key] ?? $key;
 
-        return $this->TranslateHelperText('IPSViewStyleHelper', $key, $fallback);
+        return $this->TranslateHelperTextFromDirectory(__DIR__ . '/translations', 'IPSViewStyleHelper', $key, $fallback);
     }
 
     /** @return list<array{caption:string,value:int}> */

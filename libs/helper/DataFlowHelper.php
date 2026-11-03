@@ -8,6 +8,11 @@ use InvalidArgumentException;
 use JsonException;
 use UnexpectedValueException;
 
+// Different Symcon libraries vendor separate copies of this shared declaration.
+if (trait_exists(DataFlowHelper::class, false)) {
+    return;
+}
+
 /**
  * Provides reusable JSON encoding and decoding for Symcon data-flow messages.
  *
@@ -16,7 +21,7 @@ use UnexpectedValueException;
  * parent or child and translating transport failures remain responsibilities
  * of the calling module.
  *
- * @version 1.0.0
+ * @version 1.0.1
  */
 trait DataFlowHelper
 {

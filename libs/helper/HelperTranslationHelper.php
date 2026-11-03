@@ -6,6 +6,11 @@ namespace Burki24\SymconModuleHelper;
 
 use JsonException;
 
+// Different Symcon libraries vendor separate copies of this shared declaration.
+if (trait_exists(HelperTranslationHelper::class, false)) {
+    return;
+}
+
 /**
  * Loads helper-owned translations from vendored JSON catalogs.
  *
@@ -13,7 +18,7 @@ use JsonException;
  * itself. Consumer modules therefore do not need matching locale.json
  * entries for helper captions or hints.
  *
- * @version 1.0.0
+ * @version 1.0.1
  */
 trait HelperTranslationHelper
 {
@@ -34,6 +39,17 @@ trait HelperTranslationHelper
         string $fallback,
         ?string $language = null
     ): string {
+        return $this->TranslateHelperTextFromDirectory(__DIR__ . '/translations', $catalog, $key, $fallback, $language);
+    }
+
+    /** Resolve resources next to the calling helper, independent of which library declared this trait first. */
+    protected function TranslateHelperTextFromDirectory(
+        string $directory,
+        string $catalog,
+        string $key,
+        string $fallback,
+        ?string $language = null
+    ): string {
         $catalog = trim($catalog);
         $key = trim($key);
         if ($catalog === '' || $key === '' || preg_match('/^[A-Za-z0-9_.-]+$/', $catalog) !== 1) {
@@ -43,7 +59,7 @@ trait HelperTranslationHelper
         $language = $this->NormalizeHelperTranslationLanguage(
             $language ?? $this->ResolveHelperTranslationLanguage()
         );
-        $translations = $this->LoadHelperTranslationCatalog($catalog);
+        $translations = $this->LoadHelperTranslationCatalog($directory, $catalog);
         $entry = $translations['translations'][$key] ?? null;
         if (!is_array($entry)) {
             return $fallback;
@@ -88,23 +104,23 @@ trait HelperTranslationHelper
     }
 
     /** @return array<string,mixed> */
-    private function LoadHelperTranslationCatalog(string $catalog): array
+    private function LoadHelperTranslationCatalog(string $directory, string $catalog): array
     {
-        if (array_key_exists($catalog, self::$helperTranslationCatalogCache)) {
-            return self::$helperTranslationCatalogCache[$catalog];
+        $path = $directory . '/' . $catalog . '.json';
+        if (array_key_exists($path, self::$helperTranslationCatalogCache)) {
+            return self::$helperTranslationCatalogCache[$path];
         }
 
-        $path = __DIR__ . '/translations/' . $catalog . '.json';
         if (!is_file($path)) {
-            return self::$helperTranslationCatalogCache[$catalog] = [];
+            return self::$helperTranslationCatalogCache[$path] = [];
         }
 
         try {
             $decoded = json_decode((string) file_get_contents($path), true, 512, JSON_THROW_ON_ERROR);
         } catch (JsonException) {
-            return self::$helperTranslationCatalogCache[$catalog] = [];
+            return self::$helperTranslationCatalogCache[$path] = [];
         }
 
-        return self::$helperTranslationCatalogCache[$catalog] = is_array($decoded) ? $decoded : [];
+        return self::$helperTranslationCatalogCache[$path] = is_array($decoded) ? $decoded : [];
     }
 }
