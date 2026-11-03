@@ -872,10 +872,12 @@ assertVisualization(
         && str_contains($script, 'selectCalendarView(button.dataset.view, true)')
         && str_contains($script, 'selectCalendarView(button.dataset.view)')
         && str_contains($style, '.quick-view-buttons')
+        && str_contains($style, 'flex: 0 1 auto;')
+        && str_contains($style, '@container symcon-visualization (max-width: 560px) {')
         && str_contains($style, 'grid-template-areas: "navigation period view" "quick quick actions";')
         && str_contains($style, 'overflow-x: auto;')
         && str_contains($style, 'flex-wrap: nowrap;'),
-    'Optional quick-view buttons must share the client-local view switch and fit into a scrollable second toolbar row in narrow layouts.'
+    'Optional quick-view buttons must share the client-local view switch, scroll when needed and move to a second row only in narrow tiles.'
 );
 
 assertVisualization(

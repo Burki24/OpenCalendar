@@ -191,8 +191,18 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
     font-size: 1.05em;
 }
 
-.quick-view-buttons { display: flex; align-items: center; flex: 0 0 auto; flex-wrap: wrap; gap: 4px; }
-.quick-view-button { font-size: .8em; font-weight: 700; }
+.quick-view-buttons {
+    display: flex;
+    align-items: center;
+    flex: 0 1 auto;
+    min-width: 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+    flex-wrap: nowrap;
+    gap: 4px;
+    scrollbar-width: thin;
+}
+.quick-view-button { flex: 0 0 auto; font-size: .8em; font-weight: 700; }
 .quick-view-button.active {
     border-color: var(--cal-accent);
     background: var(--cal-gradient-accent);
@@ -1276,27 +1286,6 @@ html.tile-title-hidden.tile-maximize-visible:fullscreen {
 }
 
 @container symcon-visualization (max-width: 45rem) {
-    .toolbar.has-quick-views {
-        display: grid;
-        grid-template-columns: auto minmax(0, 1fr) auto;
-        grid-template-areas: "navigation period view" "quick quick actions";
-        column-gap: 4px;
-        row-gap: 5px;
-    }
-    .toolbar.has-quick-views > .toolbar-group:first-child { grid-area: navigation; }
-    .toolbar.has-quick-views .toolbar-title { grid-area: period; }
-    .toolbar.has-quick-views .toolbar-spacer { display: none; }
-    .toolbar.has-quick-views .quick-view-buttons {
-        grid-area: quick;
-        min-width: 0;
-        overflow-x: auto;
-        overflow-y: hidden;
-        flex-wrap: nowrap;
-        scrollbar-width: thin;
-    }
-    .toolbar.has-quick-views .quick-view-button { flex: 0 0 auto; }
-    .toolbar.has-quick-views .view-selector-button { grid-area: view; }
-    .toolbar.has-quick-views .toolbar-actions { grid-area: actions; justify-self: end; }
     html.ipsview-mode .toolbar.has-quick-views .floating-add {
         position: absolute;
         right: 12px;
@@ -1309,6 +1298,23 @@ html.tile-title-hidden.tile-maximize-visible:fullscreen {
     }
     .period-title-wide { display: none; }
     .period-title-compact { display: inline; }
+}
+
+/* A fixed CSS-pixel width prevents font scaling from forcing tablet headers onto two rows. */
+@container symcon-visualization (max-width: 560px) {
+    .toolbar.has-quick-views {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr) auto;
+        grid-template-areas: "navigation period view" "quick quick actions";
+        column-gap: 4px;
+        row-gap: 5px;
+    }
+    .toolbar.has-quick-views > .toolbar-group:first-child { grid-area: navigation; }
+    .toolbar.has-quick-views .toolbar-title { grid-area: period; }
+    .toolbar.has-quick-views .toolbar-spacer { display: none; }
+    .toolbar.has-quick-views .quick-view-buttons { grid-area: quick; }
+    .toolbar.has-quick-views .view-selector-button { grid-area: view; }
+    .toolbar.has-quick-views .toolbar-actions { grid-area: actions; justify-self: end; }
 }
 
 @container symcon-visualization (max-width: 26rem) {
