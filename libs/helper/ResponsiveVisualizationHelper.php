@@ -7,120 +7,118 @@ namespace Burki24\SymconModuleHelper;
 use InvalidArgumentException;
 use Throwable;
 
-// Different Symcon libraries vendor separate copies of this shared declaration.
-if (trait_exists(ResponsiveVisualizationHelper::class, false)) {
-    return;
-}
-
-/**
- * Establishes a container-query contract for responsive HTML-SDK visualizations.
- *
- * The actual layout remains module-specific. This helper deliberately only marks
- * the visualization root as a query container and supplies shared dimension
- * tokens and an optional viewport frame with native tile heading metadata, so
- * layouts adapt to the available tile dimensions in every Symcon client.
- *
- * @version 1.0.3
- */
-trait ResponsiveVisualizationHelper
-{
+// Keep the declaration conditional: cached includes may bind unconditional types before an early return.
+if (!trait_exists(ResponsiveVisualizationHelper::class, false)) {
     /**
-     * Returns the shared responsive foundation for one visualization root.
+     * Establishes a container-query contract for responsive HTML-SDK visualizations.
      *
-     * Consumers can use `@container <name> (max-width: ...)` rules in their
-     * own stylesheet. Container queries respond to the tile width rather than
-     * the browser viewport and therefore also work in the Symcon mobile apps.
-     * Set $fillViewport to opt into a full-height flex frame. Apply the inset
-     * from ResponsiveVisualizationLayoutOptions() to --symc-tile-header-inset;
-     * the root then reserves that space once as its top padding.
-     * Mark the top toolbar with data-symc-tile-toolbar and forward tileActionInset
-     * to --symc-tile-action-inset to keep native overlay controls unobstructed.
+     * The actual layout remains module-specific. This helper deliberately only marks
+     * the visualization root as a query container and supplies shared dimension
+     * tokens and an optional viewport frame with native tile heading metadata, so
+     * layouts adapt to the available tile dimensions in every Symcon client.
+     *
+     * @version 1.0.4
      */
-    protected function ResponsiveVisualizationCSS(string $rootSelector, string $containerName = 'symcon-visualization', bool $fillViewport = false): string
+    trait ResponsiveVisualizationHelper
     {
-        $rootSelector = trim($rootSelector);
-        $containerName = trim($containerName);
+        /**
+         * Returns the shared responsive foundation for one visualization root.
+         *
+         * Consumers can use `@container <name> (max-width: ...)` rules in their
+         * own stylesheet. Container queries respond to the tile width rather than
+         * the browser viewport and therefore also work in the Symcon mobile apps.
+         * Set $fillViewport to opt into a full-height flex frame. Apply the inset
+         * from ResponsiveVisualizationLayoutOptions() to --symc-tile-header-inset;
+         * the root then reserves that space once as its top padding.
+         * Mark the top toolbar with data-symc-tile-toolbar and forward tileActionInset
+         * to --symc-tile-action-inset to keep native overlay controls unobstructed.
+         */
+        protected function ResponsiveVisualizationCSS(string $rootSelector, string $containerName = 'symcon-visualization', bool $fillViewport = false): string
+        {
+            $rootSelector = trim($rootSelector);
+            $containerName = trim($containerName);
 
-        if (preg_match('/^#[A-Za-z][A-Za-z0-9_-]*$/', $rootSelector) !== 1) {
-            throw new InvalidArgumentException('The responsive visualization root must be an ID selector.');
-        }
-        if (preg_match('/^[a-z][a-z0-9-]*$/', $containerName) !== 1) {
-            throw new InvalidArgumentException('The responsive visualization container name is invalid.');
-        }
-
-        $css = <<<CSS
-{$rootSelector} {
-    container-name: {$containerName};
-    container-type: inline-size;
-    min-inline-size: 0;
-    -webkit-text-size-adjust: 100%;
-    text-size-adjust: 100%;
-    --symc-responsive-gap: clamp(0.5rem, 2cqi, 1rem);
-    --symc-responsive-padding: clamp(0.625rem, 2.5cqi, 1.25rem);
-    --symc-responsive-touch-target: 44px;
-}
-CSS;
-        if ($fillViewport) {
-            $css .= <<<CSS
-
-html, body {
-    width: 100%;
-    height: 100%;
-    margin: 0;
-    overflow: hidden;
-}
-{$rootSelector} {
-    box-sizing: border-box;
-    display: flex;
-    flex-direction: column;
-    width: 100%;
-    height: 100%;
-    min-height: 0;
-    padding: var(--symc-responsive-padding, 12px);
-    padding-top: calc(var(--symc-responsive-padding, 12px) + var(--symc-tile-header-inset, 0px));
-    overflow: hidden;
-}
-{$rootSelector} [data-symc-tile-toolbar] {
-    box-sizing: border-box;
-    padding-right: var(--symc-tile-action-inset, 0px);
-}
-CSS;
-        }
-
-        return $css;
-    }
-
-    /**
-     * Returns the shared native HTML-SDK heading reservation in CSS pixels.
-     *
-     * Native tiles reserve 58px when their object title is visible. An absent
-     * object field or a failed object lookup conservatively keeps that space.
-     * IPSView/standalone pages pass false and do not query the Symcon object.
-     * A hidden title with a visible maximize button reserves 44px on the right
-     * of an opted-in toolbar only; content height and workspace width stay free.
-     * This is presentation metadata only; consumers forward it to their client.
-     *
-     * @return array{tileHeaderVisible: bool, tileHeaderInset: int, tileMaximizeVisible: bool, tileActionInset: int}
-     */
-    protected function ResponsiveVisualizationLayoutOptions(bool $nativeTile = true): array
-    {
-        $visible = $nativeTile;
-        $maximizeVisible = $nativeTile;
-        if ($nativeTile) {
-            try {
-                $object = IPS_GetObject($this->InstanceID);
-                $visible = !($object['ObjectIsHiddenTitle'] ?? false);
-                $maximizeVisible = !($object['ObjectIsHiddenMaximize'] ?? false);
-            } catch (Throwable) {
-                $visible = true;
+            if (preg_match('/^#[A-Za-z][A-Za-z0-9_-]*$/', $rootSelector) !== 1) {
+                throw new InvalidArgumentException('The responsive visualization root must be an ID selector.');
             }
+            if (preg_match('/^[a-z][a-z0-9-]*$/', $containerName) !== 1) {
+                throw new InvalidArgumentException('The responsive visualization container name is invalid.');
+            }
+
+            $css = <<<CSS
+    {$rootSelector} {
+        container-name: {$containerName};
+        container-type: inline-size;
+        min-inline-size: 0;
+        -webkit-text-size-adjust: 100%;
+        text-size-adjust: 100%;
+        --symc-responsive-gap: clamp(0.5rem, 2cqi, 1rem);
+        --symc-responsive-padding: clamp(0.625rem, 2.5cqi, 1.25rem);
+        --symc-responsive-touch-target: 44px;
+    }
+    CSS;
+            if ($fillViewport) {
+                $css .= <<<CSS
+
+    html, body {
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        overflow: hidden;
+    }
+    {$rootSelector} {
+        box-sizing: border-box;
+        display: flex;
+        flex-direction: column;
+        width: 100%;
+        height: 100%;
+        min-height: 0;
+        padding: var(--symc-responsive-padding, 12px);
+        padding-top: calc(var(--symc-responsive-padding, 12px) + var(--symc-tile-header-inset, 0px));
+        overflow: hidden;
+    }
+    {$rootSelector} [data-symc-tile-toolbar] {
+        box-sizing: border-box;
+        padding-right: var(--symc-tile-action-inset, 0px);
+    }
+    CSS;
+            }
+
+            return $css;
         }
 
-        return [
-            'tileHeaderVisible'   => $visible,
-            'tileHeaderInset'     => $visible ? 58 : 0,
-            'tileMaximizeVisible' => $maximizeVisible,
-            'tileActionInset'     => !$visible && $maximizeVisible ? 44 : 0
-        ];
+        /**
+         * Returns the shared native HTML-SDK heading reservation in CSS pixels.
+         *
+         * Native tiles reserve 58px when their object title is visible. An absent
+         * object field or a failed object lookup conservatively keeps that space.
+         * IPSView/standalone pages pass false and do not query the Symcon object.
+         * A hidden title with a visible maximize button reserves 44px on the right
+         * of an opted-in toolbar only; content height and workspace width stay free.
+         * This is presentation metadata only; consumers forward it to their client.
+         *
+         * @return array{tileHeaderVisible: bool, tileHeaderInset: int, tileMaximizeVisible: bool, tileActionInset: int}
+         */
+        protected function ResponsiveVisualizationLayoutOptions(bool $nativeTile = true): array
+        {
+            $visible = $nativeTile;
+            $maximizeVisible = $nativeTile;
+            if ($nativeTile) {
+                try {
+                    $object = IPS_GetObject($this->InstanceID);
+                    $visible = !($object['ObjectIsHiddenTitle'] ?? false);
+                    $maximizeVisible = !($object['ObjectIsHiddenMaximize'] ?? false);
+                } catch (Throwable) {
+                    $visible = true;
+                }
+            }
+
+            return [
+                'tileHeaderVisible'   => $visible,
+                'tileHeaderInset'     => $visible ? 58 : 0,
+                'tileMaximizeVisible' => $maximizeVisible,
+                'tileActionInset'     => !$visible && $maximizeVisible ? 44 : 0
+            ];
+        }
     }
 }
