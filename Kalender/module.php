@@ -85,6 +85,8 @@ class Calendar extends IPSModuleStrict
             $this->RegisterPropertyString('ProviderCalendarID', '');
             $this->RegisterPropertyString('CalendarURL', '');
             $this->RegisterPropertyString('CalendarColor', '');
+            $this->RegisterPropertyBoolean('UseDisplayColor', false);
+            $this->RegisterPropertyInteger('DisplayColor', 0x4F8EF7);
             $this->RegisterPropertyBoolean('CanWrite', false);
             $this->RegisterPropertyString('MicrosoftTaskListID', '');
             $this->RegisterPropertyInteger('UpdateSchedule', SynchronizationSchedule::CUSTOM);
@@ -179,6 +181,9 @@ class Calendar extends IPSModuleStrict
                 if (($element['name'] ?? '') === 'MicrosoftTaskListID') {
                     $element['visible'] = !$local && count($taskListOptions) > 1;
                     $element['options'] = $taskListOptions;
+                }
+                if (in_array(($element['name'] ?? ''), ['UseDisplayColor', 'DisplayColor'], true)) {
+                    $element['visible'] = !$local;
                 }
                 if (($element['caption'] ?? '') === 'Calendar identity') {
                     foreach ($element['items'] as &$item) {
@@ -1548,6 +1553,15 @@ class Calendar extends IPSModuleStrict
             $writeAccessKnown = $metadataAvailable
                 && $this->ReadAttributeBoolean('DetectedWriteAccessKnown');
             $detectedColor = $this->ReadAttributeString('DetectedCalendarColor');
+            $calendarColor = $metadataAvailable && $detectedColor !== ''
+                ? $detectedColor
+                : $this->ReadPropertyString('CalendarColor');
+            if (!$this->ReadPropertyBoolean('LocalCalendar') && $this->ReadPropertyBoolean('UseDisplayColor')) {
+                $displayColor = $this->ReadPropertyInteger('DisplayColor');
+                if ($displayColor >= 0 && $displayColor <= 0xFFFFFF) {
+                    $calendarColor = sprintf('#%06X', $displayColor);
+                }
+            }
             $defaultReminder = json_decode($this->ReadAttributeString('DetectedDefaultReminder'), true);
             if (!is_array($defaultReminder) || array_is_list($defaultReminder)) {
                 $defaultReminder = [];
@@ -1558,9 +1572,7 @@ class Calendar extends IPSModuleStrict
                 [
                     'localCalendar'                => $this->ReadPropertyBoolean('LocalCalendar'),
                     'calendarId'                   => $this->effectiveCalendarId(),
-                    'calendarColor'                => $metadataAvailable && $detectedColor !== ''
-                        ? $detectedColor
-                        : $this->ReadPropertyString('CalendarColor'),
+                    'calendarColor'                => $calendarColor,
                     'canWrite'                     => $metadataAvailable
                         ? ($writeAccessKnown
                             ? $this->ReadAttributeBoolean('DetectedCanWrite')
@@ -4411,6 +4423,11 @@ class Calendar extends IPSModuleStrict
         }
         if (!in_array(trim($this->ReadAttributeString('LocalCalendarResources')), ['', '{}', '[]'], true)) {
             return $this->Translate('This instance contains local original events. Keep local calendar mode enabled.');
+        }
+        if ($this->ReadPropertyBoolean('UseDisplayColor')
+            && ($this->ReadPropertyInteger('DisplayColor') < 0
+                || $this->ReadPropertyInteger('DisplayColor') > 0xFFFFFF)) {
+            return $this->Translate('The display color is invalid.');
         }
         if (!SynchronizationSchedule::isValid($this->ReadPropertyInteger('UpdateSchedule'))) {
             return $this->Translate('The synchronization schedule is invalid.');

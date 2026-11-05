@@ -104,6 +104,17 @@
             ]
         },
         {
+            "type": "CheckBox",
+            "name": "UseDisplayColor",
+            "caption": "Use custom display color"
+        },
+        {
+            "type": "SelectColor",
+            "name": "DisplayColor",
+            "caption": "Display color",
+            "allowTransparent": false
+        },
+        {
             "type": "ExpansionPanel",
             "caption": "Calendar identity",
             "expanded": false,
