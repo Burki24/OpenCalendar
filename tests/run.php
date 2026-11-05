@@ -54,6 +54,7 @@ $commands = [
     ['Verify local calendar provider and original data', [PHP_BINARY, 'tests/local-calendar-provider.php']],
     ['Verify standalone local calendar runtime', [PHP_BINARY, 'tests/local-calendar-module.php']],
     ['Verify local calendar account, configurator and console export', [PHP_BINARY, 'tests/local-calendar-account.php']],
+    ['Verify calendar display color override', [PHP_BINARY, 'tests/calendar-display-color.php']],
     ['Verify vendored helper integrity', ['python3', 'tests/helper_integrity.py']],
     ['Verify DataFlowHelper integration', ['python3', 'tests/data_flow_integration.py']],
     ['Check safe debug integration', [PHP_BINARY, 'tests/debug-integration.php']],

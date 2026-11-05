@@ -12,6 +12,7 @@ OpenCalendar ist eine Anwendung für Symcon, mit der Nutzer ihre Online-Kalender
 ![OpenCalendar: Kalender und Aufgaben in der Symcon-Kachelvisualisierung und in IPSView](docs/images/opencalendar-readme-hero-design-v2.png)
 
 Die gefundenen Kalender können einzeln synchronisiert, in einer gemeinsamen Kachel angezeigt und optional als interaktive HTML-Seite in IPSView verwendet werden.
+Für externe Kalender, einschließlich schreibgeschützter ICS-/Webcal-Feeds ohne eigene Farbe, lässt sich in der jeweiligen **Kalender**-Instanz eine optionale **Anzeigefarbe** wählen. Sie gilt für Kachel und IPSView, ohne die Farbe beim Anbieter zu ändern.
 In der Kalender Ansicht lassen sich optionale Buchstaben-Schaltflächen für
 häufig verwendete Ansichten direkt in der Kopfzeile konfigurieren. Sie schalten
 Kachel und IPSView ohne Auswahlmenü um; die Wahl bleibt pro Client gespeichert.

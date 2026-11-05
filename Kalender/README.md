@@ -208,7 +208,11 @@ Benutzerdefiniertes Intervall | Eigener Abstand in Minuten; wird nur beim Zeitpl
 Vergangene Termine laden | Anzahl der Tage vor dem aktuellen Datum
 Zukünftige Termine laden | Anzahl der Tage nach dem aktuellen Datum
 Microsoft-To-Do-Aufgabenliste | Optional eingebundene native Liste des Microsoft-Kontos; leer bedeutet keine Einbindung. Benötigt Aufgaben-Zugriff über OAuth
+Eigene Anzeigefarbe verwenden | Überschreibt bei einem externen Kalender dessen Farbe nur in OpenCalendar; auch für schreibgeschützte ICS-/Webcal-Kalender ohne Anbieterfarbe verfügbar
+Anzeigefarbe | Farbe für die Kachel- und IPSView-Darstellung, wenn die eigene Anzeigefarbe aktiviert ist
 Kalenderidentität | Von der Kalender Einrichtung oder dem Konfigurator gesetzte, schreibgeschützte Anbieterinformationen
+
+Für einen ICS-/Webcal-Kalender ohne Farbangabe die zugehörige **Kalender**-Instanz öffnen, **Eigene Anzeigefarbe verwenden** aktivieren, die **Anzeigefarbe** wählen und die Konfiguration übernehmen. Die neue Farbe erscheint in allen Kalender-Ansichten, die diese Instanz verwenden. Der Feed und seine Farbe beim Anbieter bleiben unverändert. Wird die Option ausgeschaltet, gilt wieder die vom Anbieter gelieferte Farbe oder die bisherige Ersatzfarbe. Lokale Symcon-Kalender verwenden weiterhin das Feld **Kalenderfarbe** unter **Kalenderidentität**.
 
 Bestehende Instanzen behalten ihren bisherigen Minutenwert als benutzerdefiniertes Intervall. Monatliche und jährliche Zeitpläne werden intern täglich auf Fälligkeit geprüft, damit keine für lange Zeiträume ungeeigneten Millisekunden-Timer verwendet werden. **Jetzt synchronisieren** bleibt unabhängig vom Zeitplan jederzeit verfügbar.
 
