@@ -41,6 +41,18 @@
         "message.variables_deleted": {
             "en": "The retained IPSView variables were deleted.",
             "de": "Die beibehaltenen IPSView-Variablen wurden gelöscht."
+        },
+        "action.regenerate_variables": {
+            "en": "Regenerate IPSView HTML",
+            "de": "IPSView-HTML neu generieren"
+        },
+        "message.variables_regenerated": {
+            "en": "IPSView HTML regenerated.",
+            "de": "IPSView-HTML wurde neu generiert."
+        },
+        "error.regenerate_variables": {
+            "en": "IPSView HTML could not be regenerated. Enable IPSView output and apply the instance configuration first.",
+            "de": "IPSView-HTML konnte nicht neu generiert werden. Aktivieren Sie zuerst die IPSView-Ausgabe und übernehmen Sie die Instanzkonfiguration."
         }
     }
 }

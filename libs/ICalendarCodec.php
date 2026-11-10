@@ -15,6 +15,7 @@ require_once __DIR__ . '/ICalendarRecurrence.php';
 require_once __DIR__ . '/ICalendarTimezoneResolver.php';
 require_once __DIR__ . '/CalendarEventRecurrence.php';
 require_once __DIR__ . '/CalendarEventReminder.php';
+require_once __DIR__ . '/CalendarTaskEvent.php';
 require_once __DIR__ . '/CalendarRecurrenceRule.php';
 
 final class ICalendarCodec
@@ -66,6 +67,7 @@ final class ICalendarCodec
                     ? CalendarEventRecurrence::master($uid)
                     : CalendarEventRecurrence::single());
 
+            $taskMetadata = self::taskMetadataFromProperties($properties);
             $events[] = array_merge([
                 'id'                          => hash('sha256', $resourceUrl . '|' . $uid . '|' . $recurrenceId . '|' . $start['value']),
                 'uid'                         => $uid,
@@ -103,7 +105,7 @@ final class ICalendarCodec
                 ),
                 'url'                         => self::propertyValue($properties, 'URL'),
                 'reminder'                    => self::reminderState($block)
-            ], $recurrenceIdentity);
+            ], $recurrenceIdentity, $taskMetadata);
         }
 
         return $events;
@@ -193,7 +195,11 @@ final class ICalendarCodec
         $lines[] = 'SEQUENCE:0';
         $lines[] = self::formatEventDateLine('DTSTART', $start, $allDay, $useTimezoneReference ? $timezoneName : '');
         $lines[] = self::formatEventDateLine('DTEND', $end, $allDay, $useTimezoneReference ? $timezoneName : '');
-        $lines[] = 'SUMMARY:' . self::escapeText($summary);
+        $taskMetadata = self::taskMetadataForWrite($data);
+        $lines[] = 'SUMMARY:' . self::escapeText(
+            $taskMetadata !== [] ? CalendarTaskEvent::plainSummary($summary) : $summary
+        );
+        array_push($lines, ...self::taskMetadataLines($taskMetadata));
 
         if ($recurring) {
             $lines[] = CalendarRecurrenceRule::toICalendarRule(
@@ -231,6 +237,8 @@ final class ICalendarCodec
      * Updates a non-recurring VEVENT inside an existing iCalendar resource.
      *
      * @param array<string, mixed> $data
+     * @param bool $removeFormerFirstOccurrenceOverride Removes the detached override
+     *        at the old master start when a first-occurrence following update reanchors it.
      */
     public static function updateEvent(string $ical, string $uid, array $data): string
     {
@@ -399,8 +407,12 @@ final class ICalendarCodec
      *
      * @param array<string, mixed> $data
      */
-    public static function updateRecurringSeries(string $ical, string $uid, array $data): string
-    {
+    public static function updateRecurringSeries(
+        string $ical,
+        string $uid,
+        array $data,
+        bool $removeFormerFirstOccurrenceOverride = false
+    ): string {
         $uid = trim($uid);
         if ($uid === '') {
             throw new InvalidArgumentException('The recurring event UID is missing.');
@@ -411,6 +423,16 @@ final class ICalendarCodec
         $master = self::recurringMaster($blocks, $uid);
         $block = $master['lines'];
         $properties = $master['properties'];
+        $formerFirstOccurrence = null;
+        if ($removeFormerFirstOccurrenceOverride) {
+            $startProperty = self::firstProperty($properties, 'DTSTART');
+            if ($startProperty === null) {
+                throw new RuntimeException('The recurring event master has no start.');
+            }
+            $formerFirstOccurrence = new DateTimeImmutable(
+                '@' . self::parseDateProperty($startProperty)['timestamp']
+            );
+        }
         $recurrenceProvided = array_key_exists('recurrence', $data);
         $recurrence = $data['recurrence'] ?? null;
         $removeRecurrence = $recurrenceProvided
@@ -500,7 +522,32 @@ final class ICalendarCodec
             );
         }
 
-        array_splice($lines, $master['start'], $master['end'] - $master['start'] + 1, $block);
+        $operations = [[
+            'start'       => $master['start'],
+            'length'      => $master['end'] - $master['start'] + 1,
+            'replacement' => $block
+        ]];
+        if ($formerFirstOccurrence !== null) {
+            foreach (self::recurrenceOverrides($blocks, $uid, $formerFirstOccurrence) as $override) {
+                $operations[] = [
+                    'start'       => $override['start'],
+                    'length'      => $override['end'] - $override['start'] + 1,
+                    'replacement' => []
+                ];
+            }
+        }
+        usort(
+            $operations,
+            static fn (array $left, array $right): int => $right['start'] <=> $left['start']
+        );
+        foreach ($operations as $operation) {
+            array_splice(
+                $lines,
+                $operation['start'],
+                $operation['length'],
+                $operation['replacement']
+            );
+        }
 
         return self::foldLines($lines);
     }
@@ -602,7 +649,9 @@ final class ICalendarCodec
     ): array {
         $recurrence = $data['recurrence'] ?? null;
         if (!is_array($recurrence) || $recurrence === [] || array_is_list($recurrence)) {
-            throw new InvalidArgumentException('The recurrence settings are required when splitting a recurring event.');
+            throw new InvalidArgumentException(
+                'The recurrence settings are required when splitting a recurring event.'
+            );
         }
 
         $context = self::recurringSplitContext($ical, $uid, $originalStart);
@@ -652,6 +701,139 @@ final class ICalendarCodec
 
         return [
             'originalIcal' => $originalIcal,
+            'newIcal'      => self::foldLines($newLines),
+            'newUid'       => $newUid
+        ];
+    }
+
+    /**
+     * Separates a new recurring tail after a completed first occurrence.
+     *
+     * The completed detached first occurrence remains part of a one-occurrence
+     * historical series. The requested recurring data becomes a separate open
+     * series, so moving planned follow-up tasks never reopens that completion.
+     *
+     * @param array<string, mixed> $data Changes and recurrence settings for the new future series.
+     * @return array{originalIcal: string, newIcal: string, newUid: string}
+     */
+    public static function splitCompletedFirstRecurringSeries(
+        string $ical,
+        string $uid,
+        string $originalStart,
+        array $data
+    ): array {
+        $recurrence = $data['recurrence'] ?? null;
+        if (!is_array($recurrence) || $recurrence === [] || array_is_list($recurrence)) {
+            throw new InvalidArgumentException('The recurrence settings are required when splitting a recurring event.');
+        }
+
+        $context = self::recurringSplitContext($ical, $uid, $originalStart);
+        if ($context['position'] !== 1) {
+            throw new RuntimeException('Only the first recurring occurrence can retain a completed override.');
+        }
+
+        $retainedSettings = $context['settings'];
+        $retainedSettings['endMode'] = 'count';
+        $retainedSettings['count'] = 1;
+        unset($retainedSettings['until']);
+        $retainedMaster = $context['master']['lines'];
+        self::replaceProperty(
+            $retainedMaster,
+            'RRULE',
+            CalendarRecurrenceRule::toICalendarRule(
+                $retainedSettings,
+                $context['masterStart'],
+                $context['allDay'],
+                $context['timezone']
+            )
+        );
+        self::touchEventBlock($retainedMaster);
+
+        $originalLines = $context['lines'];
+        $operations = [[
+            'start'       => $context['master']['start'],
+            'length'      => $context['master']['end'] - $context['master']['start'] + 1,
+            'replacement' => $retainedMaster
+        ]];
+        foreach ($context['blocks'] as $block) {
+            $properties = self::readTopLevelProperties($block['lines']);
+            if (!hash_equals($context['uid'], self::propertyValue($properties, 'UID'))) {
+                continue;
+            }
+            $recurrenceId = self::firstProperty($properties, 'RECURRENCE-ID');
+            if ($recurrenceId === null) {
+                continue;
+            }
+            try {
+                $timestamp = self::parseDateProperty($recurrenceId)['timestamp'];
+            } catch (Throwable) {
+                continue;
+            }
+            if ($timestamp <= $context['masterStart']->getTimestamp()) {
+                continue;
+            }
+            $operations[] = [
+                'start'       => $block['start'],
+                'length'      => $block['end'] - $block['start'] + 1,
+                'replacement' => []
+            ];
+        }
+        usort(
+            $operations,
+            static fn (array $left, array $right): int => $right['start'] <=> $left['start']
+        );
+        foreach ($operations as $operation) {
+            array_splice(
+                $originalLines,
+                $operation['start'],
+                $operation['length'],
+                $operation['replacement']
+            );
+        }
+
+        $newBlock = self::createOccurrenceOverrideBlock(
+            $context['master']['lines'],
+            $context['masterStart']
+        );
+        self::replaceProperty($newBlock, 'RECURRENCE-ID', null);
+        $newUid = bin2hex(random_bytes(16)) . '@ips-kalender';
+        self::replaceProperty($newBlock, 'UID', 'UID:' . $newUid);
+        self::applyEventChangesToBlock($newBlock, $data);
+
+        $updatedProperties = self::readTopLevelProperties($newBlock);
+        $updatedStartProperty = self::firstProperty($updatedProperties, 'DTSTART');
+        if ($updatedStartProperty === null) {
+            throw new RuntimeException('The split recurring event has no start.');
+        }
+        $updatedStart = self::parseDateProperty($updatedStartProperty);
+        $updatedTimezone = self::timezone($updatedStart['timezone']);
+        $updatedStartDate = (new DateTimeImmutable('@' . $updatedStart['timestamp']))
+            ->setTimezone($updatedTimezone);
+        self::replaceProperty(
+            $newBlock,
+            'RRULE',
+            CalendarRecurrenceRule::toICalendarRule(
+                $recurrence,
+                $updatedStartDate,
+                $updatedStart['allDay'],
+                $updatedStart['timezone']
+            )
+        );
+
+        $now = gmdate('Ymd\\THis\\Z');
+        self::replaceProperty($newBlock, 'SEQUENCE', 'SEQUENCE:0');
+        self::replaceProperty($newBlock, 'CREATED', 'CREATED:' . $now);
+        self::replaceProperty($newBlock, 'DTSTAMP', 'DTSTAMP:' . $now);
+        self::replaceProperty($newBlock, 'LAST-MODIFIED', 'LAST-MODIFIED:' . $now);
+
+        $newLines = $context['lines'];
+        foreach (array_reverse($context['blocks']) as $block) {
+            array_splice($newLines, $block['start'], $block['end'] - $block['start'] + 1);
+        }
+        self::insertEventBlock($newLines, $newBlock);
+
+        return [
+            'originalIcal' => self::foldLines($originalLines),
             'newIcal'      => self::foldLines($newLines),
             'newUid'       => $newUid
         ];
@@ -1062,12 +1244,31 @@ final class ICalendarCodec
      */
     private static function applyEventChangesToBlock(array &$block, array $data): void
     {
+        $taskSupplied = self::taskFieldsSupplied($data);
+        $taskMetadata = $taskSupplied ? self::taskMetadataForWrite($data) : [];
         if (array_key_exists('summary', $data)) {
             $summary = trim((string) $data['summary']);
             if ($summary === '') {
                 throw new InvalidArgumentException('The event summary must not be empty.');
             }
-            self::replaceProperty($block, 'SUMMARY', 'SUMMARY:' . self::escapeText($summary));
+            self::replaceProperty(
+                $block,
+                'SUMMARY',
+                'SUMMARY:' . self::escapeText($taskSupplied ? CalendarTaskEvent::plainSummary($summary) : $summary)
+            );
+        }
+        if ($taskSupplied) {
+            foreach ([
+                'X-OPENCALENDAR-TASK',
+                'X-OPENCALENDAR-TASK-STATUS',
+                'X-OPENCALENDAR-ROLL-FORWARD'
+            ] as $property) {
+                self::replaceProperty($block, $property, null);
+            }
+            foreach (self::taskMetadataLines($taskMetadata) as $line) {
+                $property = substr($line, 0, (int) strpos($line, ':'));
+                self::replaceProperty($block, $property, $line);
+            }
         }
         foreach (['description' => 'DESCRIPTION', 'location' => 'LOCATION'] as $key => $property) {
             if (array_key_exists($key, $data)) {
@@ -1759,6 +1960,67 @@ final class ICalendarCodec
     private static function propertyValue(array $properties, string $name): string
     {
         return (string) (self::firstProperty($properties, $name)['value'] ?? '');
+    }
+
+    /** @param array<string, list<array{value:string, params:array<string,string>}>> $properties */
+    private static function taskMetadataFromProperties(array $properties): array
+    {
+        if (strtoupper(trim(self::propertyValue($properties, 'X-OPENCALENDAR-TASK'))) !== 'TRUE') {
+            return [];
+        }
+        $status = strtolower(trim(self::propertyValue($properties, 'X-OPENCALENDAR-TASK-STATUS')));
+        $scope = strtolower(trim(self::propertyValue($properties, 'X-OPENCALENDAR-ROLL-FORWARD')));
+        if (!in_array($scope, [
+            CalendarTaskEvent::ROLL_FORWARD_SCOPE_OCCURRENCE,
+            CalendarTaskEvent::ROLL_FORWARD_SCOPE_FOLLOWING,
+            CalendarTaskEvent::ROLL_FORWARD_SCOPE_DISABLED
+        ], true)) {
+            $scope = CalendarTaskEvent::ROLL_FORWARD_SCOPE_OCCURRENCE;
+        }
+        $completed = $status === 'completed';
+        return [
+            'task'                 => true,
+            'taskCompleted'        => $completed,
+            'taskStatus'           => $completed ? 'completed' : 'open',
+            'taskRollForwardScope' => $scope,
+            'taskFollowPlanned'    => $scope === CalendarTaskEvent::ROLL_FORWARD_SCOPE_FOLLOWING
+        ];
+    }
+
+    /** @param array<string, mixed> $data */
+    private static function taskFieldsSupplied(array $data): bool
+    {
+        return array_key_exists('task', $data)
+            || array_key_exists('taskCompleted', $data)
+            || array_key_exists('taskStatus', $data)
+            || array_key_exists('taskFollowPlanned', $data)
+            || array_key_exists('taskRollForwardScope', $data);
+    }
+
+    /** @param array<string, mixed> $data @return array<string, mixed> */
+    private static function taskMetadataForWrite(array $data): array
+    {
+        $normalized = CalendarTaskEvent::enrich($data);
+        if (!(bool) ($normalized['task'] ?? false)) {
+            return [];
+        }
+        return [
+            'status' => (bool) ($normalized['taskCompleted'] ?? false) ? 'completed' : 'open',
+            'scope'  => (string) ($normalized['taskRollForwardScope'] ?? CalendarTaskEvent::ROLL_FORWARD_SCOPE_OCCURRENCE)
+        ];
+    }
+
+    /** @param array<string, mixed> $metadata @return list<string> */
+    private static function taskMetadataLines(array $metadata): array
+    {
+        if ($metadata === []) {
+            return [];
+        }
+        return [
+            'X-OPENCALENDAR-TASK:TRUE',
+            'X-OPENCALENDAR-TASK-STATUS:' . strtoupper((string) $metadata['status']),
+            'X-OPENCALENDAR-ROLL-FORWARD:' . strtoupper((string) $metadata['scope'])
+        ];
     }
 
     /**

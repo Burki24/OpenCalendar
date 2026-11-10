@@ -3,8 +3,38 @@
 declare(strict_types=1);
 
 $root = dirname(__DIR__);
+$bash = 'bash';
+if (PHP_OS_FAMILY === 'Windows') {
+    // Prefer Git Bash over the Windows bash.exe alias that launches WSL.
+    foreach ([
+        (getenv('ProgramFiles') ?: 'C:/Program Files') . '/Git/bin/bash.exe',
+        (getenv('ProgramFiles(x86)') ?: 'C:/Program Files (x86)') . '/Git/bin/bash.exe',
+        (getenv('LOCALAPPDATA') ?: '') . '/Programs/Git/bin/bash.exe'
+    ] as $candidate) {
+        if (is_file($candidate)) {
+            $bash = $candidate;
+            break;
+        }
+    }
+}
 
 $commands = [
+    ['Verify debug flow and confidentiality', [PHP_BINARY, 'tests/debug-output.php']],
+    ['Verify moved IPSView output identity', [PHP_BINARY, 'tests/ipsview-moved-output.php']],
+    ['Verify embedded dialog bounds and errors', ['node', 'tests/dialog-embedding.js']],
+    ['Verify empty HTML descriptions in event details', ['node', 'tests/empty-html-description.js']],
+    ['Verify configurable quick-view buttons', ['node', 'tests/quick-view-buttons.js']],
+    ['Verify compact toolbar dates', ['node', 'tests/compact-toolbar-date.js']],
+    ['Verify IPSView endpoint resolution', ['node', 'tests/ipsview-endpoint.js']],
+    ['Verify CalDAV cache resource identity', [PHP_BINARY, 'tests/caldav-resource-identity.php']],
+    ['Verify IPSView bundled fonts', [PHP_BINARY, 'tests/ipsview-font-assets.php']],
+    ['Verify IPSView picker TAB navigation', ['node', 'tests/ipsview-tab-navigation.js']],
+    ['Verify multi-day event display', ['node', 'tests/multi-day-display.js']],
+    ['Verify IPSView date/time picker', ['node', 'tests/datetime-picker.js']],
+    ['Verify picker wheel and touch scrolling', ['node', 'tests/picker-scroll.js']],
+    ['Verify IPSView annual-event picker', ['node', 'tests/ipsview-anniversary-picker.js']],
+    ['Verify Microsoft task discovery on first connection', [PHP_BINARY, 'tests/microsoft-task-discovery.php']],
+    ['Verify event editor duration preservation', ['node', 'tests/event-editor-duration.js']],
     ['Verify vendored helper integrity', ['python3', 'tests/helper_integrity.py']],
     ['Verify DataFlowHelper integration', ['python3', 'tests/data_flow_integration.py']],
     ['Check safe debug integration', [PHP_BINARY, 'tests/debug-integration.php']],
@@ -17,6 +47,10 @@ $commands = [
     ['Verify chunked event transfers', [PHP_BINARY, 'tests/chunked-event-transfer.php']],
     ['Verify current-day event counting', [PHP_BINARY, 'tests/calendar-event-counter.php']],
     ['Verify task appointment behavior', [PHP_BINARY, 'tests/task-appointments.php']],
+    ['Verify provider task metadata', [PHP_BINARY, 'tests/task-metadata.php']],
+    ['Verify standalone local calendar provider', [PHP_BINARY, 'tests/local-calendar-provider.php']],
+    ['Verify local calendar account integration', [PHP_BINARY, 'tests/local-calendar-account.php']],
+    ['Verify calendar display color override', [PHP_BINARY, 'tests/calendar-display-color.php']],
     ['Verify calendar failure recovery', [PHP_BINARY, 'tests/calendar-recovery.php']],
     ['Verify CalDAV pending-task identity', [PHP_BINARY, 'tests/caldav-pending-task.php']],
     ['Verify annual-event metadata and calculations', [PHP_BINARY, 'tests/birthday.php']],
@@ -30,6 +64,11 @@ $commands = [
     ['Verify Microsoft series-master synchronization', [PHP_BINARY, 'tests/microsoft-series-master-sync.php']],
     ['Verify Microsoft post-write synchronization', [PHP_BINARY, 'tests/microsoft-write-sync.php']],
     ['Verify Microsoft event-edit identity', [PHP_BINARY, 'tests/microsoft-event-edit.php']],
+    ['Verify native Microsoft To Do provider', [PHP_BINARY, 'tests/microsoft-todo-provider.php']],
+    ['Verify Microsoft To Do account gateway', [PHP_BINARY, 'tests/microsoft-todo-gateway.php']],
+    ['Verify Microsoft To Do calendar synchronization', [PHP_BINARY, 'tests/microsoft-todo-calendar-sync.php']],
+    ['Verify Microsoft To Do task projection', [PHP_BINARY, 'tests/microsoft-todo-projection.php']],
+    ['Verify Microsoft To Do calendar writes', [PHP_BINARY, 'tests/microsoft-todo-calendar-write.php']],
     ['Verify CalDAV incremental synchronization', [PHP_BINARY, 'tests/caldav-incremental-sync.php']],
     ['Verify iCalendar parsed feed cache', [PHP_BINARY, 'tests/icalendar-parse-cache.php']],
     ['Run OpenCalendar provider and integration tests', [PHP_BINARY, 'tests/calendar-provider.php']],
@@ -41,7 +80,7 @@ $commands = [
     ['Check public PHPDoc coverage', [PHP_BINARY, 'tests/phpdocs.php']],
     ['Check Symcon Strict compliance', [PHP_BINARY, 'tests/symcon-strict.php']],
     ['Run CalDAV provider tests', [PHP_BINARY, 'tests/caldav.php']],
-    ['Run CalDAV HTTP integration tests', ['bash', 'tests/run-caldav-http.sh']]
+    ['Run CalDAV HTTP integration tests', [$bash, 'tests/run-caldav-http.sh']]
 ];
 
 foreach ($commands as [$label, $command]) {

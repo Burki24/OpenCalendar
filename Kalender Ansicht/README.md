@@ -5,11 +5,18 @@ gemeinsamen responsiven Darstellung zusammen. Sie kann direkt in der
 Symcon-Kachelvisualisierung oder über eine WebContent-Variable in IPSView
 verwendet werden.
 
+Die IPSView-Aktionsverbindung übernimmt die Adresse automatisch aus dem
+Client-Kontext: aus der HTML-Basisadresse der App, der eigenen HTTP(S)-Seite
+oder bei eingebetteten HTML-Boxen aus dem Elternfenster bzw. dessen Referrer.
+Es ist keine zusätzliche Serveradresse einzugeben und keine Connect-Verbindung
+für den lokalen Zugriff erforderlich. Fehlt jeder verwertbare Verbindungskontext,
+zeigt der Speicherdialog einen Hinweis zum Neuladen; es werden keine Server
+geraten und fehlgeschlagene Schreibzugriffe nicht automatisch wiederholt.
+
 ## Voraussetzungen
 
 - Symcon ab Version 9.0 mit Kachelvisualisierung und HTML-SDK
-- mindestens eine über den Kalender Konfigurator angelegte und synchronisierte
-  **Kalender**-Instanz
+- mindestens eine über den Kalender Konfigurator angelegte **Kalender**-Instanz
 - für IPSView ein HTML-Box-Steuerelement mit Browser-Renderer
 
 ## Schnellstart für die Kachelvisualisierung
@@ -17,10 +24,19 @@ verwendet werden.
 1. Über **Instanz hinzufügen** eine Instanz **Kalender Ansicht** erstellen.
 2. In der Liste **Kalender** für jede gewünschte Zeile eine Kalender-Instanz
    auswählen und **Aktiviert** einschalten.
-3. Standardansicht, Kachel-Schriftgröße, geladenen Terminzeitraum und
-   maximale Terminanzahl festlegen. Die Kachel-Schriftgröße
+3. Standardansicht, **Standardkalender für neue Termine**, Kachel-Schriftgröße,
+   geladenen Terminzeitraum und maximale Terminanzahl festlegen. Der
+   Standardkalender kann aus den aktivierten, beschreibbaren Kalendern gewählt
+   werden. Ist er später nicht mehr verfügbar oder schreibgeschützt, verwendet
+   OpenCalendar automatisch den ersten beschreibbaren Kalender. Die Kachel-Schriftgröße
    kann zwischen 50 und 200 Prozent eingestellt werden; 100 Prozent entspricht
    der bisherigen Darstellung.
+   Unter **Schnellansichten** können zusätzlich beispielsweise fünf häufig
+   genutzte Ansichten mit je einem
+   Buchstaben als direkte Schaltflächen in der Kalender-Kopfzeile eingerichtet
+   werden, zum Beispiel **T** für Tage, **A** für Arbeitswoche und **W** für
+   Ganze Woche. Die Reihenfolge der Listeneinträge bestimmt die Reihenfolge der
+   Schaltflächen. Ohne Einträge bleibt die bisherige Kopfzeile unverändert.
 4. Den aufklappbaren Bereich **Anzeigeoptionen** öffnen. Dort sind die
    allgemeinen Zusatzinformationen wie Wochenenden, Kalendername, Ort und
    Beschreibung sowie die ansichtsspezifische Matrix für Terminanzahl,
@@ -29,6 +45,13 @@ verwendet werden.
 5. Über **Ansichtszeiträume** die sichtbare Länge jeder Darstellung festlegen.
 6. Die Konfiguration übernehmen und **Kalender synchronisieren** ausführen.
 7. Die Instanz in der Symcon-Kachelvisualisierung platzieren.
+
+Ab Symcon 9.1 kann der Titel der Kalender-Ansicht in den Objekteinstellungen
+ausgeblendet werden. Nur dann entfällt der zusätzliche Freiraum oberhalb der
+Kalender-Bedienleiste. Bleibt der Maximieren-Button sichtbar, hält die Ansicht
+seine obere rechte Ecke frei; in schmalen Kacheln bleibt dafür der obere Abstand
+erhalten. Bei sichtbarem Titel sowie unter Symcon 9.0 bleibt der bisherige
+Abstand erhalten. Die IPSView-Ausgabe ist davon unabhängig.
 
 Mit **Alle Kalenderinstanzen auswählen** werden alle im System vorhandenen
 Kalender-Instanzen im aktuell geöffneten Konfigurationsformular eingetragen und
@@ -42,6 +65,17 @@ Sicherung wiederhergestellt, soweit diese verfügbar ist.
 ## Funktionsumfang
 
 - Agenda-, Listen-, Tage-, Wochen- und Monatsansicht
+- optionale Schnellansichten mit frei gewählten Buchstaben direkt in der
+  Kopfzeile von Kachel und IPSView; bis 560 CSS-Pixel Kachelbreite stehen
+  Navigation, Datum und Ansichtsauswahl oben, Schnellansichten sowie Filter und
+  Aktualisieren darunter. Auf breiteren Tablets bleibt die Kopfzeile einzeilig.
+  Bei Platzmangel lassen sich die Schnellansichten seitlich wischen.
+  Das Auswahlmenü mit allen sechs Ansichten bleibt verfügbar.
+  Der Wechsel speichert die aktive Ansicht wie bisher nur auf dem jeweiligen
+  Client und ändert nicht die Standardansicht der Instanz.
+- kompakte numerische Datumsangaben in schmalen Kacheln und mobilen
+  IPSView-Ansichten, zum Beispiel **1.–7.10.26** statt ausgeschriebener
+  Monatsnamen; auf breiten Anzeigen bleibt die ausführliche Überschrift erhalten
 - Wochenansicht als festes Wochenraster: In **Arbeitswoche** stehen Montag bis
   Freitag nebeneinander, in **Ganze Woche** Montag bis Sonntag; mehrere sichtbare
   Wochen werden vollständig untereinander angeordnet
@@ -57,10 +91,12 @@ Sicherung wiederhergestellt, soweit diese verfügbar ist.
 - optional und je Darstellung separat einblendbare Terminanzahl pro Tag in
   Agenda-, Tage- und Wochenansicht
 - Zusammenführen beliebig vieler ausgewählter Kalender
+- pro Kalenderansicht wählbarer Standardkalender für neu erstellte Termine
 - Farben der einzelnen Kalender und Termine
 - optionale Anzeige von Kalendername, Anlass bei Jahresereignissen, Ort und Beschreibung
 - Navigation innerhalb des dargestellten Zeitraums; passt die Tage-, Wochen- oder Monatsansicht vollständig in die verfügbare Breite, kann auf Touch-Geräten zusätzlich horizontal gewischt werden (links = weiter, rechts = zurück). Muss das Raster auf einer schmalen Anzeige horizontal scrollen, verschiebt die Wischgeste stattdessen das Raster; die Zeitraum-Navigation bleibt über die Pfeilschaltflächen erreichbar
-- manuelle Synchronisation aller ausgewählten Kalender
+- manuelle Synchronisation aller ausgewählten Kalender; bei lokalen Kalendern wird
+  ausschließlich deren Anzeige-Cache aus den in Symcon gespeicherten Originalterminen neu aufgebaut
 - Erstellen, Bearbeiten, Verschieben und Löschen von Terminen in beschreibbaren Kalendern
 - Erstellen ganztägiger Aufgabentermine und Aufgabenserien, direktes Erledigen
   oder Wiederöffnen in den Termindetails und tägliches Weiterschieben offener
@@ -201,7 +237,7 @@ Alle eingebetteten Dialoge verwenden ein gemeinsames responsives OpenCalendar-Mo
 
 Erstellen- und Bearbeitungsdialoge werden bereits eingeblendet, bevor aufwendigere Dialogdaten vollständig vorbereitet sind. Beim Erstellen erscheint das Grundformular sofort; Wiederholungs- und Erinnerungsoptionen werden direkt anschließend initialisiert. Beim Bearbeiten werden zunächst die bereits synchronisierten Termindaten schreibgeschützt angezeigt, während OpenCalendar die aktuelle Provider-Identität einschließlich schreibrelevanter Daten wie ETag erneut verifiziert. Erst nach erfolgreicher Provider-Antwort wird der Editor freigeschaltet. Dadurch bleibt die bestehende Schreibsicherheit erhalten, ohne dass der Dialog während der Provider-Abfrage unsichtbar bleibt.
 
-Ein Klick auf einen Termin öffnet zunächst eine reine Termindetail-Ansicht mit Kalender, Beginn, Ende, Ort und Beschreibung. Bei unterstützten Google-, Microsoft-, Apple-iCloud- und CalDAV-Serienvorkommnissen stehen beim Bearbeiten und Löschen **Nur diesen Termin**, **Diesen und alle folgenden Termine** und **Gesamte Serie** zur Wahl. Für die vollständige Serie lädt OpenCalendar zuerst den Parent-Termin; bei CalDAV wird die bereits beim Synchronisieren bekannte Kalenderobjekt-URL direkt verwendet, sodass keine erneute UID-Suche notwendig ist. Bei „Diesen und alle folgenden Termine“ werden zusätzlich das konkrete Zielvorkommnis und die verbleibende Serienlänge verifiziert, bevor der Editor geöffnet wird. Unterstützte RRULEs werden nur geteilt, wenn OpenCalendar sie verlustfrei abbilden kann; komplexere Regeln werden nicht automatisch vereinfacht. Bei CalDAV wird beim Bearbeiten zunächst der neue zukünftige Serienteil angelegt und erst danach die ursprüngliche Ressource gekürzt. Bei Microsoft-Onlinebesprechungen und Serien mit Anhängen wird kein neuer Serienteil erzeugt, um Besprechungs- oder Anhangsdaten nicht zu beschädigen. Schreibgeschützte Kalender bleiben geschützt.
+Ein Klick auf einen Termin öffnet zunächst eine reine Termindetail-Ansicht mit Kalender, Beginn, Ende, Ort und Beschreibung. Leere HTML-Beschreibungen, die ein Anbieter unmittelbar nach dem Anlegen als HTML-Hülle zurückgibt, werden dabei nicht als großes leeres Feld angezeigt; echte HTML-Inhalte bleiben sichtbar. Bei unterstützten Google-, Microsoft-, Apple-iCloud- und CalDAV-Serienvorkommnissen stehen beim Bearbeiten und Löschen **Nur diesen Termin**, **Diesen und alle folgenden Termine** und **Gesamte Serie** zur Wahl. Für die vollständige Serie lädt OpenCalendar zuerst den Parent-Termin; bei CalDAV wird die bereits beim Synchronisieren bekannte Kalenderobjekt-URL direkt verwendet, sodass keine erneute UID-Suche notwendig ist. Bei „Diesen und alle folgenden Termine“ werden zusätzlich das konkrete Zielvorkommnis und die verbleibende Serienlänge verifiziert, bevor der Editor geöffnet wird. Unterstützte RRULEs werden nur geteilt, wenn OpenCalendar sie verlustfrei abbilden kann; komplexere Regeln werden nicht automatisch vereinfacht. Bei CalDAV wird beim Bearbeiten zunächst der neue zukünftige Serienteil angelegt und erst danach die ursprüngliche Ressource gekürzt. Bei Microsoft-Onlinebesprechungen und Serien mit Anhängen wird kein neuer Serienteil erzeugt, um Besprechungs- oder Anhangsdaten nicht zu beschädigen. Schreibgeschützte Kalender bleiben geschützt.
 
 Beim Erstellen eines Termins bieten beschreibbare Google-, Microsoft-, Apple-iCloud- und CalDAV-Kalender zusätzlich den Bereich **Wiederholen**. Unterstützt werden tägliche, wöchentliche, monatliche und jährliche Serien, ein frei wählbares Intervall, bei wöchentlichen Serien mehrere Wochentage sowie die Endarten **Nie**, **Nach Anzahl** und **Am Datum**. Die Serienoption erscheint nur bei Kalendern, deren Provider das Anlegen von Serienterminen ausdrücklich unterstützt. Für zeitgebundene Google-Serien wird die Kalenderzeitzone verwendet; bei Microsoft und CalDAV dient die Zeitzone des Clients als Rückfallwert, wenn der Kalender selbst keine Zeitzone bereitstellt. CalDAV-Serien werden mit `TZID` und passendem `VTIMEZONE` gespeichert.
 
@@ -329,10 +365,22 @@ IPSView-HTML-Box. In beschreibbaren Kalendern lassen sich dort außerdem Termine
 erstellen, bearbeiten, zwischen beschreibbaren Kalendern verschieben und löschen. Die kompakte Schaltfläche **＋ Termin** bleibt
 sichtbar, ist ohne beschreibbaren Kalender jedoch deaktiviert.
 
+Die erzeugte WebContent-Variable wird dauerhaft über ihre Objekt-ID zugeordnet.
+Nach dem Update und einmaligem Anwenden der Instanzkonfiguration darf sie im
+Objektbaum in eine andere Kategorie verschoben oder umbenannt werden. Aktualisierung
+und **IPSView-HTML neu generieren** verwenden weiterhin dieselbe Variable; es wird
+keine zusätzliche Ausgabe angelegt. Die Kalender-Ansicht-Instanz bleibt ihr Besitzer.
+Vorhandene Variablen direkt unter der Instanz werden beim Update übernommen.
+Bereits vorher verschobene Ausgaben oder entstandene Duplikate werden nicht anhand
+ihres Namens automatisch zugeordnet oder gelöscht. Für die Übernahme einer solchen
+Ausgabe muss zuerst die eindeutige ursprüngliche Zuordnung unter der Instanz
+wiederhergestellt werden.
+
 Wird die IPSView-Ausgabe später deaktiviert, bleibt die vorhandene Variable mit
 ihrer Objekt-ID, Position und bestehenden Verknüpfungen erhalten, wird aber nicht
 mehr aktualisiert. In der Instanz erscheint dann eine eigene Löschaktion. Erst
-nach ausdrücklicher Bestätigung wird die Variable entfernt.
+nach ausdrücklicher Bestätigung wird die Variable entfernt, auch wenn sie inzwischen
+in einer anderen Kategorie liegt.
 
 ### IPSView-Verbindung absichern
 
@@ -621,3 +669,13 @@ Terminfarben bleiben davon unabhängige fachliche Inhaltsfarben.
 ### Tagesübersicht der Kalenderansichten
 
 In der Monatsansicht öffnet ein Klick auf die Tageszahl oder einen freien Bereich der Tageszelle die Tagesübersicht; der Hinweis `+ weitere` bleibt ebenfalls direkt anklickbar. In der Tage-, Wochen- und Arbeitswochenansicht öffnet ein Klick auf einen freien Bereich des jeweiligen Tages dieselbe Tagesübersicht. In der Agenda öffnet die Tagesüberschrift die gleiche Übersicht und ist auch per Tastatur mit Eingabe- oder Leertaste bedienbar. Die Übersicht zeigt alle Termine des Tages, ganztägige zuerst und anschließend zeitgebundene chronologisch, sowie die Terminanzahl. Ein Klick auf einen Termin öffnet zunächst die Termindetail-Ansicht. Von dort kann ein schreibbarer Einzeltermin gezielt bearbeitet werden. Ist mindestens ein beschreibbarer Kalender verfügbar, kann über **Termin an diesem Tag erstellen** direkt ein neuer Termin für den ausgewählten Tag angelegt werden. Für einen zukünftigen ausgewählten Tag wird 09:00 Uhr vorgeschlagen; für den heutigen Tag wird nach Möglichkeit die nächste volle Stunde verwendet. Kurz vor Mitternacht bleibt der Start am aktuellen Tag, statt auf eine bereits vergangene Uhrzeit zurückzufallen. Der zusätzliche Floating-Button zum Erstellen eines Termins bleibt in Agenda und Liste als direkter Schnellzugriff sichtbar.
+
+## Debug-Ausgaben
+
+Der native Symcon-Debug zeigt deutsche Meldungen mit Funktion, Zeile, Vorgang
+und Ergebnis sowie Aktionen und Schnittstellenübergaben. Private Inhalte und
+Zugangsdaten bleiben geschützt. Details und Abnahme: [Debug-Aufbau](../docs/DEBUG_OUTPUT.md).
+
+### Mausradbedienung in IPSView
+
+Kachel und IPSView-Ausgabe nutzen die gemeinsame Eingabebehandlung aus `Symcon_ModuleHelper`. Sie normalisiert Mausrad-Deltas und ermittelt bei von IPSView umadressierten Ereignissen den Bereich unter der letzten tatsächlichen Mausposition. Listen und Dialoginhalte scrollen innerhalb ihres Bereichs; vorhandener Karten-/Diagrammzoom bleibt komponentenspezifisch. Verschachtelte teilnehmende HTML-Frames geben ausschließlich UI-Eingaben über den zentralen Vertrag weiter. Ctrl-/Meta-Mausrad bleibt beim Host. Eine vollständige Funktionsprüfung unterscheidet den IPSView-Webclient von der nativen IPSView-App.

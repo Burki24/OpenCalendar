@@ -5,7 +5,8 @@ Es findet die verfügbaren Kalender und stellt sie dem Kalender Konfigurator und
 den erzeugten Kalender-Instanzen zur Verfügung.
 
 Unterstützt werden Apple iCloud, Google Calendar, Microsoft 365/Outlook.com,
-generische CalDAV-Server sowie mehrere schreibgeschützte ICS-/Webcal-Feeds.
+generische CalDAV-Server, mehrere schreibgeschützte ICS-/Webcal-Feeds sowie
+lokale Symcon-Kalender ohne externe Verbindung.
 
 ## Voraussetzungen
 
@@ -21,9 +22,10 @@ generische CalDAV-Server sowie mehrere schreibgeschützte ICS-/Webcal-Feeds.
 2. Das Konto sinnvoll benennen, besonders wenn mehrere Konten verwendet werden.
 3. Den Anbieter auswählen und die im passenden Abschnitt beschriebenen Angaben
    eintragen beziehungsweise den OAuth-Login ausführen.
-4. **Verbindung testen** verwenden. Der Test muss erfolgreich sein und die
-   erwartete Anzahl gefundener Kalender melden.
-5. Die Konfiguration übernehmen und **Jetzt synchronisieren** ausführen.
+4. Bei externen Anbietern **Verbindung testen** verwenden. Der Test muss
+   erfolgreich sein und die erwartete Anzahl gefundener Kalender melden.
+5. Die Konfiguration übernehmen und bei externen Anbietern **Jetzt
+   synchronisieren** ausführen.
 6. Anschließend einen **Kalender Konfigurator** öffnen oder erstellen, mit diesem
    Konto verbinden und dort die gewünschten Kalender-Instanzen anlegen.
 
@@ -31,6 +33,24 @@ Mit **Kontostatus anzeigen** lassen sich der Verbindungszustand, die letzte
 Synchronisation und gegebenenfalls bereinigte Fehlermeldungen kontrollieren.
 
 ## Anbieter einrichten
+
+### Symcon-Kalender
+
+Ein lokales Konto erstellt genau einen beschreibbaren Kalender, dessen Termine
+nur in Symcon gespeichert werden. Es werden keine Zugangsdaten, keine OAuth-
+Berechtigungen und keine Netzwerkverbindungen verwendet.
+
+1. Als Anbieter **Symcon - Kalender** wählen.
+2. Einen Kalendernamen und eine Farbe über den Farbwähler festlegen.
+3. Das Konto aktivieren und die Konfiguration übernehmen.
+4. Einen damit verbundenen **Kalender Konfigurator** öffnen und den angebotenen
+   lokalen Kalender über **Erstellen** anlegen.
+
+Das Konto dient dabei ausschließlich als gewohnter organisatorischer Einstieg
+für den Konfigurator. Es führt keinen Synchronisationszeitplan aus. Die
+Originaltermine liegen dauerhaft in der erzeugten Kalenderinstanz; Cache leeren
+löscht sie nicht. Konto und Kalenderinstanz müssen in Symcon-Backups enthalten
+sein. Die Originaldaten eines lokalen Kalenders sind auf 16 MiB begrenzt.
 
 ### Apple iCloud
 
@@ -102,6 +122,9 @@ als beschreibbar erkannt; `reader` wird schreibgeschützt angeboten.
 `freeBusyReader`-Einträge werden nicht angelegt, weil sie keine Termindetails
 liefern.
 
+In beschreibbaren Google-Kalendern können bestehende Termine auch zwischen
+Uhrzeit und ganztägig umgestellt werden.
+
 **Google-Konto trennen** widerruft den Token nach Möglichkeit bei Google und
 entfernt die lokal gespeicherten OAuth-Daten. Verbindungen aus älteren
 OpenCalendar-Versionen mit einer persönlichen Google-Client-ID müssen einmal neu
@@ -116,11 +139,14 @@ Konten wie Outlook.com.
 1. Eine aktive Symcon-Connect-Verbindung sicherstellen.
 2. Als Anbieter **Microsoft 365** wählen und die Konfiguration übernehmen.
 3. **Microsoft-Konto verbinden** aufrufen.
-4. Bei Microsoft anmelden und den Kalenderzugriff bestätigen.
+4. Bei Microsoft anmelden und den Kalender- und Microsoft-To-Do-Zugriff bestätigen.
 5. Zur Instanz zurückkehren und **Jetzt synchronisieren** ausführen.
 
-OpenCalendar verwendet delegierten Kalenderzugriff. Mail, Kontakte, OneDrive,
-Teams und andere Microsoft-Graph-Bereiche werden nicht angefordert. Microsofts
+OpenCalendar verwendet die delegierten Berechtigungen `Calendars.ReadWrite`,
+`Tasks.ReadWrite` und `offline_access`. Die Aufgabenberechtigung dient dem Lesen
+der To-Do-Listen und der Bearbeitung nativer Aufgaben in einer vom Anwender
+ausgewählten Liste. Mail, Kontakte, OneDrive und Teams werden nicht
+angefordert. Microsofts
 `canEdit`-Angabe bestimmt, ob ein Kalender beschreibbar oder schreibgeschützt
 angelegt wird. In beschreibbaren Microsoft-Kalendern können außerdem neue tägliche,
 wöchentliche, monatliche und jährliche Terminserien mit Intervall sowie den
@@ -248,8 +274,10 @@ Versionen. Anschließend muss erneut synchronisiert werden.
 
 Eigenschaft | Beschreibung
 --- | ---
-Aktiv | Aktiviert die regelmäßige Kontosynchronisation
-Anbieter | Apple iCloud, Google Calendar, Microsoft 365, CalDAV oder ICS/Webcal
+Aktiv | Aktiviert die regelmäßige Kontosynchronisation; bei lokalen Konten aktiviert es die Bereitstellung für den Konfigurator
+Anbieter | Apple iCloud, Google Calendar, Microsoft 365, CalDAV, ICS/Webcal oder Symcon - Kalender
+Lokaler Kalendername | Name des einen lokalen Kalenders dieses Kontos
+Kalenderfarbe | Farbe des lokalen Kalenders im Format `#RRGGBB`
 Server-URL | CalDAV-Basisadresse beziehungsweise bei älteren ICS-Konfigurationen eine einzelne Feed-URL
 Authentifizierung | Bei ICS Auswahl zwischen URL/Zugriffsschlüssel, Benutzername/Passwort und automatischem Kompatibilitätsmodus
 Benutzername | Kontoname oder E-Mail-Adresse; bei ICS nur im Modus Benutzername/Passwort erforderlich
@@ -353,3 +381,9 @@ bool IPSKALACC_DisconnectMicrosoft(int $InstanzID);
 ```
 
 Methoden mit komplexen Rückgabewerten liefern JSON.
+
+## Debug-Ausgaben
+
+Der native Symcon-Debug zeigt deutsche Meldungen mit Funktion, Zeile, Vorgang
+und Ergebnis sowie Aktionen und Schnittstellenübergaben. Private Inhalte und
+Zugangsdaten bleiben geschützt. Details und Abnahme: [Debug-Aufbau](../docs/DEBUG_OUTPUT.md).

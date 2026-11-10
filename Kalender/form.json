@@ -6,6 +6,12 @@
             "caption": "Active"
         },
         {
+            "type": "Label",
+            "name": "LocalCalendarNotice",
+            "caption": "This is a local Symcon calendar. It has no external connection or synchronization. Events are stored permanently in this instance and must be included in backups.",
+            "visible": false
+        },
+        {
             "type": "Select",
             "name": "UpdateSchedule",
             "caption": "Synchronization schedule",
@@ -84,6 +90,29 @@
             "suffix": " days",
             "minimum": 1,
             "maximum": 1095
+        },
+        {
+            "type": "Select",
+            "name": "MicrosoftTaskListID",
+            "caption": "Microsoft To Do task list",
+            "visible": false,
+            "options": [
+                {
+                    "caption": "Do not include Microsoft To Do tasks",
+                    "value": ""
+                }
+            ]
+        },
+        {
+            "type": "CheckBox",
+            "name": "UseDisplayColor",
+            "caption": "Use custom display color"
+        },
+        {
+            "type": "SelectColor",
+            "name": "DisplayColor",
+            "caption": "Display color",
+            "allowTransparent": false
         },
         {
             "type": "ExpansionPanel",

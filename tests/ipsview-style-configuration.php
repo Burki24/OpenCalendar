@@ -3,8 +3,49 @@
 declare(strict_types=1);
 
 use Burki24\SymconModuleHelper\IPSViewControlThemeHelper;
+use Burki24\SymconModuleHelper\IPSViewStyleConfigurationHelper;
 
 require_once __DIR__ . '/../libs/helper/IPSViewControlThemeHelper.php';
+require_once __DIR__ . '/../libs/helper/IPSViewStyleConfigurationHelper.php';
+
+final class IPSViewStyleConfigurationConsumer
+{
+    use IPSViewStyleConfigurationHelper {
+        IPSViewStyleFormItems as public formItems;
+    }
+
+    protected function ReadPropertyInteger(string $name): int
+    {
+        return $name === 'IPSViewStyleSource' ? self::IPSVIEW_STYLE_SOURCE_LIGHT : 0;
+    }
+
+    protected function ReadPropertyBoolean(string $name): bool
+    {
+        return false;
+    }
+
+    protected function ReadPropertyFloat(string $name): float
+    {
+        return 0.0;
+    }
+
+    protected function ReadPropertyString(string $name): string
+    {
+        return '';
+    }
+}
+
+/** @return list<string> */
+function nativeStyleFormFamilies(IPSViewStyleConfigurationConsumer $consumer): array
+{
+    foreach ($consumer->formItems() as $item) {
+        if (($item['name'] ?? '') === 'IPSViewStyleNativeColorsPanel') {
+            return array_values(array_column($item['items'], 'name'));
+        }
+    }
+
+    throw new RuntimeException('The native IPSView color panel is missing.');
+}
 
 function assertIPSViewStyleConfiguration(bool $condition, string $message): void
 {
@@ -49,10 +90,13 @@ assertIPSViewStyleConfiguration(
         && !str_contains($configurationHelperSource, "\$decoded['ColorPage'] ?? \$decoded['ColorView']"),
     'Missing ColorView must resolve to the IPSView default #404040 and must never fall back to ColorPage.'
 );
+$defaultConsumer = new IPSViewStyleConfigurationConsumer();
 assertIPSViewStyleConfiguration(
-    str_contains($configurationHelperSource, 'foreach (IPSViewControlThemeHelper::families() as $family => $fields)')
-        && str_contains($configurationHelperSource, "IPSViewControlThemeHelper::FAMILY_CALENDAR    => 'IPSViewStyleNativeCalendarColors'"),
-    'The shared configuration helper must expose all 15 native IPSView color families.'
+    nativeStyleFormFamilies($defaultConsumer) === array_map(
+        static fn (string $family): string => 'IPSViewStyleNativeFamily_' . $family,
+        array_keys(IPSViewControlThemeHelper::families())
+    ),
+    'The shared configuration helper must expose all 15 native IPSView color families by default.'
 );
 assertIPSViewStyleConfiguration(
     str_contains($moduleSource, 'use Burki24\\SymconModuleHelper\\IPSViewStyleConfigurationHelper;')

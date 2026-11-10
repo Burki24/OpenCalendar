@@ -28,7 +28,7 @@ foreach ([$calendar, $account] as $source) {
         'Calendar modules must load the vendored DebugHelper.'
     );
     assertDebugIntegration(
-        str_contains($source, 'use DebugHelper;'),
+        str_contains($source, 'use \\Burki24\\SymconModuleHelper\\DebugFlowHelper;'),
         'Calendar modules must activate the DebugHelper trait.'
     );
     assertDebugIntegration(
@@ -37,58 +37,24 @@ foreach ([$calendar, $account] as $source) {
     );
 }
 
-foreach ([
-    'SynchronizationStart',
-    'SynchronizationCompleted',
-    'CalendarMetadata',
-    'EventTransferStart',
-    'EventTransferMetadata',
-    'EventTransferCompleted',
-    'EventCreate',
-    'EventUpdate',
-    'EventDelete',
-    'CalendarError'
-] as $message) {
-    assertDebugIntegration(
-        str_contains($calendar, "SendSafeDebug('" . $message . "'"),
-        'Calendar debug contract is missing message: ' . $message
-    );
-}
-
-foreach ([
-    'ConnectionTestStart',
-    'ConnectionTestCompleted',
-    'AccountSynchronizationStart',
-    'AccountSynchronizationCompleted',
-    'CalendarDiscoveryStart',
-    'CalendarDiscoveryCompleted',
-    'ProviderCreate',
-    'ProviderError'
-] as $message) {
-    assertDebugIntegration(
-        str_contains($account, "SendSafeDebug('" . $message . "'"),
-        'Calendar Account debug contract is missing message: ' . $message
-    );
+foreach ([$calendar, $account, $gateway] as $source) {
+    assertDebugIntegration(str_contains($source, 'DebugFlowStart(__FUNCTION__, __LINE__'), 'Debug starts must use the actual source location.');
+    assertDebugIntegration(str_contains($source, 'finally {'), 'Every start must have a finally-protected end.');
+    assertDebugIntegration(str_contains($source, 'DebugFlowEnd(__FUNCTION__, __LINE__'), 'Every instrumented function needs an end.');
+    assertDebugIntegration(!str_contains($source, 'SendSafeDebugException('), 'Raw exception messages must not be passed to the legacy helper.');
 }
 
 assertDebugIntegration(
     !str_contains($gateway, '->SendDebug('),
     'Calendar Account gateway must use the safe debug wrapper instead of direct SendDebug calls.'
 );
-foreach (['ChildRequest', 'ChildRequestCompleted', 'ChildRequestError', 'ProviderEvents', 'RecurrenceExpansion'] as $message) {
-    assertDebugIntegration(
-        str_contains($gateway, "SendSafeDebug('" . $message . "'"),
-        'Calendar Account gateway debug contract is missing message: ' . $message
-    );
-}
-
 assertDebugIntegration(
-    str_contains($calendar, "'changedFields'      => array_values(array_keys(\$changes))"),
+    str_contains($calendar, "'GeänderteFelder'        => array_values(array_keys(\$changes))"),
     'Event update debug output must log changed field names instead of event payload values.'
 );
 assertDebugIntegration(
-    str_contains($gateway, "'requestFields'     => array_values(array_keys(\$request))"),
-    'Gateway debug output must log request field names instead of request payload values.'
+    str_contains($gateway, "'Anfragefelder'     => count(\$request)"),
+    'Gateway debug output must log request field count instead of untrusted request content.'
 );
 assertDebugIntegration(
     str_contains($gateway, "\$operation !== 'ReadEventsTransferPage'"),

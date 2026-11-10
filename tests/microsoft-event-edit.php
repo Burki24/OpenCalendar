@@ -2,10 +2,13 @@
 
 declare(strict_types=1);
 
+require_once __DIR__ . '/../libs/helper/DebugFlowHelper.php';
+
 require_once __DIR__ . '/../Kalender Konto/traits/ChildGatewayTrait.php';
 
 final class MicrosoftEventEditMatchHarness
 {
+    use \Burki24\SymconModuleHelper\DebugFlowHelper;
     use KalenderKontoChildGatewayTrait;
 
     /**

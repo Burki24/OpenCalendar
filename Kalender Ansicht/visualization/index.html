@@ -16,8 +16,12 @@
             <button class="icon-button" id="today-button" title="Today" aria-label="Today">●</button>
             <button class="icon-button" id="next-button" title="Next" aria-label="Next">›</button>
         </div>
-        <div class="toolbar-title" id="period-title"></div>
+        <div class="toolbar-title" id="period-title">
+            <span class="period-title-wide" id="period-title-wide"></span>
+            <span class="period-title-compact" id="period-title-compact"></span>
+        </div>
         <div class="toolbar-spacer"></div>
+        <div class="quick-view-buttons hidden" id="quick-view-buttons" role="group" aria-label="Quick views"></div>
         <button class="view-selector-button" id="view-selector-button" type="button" aria-haspopup="dialog"
             aria-controls="view-selector-dialog" aria-expanded="false">
             <svg class="view-selector-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
@@ -108,7 +112,16 @@
             </div>
             <label class="checkbox-row" id="event-task-row"><input type="checkbox" id="event-task"> <span id="event-task-label">Task appointment</span></label>
             <label class="checkbox-row hidden" id="event-task-completed-row"><input type="checkbox" id="event-task-completed"> <span id="event-task-completed-label">Completed</span></label>
-            <label class="checkbox-row hidden" id="event-task-follow-planned-row"><input type="checkbox" id="event-task-follow-planned"> <span id="event-task-follow-planned-label">Move planned follow-up appointments</span></label>
+            <div class="form-row hidden" id="event-task-roll-forward-row">
+                <label for="event-task-roll-forward" data-i18n="When this task becomes overdue">When this task becomes overdue</label>
+                <select id="event-task-roll-forward">
+                    <option value="occurrence" data-i18n="Continue only this occurrence">Continue only this occurrence</option>
+                    <option value="following" data-i18n="Move this and all following occurrences">Move this and all following occurrences</option>
+                    <option value="disabled" data-i18n="Do not automatically reschedule">Do not automatically reschedule</option>
+                </select>
+            </div>
+            <div class="dialog-note hidden" id="event-microsoft-todo-recurrence-note" role="note"
+                data-i18n="Microsoft To Do manages this task series. The next task appears after the current task is completed.">Microsoft To Do manages this task series. The next task appears after the current task is completed.</div>
             <label class="checkbox-row" id="event-all-day-row"><input type="checkbox" id="event-all-day"> <span id="all-day-label">All day</span></label>
             <div class="form-row two" id="event-anniversary-row">
                 <div class="form-row">
@@ -462,6 +475,14 @@ window.SYMC_VISUALIZATION = {{BOOTSTRAP_JSON}};
             .trim();
     }
 
+    function htmlDescriptionHasDisplayableContent(source) {
+        if (htmlDescriptionToPlainText(source) !== '') return true;
+        const parsed = new DOMParser().parseFromString(source, 'text/html');
+        if (parsed.body?.querySelector('hr')) return true;
+        return Array.from(parsed.body?.querySelectorAll('img[src]') || [])
+            .some(image => sanitizeImageSource(image.getAttribute('src')) !== '');
+    }
+
     function sanitizeLink(value) {
         const href = String(value || '').trim();
         return /^(?:https?:|mailto:)/i.test(href) ? href : '';
@@ -562,6 +583,11 @@ window.SYMC_VISUALIZATION = {{BOOTSTRAP_JSON}};
         if (!detailsTarget || detailsTarget.querySelector('.open-calendar-html-description')) return;
         const source = htmlDescriptionSource(detailsTarget.textContent);
         if (!source) return;
+        if (!htmlDescriptionHasDisplayableContent(source)) {
+            detailsTarget.textContent = '';
+            detailsTarget.parentElement?.classList.add('hidden');
+            return;
+        }
         renderHtmlDescription(source);
     }
 

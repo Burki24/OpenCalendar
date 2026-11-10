@@ -50,8 +50,8 @@ Einmalige Einrichtung:
 1. In Microsoft Entra eine Web-App registrieren, die Konten aus beliebigen
    Organisationsverzeichnissen sowie persönliche Microsoft-Konten akzeptiert.
 2. Die genannte Redirect-URI als Web-Redirect-URI hinterlegen.
-3. Delegiert `Calendars.ReadWrite` sowie den OAuth-Scope `offline_access`
-   freigeben.
+3. Delegiert `Calendars.ReadWrite` und `Tasks.ReadWrite` sowie den OAuth-Scope
+   `offline_access` freigeben.
 4. Einen Clientschlüssel erzeugen.
 5. Client-ID, Clientschlüssel, Microsoft-Autorisierungs- und Token-Endpunkte
    sowie die benötigten Scopes unter dem Identifier

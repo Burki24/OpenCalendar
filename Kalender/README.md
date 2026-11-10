@@ -1,6 +1,6 @@
 # Kalender
 
-Das Modul repräsentiert einen einzelnen Online-Kalender.
+Das Modul repräsentiert einen einzelnen Online- oder lokalen Kalender.
 
 ## Einrichtung
 
@@ -24,6 +24,8 @@ Nach der Erstellung:
 > Schreibrechte und die korrekte Kontoverbindung vollständig ein. Das ist
 > besonders bei Konten mit mehreren Kalendern erforderlich.
 
+Lokale Kalender werden aus einem **Kalender Konto** mit dem Anbieter **Symcon - Kalender** erstellt. Der damit verbundene Konfigurator bietet genau den im Kontoformular benannten Kalender an. Er hat keine technische Anbieteridentität und keine Netzwerksynchronisierung. Seine Original-`VCALENDAR`-Objekte werden dauerhaft als Instanzdaten in Symcon gespeichert; der Anzeigecache ist davon getrennt. Das Leeren des Caches und ein Neustart löschen keine lokalen Termine. Nehmen Sie Konto und Kalenderinstanz in Ihre Backups auf. Die Summe der gespeicherten Originaldaten ist auf 16 MiB begrenzt.
+
 Nach der Erstellung durch den Konfigurator darf die Instanz im Objektbaum
 beliebig verschoben oder vom Benutzer umbenannt werden.
 
@@ -31,11 +33,13 @@ beliebig verschoben oder vom Benutzer umbenannt werden.
 
 - Abruf von CalDAV-Terminen über einen konfigurierbaren Zeitraum
 - Auflösen wiederkehrender Termine für die lokale Anzeige
-- lokaler JSON-Cache und zyklische Synchronisation
+- lokaler JSON-Cache und zyklische Synchronisation für Online-Kalender
+- lokale Kalender ohne Anbieter, OAuth oder Netzwerksynchronisierung
 - Erstellen neuer Termine sowie neuer Google-, Microsoft-, Apple-iCloud- und CalDAV-Serientermine
 - providerneutrale, eintägige ganztägige Aufgabentermine und Aufgabenserien mit
   offenem oder erledigtem Status und automatischer Fortschreibung überfälliger Aufgaben
 - Ändern und Löschen einzelner Termine sowie einzelner Google-, Microsoft-, Apple-iCloud- und CalDAV-Serienvorkommnisse
+- Wechsel bestehender Google-Termine zwischen Uhrzeit und ganztägig
 - Bearbeiten einer vollständigen Google-, Microsoft-, Apple-iCloud- oder CalDAV-Terminserie
 - Bearbeiten oder Löschen eines Google-, Microsoft-, Apple-iCloud- oder CalDAV-Serienvorkommnisses **und aller folgenden Termine** durch sicheres Teilen bzw. Kürzen der Serie
 - Löschen einer vollständigen Google-, Microsoft-, Apple-iCloud- oder CalDAV-Terminserie über ein synchronisiertes Serienvorkommnis
@@ -48,19 +52,23 @@ Google-, Microsoft-, Apple-iCloud- und CalDAV-Serien können als einzelnes Vorko
 ## Voraussetzungen
 
 - Symcon ab Version 9.0
-- eine verbundene Instanz **Kalender Konto**
-- eine über den Konfigurator zugewiesene Kalender-ID
+- für Online-Kalender eine verbundene Instanz **Kalender Konto** und eine über den Konfigurator zugewiesene Kalender-ID
+- für lokale Kalender ein verbundenes **Kalender Konto** mit dem Anbieter **Symcon - Kalender**
 
 ## Konfiguration
 
 Eigenschaft | Beschreibung
 --- | ---
-Aktiv | Aktiviert die regelmäßige Synchronisation
+Aktiv | Aktiviert die regelmäßige Synchronisation beziehungsweise die lokale Kalenderverarbeitung
 Aktualisierungsplan | Vorgegebener Rhythmus von fünf Minuten bis jährlich oder ausschließlich manuelle Synchronisation
 Benutzerdefiniertes Intervall | Eigener Abstand in Minuten; wird nur beim Zeitplan „Benutzerdefiniertes Intervall“ angezeigt
 Vergangene Termine laden | Anzahl der Tage vor dem aktuellen Datum
 Zukünftige Termine laden | Anzahl der Tage nach dem aktuellen Datum
-Kalenderidentität | Vom Konfigurator gesetzte, schreibgeschützte Anbieterinformationen
+Eigene Anzeigefarbe verwenden | Überschreibt bei einem externen Kalender dessen Farbe nur in OpenCalendar; auch für schreibgeschützte ICS-/Webcal-Kalender ohne Anbieterfarbe verfügbar
+Anzeigefarbe | Farbe für die Kachel- und IPSView-Darstellung, wenn die eigene Anzeigefarbe aktiviert ist
+Kalenderidentität | Vom Konfigurator gesetzte, schreibgeschützte Anbieterinformationen; bei lokalen Kalendern ist nur die Kalenderfarbe bearbeitbar
+
+Für einen ICS-/Webcal-Kalender ohne Farbangabe die zugehörige **Kalender**-Instanz öffnen, **Eigene Anzeigefarbe verwenden** aktivieren, die **Anzeigefarbe** wählen und die Konfiguration übernehmen. Die neue Farbe erscheint in allen Kalender-Ansichten, die diese Instanz verwenden. Der Feed und seine Farbe beim Anbieter bleiben unverändert. Wird die Option ausgeschaltet, gilt wieder die vom Anbieter gelieferte Farbe oder die bisherige Ersatzfarbe. Lokale Symcon-Kalender verwenden weiterhin das Feld **Kalenderfarbe** unter **Kalenderidentität**.
 
 Bestehende Instanzen behalten ihren bisherigen Minutenwert als benutzerdefiniertes Intervall. Monatliche und jährliche Zeitpläne werden intern täglich auf Fälligkeit geprüft, damit keine für lange Zeiträume ungeeigneten Millisekunden-Timer verwendet werden. **Jetzt synchronisieren** bleibt unabhängig vom Zeitplan jederzeit verfügbar.
 
@@ -83,7 +91,7 @@ Kalenderansicht übertragen große Terminmengen automatisch in begrenzten Seiten
 Dadurch wird weder bei der Synchronisation noch beim Aufbau der Ansicht eine
 einzelne JSON-Antwort mit sämtlichen Terminen benötigt.
 
-Ein Termin enthält unter anderem `id`, `uid`, `resourceUrl`, `etag`, `summary`, `description`, `location`, `start`, `end`, `startTimestamp`, `endTimestamp`, `allDay`, `status`, `recurrenceRule` und `recurrenceId`. Wurde der Titel durch ein ausgewähltes iCalendar-Übersetzungsprofil angepasst, enthält `originalSummary` zusätzlich den unveränderten Originaltitel. Aufgabentermine enthalten außerdem `task`, `taskCompleted`, `taskStatus` (`open` oder `completed`), `taskFollowPlanned` und einen von der Statusmarkierung bereinigten `displaySummary`. Als Jahresereignis markierte Termine erhalten zusätzlich `anniversaryType`, `anniversaryDate`, `years` und `displaySummary`. Unterstützt werden `birthday`, `anniversary`, `wedding` und `death`. Für Geburtstage bleiben zusätzlich die kompatiblen Felder `birthday`, `birthDate` und `age` erhalten. Das Ausgangsdatum wird lokal in OpenCalendar gespeichert; der eigentliche Titel beim Kalenderanbieter bleibt unverändert.
+Ein Termin enthält unter anderem `id`, `uid`, `resourceUrl`, `etag`, `summary`, `description`, `location`, `start`, `end`, `startTimestamp`, `endTimestamp`, `allDay`, `status`, `recurrenceRule` und `recurrenceId`. Wurde der Titel durch ein ausgewähltes iCalendar-Übersetzungsprofil angepasst, enthält `originalSummary` zusätzlich den unveränderten Originaltitel. Aufgabentermine enthalten außerdem `task`, `taskCompleted`, `taskStatus` (`open` oder `completed`), `taskRollForwardScope` (`occurrence`, `following` oder `disabled`), das kompatible abgeleitete Feld `taskFollowPlanned` und einen von der Statusmarkierung bereinigten `displaySummary`. Als Jahresereignis markierte Termine erhalten zusätzlich `anniversaryType`, `anniversaryDate`, `years` und `displaySummary`. Unterstützt werden `birthday`, `anniversary`, `wedding` und `death`. Für Geburtstage bleiben zusätzlich die kompatiblen Felder `birthday`, `birthDate` und `age` erhalten. Das Ausgangsdatum wird lokal in OpenCalendar gespeichert; der eigentliche Titel beim Kalenderanbieter bleibt unverändert.
 
 ## PHP-Befehlsreferenz
 
@@ -104,6 +112,7 @@ string IPSKAL_UpdateEvent(int $InstanzID, string $EventJSON);
 bool IPSKAL_DeleteEvent(int $InstanzID, string $EventJSON);
 string IPSKAL_GetCalendarStatus(int $InstanzID);
 void IPSKAL_ClearCache(int $InstanzID);
+string IPSKAL_ExportLocalCalendar(int $InstanzID, string $Dateiname, bool $Überschreiben = false);
 ```
 
 `IPSKAL_GetEvents()` bleibt als kompatibler Direktabruf für kleine Datenmengen
@@ -135,6 +144,21 @@ auch `calendarColor`, `canWrite`, `timezone`, `canCreateRecurrence`, `canUpdateF
 `canUpdateSeries` und `canDeleteSeries`. Die Serienfähigkeiten und die Zeitzone werden aus den vom
 Provider erkannten Kalender-Metadaten übernommen.
 
+`IPSKAL_ExportLocalCalendar()` ist ausschließlich für lokale Kalender vorgesehen
+und nur über die Symcon-Konsole beziehungsweise ein eigenes Skript nutzbar. Es
+schreibt die originalen iCalendar-Daten als ICS-Datei nach
+`<Symcon-Verzeichnis>/media/OpenCalendar/`. Der Dateiname darf keinen Pfad
+enthalten und muss auf `.ics` enden. Vorhandene Dateien werden standardmäßig
+nicht überschrieben.
+
+```php
+$file = IPSKAL_ExportLocalCalendar(12345, 'lokaler-kalender-backup.ics');
+echo $file;
+```
+
+Für ein bewusstes Überschreiben eines vorhandenen Sicherungsexports muss der
+dritte Parameter `true` sein.
+
 ### Termin erstellen
 
 ```php
@@ -160,12 +184,18 @@ $result = IPSKAL_CreateEvent(12345, json_encode([
 
 ### Aufgabentermin erstellen und erledigen
 
-Ein Aufgabentermin ist ein eintägiger, ganztägiger Kalendertermin. Er darf
-wiederkehrend sein.
-`task = true` setzt beim Anbieter automatisch den offenen Marker `[OC:TODO]` vor den
-Titel. `taskCompleted = true` verwendet stattdessen `[OC:DONE]`. Die Steuerfelder werden
-nicht als eigene Providerdaten übertragen; der Titelmarker ist die dauerhafte und
-anbieterübergreifende Kennzeichnung.
+Ein Aufgabentermin ist eintägig und ganztägig. Er darf wiederkehrend sein. Bei
+CalDAV und lokalen Kalendern werden die Aufgabenfelder als
+`X-OPENCALENDAR-*`-Eigenschaften, bei Google Calendar als private
+`extendedProperties` gespeichert. Ältere Titelmarker wie `[OC:TODO]` und
+`[OC:DONE]` werden weiterhin gelesen und beim nächsten Schreiben migriert.
+
+Ist für diese Kalenderinstanz eine Microsoft-To-Do-Aufgabenliste ausgewählt,
+legt `task = true` stattdessen eine native Aufgabe in dieser Liste an. Titel,
+Beschreibung, Fälligkeit, Status und eine optionale Wiederholung werden dabei
+über Microsoft Graph gespeichert. Das Ergebnis enthält die native
+`taskId`/`taskListId`-Identität und `sourceType = microsoft-todo`. Ein Aufruf
+ohne `task = true` erstellt weiterhin einen normalen Outlook-Kalendertermin.
 
 ```php
 $result = IPSKAL_CreateEvent(12345, json_encode([
@@ -194,21 +224,28 @@ $result = IPSKAL_UpdateEvent(12345, json_encode([
 ]));
 ```
 
-Offene Aufgabentermine mit einem Datum vor heute werden beim lokalen
-Tageswechsel und bei jeder Synchronisation auf heute verschoben. Erledigte
-Aufgaben bleiben unverändert. Bei einer Aufgabenserie verschiebt
-`taskFollowPlanned = true` den ab dem überfälligen Termin verbleibenden
-Serienteil; ohne diese Option bleibt der ursprüngliche Serienplan erhalten und
-nur das älteste überfällige Vorkommnis wird nachgezogen. Das Mitverschieben
-erfordert eine Kalenderanbieter-Unterstützung für „diesen und alle folgenden
-Termine“. Da dabei der echte Kalendertermin aktualisiert wird, muss der Kalender
-beschreibbar sein. Zeitgebundene Aufgabentermine werden abgewiesen. Liegt ohne
+Offene kalenderbasierte Aufgabentermine mit einem Datum vor heute werden beim lokalen
+Tageswechsel und bei jeder Synchronisation gemäß `taskRollForwardScope`
+behandelt. `occurrence` zieht nur das älteste offene Vorkommnis auf heute,
+`following` verschiebt den ab diesem Vorkommnis verbleibenden Serienteil und
+`disabled` lässt überfällige Aufgaben unverändert. Erledigte Aufgaben bleiben
+in allen Fällen unverändert. `taskFollowPlanned = true` bleibt als kompatible
+Abbildung von `following` erhalten. Das Mitverschieben erfordert eine
+Kalenderanbieter-Unterstützung für „diesen und alle folgenden Termine“. Da dabei
+der echte Kalendertermin aktualisiert wird, muss der Kalender beschreibbar sein.
+Zeitgebundene Aufgabentermine werden abgewiesen. Liegt ohne
 Mitverschieben bereits ein weiteres geplantes Vorkommnis zwischen dem alten und
 dem neuen Datum, wird die offene Aufgabe als Einzeltermin weitergeführt. So
 bleibt der Serienplan erhalten und Microsoft 365 kann die Synchronisation nicht
 wegen eines überlappenden Serienelements ablehnen.
 
-Bei `UpdateEvent` gilt `taskFollowPlanned` ebenfalls für eine Änderung des
+Native Microsoft-To-Do-Aufgaben werden nicht durch OpenCalendar nachgezogen.
+Ihre Fälligkeit und Serienfolge bleiben vollständig unter der Verwaltung von
+Microsoft. Bei einer Serienaufgabe zeigt OpenCalendar die aktuell von Graph
+gelieferte Aufgabe; die nächste offene Aufgabe erscheint nach dem Erledigen und
+der folgenden Synchronisation.
+
+Bei `UpdateEvent` gilt `taskRollForwardScope = following` ebenfalls für eine Änderung des
 Startdatums einer Serienaufgabe: Der ausgewählte und alle folgenden Termine
 werden mit neu verankertem Serienplan verschoben. Beim ersten Vorkommnis ist
 das die ganze Serie. Statusänderungen ohne Datumsänderung bleiben auf das
@@ -326,3 +363,9 @@ Keine Termine sichtbar | Zeitraum für vergangene und zukünftige Termine prüfe
 Kalender ist schreibgeschützt | Schreibrechte beim Anbieter prüfen; ICS/Webcal-Abonnements sind immer schreibgeschützt
 Ändern oder Löschen wird bei einem Serientermin verweigert | Google, Microsoft und unterstützte Apple/CalDAV-RRULEs erlauben Vorkommnis, dieses und folgende sowie vollständige Serie; komplexe Wiederholungsregeln werden nicht verlustbehaftet geteilt
 Schreibkonflikt | Kalender erneut synchronisieren; der ETag-Schutz verhindert das Überschreiben einer zwischenzeitlich geänderten Serverversion
+
+## Debug-Ausgaben
+
+Der native Symcon-Debug zeigt deutsche Meldungen mit Funktion, Zeile, Vorgang
+und Ergebnis sowie Aktionen und Schnittstellenübergaben. Private Inhalte und
+Zugangsdaten bleiben geschützt. Details und Abnahme: [Debug-Aufbau](../docs/DEBUG_OUTPUT.md).

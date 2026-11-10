@@ -10,6 +10,14 @@
 
 OpenCalendar ist eine Anwendung für Symcon, mit der Nutzer ihre Online-Kalender verbinden, synchronisieren, anzeigen und bearbeiten können. Unterstützt werden Apple iCloud, Google Calendar, Microsoft 365/Outlook.com, generische CalDAV-Server sowie schreibgeschützte ICS-/Webcal-Abonnements.
 Die gefundenen Kalender können einzeln synchronisiert, in einer gemeinsamen Kachel angezeigt und optional als interaktive HTML-Seite in IPSView verwendet werden.
+Für externe Kalender, einschließlich schreibgeschützter ICS-/Webcal-Feeds ohne eigene Farbe, lässt sich in der jeweiligen **Kalender**-Instanz eine optionale **Anzeigefarbe** wählen. Sie gilt für Kachel und IPSView, ohne die Farbe beim Anbieter zu ändern.
+In der Kalender Ansicht lassen sich optionale Buchstaben-Schaltflächen für
+häufig verwendete Ansichten direkt in der Kopfzeile konfigurieren. Sie schalten
+Kachel und IPSView ohne Auswahlmenü um; die Wahl bleibt pro Client gespeichert.
+In schmalen Ansichten verwendet die Kopfzeile kurze numerische Datumsangaben.
+Bis 560 CSS-Pixel Kachelbreite stehen die Bedienelemente in zwei Reihen; auf
+breiteren Tablets bleiben sie in einer Reihe. Bei Platzmangel lassen sich die
+Schnellansichten seitlich wischen.
 
 Umfangreiche Terminlisten werden intern seitenweise zwischen Konto, Kalender und
 Kalenderansicht übertragen. Online-ICS-/Webcal-Feeds und lokal importierte
@@ -22,7 +30,7 @@ müssen umfangreiche Kalenderdateien nicht manuell aufgeteilt werden.
 ## Voraussetzungen
 
 - Symcon ab Version 9.0
-- Netzwerkzugriff des Symcon-Servers auf den jeweiligen Kalenderdienst
+- für Online-Kalender Netzwerkzugriff des Symcon-Servers auf den jeweiligen Kalenderdienst
 - für Google und Microsoft eine aktive Symcon-Connect-Verbindung; eine eigene
   OAuth-Client-ID oder ein eigener Clientschlüssel ist nicht erforderlich
 - für Apple iCloud ein anwendungsspezifisches Apple-Passwort
@@ -37,6 +45,10 @@ müssen umfangreiche Kalenderdateien nicht manuell aufgeteilt werden.
 6. Über **Instanz hinzufügen** einen **Kalender Konfigurator** anlegen. Im Dialog das zuvor eingerichtete **Kalender Konto** als übergeordnete Instanz wählen. Ist bereits ein Konfigurator vorhanden, lässt sich die Verbindung über das Zahnrad und **Gateway ändern** kontrollieren oder anpassen.
 7. Den Konfigurator öffnen und **Kalender aktualisieren** verwenden. In der Liste die gewünschten Kalender über **Erstellen** beziehungsweise **Alle erstellen** anlegen.
 8. Optional eine Instanz **Kalender Ansicht** erstellen, die gewünschten Kalenderinstanzen auswählen und die Ansicht in der Kachelvisualisierung oder in IPSView platzieren.
+
+### Lokalen Kalender anlegen
+
+Für Termine ohne externen Anbieter oder Synchronisierung über **Instanz hinzufügen** ein **Kalender Konto** anlegen und als Anbieter **Symcon - Kalender** wählen. Name und Farbe festlegen, das Konto aktivieren und anschließend einen damit verbundenen **Kalender Konfigurator** öffnen. Dort den angebotenen lokalen Kalender über **Erstellen** anlegen. Der Kalender wird dauerhaft in Symcon gespeichert; Cache leeren entfernt nur die Anzeige-Daten, nicht die Originaltermine. Daher gehören Konto und Kalenderinstanz in die Symcon-Backups.
 
 Die ausführlichen Einstellungen der Anbieter sind in der Dokumentation des
 [Kalender Kontos](Kalender%20Konto) beschrieben.
@@ -233,48 +245,87 @@ befindet sich in der Dokumentation der Module **Kalender** und
 ## Aufgabentermine
 
 OpenCalendar kann einen gewöhnlichen ganztägigen Termin als
-**Aufgabentermin** behandeln. Dafür wird keine Aufgaben-API des Anbieters und
-keine zusätzliche OAuth-Berechtigung benötigt. Der Eintrag bleibt technisch ein
-normaler Kalendertermin und verwendet ausschließlich die bereits vorhandenen
-Schreibrechte des gewählten Kalenders.
+**Aufgabentermin** behandeln. Bei CalDAV und lokalen Kalendern werden die
+Aufgabenfelder als RFC-konforme `X-OPENCALENDAR-*`-Eigenschaften gespeichert.
+Google Calendar verwendet private `extendedProperties`. Der sichtbare Titel
+bleibt bei diesen Anbietern unverändert.
+
+Ist in einer Microsoft-365-Kalenderinstanz eine
+**Microsoft-To-Do-Aufgabenliste** ausgewählt, werden neu angelegte
+Aufgabentermine dagegen als native Microsoft-To-Do-Aufgaben über Microsoft
+Graph gespeichert. Sie erscheinen dadurch sowohl in OpenCalendar als auch in
+Microsoft To Do. Normale Termine werden weiterhin ausschließlich im
+Outlook-Kalender angelegt. Bereits vorhandene kalenderbasierte Aufgabentermine
+bleiben unverändert und werden nicht automatisch in Microsoft To Do migriert.
+
+Wiederholungen nativer Microsoft-To-Do-Aufgaben werden vollständig von
+Microsoft verwaltet. OpenCalendar zeigt die von Graph gelieferte aktuelle
+Aufgabe an. Microsoft stellt die nächste offene Aufgabe einer Serie nach dem
+Erledigen der aktuellen Aufgabe bereit; OpenCalendar übernimmt sie mit der
+nächsten Synchronisation. Zukünftige Instanzen werden nicht vorab lokal
+erzeugt.
+
+Beim Verschieben einer offenen nativen Microsoft-To-Do-Serienaufgabe wird die
+Wiederholung am neuen Datum ausgerichtet. Bei einer wöchentlichen Aufgabe
+verschiebt sich damit auch der Wochentag der Folgeaufgaben, beispielsweise
+von Dienstag auf Donnerstag. Dies ist keine Kalender-Serienausnahme „nur
+diesen Termin verschieben“. Microsoft bleibt für die nächste offene Aufgabe
+nach dem Erledigen zuständig; OpenCalendar erzeugt dafür keine Kopie und keine
+lokalen Zukunftstermine. Reine Titel- oder Beschreibungsänderungen richten die
+Serie nicht neu aus. Der Bearbeitungsdialog weist auf dieses Verhalten hin.
+
+OpenCalendar prüft nach dem Verschieben einer nativen Aufgabenserie, ob Microsoft
+für dieselbe Aufgabe das gewünschte Datum in der Symcon-Zeitzone zurückliefert.
+Bei einer Abweichung wird die Aufgabe einmal erneut gelesen. Bleibt die Abweichung
+bestehen, erscheint eine Fehlermeldung statt einer Erfolgsbestätigung. Eine zugleich
+angeforderte Erledigung wird dann nicht gesendet. Die Serienänderung kann bei
+Microsoft bereits gespeichert sein: bitte synchronisieren und die Aufgabe in
+Microsoft To Do prüfen, bevor die Änderung erneut versucht wird.
+Diese Kontrolle behebt noch nicht die beobachtete UTC-Mitternacht-Abweichung
+in westlichen Zeitzonen. Es erfolgt weder eine pauschale Tagverschiebung noch
+ein automatischer Korrekturschreibzugriff, der zusätzliche Aufgaben erzeugen könnte.
 
 Beim Erstellen oder Bearbeiten wird im Termindialog **Aufgabentermin** aktiviert.
 Aufgabentermine sind bewusst ganztägig und dauern genau einen Tag. Sie dürfen
-auch wiederkehrend sein. OpenCalendar
-speichert den Status direkt und providerunabhängig am Anfang des Termintitels:
+auch wiederkehrend sein. Intern unterscheidet OpenCalendar den Aufgabenstatus
+und die Nachziehstrategie. In iCalendar werden diese Felder so abgelegt:
 
-- `[OC:TODO]` kennzeichnet eine offene Aufgabe.
-- `[OC:DONE]` kennzeichnet eine erledigte Aufgabe.
-- `[OC:TODO:FOLLOW]` beziehungsweise `[OC:DONE:FOLLOW]` kennzeichnet eine Aufgabenserie, deren geplante
-  Folgetermine beim täglichen Nachziehen ebenfalls verschoben werden sollen.
+- `X-OPENCALENDAR-TASK:TRUE`
+- `X-OPENCALENDAR-TASK-STATUS:OPEN` beziehungsweise `COMPLETED`
+- `X-OPENCALENDAR-ROLL-FORWARD:OCCURRENCE`, `FOLLOWING` oder `DISABLED`
 
 In der Kalenderansicht öffnet ein Klick auf den Eintrag die Termindetails. Dort
 kann die Aufgabe mit **Als erledigt markieren** abgeschlossen und mit
 **Aufgabe wieder öffnen** erneut aktiviert werden. Der eigentliche Titel wird im
-Editor ohne technischen Marker angezeigt. In Google Calendar, Outlook, Apple
-Calendar oder anderen Clients bleibt der ASCII-Marker dagegen sichtbar, sodass der
-Status auch außerhalb von OpenCalendar erkennbar ist. Wird der Marker dort
-manuell entfernt oder geändert, übernimmt OpenCalendar diese Änderung bei der
-nächsten Synchronisation. Die früher verwendeten grafischen Kästchen (`☐`, `☑`)
-werden weiterhin erkannt und bei der nächsten Aufgabenänderung automatisch ersetzt.
+Editor ohne technische Metadaten angezeigt. Bestehende ASCII-Marker
+(`[OC:TODO]`, `[OC:DONE]`, `FOLLOW`, `KEEP`) und die früher verwendeten
+grafischen Kästchen (`☐`, `☑`) werden weiterhin gelesen. Bei der nächsten
+Aufgabenänderung migrieren CalDAV, lokale Kalender und Google Calendar den
+Eintrag auf die strukturierte Speicherung und entfernen den Marker aus dem Titel.
 
-Eine offene Aufgabe, deren Datum vor dem aktuellen lokalen Tag liegt, wird beim
-lokalen Tageswechsel und zusätzlich bei jeder Kalendersynchronisation auf den
-aktuellen Tag verschoben. Dadurch bleibt eine nicht erledigte Aufgabe täglich
-sichtbar. Erledigte Aufgaben werden nicht mehr verschoben und verbleiben an ihrem
-zuletzt erreichten Datum. Das Verschieben ändert den echten Termin beim
-Kalenderanbieter; es ist keine rein lokale Anzeige.
+Bei kalenderbasierten Aufgabenterminen wird eine offene Aufgabe, deren Datum vor
+dem aktuellen lokalen Tag liegt, beim lokalen Tageswechsel und zusätzlich bei
+jeder Kalendersynchronisation auf den aktuellen Tag verschoben. Dadurch bleibt
+eine nicht erledigte Aufgabe täglich sichtbar. Erledigte Aufgaben werden nicht
+mehr verschoben und verbleiben an ihrem zuletzt erreichten Datum. Das
+Verschieben ändert den echten Termin beim Kalenderanbieter; es ist keine rein
+lokale Anzeige. Native Microsoft-To-Do-Aufgaben behalten dagegen die von
+Microsoft verwaltete Fälligkeit und Serienlogik.
 
-Bei einer Aufgabenserie entscheidet die Option **Geplante Folgetermine
-mitverschieben**: Ohne sie bleibt der reguläre Serienplan erhalten und nur das
-älteste überfällige Vorkommnis wird auf heute gezogen. Mit ihr verschiebt
-OpenCalendar den ab diesem Vorkommnis verbleibenden Serienteil gemeinsam. Diese
-Option wird nur bei Kalendern angeboten, die „diesen und alle folgenden Termine“
-sicher bearbeiten können.
+Bei einer Aufgabenserie legt **Wenn diese Aufgabe überfällig wird** die
+providerunabhängige Regel fest: **Nur diesen Termin nachziehen** verschiebt nur
+das offene Vorkommnis auf heute und kennzeichnet es bei Bedarf als Einzeltermin.
+**Diesen und alle folgenden Termine verschieben** verschiebt den verbleibenden
+Serienteil gemeinsam. **Nicht automatisch nachziehen** lässt die Aufgabe auf
+ihrem geplanten Datum, bis sie manuell bearbeitet wird. Die zweite Option wird
+nur bei Kalendern angeboten, die „diesen und alle folgenden Termine“ sicher
+bearbeiten können. Bereits erledigte Vorkommnisse bleiben in allen Fällen
+unverändert.
 
-Die Option gilt auch beim manuellen Ändern des Datums einer Serienaufgabe:
-Mit Häkchen werden der ausgewählte und alle folgenden Termine gemeinsam
-verschoben. Beim ersten Vorkommnis betrifft das die gesamte Serie. Reines
+Die Auswahl **Diesen und alle folgenden Termine verschieben** gilt auch beim
+manuellen Ändern des Datums einer Serienaufgabe: Der ausgewählte und alle
+folgenden Termine werden gemeinsam verschoben. Beim ersten Vorkommnis betrifft
+das die gesamte Serie. Reines
 Erledigen oder Umbenennen ohne Datumsänderung betrifft weiterhin nur den
 ausgewählten Termin. Beim Verschieben des Serienteils werden bestehende
 Ausnahmen innerhalb dieses Teils zurückgesetzt.
@@ -340,4 +391,11 @@ Drittanbieter.
   zusammen und stellt die ausgewählten Kalender zusätzlich providerübergreifend
   über PHP-Funktionen für Tages- und Datumsbereichsabfragen sowie für
   Jahresereignisse bereit. Neben der vollständigen Ausgabe stehen kompakte
-  Varianten für einfache Skripte zur Verfügung.
+  Varianten für einfache Skripte zur Verfügung. Leere HTML-Hüllen von
+  Anbieterbeschreibungen erscheinen in den Termindetails nicht als leere Fläche.
+
+## Debug-Ausgaben
+
+Der native Symcon-Debug zeigt deutsche Meldungen mit Funktion, Zeile, Vorgang
+und Ergebnis sowie Aktionen und Schnittstellenübergaben. Private Inhalte und
+Zugangsdaten bleiben geschützt. Details und Abnahme: [Debug-Aufbau](docs/DEBUG_OUTPUT.md).

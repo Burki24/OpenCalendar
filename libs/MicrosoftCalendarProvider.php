@@ -395,6 +395,9 @@ final class MicrosoftCalendarProvider implements CalendarProviderInterface, Recu
         $parentHeaders = $parentEtag !== '' ? ['If-Match' => $parentEtag] : [];
 
         if ($position === 1) {
+            if (($target['recurrenceType'] ?? '') === CalendarEventRecurrence::EXCEPTION) {
+                return $this->replaceSeriesWithFutureTail($calendarId, $seriesId, $parentItem, $event, $parentHeaders);
+            }
             if (array_key_exists('description', $event)) {
                 $this->assertDescriptionEditable($calendarId, $seriesId);
             }
@@ -417,13 +420,31 @@ final class MicrosoftCalendarProvider implements CalendarProviderInterface, Recu
             $seriesData['recurrence'],
             $targetDate
         );
-        $trimmedParent = $this->requestJson(
-            'PATCH',
-            '/me/calendars/' . rawurlencode($calendarId) . '/events/' . rawurlencode($seriesId),
-            ['recurrence' => $trimmedRecurrence],
-            $parentHeaders,
-            [200]
-        );
+        try {
+            $trimmedParent = $this->requestJson(
+                'PATCH',
+                '/me/calendars/' . rawurlencode($calendarId) . '/events/' . rawurlencode($seriesId),
+                ['recurrence' => $trimmedRecurrence],
+                $parentHeaders,
+                [200]
+            );
+        } catch (MicrosoftCalendarProviderException $exception) {
+            // Graph cannot shorten a series to a range that contains no remaining
+            // instance. This happens after every occurrence before the selected one
+            // was deleted, most commonly when the initial occurrence was removed.
+            // Verify that no active appointment would be discarded before replacing
+            // that now-empty prefix with the requested future series.
+            if (!$this->hasNoActiveOccurrencesBeforeTarget(
+                $calendarId,
+                $seriesId,
+                $seriesData['recurrence'],
+                $targetDate
+            )) {
+                throw $exception;
+            }
+
+            return $this->replaceSeriesWithFutureTail($calendarId, $seriesId, $parentItem, $event, $parentHeaders);
+        }
 
         try {
             $created = $this->requestJson(
@@ -447,6 +468,121 @@ final class MicrosoftCalendarProvider implements CalendarProviderInterface, Recu
             } catch (Throwable) {
                 throw new MicrosoftCalendarProviderException(
                     'The new recurring series could not be created and the original series could not be restored automatically.'
+                );
+            }
+
+            throw $exception;
+        }
+
+        return $this->writeResult($calendarId, $created);
+    }
+
+    /**
+     * Checks whether a cancelled prefix left no active occurrence before a selected series position.
+     *
+     * @param array<string, mixed> $recurrence Microsoft Graph patternedRecurrence data.
+     */
+    private function hasNoActiveOccurrencesBeforeTarget(
+        string $calendarId,
+        string $seriesId,
+        array $recurrence,
+        string $targetDate
+    ): bool {
+        $range = is_array($recurrence['range'] ?? null) ? $recurrence['range'] : [];
+        $startDate = trim((string) ($range['startDate'] ?? ''));
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/D', $startDate)
+            || !preg_match('/^\d{4}-\d{2}-\d{2}$/D', $targetDate)
+            || $targetDate <= $startDate) {
+            return false;
+        }
+
+        $master = $this->requestJson(
+            'GET',
+            '/me/calendars/' . rawurlencode($calendarId) . '/events/' . rawurlencode($seriesId)
+                . '?%24select=cancelledOccurrences',
+            null,
+            ['Prefer' => 'outlook.timezone="UTC"']
+        );
+        $cancelled = is_array($master['cancelledOccurrences'] ?? null)
+            ? $master['cancelledOccurrences']
+            : [];
+        if ($cancelled === []) {
+            return false;
+        }
+
+        $instances = $this->requestJson(
+            'GET',
+            '/me/calendars/' . rawurlencode($calendarId) . '/events/' . rawurlencode($seriesId)
+                . '/instances?startDateTime=' . rawurlencode($startDate . 'T00:00:00Z')
+                . '&endDateTime=' . rawurlencode($targetDate . 'T00:00:00Z')
+                . '&%24top=1',
+            null,
+            ['Prefer' => 'outlook.timezone="UTC"']
+        );
+
+        return is_array($instances['value'] ?? null) && $instances['value'] === [];
+    }
+
+    /**
+     * Replaces an obsolete Microsoft series with its requested future tail.
+     *
+     * This is required when a first occurrence remains as a stale exception, or
+     * when a cancelled prefix leaves no active instance that Microsoft Graph can
+     * retain while shortening the original series. Creating the replacement before
+     * deleting the old master avoids data loss if creation fails.
+     *
+     * @param array<string, mixed> $parentItem
+     * @param array<string, mixed> $event
+     * @param array<string, string> $parentHeaders
+     * @return array<string, mixed>
+     */
+    private function replaceSeriesWithFutureTail(
+        string $calendarId,
+        string $seriesId,
+        array $parentItem,
+        array $event,
+        array $parentHeaders
+    ): array {
+        if (array_key_exists('description', $event)) {
+            $this->assertDescriptionEditable($calendarId, $seriesId);
+        }
+        $created = $this->requestJson(
+            'POST',
+            '/me/calendars/' . rawurlencode($calendarId) . '/events',
+            array_replace(
+                $this->splitEventBasePayload($parentItem),
+                $this->buildEventPayload($event, true)
+            ),
+            [],
+            [201]
+        );
+        $createdId = trim((string) ($created['id'] ?? ''));
+        if ($createdId === '') {
+            throw new MicrosoftCalendarProviderException(
+                'Microsoft Calendar did not return the replacement recurring series ID.'
+            );
+        }
+
+        try {
+            $this->requestJson(
+                'DELETE',
+                '/me/calendars/' . rawurlencode($calendarId) . '/events/' . rawurlencode($seriesId),
+                null,
+                $parentHeaders,
+                [204]
+            );
+        } catch (Throwable $exception) {
+            try {
+                $this->requestJson(
+                    'DELETE',
+                    '/me/calendars/' . rawurlencode($calendarId) . '/events/' . rawurlencode($createdId),
+                    null,
+                    [],
+                    [204]
+                );
+            } catch (Throwable) {
+                throw new MicrosoftCalendarProviderException(
+                    'The replacement series could not be rolled back after the original series could not be removed.'
                 );
             }
 
@@ -572,6 +708,17 @@ final class MicrosoftCalendarProvider implements CalendarProviderInterface, Recu
             ['Prefer' => 'outlook.body-content-type="text", outlook.timezone="UTC"']
         );
         $mapped = $this->mapEvent($calendarId, $item);
+        // Some Graph exception responses omit originalStart even when the
+        // stable exception and series IDs are present. The requested original
+        // start came from the selected cached occurrence and remains the only
+        // immutable anchor for splitting the series at this exception.
+        if ($mapped !== null
+            && ($mapped['recurrenceType'] ?? '') === CalendarEventRecurrence::EXCEPTION
+            && trim((string) ($mapped['originalStart'] ?? '')) === ''
+            && trim($originalStart) !== '') {
+            $mapped['originalStart'] = trim($originalStart);
+            $mapped['canUpdateFollowing'] = trim((string) ($mapped['seriesId'] ?? '')) !== '';
+        }
         if ($mapped === null
             || !CalendarEventRecurrence::isOccurrence($mapped)
             || !hash_equals($seriesId, (string) ($mapped['seriesId'] ?? ''))

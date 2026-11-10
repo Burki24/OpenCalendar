@@ -340,12 +340,16 @@ $writeClient = new FakeHttpClient([
 ]);
 $provider = new GoogleCalendarProvider($writeClient, 'access-token');
 $created = $provider->createEvent('owner@example.com', [
-    'summary'  => 'Test',
-    'allDay'   => false,
-    'start'    => '2026-07-20T10:00:00+02:00',
-    'end'      => '2026-07-20T11:00:00+02:00',
-    'location' => 'Berlin',
-    'reminder' => [
+    'summary'              => 'Test',
+    'allDay'               => false,
+    'start'                => '2026-07-20T10:00:00+02:00',
+    'end'                  => '2026-07-20T11:00:00+02:00',
+    'location'             => 'Berlin',
+    'task'                 => false,
+    'taskCompleted'        => false,
+    'taskRollForwardScope' => 'occurrence',
+    'taskFollowPlanned'    => false,
+    'reminder'             => [
         'mode'               => 'custom',
         'minutesBeforeStart' => 30
     ]
@@ -354,6 +358,10 @@ assertSameValue('created-id', $created['eventReference'], 'The created Google ev
 assertSameValue('POST', $writeClient->requests[0]['method'], 'Events must be created via POST.');
 $createBody = json_decode($writeClient->requests[0]['body'], true, 512, JSON_THROW_ON_ERROR);
 assertSameValue('Test', $createBody['summary'], 'The event summary must be sent.');
+assertTrueValue(
+    !array_key_exists('extendedProperties', $createBody),
+    'Creating a normal Google event must not submit null task properties.'
+);
 assertSameValue(false, $createBody['reminders']['useDefault'], 'Custom Google reminders must override calendar defaults.');
 assertSameValue(
     [['method' => 'popup', 'minutes' => 30]],
@@ -611,6 +619,44 @@ assertTrueValue(
     'Event deletion must return true after HTTP 204.'
 );
 assertSameValue('DELETE', $writeClient->requests[2]['method'], 'Events must be deleted via DELETE.');
+
+$allDaySwitchClient = new FakeHttpClient([
+    response(200, ['id' => 'event-id', 'etag' => '"all-day"']),
+    response(200, ['id' => 'event-id', 'etag' => '"timed"'])
+]);
+$allDaySwitchProvider = new GoogleCalendarProvider($allDaySwitchClient, 'access-token');
+$allDaySwitchProvider->updateEvent('owner@example.com', 'event-id', '"timed"', '', [
+    'allDay' => true,
+    'start'  => '2026-07-20',
+    'end'    => '2026-07-21'
+]);
+$allDaySwitchProvider->updateEvent('owner@example.com', 'event-id', '"all-day"', '', [
+    'allDay' => false,
+    'start'  => '2026-07-20T09:00:00+02:00',
+    'end'    => '2026-07-20T10:00:00+02:00'
+]);
+$toAllDay = json_decode($allDaySwitchClient->requests[0]['body'], true, 512, JSON_THROW_ON_ERROR);
+$toTimed = json_decode($allDaySwitchClient->requests[1]['body'], true, 512, JSON_THROW_ON_ERROR);
+assertSameValue(
+    ['date' => '2026-07-20', 'dateTime' => null, 'timeZone' => null],
+    $toAllDay['start'],
+    'Converting a timed Google event to all-day must remove its former start time and timezone.'
+);
+assertSameValue(
+    ['date' => '2026-07-21', 'dateTime' => null, 'timeZone' => null],
+    $toAllDay['end'],
+    'Converting a timed Google event to all-day must keep the exclusive end date and clear the former end time.'
+);
+assertSameValue(
+    ['dateTime' => '2026-07-20T09:00:00+02:00', 'date' => null],
+    $toTimed['start'],
+    'Converting an all-day Google event to timed must remove its former start date.'
+);
+assertSameValue(
+    ['dateTime' => '2026-07-20T10:00:00+02:00', 'date' => null],
+    $toTimed['end'],
+    'Converting an all-day Google event to timed must remove its former end date.'
+);
 
 $occurrenceWriteClient = new FakeHttpClient([
     response(200, ['id' => 'instance-id', 'iCalUID' => 'series@example.com', 'etag' => '"occurrence-updated"']),
@@ -2217,6 +2263,25 @@ assertSameValue(
     'Microsoft following preparation must retain a stable original occurrence start.'
 );
 
+$msExceptionWithoutOriginalStart = $msFollowingTarget;
+$msExceptionWithoutOriginalStart['type'] = 'exception';
+$msExceptionFollowingClient = new FakeHttpClient([
+    response(200, $msFollowingParent),
+    response(200, $msExceptionWithoutOriginalStart)
+]);
+$msExceptionFollowingProvider = new MicrosoftCalendarProvider($msExceptionFollowingClient, 'ms-access-token');
+$msExceptionFollowing = $msExceptionFollowingProvider->getRecurringFollowing(
+    'AQMk-primary',
+    'series-master',
+    'instance-following',
+    '2026-10-29T08:00:00+00:00'
+);
+assertSameValue(
+    '2026-10-29T08:00:00+00:00',
+    $msExceptionFollowing['originalStart'],
+    'A Microsoft exception without Graph originalStart must retain the requested occurrence anchor.'
+);
+
 $msFollowingUpdateClient = new FakeHttpClient([
     response(200, $msFollowingParent),
     response(200, $msFollowingTarget),
@@ -2287,6 +2352,91 @@ assertSameValue(
     $msFollowingCreateBody['attendees'][0],
     'Microsoft series splitting must preserve writable attendee identity without copying response state.'
 );
+
+$msCancelledPrefixParent = $msFollowingParent;
+$msCancelledPrefixParent['recurrence'] = [
+    'pattern' => ['type' => 'daily', 'interval' => 1],
+    'range'   => ['type' => 'numbered', 'startDate' => '2026-10-19', 'numberOfOccurrences' => 3]
+];
+$msCancelledPrefixTarget = $msFollowingTarget;
+$msCancelledPrefixTarget['id'] = 'instance-after-deleted-first';
+$msCancelledPrefixTarget['start']['dateTime'] = '2026-10-20T08:00:00';
+$msCancelledPrefixTarget['end']['dateTime'] = '2026-10-20T09:00:00';
+$msCancelledPrefixClient = new FakeHttpClient([
+    response(200, $msCancelledPrefixParent),
+    response(200, $msCancelledPrefixTarget),
+    response(400, ['error' => ['code' => 'ErrorInvalidRequest', 'message' => 'The specified range is invalid.']]),
+    response(200, ['cancelledOccurrences' => ['OID.series-master.2026-10-19']]),
+    response(200, ['value' => []]),
+    response(201, ['id' => 'replacement-after-deleted-first', 'iCalUId' => 'replacement@example.com']),
+    response(204)
+]);
+$msCancelledPrefixProvider = new MicrosoftCalendarProvider($msCancelledPrefixClient, 'ms-access-token');
+$msCancelledPrefixIdentity = $msFollowingIdentity;
+$msCancelledPrefixIdentity['occurrenceId'] = 'instance-after-deleted-first';
+$msCancelledPrefixIdentity['originalStart'] = '2026-10-20T08:00:00+00:00';
+$msCancelledPrefixProvider->updateEvent(
+    'AQMk-primary',
+    'instance-after-deleted-first',
+    '',
+    '',
+    [
+        'summary'    => 'Continue after deleted first occurrence',
+        'allDay'     => true,
+        'start'      => '2026-10-20',
+        'end'        => '2026-10-21',
+        'recurrence' => ['frequency' => 'DAILY', 'interval' => 1, 'endMode' => 'count', 'count' => 2]
+    ],
+    $msCancelledPrefixIdentity
+);
+assertSameValue(
+    'GET',
+    $msCancelledPrefixClient->requests[3]['method'],
+    'A rejected Microsoft trim must verify that the parent contains cancelled occurrences.'
+);
+assertTrueValue(
+    str_contains($msCancelledPrefixClient->requests[4]['url'], '/instances?')
+        && str_contains($msCancelledPrefixClient->requests[4]['url'], 'startDateTime=2026-10-19T00%3A00%3A00Z')
+        && str_contains($msCancelledPrefixClient->requests[4]['url'], 'endDateTime=2026-10-20T00%3A00%3A00Z'),
+    'A cancelled Microsoft prefix must be checked for active appointments before the old master is removed.'
+);
+assertTrueValue(
+    $msCancelledPrefixClient->requests[5]['method'] === 'POST'
+        && $msCancelledPrefixClient->requests[6]['method'] === 'DELETE'
+        && str_ends_with($msCancelledPrefixClient->requests[6]['url'], '/events/series-master'),
+    'An empty cancelled Microsoft prefix must be replaced by the requested future series instead of keeping an invalid range.'
+);
+
+$msActivePrefixClient = new FakeHttpClient([
+    response(200, $msCancelledPrefixParent),
+    response(200, $msCancelledPrefixTarget),
+    response(400, ['error' => ['code' => 'ErrorInvalidRequest', 'message' => 'The specified range is invalid.']]),
+    response(200, ['cancelledOccurrences' => ['OID.series-master.2026-10-19']]),
+    response(200, ['value' => [['id' => 'active-before-target']]])
+]);
+try {
+    (new MicrosoftCalendarProvider($msActivePrefixClient, 'ms-access-token'))->updateEvent(
+        'AQMk-primary',
+        'instance-after-deleted-first',
+        '',
+        '',
+        [
+            'summary'    => 'Do not replace active prefix',
+            'allDay'     => true,
+            'start'      => '2026-10-20',
+            'end'        => '2026-10-21',
+            'recurrence' => ['frequency' => 'DAILY', 'interval' => 1, 'endMode' => 'count', 'count' => 2]
+        ],
+        $msCancelledPrefixIdentity
+    );
+    throw new RuntimeException('A Microsoft series with an active prefix was replaced.');
+} catch (MicrosoftCalendarProviderException $exception) {
+    assertSameValue(
+        5,
+        count($msActivePrefixClient->requests),
+        'A Microsoft series with an active prefix must retain its original failed trim instead of deleting prior appointments.'
+    );
+}
 
 $msFollowingDeleteClient = new FakeHttpClient([
     response(200, $msFollowingParent),
@@ -2373,6 +2523,98 @@ foreach (['2026-10-17', '2026-10-22'] as $movedFirstDate) {
             && $body['recurrence']['range']['numberOfOccurrences'] === 8
             && $body['recurrence']['pattern']['interval'] === 10,
         'Moving the first Microsoft task occurrence in either direction must update the master and retain future repetitions.'
+    );
+}
+
+$msFirstExceptionTarget = $msFirstFollowingTarget;
+$msFirstExceptionTarget['id'] = 'exception-first';
+$msFirstExceptionTarget['type'] = 'exception';
+$msFirstExceptionTarget['originalStart'] = '2026-10-19T08:00:00.0000000';
+$msFirstExceptionReplacementClient = new FakeHttpClient([
+    response(200, $msFollowingParent),
+    response(200, $msFirstExceptionTarget),
+    response(201, [
+        'id'          => 'replacement-series-master',
+        'iCalUId'     => 'replacement-series@example.com',
+        '@odata.etag' => 'W/"replacement-series"'
+    ]),
+    response(204)
+]);
+$msFirstExceptionReplacementProvider = new MicrosoftCalendarProvider($msFirstExceptionReplacementClient, 'test-token');
+$msFirstExceptionIdentity = $msFirstFollowingIdentity;
+$msFirstExceptionIdentity['recurrenceType'] = 'exception';
+$msFirstExceptionIdentity['occurrenceId'] = 'exception-first';
+$msFirstExceptionReplacement = $msFirstExceptionReplacementProvider->updateEvent(
+    'AQMk-primary',
+    'exception-first',
+    '',
+    '',
+    [
+        'summary'    => '[OC:TODO:FOLLOW] Reopened task',
+        'allDay'     => true, 'start' => '2026-10-22', 'end' => '2026-10-23',
+        'recurrence' => ['frequency' => 'DAILY', 'interval' => 1, 'endMode' => 'count', 'count' => 8]
+    ],
+    $msFirstExceptionIdentity
+);
+assertSameValue(
+    'replacement-series-master',
+    $msFirstExceptionReplacement['eventReference'],
+    'A first Microsoft exception must be replaced by a clean recurring series when moving following tasks.'
+);
+assertSameValue(
+    'POST',
+    $msFirstExceptionReplacementClient->requests[2]['method'],
+    'A first Microsoft exception must create its replacement before the old master is removed.'
+);
+$msFirstExceptionCreateBody = json_decode(
+    $msFirstExceptionReplacementClient->requests[2]['body'],
+    true,
+    512,
+    JSON_THROW_ON_ERROR
+);
+assertSameValue(
+    '2026-10-22',
+    $msFirstExceptionCreateBody['recurrence']['range']['startDate'],
+    'The replacement Microsoft series must use the moved first occurrence as its start.'
+);
+assertSameValue(
+    8,
+    $msFirstExceptionCreateBody['recurrence']['range']['numberOfOccurrences'],
+    'The replacement Microsoft series must retain all planned following occurrences.'
+);
+assertTrueValue(
+    $msFirstExceptionReplacementClient->requests[3]['method'] === 'DELETE'
+        && str_ends_with($msFirstExceptionReplacementClient->requests[3]['url'], '/events/series-master')
+        && ($msFirstExceptionReplacementClient->requests[3]['headers']['If-Match'] ?? '') === 'W/"series-following"',
+    'The old Microsoft master and its stale first exception must be removed only after replacement creation succeeds.'
+);
+
+$msFirstExceptionRollbackClient = new FakeHttpClient([
+    response(200, $msFollowingParent),
+    response(200, $msFirstExceptionTarget),
+    response(201, ['id' => 'replacement-series-master']),
+    response(500, ['error' => ['message' => 'Cannot remove original series']]),
+    response(204)
+]);
+try {
+    (new MicrosoftCalendarProvider($msFirstExceptionRollbackClient, 'test-token'))->updateEvent(
+        'AQMk-primary',
+        'exception-first',
+        '',
+        '',
+        [
+            'summary'    => '[OC:TODO:FOLLOW] Reopened task',
+            'allDay'     => true, 'start' => '2026-10-22', 'end' => '2026-10-23',
+            'recurrence' => ['frequency' => 'DAILY', 'interval' => 1, 'endMode' => 'count', 'count' => 8]
+        ],
+        $msFirstExceptionIdentity
+    );
+    throw new RuntimeException('A failed first-exception replacement was reported as successful.');
+} catch (MicrosoftCalendarProviderException) {
+    assertTrueValue(
+        $msFirstExceptionRollbackClient->requests[4]['method'] === 'DELETE'
+            && str_ends_with($msFirstExceptionRollbackClient->requests[4]['url'], '/events/replacement-series-master'),
+        'A failed first-exception replacement must remove its newly created series before reporting the error.'
     );
 }
 
@@ -3640,6 +3882,7 @@ $viewStyleSource = file_get_contents(__DIR__ . '/../Kalender Ansicht/visualizati
 $viewScriptSource = file_get_contents(__DIR__ . '/../Kalender Ansicht/visualization/app.js');
 $viewFormSource = file_get_contents(__DIR__ . '/../Kalender Ansicht/form.json');
 $viewLocaleSource = file_get_contents(__DIR__ . '/../Kalender Ansicht/locale.json');
+$htmlPageHelperSource = file_get_contents(__DIR__ . '/../libs/helper/IPSViewHTMLPageHelper.php');
 assertTrueValue(
     is_string($accountModuleSource)
         && str_contains($accountModuleSource, 'self::GOOGLE_OAUTH_IDENTIFIER, self::MICROSOFT_OAUTH_IDENTIFIER')
@@ -3710,7 +3953,7 @@ assertTrueValue(
     is_string($calendarModuleSource)
         && str_contains($calendarModuleSource, "RegisterAttributeString('ResolvedCalendarID', '')")
         && str_contains($calendarModuleSource, 'private function effectiveCalendarId(): string')
-        && str_contains($calendarModuleSource, 'Recovered the calendar identity from the unique instance name.'),
+        && str_contains($calendarModuleSource, 'Kalenderzuordnung anhand eindeutiger vorhandener Zuordnung wiederhergestellt.'),
     'Existing calendar instances with a missing ID must recover an unambiguous identity without recreation.'
 );
 assertTrueValue(
@@ -3719,7 +3962,7 @@ assertTrueValue(
         && str_contains($calendarModuleSource, "array_key_exists('writeAccessKnown', \$calendar)")
         && !str_contains($calendarModuleSource, ": array_key_exists('create', \$capabilities)")
         && str_contains($calendarModuleSource, "\$this->ReadAttributeBoolean('DetectedCanWrite')
-                            || \$this->ReadPropertyBoolean('CanWrite')"),
+                                || \$this->ReadPropertyBoolean('CanWrite')"),
     'Calendar instances must preserve writable operation for legacy caches and incomplete DAV privilege metadata.'
 );
 assertTrueValue(
@@ -3826,12 +4069,13 @@ assertTrueValue(
 );
 assertTrueValue(
     is_string($viewModuleSource)
-        && str_contains($viewModuleSource, "case 'FormRegenerateIPSViewHTML':")
+        && str_contains($viewModuleSource, '$this->HandleIPSViewHTMLPageAction($Ident, $Value)')
         && str_contains($viewModuleSource, 'public function RegenerateIPSViewHTML(): bool')
-        && str_contains($viewModuleSource, "return \$this->UpdateIPSViewHTMLVariable('IPSViewCalendar', \$html);")
+        && str_contains($viewModuleSource, 'return $debugFlowResult = $this->RegenerateIPSViewHTMLPages();')
+        && str_contains($htmlPageHelperSource, "private const IPSVIEW_HTML_REGENERATE_ACTION = 'IPSViewHTMLRegenerateVariables';")
         && str_contains($viewModuleSource, 'private function renderNonEmptyIPSViewHTML(array $state, string $debugContext): ?string')
         && str_contains($viewModuleSource, 'private function existingIPSViewHTML(): string')
-        && str_contains($viewModuleSource, "'Rendering returned an empty document; preserving the existing IPSView HTML.'")
+        && str_contains($viewModuleSource, "'Darstellung lieferte ein leeres Dokument; vorhandene IPSView-Ausgabe bleibt erhalten.'")
         && !str_contains($viewModuleSource, "UnregisterVariable('IPSViewCalendar')"),
     'IPSView regeneration must preserve the object ID and must never replace valid WebContent with an empty render result.'
 );

@@ -29,8 +29,10 @@ final class TaskSeriesWriteCalendar extends Calendar
 {
     public array $requests = [];
     public array $source = [];
+    public array $following = [];
     public bool $cacheAvailable = true;
     public bool $followingAvailable = true;
+    public bool $localCalendar = false;
 
     protected function HasActiveParent(): bool
     {
@@ -40,6 +42,11 @@ final class TaskSeriesWriteCalendar extends Calendar
     protected function ReadAttributeBoolean(string $Name): bool
     {
         return true;
+    }
+
+    protected function ReadPropertyBoolean(string $Name): bool
+    {
+        return $Name === 'LocalCalendar' ? $this->localCalendar : true;
     }
 
     protected function ReadAttributeString(string $Name): string
@@ -75,7 +82,7 @@ final class TaskSeriesWriteCalendar extends Calendar
             return json_encode(['Success' => false, 'Error' => 'Series lookup unavailable.'], JSON_THROW_ON_ERROR);
         }
         $payload = match ($request['Operation']) {
-            'GetRecurringFollowing' => array_merge($this->source, [
+            'GetRecurringFollowing' => array_merge($this->following !== [] ? $this->following : $this->source, [
                 'etag'               => 'fresh-etag',
                 'writeScope'         => 'following',
                 'recurrenceSettings' => [
@@ -131,6 +138,23 @@ assertTaskAppointment(
     count($writes) === 1 && $writes[0]['Recurrence']['writeScope'] === 'occurrence',
     'Completing a task with follow-up enabled must still affect only that occurrence.'
 );
+
+$manualCalendar->source['summary'] = '[OC:DONE:FOLLOW] Task';
+$manualCalendar->following = array_merge($manualCalendar->source, ['summary' => '[OC:TODO:FOLLOW] Task']);
+$manualCalendar->requests = [];
+$manualCalendar->UpdateEvent(json_encode(array_merge($manualCalendar->source, ['changes' => [
+    'task'  => true, 'taskCompleted' => true, 'taskFollowPlanned' => true,
+    'start' => '2026-09-13', 'end' => '2026-09-14'
+]]), JSON_THROW_ON_ERROR));
+$writes = array_values(array_filter($manualCalendar->requests, static fn (array $r): bool => $r['Operation'] === 'UpdateEvent'));
+assertTaskAppointment(
+    count($writes) === 1
+        && $writes[0]['Recurrence']['writeScope'] === 'following'
+        && $writes[0]['Event']['summary'] === '[OC:TODO:FOLLOW] Task',
+    'Moving a completed first task occurrence must not mark the reanchored series as completed.'
+);
+$manualCalendar->following = [];
+$manualCalendar->source['summary'] = '[OC:TODO:FOLLOW] Task';
 
 $manualCalendar->cacheAvailable = false;
 foreach (['2026-09-10' => '2026-10-10', '2026-09-17' => '2026-10-17', '2026-09-12' => null] as $newDate => $expectedUntil) {
@@ -188,9 +212,9 @@ $created = CalendarTaskEvent::prepareWrite([
 ]);
 assertTaskAppointment(
     $created['summary'] === '[OC:TODO] Versicherung prüfen'
-        && !array_key_exists('task', $created)
-        && !array_key_exists('taskCompleted', $created),
-    'Creating a task appointment must persist only the open title marker.'
+        && ($created['task'] ?? false) === true
+        && ($created['taskCompleted'] ?? true) === false,
+    'Creating a task appointment must retain structured metadata for provider-specific persistence.'
 );
 
 $enriched = CalendarTaskEvent::enrich($created);
@@ -217,9 +241,40 @@ $followPlanned = CalendarTaskEvent::prepareWrite(
 );
 assertTaskAppointment(
     $followPlanned['summary'] === '[OC:TODO:FOLLOW] Versicherung prüfen'
-        && (CalendarTaskEvent::enrich($followPlanned)['taskFollowPlanned'] ?? false) === true,
-    'A task series must persist the choice to move planned follow-up appointments.'
+        && (CalendarTaskEvent::enrich($followPlanned)['taskFollowPlanned'] ?? false) === true
+        && (CalendarTaskEvent::enrich($followPlanned)['taskRollForwardScope'] ?? '')
+            === CalendarTaskEvent::ROLL_FORWARD_SCOPE_FOLLOWING
+        && ($enriched['taskRollForwardScope'] ?? '') === CalendarTaskEvent::ROLL_FORWARD_SCOPE_OCCURRENCE,
+    'Existing task markers must map to their compatible explicit roll-forward policies.'
 );
+
+$rollForwardDisabled = CalendarTaskEvent::prepareWrite(
+    ['task' => true, 'taskRollForwardScope' => CalendarTaskEvent::ROLL_FORWARD_SCOPE_DISABLED],
+    $enriched + ['allDay' => true, 'recurring' => true, 'start' => '2026-09-08', 'end' => '2026-09-09']
+);
+$disabledTask = CalendarTaskEvent::enrich($rollForwardDisabled);
+assertTaskAppointment(
+    $rollForwardDisabled['summary'] === '[OC:TODO:KEEP] Versicherung prüfen'
+        && ($disabledTask['taskRollForwardScope'] ?? '') === CalendarTaskEvent::ROLL_FORWARD_SCOPE_DISABLED
+        && ($disabledTask['taskFollowPlanned'] ?? true) === false,
+    'The disabled roll-forward scope must persist independently of the legacy follow-up flag.'
+);
+assertTaskAppointment(
+    CalendarTaskEvent::rollForwardChanges(
+        $disabledTask + ['allDay' => true, 'start' => '2026-09-08', 'end' => '2026-09-09'],
+        new DateTimeImmutable('2026-09-10')
+    ) === null,
+    'A task with disabled roll-forward must remain on its planned date while overdue.'
+);
+try {
+    CalendarTaskEvent::prepareWrite(
+        ['task' => true, 'taskRollForwardScope' => 'invalid'],
+        $enriched + ['allDay' => true, 'start' => '2026-09-08', 'end' => '2026-09-09']
+    );
+    throw new RuntimeException('An invalid task roll-forward scope must be rejected.');
+} catch (InvalidArgumentException) {
+    // Expected: public visualization input must not introduce arbitrary title markers.
+}
 
 $renamed = CalendarTaskEvent::prepareWrite(
     ['summary' => 'Versicherung wechseln'],
@@ -251,13 +306,30 @@ $normal = CalendarTaskEvent::prepareWrite(
     $enriched
 );
 assertTaskAppointment(
-    $normal['summary'] === 'Versicherung prüfen',
+    $normal['summary'] === 'Versicherung prüfen'
+        && array_key_exists('task', $normal)
+        && $normal['task'] === false,
     'Converting a task back to a normal event must remove its marker.'
 );
 $normalEnriched = CalendarTaskEvent::enrich(array_merge($enriched, $normal));
 assertTaskAppointment(
     !array_key_exists('task', $normalEnriched) && !array_key_exists('displaySummary', $normalEnriched),
     'Converting a task back to a normal event must remove stale task display metadata.'
+);
+
+$ordinary = CalendarTaskEvent::prepareWrite([
+    'summary'              => 'Normaler Termin',
+    'task'                 => false,
+    'taskCompleted'        => false,
+    'taskRollForwardScope' => CalendarTaskEvent::ROLL_FORWARD_SCOPE_OCCURRENCE,
+    'taskFollowPlanned'    => false
+], ['summary' => 'Normaler Termin']);
+assertTaskAppointment(
+    !array_key_exists('task', $ordinary)
+        && !array_key_exists('taskCompleted', $ordinary)
+        && !array_key_exists('taskRollForwardScope', $ordinary)
+        && !array_key_exists('taskFollowPlanned', $ordinary),
+    'Task controls submitted for a normal event must not reach calendar providers.'
 );
 
 $calendar = new Calendar(9012);
@@ -384,6 +456,37 @@ assertTaskAppointment(
     !CalendarTaskEvent::requiresOccurrenceDetachment($seriesEvents, $seriesEvents[0], '2026-09-18'),
     'A task occurrence must remain part of its series when its new date precedes the next planned occurrence.'
 );
+$mustDetachRolledForwardTask = new ReflectionMethod(Calendar::class, 'mustDetachRolledForwardTaskOccurrence');
+$manualCalendar->localCalendar = false;
+assertTaskAppointment(
+    !$mustDetachRolledForwardTask->invoke($manualCalendar, $seriesEvents, $seriesEvents[0], '2026-09-18'),
+    'External calendars must retain their series occurrence when the moved task does not cross a planned occurrence.'
+);
+$manualCalendar->localCalendar = true;
+assertTaskAppointment(
+    $mustDetachRolledForwardTask->invoke($manualCalendar, $seriesEvents, $seriesEvents[0], '2026-09-18'),
+    'A locally stored overdue task occurrence must detach from its series when it is rolled forward.'
+);
+$manualCalendar->localCalendar = false;
+$detachedTaskWrite = CalendarTaskEvent::prepareWrite([
+    'summary'           => 'Serienaufgabe',
+    'allDay'            => true,
+    'start'             => '2026-09-18',
+    'end'               => '2026-09-19',
+    'task'              => true,
+    'taskCompleted'     => false,
+    'taskFollowPlanned' => false
+], [
+    'summary' => '[OC:TODO:FOLLOW] Serienaufgabe',
+    'allDay'  => true,
+    'start'   => '2026-09-12',
+    'end'     => '2026-09-13'
+]);
+assertTaskAppointment(
+    $detachedTaskWrite['summary'] === '[OC:TODO] Serienaufgabe'
+        && ($detachedTaskWrite['taskFollowPlanned'] ?? true) === false,
+    'A rolled-forward detached task must be persisted as a standalone task without the series-follow marker.'
+);
 $shiftedEvents = CalendarTaskEvent::shiftFollowingEvents(
     $seriesEvents,
     $seriesEvents[0],
@@ -411,6 +514,78 @@ assertTaskAppointment(
         && $preservedEvents[1]['start'] === '2026-09-18'
         && $preservedEvents[2]['start'] === '2026-09-19',
     'A delayed provider response must not overwrite or repeat a task-series shift already completed today.'
+);
+
+$mergeIncrementalEvents = new ReflectionMethod(Calendar::class, 'mergeIncrementalEvents');
+$microsoftExceptionStart = new DateTimeImmutable('today -7 days');
+$microsoftExceptionEnd = $microsoftExceptionStart->modify('+1 day');
+$cachedMicrosoftException = array_merge(
+    IPSKalender\CalendarEventRecurrence::occurrence(
+        'microsoft-series',
+        'microsoft-exception',
+        $microsoftExceptionStart->format('Y-m-d'),
+        '',
+        true,
+        true,
+        true,
+        true,
+        true
+    ),
+    [
+        'eventReference' => 'microsoft-exception',
+        'summary'        => '[OC:TODO:FOLLOW] Microsoft task',
+        'allDay'         => true,
+        'start'          => $microsoftExceptionStart->format('Y-m-d'),
+        'end'            => $microsoftExceptionEnd->format('Y-m-d')
+    ]
+);
+$deltaMicrosoftException = $cachedMicrosoftException;
+$deltaMicrosoftException['originalStart'] = '';
+$deltaMicrosoftException['canUpdateFollowing'] = false;
+$mergedMicrosoftExceptions = $mergeIncrementalEvents->invoke(
+    $manualCalendar,
+    [$cachedMicrosoftException],
+    [$deltaMicrosoftException]
+);
+assertTaskAppointment(
+    count($mergedMicrosoftExceptions) === 1
+        && ($mergedMicrosoftExceptions[0]['originalStart'] ?? '') === $microsoftExceptionStart->format('Y-m-d')
+        && ($mergedMicrosoftExceptions[0]['canUpdateFollowing'] ?? false) === true,
+    'A Microsoft delta exception without originalStart must retain the cached occurrence identity for following moves.'
+);
+
+$manualCalendar->cacheAvailable = true;
+$manualCalendar->source = array_merge(
+    IPSKalender\CalendarEventRecurrence::occurrence(
+        'microsoft-series',
+        'microsoft-exception',
+        '',
+        '',
+        true,
+        true,
+        true,
+        true,
+        false
+    ),
+    [
+        'uid'         => 'microsoft-exception',
+        'resourceUrl' => 'microsoft-exception',
+        'summary'     => '[OC:TODO:FOLLOW] Microsoft task',
+        'allDay'      => true,
+        'start'       => '2026-09-12',
+        'end'         => '2026-09-13'
+    ]
+);
+$resolveWriteRecurrence = new ReflectionMethod(Calendar::class, 'resolveWriteRecurrence');
+$resolvedExceptionRecurrence = $resolveWriteRecurrence->invoke(
+    $manualCalendar,
+    array_merge($manualCalendar->source, ['originalStart' => '2026-09-12']),
+    true
+);
+assertTaskAppointment(
+    ($resolvedExceptionRecurrence['originalStart'] ?? '') === '2026-09-12'
+        && ($resolvedExceptionRecurrence['canUpdateFollowing'] ?? false) === true,
+    'A Microsoft exception must retain a supplied original-start fallback for following task moves.'
 );
 
 foreach ([

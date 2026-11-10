@@ -105,6 +105,11 @@ html.ipsview-mode {
     --cal-dialog-font-size: clamp(1rem, 0.96rem + 0.14vw, 1.06rem);
     --calendar-time-column-width: 5.25em;
 }
+html.tile-title-hidden { --tile-title-clearance: 0px; }
+html.tile-title-hidden.tile-maximize-visible {
+    --tile-title-clearance: 58px;
+    --tile-maximize-clearance: 48px;
+}
 html.ipsview-mode button:disabled,
 html.ipsview-mode [aria-disabled="true"] {
     color: var(--cal-text-inactive);
@@ -136,16 +141,19 @@ button { color: inherit; }
 }
 
 .toolbar {
+    --tile-toolbar-clearance: var(--tile-title-clearance);
     display: flex;
     align-items: center;
     gap: 7px;
-    min-height: calc(42px + var(--tile-title-clearance));
-    padding: calc(3px + var(--tile-title-clearance)) 10px 8px;
+    min-height: calc(42px + var(--tile-toolbar-clearance));
+    padding: calc(3px + var(--tile-toolbar-clearance)) 10px 8px;
     border-bottom: var(--cal-line-width, 1px) solid var(--cal-line, var(--cal-border));
 }
+html.tile-title-hidden.tile-maximize-visible .toolbar { --tile-toolbar-clearance: 0px; }
 
 .toolbar-group { display: flex; align-items: center; gap: 4px; }
 .toolbar-spacer { flex: 1; }
+.toolbar-actions { margin-right: var(--tile-maximize-clearance, 0px); }
 
 .toolbar-title {
     min-width: 0;
@@ -156,6 +164,7 @@ button { color: inherit; }
     text-overflow: ellipsis;
     white-space: nowrap;
 }
+.period-title-compact { display: none; }
 
 .icon-button, .view-selector-button, .view-selector-option, .primary-button, .secondary-button, .danger-button {
     border: var(--cal-border-width, 1px) solid var(--cal-border);
@@ -180,6 +189,24 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
     padding: 0;
     place-items: center;
     font-size: 1.05em;
+}
+
+.quick-view-buttons {
+    display: flex;
+    align-items: center;
+    flex: 0 1 auto;
+    min-width: 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+    flex-wrap: nowrap;
+    gap: 4px;
+    scrollbar-width: thin;
+}
+.quick-view-button { flex: 0 0 auto; font-size: .8em; font-weight: 700; }
+.quick-view-button.active {
+    border-color: var(--cal-accent);
+    background: var(--cal-gradient-accent);
+    color: var(--cal-text-active, var(--cal-text));
 }
 
 .calendar-filter-icon { width: 17px; height: 17px; fill: currentColor; }
@@ -710,6 +737,17 @@ html.ipsview-mode .danger-button { min-height: 48px; padding-inline: 18px; }
 .oc-dialog-large { --dialog-width: var(--cal-dialog-large-width); }
 .oc-dialog-extra-large { --dialog-width: var(--cal-dialog-extra-large-width); }
 .oc-dialog[open] { display: flex; flex-direction: column; }
+#event-dialog {
+    position: fixed;
+    top: var(--event-dialog-visible-top, calc(var(--tile-title-clearance) + 12px));
+    right: var(--event-dialog-visible-right, 12px);
+    bottom: var(--event-dialog-visible-bottom, 12px);
+    left: var(--event-dialog-visible-left, 12px);
+    width: min(var(--dialog-width), calc(100% - 24px));
+    height: auto;
+    max-height: none;
+    margin: auto;
+}
 .oc-dialog > .dialog-layout {
     display: flex;
     flex: 1 1 auto;
@@ -719,6 +757,37 @@ html.ipsview-mode .danger-button { min-height: 48px; padding-inline: 18px; }
     min-height: 0;
     max-height: inherit;
     overflow: hidden;
+}
+#event-dialog > .dialog-layout {
+    height: 100%;
+    max-height: 100%;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-y;
+    scrollbar-gutter: stable;
+}
+#event-dialog .dialog-body {
+    flex: 0 0 auto;
+    min-height: auto;
+    overflow: visible;
+    overscroll-behavior: auto;
+    touch-action: auto;
+}
+#event-dialog .dialog-header {
+    position: sticky;
+    top: 0;
+    z-index: 6;
+    background: var(--cal-dialog);
+    box-shadow: 0 1px 0 var(--cal-line, var(--cal-border));
+}
+#event-dialog .dialog-actions {
+    position: sticky;
+    bottom: 0;
+    z-index: 6;
+    background: var(--cal-dialog);
+    box-shadow: 0 -1px 0 var(--cal-line, var(--cal-border));
 }
 .oc-dialog::backdrop {
     background: color-mix(in srgb, var(--cal-text) 42%, transparent);
@@ -877,6 +946,9 @@ html.ipsview-mode #event-dialog .dialog-actions {
 .calendar-picker-trigger[aria-expanded="true"] .calendar-picker-chevron { transform: rotate(180deg); }
 .calendar-picker-options {
     display: grid;
+    grid-auto-rows: max-content;
+    align-content: start;
+    grid-template-columns: minmax(0, 1fr);
     gap: 2px;
     max-height: min(230px, 36vh);
     padding: 4px;
@@ -889,6 +961,10 @@ html.ipsview-mode #event-dialog .dialog-actions {
 }
 .calendar-picker-option {
     width: 100%;
+    min-width: 0;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    line-height: 1.25;
     min-height: 34px;
     padding: 7px 9px;
     border: 0;
@@ -1060,6 +1136,24 @@ html.ipsview-mode .view-selector-option { min-height: 48px; padding: 10px 13px; 
     outline-offset: 1px;
 }
 .hidden { display: none !important; }
+html.ipsview-mode #event-date-row { align-items: start; }
+.ips-date-field { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; align-content: start; gap: 4px; min-width: 0; }
+.ips-date-field > input::-webkit-calendar-picker-indicator { display: none; }
+.ips-date-trigger { align-self: start; }
+.ips-date-trigger svg { width: 1.1em; height: 1.1em; vertical-align: middle; }
+.ips-date-panel { grid-column: 1 / -1; padding: 8px; border: 1px solid var(--cal-border); border-radius: var(--cal-radius); background: var(--cal-dialog); min-width: 0; }
+.ips-date-nav { display: flex; align-items: center; justify-content: space-between; gap: 4px; }
+.ips-date-nav span { text-align: center; overflow-wrap: anywhere; }
+.ips-date-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 2px; margin-block: 8px; }
+.ips-date-grid > span { font-size: .65em; text-align: center; overflow-wrap: anywhere; }
+html.ipsview-mode .ips-date-grid > button { padding: 4px 0; min-width: 0; min-height: 2em; font-size: .8em; }
+.ips-date-grid button[aria-pressed="true"] { outline: 2px solid var(--cal-accent); outline-offset: -2px; }
+.ips-date-adjacent { opacity: .6; }
+.ips-date-time { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; }
+.ips-date-time label { min-width: 0; }
+.ips-date-actions { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
+.ips-date-actions button { max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
+html.ipsview-mode .ips-date-actions button { flex: 1 1 auto; padding-inline: .5em; }
 
 @media (max-width: 560px) {
     .oc-dialog {
@@ -1067,6 +1161,13 @@ html.ipsview-mode .view-selector-option { min-height: 48px; padding: 10px 13px; 
         max-height: calc(100vh - var(--tile-title-clearance) - 16px);
         max-height: calc(100dvh - var(--tile-title-clearance) - 16px);
         margin: calc(var(--tile-title-clearance) + 8px) auto 8px;
+    }
+    #event-dialog {
+        top: var(--event-dialog-visible-top, calc(var(--tile-title-clearance) + 8px));
+        right: var(--event-dialog-visible-right, 8px);
+        bottom: var(--event-dialog-visible-bottom, 8px);
+        left: var(--event-dialog-visible-left, 8px);
+        width: calc(100% - 16px);
     }
     .dialog-header { min-height: 50px; padding: 8px 9px 8px 12px; }
     .dialog-body { padding: 12px; }
@@ -1089,11 +1190,15 @@ html.ipsview-mode .view-selector-option { min-height: 48px; padding: 10px 13px; 
 :fullscreen {
     --tile-title-clearance: 0px;
 }
+html.tile-title-hidden.tile-maximize-visible:fullscreen {
+    --tile-title-clearance: 0px;
+    --tile-maximize-clearance: 0px;
+}
 
 @media (max-width: 560px) {
     .toolbar {
         gap: 4px;
-        min-height: calc(42px + var(--tile-title-clearance));
+        min-height: calc(42px + var(--tile-toolbar-clearance));
         padding-inline: 6px;
     }
     .toolbar-title { flex: 1 1 auto; padding-inline: 2px; font-size: .82em; }
@@ -1134,6 +1239,11 @@ html.ipsview-mode .view-selector-option { min-height: 48px; padding: 10px 13px; 
     .week-grid.vertical-week-grid .week-column { min-height: 0; }
 }
 
+@media (max-width: 720px) {
+    .period-title-wide { display: none; }
+    .period-title-compact { display: inline; }
+}
+
 @media (max-height: 260px) {
     .toolbar { min-height: 36px; padding-bottom: 5px; }
     .icon-button { width: 30px; height: 30px; }
@@ -1158,7 +1268,7 @@ html.ipsview-mode .view-selector-option { min-height: 48px; padding: 10px 13px; 
 @container symcon-visualization (max-width: 35rem) {
     .toolbar {
         gap: 4px;
-        min-height: calc(42px + var(--tile-title-clearance));
+        min-height: calc(42px + var(--tile-toolbar-clearance));
         padding-inline: var(--symc-responsive-padding);
     }
     .toolbar-title { flex: 1 1 auto; padding-inline: 2px; font-size: .82em; }
@@ -1175,7 +1285,43 @@ html.ipsview-mode .view-selector-option { min-height: 48px; padding: 10px 13px; 
     }
 }
 
+@container symcon-visualization (max-width: 45rem) {
+    html.ipsview-mode .toolbar.has-quick-views .floating-add {
+        position: absolute;
+        right: 12px;
+        bottom: 12px;
+        width: 48px;
+        height: 48px;
+        min-width: 48px;
+        padding: 0;
+        border-radius: 50%;
+    }
+    .period-title-wide { display: none; }
+    .period-title-compact { display: inline; }
+}
+
+/* A fixed CSS-pixel width prevents font scaling from forcing tablet headers onto two rows. */
+@container symcon-visualization (max-width: 560px) {
+    .toolbar.has-quick-views {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr) auto;
+        grid-template-areas: "navigation period view" "quick quick actions";
+        column-gap: 4px;
+        row-gap: 5px;
+    }
+    .toolbar.has-quick-views > .toolbar-group:first-child { grid-area: navigation; }
+    .toolbar.has-quick-views .toolbar-title { grid-area: period; }
+    .toolbar.has-quick-views .toolbar-spacer { display: none; }
+    .toolbar.has-quick-views .quick-view-buttons { grid-area: quick; }
+    .toolbar.has-quick-views .view-selector-button { grid-area: view; }
+    .toolbar.has-quick-views .toolbar-actions { grid-area: actions; justify-self: end; }
+}
+
 @container symcon-visualization (max-width: 26rem) {
+    html.tile-title-hidden.tile-maximize-visible .toolbar {
+        --tile-toolbar-clearance: var(--tile-title-clearance);
+    }
+    html.tile-title-hidden.tile-maximize-visible .toolbar-actions { margin-right: 0; }
     .view-selector-label,
     .view-selector-chevron { display: none; }
     .view-selector-button { min-width: var(--symc-responsive-touch-target); min-height: var(--symc-responsive-touch-target); justify-content: center; padding-inline: 6px; }

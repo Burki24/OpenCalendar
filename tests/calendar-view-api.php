@@ -82,6 +82,9 @@ try {
 $moduleSource = (string) file_get_contents(__DIR__ . '/../Kalender Ansicht/module.php');
 $calendarModuleSource = (string) file_get_contents(__DIR__ . '/../Kalender/module.php');
 $readmeSource = (string) file_get_contents(__DIR__ . '/../Kalender Ansicht/README.md');
+// Source contracts ignore result capture; runtime debug tests verify behavior.
+$moduleSource = str_replace('return $debugFlowResult = ', 'return ', $moduleSource);
+$calendarModuleSource = str_replace('return $debugFlowResult = ', 'return ', $calendarModuleSource);
 $moduleMetadata = json_decode(
     (string) file_get_contents(__DIR__ . '/../Kalender Ansicht/module.json'),
     true,
@@ -254,8 +257,8 @@ assertCalendarViewApi(
     str_contains($moduleSource, '$event[\'calendarInstanceId\'] = $calendar[\'instanceId\'];')
         && str_contains($moduleSource, '$event[\'calendarName\'] = $calendar[\'name\'];')
         && str_contains($moduleSource, '$event[\'calendarColor\'] = $calendar[\'color\'];')
-        && str_contains($moduleSource, '$event[\'canWrite\'] = $calendar[\'canWrite\'];'),
-    'Calendar View appointment results must identify their source calendar.'
+        && str_contains($moduleSource, "!array_key_exists('canWrite', \$event)"),
+    'Calendar View appointment results must identify their source calendar and retain explicit item write restrictions.'
 );
 
 assertCalendarViewApi(
@@ -384,8 +387,10 @@ assertCalendarViewApi(
         && str_contains($normalizedModuleSource, "'timezone' => trim((string) (\$calendarStatus['timezone'] ?? ''))")
         && str_contains($normalizedModuleSource, "'canCreateRecurrence' => (bool) (\$calendarStatus['canCreateRecurrence'] ?? false)")
         && str_contains($normalizedModuleSource, "'canDeleteSeries' => (bool) (\$calendarStatus['canDeleteSeries'] ?? false)")
+        && str_contains($normalizedModuleSource, "'microsoftTodoEnabled' => trim((string) (\$calendarStatus['microsoftTaskListId'] ?? IPS_GetProperty(\$instanceId, 'MicrosoftTaskListID'))) !== ''")
         && str_contains($normalizedModuleSource, "'maxReminders' => max(1, min(CalendarEventReminder::MAX_REMINDERS, (int) (\$calendarStatus['maxReminders'] ?? 1)))")
-        && str_contains($moduleSource, "\$calendar['provider'] = \$this->calendarProviderKey(\$instance);")
+        && str_contains($moduleSource, "? 'local'")
+        && str_contains($moduleSource, ': $this->calendarProviderKey($instance);')
         && str_contains($moduleSource, "\$calendar['lastSynchronization'] = max(0, (int) (\$calendarStatus['lastSynchronization'] ?? 0));")
         && str_contains($moduleSource, "\$calendar['status'] = (int) (\$instance['InstanceStatus'] ?? 0);")
         && str_contains($moduleSource, "\$calendar['lastError'] = trim((string) (\$calendarStatus['lastError'] ?? ''));")
@@ -436,6 +441,56 @@ $validateReminderMinutesWindowMethod->setAccessible(true);
 $validateVisualizationActionRangeMethod = new ReflectionMethod(CalendarView::class, 'validateVisualizationActionRange');
 $validateVisualizationActionRangeMethod->setAccessible(true);
 $calendarView = new CalendarView(1);
+$quickViewButtonsMethod = new ReflectionMethod(CalendarView::class, 'quickViewButtonsFromProperty');
+assertCalendarViewApi(
+    $quickViewButtonsMethod->invoke(null, json_encode([
+        ['View' => 3, 'Label' => 'T'],
+        ['View' => 5, 'Label' => 'A'],
+        ['View' => 1, 'Label' => 'W'],
+        ['View' => 1, 'Label' => 'X'],
+        ['View' => 99, 'Label' => 'Z'],
+        ['View' => 2, 'Label' => '<']
+    ], JSON_THROW_ON_ERROR)) === [
+        ['view' => 'threeDays', 'label' => 'T'],
+        ['view' => 'workWeek', 'label' => 'A'],
+        ['view' => 'week', 'label' => 'W']
+    ],
+    'Quick-view settings must preserve order while rejecting duplicate views and invalid buttons.'
+);
+assertCalendarViewApi(
+    $quickViewButtonsMethod->invoke(null, 'invalid') === []
+        && $quickViewButtonsMethod->invoke(null, '[]') === [],
+    'Absent and malformed quick-view settings must leave the toolbar unchanged.'
+);
+$tileTitleLayoutClasses = new ReflectionMethod(CalendarView::class, 'tileTitleLayoutClasses');
+assertCalendarViewApi(
+    $tileTitleLayoutClasses->invoke(null, ['ObjectIsHiddenTitle' => true], '9.0') === [],
+    'Symcon 9.0 must retain the title clearance even if a newer object field is present.'
+);
+assertCalendarViewApi(
+    $tileTitleLayoutClasses->invoke(null, [], '9.0') === [],
+    'Symcon 9.0 object metadata without title visibility must retain the title clearance.'
+);
+assertCalendarViewApi(
+    $tileTitleLayoutClasses->invoke(null, ['ObjectIsHiddenTitle' => false], '9.1') === [],
+    'A visible title on Symcon 9.1 must retain the title clearance.'
+);
+assertCalendarViewApi(
+    $tileTitleLayoutClasses->invoke(null, ['ObjectIsHiddenTitle' => true, 'ObjectIsHiddenMaximize' => true], '9.1') === ['tile-title-hidden'],
+    'A hidden title and hidden maximize button on Symcon 9.1 need no host clearance.'
+);
+assertCalendarViewApi(
+    $tileTitleLayoutClasses->invoke(null, ['ObjectIsHiddenTitle' => true, 'ObjectIsHiddenMaximize' => false], '9.1') === ['tile-title-hidden', 'tile-maximize-visible'],
+    'A visible maximize button must keep its corner clear when the title is hidden.'
+);
+assertCalendarViewApi(
+    $tileTitleLayoutClasses->invoke(null, ['ObjectIsHiddenTitle' => true], '9.1') === ['tile-title-hidden', 'tile-maximize-visible'],
+    'Missing maximize metadata must conservatively reserve its corner.'
+);
+assertCalendarViewApi(
+    $tileTitleLayoutClasses->invoke(null, ['ObjectIsHiddenTitle' => true, 'ObjectIsHiddenMaximize' => true], '9.2') === ['tile-title-hidden'],
+    'Newer Symcon versions must retain support for hidden tile titles.'
+);
 $previousTimezone = date_default_timezone_get();
 date_default_timezone_set('Europe/Berlin');
 

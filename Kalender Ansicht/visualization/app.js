@@ -58,9 +58,11 @@ let toastTimer = null;
 let monthLayoutFrame = null;
 let selectedDayEventsDate = null;
 let swipeGesture = null;
+let pickerTouchScroll = null;
 let suppressSwipeClickUntil = 0;
 let deferredCalendarState = null;
 let calendarStateSignature = '';
+let quickViewButtonsSignature = '';
 let eventEditingActive = false;
 let eventEditingRevision = 0;
 let eventDialogLoadingMode = '';
@@ -80,6 +82,8 @@ const monthEventData = new WeakMap();
 
 const content = document.getElementById('calendar-content');
 const periodTitle = document.getElementById('period-title');
+const periodTitleWide = document.getElementById('period-title-wide');
+const periodTitleCompact = document.getElementById('period-title-compact');
 const eventDialog = document.getElementById('event-dialog');
 const eventDetailsDialog = document.getElementById('event-details-dialog');
 const editScopeDialog = document.getElementById('edit-scope-dialog');
@@ -102,8 +106,9 @@ const eventAnniversaryDateLabel = document.getElementById('event-anniversary-dat
 const eventTask = document.getElementById('event-task');
 const eventTaskCompleted = document.getElementById('event-task-completed');
 const eventTaskCompletedRow = document.getElementById('event-task-completed-row');
-const eventTaskFollowPlanned = document.getElementById('event-task-follow-planned');
-const eventTaskFollowPlannedRow = document.getElementById('event-task-follow-planned-row');
+const eventTaskRollForwardScope = document.getElementById('event-task-roll-forward');
+const eventTaskRollForwardScopeRow = document.getElementById('event-task-roll-forward-row');
+const eventMicrosoftTodoRecurrenceNote = document.getElementById('event-microsoft-todo-recurrence-note');
 const eventRecurrenceRow = document.getElementById('event-recurrence-row');
 const eventRecurrenceFrequency = document.getElementById('event-recurrence-frequency');
 const eventRecurrenceOptions = document.getElementById('event-recurrence-options');
@@ -127,6 +132,7 @@ const dayEventsDialog = document.getElementById('day-events-dialog');
 const viewSelectorDialog = document.getElementById('view-selector-dialog');
 const viewSelectorButton = document.getElementById('view-selector-button');
 const viewSelectorLabel = document.getElementById('view-selector-label');
+const quickViewButtons = document.getElementById('quick-view-buttons');
 const calendarFilterDialog = document.getElementById('calendar-filter-dialog');
 const calendarFilterOptions = document.getElementById('calendar-filter-options');
 const monthResizeObserver = typeof ResizeObserver === 'function'
@@ -408,9 +414,76 @@ function setEventDialogLoading(mode = '') {
     eventReminderRow.classList.remove('hidden');
 }
 
+function eventDialogHostViewport() {
+    try {
+        if (window.parent === window || !window.frameElement) return null;
+        const hostWindow = window.parent;
+        const hostViewport = hostWindow.visualViewport || hostWindow;
+        const viewportLeft = Number(hostViewport.offsetLeft || 0);
+        const viewportTop = Number(hostViewport.offsetTop || 0);
+        const viewportWidth = Number(hostViewport.width || hostWindow.innerWidth);
+        const viewportHeight = Number(hostViewport.height || hostWindow.innerHeight);
+        const frameBounds = window.frameElement.getBoundingClientRect();
+        const horizontalScale = frameBounds.width / window.innerWidth;
+        const verticalScale = frameBounds.height / window.innerHeight;
+        if (!Number.isFinite(viewportWidth)
+            || !Number.isFinite(viewportHeight)
+            || !Number.isFinite(horizontalScale)
+            || !Number.isFinite(verticalScale)
+            || horizontalScale <= 0
+            || verticalScale <= 0) {
+            return null;
+        }
+
+        const viewportRight = viewportLeft + viewportWidth;
+        const viewportBottom = viewportTop + viewportHeight;
+        const visibleLeft = Math.max(viewportLeft, frameBounds.left);
+        const visibleTop = Math.max(viewportTop, frameBounds.top);
+        const visibleRight = Math.min(viewportRight, frameBounds.right);
+        const visibleBottom = Math.min(viewportBottom, frameBounds.bottom);
+        if (visibleRight <= visibleLeft || visibleBottom <= visibleTop) return null;
+
+        return {
+            left: (visibleLeft - frameBounds.left) / horizontalScale,
+            top: (visibleTop - frameBounds.top) / verticalScale,
+            right: window.innerWidth - ((visibleRight - frameBounds.left) / horizontalScale),
+            bottom: window.innerHeight - ((visibleBottom - frameBounds.top) / verticalScale)
+        };
+    } catch (_) {
+        // Standalone mode and cross-origin hosts use the CSS viewport fallback.
+        return null;
+    }
+}
+
+function updateEventDialogViewportBounds() {
+    const hostViewport = eventDialogHostViewport();
+    if (!hostViewport) {
+        eventDialog.style.removeProperty('--event-dialog-visible-left');
+        eventDialog.style.removeProperty('--event-dialog-visible-top');
+        eventDialog.style.removeProperty('--event-dialog-visible-right');
+        eventDialog.style.removeProperty('--event-dialog-visible-bottom');
+        return;
+    }
+
+    const titleClearance = Number.parseFloat(getComputedStyle(document.documentElement)
+        .getPropertyValue('--tile-title-clearance')) || 0;
+    const edge = window.innerWidth <= 560 ? 8 : 12;
+    const left = Math.max(edge, hostViewport.left + edge);
+    const top = Math.max(titleClearance + edge, hostViewport.top + edge);
+    const right = Math.max(edge, hostViewport.right + edge);
+    const bottom = Math.max(edge, hostViewport.bottom + edge);
+    eventDialog.style.setProperty('--event-dialog-visible-left', `${left}px`);
+    eventDialog.style.setProperty('--event-dialog-visible-top', `${top}px`);
+    eventDialog.style.setProperty('--event-dialog-visible-right', `${right}px`);
+    eventDialog.style.setProperty('--event-dialog-visible-bottom', `${bottom}px`);
+}
+
 function showEventDialog() {
+    eventDialog.querySelector('.event-save-error')?.remove();
     if (!eventEditingActive) beginEventEditing();
+    updateEventDialogViewportBounds();
     if (!eventDialog.open) eventDialog.showModal();
+    requestAnimationFrame(updateEventDialogViewportBounds);
 }
 
 function deferEventDialogSetup(callback) {
@@ -611,6 +684,57 @@ function openViewSelector() {
     }
 }
 
+function configuredQuickViewButtons() {
+    const entries = Array.isArray(calendarState.settings.quickViewButtons)
+        ? calendarState.settings.quickViewButtons
+        : [];
+    const usedViews = new Set();
+    return entries.filter(entry => {
+        if (!entry || !calendarViews.has(entry.view) || usedViews.has(entry.view)
+            || typeof entry.label !== 'string' || !/^[A-Za-zÄÖÜäöü]$/u.test(entry.label)) return false;
+        usedViews.add(entry.view);
+        return true;
+    });
+}
+
+function updateQuickViewButtons() {
+    const entries = configuredQuickViewButtons();
+    const signature = JSON.stringify(entries);
+    if (signature !== quickViewButtonsSignature) {
+        quickViewButtons.textContent = '';
+        entries.forEach(entry => {
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'icon-button quick-view-button';
+            button.dataset.view = entry.view;
+            button.textContent = entry.label;
+            button.addEventListener('click', () => selectCalendarView(button.dataset.view));
+            quickViewButtons.appendChild(button);
+        });
+        quickViewButtonsSignature = signature;
+    }
+    quickViewButtons.classList.toggle('hidden', entries.length === 0);
+    quickViewButtons.parentElement.classList.toggle('has-quick-views', entries.length > 0);
+    quickViewButtons.setAttribute('aria-label', t('Quick views'));
+    Array.from(quickViewButtons.children).forEach(button => {
+        const view = button.dataset.view;
+        const label = t(calendarViewLabels[view] || view);
+        button.title = label;
+        button.setAttribute('aria-label', label);
+        button.setAttribute('aria-pressed', String(view === activeView));
+        button.classList.toggle('active', view === activeView);
+    });
+}
+
+function selectCalendarView(view, closeDialog = false) {
+    if (!calendarViews.has(view)) return;
+    activeView = view;
+    clampCurrentCursorDate();
+    persistClientViewState();
+    if (closeDialog) viewSelectorDialog.close();
+    render();
+}
+
 function updateToolbar() {
     const showControls = listControlsVisible();
     document.getElementById('previous-button').parentElement.classList.toggle('hidden', !showControls);
@@ -619,6 +743,7 @@ function updateToolbar() {
     viewSelectorLabel.textContent = activeViewLabel;
     viewSelectorButton.title = `${t('View')}: ${activeViewLabel}`;
     viewSelectorButton.setAttribute('aria-label', `${t('View')}: ${activeViewLabel}`);
+    updateQuickViewButtons();
     updateViewSelectorOptions();
     [
         ['previous-button', 'Previous'],
@@ -632,13 +757,18 @@ function updateToolbar() {
         button.setAttribute('aria-label', t(text));
     });
 
+    let wideTitle;
+    let compactTitle;
     if (activeView === 'month') {
         const monthCount = viewPeriod('month');
         const start = new Date(cursorDate.getFullYear(), cursorDate.getMonth(), 1);
         const end = new Date(start.getFullYear(), start.getMonth() + monthCount - 1, 1);
-        periodTitle.textContent = monthCount === 1
+        wideTitle = monthCount === 1
             ? formatMonth(start)
             : `${formatMonth(start)} – ${formatMonth(end)}`;
+        compactTitle = monthCount === 1
+            ? formatCompactMonth(start)
+            : `${formatCompactMonth(start)}–${formatCompactMonth(end)}`;
     } else if (activeView === 'week' || activeView === 'workWeek') {
         const days = weekViewDays(activeView === 'workWeek');
         const start = days[0] || startOfWeek(cursorDate);
@@ -646,18 +776,24 @@ function updateToolbar() {
         const calendarWeek = calendarState.settings.showWeekCalendarWeek !== false
             ? `${formatCalendarWeekLabel(days)} · `
             : '';
-        periodTitle.textContent = calendarWeek + formatRange(start, end);
+        wideTitle = calendarWeek + formatRange(start, end);
+        compactTitle = calendarWeek + formatCompactRange(start, end);
     } else if (activeView === 'threeDays') {
         const days = getVisibleDays(cursorDate, viewPeriod('threeDays'));
         const calendarWeek = calendarState.settings.showThreeDaysCalendarWeek === true
             ? `${formatCalendarWeekLabel(days)} · `
             : '';
-        periodTitle.textContent = calendarWeek + formatRange(days[0], days[days.length - 1]);
+        wideTitle = calendarWeek + formatRange(days[0], days[days.length - 1]);
+        compactTitle = calendarWeek + formatCompactRange(days[0], days[days.length - 1]);
     } else {
         const days = viewPeriod(activeView === 'list' ? 'list' : 'agenda');
         const end = addDays(cursorDate, days - 1);
-        periodTitle.textContent = formatRange(cursorDate, end);
+        wideTitle = formatRange(cursorDate, end);
+        compactTitle = formatCompactRange(cursorDate, end);
     }
+    periodTitleWide.textContent = wideTitle;
+    periodTitleCompact.textContent = compactTitle;
+    periodTitle.title = wideTitle;
 }
 
 function renderAgenda() {
@@ -713,7 +849,7 @@ function renderAgenda() {
             openDayEvents(group.date, dayEvents);
         });
         section.appendChild(heading);
-        group.events.forEach(event => section.appendChild(createAgendaEvent(event)));
+        group.events.forEach(event => section.appendChild(createAgendaEvent(event, group.date)));
         content.appendChild(section);
     });
 }
@@ -737,7 +873,7 @@ function agendaEventAnchorKey(event) {
     return `${calendarInstanceId}|${identity}|${start}`;
 }
 
-function createAgendaEvent(event) {
+function createAgendaEvent(event, day) {
     const card = element('button', 'event-card');
     card.type = 'button';
     card.dataset.agendaAnchor = agendaEventAnchorKey(event);
@@ -745,7 +881,7 @@ function createAgendaEvent(event) {
     const color = element('span', 'event-color');
     color.style.background = safeColor(event.calendarColor);
     const time = element('span', 'event-time');
-    time.textContent = event.allDay ? t('All day') : formatTime(eventStart(event)) + '\n' + formatTime(eventEnd(event));
+    time.textContent = event.allDay ? t('All day') : eventDayTimes(event, day).join('\n');
     time.style.whiteSpace = 'pre-line';
     const main = element('span', 'event-main');
     const title = element('span', 'event-title');
@@ -859,14 +995,14 @@ function listColumns() {
         columns.push({
             key: 'start',
             label: 'Start',
-            value: event => event.allDay ? t('All day') : formatTime(eventStart(event))
+            value: (event, displayDate) => event.allDay ? t('All day') : eventDayTimes(event, displayDate)[0]
         });
     }
     if (calendarState.settings.showListEnd !== false) {
         columns.push({
             key: 'end',
             label: 'End',
-            value: event => event.allDay ? '' : formatTime(eventEnd(event))
+            value: (event, displayDate) => event.allDay ? '' : eventDayTimes(event, displayDate)[1]
         });
     }
     if (calendarState.settings.showListTitle !== false) {
@@ -1212,7 +1348,7 @@ function appendTimelineEvents(container, dayStart, entries, range) {
     const minute = 60_000;
     const dayStartTimestamp = dayStart.getTime();
     entries.forEach(entry => {
-        const item = createSingleDayTimelineEvent(entry.event);
+        const item = createSingleDayTimelineEvent(entry.event, dayStart);
         const startMinute = (entry.startTimestamp - dayStartTimestamp) / minute;
         const endMinute = (entry.endTimestamp - dayStartTimestamp) / minute;
         const top = Math.max(0, (startMinute - range.startMinute) * range.pixelsPerMinute);
@@ -1225,19 +1361,19 @@ function appendTimelineEvents(container, dayStart, entries, range) {
     });
 }
 
-function createSingleDayTimelineEvent(event) {
+function createSingleDayTimelineEvent(event, day) {
     const item = element('button', 'single-day-timeline-event');
     item.type = 'button';
     item.style.setProperty('--event-color', safeColor(event.calendarColor));
     item.setAttribute(
         'aria-label',
-        `${eventDisplaySummary(event) || t('Untitled event')}, ${formatTime(eventStart(event))} – ${formatTime(eventEnd(event))}`
+        `${eventDisplaySummary(event) || t('Untitled event')}, ${eventDayTimes(event, day).join(' – ')}`
     );
 
     const title = document.createElement('strong');
     title.textContent = eventDisplaySummary(event) || t('Untitled event');
     const time = element('span', 'single-day-timeline-time');
-    time.textContent = formatTime(eventStart(event));
+    time.textContent = eventDayTimes(event, day)[0];
     item.append(title, time);
     item.addEventListener('click', () => openEventDetails(event));
     return item;
@@ -1298,18 +1434,18 @@ function renderWeekEventLayout(eventList, events, dayStart, dayEnd) {
         });
     });
 
-    fallbackEvents.forEach(event => eventList.appendChild(createWeekEventElement(event)));
+    fallbackEvents.forEach(event => eventList.appendChild(createWeekEventElement(event, dayStart)));
     buildWeekEventOverlapGroups(timedEvents).forEach(group => {
         const laneCount = group.reduce((maximum, entry) => Math.max(maximum, entry.lane + 1), 1);
         if (laneCount <= 1) {
-            group.forEach(entry => eventList.appendChild(createWeekEventElement(entry.event)));
+            group.forEach(entry => eventList.appendChild(createWeekEventElement(entry.event, dayStart)));
             return;
         }
 
         const overlapGroup = element('div', 'week-event-overlap-group');
         overlapGroup.style.setProperty('--week-event-columns', String(laneCount));
         const lanes = Array.from({ length: laneCount }, () => element('div', 'week-event-overlap-lane'));
-        group.forEach(entry => lanes[entry.lane].appendChild(createWeekEventElement(entry.event)));
+        group.forEach(entry => lanes[entry.lane].appendChild(createWeekEventElement(entry.event, dayStart)));
         lanes.forEach(lane => overlapGroup.appendChild(lane));
         eventList.appendChild(overlapGroup);
     });
@@ -1353,7 +1489,7 @@ function buildWeekEventOverlapGroups(entries) {
     return groups;
 }
 
-function createWeekEventElement(event) {
+function createWeekEventElement(event, day) {
     const item = element('div', 'week-event');
     item.style.setProperty('--event-color', safeColor(event.calendarColor));
     item.tabIndex = 0;
@@ -1362,7 +1498,7 @@ function createWeekEventElement(event) {
     const title = document.createElement('strong');
     title.textContent = eventDisplaySummary(event) || t('Untitled event');
     const time = document.createElement('span');
-    const timeParts = [event.allDay ? t('All day') : formatTime(eventStart(event))];
+    const timeParts = [event.allDay ? t('All day') : eventDayTimes(event, day)[0]];
     if (calendarState.settings.showAnniversaryType !== false) timeParts.push(annualEventLabel(event));
     time.textContent = timeParts.filter(Boolean).join(' · ');
     item.append(title, time);
@@ -1502,7 +1638,7 @@ function bindDayOverview(target, day, events) {
 function renderMonthEventPreview(container, day, events) {
     container.replaceChildren();
     const visibleCount = Math.min(3, events.length);
-    events.slice(0, visibleCount).forEach(event => container.appendChild(createMonthEventChip(event)));
+    events.slice(0, visibleCount).forEach(event => container.appendChild(createMonthEventChip(event, day)));
     if (events.length > visibleCount) {
         container.appendChild(createMoreEventsButton(day, events, events.length - visibleCount));
     }
@@ -1526,7 +1662,7 @@ function fitMonthEventContainer(container, day, events) {
     const visibleChips = [];
 
     for (const event of events) {
-        const chip = createMonthEventChip(event);
+        const chip = createMonthEventChip(event, day);
         container.appendChild(chip);
         if (container.scrollHeight > container.clientHeight) {
             chip.remove();
@@ -1545,12 +1681,12 @@ function fitMonthEventContainer(container, day, events) {
     }
 }
 
-function createMonthEventChip(event) {
+function createMonthEventChip(event, day) {
     const chip = element('button', 'event-chip');
     chip.type = 'button';
     chip.style.setProperty('--event-color', safeColor(event.calendarColor));
     const occasion = calendarState.settings.showAnniversaryType !== false ? annualEventLabel(event) : '';
-    chip.textContent = (event.allDay ? '' : formatTime(eventStart(event)) + ' ')
+    chip.textContent = (event.allDay ? '' : eventDayTimes(event, day)[0] + ' ')
         + (eventDisplaySummary(event) || t('Untitled event'))
         + (occasion ? ' · ' + occasion : '');
     chip.addEventListener('click', () => openEventDetails(event));
@@ -1584,7 +1720,7 @@ function openDayEvents(day, events) {
         item.type = 'button';
         item.style.setProperty('--event-color', safeColor(event.calendarColor));
         const time = element('span', 'day-event-time');
-        time.textContent = event.allDay ? t('All day') : `${formatTime(eventStart(event))} – ${formatTime(eventEnd(event))}`;
+        time.textContent = event.allDay ? t('All day') : eventDayTimes(event, day).join(' – ');
         const summary = element('span', 'day-event-summary');
         summary.textContent = eventDisplaySummary(event) || t('Untitled event');
         item.append(time, summary);
@@ -1665,17 +1801,25 @@ function visibleCalendarEvents() {
     return calendarState.events.filter(event => visibleCalendarIds.has(Number(event.calendarInstanceId)));
 }
 
+// Display-only clipping: never change the original event used for editing or syncing.
+function eventDayTimes(event, day = eventStart(event)) {
+    const start = eventStart(event);
+    const end = eventEnd(event);
+    const dayStart = startOfDay(day);
+    const dayEnd = addDays(dayStart, 1);
+    return [
+        formatTime(start < dayStart ? dayStart : start),
+        end >= dayEnd ? '24:00' : formatTime(end)
+    ];
+}
+
 function dailyViewEntries(events, rangeStart, rangeEnd) {
     const entries = [];
     events.forEach(event => {
-        if (!event.allDay) {
-            const date = eventStart(event);
-            entries.push({ event, date: date < rangeStart ? startOfDay(rangeStart) : date });
-            return;
-        }
-
-        let day = eventStart(event);
-        const end = eventEnd(event);
+        if (!eventOverlaps(event, rangeStart, rangeEnd)) return;
+        const start = eventStart(event);
+        let day = startOfDay(start);
+        const end = new Date(Math.max(eventEnd(event).getTime(), start.getTime() + 1));
         if (day < rangeStart) day = startOfDay(rangeStart);
         while (day < end && day < rangeEnd) {
             entries.push({ event, date: startOfDay(day) });
@@ -1756,8 +1900,24 @@ function eventDisplaySummary(event) {
 
 function taskPlainSummary(summary) {
     return String(summary || '').trim()
-        .replace(/^(?:\[OC:(?:TODO|DONE)(?::FOLLOW)?\]|☐↻|☑↻|☐|☑)\s*/u, '')
+        .replace(/^(?:\[OC:(?:TODO|DONE)(?::(?:FOLLOW|KEEP))?\]|☐↻|☑↻|☐|☑)\s*/u, '')
         .trim();
+}
+
+function taskRollForwardScope(event) {
+    const scope = String(event?.taskRollForwardScope || '').trim().toLowerCase();
+    if (['occurrence', 'following', 'disabled'].includes(scope)) return scope;
+    return event?.taskFollowPlanned ? 'following' : 'occurrence';
+}
+
+function microsoftTodoIdentity(event) {
+    if (String(event?.sourceType || '').trim().toLowerCase() !== 'microsoft-todo') return {};
+    return {
+        sourceType: 'microsoft-todo',
+        taskProvider: 'microsoft-todo',
+        taskId: String(event?.taskId || ''),
+        taskListId: String(event?.taskListId || '')
+    };
 }
 
 function editableEventSummary(event) {
@@ -1768,7 +1928,7 @@ function editableEventSummary(event) {
 function loadTaskEditor(event) {
     eventTask.checked = Boolean(event?.task);
     eventTaskCompleted.checked = Boolean(event?.taskCompleted);
-    eventTaskFollowPlanned.checked = Boolean(event?.taskFollowPlanned);
+    eventTaskRollForwardScope.value = taskRollForwardScope(event);
     updateTaskControls();
 }
 
@@ -1778,11 +1938,20 @@ function updateTaskControls() {
     eventTaskCompletedRow.classList.toggle('hidden', !enabled);
     eventTaskCompleted.disabled = !eventDialogEditable || !enabled;
     const recurring = eventRecurrenceFrequency.value !== 'none' || Boolean(selectedEvent?.recurring);
+    const microsoftTodo = enabled && selectedCalendarUsesMicrosoftTodo();
     const canFollow = Boolean(selectedCalendarEntry()?.canUpdateFollowing);
-    eventTaskFollowPlannedRow.classList.toggle('hidden', !enabled || !recurring || !canFollow);
-    eventTaskFollowPlanned.disabled = !eventDialogEditable || !enabled || !recurring || !canFollow;
-    if (!recurring || !canFollow) eventTaskFollowPlanned.checked = false;
+    eventTaskRollForwardScopeRow.classList.toggle('hidden', !enabled || !recurring || microsoftTodo);
+    eventMicrosoftTodoRecurrenceNote.classList.toggle('hidden', !enabled || !recurring || !microsoftTodo);
+    eventTaskRollForwardScope.disabled = !eventDialogEditable || !enabled || !recurring || microsoftTodo;
+    const followingOption = eventTaskRollForwardScope.querySelector('option[value="following"]');
+    followingOption.disabled = !canFollow;
+    if (microsoftTodo) {
+        eventTaskRollForwardScope.value = 'disabled';
+    } else if (!recurring || (!canFollow && eventTaskRollForwardScope.value === 'following')) {
+        eventTaskRollForwardScope.value = 'occurrence';
+    }
     updateTaskMoveNote();
+    synchronizeIPSViewEventStatePickers();
 
     if (!enabled || !eventDialogEditable) return;
 
@@ -1803,10 +1972,13 @@ function updateTaskMoveNote() {
         || ['series', 'following'].includes(selectedEvent?.writeScope)) return;
     const note = document.getElementById('dialog-note');
     const moving = Number(eventCalendarInput.value) !== Number(selectedEvent?.calendarInstanceId);
-    note.textContent = eventTask.checked && eventTaskFollowPlanned.checked && moving
+    const scope = eventTaskRollForwardScope.value;
+    note.textContent = eventTask.checked && scope === 'following' && moving
         ? t('This and all following tasks will be moved to the selected calendar.')
-        : eventTask.checked && eventTaskFollowPlanned.checked
+        : eventTask.checked && scope === 'following'
         ? t('Changing the date moves this and all following occurrences. Existing following exceptions will be reset.')
+        : eventTask.checked && scope === 'disabled'
+        ? t('Overdue tasks will remain on their original date until you move them manually.')
         : t('Only this occurrence of the recurring event will be changed.');
     note.classList.remove('hidden');
 }
@@ -1818,6 +1990,7 @@ function resetAnniversaryEditor() {
     eventAnniversaryDateRow.classList.add('hidden');
     eventAnniversaryDate.required = false;
     updateAnniversaryDateLabel();
+    synchronizeIPSViewEventStatePicker(eventAnniversaryType);
 }
 
 function annualEventType(event) {
@@ -1902,6 +2075,497 @@ function updateAnniversaryControls() {
         eventRecurrenceOptions.classList.add('hidden');
     } else {
         allDayInput.disabled = !eventDialogEditable || eventTask.checked;
+    }
+    synchronizeIPSViewEventStatePickers();
+}
+
+const ipsViewEventStatePickers = new Map();
+let ipsViewEventSelectSequence = 0;
+
+function initializeIPSViewEventStatePickers() {
+    if (calendarVisualization.mode !== 'ipsview') return;
+    eventDialog.querySelectorAll('select').forEach(select => initializeIPSViewEventStatePicker(select));
+}
+
+function initializeIPSViewEventStatePicker(select) {
+    if (calendarVisualization.mode !== 'ipsview'
+        || !(select instanceof HTMLSelectElement)
+        || ipsViewEventStatePickers.has(select)) return;
+
+    if (!select.id) {
+        ipsViewEventSelectSequence += 1;
+        select.id = `event-dialog-select-${ipsViewEventSelectSequence}`;
+    }
+    const row = select.closest('.form-row');
+    const label = row instanceof HTMLElement
+        ? Array.from(row.querySelectorAll('label')).find(candidate => candidate.htmlFor === select.id)
+            || row.querySelector('label')
+        : null;
+    if (!(row instanceof HTMLElement) || !(label instanceof HTMLLabelElement)) return;
+
+    const picker = element('div', 'calendar-picker event-state-picker');
+    const trigger = document.createElement('button');
+    const value = document.createElement('span');
+    const chevron = document.createElement('span');
+    const options = element('div', 'calendar-picker-options hidden');
+
+    trigger.type = 'button';
+    trigger.className = 'calendar-picker-trigger';
+    trigger.id = `${select.id}-trigger`;
+    trigger.setAttribute('aria-haspopup', 'listbox');
+    trigger.setAttribute('aria-expanded', 'false');
+    trigger.setAttribute('aria-controls', `${select.id}-options`);
+    value.id = `${select.id}-value`;
+    chevron.className = 'calendar-picker-chevron';
+    chevron.setAttribute('aria-hidden', 'true');
+    chevron.textContent = '⌄';
+    trigger.append(value, chevron);
+
+    options.id = `${select.id}-options`;
+    options.setAttribute('role', 'listbox');
+    label.id = label.id || `${select.id}-label`;
+    label.htmlFor = trigger.id;
+    options.setAttribute('aria-labelledby', label.id);
+
+    trigger.addEventListener('click', event => {
+        event.stopPropagation();
+        toggleIPSViewEventStatePicker(select);
+    });
+    trigger.addEventListener('keydown', event => {
+        if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+            event.preventDefault();
+            openIPSViewEventStatePicker(select, true);
+        } else if (event.key === 'Escape') {
+            closeIPSViewEventStatePicker(select);
+        }
+    });
+
+    picker.append(trigger, options);
+    select.classList.add('hidden');
+    select.setAttribute('aria-hidden', 'true');
+    row.appendChild(picker);
+    ipsViewEventStatePickers.set(select, { picker, trigger, value, options });
+    synchronizeIPSViewEventStatePicker(select);
+}
+
+function rebuildIPSViewEventStatePickerOptions(select, picker) {
+    picker.options.replaceChildren();
+    Array.from(select.options).forEach(nativeOption => {
+        const option = document.createElement('button');
+        option.type = 'button';
+        option.className = 'calendar-picker-option';
+        if (calendarVisualization.mode === 'ipsview') option.tabIndex = -1;
+        option.dataset.value = nativeOption.value;
+        option.setAttribute('role', 'option');
+        option.textContent = t(nativeOption.dataset.i18n || nativeOption.textContent.trim());
+        option.disabled = nativeOption.disabled;
+        option.setAttribute('aria-disabled', String(nativeOption.disabled));
+        option.addEventListener('click', event => {
+            event.stopPropagation();
+            if (option.disabled) return;
+            select.value = option.dataset.value || '';
+            select.dispatchEvent(new Event('change', { bubbles: true }));
+            synchronizeIPSViewEventStatePicker(select);
+            closeIPSViewEventStatePicker(select);
+            picker.trigger.focus();
+        });
+        option.addEventListener('keydown', event => handleIPSViewEventStateOptionKeydown(event, select));
+        picker.options.appendChild(option);
+    });
+}
+
+function synchronizeIPSViewEventStatePicker(select) {
+    const picker = ipsViewEventStatePickers.get(select);
+    if (!picker) return;
+
+    const nativeOptions = Array.from(select.options);
+    const pickerOptions = Array.from(picker.options.querySelectorAll('.calendar-picker-option'));
+    const optionsChanged = nativeOptions.length !== pickerOptions.length
+        || nativeOptions.some((nativeOption, index) => pickerOptions[index]?.dataset.value !== nativeOption.value)
+        || nativeOptions.some((nativeOption, index) => {
+            const option = pickerOptions[index];
+            return option
+                && (option.textContent !== t(nativeOption.dataset.i18n || nativeOption.textContent.trim())
+                    || option.disabled !== nativeOption.disabled);
+        });
+    if (optionsChanged) rebuildIPSViewEventStatePickerOptions(select, picker);
+
+    const selectedOption = nativeOptions.find(option => option.value === select.value) || null;
+    picker.value.textContent = selectedOption
+        ? t(selectedOption.dataset.i18n || selectedOption.textContent.trim())
+        : '';
+    picker.trigger.disabled = select.disabled;
+    picker.trigger.setAttribute('aria-disabled', String(select.disabled));
+    if (select.disabled) closeIPSViewEventStatePicker(select);
+
+    picker.options.querySelectorAll('.calendar-picker-option').forEach(option => {
+        const selected = option.dataset.value === select.value;
+        option.setAttribute('aria-selected', String(selected));
+    });
+}
+
+function synchronizeIPSViewEventStatePickers() {
+    ipsViewEventStatePickers.forEach((picker, select) => {
+        if (!select.isConnected || !picker.picker.isConnected) {
+            ipsViewEventStatePickers.delete(select);
+            return;
+        }
+        synchronizeIPSViewEventStatePicker(select);
+    });
+}
+
+function openIPSViewEventStatePicker(select, focusSelected = false) {
+    const picker = ipsViewEventStatePickers.get(select);
+    if (!picker || picker.trigger.disabled) return;
+    closeIPSViewEventStatePickers(select);
+    picker.options.classList.remove('hidden');
+    picker.trigger.setAttribute('aria-expanded', 'true');
+    if (focusSelected) {
+        const selected = picker.options.querySelector('[aria-selected="true"]')
+            || picker.options.querySelector('.calendar-picker-option');
+        selected?.focus();
+    }
+}
+
+function closeIPSViewEventStatePicker(select) {
+    const picker = ipsViewEventStatePickers.get(select);
+    if (!picker) return;
+    picker.options.classList.add('hidden');
+    picker.trigger.setAttribute('aria-expanded', 'false');
+}
+
+function closeIPSViewEventStatePickers(exceptSelect = null) {
+    ipsViewEventStatePickers.forEach((picker, select) => {
+        if (select !== exceptSelect) closeIPSViewEventStatePicker(select);
+    });
+}
+
+function toggleIPSViewEventStatePicker(select) {
+    const picker = ipsViewEventStatePickers.get(select);
+    if (!picker) return;
+    if (picker.options.classList.contains('hidden')) {
+        openIPSViewEventStatePicker(select);
+    } else {
+        closeIPSViewEventStatePicker(select);
+    }
+}
+
+function handleIPSViewEventStateOptionKeydown(event, select) {
+    const picker = ipsViewEventStatePickers.get(select);
+    if (!picker) return;
+    const options = Array.from(picker.options.querySelectorAll('.calendar-picker-option:not(:disabled)'));
+    const currentIndex = options.indexOf(event.currentTarget);
+    let nextIndex = currentIndex;
+    if (event.key === 'ArrowDown') nextIndex = Math.min(options.length - 1, currentIndex + 1);
+    else if (event.key === 'ArrowUp') nextIndex = Math.max(0, currentIndex - 1);
+    else if (event.key === 'Home') nextIndex = 0;
+    else if (event.key === 'End') nextIndex = options.length - 1;
+    else if (event.key === 'Escape') {
+        event.preventDefault();
+        closeIPSViewEventStatePicker(select);
+        picker.trigger.focus();
+        return;
+    } else {
+        return;
+    }
+    event.preventDefault();
+    options[nextIndex]?.focus();
+}
+
+function datePickerMonthDays(year, month) {
+    const first = new Date(year, month, 1, 12);
+    const offset = (first.getDay() + 6) % 7;
+    return Array.from({length: 42}, (_, index) => new Date(year, month, 1 - offset + index, 12));
+}
+
+function datePickerInputValue(day, hours, minutes, allDay) {
+    if (!(day instanceof Date) || !Number.isFinite(day.getTime())) return '';
+    const date = `${String(day.getFullYear()).padStart(4, '0')}-${String(day.getMonth() + 1).padStart(2, '0')}-${String(day.getDate()).padStart(2, '0')}`;
+    if (allDay) return date;
+    if (!/^\d{1,2}$/.test(String(hours)) || !/^\d{1,2}$/.test(String(minutes))
+        || Number(hours) > 23 || Number(minutes) > 59) return '';
+    return `${date}T${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+}
+
+function ipsViewDateText(value) {
+    const match = /^(\d{4})-(\d{2})-(\d{2})(?:T(\d{2}):(\d{2}))?$/.exec(value);
+    return match ? `${match[3]}.${match[2]}.${match[1]}` + (match[4] ? ` ${match[4]}:${match[5]}` : '') : '';
+}
+
+function ipsViewDateValue(text, allDay) {
+    const match = /^(\d{2})\.(\d{2})\.(\d{4})(?: (\d{2}):(\d{2}))?$/.exec(text);
+    if (!match || (!allDay && !match[4]) || (allDay && match[4])) return '';
+    const [, day, month, year, hour = '00', minute = '00'] = match;
+    if (+year < 1 || +hour > 23 || +minute > 59) return '';
+    const date = new Date(0);
+    date.setFullYear(+year, +month - 1, +day);
+    date.setHours(+hour, +minute, 0, 0);
+    if (date.getFullYear() !== +year || date.getMonth() !== +month - 1 || date.getDate() !== +day
+        || date.getHours() !== +hour || date.getMinutes() !== +minute) return '';
+    return `${year}-${month}-${day}` + (allDay ? '' : `T${hour}:${minute}`);
+}
+
+function initializeIPSViewDateSegments(input) {
+    const editor = document.createElement('input');
+    editor.type = 'text';
+    editor.id = `${input.id}-segments`;
+    editor.className = 'ips-date-segments';
+    editor.autocomplete = 'off';
+    editor.spellcheck = false;
+    input.before(editor);
+    input.classList.add('hidden');
+    input.tabIndex = -1;
+    input.setAttribute('aria-hidden', 'true');
+    const label = document.querySelector(`label[for="${input.id}"]`);
+    if (label) label.htmlFor = editor.id;
+    const ranges = () => input.type === 'date' ? [[0, 2], [3, 5], [6, 10]] : [[0, 2], [3, 5], [6, 10], [11, 13], [14, 16]];
+    let reverseEntry = false;
+    const sync = () => {
+        editor.value = ipsViewDateText(input.value);
+        editor.disabled = input.disabled;
+        editor.readOnly = input.readOnly;
+        editor.required = input.required;
+        editor.placeholder = input.type === 'date' ? 'TT.MM.JJJJ' : 'TT.MM.JJJJ hh:mm';
+        editor.setCustomValidity('');
+    };
+    input.ipsViewSync = sync;
+    sync();
+    let digits = '';
+    const select = index => { digits = ''; editor.setSelectionRange(...ranges()[index]); };
+    document.addEventListener('keydown', event => { if (event.key === 'Tab') reverseEntry = event.shiftKey; }, true);
+    editor.addEventListener('focus', () => select(reverseEntry ? ranges().length - 1 : 0));
+    editor.addEventListener('click', () => {
+        const index = ranges().findIndex(([, end]) => editor.selectionStart <= end);
+        select(index < 0 ? ranges().length - 1 : index);
+    });
+    editor.addEventListener('keydown', event => {
+        const parts = ranges();
+        let index = parts.findIndex(([, end]) => editor.selectionStart <= end);
+        if (index < 0) index = parts.length - 1;
+        if (!editor.readOnly && !event.ctrlKey && !event.metaKey && !event.altKey
+            && (/^\d$/.test(event.key) || ['Backspace', 'Delete'].includes(event.key))) {
+            event.preventDefault();
+            const [start, end] = parts[index];
+            if (!editor.value) editor.value = input.type === 'date' ? '00.00.0000' : '00.00.0000 00:00';
+            digits = /^\d$/.test(event.key) ? (digits.length >= end - start ? '' : digits) + event.key : '';
+            editor.value = editor.value.slice(0, start) + digits.padStart(end - start, '0') + editor.value.slice(end);
+            editor.setSelectionRange(start, end);
+            editor.dispatchEvent(new Event('input', {bubbles: true}));
+            return;
+        }
+        if (event.key !== 'Tab') return;
+        const next = index + (event.shiftKey ? -1 : 1);
+        if (next < 0 || next >= parts.length) return;
+        event.preventDefault();
+        select(next);
+    });
+    const validate = () => {
+        const value = ipsViewDateValue(editor.value, input.type === 'date');
+        editor.setCustomValidity(value || (!editor.required && !editor.value) ? '' : t('Invalid date.'));
+        return value;
+    };
+    editor.addEventListener('input', validate);
+    const commit = () => {
+        if (input.disabled || input.readOnly) return true;
+        const value = validate();
+        if (!value && (editor.required || editor.value)) {
+            editor.reportValidity();
+            return false;
+        }
+        if (value === input.value) return true;
+        const previous = input.value;
+        input.value = value;
+        if (!input.validity.valid) {
+            editor.setCustomValidity(input.validationMessage);
+            input.value = previous;
+            editor.reportValidity();
+            return false;
+        }
+        input.dispatchEvent(new Event('input', {bubbles: true}));
+        input.dispatchEvent(new Event('change', {bubbles: true}));
+        return true;
+    };
+    editor.addEventListener('change', commit);
+    // Programmatic segment keystrokes do not cause a native change on Windows.
+    editor.addEventListener('blur', commit);
+    input.ipsViewPendingCommit = () => {
+        if (input.disabled || input.readOnly || editor.value === ipsViewDateText(input.value)) return () => true;
+        const text = editor.value;
+        return () => { editor.value = text; return commit(); };
+    };
+    input.addEventListener('input', sync);
+    input.addEventListener('change', sync);
+    input.addEventListener('invalid', event => {
+        event.preventDefault();
+        editor.setCustomValidity(input.validationMessage);
+        editor.reportValidity();
+    });
+    new MutationObserver(sync).observe(input, {attributes: true, attributeFilter: ['type', 'disabled', 'readonly', 'required']});
+}
+
+function commitIPSViewDateSegments() {
+    // Snapshot both pending edits before the start update adjusts the end.
+    const commits = ['event-start', 'event-end'].map(id =>
+        document.getElementById(id).ipsViewPendingCommit?.() || (() => true));
+    return commits.every(commit => commit());
+}
+
+function initializeIPSViewDatePickers() {
+    if (calendarVisualization.mode !== 'ipsview') return;
+    let closeActive = null;
+    const locale = calendarVisualization.language || undefined;
+    for (const id of ['event-start', 'event-end']) {
+        const input = document.getElementById(id);
+        if (!input || input.closest('.ips-date-field')) continue;
+        const wrapper = element('div', 'ips-date-field');
+        input.before(wrapper);
+        wrapper.append(input);
+        initializeIPSViewDateSegments(input);
+        const trigger = element('button', 'secondary-button ips-date-trigger');
+        trigger.type = 'button';
+        trigger.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4m10-4v4M3 11h18m-13 4h2m4 0h2m-8 3h2m4 0h2"/></svg>';
+        trigger.setAttribute('aria-label', `${t('Date')} – ${t(id === 'event-start' ? 'Start' : 'End')}`);
+        trigger.setAttribute('aria-expanded', 'false');
+        trigger.setAttribute('aria-controls', `${id}-picker`);
+        wrapper.append(trigger);
+        const panel = element('div', 'ips-date-panel hidden');
+        panel.id = `${id}-picker`;
+        panel.setAttribute('role', 'group');
+        panel.setAttribute('aria-label', trigger.getAttribute('aria-label'));
+        wrapper.append(panel);
+        let day;
+        let month;
+        let hours;
+        let minutes;
+        const close = (focus = false) => {
+            panel.classList.add('hidden');
+            panel.replaceChildren();
+            trigger.setAttribute('aria-expanded', 'false');
+            if (closeActive === close) closeActive = null;
+            if (focus) trigger.focus();
+        };
+        const button = (text, action, parent = panel) => {
+            const node = element('button', 'secondary-button');
+            node.type = 'button';
+            node.textContent = text;
+            node.addEventListener('click', action);
+            parent.append(node);
+            return node;
+        };
+        const render = (focusDay = false) => {
+            panel.replaceChildren();
+            const nav = element('div', 'ips-date-nav');
+            panel.append(nav);
+            const changeMonth = delta => {
+                month = new Date(month.getFullYear(), month.getMonth() + delta, 1, 12);
+                render();
+                panel.querySelectorAll('.ips-date-nav button')[delta < 0 ? 0 : 1]?.focus({preventScroll: true});
+            };
+            const formatMonth = value => new Intl.DateTimeFormat(locale, {month: 'long', year: 'numeric'}).format(value);
+            const previous = button('‹', () => changeMonth(-1), nav);
+            previous.setAttribute('aria-label', formatMonth(new Date(month.getFullYear(), month.getMonth() - 1, 1)));
+            const title = element('span', '');
+            title.textContent = formatMonth(month);
+            title.setAttribute('aria-live', 'polite');
+            nav.append(title);
+            const next = button('›', () => changeMonth(1), nav);
+            next.setAttribute('aria-label', formatMonth(new Date(month.getFullYear(), month.getMonth() + 1, 1)));
+            const grid = element('div', 'ips-date-grid');
+            panel.append(grid);
+            for (let index = 0; index < 7; index++) {
+                const label = element('span', '');
+                label.textContent = new Intl.DateTimeFormat(locale, {weekday: 'short'}).format(new Date(2024, 0, 1 + index));
+                grid.append(label);
+            }
+            let selectedButton;
+            const choose = value => {
+                day = value;
+                month = new Date(day.getFullYear(), day.getMonth(), 1, 12);
+                render(true);
+            };
+            for (const value of datePickerMonthDays(month.getFullYear(), month.getMonth())) {
+                const cell = button(String(value.getDate()), () => choose(value), grid);
+                const selected = datePickerInputValue(day, '', '', true) === datePickerInputValue(value, '', '', true);
+                cell.setAttribute('aria-label', new Intl.DateTimeFormat(locale, {dateStyle: 'full'}).format(value));
+                cell.setAttribute('aria-pressed', String(selected));
+                cell.classList.toggle('ips-date-adjacent', value.getMonth() !== month.getMonth());
+                cell.tabIndex = selected ? 0 : -1;
+                if (selected) selectedButton = cell;
+                cell.addEventListener('keydown', event => {
+                    const offsets = {ArrowLeft: -1, ArrowRight: 1, ArrowUp: -7, ArrowDown: 7};
+                    if (!(event.key in offsets)) return;
+                    event.preventDefault();
+                    choose(new Date(value.getFullYear(), value.getMonth(), value.getDate() + offsets[event.key], 12));
+                });
+            }
+            // Keep the displayed month keyboard-accessible after navigating away from the selection.
+            if (!selectedButton) grid.querySelector('button').tabIndex = 0;
+            const time = element('div', 'ips-date-time');
+            panel.append(time);
+            const numberInput = (caption, value, maximum) => {
+                const label = element('label', '');
+                label.textContent = t(caption);
+                const field = document.createElement('input');
+                field.type = 'number'; field.min = '0'; field.max = String(maximum); field.step = '1'; field.required = true;
+                field.value = value;
+                label.append(field); time.append(label);
+                return field;
+            };
+            const hourInput = numberInput('Hours', hours, 23);
+            const minuteInput = numberInput('Minutes', minutes, 59);
+            const allDay = input.type === 'date';
+            time.classList.toggle('hidden', allDay);
+            hourInput.disabled = minuteInput.disabled = allDay;
+            hourInput.addEventListener('input', () => { hours = hourInput.value; });
+            minuteInput.addEventListener('input', () => { minutes = minuteInput.value; });
+            const actions = element('div', 'ips-date-actions');
+            panel.append(actions);
+            button(t('Today'), () => choose(new Date()), actions);
+            button(t('Cancel'), () => close(true), actions);
+            button(t('Apply'), () => {
+                if (input.disabled || input.readOnly) return close();
+                if (!allDay && (!hourInput.reportValidity() || !minuteInput.reportValidity())) return;
+                const value = datePickerInputValue(day, hours, minutes, allDay);
+                if (!value) return;
+                const previousValue = input.value;
+                input.value = value;
+                if (!input.reportValidity()) { input.value = previousValue; return; }
+                close(true);
+                input.dispatchEvent(new Event('input', {bubbles: true}));
+                input.dispatchEvent(new Event('change', {bubbles: true}));
+            }, actions);
+            if (focusDay) selectedButton?.focus({preventScroll: true});
+        };
+        trigger.addEventListener('click', () => {
+            if (input.disabled || input.readOnly) return;
+            if (!panel.classList.contains('hidden')) return close();
+            closeActive?.();
+            day = readInputDate(input.value) || new Date();
+            month = new Date(day.getFullYear(), day.getMonth(), 1, 12);
+            hours = String(day.getHours()).padStart(2, '0');
+            minutes = String(day.getMinutes()).padStart(2, '0');
+            closeActive = close;
+            render();
+            panel.classList.remove('hidden');
+            trigger.setAttribute('aria-expanded', 'true');
+            panel.querySelector('[aria-pressed="true"]')?.focus({preventScroll: true});
+        });
+        document.addEventListener('click', event => {
+            // Rendering a new month removes the clicked cell, but its event path
+            // still identifies this picker as the original click destination.
+            const inside = event.composedPath?.().includes(wrapper) || wrapper.contains(event.target);
+            if (!inside) close();
+        });
+        document.addEventListener('keydown', event => {
+            if (event.key !== 'Escape' || panel.classList.contains('hidden')) return;
+            event.preventDefault(); event.stopImmediatePropagation(); close(true);
+        }, true);
+        const updateDisabled = () => { trigger.disabled = input.disabled || input.readOnly; close(); };
+        new MutationObserver(updateDisabled).observe(input, {attributes: true, attributeFilter: ['disabled', 'readonly', 'type']});
+        input.addEventListener('change', () => close());
+        eventDialog.addEventListener('close', () => close());
+        document.getElementById('event-all-day').addEventListener('change', () => close());
+        updateDisabled();
     }
 }
 
@@ -2401,7 +3065,10 @@ function openNewEvent(preferredDay = null) {
     icsImportFile.value = '';
     icsImportFile.disabled = !calendarCanImportIcsFile;
     icsImportButton.classList.toggle('hidden', !calendarCanImportIcsFile);
-    populateCalendarSelect(writable, writable[0].instanceId);
+    const defaultCalendarInstanceId = Number(calendarState.settings.defaultCalendarInstanceId) || 0;
+    const defaultCalendar = writable.find(calendar => calendar.instanceId === defaultCalendarInstanceId)
+        || writable[0];
+    populateCalendarSelect(writable, defaultCalendar.instanceId);
     document.getElementById('dialog-title').textContent = t('Create event');
     document.getElementById('event-summary').value = '';
     document.getElementById('event-location').value = '';
@@ -2517,6 +3184,8 @@ async function toggleSelectedTaskCompletion() {
             end: selectedEvent.end,
             summary: selectedEvent.summary,
             taskFollowPlanned: Boolean(selectedEvent.taskFollowPlanned),
+            taskRollForwardScope: taskRollForwardScope(selectedEvent),
+            ...microsoftTodoIdentity(selectedEvent),
             ...recurrencePayload(selectedEvent),
             changes: {
                 task: true,
@@ -2664,6 +3333,7 @@ async function prepareEventEdit(event) {
             uid,
             resourceUrl: String(event?.resourceUrl || ''),
             eventReference,
+            ...microsoftTodoIdentity(event),
             seriesId,
             occurrenceId,
             originalStart,
@@ -2753,6 +3423,7 @@ async function confirmDeleteEvent() {
             event: {
                 resourceUrl: event.resourceUrl,
                 etag: event.etag,
+                ...microsoftTodoIdentity(event),
                 ...recurrencePayload(event, selectedDeleteScope(event))
             }
         });
@@ -2809,6 +3480,7 @@ function eventCanUpdate(event) {
 
 function eventCanMove(event, writeScope = '') {
     if (!hasActionBridge() || !Boolean(event?.canWrite)) return false;
+    if (String(event?.sourceType || '').trim().toLowerCase() === 'microsoft-todo') return false;
     const reminder = eventReminderState(event);
     if (reminder.mode === 'complex') return false;
     if (reminder.mode === 'default') {
@@ -2874,6 +3546,8 @@ function recurrencePayload(event, writeScope = '') {
 
 function eventReadOnlyReason(event) {
     if (eventCanUpdate(event) || eventCanDelete(event)) return '';
+    const explicitReason = String(event?.readOnlyReason || '').trim();
+    if (explicitReason) return explicitReason;
     if (!hasActionBridge()) return 'Editing events is unavailable because no action bridge is configured.';
     if (event.recurring || event.recurrenceId) return 'Recurring occurrences are currently read-only.';
     return 'This calendar is read-only.';
@@ -2948,6 +3622,10 @@ function openExistingEvent(event, writeScope = '') {
     if (!editable) {
         note.textContent = t(eventReadOnlyReason(selectedEvent));
         note.classList.remove('hidden');
+    } else if (String(selectedEvent.sourceType || '').toLowerCase() === 'microsoft-todo'
+        && selectedEvent.taskNativeRecurrence && !selectedEvent.taskCompleted) {
+        note.textContent = t('Changing the due date also realigns the Microsoft To Do recurrence. Future tasks are provided by Microsoft after completion.');
+        note.classList.remove('hidden');
     } else if (editingSeries) {
         note.textContent = selectedEvent.recurrenceEditable === false
             ? `${t('Changes will apply to the entire recurring series.')} ${t('The recurrence pattern of this series cannot be edited here.')}`
@@ -2977,6 +3655,7 @@ function populateCalendarSelect(calendars, selectedId) {
         const option = document.createElement('button');
         option.type = 'button';
         option.className = 'calendar-picker-option';
+        if (calendarVisualization.mode === 'ipsview') option.tabIndex = -1;
         option.dataset.value = String(calendar.instanceId);
         option.textContent = calendar.name;
         option.setAttribute('role', 'option');
@@ -3042,6 +3721,19 @@ function toggleCalendarPicker() {
     }
 }
 
+function handleIPSViewPickerTab(event) {
+    if (calendarVisualization.mode !== 'ipsview' || event.key !== 'Tab') return;
+    const picker = event.target.closest?.('.calendar-picker');
+    if (!picker || !eventDialog.contains(picker)) return;
+    const trigger = picker.querySelector('.calendar-picker-trigger[aria-expanded="true"]');
+    if (!trigger) return;
+    picker.querySelector('.calendar-picker-options')?.classList.add('hidden');
+    trigger.setAttribute('aria-expanded', 'false');
+    // Let native Tab/Shift+Tab proceed from the field, not a hidden option.
+    // Do not preventDefault: date segments and other native controls keep their behavior.
+    trigger.focus();
+}
+
 function handleCalendarOptionKeydown(event) {
     const options = Array.from(eventCalendarOptions.querySelectorAll('.calendar-picker-option'));
     const currentIndex = options.indexOf(event.currentTarget);
@@ -3069,6 +3761,10 @@ function calendarEntryByInstanceId(instanceId) {
 
 function selectedCalendarEntry() {
     return calendarEntryByInstanceId(eventCalendarInput.value);
+}
+
+function selectedCalendarUsesMicrosoftTodo() {
+    return Boolean(selectedCalendarEntry()?.microsoftTodoEnabled);
 }
 
 function eventReminderState(event) {
@@ -3224,7 +3920,9 @@ function appendReminderEditorEntry(minutesBeforeStart) {
 
     entry.append(fields, actions);
     eventReminderExtraList.append(entry);
+    initializeIPSViewEventStatePicker(unitSelect);
     setReminderFieldsFromMinutes(valueInput, unitSelect, minutesBeforeStart);
+    synchronizeIPSViewEventStatePicker(unitSelect);
 }
 
 function clearExtraReminderEntries() {
@@ -3374,6 +4072,7 @@ function updateReminderControls() {
     const maxReminders = maxReminderCount(selectedCalendar);
     eventReminderAddRow.classList.toggle('hidden', !custom || entries.length >= maxReminders);
     eventReminderAddButton.disabled = !custom || entries.length >= maxReminders;
+    synchronizeIPSViewEventStatePickers();
 
     eventReminderValue.setCustomValidity('');
     if (custom && entries.length > maxReminders) {
@@ -3573,6 +4272,8 @@ function recurrencePatternControls() {
     eventRecurrenceWeekdays.before(row);
     mode.addEventListener('change', updateRecurrenceControls);
     index.addEventListener('change', updateRecurrenceControls);
+    initializeIPSViewEventStatePicker(mode);
+    initializeIPSViewEventStatePicker(index);
 
     return { row, mode, index };
 }
@@ -3607,6 +4308,7 @@ function updateRecurrenceAvailability() {
         : selectedEvent === null
             ? Boolean(calendar?.canWrite) && Boolean(calendar?.canCreateRecurrence)
             : editingSingle
+                && selectedEvent?.recurrenceEditable !== false
                 && eventCanUpdateOccurrence(selectedEvent)
                 && Boolean(calendar?.canWrite)
                 && Boolean(movingSingle ? calendar?.canCreateRecurrence : calendar?.canUpdateRecurrence);
@@ -3658,6 +4360,7 @@ function updateRecurrenceControls() {
     };
     eventRecurrenceIntervalUnit.textContent = enabled ? t(units[frequency] || 'Days') : '';
     updateRecurrenceEndDateMinimum();
+    synchronizeIPSViewEventStatePickers();
 }
 
 function updateRecurrenceEndDateMinimum() {
@@ -3759,6 +4462,13 @@ function setDialogEditable(editable, descriptionEditable = editable) {
     updateRecurrenceAvailability();
     updateReminderControls();
     updateAnniversaryControls();
+    if (String(selectedEvent?.sourceType || '').trim().toLowerCase() === 'microsoft-todo') {
+        ['event-all-day', 'event-end', 'event-location'].forEach(id => {
+            document.getElementById(id).disabled = true;
+        });
+        eventTask.disabled = true;
+        eventTaskRollForwardScope.disabled = true;
+    }
 }
 
 function setDateInputs(start, end, allDay, allDayEndExclusive = false) {
@@ -3770,6 +4480,8 @@ function setDateInputs(start, end, allDay, allDayEndExclusive = false) {
     startInput.dataset.previousValue = startInput.value;
     const displayEnd = allDay && allDayEndExclusive && end > start ? addDays(end, -1) : end;
     endInput.value = allDay ? localDate(displayEnd) : localDateTime(displayEnd);
+    startInput.ipsViewSync?.();
+    endInput.ipsViewSync?.();
 }
 
 function updateEndFromStart() {
@@ -3784,28 +4496,17 @@ function updateEndFromStart() {
     if (allDay) {
         end = start;
     } else {
-        const dateChanged = previousStart && dayKey(previousStart) !== dayKey(start);
-        const timeChanged = previousStart
-            && (previousStart.getHours() !== start.getHours()
-                || previousStart.getMinutes() !== start.getMinutes());
         const currentEnd = readInputDate(endInput.value);
-
-        if (dateChanged && !timeChanged && currentEnd) {
-            end = new Date(
-                start.getFullYear(),
-                start.getMonth(),
-                start.getDate(),
-                currentEnd.getHours(),
-                currentEnd.getMinutes()
-            );
-            if (end <= start) end = new Date(start.getTime() + 60 * 60 * 1000);
-        } else {
-            end = new Date(start.getTime() + 60 * 60 * 1000);
-        }
+        const duration = previousStart && currentEnd
+            ? currentEnd.getTime() - previousStart.getTime()
+            : 0;
+        // Preserve the current duration, including manual end edits and overnight events.
+        end = new Date(start.getTime() + (duration > 0 ? duration : 60 * 60 * 1000));
     }
 
     endInput.value = allDay ? localDate(end) : localDateTime(end);
     startInput.dataset.previousValue = startInput.value;
+    endInput.ipsViewSync?.();
 }
 
 function updateDialogColor() {
@@ -3824,15 +4525,18 @@ function updateSaveButtonLabel() {
 
 eventForm.addEventListener('submit', async event => {
     event.preventDefault();
+    if (!commitIPSViewDateSegments()) return;
     const allDay = document.getElementById('event-all-day').checked;
     const calendarInstanceId = Number(eventCalendarInput.value);
+    const microsoftTodo = eventTask.checked && selectedCalendarUsesMicrosoftTodo();
     const eventData = {
         summary: document.getElementById('event-summary').value.trim(),
         description: document.getElementById('event-description').value.trim(),
         location: document.getElementById('event-location').value.trim(),
         task: eventTask.checked,
         taskCompleted: eventTask.checked && eventTaskCompleted.checked,
-        taskFollowPlanned: eventTask.checked && eventTaskFollowPlanned.checked,
+        taskRollForwardScope: eventTask.checked ? (microsoftTodo ? 'disabled' : eventTaskRollForwardScope.value) : 'occurrence',
+        taskFollowPlanned: eventTask.checked && !microsoftTodo && eventTaskRollForwardScope.value === 'following',
         allDay,
         start: inputDateValue(document.getElementById('event-start').value, allDay),
         end: inputDateValue(document.getElementById('event-end').value, allDay, allDay)
@@ -3906,6 +4610,7 @@ eventForm.addEventListener('submit', async event => {
                     uid: selectedEvent.uid,
                     resourceUrl: selectedEvent.resourceUrl,
                     etag: selectedEvent.etag,
+                    ...microsoftTodoIdentity(selectedEvent),
                     ...recurrencePayload(selectedEvent),
                     changes: eventData
                 }
@@ -3957,16 +4662,17 @@ document.getElementById('event-all-day').addEventListener('change', event => {
 eventTask.addEventListener('change', () => {
     if (!eventTask.checked) {
         eventTaskCompleted.checked = false;
-        eventTaskFollowPlanned.checked = false;
+        eventTaskRollForwardScope.value = 'occurrence';
     }
     updateTaskControls();
     updateRecurrenceAvailability();
     updateAnniversaryControls();
 });
-eventTaskFollowPlanned.addEventListener('change', updateTaskMoveNote);
+eventTaskRollForwardScope.addEventListener('change', updateTaskMoveNote);
 eventCalendarInput.addEventListener('change', () => {
     updateDialogColor();
     updateSaveButtonLabel();
+    updateTaskControls();
     updateRecurrenceAvailability();
     updateAnniversaryControls();
     resolveDefaultReminderForCalendarMove();
@@ -4052,16 +4758,30 @@ eventCalendarTrigger.addEventListener('keydown', event => {
 });
 document.addEventListener('click', event => {
     if (!eventCalendarPicker.contains(event.target)) closeCalendarPicker();
+    if (!(event.target instanceof Element) || !event.target.closest('.event-state-picker')) {
+        closeIPSViewEventStatePickers();
+    }
 });
 eventDialog.addEventListener('cancel', event => {
     if (!eventCalendarOptions.classList.contains('hidden')) {
         event.preventDefault();
         closeCalendarPicker();
         eventCalendarTrigger.focus();
+        return;
+    }
+    const openStatePicker = Array.from(ipsViewEventStatePickers.entries())
+        .find(([, picker]) => !picker.options.classList.contains('hidden'));
+    if (openStatePicker) {
+        event.preventDefault();
+        closeIPSViewEventStatePicker(openStatePicker[0]);
+        openStatePicker[1].trigger.focus();
     }
 });
 eventDialog.addEventListener('close', () => {
+    clearPickerMousePosition();
+    endPickerTouchScroll();
     closeCalendarPicker();
+    closeIPSViewEventStatePickers();
     if (eventDialogLoadingMode === 'provider') {
         pendingEventEdit = null;
         pendingSeriesEdit = null;
@@ -4135,14 +4855,10 @@ document.getElementById('today-button').addEventListener('click', () => {
 document.getElementById('previous-button').addEventListener('click', () => navigate(-1));
 document.getElementById('next-button').addEventListener('click', () => navigate(1));
 document.querySelectorAll('.view-selector-option').forEach(button => button.addEventListener('click', () => {
-    if (!calendarViews.has(button.dataset.view)) return;
-    activeView = button.dataset.view;
-    clampCurrentCursorDate();
-    persistClientViewState();
-    viewSelectorDialog.close();
-    render();
+    selectCalendarView(button.dataset.view, true);
 }));
 window.addEventListener('resize', () => {
+    updateEventDialogViewportBounds();
     if (activeView === 'month') {
         scheduleMonthEventLayout();
     } else if (activeView === 'week' || activeView === 'workWeek') {
@@ -4151,12 +4867,27 @@ window.addEventListener('resize', () => {
     }
     updateSwipeNavigationMode();
 });
+try {
+    window.parent?.addEventListener('resize', updateEventDialogViewportBounds);
+    window.parent?.addEventListener('scroll', updateEventDialogViewportBounds, true);
+    window.parent?.visualViewport?.addEventListener('resize', updateEventDialogViewportBounds);
+    window.parent?.visualViewport?.addEventListener('scroll', updateEventDialogViewportBounds);
+} catch (_) {
+    // Standalone mode and cross-origin hosts use the CSS viewport fallback.
+}
 document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'hidden') return;
     void ensureVisibleRangeLoaded();
     requestIPSViewStateRefresh();
 });
 document.addEventListener('wheel', containWheelInsideTile, { capture: true, passive: false });
+window.addEventListener('pointermove', rememberPickerMousePosition, { capture: true, passive: true });
+window.addEventListener('blur', clearPickerMousePosition);
+document.documentElement.addEventListener('pointerleave', clearPickerMousePosition);
+document.addEventListener('touchstart', beginPickerTouchScroll, { capture: true, passive: true });
+document.addEventListener('touchmove', movePickerTouchScroll, { capture: true, passive: false });
+document.addEventListener('touchend', endPickerTouchScroll, { capture: true, passive: true });
+document.addEventListener('touchcancel', endPickerTouchScroll, { capture: true, passive: true });
 content.addEventListener('pointerdown', beginSwipeNavigation);
 content.addEventListener('pointerup', finishSwipeNavigation);
 content.addEventListener('pointercancel', cancelSwipeNavigation);
@@ -4246,30 +4977,71 @@ function calendarDialogIsOpen() {
     ].some(dialog => dialog.open);
 }
 
+function clearPickerMousePosition() {
+    window.SymconVisualizationInteraction.clearPointer();
+}
+function rememberPickerMousePosition(event) {
+    window.SymconVisualizationInteraction.rememberPointer(event);
+}
+function pickerHitTestPoint(event) {
+    return window.SymconVisualizationInteraction.point(event);
+}
+function pickerScrollTarget(event) {
+    // Embedded hosts can retarget an event; prefer its original DOM path.
+    const targets = typeof event.composedPath === 'function' ? event.composedPath() : [];
+    targets.push(event.target);
+    for (const target of targets) {
+        const element = target instanceof Element ? target : target?.parentElement;
+        const list = element?.closest?.('.calendar-picker-options');
+        if (list) return list;
+    }
+    // Some embedded hosts report DIALOG as the wheel target, with no list in
+    // the composed path. Use viewport coordinates to resolve the visible hit.
+    // Touch retains its existing gesture target.
+    if (['wheel', 'mousewheel', 'pointermove'].includes(event.type)
+        && Number.isFinite(event.clientX) && Number.isFinite(event.clientY)) {
+        const point = pickerHitTestPoint(event);
+        const hit = document.elementFromPoint?.(point.clientX, point.clientY);
+        return hit?.closest?.('.calendar-picker-options') || null;
+    }
+    return null;
+}
+function beginPickerTouchScroll(event) {
+    pickerTouchScroll = null;
+    if (event.touches.length !== 1) return;
+    const target = pickerScrollTarget(event);
+    if (!target) return;
+    const touch = event.touches[0];
+    pickerTouchScroll = { target, identifier: touch.identifier, y: touch.clientY };
+}
+function movePickerTouchScroll(event) {
+    if (!pickerTouchScroll) return;
+    if (event.touches.length !== 1 || !event.cancelable) {
+        pickerTouchScroll = null;
+        return;
+    }
+    const touch = event.touches[0];
+    if (touch.identifier !== pickerTouchScroll.identifier) return;
+    // Keep the gesture in the list, including at its upper and lower limits.
+    pickerTouchScroll.target.scrollTop += pickerTouchScroll.y - touch.clientY;
+    pickerTouchScroll.y = touch.clientY;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+}
+function endPickerTouchScroll() {
+    pickerTouchScroll = null;
+}
+
 function containWheelInsideTile(event) {
     if (event.ctrlKey) return;
 
-    const calendarOptionList = event.target instanceof Element
-        ? event.target.closest('.calendar-picker-options')
-        : null;
+    const calendarOptionList = pickerScrollTarget(event);
     const openDialog = [eventDialog, eventDetailsDialog, editScopeDialog, deleteConfirmDialog, dayEventsDialog, viewSelectorDialog, calendarFilterDialog]
         .find(dialog => dialog.open);
-    const scrollTarget = calendarOptionList || openDialog?.querySelector('.dialog-body') || content;
-    const factor = event.deltaMode === WheelEvent.DOM_DELTA_LINE
-        ? 16
-        : (event.deltaMode === WheelEvent.DOM_DELTA_PAGE ? scrollTarget.clientHeight : 1);
-    const deltaX = event.deltaX * factor;
-    const deltaY = event.deltaY * factor;
-
-    if (event.shiftKey && deltaX === 0) {
-        scrollTarget.scrollLeft += deltaY;
-    } else {
-        scrollTarget.scrollLeft += deltaX;
-        scrollTarget.scrollTop += deltaY;
-    }
-
-    event.preventDefault();
-    event.stopImmediatePropagation();
+    const scrollTarget = calendarOptionList
+        || openDialog?.querySelector('.dialog-layout, .dialog-body')
+        || content;
+    window.SymconVisualizationInteraction.scroll(event, scrollTarget);
 }
 
 function visibleViewRange() {
@@ -4644,6 +5416,38 @@ function hasIPSViewActionBridge() {
     return Boolean(calendarIPSViewConfig?.endpoint && calendarIPSViewConfig?.token);
 }
 
+function calendarIPSViewEndpoint() {
+    const endpoint = String(calendarIPSViewConfig?.endpoint || '');
+    if (!/^\/hook\/opencalendar\/view\/\d+$/.test(endpoint)) {
+        throw new Error(t('Action failed.'));
+    }
+    // IPSView injects a base element (including in about:blank on Windows).
+    // The tile HTML box instead uses a data: frame with the Symcon referrer.
+    // Neither must require another user-entered address or a Connect account.
+    const candidates = [
+        document.querySelector('base[href]')?.getAttribute('href'),
+        document.baseURI,
+        window.location.href
+    ];
+    try {
+        if (window.parent !== window) candidates.push(window.parent.location.href);
+    } catch (_) {
+        // An opaque data: frame cannot read its parent, even on the same server.
+    }
+    candidates.push(document.referrer);
+    for (const candidate of candidates) {
+        if (typeof candidate !== 'string' || !/^https?:\/\//i.test(candidate)) continue;
+        try {
+            const base = new URL(candidate);
+            // Use only the origin: no inherited credentials, path, query or fragment.
+            return new URL(endpoint, base.origin).href;
+        } catch (_) {
+            // Try the next host-provided document context, never a guessed host.
+        }
+    }
+    throw new Error(t('The IPSView connection address is unavailable. Reload the view.'));
+}
+
 async function calendarIPSViewRequest(action, value) {
     if (!hasIPSViewActionBridge()) {
         throw new Error(t('Action failed.'));
@@ -4654,12 +5458,13 @@ async function calendarIPSViewRequest(action, value) {
     body.set('action', action);
     body.set('value', JSON.stringify(value));
 
-    const response = await fetch(String(calendarIPSViewConfig.endpoint), {
+    const response = await fetch(calendarIPSViewEndpoint(), {
         method: 'POST',
         headers: {
             'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8'
         },
         body: body.toString(),
+        redirect: 'error',
         cache: 'no-store',
         credentials: 'same-origin'
     });
@@ -4762,7 +5567,6 @@ function applyStaticTranslations() {
     document.getElementById('all-day-label').textContent = t('All day');
     document.getElementById('event-task-label').textContent = t('Task appointment');
     document.getElementById('event-task-completed-label').textContent = t('Completed');
-    document.getElementById('event-task-follow-planned-label').textContent = t('Move planned follow-up appointments');
     document.getElementById('dialog-title').textContent = t('Event');
     document.getElementById('details-dialog-title').textContent = t('Event details');
     document.getElementById('edit-scope-dialog-title').textContent = t('Edit recurring event');
@@ -4796,6 +5600,19 @@ function applyStaticTranslations() {
 }
 
 function showToast(message, level) {
+    if (level === 'error' && eventDialog.open) {
+        // A regular page toast is behind a modal dialog's top layer.
+        let note = eventDialog.querySelector('.event-save-error');
+        if (!note) {
+            note = document.createElement('div');
+            note.className = 'dialog-note event-save-error';
+            note.setAttribute('role', 'alert');
+            eventDialog.append(note);
+        }
+        note.textContent = message;
+        note.scrollIntoView({block: 'nearest'});
+        return;
+    }
     const toast = document.getElementById('toast');
     toast.textContent = message;
     toast.className = 'toast visible' + (level === 'error' ? ' error' : '');
@@ -4943,10 +5760,36 @@ function formatMonth(date) {
     return new Intl.DateTimeFormat(undefined, { month: 'long', year: 'numeric' }).format(date);
 }
 function formatRange(start, end) { return new Intl.DateTimeFormat(undefined, { day: '2-digit', month: 'short' }).format(start) + ' – ' + new Intl.DateTimeFormat(undefined, { day: '2-digit', month: 'short', year: 'numeric' }).format(end); }
+function formatCompactRange(start, end) {
+    if (!document.documentElement.lang.toLowerCase().startsWith('de')) {
+        return new Intl.DateTimeFormat(undefined, {day: 'numeric', month: 'numeric', year: '2-digit'}).formatRange(start, end);
+    }
+
+    const compactDate = date => `${date.getDate()}.${date.getMonth() + 1}.${String(date.getFullYear()).slice(-2)}`;
+    if (start.getFullYear() === end.getFullYear() && start.getMonth() === end.getMonth()) {
+        return start.getDate() === end.getDate()
+            ? compactDate(end)
+            : `${start.getDate()}.–${compactDate(end)}`;
+    }
+    if (start.getFullYear() === end.getFullYear()) {
+        return `${start.getDate()}.${start.getMonth() + 1}.–${compactDate(end)}`;
+    }
+    return `${compactDate(start)}–${compactDate(end)}`;
+}
+function formatCompactMonth(date) {
+    if (document.documentElement.lang.toLowerCase().startsWith('de')) {
+        return `${date.getMonth() + 1}.${String(date.getFullYear()).slice(-2)}`;
+    }
+    return new Intl.DateTimeFormat(undefined, {month: 'numeric', year: '2-digit'}).format(date);
+}
 function safeColor(value) {
     if (/^#[0-9a-f]{6}$/i.test(value || '')) return value;
     return getComputedStyle(document.documentElement).getPropertyValue('--cal-accent').trim() || 'currentColor';
 }
+
+initializeIPSViewEventStatePickers();
+initializeIPSViewDatePickers();
+eventDialog.addEventListener('keydown', handleIPSViewPickerTab);
 
 if (calendarVisualization.state && typeof calendarVisualization.state === 'object') {
     handleMessage({ type: 'state', payload: calendarVisualization.state });

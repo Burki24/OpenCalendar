@@ -95,12 +95,24 @@ $script = (string) file_get_contents(__DIR__ . '/../Kalender Ansicht/visualizati
 $indexSource = (string) file_get_contents(__DIR__ . '/../Kalender Ansicht/visualization/index.html');
 $style = (string) file_get_contents(__DIR__ . '/../Kalender Ansicht/visualization/style.css');
 $moduleSource = (string) file_get_contents(__DIR__ . '/../Kalender Ansicht/module.php');
+// Return-value capture is covered by runtime debug tests, not this source contract.
+$moduleSource = str_replace('return $debugFlowResult = ', 'return ', $moduleSource);
 $formSource = (string) file_get_contents(__DIR__ . '/../Kalender Ansicht/form.json');
 $localeSource = (string) file_get_contents(__DIR__ . '/../Kalender Ansicht/locale.json');
 $localeData = json_decode($localeSource, true, 512, JSON_THROW_ON_ERROR);
 $germanTranslations = is_array($localeData['translations']['de'] ?? null)
     ? $localeData['translations']['de']
     : [];
+assertVisualization(
+    str_contains($style, '--tile-title-clearance: 58px;')
+        && str_contains($style, 'html.tile-title-hidden { --tile-title-clearance: 0px; }')
+        && str_contains($style, 'html.tile-title-hidden.tile-maximize-visible {')
+        && str_contains($style, '--tile-maximize-clearance: 48px;')
+        && str_contains($style, '.toolbar-actions { margin-right: var(--tile-maximize-clearance, 0px); }')
+        && str_contains($style, 'html.tile-title-hidden.tile-maximize-visible .toolbar-actions { margin-right: 0; }')
+        && str_contains($style, 'html.ipsview-mode {'),
+    'The native tile must distinguish a hidden title from a visible maximize button; IPSView retains its own layout.'
+);
 preg_match_all('/Translate\\(\'([^\']+)\'\\)/', $moduleSource, $moduleTranslationMatches);
 foreach (array_unique($moduleTranslationMatches[1] ?? []) as $translationKey) {
     assertVisualization(
@@ -137,13 +149,11 @@ assertVisualization(
 assertVisualization(
     str_contains($script, 'function updateEndFromStart()')
         && str_contains($script, 'startInput.dataset.previousValue = startInput.value;')
-        && str_contains($script, 'const dateChanged = previousStart && dayKey(previousStart) !== dayKey(start);')
-        && str_contains($script, 'if (dateChanged && !timeChanged && currentEnd) {')
-        && str_contains($script, 'currentEnd.getHours(),')
-        && str_contains($script, 'new Date(start.getTime() + 60 * 60 * 1000)')
+        && str_contains($script, 'currentEnd.getTime() - previousStart.getTime()')
+        && str_contains($script, 'duration > 0 ? duration : 60 * 60 * 1000')
         && str_contains($script, "document.getElementById('event-start').addEventListener('change', () => {")
         && str_contains($script, 'updateRecurrenceEndDateMinimum();'),
-    'Changing only the start date must move the end to that date while preserving its time; changing the start time must use a one-hour duration.'
+    'Changing the start must preserve the current duration; only a missing or invalid duration defaults to one hour.'
 );
 
 assertVisualization(
@@ -410,6 +420,8 @@ assertVisualization(
 
 $formSource = (string) file_get_contents(__DIR__ . '/../Kalender Ansicht/form.json');
 $moduleSource = (string) file_get_contents(__DIR__ . '/../Kalender Ansicht/module.php');
+// Return-value capture is covered by runtime debug tests, not this source contract.
+$moduleSource = str_replace('return $debugFlowResult = ', 'return ', $moduleSource);
 assertVisualization(
     str_contains($moduleSource, '\'Events with complex reminder settings cannot be moved safely.\'')
         && str_contains($moduleSource, '($sourceReminder[\'mode\'] ?? \'\') === \'complex\'')
@@ -436,7 +448,8 @@ assertVisualization(
 );
 
 assertVisualization(
-    substr_count($moduleSource, "if ((\$event['recurrenceType'] ?? '') === 'occurrence'") === 2
+    substr_count($moduleSource, 'CalendarEventRecurrence::isOccurrence($event)') === 2
+        && str_contains($moduleSource, 'CalendarEventRecurrence::isOccurrence($eventEdit)')
         && substr_count($moduleSource, "\$event['originalStart'] = trim((string) (\$event['start'] ?? ''));") === 2
         && substr_count($moduleSource, "\$recurringOccurrence = (bool) (\$event['recurring'] ?? false)") === 2
         && substr_count($moduleSource, "trim((string) (\$event['occurrenceId'] ?? '')) !== ''") >= 2
@@ -522,6 +535,18 @@ assertVisualization(
         && str_contains($moduleSource, "'Changes will apply to this and all following occurrences.'")
         && str_contains($moduleSource, "'Changes will apply to the entire recurring series.'"),
     'Recurring Google, Microsoft and CalDAV events must offer supported write scopes with verified provider data.'
+);
+assertVisualization(
+    str_contains($script, "const explicitReason = String(event?.readOnlyReason || '').trim();")
+        && str_contains($moduleSource, "!array_key_exists('canWrite', \$event)"),
+    'Virtual provider items must retain explicit write restrictions and explain why they are read-only.'
+);
+assertVisualization(
+    str_contains($script, 'function microsoftTodoIdentity(event)')
+        && substr_count($script, '...microsoftTodoIdentity(') >= 4
+        && str_contains($script, "if (String(event?.sourceType || '').trim().toLowerCase() === 'microsoft-todo') return false;")
+        && str_contains($script, 'selectedEvent?.recurrenceEditable !== false'),
+    'Microsoft To Do edits, completion changes, and deletes must retain native identity while moves and recurrence edits stay disabled.'
 );
 $seriesWriteScopePosition = strpos(
     $calendarModuleSource,
@@ -839,6 +864,32 @@ assertVisualization(
 );
 
 assertVisualization(
+    str_contains($indexSource, 'id="quick-view-buttons"')
+        && str_contains($formSource, '"name": "QuickViewButtons"')
+        && str_contains($formSource, '"rowCount": 5')
+        && str_contains($moduleSource, "'quickViewButtons'          =>")
+        && str_contains($script, 'function selectCalendarView(view, closeDialog = false)')
+        && str_contains($script, 'selectCalendarView(button.dataset.view, true)')
+        && str_contains($script, 'selectCalendarView(button.dataset.view)')
+        && str_contains($style, '.quick-view-buttons')
+        && str_contains($style, 'flex: 0 1 auto;')
+        && str_contains($style, '@container symcon-visualization (max-width: 560px) {')
+        && str_contains($style, 'grid-template-areas: "navigation period view" "quick quick actions";')
+        && str_contains($style, 'overflow-x: auto;')
+        && str_contains($style, 'flex-wrap: nowrap;'),
+    'Optional quick-view buttons must share the client-local view switch, scroll when needed and move to a second row only in narrow tiles.'
+);
+
+assertVisualization(
+    str_contains($indexSource, 'id="period-title-wide"')
+        && str_contains($indexSource, 'id="period-title-compact"')
+        && str_contains($script, 'formatCompactRange(')
+        && str_contains($style, '.period-title-compact { display: none; }')
+        && str_contains($style, '.period-title-compact { display: inline; }'),
+    'Narrow tile and IPSView toolbars must display a compact numeric date range while retaining the full desktop label.'
+);
+
+assertVisualization(
     str_contains($indexSource, 'id="delete-confirm-summary"')
         && str_contains($indexSource, 'id="delete-confirm-period"')
         && str_contains($indexSource, 'id="delete-confirm-question"')
@@ -876,6 +927,18 @@ assertVisualization(
         && str_contains($moduleSource, '\'Filter calendars\'')
         && str_contains($moduleSource, '\'Select all\''),
     'The month day overview must sort its events, show the event count and allow creating an event directly for the selected day when a writable calendar is available.'
+);
+
+assertVisualization(
+    str_contains($moduleSource, "RegisterPropertyInteger('DefaultCalendarInstanceID', 0)")
+        && str_contains($moduleSource, "'defaultCalendarInstanceId' => max(0, \$this->ReadPropertyInteger('DefaultCalendarInstanceID'))")
+        && str_contains($moduleSource, 'private function defaultCalendarOptions(array $configuration): array')
+        && str_contains($formSource, '"name": "DefaultCalendarInstanceID"')
+        && str_contains($formSource, '"caption": "Default calendar for new events"')
+        && str_contains($script, 'const defaultCalendarInstanceId = Number(calendarState.settings.defaultCalendarInstanceId) || 0;')
+        && str_contains($script, 'const defaultCalendar = writable.find(calendar => calendar.instanceId === defaultCalendarInstanceId)')
+        && str_contains($script, '|| writable[0];'),
+    'New events must prefer the configured writable default calendar and fall back to the first writable calendar.'
 );
 
 assertVisualization(
@@ -924,8 +987,18 @@ assertVisualization(
         && str_contains($style, '--cal-dialog-extra-large-width: 760px;')
         && str_contains($style, '.oc-dialog-extra-large { --dialog-width: var(--cal-dialog-extra-large-width); }')
         && str_contains($style, '.oc-dialog[open] { display: flex; flex-direction: column; }')
+        && str_contains($style, '#event-dialog {')
+        && str_contains($style, 'position: fixed;')
+        && str_contains($style, 'top: var(--event-dialog-visible-top, calc(var(--tile-title-clearance) + 12px));')
+        && str_contains($style, 'right: var(--event-dialog-visible-right, 12px);')
+        && str_contains($style, 'bottom: var(--event-dialog-visible-bottom, 12px);')
+        && str_contains($style, 'left: var(--event-dialog-visible-left, 12px);')
         && str_contains($style, '.oc-dialog > .dialog-layout {')
         && str_contains($style, 'flex: 1 1 auto;')
+        && str_contains($style, '#event-dialog > .dialog-layout {')
+        && str_contains($style, 'height: 100%;')
+        && str_contains($style, '#event-dialog .dialog-header {')
+        && str_contains($style, 'position: sticky;')
         && str_contains($style, 'scrollbar-gutter: stable;')
         && str_contains($style, '.dialog-actions-start, .dialog-actions-end {')
         && str_contains($style, '.event-details-dialog { --dialog-width: 720px; }')
@@ -940,7 +1013,7 @@ assertVisualization(
         && str_contains($style, '.delete-scope-option:hover,')
         && str_contains($style, '.edit-scope-option:hover { background: var(--cal-surface-hover); }')
         && str_contains($style, '@media (max-width: 420px) {'),
-    'All OpenCalendar modals must share responsive size classes, fixed header/footer layout and a scrollable content area.'
+    'All OpenCalendar modals must share responsive size classes, while the event editor reserves a viewport-bounded scroll area.'
 );
 
 assertVisualization(
@@ -1230,9 +1303,38 @@ foreach ([$native, $ipsView] as $html) {
     assertVisualization(
         str_contains($html, 'id="event-task"')
             && str_contains($html, 'id="event-task-completed"')
+            && str_contains($html, 'id="event-task-roll-forward"')
             && str_contains($html, 'id="details-task-toggle-button"')
             && str_contains($html, "sendAction('UpdateEvent', value)"),
-        'Task appointments must be editable and directly completable in both visualization modes.'
+        'Task appointments must expose a roll-forward policy and be directly completable in both visualization modes.'
+    );
+    assertVisualization(
+        str_contains($script, "['occurrence', 'following', 'disabled'].includes(scope)")
+            && str_contains($script, 'taskRollForwardScope: eventTask.checked ?')
+            && str_contains($script, "'Overdue tasks will remain on their original date until you move them manually.'"),
+        'The visualization must submit one explicit provider-neutral roll-forward policy for each task series.'
+    );
+    assertVisualization(
+        str_contains($indexSource, 'id="event-microsoft-todo-recurrence-note"')
+            && str_contains($script, 'function selectedCalendarUsesMicrosoftTodo()')
+            && str_contains($script, 'const microsoftTodo = enabled && selectedCalendarUsesMicrosoftTodo();')
+            && str_contains($script, "eventTaskRollForwardScope.value = 'disabled';")
+            && str_contains($script, "taskRollForwardScope: eventTask.checked ? (microsoftTodo ? 'disabled' : eventTaskRollForwardScope.value) : 'occurrence'")
+            && str_contains($localeSource, '"Microsoft To Do manages this task series. The next task appears after the current task is completed.": "Microsoft To Do verwaltet diese Aufgabenserie. Die nächste Aufgabe erscheint, nachdem die aktuelle Aufgabe erledigt wurde."'),
+        'Native Microsoft To Do series must hide OpenCalendar roll-forward policies and explain provider-managed recurrence.'
+    );
+    assertVisualization(
+        str_contains($script, "openDialog?.querySelector('.dialog-layout, .dialog-body')"),
+        'Wheel handling must target the event editor form, which owns its viewport-bounded scroll area.'
+    );
+    assertVisualization(
+        str_contains($script, 'function eventDialogHostViewport()')
+            && str_contains($script, 'window.frameElement.getBoundingClientRect()')
+            && str_contains($script, '--event-dialog-visible-left')
+            && str_contains($script, '--event-dialog-visible-top')
+            && str_contains($script, '--event-dialog-visible-right')
+            && str_contains($script, '--event-dialog-visible-bottom'),
+        'The Symcon editor must limit itself to the visible portion of an oversized HTML-SDK tile.'
     );
     assertVisualization(
         str_contains($script, "event.taskRolledForward ? ' ↻' : ''")

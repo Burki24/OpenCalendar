@@ -34,6 +34,17 @@
         },
         {
             "type": "Select",
+            "name": "DefaultCalendarInstanceID",
+            "caption": "Default calendar for new events",
+            "options": [
+                {
+                    "caption": "Automatic (first writable calendar)",
+                    "value": 0
+                }
+            ]
+        },
+        {
+            "type": "Select",
             "name": "DefaultView",
             "caption": "Default view",
             "options": [
@@ -60,6 +71,62 @@
                 {
                     "caption": "Month",
                     "value": 2
+                }
+            ]
+        },
+        {
+            "type": "List",
+            "name": "QuickViewButtons",
+            "caption": "Quick view buttons",
+            "rowCount": 5,
+            "add": true,
+            "delete": true,
+            "changeOrder": true,
+            "columns": [
+                {
+                    "caption": "View",
+                    "name": "View",
+                    "width": "auto",
+                    "add": 0,
+                    "edit": {
+                        "type": "Select",
+                        "options": [
+                            {
+                                "caption": "Agenda",
+                                "value": 0
+                            },
+                            {
+                                "caption": "List",
+                                "value": 4
+                            },
+                            {
+                                "caption": "Days",
+                                "value": 3
+                            },
+                            {
+                                "caption": "Full week",
+                                "value": 1
+                            },
+                            {
+                                "caption": "Work week",
+                                "value": 5
+                            },
+                            {
+                                "caption": "Month",
+                                "value": 2
+                            }
+                        ]
+                    }
+                },
+                {
+                    "caption": "Button letter",
+                    "name": "Label",
+                    "width": "110px",
+                    "add": "",
+                    "edit": {
+                        "type": "ValidationTextBox",
+                        "validate": "^[A-Za-zÄÖÜäöü]$"
+                    }
                 }
             ]
         },
@@ -574,11 +641,6 @@
                 {
                     "type": "Label",
                     "caption": "In IPSView, use an HTML-Box with the client browser renderer so JavaScript is available."
-                },
-                {
-                    "type": "Button",
-                    "caption": "Regenerate IPSView HTML",
-                    "onClick": "IPS_RequestAction($id, 'FormRegenerateIPSViewHTML', '');"
                 }
             ]
         }
@@ -642,32 +704,6 @@
                     {
                         "type": "Label",
                         "caption": "No calendar instances found."
-                    }
-                ]
-            }
-        },
-        {
-            "type": "PopupAlert",
-            "name": "IPSViewRegenerationSuccessPopup",
-            "visible": false,
-            "popup": {
-                "items": [
-                    {
-                        "type": "Label",
-                        "caption": "IPSView HTML regenerated."
-                    }
-                ]
-            }
-        },
-        {
-            "type": "PopupAlert",
-            "name": "IPSViewRegenerationFailurePopup",
-            "visible": false,
-            "popup": {
-                "items": [
-                    {
-                        "type": "Label",
-                        "caption": "IPSView HTML could not be regenerated. Enable IPSView output and apply the instance configuration first."
                     }
                 ]
             }

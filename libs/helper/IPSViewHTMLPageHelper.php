@@ -6,11 +6,11 @@ namespace Burki24\SymconModuleHelper;
 
 use InvalidArgumentException;
 use JsonException;
-use ReflectionClass;
 use RuntimeException;
 use Throwable;
 
 require_once __DIR__ . '/HelperTranslationHelper.php';
+require_once __DIR__ . '/VisualizationAssetHelper.php';
 
 /**
  * Renders native and IPSView HTML pages through one shared asset contract.
@@ -19,18 +19,21 @@ require_once __DIR__ . '/HelperTranslationHelper.php';
  * visual implementation in style.css/app.js. The helper owns asset loading,
  * bootstrap encoding, page metadata, fixed placeholders and validation.
  *
- * @version 1.3.0
+ * @version 1.5.6
  */
 trait IPSViewHTMLPageHelper
 {
     use HelperTranslationHelper;
+    use VisualizationAssetHelper;
 
     public const IPSVIEW_HTML_CONTRACT_VERSION = 1;
 
     private const IPSVIEW_HTML_ENABLE_PROPERTY = 'EnableIPSView';
     private const IPSVIEW_HTML_VARIABLE_REGISTRY_ATTRIBUTE = 'IPSViewHTMLVariableRegistry';
+    private const IPSVIEW_HTML_VARIABLE_IDS_ATTRIBUTE = 'IPSViewHTMLVariableIDs';
     private const IPSVIEW_HTML_FORM_MARKER = 'Configure optional IPSView HTML output.';
     private const IPSVIEW_HTML_DELETE_ACTION = 'IPSViewHTMLDeleteVariables';
+    private const IPSVIEW_HTML_REGENERATE_ACTION = 'IPSViewHTMLRegenerateVariables';
 
     /** @var array<string,string> */
     private const IPSVIEW_HTML_TRANSLATION_SOURCES = [
@@ -42,7 +45,10 @@ trait IPSViewHTMLPageHelper
         'popup.delete_description'       => 'The following IPSView variables will be deleted permanently. Existing links and placements that reference them will no longer work.',
         'action.keep_variables'          => 'Keep variables',
         'action.confirm_delete'          => 'Delete variables',
-        'message.variables_deleted'      => 'The retained IPSView variables were deleted.'
+        'message.variables_deleted'      => 'The retained IPSView variables were deleted.',
+        'action.regenerate_variables'    => 'Regenerate IPSView HTML',
+        'message.variables_regenerated'  => 'IPSView HTML regenerated.',
+        'error.regenerate_variables'     => 'IPSView HTML could not be regenerated. Enable IPSView output and apply the instance configuration first.'
     ];
 
     /** @var list<string> */
@@ -82,6 +88,7 @@ trait IPSViewHTMLPageHelper
     {
         $this->RegisterPropertyBoolean(self::IPSVIEW_HTML_ENABLE_PROPERTY, false);
         $this->RegisterAttributeString(self::IPSVIEW_HTML_VARIABLE_REGISTRY_ATTRIBUTE, '[]');
+        $this->RegisterAttributeString(self::IPSVIEW_HTML_VARIABLE_IDS_ATTRIBUTE, '[]');
     }
 
     /**
@@ -92,12 +99,19 @@ trait IPSViewHTMLPageHelper
      */
     protected function HandleIPSViewHTMLPageAction(string $ident, mixed $value): bool
     {
-        if ($ident !== self::IPSVIEW_HTML_DELETE_ACTION) {
-            return false;
+        if ($ident === self::IPSVIEW_HTML_DELETE_ACTION) {
+            $this->DeleteRetainedIPSViewHTMLVariables();
+            return true;
+        }
+        if ($ident === self::IPSVIEW_HTML_REGENERATE_ACTION) {
+            if (!$this->RegenerateIPSViewHTMLPages()) {
+                throw new RuntimeException($this->IPSViewHTMLPageText('error.regenerate_variables'));
+            }
+
+            return true;
         }
 
-        $this->DeleteRetainedIPSViewHTMLVariables();
-        return true;
+        return false;
     }
 
     /**
@@ -124,6 +138,15 @@ trait IPSViewHTMLPageHelper
             [
                 'type'    => 'Label',
                 'caption' => $description
+            ],
+            [
+                'type'    => 'Button',
+                'caption' => $this->IPSViewHTMLPageText('action.regenerate_variables'),
+                'onClick' => 'IPS_RequestAction($id, '
+                    . var_export(self::IPSVIEW_HTML_REGENERATE_ACTION, true)
+                    . ', ""); return '
+                    . var_export('MESSAGE:' . $this->IPSViewHTMLPageText('message.variables_regenerated'), true)
+                    . ';'
             ]
         ];
 
@@ -191,6 +214,50 @@ trait IPSViewHTMLPageHelper
     }
 
     /**
+     * Re-renders every registered IPSView WebContent variable through the
+     * consumer's GetIPSViewHTML() method without replacing the variables.
+     */
+    protected function RegenerateIPSViewHTMLPages(): bool
+    {
+        if (!$this->IsIPSViewHTMLPageEnabled() || !method_exists($this, 'GetIPSViewHTML')) {
+            return false;
+        }
+
+        try {
+            if (
+                method_exists($this, 'PrepareIPSViewHTMLRegeneration')
+                && !$this->PrepareIPSViewHTMLRegeneration()
+            ) {
+                return false;
+            }
+
+            $html = $this->GetIPSViewHTML();
+            if (!is_string($html) || trim($html) === '') {
+                return false;
+            }
+
+            $updated = false;
+            foreach (array_keys($this->ReadIPSViewHTMLVariableRegistry()) as $ident) {
+                if (!$this->IPSViewHTMLVariableExists($ident)) {
+                    continue;
+                }
+                if (!$this->UpdateIPSViewHTMLVariable($ident, $html)) {
+                    return false;
+                }
+                $updated = true;
+            }
+
+            return $updated;
+        } catch (Throwable $exception) {
+            if (method_exists($this, 'SendDebug')) {
+                $this->SendDebug('IPSViewHTMLRegeneration', $exception->getMessage(), 0);
+            }
+
+            return false;
+        }
+    }
+
+    /**
      * Creates, preserves or explicitly deletes one optional IPSView WebContent variable.
      *
      * The variable is maintained as a native String variable with the Symcon
@@ -226,6 +293,7 @@ trait IPSViewHTMLPageHelper
         }
 
         $this->RememberIPSViewHTMLVariable($ident, $caption);
+        $variableID = $this->IPSViewHTMLVariableID($ident);
 
         if (!$this->IsIPSViewHTMLPageEnabled()) {
             return false;
@@ -234,6 +302,10 @@ trait IPSViewHTMLPageHelper
             throw new RuntimeException('IPSViewHTMLPageHelper requires MaintainVariable() and SetValue().');
         }
 
+        if ($variableID > 0 && !$this->IPSViewHTMLVariableHasOriginalIdent($ident, $variableID)) {
+            // Keep a moved output at the user's chosen location.
+            return false;
+        }
         $presentation = [
             'PRESENTATION' => VARIABLE_PRESENTATION_WEB_CONTENT,
             'HTML_TYPE'    => 0
@@ -251,6 +323,7 @@ trait IPSViewHTMLPageHelper
             true
         );
 
+        $this->IPSViewHTMLVariableID($ident);
         if ($created) {
             $this->SetValue($ident, $initialHtml);
         }
@@ -279,7 +352,23 @@ trait IPSViewHTMLPageHelper
         }
 
         try {
-            $this->SetValue($ident, $html);
+            $variableID = $this->IPSViewHTMLVariableID($ident);
+            // IPSModuleStrict status variables require the module setter; moved outputs use their retained ID.
+            $moduleIdent = $variableID > 0
+                ? $this->IPSViewHTMLModuleVariableIdent($ident, $variableID)
+                : $ident;
+            if ($moduleIdent !== null) {
+                if ($this->SetValue($moduleIdent, $html) === false) {
+                    throw new RuntimeException('Unable to update the IPSView module variable.');
+                }
+            } else {
+                if (function_exists('IPS_GetObject') && (IPS_GetObject($variableID)['ObjectIsReadOnly'] ?? false)) {
+                    throw new RuntimeException('A moved read-only IPSView variable cannot be updated.');
+                }
+                if (!SetValueString($variableID, $html)) {
+                    throw new RuntimeException('Unable to update the moved IPSView variable.');
+                }
+            }
 
             return true;
         } catch (Throwable $exception) {
@@ -293,6 +382,9 @@ trait IPSViewHTMLPageHelper
 
     /**
      * Renders a complete visualization document from index.html, style.css and app.js.
+     *
+     * Replacement values are inserted once and are never interpreted as template syntax.
+     * Unknown placeholders are rejected in the template itself, not in rendered payloads.
      *
      * Required template placeholders:
      * {{HTML_LANGUAGE}}, {{HTML_CLASSES}}, {{VIEWPORT_CONTENT}},
@@ -347,6 +439,11 @@ trait IPSViewHTMLPageHelper
         $visualizationTheme = $this->IPSViewHTMLStringOption($configuration, 'visualizationTheme', '');
         $ipsViewStyle = $this->IPSViewHTMLStringOption($configuration, 'ipsViewStyle', '');
         $bootstrap = $this->BuildVisualizationHTMLBootstrap($ipsView, $configuration);
+        $interactionURL = method_exists($this, 'VisualizationInteractionScriptURL') ? $this->VisualizationInteractionScriptURL() : '';
+        if (!is_string($interactionURL) || ($interactionURL !== '' && (preg_match('#^/hook/[A-Za-z0-9/_.-]+$#D', $interactionURL) !== 1 || str_contains($interactionURL, '..')))) {
+            throw new InvalidArgumentException('The interaction asset must use a fixed same-origin hook path.');
+        }
+        $externalInteraction = $interactionURL !== '' && str_contains($template, '{{INTERACTION_SCRIPT}}');
 
         $replacements = [
             '{{HTML_LANGUAGE}}'       => htmlspecialchars($language, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'),
@@ -358,7 +455,8 @@ trait IPSViewHTMLPageHelper
             '{{MODULE_STYLE}}'        => $moduleStyle,
             '{{IPSVIEW_STYLE}}'       => $ipsView ? $ipsViewStyle : '',
             '{{BOOTSTRAP_JSON}}'      => $this->EncodeVisualizationHTMLJSON($bootstrap),
-            '{{MODULE_SCRIPT}}'       => $moduleScript
+            '{{MODULE_SCRIPT}}'       => $moduleScript,
+            '{{INTERACTION_SCRIPT}}'  => $externalInteraction ? '<script src="' . htmlspecialchars($interactionURL, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '"></script>' : ''
         ];
 
         foreach ($this->NormalizeIPSViewHTMLReplacements($configuration['replacements'] ?? []) as $placeholder => $value) {
@@ -369,12 +467,20 @@ trait IPSViewHTMLPageHelper
             $replacements[$placeholder] = $value;
         }
 
-        $html = str_replace(array_keys($replacements), array_values($replacements), $template);
-        if (preg_match('/\{\{[A-Z][A-Z0-9_]*\}\}/', $html, $match) === 1) {
-            throw new RuntimeException('Unresolved visualization placeholder: ' . $match[0]);
+        if (!$externalInteraction) {
+            $replacements['{{MODULE_SCRIPT}}'] = $this->VisualizationInteractionScript() . "\n" . $replacements['{{MODULE_SCRIPT}}'];
         }
 
-        return $html;
+        // Validate only the template: marker-shaped device names and other payloads are data.
+        preg_match_all('/\{\{[A-Z][A-Z0-9_]*\}\}/', $template, $matches);
+        foreach ($matches[0] as $placeholder) {
+            if (!array_key_exists($placeholder, $replacements)) {
+                throw new RuntimeException('Unresolved visualization placeholder: ' . $placeholder);
+            }
+        }
+
+        // A single pass must never expand placeholders introduced by a replacement value.
+        return strtr($template, $replacements);
     }
 
     /**
@@ -414,11 +520,22 @@ trait IPSViewHTMLPageHelper
     protected function IPSViewTranslationsFromLocale(array $additionalKeys = []): array
     {
         $keys = $this->NormalizeIPSViewHTMLTranslationKeys($additionalKeys);
+        $activeTranslations = [];
+        $language = $this->NormalizeHelperTranslationLanguage($this->ResolveHelperTranslationLanguage());
         $localePath = $this->ResolveIPSViewHTMLModuleDirectory() . DIRECTORY_SEPARATOR . 'locale.json';
         if (is_file($localePath)) {
             try {
                 $locale = json_decode((string) file_get_contents($localePath), true, 512, JSON_THROW_ON_ERROR);
                 if (is_array($locale) && isset($locale['translations']) && is_array($locale['translations'])) {
+                    $selectedTranslations = $locale['translations'][$language] ?? null;
+                    if (is_array($selectedTranslations)) {
+                        foreach ($selectedTranslations as $source => $translation) {
+                            if (is_string($source) && $source !== '' && is_string($translation)) {
+                                $activeTranslations[$source] = $translation;
+                            }
+                        }
+                    }
+
                     foreach ($locale['translations'] as $translations) {
                         if (!is_array($translations)) {
                             continue;
@@ -436,7 +553,10 @@ trait IPSViewHTMLPageHelper
             }
         }
 
-        return $this->TranslateIPSViewHTMLKeys(array_values(array_unique($keys)));
+        return $this->TranslateIPSViewHTMLLocaleKeys(
+            array_values(array_unique($keys)),
+            $activeTranslations
+        );
     }
 
     /**
@@ -449,6 +569,44 @@ trait IPSViewHTMLPageHelper
     protected function IPSViewTranslationsFor(array $keys): array
     {
         return $this->TranslateIPSViewHTMLKeys($this->NormalizeIPSViewHTMLTranslationKeys($keys));
+    }
+
+    /**
+     * Resolves an owned HTML variable independently of its current parent.
+     * Legacy child variables are adopted once; no global ident/name search is used.
+     *
+     * @param string $ident Registered output ident.
+     * @return int Existing String variable ID, or zero when unavailable.
+     */
+    protected function IPSViewHTMLVariableID(string $ident): int
+    {
+        $ident = $this->NormalizeIPSViewHTMLVariableIdent($ident);
+        $ids = $this->ReadIPSViewHTMLStringMapAttribute(self::IPSVIEW_HTML_VARIABLE_IDS_ATTRIBUTE);
+        $variableID = (int) ($ids[$ident] ?? 0);
+        if ($variableID > 0 && IPS_VariableExists($variableID)) {
+            if (IPS_GetVariable($variableID)['VariableType'] !== VARIABLETYPE_STRING) {
+                throw new RuntimeException('Registered IPSView output is not a String variable.');
+            }
+            return $variableID;
+        }
+        if (!method_exists($this, 'GetIDForIdent')) {
+            return 0;
+        }
+        try {
+            $variableID = @$this->GetIDForIdent($ident);
+        } catch (Throwable) {
+            return 0;
+        }
+        if (!is_int($variableID) || $variableID <= 0 || !IPS_VariableExists($variableID)
+            || IPS_GetVariable($variableID)['VariableType'] !== VARIABLETYPE_STRING) {
+            return 0;
+        }
+        $ids[$ident] = (string) $variableID;
+        $this->WriteAttributeString(
+            self::IPSVIEW_HTML_VARIABLE_IDS_ATTRIBUTE,
+            json_encode($ids, JSON_THROW_ON_ERROR)
+        );
+        return $variableID;
     }
 
     /**
@@ -647,6 +805,24 @@ trait IPSViewHTMLPageHelper
     }
 
     /**
+     * @param list<string>        $keys
+     * @param array<string,string> $activeTranslations
+     *
+     * @return array<string,string>
+     */
+    private function TranslateIPSViewHTMLLocaleKeys(array $keys, array $activeTranslations): array
+    {
+        sort($keys, SORT_STRING);
+
+        $translations = [];
+        foreach ($keys as $key) {
+            $translations[$key] = $activeTranslations[$key] ?? $key;
+        }
+
+        return $translations;
+    }
+
+    /**
      * @return array<string,string> Existing retained variables mapped from ident to caption.
      */
     private function IPSViewHTMLRetainedVariables(): array
@@ -726,11 +902,17 @@ trait IPSViewHTMLPageHelper
 
         foreach (array_keys($this->ReadIPSViewHTMLVariableRegistry()) as $ident) {
             if ($this->IPSViewHTMLVariableExists($ident)) {
-                $this->UnregisterVariable($ident);
+                $variableID = $this->IPSViewHTMLVariableID($ident);
+                if ($variableID > 0 && !$this->IPSViewHTMLVariableHasOriginalIdent($ident, $variableID)) {
+                    IPS_DeleteVariable($variableID);
+                } else {
+                    $this->UnregisterVariable($ident);
+                }
             }
         }
 
         $this->WriteAttributeString(self::IPSVIEW_HTML_VARIABLE_REGISTRY_ATTRIBUTE, '[]');
+        $this->WriteAttributeString(self::IPSVIEW_HTML_VARIABLE_IDS_ATTRIBUTE, '[]');
     }
 
     /** @return array<string,string> */
@@ -763,6 +945,9 @@ trait IPSViewHTMLPageHelper
 
     private function IPSViewHTMLVariableExists(string $ident): bool
     {
+        if ($this->IPSViewHTMLVariableID($ident) > 0) {
+            return true;
+        }
         if (method_exists($this, 'VariableExists')) {
             return (bool) $this->VariableExists($ident);
         }
@@ -776,6 +961,39 @@ trait IPSViewHTMLPageHelper
             return is_int($variableID) && $variableID > 0;
         } catch (Throwable) {
             return false;
+        }
+    }
+
+    private function IPSViewHTMLVariableHasOriginalIdent(string $ident, int $variableID): bool
+    {
+        try {
+            return @$this->GetIDForIdent($ident) === $variableID;
+        } catch (Throwable) {
+            return false;
+        }
+    }
+
+    /** Resolves an output still owned by this module, even if its ident changed. */
+    private function IPSViewHTMLModuleVariableIdent(string $ident, int $variableID): ?string
+    {
+        if ($this->IPSViewHTMLVariableHasOriginalIdent($ident, $variableID)) {
+            return $ident;
+        }
+        if (!isset($this->InstanceID) || !function_exists('IPS_GetObject')) {
+            return null;
+        }
+
+        $object = IPS_GetObject($variableID);
+        $currentIdent = $object['ObjectIdent'] ?? null;
+        if (($object['ParentID'] ?? null) !== $this->InstanceID
+            || !is_string($currentIdent) || $currentIdent === '') {
+            return null;
+        }
+
+        try {
+            return @$this->GetIDForIdent($currentIdent) === $variableID ? $currentIdent : null;
+        } catch (Throwable) {
+            return null;
         }
     }
 
@@ -793,17 +1011,11 @@ trait IPSViewHTMLPageHelper
     {
         $fallback = self::IPSVIEW_HTML_TRANSLATION_SOURCES[$key] ?? $key;
 
-        return $this->TranslateHelperText('IPSViewHTMLPageHelper', $key, $fallback);
+        return $this->TranslateHelperTextFromDirectory(__DIR__ . '/translations', 'IPSViewHTMLPageHelper', $key, $fallback);
     }
 
     private function ResolveIPSViewHTMLModuleDirectory(): string
     {
-        $reflection = new ReflectionClass($this);
-        $moduleFile = $reflection->getFileName();
-        if (!is_string($moduleFile) || $moduleFile === '') {
-            throw new RuntimeException('The module file path could not be determined.');
-        }
-
-        return dirname($moduleFile);
+        return dirname($this->VisualizationAssetDirectory());
     }
 }

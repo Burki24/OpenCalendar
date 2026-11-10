@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+require_once __DIR__ . '/../libs/helper/DebugFlowHelper.php';
+
 use IPSKalender\CalendarHttpClientInterface;
 use IPSKalender\CalendarHttpResponse;
 use IPSKalender\MicrosoftCalendarIncrementalSync;
@@ -110,6 +112,28 @@ microsoftSyncExpect(
     count($directLookupHttp->urls) === 1
         && str_contains($directLookupHttp->urls[0], '/me/calendars/primary/events/direct-edit-1'),
     'Direct Microsoft edit lookup must request exactly the selected event instead of a calendar view.'
+);
+
+$exceptionWithoutOriginalStart = microsoftSyncOccurrence(
+    'direct-exception-1',
+    'direct-series-1',
+    'Direct exception',
+    '2026-08-19'
+);
+$exceptionWithoutOriginalStart['type'] = 'exception';
+$exceptionLookupHttp = new MicrosoftIncrementalSyncTestHttpClient([
+    microsoftSyncResponse(200, $exceptionWithoutOriginalStart)
+]);
+$exceptionLookupSynchronizer = new MicrosoftCalendarIncrementalSync($exceptionLookupHttp, 'access-token');
+$exceptionLookupEvent = $exceptionLookupSynchronizer->getEventByReference(
+    'primary',
+    'direct-exception-1',
+    '2026-08-19T09:00:00+00:00'
+);
+microsoftSyncExpect(
+    ($exceptionLookupEvent['originalStart'] ?? '') === '2026-08-19T09:00:00+00:00'
+        && ($exceptionLookupEvent['canUpdateFollowing'] ?? false) === true,
+    'A directly fetched Microsoft exception must retain the known original start for following-series moves.'
 );
 
 $initialNextLink = 'https://graph.microsoft.com/v1.0/me/calendars/primary/calendarView/delta?$skiptoken=page-2';
@@ -268,6 +292,7 @@ require_once __DIR__ . '/../Kalender Konto/traits/ChildGatewayTrait.php';
 
 final class MicrosoftEditIdentityTestHarness
 {
+    use \Burki24\SymconModuleHelper\DebugFlowHelper;
     use KalenderKontoChildGatewayTrait;
 
     /**
