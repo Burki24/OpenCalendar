@@ -62,23 +62,12 @@ function IPS_GetInstanceListByModuleID(string $moduleID): array
 
 /** @var array<string, mixed> */
 $localAccountConfiguration = [];
-/** @var list<array{instanceID: int, name: string, value: mixed}> */
-$localAccountPropertyWrites = [];
 
 function IPS_GetConfiguration(int $instanceID): string
 {
     global $localAccountConfiguration;
 
     return json_encode($localAccountConfiguration, JSON_THROW_ON_ERROR);
-}
-
-function IPS_SetProperty(int $instanceID, string $name, mixed $value): bool
-{
-    global $localAccountPropertyWrites;
-
-    $localAccountPropertyWrites[] = ['instanceID' => $instanceID, 'name' => $name, 'value' => $value];
-
-    return true;
 }
 
 function IPS_GetProperty(int $instanceID, string $name): mixed
@@ -170,16 +159,15 @@ localAccountExpect(
 );
 $account->SetTestProperty('LocalCalendarColor', 0x4FB286);
 $localAccountConfiguration = ['LocalCalendarColor' => '#4fb286'];
-$migrateLegacyColor = new ReflectionMethod(CalendarAccount::class, 'migrateLegacyLocalCalendarColor');
-$migrateLegacyColor->invoke($account);
+$localCalendarColor = new ReflectionMethod(CalendarAccount::class, 'localCalendarColor');
 localAccountExpect(
-    $localAccountPropertyWrites === [[
-        'instanceID' => 42,
-        'name'       => 'LocalCalendarColor',
-        'value'      => 0x4FB286
-    ]],
-    'Existing hexadecimal local calendar colors must migrate to SelectColor RGB values.'
+    $localCalendarColor->invoke($account) === 0x4FB286
+        && $definitionMethod->invoke($account)['color'] === '#4FB286'
+        && $validateConfiguration->invoke($account) === ''
+        && $localAccountConfiguration === ['LocalCalendarColor' => '#4fb286'],
+    'Existing hexadecimal local calendar colors must remain usable without changing the stored property.'
 );
+$localAccountConfiguration = [];
 
 $configurator = new CalendarConfigurator(100);
 $buildValues = new ReflectionMethod(CalendarConfigurator::class, 'buildConfiguratorValues');

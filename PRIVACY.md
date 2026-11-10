@@ -1,6 +1,6 @@
 # Datenschutzhinweise / Privacy Notice
 
-**Stand / Last updated: 13.09.2026**
+**Stand / Last updated: 09.11.2026**
 
 OpenCalendar ist eine quellverfügbare, unter der PolyForm Noncommercial License 1.0.0 bereitgestellte Bibliothek für Symcon. Die Kalenderverarbeitung findet grundsätzlich auf der Symcon-Installation des Anwenders statt. Der Modulautor betreibt keinen eigenen Kalender-Backenddienst und erhält über OpenCalendar keine Kalenderinhalte.
 
@@ -12,14 +12,14 @@ Je nach gewähltem Anbieter verarbeitet OpenCalendar insbesondere:
 
 - Zugangsdaten oder OAuth-Zugangstoken für das verbundene Kalenderkonto,
 - Kalenderkennungen, Kalendernamen, Farben und Berechtigungen,
-- Termindaten wie Titel, Beschreibung, Ort, Beginn, Ende, Ganztagsstatus, Wiederholungsinformationen und technische Termin-IDs,
+- Termin- und bei ausgewählter Microsoft-To-Do-Liste Aufgabendaten wie Titel, Beschreibung, Ort, Beginn, Ende beziehungsweise Fälligkeit, Ganztags- und Erledigungsstatus, Wiederholungsinformationen sowie technische Termin-, Aufgaben- und Listen-IDs,
 - Synchronisationszeitpunkte, ETags und technische Fehlerzustände.
 
 Kalender- und Termindaten werden lokal in Symcon zwischengespeichert, soweit dies für Synchronisation, Darstellung und Bearbeitung erforderlich ist. Dadurch können diese Daten auch Bestandteil eines vom Anwender erstellten Symcon-Backups werden.
 
 Ein vom Anwender über ein **lokales Kalenderkonto** angelegter **lokaler Kalender** speichert seine Originaltermine ausschließlich in der eigenen Symcon-Installation. Er benötigt keinen externen Anbieter, kein OAuth und keine Netzwerkverbindung. Erst wenn der Anwender einen solchen Termin bewusst in einen externen Kalender verschiebt, werden die dafür notwendigen Termindaten an diesen ausgewählten Anbieter übertragen.
 
-Wenn der Anwender einen Termin als **Aufgabentermin** kennzeichnet, verarbeitet OpenCalendar zusätzlich den Aufgabenstatus und gegebenenfalls die Zuordnung zu einer Ursprungsserie. Bei späteren Synchronisationen werden überfällige offene Aufgaben automatisch nachgezogen, bis sie erledigt sind oder die Aufgabenkennzeichnung entfernt wird. Dazu können beim Kalenderanbieter Termine geändert und bei Serien Einzeltermine angelegt sowie die zugehörigen ursprünglichen Vorkommnisse entfernt werden. Die vom Anwender gewählte Option **Geplante Folgetermine mitverschieben** bestimmt, ob der folgende Serienplan mit angepasst wird. Diese Verarbeitung verwendet normale Kalendertermine, keine Google-Tasks- oder Microsoft-To-Do-Anbindung.
+Wenn der Anwender einen Termin als **Aufgabentermin** kennzeichnet, verarbeitet OpenCalendar zusätzlich den Aufgabenstatus und gegebenenfalls die Zuordnung zu einer Ursprungsserie. Bei späteren Synchronisationen werden überfällige offene Aufgaben automatisch nachgezogen, bis sie erledigt sind oder die Aufgabenkennzeichnung entfernt wird. Dazu können beim Kalenderanbieter Termine geändert und bei Serien Einzeltermine angelegt sowie die zugehörigen ursprünglichen Vorkommnisse entfernt werden. Die vom Anwender gewählte Option **Geplante Folgetermine mitverschieben** bestimmt, ob der folgende Serienplan mit angepasst wird. Diese kalenderbasierten Aufgaben verwenden normale Kalendertermine und keine Google-Tasks-Anbindung. Bei Microsoft 365 können Anwender zusätzlich eine Microsoft-To-Do-Liste für neue Aufgabentermine auswählen; diese Aufgaben werden als native Microsoft-To-Do-Aufgaben verarbeitet. Bestehende kalenderbasierte Aufgabentermine werden dabei nicht automatisch übertragen.
 
 Wählt der Anwender beim Verschieben eines Termins oder einer unterstützten Serie einen anderen Kalenderanbieter als Ziel, überträgt die Symcon-Installation die hierfür erforderlichen Termindaten an diesen Zielanbieter. Erst nach bestätigter Erstellung im Ziel wird versucht, die entsprechende Quelle zu löschen. Eine solche providerübergreifende Übertragung erfolgt auf Veranlassung des Anwenders, nicht automatisch an beliebige Anbieter.
 
@@ -135,16 +135,17 @@ OpenCalendar verwendet Google-Nutzerdaten ausschließlich zur Bereitstellung ode
 
 Die Microsoft-Anbindung verwendet eine zentral registrierte Microsoft-Entra-Anwendung und den OAuth-Dienst von Symcon. Anwender müssen keine eigene Client-ID und keinen eigenen Clientschlüssel hinterlegen.
 
-OpenCalendar fordert ausschließlich delegierten Kalenderzugriff an:
+OpenCalendar verwendet folgende delegierte Berechtigungen:
 
 - `Calendars.ReadWrite` zum Lesen, Erstellen, Ändern und Löschen von Kalenderterminen,
+- `Tasks.ReadWrite` zum Lesen der Microsoft-To-Do-Listen und zum Lesen, Erstellen, Ändern und Löschen von Aufgaben in einer vom Anwender ausgewählten Liste,
 - `offline_access`, damit die Verbindung über ein Refresh-Token dauerhaft genutzt werden kann.
 
 Für Anmeldung und Token-Aktualisierung werden OAuth-Daten über den Symcon-OAuth-Dienst unter `https://oauth.ipmagic.de` verarbeitet. Dazu gehören insbesondere Autorisierungscodes und Refresh-Tokens, die für den Austausch mit Microsoft erforderlich sind.
 
-Die eigentlichen Kalender- und Termindaten werden von der Symcon-Installation direkt über `https://graph.microsoft.com` mit Microsoft Graph ausgetauscht und nicht über einen Kalender-Backenddienst des Modulautors geleitet.
+Die eigentlichen Kalender-, Termin- und Microsoft-To-Do-Aufgabendaten werden von der Symcon-Installation direkt über `https://graph.microsoft.com` mit Microsoft Graph ausgetauscht und nicht über einen Backenddienst des Modulautors geleitet. Die To-Do-Liste wird vom Anwender je Microsoft-Kalenderinstanz ausgewählt. Microsoft verwaltet Wiederholungen nativer To-Do-Aufgaben; OpenCalendar synchronisiert die von Microsoft gelieferten Aufgaben und ihren Status.
 
-Das Microsoft-Refresh-Token wird als internes, persistentes Symcon-Attribut gespeichert; kurzlebige Access-Tokens werden nur im Instanzpuffer gehalten. Zusätzlich können Konto-, Kalender- und Termininformationen lokal in Symcon zwischengespeichert werden.
+Das Microsoft-Refresh-Token wird als internes, persistentes Symcon-Attribut gespeichert; kurzlebige Access-Tokens werden nur im Instanzpuffer gehalten. Zusätzlich können Konto-, Kalender-, Termin-, Aufgaben- und Aufgabenlisteninformationen lokal in Symcon zwischengespeichert und in Symcon-Backups übernommen werden.
 
 Beim Trennen eines Microsoft-Kontos entfernt OpenCalendar die lokal gespeicherten Microsoft-OAuth-Daten sowie die Kalenderlisten- und Feed-Caches der Konto-Instanz. Termincaches untergeordneter Kalender-Instanzen und bereits erzeugte IPSView-Inhalte bleiben erhalten; siehe Abschnitt 6. Eine bereits bei Microsoft erteilte Zustimmung kann zusätzlich vom Anwender in den Sicherheitseinstellungen seines Microsoft-Kontos beziehungsweise durch den Administrator des jeweiligen Microsoft-365-Mandanten widerrufen werden.
 
@@ -233,7 +234,7 @@ Diese Datenschutzhinweise werden angepasst, wenn sich die Datenverarbeitung, die
 
 # Privacy Notice (English)
 
-**Last updated: 13 September 2026**
+**Last updated: 9 November 2026**
 
 OpenCalendar is a source-available library for Symcon distributed under the PolyForm Noncommercial License 1.0.0. Calendar processing generally takes place on the user's own Symcon installation. The module author does not operate a calendar backend service and does not receive calendar content through OpenCalendar.
 
@@ -245,14 +246,14 @@ Depending on the selected provider, OpenCalendar processes in particular:
 
 - credentials or OAuth access tokens for the connected calendar account,
 - calendar identifiers, calendar names, colors and permissions,
-- event data such as title, description, location, start, end, all-day status, recurrence information and technical event IDs,
+- event data and, where a Microsoft To Do list is selected, task data such as title, description, location, start, end or due date, all-day and completion status, recurrence information and technical event, task and list IDs,
 - synchronization timestamps, ETags and technical error states.
 
 Calendar and event data is cached locally in Symcon where required for synchronization, display and editing. This data may therefore also be included in Symcon backups created by the user.
 
 A **local calendar** created through a local calendar account stores its original events exclusively in the local Symcon installation. It requires no external provider, OAuth access or network connection. Event data is only transferred to an external provider if the user explicitly moves such an event to a selected external calendar.
 
-When the user marks an event as a **task appointment**, OpenCalendar additionally processes its task status and, where applicable, its association with an original series. During subsequent synchronizations, overdue open tasks are automatically moved forward until completed or no longer marked as tasks. This can update provider events and, for recurring tasks, create individual events and remove the corresponding original occurrences. The user's **Move planned following events as well** option determines whether the following series schedule is adjusted. This uses regular calendar events, not a Google Tasks or Microsoft To Do integration.
+When the user marks an event as a **task appointment**, OpenCalendar additionally processes its task status and, where applicable, its association with an original series. During subsequent synchronizations, overdue open tasks are automatically moved forward until completed or no longer marked as tasks. This can update provider events and, for recurring tasks, create individual events and remove the corresponding original occurrences. The user's **Move planned following events as well** option determines whether the following series schedule is adjusted. These calendar-based tasks use regular calendar events and no Google Tasks integration. For Microsoft 365, users may also select a Microsoft To Do list for new task appointments; these are processed as native Microsoft To Do tasks. Existing calendar-based task appointments are not transferred automatically.
 
 When the user moves an event or a supported series to a calendar hosted by another provider, the Symcon installation transmits the required event data to that destination provider. Only after creation at the destination is confirmed does OpenCalendar attempt to delete the corresponding source. Such cross-provider transfers are initiated by the user, not performed automatically to arbitrary providers.
 
@@ -373,13 +374,14 @@ Microsoft integration uses a centrally registered Microsoft Entra application an
 The requested delegated permissions are limited to:
 
 - `Calendars.ReadWrite`,
+- `Tasks.ReadWrite` to read Microsoft To Do lists and to read, create, update and delete tasks in a list selected by the user,
 - `offline_access`.
 
 OAuth authorization codes and refresh tokens required for sign-in and token renewal are processed through the Symcon OAuth service at `https://oauth.ipmagic.de`.
 
-Actual calendar and event data is exchanged directly between the user's Symcon installation and Microsoft Graph at `https://graph.microsoft.com` and is not routed through a calendar backend operated by the module author.
+Actual calendar, event and Microsoft To Do task data is exchanged directly between the user's Symcon installation and Microsoft Graph at `https://graph.microsoft.com` and is not routed through a backend operated by the module author. The user selects the To Do list for each Microsoft calendar instance. Microsoft manages native To Do recurrences; OpenCalendar synchronizes the tasks and their status returned by Microsoft.
 
-The Microsoft refresh token is stored as an internal persistent Symcon attribute; short-lived access tokens are kept only in the instance buffer. Account, calendar and event information may additionally be cached locally in Symcon.
+The Microsoft refresh token is stored as an internal persistent Symcon attribute; short-lived access tokens are kept only in the instance buffer. Account, calendar, event, task and task-list information may additionally be cached locally in Symcon and included in Symcon backups.
 
 Disconnecting a Microsoft account removes the locally stored Microsoft OAuth data and the account instance's calendar-list and feed caches. Child calendar instances' event caches and previously generated IPSView content are retained; see section 6. Consent already granted at Microsoft can additionally be revoked by the user in their Microsoft account security settings or by the administrator of the relevant Microsoft 365 tenant.
 

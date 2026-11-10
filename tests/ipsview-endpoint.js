@@ -76,4 +76,3 @@ if (source.includes('function calendarIPSViewEndpoint(')) vm.runInContext(extrac
     await assert.rejects(context.calendarIPSViewRequest('CreateEvent', {}), /Unauthorized/);
     console.log('Automatic IPSView endpoint tests passed (tile, Windows, Connect, srcdoc, direct HTTP and failure cases).');
 })().catch(error=>{console.error(error);process.exitCode=1;});
-
