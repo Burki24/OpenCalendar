@@ -17,7 +17,7 @@ if (!trait_exists(VisualizationAssetHelper::class, false)) {
      * vendored helper can reliably access files from that module's visualization
      * directory.
      *
-     * @version 1.1.3
+     * @version 1.1.4
      */
     trait VisualizationAssetHelper
     {
@@ -53,12 +53,19 @@ if (!trait_exists(VisualizationAssetHelper::class, false)) {
             return $script;
         }
 
-        /** Returns local wheel routing and UI forwarding for explicitly named own child frames. */
+        /**
+         * Returns wheel routing with scroll-boundary handoff and opt-in frame forwarding.
+         * When available, DebugFlowHelper identifies the delivered asset in native debug.
+         * Individual wheel events remain in the browser and create no network traffic.
+         */
         protected function VisualizationInteractionScript(): string
         {
             $script = file_get_contents(__DIR__ . '/visualization/interaction.min.js');
             if ($script === false) {
                 throw new RuntimeException('The visualization interaction asset could not be loaded.');
+            }
+            if (method_exists($this, 'DebugFlowEvent')) {
+                $this->DebugFlowEvent(__FUNCTION__, __LINE__, 'AKTION', 'Zentrale Mausradunterstützung geladen. An Scrollgrenzen wird der nächste bewegliche Bereich verwendet; offene Dialoge schützen den Hintergrund. Einzelne Mausbewegungen bleiben im Browser.', ['Assetkennung' => substr(hash('sha256', $script), 0, 16)]);
             }
             return $script;
         }
