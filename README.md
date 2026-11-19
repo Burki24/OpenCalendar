@@ -6,6 +6,9 @@
 [![License](https://img.shields.io/badge/License-PolyForm--Noncommercial--1.0.0-brightgreen.svg)](LICENSE)
 [![Check Style](https://github.com/Burki24/OpenCalendar/actions/workflows/style.yml/badge.svg?branch=main)](https://github.com/Burki24/OpenCalendar/actions/workflows/style.yml?query=branch%3Amain)
 [![Run Tests](https://github.com/Burki24/OpenCalendar/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/Burki24/OpenCalendar/actions/workflows/tests.yml?query=branch%3Amain)
+
+[![PayPal.Me](https://img.shields.io/badge/PayPal-Me-lightblue.svg)](#spenden)
+
 <img width="1672" height="941" alt="exec-2745150d-8d12-4fbc-acab-0d2c7ff68cf3" src="https://github.com/user-attachments/assets/0acec8d0-4d98-44ed-9c22-24f086832890" />
 
 OpenCalendar ist eine Anwendung für Symcon, mit der Nutzer ihre Online-Kalender verbinden, synchronisieren, anzeigen und bearbeiten können. Unterstützt werden Apple iCloud, Google Calendar, Microsoft 365/Outlook.com, generische CalDAV-Server sowie schreibgeschützte ICS-/Webcal-Abonnements.
@@ -399,3 +402,9 @@ Drittanbieter.
 Der native Symcon-Debug zeigt deutsche Meldungen mit Funktion, Zeile, Vorgang
 und Ergebnis sowie Aktionen und Schnittstellenübergaben. Private Inhalte und
 Zugangsdaten bleiben geschützt. Details und Abnahme: [Debug-Aufbau](docs/DEBUG_OUTPUT.md).
+
+## Spenden
+
+Mit einer freiwilligen Spende kannst du die Weiterentwicklung dieses Projekts unterstützen.
+
+[![PayPal.Me](https://img.shields.io/badge/PayPal-Me-lightblue.svg)](https://www.paypal.me/BurkhardKneiseler)
