@@ -59,20 +59,31 @@
             if (event.stopImmediatePropagation) event.stopImmediatePropagation();
             else if (event.stopPropagation) event.stopPropagation();
         }
-        function scroll(event, target) {
+        function scroll(event, target, axes = {x: true, y: true}) {
             if (!target || event.ctrlKey || event.metaKey) return false;
             const movement = delta(event, target);
             if (!movement.deltaX && !movement.deltaY) return false;
-            target.scrollLeft += movement.deltaX;
-            target.scrollTop += movement.deltaY;
+            const left = target.scrollLeft, top = target.scrollTop;
+            if (axes.x) target.scrollLeft += movement.deltaX;
+            if (axes.y) target.scrollTop += movement.deltaY;
+            // Browsers clamp positions, including negative RTL scrollLeft.
+            // Only the element that really moved may consume this wheel.
+            if (target.scrollLeft === left && target.scrollTop === top) return false;
             consume(event);
             return true;
         }
         function scrollable(target) {
-            if (!target || !target.tagName || typeof environment.getComputedStyle !== 'function') return false;
+            if (!target || !target.tagName || typeof environment.getComputedStyle !== 'function') return null;
             const style = environment.getComputedStyle(target);
-            return ((target.scrollHeight > target.clientHeight) && /auto|scroll|overlay/.test(style.overflowY))
-                || ((target.scrollWidth > target.clientWidth) && /auto|scroll|overlay/.test(style.overflowX));
+            const viewport = target === document.scrollingElement;
+            const bodyStyle = viewport && document.body ? environment.getComputedStyle(document.body) : null;
+            const allowed = axis => {
+                let overflow = style['overflow' + axis];
+                if (viewport && overflow === 'visible' && bodyStyle) overflow = bodyStyle['overflow' + axis];
+                return /^(auto|scroll|overlay)$/.test(overflow) || (viewport && overflow === 'visible');
+            };
+            const axes = {x: target.scrollWidth > target.clientWidth && allowed('X'), y: target.scrollHeight > target.clientHeight && allowed('Y')};
+            return axes.x || axes.y ? axes : null;
         }
         function resolve(event) {
             if (event.clientX === 0 && event.clientY === 0 && pointer && typeof document.elementFromPoint === 'function') {
@@ -105,7 +116,8 @@
                         return true;
                     }
                 }
-                if (scrollable(target)) return scroll(event, target);
+                const axes = scrollable(target);
+                if (axes && scroll(event, target, axes)) return true;
                 const handler = regions.get(target);
                 if (handler) {
                     const position = point(event), movement = delta(event, target);
@@ -114,6 +126,8 @@
                         preventDefault() { prevented = true; }, stopPropagation() {}};
                     if (handler(normalized) === true || prevented) { consume(event); return true; }
                 }
+                // Inner lists may hand off to their dialog, never behind it.
+                if (target.tagName === 'DIALOG' && target.open) { consume(event); return true; }
                 target = target.parentElement;
             }
             // Let existing chart/component handlers receive corrected native input.
