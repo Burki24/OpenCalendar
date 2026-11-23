@@ -20,7 +20,7 @@ The files in this directory are vendored from
 | `IPSViewStyleProfileHelper.php` | 1.0.1 | `eca6aa486d60b0db11cc7db0b486dc5b1723c49e26c23fe72465a33cf73f453d` |
 | `IPSViewStyleHelper.php` | 1.6.10 | `16773fc594ae3b6df9b7d352611ec79a02c4c7089466769c94b77b1f90cdc7d9` |
 | `ParentConnectionHelper.php` | 1.0.0 | `d4f01dee721aa32e64410979ca15b2795a0fcc59c0232c0ad69e4702d9ff573c` |
-| `PersistentJsonCacheHelper.php` | 1.0.0 | `adbc7680abe814dc6c15a9cda1312cc30023073595052006662716bc0d65f2a4` |
+| `PersistentJsonCacheHelper.php` | 1.0.1 | `e048ce434b80f396e1821fdfba65982ad6c02123c50a2e335c6d436d0aa3ae38` |
 | `SymconOAuthHelper.php` | 1.0.0 | `d9053bfd083a581b96f8526cbb05e8568a6ad24a81cafa3e9b05108343bf2a65` |
 | `VariableHelper.php` | 1.2.0 | `43b205a2ca87553a3a59a9e94f1c5c72fc4643cebedb080a9706139d98b30624` |
 | `VisualizationThemeHelper.php` | 1.1.2 | `ffd5ba38a26191fd40c5900f8338ae520fa12904474493712eac7975304f4672` |

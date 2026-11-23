@@ -389,10 +389,10 @@
             "source_sha": "82a13d236b430c0ffbcb714aed56d9e52c344ff2"
         },
         "PersistentJsonCacheHelper": {
-            "version": "1.0.0",
-            "sha256": "adbc7680abe814dc6c15a9cda1312cc30023073595052006662716bc0d65f2a4",
+            "version": "1.0.1",
+            "sha256": "e048ce434b80f396e1821fdfba65982ad6c02123c50a2e335c6d436d0aa3ae38",
             "path": "libs/helper/PersistentJsonCacheHelper.php",
-            "source_sha": "82a13d236b430c0ffbcb714aed56d9e52c344ff2"
+            "source_sha": "f44349716dcf828f3e2f294cdc31e726650ef611"
         },
         "SymconOAuthHelper": {
             "version": "1.0.0",
