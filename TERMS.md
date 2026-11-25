@@ -1,12 +1,12 @@
 # Nutzungsbedingungen / Terms of Use
 
-**Stand / Last updated: 28.08.2026**
+**Stand / Last updated: 25.11.2026**
 
 OpenCalendar ist quellverfügbare Software und wird unter der im Repository enthaltenen [PolyForm Noncommercial License 1.0.0](https://github.com/Burki24/OpenCalendar/blob/main/LICENSE) bereitgestellt. Die Lizenz gestattet die Nutzung, Änderung und Weitergabe ausschließlich für die in ihr definierten nichtkommerziellen Zwecke. Eine kommerzielle Nutzung wird durch diese Lizenz nicht gestattet und erfordert eine gesonderte Erlaubnis des Lizenzgebers.
 
 ## Nutzung
 
-Der Anwender ist dafür verantwortlich, OpenCalendar nur mit Kalenderkonten und Daten zu verbinden, für deren Zugriff und Bearbeitung er berechtigt ist. Zugangsdaten, OAuth-Zugangstoken und private Kalender-URLs sind vertraulich zu behandeln.
+Der Anwender ist dafür verantwortlich, OpenCalendar nur mit Kalenderkonten, Terminen und Dateianhängen zu verwenden, für deren Zugriff und Bearbeitung er berechtigt ist. Zugangsdaten, OAuth-Zugangstoken und private Kalender-URLs sind vertraulich zu behandeln. Für beim Anbieter gespeicherte Anhänge gelten zusätzlich dessen Freigabe- und Aufbewahrungsregeln.
 
 Die Verfügbarkeit und Funktion externer Dienste wie Google Calendar, Microsoft 365/Outlook.com, Apple iCloud, CalDAV-Server, iCalendar-Anbieter und Symcon Connect liegt außerhalb der Kontrolle des OpenCalendar-Projekts. Für diese Dienste gelten zusätzlich die jeweiligen Bedingungen der Anbieter.
 
@@ -26,7 +26,7 @@ Google, Google Calendar, Microsoft, Microsoft 365, Outlook, Apple und iCloud sin
 
 OpenCalendar is source-available software distributed under the [PolyForm Noncommercial License 1.0.0](https://github.com/Burki24/OpenCalendar/blob/main/LICENSE) included in this repository. The license permits use, modification and distribution only for the noncommercial purposes defined in its terms. Commercial use is not permitted by this license and requires separate permission from the licensor.
 
-Users are responsible for connecting OpenCalendar only to calendar accounts and data they are authorized to access and modify. Credentials, OAuth tokens and private calendar URLs must be treated as confidential.
+Users are responsible for using OpenCalendar only with calendar accounts, events and file attachments they are authorized to access and modify. Credentials, OAuth tokens and private calendar URLs must be treated as confidential. Attachments stored with a provider are also subject to that provider's sharing and retention rules.
 
 Availability and operation of external services such as Google Calendar, Microsoft 365/Outlook.com, Apple iCloud, CalDAV servers, iCalendar providers and Symcon Connect are outside the control of the OpenCalendar project and are additionally subject to the respective providers' terms.
 

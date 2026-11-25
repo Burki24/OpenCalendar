@@ -10,6 +10,7 @@ require_once __DIR__ . '/../libs/CalendarAttachmentTransport.php';
 require_once __DIR__ . '/../libs/AttachmentUploadPolicy.php';
 
 use Burki24\SymconModuleHelper\ConfigurationFormHelper;
+use Burki24\SymconModuleHelper\DebugHelper;
 use Burki24\SymconModuleHelper\IPSViewHTMLPageHelper;
 use Burki24\SymconModuleHelper\IPSViewStyleConfigurationHelper;
 use Burki24\SymconModuleHelper\VariableHelper;
@@ -27,6 +28,7 @@ require_once __DIR__ . '/../libs/CalendarEventReminder.php';
 require_once __DIR__ . '/../libs/CalendarEventState.php';
 require_once __DIR__ . '/../libs/CalendarTaskEvent.php';
 require_once __DIR__ . '/../libs/helper/ConfigurationFormHelper.php';
+require_once __DIR__ . '/../libs/helper/DebugHelper.php';
 require_once __DIR__ . '/../libs/helper/IPSViewHTMLPageHelper.php';
 require_once __DIR__ . '/../libs/helper/IPSViewStyleConfigurationHelper.php';
 require_once __DIR__ . '/../libs/helper/VariableHelper.php';
@@ -36,6 +38,7 @@ require_once __DIR__ . '/../libs/helper/VisualizationThemeHelper.php';
 class CalendarView extends IPSModuleStrict
 {
     use ConfigurationFormHelper;
+    use DebugHelper;
     use IPSViewHTMLPageHelper;
     use IPSViewStyleConfigurationHelper;
     use VariableHelper;
@@ -403,7 +406,7 @@ class CalendarView extends IPSModuleStrict
 
             $this->SetStatus($calendars === [] ? self::STATUS_NO_CALENDARS : IS_ACTIVE);
         } catch (Throwable $exception) {
-            $this->SendDebug('Configuration', $exception->getMessage(), 0);
+            $this->logSafeException('Configuration', $exception);
             $this->SetStatus(self::STATUS_INVALID_CONFIGURATION);
         }
 
@@ -494,7 +497,7 @@ class CalendarView extends IPSModuleStrict
                     break;
             }
         } catch (Throwable $exception) {
-            $this->SendDebug('VisualizationAction', $exception->getMessage(), 0);
+            $this->logSafeException('VisualizationAction', $exception);
             $this->sendToast('error', $exception->getMessage());
         }
     }
@@ -610,7 +613,7 @@ class CalendarView extends IPSModuleStrict
                     JSON_THROW_ON_ERROR
                 );
             } catch (Throwable $exception) {
-                $this->SendDebug('AnniversaryList', $exception->getMessage(), 0);
+                $this->logSafeException('AnniversaryList', $exception);
                 continue;
             }
             if (!is_array($calendarEntries) || !array_is_list($calendarEntries)) {
@@ -1182,10 +1185,9 @@ class CalendarView extends IPSModuleStrict
                 return false;
             }
 
-            $this->SendDebug(
+            $this->SendSafeDebug(
                 'Initialization',
-                'Selected calendar instances did not finish initialization before the refresh limit.',
-                0
+                'Selected calendar instances did not finish initialization before the refresh limit.'
             );
         }
 
@@ -1291,7 +1293,7 @@ class CalendarView extends IPSModuleStrict
                     )
                 ]);
             } catch (Throwable $exception) {
-                $this->SendDebug('IPSViewAction', $exception->getMessage(), 0);
+                $this->logSafeException('IPSViewAction', $exception);
                 $this->outputIPSViewResponse(['Error' => 'State retrieval failed.'], 500);
             }
 
@@ -1331,7 +1333,7 @@ class CalendarView extends IPSModuleStrict
         } catch (RuntimeException $exception) {
             $this->outputIPSViewResponse(['Error' => $exception->getMessage()], 400);
         } catch (Throwable $exception) {
-            $this->SendDebug('IPSViewAction', $exception->getMessage(), 0);
+            $this->logSafeException('IPSViewAction', $exception);
             $this->outputIPSViewResponse(['Error' => 'Action failed.'], 500);
         }
     }
@@ -1452,7 +1454,7 @@ class CalendarView extends IPSModuleStrict
                 JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR
             ));
         } catch (Throwable $exception) {
-            $this->SendDebug('VisualizationUpdate', $exception->getMessage(), 0);
+            $this->logSafeException('VisualizationUpdate', $exception);
         }
     }
 
@@ -1466,7 +1468,7 @@ class CalendarView extends IPSModuleStrict
             try {
                 $state = $this->buildState();
             } catch (Throwable $exception) {
-                $this->SendDebug('CalendarState', $exception->getMessage(), 0);
+                $this->logSafeException('CalendarState', $exception);
 
                 return;
             }
@@ -1475,7 +1477,7 @@ class CalendarView extends IPSModuleStrict
         try {
             $this->UpdateVisualizationValue($this->getFullUpdateMessage($state));
         } catch (Throwable $exception) {
-            $this->SendDebug('VisualizationUpdate', $exception->getMessage(), 0);
+            $this->logSafeException('VisualizationUpdate', $exception);
         }
 
         if ($updateIPSViewHTML && $this->IsIPSViewHTMLPageEnabled()) {
@@ -1485,7 +1487,7 @@ class CalendarView extends IPSModuleStrict
                     $this->UpdateIPSViewHTMLVariable('IPSViewCalendar', $html);
                 }
             } catch (Throwable $exception) {
-                $this->SendDebug('IPSViewUpdate', $exception->getMessage(), 0);
+                $this->logSafeException('IPSViewUpdate', $exception);
             }
         }
     }
@@ -1581,10 +1583,9 @@ class CalendarView extends IPSModuleStrict
             return $html;
         }
 
-        $this->SendDebug(
+        $this->SendSafeDebug(
             $debugContext,
-            'Rendering returned an empty document; preserving the existing IPSView HTML.',
-            0
+            'Rendering returned an empty document; preserving the existing IPSView HTML.'
         );
 
         return null;
@@ -1793,7 +1794,7 @@ class CalendarView extends IPSModuleStrict
                         $queryEnd
                     );
                 } catch (Throwable $exception) {
-                    $this->SendDebug('CalendarData', $exception->getMessage(), 0);
+                    $this->logSafeException('CalendarData', $exception);
                     continue;
                 }
 
@@ -2576,7 +2577,7 @@ class CalendarView extends IPSModuleStrict
             try {
                 IPSKAL_FinishEventsTransfer($instanceId, $token);
             } catch (Throwable $exception) {
-                $this->SendDebug('EventTransferCleanup', $exception->getMessage(), 0);
+                $this->logSafeException('EventTransferCleanup', $exception);
             }
         }
 
@@ -2750,7 +2751,7 @@ class CalendarView extends IPSModuleStrict
                     return true;
                 }
             } catch (Throwable $exception) {
-                $this->SendDebug('CalendarInitialization', $exception->getMessage(), 0);
+                $this->logSafeException('CalendarInitialization', $exception);
 
                 return true;
             }
@@ -2794,7 +2795,7 @@ class CalendarView extends IPSModuleStrict
                     $calendarStatus = $decodedStatus;
                 }
             } catch (Throwable $exception) {
-                $this->SendDebug('CalendarStatus', $exception->getMessage(), 0);
+                $this->logSafeException('CalendarStatus', $exception);
             }
 
             $color = strtoupper(trim((string) ($calendarStatus['calendarColor']
@@ -2974,10 +2975,9 @@ class CalendarView extends IPSModuleStrict
         }
 
         if ($selection !== []) {
-            $this->SendDebug(
+            $this->SendSafeDebug(
                 'CalendarSelection',
-                'Recovered the calendar selection from existing message subscriptions.',
-                0
+                'Recovered the calendar selection from existing message subscriptions.'
             );
             $this->storeCalendarSelectionBackup($selection);
         }
@@ -3330,7 +3330,7 @@ class CalendarView extends IPSModuleStrict
                 }
             }
         } catch (Throwable $exception) {
-            $this->SendDebug('CalendarStatus', $exception->getMessage(), 0);
+            $this->logSafeException('CalendarStatus', $exception);
         }
 
         return $this->Translate($fallbackMessage);
@@ -3344,7 +3344,7 @@ class CalendarView extends IPSModuleStrict
             try {
                 $success = IPSKAL_Synchronize($calendar['instanceId']);
             } catch (Throwable $exception) {
-                $this->SendDebug('CalendarSynchronization', $exception->getMessage(), 0);
+                $this->logSafeException('CalendarSynchronization', $exception);
                 $success = false;
             }
             if (!$success) {
@@ -3882,7 +3882,7 @@ class CalendarView extends IPSModuleStrict
                 )
             );
         } catch (Throwable $exception) {
-            $this->SendDebug('MoveRollback', $exception->getMessage(), 0);
+            $this->logSafeException('MoveRollback', $exception);
             return false;
         }
     }
@@ -3893,5 +3893,15 @@ class CalendarView extends IPSModuleStrict
             ['type' => 'toast', 'level' => $level, 'message' => $message],
             JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR
         ));
+    }
+
+    /** Records an exception without provider messages, URLs, event data, or arguments. */
+    private function logSafeException(string $channel, Throwable $exception): void
+    {
+        $this->SendSafeDebug($channel, [
+            'type' => $exception::class,
+            'file' => basename($exception->getFile()),
+            'line' => $exception->getLine()
+        ]);
     }
 }

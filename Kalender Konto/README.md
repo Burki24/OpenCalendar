@@ -6,6 +6,9 @@ Neben externen Anbietern kann ein Kalender Konto den Anbieter **Symcon - Kalende
 verwenden. Dieser speichert einen beschreibbaren Kalender ausschließlich in
 Symcon und benötigt weder Zugangsdaten noch eine Netzwerkverbindung oder
 Synchronisation. Name und Farbe werden direkt im Konto festgelegt.
+Bereits gespeicherte Farben im älteren Hexformat bleiben beim Lesen und im
+Farbformular sichtbar; OpenCalendar schreibt die Benutzereinstellung beim
+Anwenden der Konfiguration nicht automatisch um.
 
 Zum Erstellen der eigentlichen Kalenderinstanz wird anschließend ein mit dem
 Konto verbundener **Kalender Konfigurator** verwendet. Er erkennt genau diesen

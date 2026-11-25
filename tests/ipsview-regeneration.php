@@ -147,4 +147,20 @@ assertIPSViewRegeneration(
     'The shared configuration action must reach the same helper-backed regeneration workflow.'
 );
 
+$diagnosticView = new RegenerationCalendarView(9407);
+$privateProviderDetail = 'https://private.example.invalid/feed?token=secret-calendar-value';
+(new ReflectionMethod(CalendarView::class, 'logSafeException'))->invoke(
+    $diagnosticView,
+    'CalendarData',
+    new RuntimeException($privateProviderDetail)
+);
+assertIPSViewRegeneration(
+    count($diagnosticView->debug) === 1
+        && $diagnosticView->debug[0][0] === 'CalendarData'
+        && str_contains($diagnosticView->debug[0][1], 'RuntimeException')
+        && !str_contains($diagnosticView->debug[0][1], $privateProviderDetail)
+        && !str_contains($diagnosticView->debug[0][1], 'secret-calendar-value'),
+    'Calendar View diagnostics must omit raw provider exceptions and private URLs.'
+);
+
 fwrite(STDOUT, "Calendar View shared IPSView regeneration tests passed.\n");

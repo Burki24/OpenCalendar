@@ -26,6 +26,15 @@ Einrichtungsassistent zur Verfügung. Sie führt vom Kalenderanbieter über das
 Kalender Konto und die Kalenderauswahl bis zur fertigen Kalender Ansicht und
 übernimmt dabei die notwendigen technischen Verknüpfungen automatisch.
 
+**Dateianhänge (3.0):** Kalenderinstanz und Kalenderansicht müssen den Zugriff
+und den gewünschten Speicherort gesondert freigeben. Lokale Kalender und
+Google-Termine können Dateien ausschließlich in Symcon speichern; Google-
+Anbieteranhänge werden als bestätigte Links geöffnet. Microsoft-365-Termine,
+Microsoft-To-Do-Aufgaben sowie Apple-/CalDAV-Termine unterstützen bei Freigabe
+Anbieter-Upload, Download und einzelnes Löschen. ICS-/Webcal-Quellen bleiben
+schreibgeschützt. Umfang, Dateigrenzen und Zugriffsvoraussetzungen stehen in der
+[Dokumentation der Kalender Ansicht](Kalender%20Ansicht/README.md#anhangsberechtigungen-und-bestehende-anh%C3%A4nge).
+
 Umfangreiche Terminlisten werden intern seitenweise zwischen Konto, Kalender und
 Kalenderansicht übertragen. Online-ICS-/Webcal-Feeds und lokal importierte
 ICS-Dateien dürfen jeweils höchstens 16 MiB groß sein. Innerhalb dieser Grenze

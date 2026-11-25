@@ -163,6 +163,9 @@ class CalendarAccount extends IPSModuleStrict
         $state['MicrosoftStatus']['caption'] = $this->microsoftStatusText();
         $state['UpdateInterval']['visible'] = $this->ReadPropertyInteger('Provider') !== self::PROVIDER_LOCAL
             && $this->ReadPropertyInteger('UpdateSchedule') === SynchronizationSchedule::CUSTOM;
+        if ($this->ReadPropertyInteger('Provider') === self::PROVIDER_LOCAL) {
+            $state['LocalCalendarColor']['value'] = $this->localCalendarColor();
+        }
         $this->applyProviderFormStateToConfiguration($form, $state);
         $isLocal = $this->ReadPropertyInteger('Provider') === self::PROVIDER_LOCAL;
         if (isset($form['actions']) && is_array($form['actions'])) {
@@ -297,8 +300,6 @@ class CalendarAccount extends IPSModuleStrict
     public function ApplyChanges(): void
     {
         parent::ApplyChanges();
-
-        $this->migrateLegacyLocalCalendarColor();
 
         $providerName = $this->getProviderName($this->ReadPropertyInteger('Provider'));
         $username = match ($this->ReadPropertyInteger('Provider')) {
@@ -1317,7 +1318,7 @@ class CalendarAccount extends IPSModuleStrict
             if (trim($this->ReadPropertyString('LocalCalendarName')) === '') {
                 return $this->Translate('The local calendar name is missing.');
             }
-            if (!$this->isValidLocalCalendarColor($this->ReadPropertyInteger('LocalCalendarColor'))) {
+            if (!$this->isValidLocalCalendarColor($this->localCalendarColor())) {
                 return $this->Translate('The local calendar color is invalid.');
             }
 
@@ -1492,7 +1493,7 @@ class CalendarAccount extends IPSModuleStrict
         return [
             'id'            => 'local:' . $this->InstanceID,
             'name'          => trim($this->ReadPropertyString('LocalCalendarName')),
-            'color'         => sprintf('#%06X', $this->ReadPropertyInteger('LocalCalendarColor')),
+            'color'         => sprintf('#%06X', $this->localCalendarColor()),
             'description'   => $this->Translate('Stored only in Symcon without external synchronization.'),
             'localCalendar' => true,
             'capabilities'  => [
@@ -1512,20 +1513,16 @@ class CalendarAccount extends IPSModuleStrict
         ];
     }
 
-    /**
-     * Converts the short-lived hexadecimal color property from the first local-calendar release.
-     */
-    private function migrateLegacyLocalCalendarColor(): void
+    /** Reads an older hexadecimal color without changing the saved user property. */
+    private function localCalendarColor(): int
     {
         $configuration = json_decode(IPS_GetConfiguration($this->InstanceID), true);
-        if (!is_array($configuration)) {
-            return;
-        }
-        $legacyColor = $configuration['LocalCalendarColor'] ?? null;
+        $legacyColor = is_array($configuration) ? ($configuration['LocalCalendarColor'] ?? null) : null;
         if (!is_string($legacyColor) || preg_match('/^#[0-9A-Fa-f]{6}$/', $legacyColor) !== 1) {
-            return;
+            return $this->ReadPropertyInteger('LocalCalendarColor');
         }
-        IPS_SetProperty($this->InstanceID, 'LocalCalendarColor', hexdec(substr($legacyColor, 1)));
+
+        return hexdec(substr($legacyColor, 1));
     }
 
     private function isValidLocalCalendarColor(int $color): bool

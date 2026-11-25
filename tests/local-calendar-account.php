@@ -52,11 +52,12 @@ class IPSModuleStrict
 
 function IPS_GetConfiguration(int $instanceID): string
 {
-    return '{}';
+    return $GLOBALS['legacyLocalCalendarConfiguration'] ?? '{}';
 }
 
 function IPS_SetProperty(int $instanceID, string $name, mixed $value): bool
 {
+    $GLOBALS['localCalendarPropertyWrites'] = ($GLOBALS['localCalendarPropertyWrites'] ?? 0) + 1;
     return true;
 }
 
@@ -119,6 +120,31 @@ localAccountExpect(
     (new ReflectionMethod(CalendarAccount::class, 'validateConfiguration'))->invoke($account) === '',
     'A complete local account configuration must work without external credentials.'
 );
+
+$GLOBALS['legacyLocalCalendarConfiguration'] = json_encode(
+    ['LocalCalendarColor' => '#336699'],
+    JSON_THROW_ON_ERROR
+);
+$legacyAccount = new CalendarAccount(43);
+$legacyAccount->SetTestProperty('Provider', 5);
+$legacyAccount->SetTestProperty('LocalCalendarName', 'Legacy');
+$legacyAccount->SetTestProperty('LocalCalendarColor', '#336699');
+localAccountExpect(
+    (new ReflectionMethod(CalendarAccount::class, 'validateConfiguration'))->invoke($legacyAccount) === ''
+        && (new ReflectionMethod(CalendarAccount::class, 'localCalendarDefinition'))->invoke($legacyAccount)['color'] === '#336699',
+    'A legacy hexadecimal calendar color must remain valid and visible without a property write.'
+);
+$legacyForm = json_decode($legacyAccount->GetConfigurationForm(), true, 512, JSON_THROW_ON_ERROR);
+$legacyColorField = array_values(array_filter(
+    $legacyForm['elements'] ?? [],
+    static fn (array $element): bool => ($element['name'] ?? '') === 'LocalCalendarColor'
+));
+localAccountExpect(
+    ($legacyColorField[0]['value'] ?? null) === 0x336699
+        && ($GLOBALS['localCalendarPropertyWrites'] ?? 0) === 0,
+    'The color form must show the old RGB value without modifying the saved configuration.'
+);
+unset($GLOBALS['legacyLocalCalendarConfiguration']);
 
 $configuratorSource = (string) file_get_contents(__DIR__ . '/../Kalender Konfigurator/module.php');
 localAccountExpect(

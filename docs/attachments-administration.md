@@ -1,10 +1,12 @@
 # Lokale Dateianhänge sichern und aufräumen
 
-Diese Verwaltungsfunktionen gehören zur Vorbereitung der Dateianhänge in
-`dev_9.1`. Sie stehen vertrauenswürdigen Symcon-Skripten über die Kalender-Instanz
-zur Verfügung. Eine Bedienoberfläche in IPSView oder der Kachel ist noch nicht
-freigeschaltet. Google und die Übertragung von Dateien zu Kalenderanbietern sind
-nicht Bestandteil dieses Schritts.
+Diese Verwaltungsfunktionen stehen vertrauenswürdigen Symcon-Skripten über die
+Kalender-Instanz zur Verfügung. Die Kachel und IPSView bieten inzwischen
+getrennt freizugebende Anhangsfunktionen für lokale Kalender, Google-Termine,
+Microsoft 365, Microsoft To Do und Apple/CalDAV. Die hier beschriebenen
+Sicherungs- und Bereinigungsfunktionen betreffen ausschließlich lokale
+Originaldateien in Symcon, auch solche an Google-Terminen. Anhänge beim
+Kalenderanbieter sind nicht Teil dieser lokalen Sicherung.
 
 ## Zugriff und Aufbewahrung
 

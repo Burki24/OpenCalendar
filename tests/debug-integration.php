@@ -13,12 +13,14 @@ $root = dirname(__DIR__);
 $calendar = file_get_contents($root . '/Kalender/module.php');
 $account = file_get_contents($root . '/Kalender Konto/module.php');
 $gateway = file_get_contents($root . '/Kalender Konto/traits/ChildGatewayTrait.php');
+$view = file_get_contents($root . '/Kalender Ansicht/module.php');
 
 assertDebugIntegration(is_string($calendar), 'Calendar module source must be readable.');
 assertDebugIntegration(is_string($account), 'Calendar Account module source must be readable.');
 assertDebugIntegration(is_string($gateway), 'Calendar Account child gateway source must be readable.');
+assertDebugIntegration(is_string($view), 'Calendar View module source must be readable.');
 
-foreach ([$calendar, $account] as $source) {
+foreach ([$calendar, $account, $view] as $source) {
     assertDebugIntegration(
         str_contains($source, 'use Burki24\\SymconModuleHelper\\DebugHelper;'),
         'Calendar modules must import DebugHelper.'
@@ -36,6 +38,14 @@ foreach ([$calendar, $account] as $source) {
         'Calendar modules must use the safe debug wrapper instead of direct SendDebug calls.'
     );
 }
+
+assertDebugIntegration(
+    str_contains($view, 'private function logSafeException(')
+        && str_contains($view, 'SendSafeDebug($channel, [')
+        && str_contains($view, "'type' => \$exception::class")
+        && !str_contains($view, "'message' => \$exception->getMessage()"),
+    'Calendar View exceptions must be logged without private provider messages or payloads.'
+);
 
 foreach ([
     'SynchronizationStart',
