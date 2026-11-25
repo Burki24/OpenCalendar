@@ -2,6 +2,8 @@
 
 ## Neu
 
+- Die Kalender Ansicht kann unter Symcon 9.1 optional zusätzlich zur normalen
+  Kachel als native HTML-Vollbildansicht angeboten werden.
 - Die neue **Kalender Einrichtung** führt schrittweise durch Anbieter, Konto,
   Kalenderauswahl und Kalender Ansicht. Bestehende Installationen können die
   bisherige manuelle Einrichtung weiter nutzen.

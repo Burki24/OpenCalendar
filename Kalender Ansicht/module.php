@@ -131,6 +131,7 @@ class CalendarView extends IPSModuleStrict
         $this->RegisterPropertyString('QuickViewButtons', '[]');
         $this->RegisterPropertyInteger('TileWeekOrientation', 0);
         $this->RegisterPropertyInteger('TileFontScale', 100);
+        $this->RegisterPropertyBoolean('EnableHTMLFullscreen', false);
         $this->RegisterPropertyBoolean('ShowTileTitle', true);
         $this->RegisterPropertyBoolean('ShowTileMaximizeButton', true);
         $this->RegisterPropertyInteger('PastDays', 0);
@@ -341,7 +342,7 @@ class CalendarView extends IPSModuleStrict
     {
         parent::ApplyChanges();
 
-        $this->SetVisualizationType(1);
+        $this->SetVisualizationType($this->ReadPropertyBoolean('EnableHTMLFullscreen') ? 2 : 1);
         $this->applyTileObjectVisibility();
 
         $preservedIPSViewHTML = $this->existingIPSViewHTML();

@@ -181,6 +181,11 @@
         },
         {
             "type": "CheckBox",
+            "name": "EnableHTMLFullscreen",
+            "caption": "Offer HTML fullscreen view"
+        },
+        {
+            "type": "CheckBox",
             "name": "ShowTileTitle",
             "caption": "Show tile title"
         },

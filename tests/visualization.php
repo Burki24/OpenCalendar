@@ -687,8 +687,9 @@ $applyChangesSource = $applyChangesStart !== false && $initializeStart !== false
     ? substr($moduleSource, $applyChangesStart, $initializeStart - $applyChangesStart)
     : '';
 assertVisualization(
-    str_contains($applyChangesSource, '$this->SetVisualizationType(1);'),
-    'Applying Calendar View configuration must re-register the native HTML visualization so updated tile assets are loaded.'
+    str_contains($moduleSource, "\$this->RegisterPropertyBoolean('EnableHTMLFullscreen', false);")
+        && str_contains($applyChangesSource, "\$this->SetVisualizationType(\$this->ReadPropertyBoolean('EnableHTMLFullscreen') ? 2 : 1);"),
+    'Calendar View must default to its existing HTML tile and enable the additional Symcon 9.1 fullscreen visualization only on request.'
 );
 
 assertVisualization(

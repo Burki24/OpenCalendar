@@ -243,6 +243,13 @@ seine obere rechte Ecke frei; in schmalen Kacheln bleibt dafür der obere Abstan
 erhalten. Bei sichtbarem Titel sowie unter Symcon 9.0 bleibt der bisherige
 Abstand erhalten. Die IPSView-Ausgabe ist davon unabhängig.
 
+### HTML-Vollbildansicht in Symcon 9.1
+
+Mit **HTML-Vollbildansicht anbieten** kann die Kalender Ansicht in Symcon 9.1
+zusätzlich zur normalen Kachel als Vollbildansicht geöffnet werden. Die Option
+ist standardmäßig ausgeschaltet; die Kachel bleibt auch bei aktivierter Option
+verfügbar. Dies betrifft die native Symcon-Visualisierung, nicht die IPSView-Ausgabe.
+
 ### Kacheltitel und Maximieren-Button in Symcon 9.1
 
 Die Optionen **Kacheltitel anzeigen** und **Maximieren-Button anzeigen** verwenden
@@ -334,6 +341,7 @@ Eigenschaft | Beschreibung
 Kalender | Ausgewählte Kalender-Instanzen und ihre Aktivierung
 Standardansicht | Agenda, Liste, Tage, Woche oder Monat; wird nur verwendet, solange der jeweilige Client noch keinen eigenen Ansichtsstand gespeichert hat
 Schnellansichten | Frei sortierbare Buchstaben-Schaltflächen für ausgewählte Ansichten; das Formular zeigt fünf Zeilen, die Auswahl bleibt clientlokal
+HTML-Vollbildansicht anbieten | Stellt in Symcon 9.1 neben der normalen Kachel eine native HTML-Vollbildansicht bereit; standardmäßig ausgeschaltet
 Kacheltitel anzeigen | Steuert die native Symcon-9.1-Einstellung für den Kacheltitel der Kalender Ansicht und vorhandener Links auf diese Instanz
 Maximieren-Button anzeigen | Steuert die native Symcon-9.1-Einstellung für den Maximieren-Button der Kalender Ansicht und vorhandener Links auf diese Instanz
 Vergangene/Zukünftige Tage | Datenzeitraum, aus dem Termine für alle Darstellungen geladen und zusammengeführt werden
