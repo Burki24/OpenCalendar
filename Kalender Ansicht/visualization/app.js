@@ -760,18 +760,43 @@ function selectCalendarView(view, closeDialog = false) {
 function configureFullscreenButton() {
     const button = document.getElementById('fullscreen-button');
     const instanceId = Number(calendarOptions.instanceId);
-    const available = isNativeVisualization()
-        && calendarOptions.enableHtmlFullscreen === true
+    const nativeAvailable = isNativeVisualization()
         && Number.isInteger(instanceId)
         && instanceId >= 10000
         && instanceId <= 59999
         && typeof window.openObject === 'function';
+    const ipsViewAvailable = calendarVisualization.mode === 'ipsview'
+        && document.fullscreenEnabled !== false
+        && typeof document.documentElement.requestFullscreen === 'function'
+        && typeof document.exitFullscreen === 'function';
+    const available = calendarOptions.enableHtmlFullscreen === true
+        && (nativeAvailable || ipsViewAvailable);
     button.classList.toggle('hidden', !available);
     if (!available) return;
 
-    button.title = t('Open fullscreen');
-    button.setAttribute('aria-label', t('Open fullscreen'));
-    button.addEventListener('click', () => window.openObject(instanceId));
+    const updateLabel = () => {
+        const label = t(ipsViewAvailable && document.fullscreenElement ? 'Exit fullscreen' : 'Open fullscreen');
+        button.title = label;
+        button.setAttribute('aria-label', label);
+    };
+    updateLabel();
+    if (nativeAvailable) {
+        button.addEventListener('click', () => window.openObject(instanceId));
+        return;
+    }
+
+    document.addEventListener('fullscreenchange', updateLabel);
+    button.addEventListener('click', async () => {
+        try {
+            if (document.fullscreenElement) {
+                await document.exitFullscreen();
+            } else {
+                await document.documentElement.requestFullscreen();
+            }
+        } catch {
+            showToast(t('Fullscreen could not be opened.'), 'error');
+        }
+    });
 }
 
 function updateToolbar() {
