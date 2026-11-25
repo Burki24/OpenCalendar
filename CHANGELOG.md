@@ -27,6 +27,8 @@
 
 ## Fixes
 
+- Die Kalender-Ansicht zeigt bei aktivierter HTML-Vollbildoption einen eigenen
+  Vollbild-Button in der nativen Kachel, auch wenn der Symcon-Button nicht sichtbar ist.
 - Bereits gespeicherte lokale Kalenderfarben im alten Hexformat werden angezeigt,
   ohne die Benutzereinstellung beim Anwenden der Konfiguration zu überschreiben.
 - CalDAV-Termine werden bei unterschiedlich kodierten Ressourcenadressen nicht

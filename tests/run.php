@@ -22,6 +22,7 @@ $commands = [
     ['Verify embedded dialog bounds and errors', ['node', 'tests/dialog-embedding.js']],
     ['Verify empty HTML descriptions in event details', ['node', 'tests/empty-html-description.js']],
     ['Verify configurable quick-view buttons', ['node', 'tests/quick-view-buttons.js']],
+    ['Verify native calendar fullscreen button', ['node', 'tests/fullscreen-button.js']],
     ['Verify compact toolbar dates', ['node', 'tests/compact-toolbar-date.js']],
     ['Verify moved IPSView output identity', [PHP_BINARY, 'tests/ipsview-moved-output.php']],
     ['Verify private attachment transfers', [PHP_BINARY, 'tests/attachment-transfer.php']],

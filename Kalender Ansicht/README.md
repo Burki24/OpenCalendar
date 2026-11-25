@@ -249,6 +249,11 @@ Mit **HTML-Vollbildansicht anbieten** kann die Kalender Ansicht in Symcon 9.1
 zusätzlich zur normalen Kachel als Vollbildansicht geöffnet werden. Die Option
 ist standardmäßig ausgeschaltet; die Kachel bleibt auch bei aktivierter Option
 verfügbar. Dies betrifft die native Symcon-Visualisierung, nicht die IPSView-Ausgabe.
+Bei aktivierter Option zeigt die Kalender-Kopfzeile einen eigenen
+**Vollbild öffnen**-Button. Er öffnet die Kalender-Instanz über die
+Symcon-Visualisierung und ist unabhängig davon, ob Symcon den nativen
+Maximieren-Button an der Kachel anzeigt. Die Instanz muss aus der
+Startkategorie der Visualisierung erreichbar sein.
 
 ### Kacheltitel und Maximieren-Button in Symcon 9.1
 

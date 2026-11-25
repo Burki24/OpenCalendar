@@ -757,6 +757,23 @@ function selectCalendarView(view, closeDialog = false) {
     render();
 }
 
+function configureFullscreenButton() {
+    const button = document.getElementById('fullscreen-button');
+    const instanceId = Number(calendarOptions.instanceId);
+    const available = isNativeVisualization()
+        && calendarOptions.enableHtmlFullscreen === true
+        && Number.isInteger(instanceId)
+        && instanceId >= 10000
+        && instanceId <= 59999
+        && typeof window.openObject === 'function';
+    button.classList.toggle('hidden', !available);
+    if (!available) return;
+
+    button.title = t('Open fullscreen');
+    button.setAttribute('aria-label', t('Open fullscreen'));
+    button.addEventListener('click', () => window.openObject(instanceId));
+}
+
 function updateToolbar() {
     const showControls = listControlsVisible();
     document.getElementById('previous-button').parentElement.classList.toggle('hidden', !showControls);
@@ -5718,6 +5735,7 @@ document.getElementById('day-events-create-button').addEventListener('click', ()
 document.getElementById('dialog-close').addEventListener('click', () => eventDialog.close());
 document.getElementById('cancel-button').addEventListener('click', () => eventDialog.close());
 document.getElementById('add-button').addEventListener('click', openNewEvent);
+configureFullscreenButton();
 viewSelectorButton.addEventListener('click', openViewSelector);
 document.getElementById('view-selector-close').addEventListener('click', () => viewSelectorDialog.close());
 document.getElementById('view-selector-close-button').addEventListener('click', () => viewSelectorDialog.close());

@@ -1546,6 +1546,7 @@ class CalendarView extends IPSModuleStrict
             'translations'       => $translations,
             'options'            => [
                 'instanceId'           => $this->InstanceID,
+                'enableHtmlFullscreen' => !$ipsView && $this->ReadPropertyBoolean('EnableHTMLFullscreen'),
                 'agendaColorBarWidth'  => $ipsView
                     ? max(2, min(16, $this->ReadPropertyInteger('IPSViewColorBarWidth')))
                     : 5,

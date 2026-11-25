@@ -214,6 +214,7 @@ a.secondary-button:focus-visible {
 }
 
 .calendar-filter-icon { width: 17px; height: 17px; fill: currentColor; }
+.fullscreen-icon { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 #calendar-filter-button.filter-active {
     border-color: var(--cal-accent);
     background: var(--cal-gradient-accent);

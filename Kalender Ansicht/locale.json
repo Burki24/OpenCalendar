@@ -85,6 +85,7 @@
             "Month": "Monat",
             "Tile font size (%)": "Kachel-Schriftgröße (%)",
             "Offer HTML fullscreen view": "HTML-Vollbildansicht anbieten",
+            "Open fullscreen": "Vollbild öffnen",
             "Show tile title": "Kacheltitel anzeigen",
             "Show maximize button": "Maximieren-Button anzeigen",
             "Tile title and maximize settings also apply to existing links to this Calendar View.": "Kacheltitel und Maximieren-Button werden auch auf vorhandene Links zu dieser Kalender Ansicht angewendet.",
