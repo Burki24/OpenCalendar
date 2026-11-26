@@ -122,153 +122,6 @@ class OpenCalendarDiscovery extends IPSModuleStrict
     }
 
     /**
-     * Reuses the existing calendar, view and result pages for a shorter existing-account flow.
-     *
-     * @param array<string, mixed> $setupWizard Existing setup popup after dynamic fields were filled.
-     * @return array<string, mixed>
-     */
-    private function extensionWizardAction(array $setupWizard): array
-    {
-        $activeAccounts = $this->calendarAccountSelectOptions(true);
-        $pages = [[
-            'name'     => 'existingAccount',
-            'caption'  => 'Choose an existing calendar account',
-            'items'    => [
-                [
-                    'type'    => 'Label',
-                    'caption' => 'This assistant adds calendars from an existing, active account. Its connection and calendar list are checked before you continue.'
-                ],
-                [
-                    'type'    => 'Select',
-                    'name'    => 'ExtensionAccountID',
-                    'caption' => 'Calendar account',
-                    'value'   => 0,
-                    'options' => $activeAccounts
-                ]
-            ],
-            'validate' => 'return IPSKALDISCOVERY_ValidateWizardExtensionAccount($id, $ExtensionAccountID);',
-            'nextPage' => 'calendars'
-        ]];
-
-        $viewOptions = $this->calendarViewSelectOptions();
-        foreach ($setupWizard['popup']['pages'] as $page) {
-            $pageName = (string) ($page['name'] ?? '');
-            if (!in_array($pageName, ['calendars', 'view', 'summary', 'result'], true)) {
-                continue;
-            }
-
-            if ($pageName === 'calendars') {
-                $page['closeCaption'] = 'Cancel';
-                $page['items'] = array_values(array_filter(
-                    $page['items'],
-                    static fn (array $item): bool => !in_array(
-                        (string) ($item['caption'] ?? ''),
-                        [
-                            'If you choose Set up later, a newly created calendar account remains disabled until setup is completed.',
-                            'Select at least one calendar. A primary calendar, or the only available calendar, is preselected automatically.'
-                        ],
-                        true
-                    )
-                ));
-                foreach ($page['items'] as &$item) {
-                    if (($item['name'] ?? '') === 'WizardCalendars') {
-                        $item['name'] = 'ExtensionCalendars';
-                        $item['onEdit'] = str_replace(
-                            '$WizardCalendars',
-                            '$ExtensionCalendars',
-                            (string) ($item['onEdit'] ?? '')
-                        );
-                        $item['columns'][] = [
-                            'caption' => 'State',
-                            'name'    => 'setupState',
-                            'width'   => '130px'
-                        ];
-                    }
-                }
-                unset($item);
-                $page['items'][] = [
-                    'type'    => 'Label',
-                    'caption' => 'Already configured calendars are reused. Select them only if they should also be added to the chosen calendar view.'
-                ];
-            } elseif ($pageName === 'view') {
-                foreach ($page['items'] as &$item) {
-                    if (($item['name'] ?? '') === 'ViewMode') {
-                        $item['name'] = 'ExtensionViewMode';
-                        $item['value'] = count($viewOptions) > 1 ? self::VIEW_MODE_EXISTING : self::VIEW_MODE_NEW;
-                    } elseif (($item['name'] ?? '') === 'ExistingViewID') {
-                        $item['name'] = 'ExtensionExistingViewID';
-                    } elseif (($item['name'] ?? '') === 'ViewName') {
-                        $item['name'] = 'ExtensionViewName';
-                    }
-                }
-                unset($item);
-                $page['validate'] = str_replace(
-                    ['$ViewMode', '$ExistingViewID', '$ViewName'],
-                    ['$ExtensionViewMode', '$ExtensionExistingViewID', '$ExtensionViewName'],
-                    (string) $page['validate']
-                );
-                $page['onConfirm'] = str_replace(
-                    ['$ViewMode', '$ExistingViewID', '$ViewName'],
-                    ['$ExtensionViewMode', '$ExtensionExistingViewID', '$ExtensionViewName'],
-                    (string) $page['onConfirm']
-                );
-                $page['closeCaption'] = 'Cancel';
-            } elseif ($pageName === 'summary') {
-                $page['caption'] = 'Review calendar addition';
-                $page['items'] = array_values(array_filter(
-                    $page['items'],
-                    static fn (array $item): bool => !in_array(
-                        (string) ($item['caption'] ?? ''),
-                        [
-                            'If selected, OpenCalendar also creates a Calendar Configurator for this account. An existing matching configurator is reused.',
-                            'A newly created calendar account is activated. Existing accounts keep their current activation state.'
-                        ],
-                        true
-                    )
-                ));
-            } elseif ($pageName === 'result') {
-                $page['caption'] = 'Calendar addition completed';
-                $page['items'] = array_values(array_filter(
-                    $page['items'],
-                    static fn (array $item): bool => !in_array(
-                        (string) ($item['name'] ?? ''),
-                        ['ResultNextAction', 'ResultConfigurator'],
-                        true
-                    ) && ($item['caption'] ?? '')
-                        !== 'Choose “Set up another calendar account” and click Next to return directly to provider selection. The completed configuration remains unchanged.'
-                ));
-                foreach ($page['items'] as &$item) {
-                    if (str_starts_with((string) ($item['name'] ?? ''), 'Result')) {
-                        $item['name'] = 'Extension' . $item['name'];
-                    }
-                }
-                unset($item);
-                $page['onConfirm'] = "IPS_RequestAction(\$id, 'WizardComplete', '');";
-                $page['nextPage'] = -1;
-            }
-
-            $pages[] = $page;
-        }
-
-        return [
-            'type'    => 'PopupButton',
-            'name'    => 'AddCalendarWizard',
-            'caption' => 'Add calendars to an existing account',
-            'enabled' => count($activeAccounts) > 1,
-            'width'   => '400px',
-            'popup'   => [
-                'caption'      => 'Add calendars',
-                'closeCaption' => 'Cancel',
-                'items'        => [[
-                    'type'    => 'Label',
-                    'caption' => 'This fallback content is not shown while wizard pages are available.'
-                ]],
-                'pages' => $pages
-            ]
-        ];
-    }
-
-    /**
      * Handles discovery-wizard actions and forwards unsupported actions to the Symcon base module.
      *
      * @param string $Ident Action identifier supplied by the configuration form.
@@ -446,20 +299,6 @@ class OpenCalendarDiscovery extends IPSModuleStrict
         } catch (InvalidArgumentException | RuntimeException | JsonException $exception) {
             return $exception->getMessage();
         }
-    }
-
-    private function providerKeyForAccount(int $accountID): string
-    {
-        return match ((int) IPS_GetProperty($accountID, 'Provider')) {
-            CalendarProviderType::APPLE     => 'apple',
-            CalendarProviderType::CALDAV    => 'caldav',
-            CalendarProviderType::GOOGLE    => 'google',
-            CalendarProviderType::MICROSOFT => 'microsoft',
-            CalendarProviderType::ICS       => 'ics',
-            default => throw new InvalidArgumentException(
-                $this->Translate('The selected calendar account uses an unsupported provider.')
-            )
-        };
     }
 
     /**
@@ -775,6 +614,167 @@ class OpenCalendarDiscovery extends IPSModuleStrict
         }
 
         return '';
+    }
+
+    /**
+     * Reuses the existing calendar, view and result pages for a shorter existing-account flow.
+     *
+     * @param array<string, mixed> $setupWizard Existing setup popup after dynamic fields were filled.
+     * @return array<string, mixed>
+     */
+    private function extensionWizardAction(array $setupWizard): array
+    {
+        $activeAccounts = $this->calendarAccountSelectOptions(true);
+        $pages = [[
+            'name'     => 'existingAccount',
+            'caption'  => 'Choose an existing calendar account',
+            'items'    => [
+                [
+                    'type'    => 'Label',
+                    'caption' => 'This assistant adds calendars from an existing, active account. Its connection and calendar list are checked before you continue.'
+                ],
+                [
+                    'type'    => 'Select',
+                    'name'    => 'ExtensionAccountID',
+                    'caption' => 'Calendar account',
+                    'value'   => 0,
+                    'options' => $activeAccounts
+                ]
+            ],
+            'validate' => 'return IPSKALDISCOVERY_ValidateWizardExtensionAccount($id, $ExtensionAccountID);',
+            'nextPage' => 'calendars'
+        ]];
+
+        $viewOptions = $this->calendarViewSelectOptions();
+        foreach ($setupWizard['popup']['pages'] as $page) {
+            $pageName = (string) ($page['name'] ?? '');
+            if (!in_array($pageName, ['calendars', 'view', 'summary', 'result'], true)) {
+                continue;
+            }
+
+            if ($pageName === 'calendars') {
+                $page['closeCaption'] = 'Cancel';
+                $page['items'] = array_values(array_filter(
+                    $page['items'],
+                    static fn (array $item): bool => !in_array(
+                        (string) ($item['caption'] ?? ''),
+                        [
+                            'If you choose Set up later, a newly created calendar account remains disabled until setup is completed.',
+                            'Select at least one calendar. A primary calendar, or the only available calendar, is preselected automatically.'
+                        ],
+                        true
+                    )
+                ));
+                foreach ($page['items'] as &$item) {
+                    if (($item['name'] ?? '') === 'WizardCalendars') {
+                        $item['name'] = 'ExtensionCalendars';
+                        $item['onEdit'] = str_replace(
+                            '$WizardCalendars',
+                            '$ExtensionCalendars',
+                            (string) ($item['onEdit'] ?? '')
+                        );
+                        $item['columns'][] = [
+                            'caption' => 'State',
+                            'name'    => 'setupState',
+                            'width'   => '130px'
+                        ];
+                    }
+                }
+                unset($item);
+                $page['items'][] = [
+                    'type'    => 'Label',
+                    'caption' => 'Already configured calendars are reused. Select them only if they should also be added to the chosen calendar view.'
+                ];
+            } elseif ($pageName === 'view') {
+                foreach ($page['items'] as &$item) {
+                    if (($item['name'] ?? '') === 'ViewMode') {
+                        $item['name'] = 'ExtensionViewMode';
+                        $item['value'] = count($viewOptions) > 1 ? self::VIEW_MODE_EXISTING : self::VIEW_MODE_NEW;
+                    } elseif (($item['name'] ?? '') === 'ExistingViewID') {
+                        $item['name'] = 'ExtensionExistingViewID';
+                    } elseif (($item['name'] ?? '') === 'ViewName') {
+                        $item['name'] = 'ExtensionViewName';
+                    }
+                }
+                unset($item);
+                $page['validate'] = str_replace(
+                    ['$ViewMode', '$ExistingViewID', '$ViewName'],
+                    ['$ExtensionViewMode', '$ExtensionExistingViewID', '$ExtensionViewName'],
+                    (string) $page['validate']
+                );
+                $page['onConfirm'] = str_replace(
+                    ['$ViewMode', '$ExistingViewID', '$ViewName'],
+                    ['$ExtensionViewMode', '$ExtensionExistingViewID', '$ExtensionViewName'],
+                    (string) $page['onConfirm']
+                );
+                $page['closeCaption'] = 'Cancel';
+            } elseif ($pageName === 'summary') {
+                $page['caption'] = 'Review calendar addition';
+                $page['items'] = array_values(array_filter(
+                    $page['items'],
+                    static fn (array $item): bool => !in_array(
+                        (string) ($item['caption'] ?? ''),
+                        [
+                            'If selected, OpenCalendar also creates a Calendar Configurator for this account. An existing matching configurator is reused.',
+                            'A newly created calendar account is activated. Existing accounts keep their current activation state.'
+                        ],
+                        true
+                    )
+                ));
+            } elseif ($pageName === 'result') {
+                $page['caption'] = 'Calendar addition completed';
+                $page['items'] = array_values(array_filter(
+                    $page['items'],
+                    static fn (array $item): bool => !in_array(
+                        (string) ($item['name'] ?? ''),
+                        ['ResultNextAction', 'ResultConfigurator'],
+                        true
+                    ) && ($item['caption'] ?? '')
+                        !== 'Choose “Set up another calendar account” and click Next to return directly to provider selection. The completed configuration remains unchanged.'
+                ));
+                foreach ($page['items'] as &$item) {
+                    if (str_starts_with((string) ($item['name'] ?? ''), 'Result')) {
+                        $item['name'] = 'Extension' . $item['name'];
+                    }
+                }
+                unset($item);
+                $page['onConfirm'] = "IPS_RequestAction(\$id, 'WizardComplete', '');";
+                $page['nextPage'] = -1;
+            }
+
+            $pages[] = $page;
+        }
+
+        return [
+            'type'    => 'PopupButton',
+            'name'    => 'AddCalendarWizard',
+            'caption' => 'Add calendars to an existing account',
+            'enabled' => count($activeAccounts) > 1,
+            'width'   => '400px',
+            'popup'   => [
+                'caption'      => 'Add calendars',
+                'closeCaption' => 'Cancel',
+                'items'        => [[
+                    'type'    => 'Label',
+                    'caption' => 'This fallback content is not shown while wizard pages are available.'
+                ]],
+                'pages' => $pages
+            ]
+        ];
+    }
+
+    private function providerKeyForAccount(int $accountID): string
+    {
+        return match ((int) IPS_GetProperty($accountID, 'Provider')) {
+            CalendarProviderType::APPLE     => 'apple',
+            CalendarProviderType::CALDAV    => 'caldav',
+            CalendarProviderType::GOOGLE    => 'google',
+            CalendarProviderType::MICROSOFT => 'microsoft',
+            CalendarProviderType::ICS       => 'ics',
+            default                         => throw new InvalidArgumentException(
+                $this->Translate('The selected calendar account uses an unsupported provider.')
+            )
+        };
     }
 
     private function prepareWizardAccount(mixed $value): void

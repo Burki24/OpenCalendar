@@ -68,12 +68,12 @@ function IPSKALACC_GetCalendars(int $accountID): string
 
 class IPSModuleStrict
 {
+    /** @var array<string, array<string, mixed>> */
+    public array $updatedFields = [];
     /** @var array<string, int|string> */
     private array $attributes = [];
     /** @var array<string, string> */
     private array $buffers = [];
-    /** @var array<string, array<string, mixed>> */
-    public array $updatedFields = [];
 
     public function Create(): void
     {
