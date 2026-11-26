@@ -2,6 +2,9 @@
 
 ## Neu
 
+- Ein kurzer Assistent ergänzt weitere Kalender eines bestehenden Kontos,
+  verwendet vorhandene Kalenderinstanzen und ordnet sie einer Kalender Ansicht zu.
+  Der Kalender Konfigurator bietet einen Einstieg zur Kalender Einrichtung.
 - Die Kalender Ansicht kann unter Symcon 9.1 optional zusätzlich zur normalen
   Kachel als native HTML-Vollbildansicht angeboten werden.
 - Die neue **Kalender Einrichtung** führt schrittweise durch Anbieter, Konto,

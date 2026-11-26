@@ -213,7 +213,19 @@
             "Calendar View: %s": "Kalender Ansicht: %s",
             "OpenCalendar requires an app-specific password. Create it in the Apple Account under Sign-In and Security > App-Specific Passwords. Two-factor authentication must be enabled.": "OpenCalendar benötigt ein app-spezifisches Passwort. Dieses wird im Apple Account unter „Anmelden und Sicherheit > App-spezifische Passwörter“ erstellt. Dafür muss die Zwei-Faktor-Authentifizierung aktiviert sein.",
             "Open Apple Account": "Apple Account öffnen",
-            "How to create an app-specific password": "Anleitung: App-spezifisches Passwort erstellen"
+            "How to create an app-specific password": "Anleitung: App-spezifisches Passwort erstellen",
+            "Add calendars to an existing account": "Weitere Kalender zu vorhandenem Konto hinzufügen",
+            "Add calendars": "Kalender hinzufügen",
+            "Choose an existing calendar account": "Vorhandenes Kalender Konto auswählen",
+            "This assistant adds calendars from an existing, active account. Its connection and calendar list are checked before you continue.": "Dieser Assistent fügt Kalender aus einem vorhandenen, aktiven Konto hinzu. Verbindung und Kalenderliste werden vor dem Fortfahren geprüft.",
+            "Choose an active calendar account to add calendars.": "Bitte ein aktives Kalender Konto auswählen, um Kalender hinzuzufügen.",
+            "The selected calendar account uses an unsupported provider.": "Das ausgewählte Kalender Konto verwendet einen nicht unterstützten Anbieter.",
+            "State": "Stand",
+            "Already configured": "Bereits eingerichtet",
+            "New calendar": "Neuer Kalender",
+            "Already configured calendars are reused. Select them only if they should also be added to the chosen calendar view.": "Bereits eingerichtete Kalender werden wiederverwendet. Wählen Sie diese nur aus, wenn sie auch der gewählten Kalender Ansicht hinzugefügt werden sollen.",
+            "Review calendar addition": "Kalendererweiterung prüfen",
+            "Calendar addition completed": "Kalendererweiterung abgeschlossen"
         }
     }
 }

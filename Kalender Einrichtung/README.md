@@ -3,6 +3,19 @@
 Die **Kalender Einrichtung** ist die zentrale Discovery- und Einrichtungsinstanz
 für OpenCalendar ab Version 3.0 und benötigt Symcon 9.1 oder neuer.
 
+Für ein bereits eingerichtetes Konto gibt es zusätzlich **Weitere Kalender zu
+vorhandenem Konto hinzufügen**. Dieser kürzere Assistent prüft die bestehende
+Verbindung, kennzeichnet bereits eingerichtete Kalender und führt direkt zur
+Kalenderauswahl. Die ausgewählten Kalender werden angelegt oder wiederverwendet
+und einer neuen oder vorhandenen Kalender Ansicht zugeordnet. Bestehende
+Zuordnungen der Ansicht bleiben erhalten. Abschließend prüft der Assistent die
+Synchronisation; bei einem Fehler kann sie auf der Ergebnisseite wiederholt
+werden. Es werden keine Zugangsdaten neu abgefragt oder geändert.
+
+Der Einstieg **Kalender mit Assistent hinzufügen** im Kalender Konfigurator
+öffnet die Kalender Einrichtung. Dort den kürzeren Assistenten wählen. Wenn
+noch keine Kalender Einrichtung existiert, zuerst eine solche Instanz anlegen.
+
 Technisch heißt das Modul **OpenCalendar Discovery**. In einer deutschen
 Symcon-Oberfläche wird dieser Name über die `locale.json` als
 **Kalender Einrichtung** angezeigt.

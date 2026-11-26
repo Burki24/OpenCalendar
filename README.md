@@ -29,6 +29,11 @@ Ab Version 3.0 steht zusätzlich die **Kalender Einrichtung** als zentraler
 Einrichtungsassistent zur Verfügung. Sie führt vom Kalenderanbieter über das
 Kalender Konto und die Kalenderauswahl bis zur fertigen Kalender Ansicht und
 übernimmt dabei die notwendigen technischen Verknüpfungen automatisch.
+Für weitere Kalender eines vorhandenen Kontos öffnet **Kalender mit Assistent
+hinzufügen** im Kalender Konfigurator die Kalender Einrichtung. Dort führt
+**Weitere Kalender zu vorhandenem Konto hinzufügen** direkt über die
+Konto- und Kalenderauswahl zur bestehenden oder neuen Kalender Ansicht;
+vorhandene Kalenderinstanzen und Ansichtszuordnungen bleiben erhalten.
 
 **Dateianhänge (3.0):** Kalenderinstanz und Kalenderansicht müssen den Zugriff
 und den gewünschten Speicherort gesondert freigeben. Lokale Kalender und

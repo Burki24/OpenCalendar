@@ -34,6 +34,16 @@ function IPS_InstanceExists(int $instanceId): bool
     return isset($configuratorTestInstances[$instanceId]);
 }
 
+function IPS_GetInstanceListByModuleID(string $moduleID): array
+{
+    return $moduleID === '{3CD8AB0E-BDB4-4B3F-A838-B4003A3BAD81}' ? [301, 300] : [];
+}
+
+function IPS_GetParent(int $instanceID): int
+{
+    return in_array($instanceID, [100, 300], true) ? 50 : 60;
+}
+
 class IPSModuleStrict
 {
     public int $InstanceID;
@@ -150,6 +160,11 @@ class IPSModuleStrict
     {
         return $text;
     }
+
+    protected function SendDataToParent(string $data): string
+    {
+        return json_encode(['Success' => true, 'Payload' => []], JSON_THROW_ON_ERROR);
+    }
 }
 
 require_once __DIR__ . '/../Kalender Konfigurator/module.php';
@@ -236,6 +251,17 @@ assertConfiguratorSame(
     '[]',
     $configurator->TestAttribute('CachedCalendars'),
     'Removing or selecting an unavailable account must clear discovered calendars.'
+);
+
+$form = json_decode($configurator->GetConfigurationForm(), true, 512, JSON_THROW_ON_ERROR);
+$assistantButton = array_values(array_filter(
+    $form['actions'],
+    static fn (array $action): bool => ($action['type'] ?? '') === 'OpenObjectButton'
+));
+assertConfiguratorSame(
+    300,
+    $assistantButton[0]['objectID'] ?? null,
+    'The configurator must open a Calendar Setup instance in the same category when one exists.'
 );
 
 fwrite(STDOUT, "Calendar configurator cache tests passed.\n");

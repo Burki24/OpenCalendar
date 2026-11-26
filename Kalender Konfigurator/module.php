@@ -18,6 +18,7 @@ class CalendarConfigurator extends IPSModuleStrict
 
     private const DATA_ID_TO_PARENT = '{4E535B1D-69C7-AC77-1372-0282B21BAEC9}';
     private const CALENDAR_MODULE_ID = '{227B63E4-4223-316B-76E9-FD3849689562}';
+    private const DISCOVERY_MODULE_ID = '{3CD8AB0E-BDB4-4B3F-A838-B4003A3BAD81}';
     private const INITIALIZATION_DELAY_MS = 5_000;
 
     private const STATUS_DISCOVERY_FAILED = 201;
@@ -117,6 +118,27 @@ class CalendarConfigurator extends IPSModuleStrict
         }
 
         $form['elements'][0]['values'] = $this->buildConfiguratorValues($calendars);
+
+        $discoveryIDs = IPS_GetInstanceListByModuleID(self::DISCOVERY_MODULE_ID);
+        if ($discoveryIDs !== []) {
+            $discoveryID = $discoveryIDs[0];
+            foreach ($discoveryIDs as $candidateID) {
+                if (IPS_GetParent($candidateID) === IPS_GetParent($this->InstanceID)) {
+                    $discoveryID = $candidateID;
+                    break;
+                }
+            }
+            $form['actions'][] = [
+                'type'     => 'OpenObjectButton',
+                'caption'  => 'Add calendars with the assistant',
+                'objectID' => $discoveryID
+            ];
+        } else {
+            $form['actions'][] = [
+                'type'    => 'Label',
+                'caption' => 'Create a Calendar Setup instance to add calendars with the assistant.'
+            ];
+        }
 
         return $this->EncodeConfigurationForm($form);
     }

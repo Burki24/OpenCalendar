@@ -111,7 +111,161 @@ class OpenCalendarDiscovery extends IPSModuleStrict
         }
         unset($action);
 
+        foreach ($form['actions'] as $action) {
+            if (($action['name'] ?? '') === 'SetupWizard') {
+                $form['actions'][] = $this->extensionWizardAction($action);
+                break;
+            }
+        }
+
         return json_encode($form, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE);
+    }
+
+    /**
+     * Reuses the existing calendar, view and result pages for a shorter existing-account flow.
+     *
+     * @param array<string, mixed> $setupWizard Existing setup popup after dynamic fields were filled.
+     * @return array<string, mixed>
+     */
+    private function extensionWizardAction(array $setupWizard): array
+    {
+        $activeAccounts = $this->calendarAccountSelectOptions(true);
+        $pages = [[
+            'name'     => 'existingAccount',
+            'caption'  => 'Choose an existing calendar account',
+            'items'    => [
+                [
+                    'type'    => 'Label',
+                    'caption' => 'This assistant adds calendars from an existing, active account. Its connection and calendar list are checked before you continue.'
+                ],
+                [
+                    'type'    => 'Select',
+                    'name'    => 'ExtensionAccountID',
+                    'caption' => 'Calendar account',
+                    'value'   => 0,
+                    'options' => $activeAccounts
+                ]
+            ],
+            'validate' => 'return IPSKALDISCOVERY_ValidateWizardExtensionAccount($id, $ExtensionAccountID);',
+            'nextPage' => 'calendars'
+        ]];
+
+        $viewOptions = $this->calendarViewSelectOptions();
+        foreach ($setupWizard['popup']['pages'] as $page) {
+            $pageName = (string) ($page['name'] ?? '');
+            if (!in_array($pageName, ['calendars', 'view', 'summary', 'result'], true)) {
+                continue;
+            }
+
+            if ($pageName === 'calendars') {
+                $page['closeCaption'] = 'Cancel';
+                $page['items'] = array_values(array_filter(
+                    $page['items'],
+                    static fn (array $item): bool => !in_array(
+                        (string) ($item['caption'] ?? ''),
+                        [
+                            'If you choose Set up later, a newly created calendar account remains disabled until setup is completed.',
+                            'Select at least one calendar. A primary calendar, or the only available calendar, is preselected automatically.'
+                        ],
+                        true
+                    )
+                ));
+                foreach ($page['items'] as &$item) {
+                    if (($item['name'] ?? '') === 'WizardCalendars') {
+                        $item['name'] = 'ExtensionCalendars';
+                        $item['onEdit'] = str_replace(
+                            '$WizardCalendars',
+                            '$ExtensionCalendars',
+                            (string) ($item['onEdit'] ?? '')
+                        );
+                        $item['columns'][] = [
+                            'caption' => 'State',
+                            'name'    => 'setupState',
+                            'width'   => '130px'
+                        ];
+                    }
+                }
+                unset($item);
+                $page['items'][] = [
+                    'type'    => 'Label',
+                    'caption' => 'Already configured calendars are reused. Select them only if they should also be added to the chosen calendar view.'
+                ];
+            } elseif ($pageName === 'view') {
+                foreach ($page['items'] as &$item) {
+                    if (($item['name'] ?? '') === 'ViewMode') {
+                        $item['name'] = 'ExtensionViewMode';
+                        $item['value'] = count($viewOptions) > 1 ? self::VIEW_MODE_EXISTING : self::VIEW_MODE_NEW;
+                    } elseif (($item['name'] ?? '') === 'ExistingViewID') {
+                        $item['name'] = 'ExtensionExistingViewID';
+                    } elseif (($item['name'] ?? '') === 'ViewName') {
+                        $item['name'] = 'ExtensionViewName';
+                    }
+                }
+                unset($item);
+                $page['validate'] = str_replace(
+                    ['$ViewMode', '$ExistingViewID', '$ViewName'],
+                    ['$ExtensionViewMode', '$ExtensionExistingViewID', '$ExtensionViewName'],
+                    (string) $page['validate']
+                );
+                $page['onConfirm'] = str_replace(
+                    ['$ViewMode', '$ExistingViewID', '$ViewName'],
+                    ['$ExtensionViewMode', '$ExtensionExistingViewID', '$ExtensionViewName'],
+                    (string) $page['onConfirm']
+                );
+                $page['closeCaption'] = 'Cancel';
+            } elseif ($pageName === 'summary') {
+                $page['caption'] = 'Review calendar addition';
+                $page['items'] = array_values(array_filter(
+                    $page['items'],
+                    static fn (array $item): bool => !in_array(
+                        (string) ($item['caption'] ?? ''),
+                        [
+                            'If selected, OpenCalendar also creates a Calendar Configurator for this account. An existing matching configurator is reused.',
+                            'A newly created calendar account is activated. Existing accounts keep their current activation state.'
+                        ],
+                        true
+                    )
+                ));
+            } elseif ($pageName === 'result') {
+                $page['caption'] = 'Calendar addition completed';
+                $page['items'] = array_values(array_filter(
+                    $page['items'],
+                    static fn (array $item): bool => !in_array(
+                        (string) ($item['name'] ?? ''),
+                        ['ResultNextAction', 'ResultConfigurator'],
+                        true
+                    ) && ($item['caption'] ?? '')
+                        !== 'Choose “Set up another calendar account” and click Next to return directly to provider selection. The completed configuration remains unchanged.'
+                ));
+                foreach ($page['items'] as &$item) {
+                    if (str_starts_with((string) ($item['name'] ?? ''), 'Result')) {
+                        $item['name'] = 'Extension' . $item['name'];
+                    }
+                }
+                unset($item);
+                $page['onConfirm'] = "IPS_RequestAction(\$id, 'WizardComplete', '');";
+                $page['nextPage'] = -1;
+            }
+
+            $pages[] = $page;
+        }
+
+        return [
+            'type'    => 'PopupButton',
+            'name'    => 'AddCalendarWizard',
+            'caption' => 'Add calendars to an existing account',
+            'enabled' => count($activeAccounts) > 1,
+            'width'   => '400px',
+            'popup'   => [
+                'caption'      => 'Add calendars',
+                'closeCaption' => 'Cancel',
+                'items'        => [[
+                    'type'    => 'Label',
+                    'caption' => 'This fallback content is not shown while wizard pages are available.'
+                ]],
+                'pages' => $pages
+            ]
+        ];
     }
 
     /**
@@ -125,6 +279,7 @@ class OpenCalendarDiscovery extends IPSModuleStrict
         switch ($Ident) {
             case 'WizardProvider':
                 $this->resetWizardCompletionState();
+                $this->SetBuffer('WizardExtensionMode', '0');
                 $providerSelection = $this->decodeWizardProviderSelection($Value);
                 $provider = $providerSelection['provider'];
                 $this->SetBuffer('WizardProvider', $provider);
@@ -234,6 +389,77 @@ class OpenCalendarDiscovery extends IPSModuleStrict
         }
 
         return '';
+    }
+
+    /**
+     * Validates and prepares one existing account for the shorter calendar-addition flow.
+     *
+     * @param int $AccountID Existing active Calendar Account instance ID.
+     * @return string Empty on success or a localized validation error.
+     */
+    public function ValidateWizardExtensionAccount(int $AccountID): string
+    {
+        try {
+            if ($AccountID <= 0 || !IPS_InstanceExists($AccountID)) {
+                throw new InvalidArgumentException($this->Translate('Please select an existing calendar account.'));
+            }
+            if (!in_array($AccountID, IPS_GetInstanceListByModuleID(self::CALENDAR_ACCOUNT_MODULE_ID), true)) {
+                throw new InvalidArgumentException($this->Translate('The selected instance is not a calendar account.'));
+            }
+            $provider = $this->providerKeyForAccount($AccountID);
+            if (!(bool) IPS_GetProperty($AccountID, 'Active')) {
+                throw new InvalidArgumentException($this->Translate('Choose an active calendar account to add calendars.'));
+            }
+
+            $this->completeWizardSession();
+            $this->SetBuffer('WizardExtensionMode', '1');
+            $this->SetBuffer('WizardProvider', $provider);
+            $this->prepareWizardAccount(json_encode([
+                'mode'              => self::ACCOUNT_MODE_EXISTING,
+                'existingAccountID' => $AccountID,
+                'accountName'       => ''
+            ], JSON_THROW_ON_ERROR));
+
+            $connectionError = $this->testWizardConnection($AccountID);
+            if ($connectionError !== '') {
+                return $connectionError;
+            }
+
+            $existingCalendarIDs = array_keys($this->existingCalendarInstancesForAccount($AccountID));
+            $newCalendarIDs = array_values(array_filter(array_map(
+                static fn (array $calendar): string => trim((string) ($calendar['id'] ?? '')),
+                $this->readWizardCalendars()
+            ), static fn (string $calendarID): bool => $calendarID !== ''
+                && !in_array($calendarID, $existingCalendarIDs, true)));
+            $selectedCalendarIDs = count($newCalendarIDs) === 1 ? $newCalendarIDs : [];
+            $this->SetBuffer('WizardSelectedCalendarIDs', json_encode($selectedCalendarIDs, JSON_THROW_ON_ERROR));
+            $this->UpdateFormField(
+                'ExtensionCalendars',
+                'values',
+                json_encode(
+                    $this->wizardCalendarListValues($this->readWizardCalendars()),
+                    JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES
+                )
+            );
+
+            return '';
+        } catch (InvalidArgumentException | RuntimeException | JsonException $exception) {
+            return $exception->getMessage();
+        }
+    }
+
+    private function providerKeyForAccount(int $accountID): string
+    {
+        return match ((int) IPS_GetProperty($accountID, 'Provider')) {
+            CalendarProviderType::APPLE     => 'apple',
+            CalendarProviderType::CALDAV    => 'caldav',
+            CalendarProviderType::GOOGLE    => 'google',
+            CalendarProviderType::MICROSOFT => 'microsoft',
+            CalendarProviderType::ICS       => 'ics',
+            default => throw new InvalidArgumentException(
+                $this->Translate('The selected calendar account uses an unsupported provider.')
+            )
+        };
     }
 
     /**
@@ -989,8 +1215,9 @@ class OpenCalendarDiscovery extends IPSModuleStrict
      */
     private function updateWizardResultForm(array $result): void
     {
+        $fieldPrefix = $this->GetBuffer('WizardExtensionMode') === '1' ? 'Extension' : '';
         foreach ($this->wizardResultCaptions($result) as $field => $caption) {
-            $this->UpdateFormField($field, 'caption', $caption);
+            $this->UpdateFormField($fieldPrefix . $field, 'caption', $caption);
         }
 
         $showVerificationHelp = $this->wizardResultNeedsVerificationHelp($result);
@@ -1001,7 +1228,7 @@ class OpenCalendarDiscovery extends IPSModuleStrict
             'ResultSynchronizationHintManual',
             'ResultSynchronizationHintDebug'
         ] as $field) {
-            $this->UpdateFormField($field, 'visible', $showVerificationHelp);
+            $this->UpdateFormField($fieldPrefix . $field, 'visible', $showVerificationHelp);
         }
     }
 
@@ -1273,6 +1500,7 @@ class OpenCalendarDiscovery extends IPSModuleStrict
 
     private function completeWizardSession(): void
     {
+        $this->SetBuffer('WizardExtensionMode', '0');
         $this->SetBuffer('WizardProvider', '');
         $this->SetBuffer('WizardCreateConfigurator', '0');
         $this->SetBuffer('WizardAccountSelection', '');
@@ -1730,7 +1958,7 @@ class OpenCalendarDiscovery extends IPSModuleStrict
                 $this->readWizardSelectedCalendarIDs(),
                 $availableCalendarIDs
             ));
-            if ($selectedCalendarIDs === []) {
+            if ($selectedCalendarIDs === [] && $this->GetBuffer('WizardExtensionMode') !== '1') {
                 $selectedCalendarIDs = $this->defaultWizardSelectedCalendarIDs($calendars);
             }
             $this->SetBuffer(
@@ -1741,7 +1969,7 @@ class OpenCalendarDiscovery extends IPSModuleStrict
                 )
             );
             $this->UpdateFormField(
-                'WizardCalendars',
+                $this->GetBuffer('WizardExtensionMode') === '1' ? 'ExtensionCalendars' : 'WizardCalendars',
                 'values',
                 json_encode(
                     $this->wizardCalendarListValues($calendars),
@@ -1826,7 +2054,12 @@ class OpenCalendarDiscovery extends IPSModuleStrict
     private function wizardCalendarListValues(array $calendars): array
     {
         $selectedCalendarIDs = $this->readWizardSelectedCalendarIDs();
-        $hasStoredSelection = $selectedCalendarIDs !== [];
+        $extensionMode = $this->GetBuffer('WizardExtensionMode') === '1'
+            && IPS_InstanceExists((int) $this->GetBuffer('WizardAccountID'));
+        $hasStoredSelection = $selectedCalendarIDs !== [] || $extensionMode;
+        $existingCalendarIDs = $extensionMode
+            ? array_keys($this->existingCalendarInstancesForAccount($this->wizardAccountID()))
+            : [];
         $hasPrimaryCalendar = count(array_filter(
             $calendars,
             static fn (array $calendar): bool => (bool) ($calendar['primary'] ?? false)
@@ -1859,7 +2092,12 @@ class OpenCalendarDiscovery extends IPSModuleStrict
                 'name'       => $name,
                 'access'     => $this->Translate($canWrite ? 'Read and write' : 'Read only'),
                 'primary'    => (bool) ($calendar['primary'] ?? false) ? $this->Translate('Yes') : '',
-                'calendarId' => $calendarID
+                'calendarId' => $calendarID,
+                'setupState' => $extensionMode
+                    ? $this->Translate(in_array($calendarID, $existingCalendarIDs, true)
+                        ? 'Already configured'
+                        : 'New calendar')
+                    : ''
             ];
         }
 
@@ -2190,7 +2428,7 @@ class OpenCalendarDiscovery extends IPSModuleStrict
     /**
      * @return list<array{caption: string, value: int}>
      */
-    private function calendarAccountSelectOptions(): array
+    private function calendarAccountSelectOptions(bool $activeOnly = false): array
     {
         $options = [
             [
@@ -2202,6 +2440,12 @@ class OpenCalendarDiscovery extends IPSModuleStrict
         $accounts = [];
         foreach (IPS_GetInstanceListByModuleID(self::CALENDAR_ACCOUNT_MODULE_ID) as $accountID) {
             $provider = (int) IPS_GetProperty($accountID, 'Provider');
+            if ($activeOnly && (
+                !(bool) IPS_GetProperty($accountID, 'Active')
+                || !isset(self::PROVIDER_LABELS[$provider])
+            )) {
+                continue;
+            }
             $providerLabel = self::PROVIDER_LABELS[$provider] ?? $this->Translate('Calendar account');
             $name = trim(IPS_GetName($accountID));
             if ($name === '') {

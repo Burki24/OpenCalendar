@@ -20,7 +20,9 @@
             "Calendar discovery failed. Please check the instance status for details.": "Kalendersuche fehlgeschlagen. Bitte prüfen Sie den Instanzstatus für weitere Details.",
             "No calendar account is connected. Select a parent gateway first.": "Es ist kein Kalenderkonto verbunden. Wählen Sie zuerst ein übergeordnetes Gateway aus.",
             "The connected calendar account is not active.": "Das verbundene Kalenderkonto ist nicht aktiv.",
-            "Calendar account connection missing": "Verbindung zum Kalenderkonto fehlt"
+            "Calendar account connection missing": "Verbindung zum Kalenderkonto fehlt",
+            "Add calendars with the assistant": "Kalender mit Assistent hinzufügen",
+            "Create a Calendar Setup instance to add calendars with the assistant.": "Für das geführte Hinzufügen von Kalendern zuerst eine Instanz „Kalender Einrichtung“ anlegen."
         }
     }
 }

@@ -10,6 +10,15 @@ empfohlene Weg. Dort kann der Kalender Konfigurator optional direkt mit
 angelegt werden. Der Konfigurator bleibt für die spätere Erweiterung eines
 Kontos und für eine manuelle Einrichtung verfügbar.
 
+Für eine geführte Erweiterung bietet der Konfigurator **Kalender mit Assistent
+hinzufügen** an. Die Schaltfläche öffnet eine vorhandene **Kalender Einrichtung**;
+dort **Weitere Kalender zu vorhandenem Konto hinzufügen** auswählen. Der
+Assistent prüft das Konto, zeigt neue und bereits eingerichtete Kalender an,
+übernimmt die Kalenderinstanzen und ergänzt auf Wunsch eine vorhandene Kalender
+Ansicht. Wenn noch keine Kalender Einrichtung existiert, erscheint ein Hinweis,
+eine solche Instanz anzulegen. Die Konfiguratorliste kann weiterhin direkt für
+einzelne oder alle fehlenden Kalender verwendet werden.
+
 ## Voraussetzungen
 
 - Symcon ab Version 9.1

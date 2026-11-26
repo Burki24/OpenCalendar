@@ -75,6 +75,7 @@ $commands = [
     ['Verify annual-event metadata synchronization', [PHP_BINARY, 'tests/anniversary-metadata-sync.php']],
     ['Verify Calendar View PHP API', [PHP_BINARY, 'tests/calendar-view-api.php']],
     ['Verify calendar configurator cache isolation', [PHP_BINARY, 'tests/configurator-cache.php']],
+    ['Verify guided addition of calendars to an existing account', [PHP_BINARY, 'tests/guided-calendar-addition.php']],
     ['Verify Google incremental synchronization', [PHP_BINARY, 'tests/google-incremental-sync.php']],
     ['Verify Microsoft incremental synchronization', [PHP_BINARY, 'tests/microsoft-incremental-sync.php']],
     ['Verify Microsoft incremental synchronization routing', [PHP_BINARY, 'tests/microsoft-full-sync-routing.php']],
