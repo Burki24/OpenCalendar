@@ -3,8 +3,8 @@
 Die **Kalender Einrichtung** ist die zentrale Discovery- und Einrichtungsinstanz
 für OpenCalendar ab Version 3.0 und benötigt Symcon 9.1 oder neuer.
 
-Für ein bereits eingerichtetes Konto gibt es zusätzlich **Weitere Kalender zu
-vorhandenem Konto hinzufügen**. Dieser kürzere Assistent prüft die bestehende
+Für ein bereits eingerichtetes Konto gibt es zusätzlich **Kalender hinzufügen**.
+Dieser kürzere Assistent prüft die bestehende
 Verbindung, kennzeichnet bereits eingerichtete Kalender und führt direkt zur
 Kalenderauswahl. Die ausgewählten Kalender werden angelegt oder wiederverwendet
 und einer neuen oder vorhandenen Kalender Ansicht zugeordnet. Bestehende
@@ -16,8 +16,8 @@ Der Einstieg **Kalender mit Assistent hinzufügen** im Kalender Konfigurator
 öffnet die Kalender Einrichtung. Dort den kürzeren Assistenten wählen. Wenn
 noch keine Kalender Einrichtung existiert, zuerst eine solche Instanz anlegen.
 
-Für einen weiteren Online-Feed in einem aktiven ICS/Webcal-Konto steht
-**ICS/Webcal-Abonnement hinzufügen** bereit. Der Assistent fragt Konto, URL,
+Über **ICS/Webcal hinzufügen** lässt sich ein weiterer Online-Feed in einem
+aktiven ICS/Webcal-Konto einrichten. Der Assistent fragt Konto, URL,
 Kalendername und gegebenenfalls HTTP-Zugangsdaten ab. Vor dem Speichern ruft er
 den Feed zur Prüfung ab. Erst nach Bestätigung der Zusammenfassung ergänzt er
 die bestehende Abonnementliste, legt die schreibgeschützte Kalenderinstanz an
@@ -25,8 +25,10 @@ oder verwendet eine passende vorhandene Instanz und ordnet sie einer gewählten
 Kalender Ansicht zu. Der Aktualisierungsplan wird vom Konto übernommen.
 Bereits konfigurierte Feed-URLs werden nicht erneut eingetragen. Bei einer
 fehlgeschlagenen Abschlussprüfung bleiben bestätigte Änderungen erhalten und
-die Ergebnisseite bietet eine erneute Prüfung an. Für das erste ICS/Webcal-Konto
-bleibt der Hauptassistent zuständig.
+die Ergebnisseite bietet eine erneute Prüfung an. Wenn noch kein aktives
+ICS/Webcal-Konto vorhanden ist, öffnet derselbe Button die **Einrichtung** mit
+vorausgewähltem ICS/Webcal-Anbieter. Dort kann ein neues Konto angelegt oder
+ein vorhandenes Konto eingerichtet werden.
 
 Technisch heißt das Modul **OpenCalendar Discovery**. In einer deutschen
 Symcon-Oberfläche wird dieser Name über die `locale.json` als

@@ -223,6 +223,9 @@ $discovery->Create();
 $form = json_decode($discovery->GetConfigurationForm(), true, 512, JSON_THROW_ON_ERROR);
 $actions = array_column($form['actions'], null, 'name');
 checkGuidedAddition(isset($actions['SetupWizard'], $actions['AddCalendarWizard']), 'Both setup flows must be available.');
+checkGuidedAddition($actions['SetupWizard']['caption'] === 'Start setup', 'The main setup button must have a short caption.');
+checkGuidedAddition($actions['AddCalendarWizard']['caption'] === 'Add calendars', 'The calendar button must have a short caption.');
+checkGuidedAddition($actions['AddICSSubscriptionWizard']['caption'] === 'Add ICS/Webcal', 'The ICS button must have a short caption.');
 
 $pages = array_column($actions['AddCalendarWizard']['popup']['pages'], null, 'name');
 checkGuidedAddition(array_keys($pages) === ['existingAccount', 'calendars', 'view', 'summary', 'result'], 'The extension flow must skip provider credentials.');
@@ -335,10 +338,21 @@ $discovery->RequestAction('WizardFinishICSSubscription', $newFeed);
 $feedsAgain = json_decode($instances[102]['properties']['ICalendarFeeds'], true, 512, JSON_THROW_ON_ERROR);
 checkGuidedAddition(count($feedsAgain) === 2, 'Repeating the finish action must not create a duplicate feed.');
 
-unset($instances[100], $instances[101], $instances[102]);
+unset($instances[102]);
+$formWithoutICS = json_decode($discovery->GetConfigurationForm(), true, 512, JSON_THROW_ON_ERROR);
+$actionsWithoutICS = array_column($formWithoutICS['actions'], null, 'name');
+$icsFallback = $actionsWithoutICS['AddICSSubscriptionWizard'];
+checkGuidedAddition(($icsFallback['enabled'] ?? true) === true, 'The ICS shortcut must be available without an active ICS account.');
+$fallbackPages = array_column($icsFallback['popup']['pages'], null, 'name');
+checkGuidedAddition(isset($fallbackPages['welcome'], $fallbackPages['provider'], $fallbackPages['account']), 'The ICS shortcut must offer new-account setup.');
+$providerField = array_column($fallbackPages['provider']['items'], null, 'name')['Provider'];
+checkGuidedAddition($providerField['value'] === 'ics', 'The fallback must preselect ICS/Webcal.');
+checkGuidedAddition(array_column($providerField['options'], 'value') === ['ics'], 'The fallback must remain an ICS/Webcal flow.');
+
+unset($instances[100], $instances[101]);
 $formWithoutAccount = json_decode($discovery->GetConfigurationForm(), true, 512, JSON_THROW_ON_ERROR);
 $actionsWithoutAccount = array_column($formWithoutAccount['actions'], null, 'name');
 checkGuidedAddition($actionsWithoutAccount['AddCalendarWizard']['enabled'] === false, 'The shortcut must be disabled when no active account exists.');
-checkGuidedAddition($actionsWithoutAccount['AddICSSubscriptionWizard']['enabled'] === false, 'The ICS shortcut must be disabled without an active ICS account.');
+checkGuidedAddition(($actionsWithoutAccount['AddICSSubscriptionWizard']['enabled'] ?? true) === true, 'The ICS shortcut must remain available without any account.');
 
 fwrite(STDOUT, "Guided calendar addition tests passed.\n");

@@ -121,7 +121,7 @@ class OpenCalendarDiscovery extends IPSModuleStrict
             if (($action['name'] ?? '') === 'SetupWizard') {
                 $extensionWizard = $this->extensionWizardAction($action);
                 $form['actions'][] = $extensionWizard;
-                $form['actions'][] = $this->iCalendarSubscriptionWizardAction($extensionWizard);
+                $form['actions'][] = $this->iCalendarSubscriptionWizardAction($extensionWizard, $action);
                 break;
             }
         }
@@ -734,11 +734,38 @@ class OpenCalendarDiscovery extends IPSModuleStrict
      * Builds a read-only feed subscription flow that commits the new source on the final page.
      *
      * @param array<string, mixed> $extensionWizard Existing-account wizard with prepared view/result pages.
+     * @param array<string, mixed> $setupWizard Main wizard for the first ICS/Webcal account.
      * @return array<string, mixed>
      */
-    private function iCalendarSubscriptionWizardAction(array $extensionWizard): array
+    private function iCalendarSubscriptionWizardAction(array $extensionWizard, array $setupWizard): array
     {
         $accounts = $this->calendarAccountSelectOptions(true, CalendarProviderType::ICS);
+        if (count($accounts) === 1) {
+            $setupWizard['name'] = 'AddICSSubscriptionWizard';
+            $setupWizard['caption'] = 'Add ICS/Webcal';
+            $setupWizard['width'] = '240px';
+            $setupWizard['popup']['caption'] = 'Add an ICS/Webcal subscription';
+            foreach ($setupWizard['popup']['pages'] as &$page) {
+                if (($page['name'] ?? '') !== 'provider') {
+                    continue;
+                }
+                foreach ($page['items'] as &$item) {
+                    if (($item['name'] ?? '') === 'Provider') {
+                        $item['value'] = 'ics';
+                        $item['options'] = array_values(array_filter(
+                            $item['options'],
+                            static fn (array $option): bool => ($option['value'] ?? null) === 'ics'
+                        ));
+                        break;
+                    }
+                }
+                unset($item);
+                break;
+            }
+            unset($page);
+            return $setupWizard;
+        }
+
         $pages = [[
             'name'     => 'icsAccount',
             'caption'  => 'Choose an ICS/Webcal account',
@@ -829,9 +856,9 @@ class OpenCalendarDiscovery extends IPSModuleStrict
         return [
             'type'    => 'PopupButton',
             'name'    => 'AddICSSubscriptionWizard',
-            'caption' => 'Add an ICS/Webcal subscription',
-            'enabled' => count($accounts) > 1,
-            'width'   => '400px',
+            'caption' => 'Add ICS/Webcal',
+            'enabled' => true,
+            'width'   => '240px',
             'popup'   => [
                 'caption'      => 'Add an ICS/Webcal subscription',
                 'closeCaption' => 'Cancel',
@@ -1044,9 +1071,9 @@ class OpenCalendarDiscovery extends IPSModuleStrict
         return [
             'type'    => 'PopupButton',
             'name'    => 'AddCalendarWizard',
-            'caption' => 'Add calendars to an existing account',
+            'caption' => 'Add calendars',
             'enabled' => count($activeAccounts) > 1,
-            'width'   => '400px',
+            'width'   => '240px',
             'popup'   => [
                 'caption'      => 'Add calendars',
                 'closeCaption' => 'Cancel',

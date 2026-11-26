@@ -1,5 +1,11 @@
 # Unveröffentlicht
 
+## Korrigiert
+
+- Der ICS/Webcal-Einstieg bleibt auch ohne aktives ICS-Konto verfügbar und
+  führt dann durch die Kontoeinrichtung. Die drei Assistenten-Buttons haben
+  kürzere Beschriftungen.
+
 ## Neu
 
 - Ein geführter Ablauf prüft und ergänzt weitere ICS/Webcal-Abonnements eines

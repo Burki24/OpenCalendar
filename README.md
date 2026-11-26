@@ -31,12 +31,13 @@ Kalender Konto und die Kalenderauswahl bis zur fertigen Kalender Ansicht und
 übernimmt dabei die notwendigen technischen Verknüpfungen automatisch.
 Für weitere Kalender eines vorhandenen Kontos öffnet **Kalender mit Assistent
 hinzufügen** im Kalender Konfigurator die Kalender Einrichtung. Dort führt
-**Weitere Kalender zu vorhandenem Konto hinzufügen** direkt über die
+**Kalender hinzufügen** direkt über die
 Konto- und Kalenderauswahl zur bestehenden oder neuen Kalender Ansicht;
 vorhandene Kalenderinstanzen und Ansichtszuordnungen bleiben erhalten.
 Ein weiteres ICS/Webcal-Abonnement lässt sich in der Kalender Einrichtung mit
-**ICS/Webcal-Abonnement hinzufügen** prüfen und bis zur Kalender Ansicht
-einrichten, ohne die übrigen Feeds des Kontos zu ersetzen.
+**ICS/Webcal hinzufügen** prüfen und bis zur Kalender Ansicht einrichten, ohne
+die übrigen Feeds des Kontos zu ersetzen. Ohne aktives ICS/Webcal-Konto öffnet
+derselbe Button den Einrichtungsassistenten mit vorausgewähltem ICS/Webcal.
 
 **Dateianhänge (3.0):** Kalenderinstanz und Kalenderansicht müssen den Zugriff
 und den gewünschten Speicherort gesondert freigeben. Lokale Kalender und
@@ -93,7 +94,7 @@ empfohlene Weg.
 
 1. OpenCalendar installieren und über **Instanz hinzufügen** eine Instanz
    **Kalender Einrichtung** anlegen.
-2. **OpenCalendar-Einrichtungsassistent starten** wählen.
+2. **Einrichtung starten** wählen.
 3. Den gewünschten Kalenderanbieter auswählen. Optional kann der Assistent
    gleichzeitig einen **Kalender Konfigurator** für die spätere Verwaltung
    dieses Kontos anlegen.
