@@ -18,6 +18,9 @@ Assistent prüft das Konto, zeigt neue und bereits eingerichtete Kalender an,
 Ansicht. Wenn noch keine Kalender Einrichtung existiert, erscheint ein Hinweis,
 eine solche Instanz anzulegen. Die Konfiguratorliste kann weiterhin direkt für
 einzelne oder alle fehlenden Kalender verwendet werden.
+Für einen neuen ICS/Webcal-Feed im bestehenden Konto dort stattdessen
+**ICS/Webcal-Abonnement hinzufügen** wählen; der Assistent ergänzt den Feed und
+führt bis zur Kalender Ansicht.
 
 ## Voraussetzungen
 

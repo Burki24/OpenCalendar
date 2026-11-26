@@ -225,7 +225,23 @@
             "New calendar": "Neuer Kalender",
             "Already configured calendars are reused. Select them only if they should also be added to the chosen calendar view.": "Bereits eingerichtete Kalender werden wiederverwendet. Wählen Sie diese nur aus, wenn sie auch der gewählten Kalender Ansicht hinzugefügt werden sollen.",
             "Review calendar addition": "Kalendererweiterung prüfen",
-            "Calendar addition completed": "Kalendererweiterung abgeschlossen"
+            "Calendar addition completed": "Kalendererweiterung abgeschlossen",
+            "Add an ICS/Webcal subscription": "ICS/Webcal-Abonnement hinzufügen",
+            "Choose an ICS/Webcal account": "ICS/Webcal-Konto auswählen",
+            "Choose an existing ICS/Webcal account. To create an account, use the main setup assistant.": "Ein vorhandenes ICS/Webcal-Konto auswählen. Ein neues Konto kann mit dem Hauptassistenten eingerichtet werden.",
+            "Choose an ICS/Webcal calendar account.": "Bitte ein ICS/Webcal-Kalenderkonto auswählen.",
+            "Check ICS/Webcal subscription": "ICS/Webcal-Abonnement prüfen",
+            "The feed is checked now and saved only after you confirm the summary. Existing subscriptions remain unchanged.": "Der Feed wird jetzt geprüft und erst nach Bestätigung der Zusammenfassung gespeichert. Vorhandene Abonnements bleiben erhalten.",
+            "The ICS/Webcal feed could not be checked. Verify its URL and credentials.": "Der ICS/Webcal-Feed konnte nicht geprüft werden. Bitte URL und Zugangsdaten kontrollieren.",
+            "Please enter the iCalendar username and password.": "Bitte iCalendar-Benutzernamen und Passwort eingeben.",
+            "This ICS/Webcal URL is already configured.": "Diese ICS/Webcal-URL ist bereits eingerichtet.",
+            "The existing iCalendar subscription list is invalid.": "Die vorhandene iCalendar-Abonnementliste ist ungültig.",
+            "Review ICS/Webcal subscription": "ICS/Webcal-Abonnement prüfen",
+            "The new feed was checked successfully. Its URL and credentials will be saved to the selected account only when you continue.": "Der neue Feed wurde erfolgreich geprüft. URL und Zugangsdaten werden erst beim Fortfahren im gewählten Konto gespeichert.",
+            "OpenCalendar then creates or reuses its calendar instance, adds it to the chosen view and checks synchronization. Existing subscriptions and view assignments remain unchanged.": "OpenCalendar legt anschließend die Kalenderinstanz an oder verwendet sie erneut, ordnet sie der gewählten Ansicht zu und prüft die Synchronisation. Vorhandene Abonnements und Ansichtszuordnungen bleiben erhalten.",
+            "ICS/Webcal subscription completed": "ICS/Webcal-Abonnement eingerichtet",
+            "The iCalendar subscription selection is invalid.": "Die Auswahl des iCalendar-Abonnements ist ungültig.",
+            "The verified iCalendar feed has changed. Check it again.": "Der geprüfte iCalendar-Feed wurde geändert. Bitte erneut prüfen."
         }
     }
 }

@@ -16,6 +16,18 @@ Der Einstieg **Kalender mit Assistent hinzufügen** im Kalender Konfigurator
 öffnet die Kalender Einrichtung. Dort den kürzeren Assistenten wählen. Wenn
 noch keine Kalender Einrichtung existiert, zuerst eine solche Instanz anlegen.
 
+Für einen weiteren Online-Feed in einem aktiven ICS/Webcal-Konto steht
+**ICS/Webcal-Abonnement hinzufügen** bereit. Der Assistent fragt Konto, URL,
+Kalendername und gegebenenfalls HTTP-Zugangsdaten ab. Vor dem Speichern ruft er
+den Feed zur Prüfung ab. Erst nach Bestätigung der Zusammenfassung ergänzt er
+die bestehende Abonnementliste, legt die schreibgeschützte Kalenderinstanz an
+oder verwendet eine passende vorhandene Instanz und ordnet sie einer gewählten
+Kalender Ansicht zu. Der Aktualisierungsplan wird vom Konto übernommen.
+Bereits konfigurierte Feed-URLs werden nicht erneut eingetragen. Bei einer
+fehlgeschlagenen Abschlussprüfung bleiben bestätigte Änderungen erhalten und
+die Ergebnisseite bietet eine erneute Prüfung an. Für das erste ICS/Webcal-Konto
+bleibt der Hauptassistent zuständig.
+
 Technisch heißt das Modul **OpenCalendar Discovery**. In einer deutschen
 Symcon-Oberfläche wird dieser Name über die `locale.json` als
 **Kalender Einrichtung** angezeigt.

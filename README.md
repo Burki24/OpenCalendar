@@ -34,6 +34,9 @@ hinzufügen** im Kalender Konfigurator die Kalender Einrichtung. Dort führt
 **Weitere Kalender zu vorhandenem Konto hinzufügen** direkt über die
 Konto- und Kalenderauswahl zur bestehenden oder neuen Kalender Ansicht;
 vorhandene Kalenderinstanzen und Ansichtszuordnungen bleiben erhalten.
+Ein weiteres ICS/Webcal-Abonnement lässt sich in der Kalender Einrichtung mit
+**ICS/Webcal-Abonnement hinzufügen** prüfen und bis zur Kalender Ansicht
+einrichten, ohne die übrigen Feeds des Kontos zu ersetzen.
 
 **Dateianhänge (3.0):** Kalenderinstanz und Kalenderansicht müssen den Zugriff
 und den gewünschten Speicherort gesondert freigeben. Lokale Kalender und

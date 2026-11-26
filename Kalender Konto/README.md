@@ -177,6 +177,9 @@ Zugangsdaten.
 
 ICS-/Webcal-Quellen sind schreibgeschützt. Ein Konto kann mehrere voneinander
 unabhängige Online-Abonnements und lokal hochgeladene ICS-Dateien verwalten.
+Weitere Online-Abonnements können auch in der **Kalender Einrichtung** über
+**ICS/Webcal-Abonnement hinzufügen** geführt hinzugefügt werden. Der Feed wird
+vor dem Speichern geprüft und anschließend einer Kalender Ansicht zugeordnet.
 
 Minimaler Ablauf:
 

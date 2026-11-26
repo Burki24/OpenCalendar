@@ -2,9 +2,15 @@
 
 declare(strict_types=1);
 
+use IPSKalender\CalendarHttpClient;
 use IPSKalender\CalendarProviderType;
+use IPSKalender\ICalendarAuthentication;
+use IPSKalender\ICalendarFeedProvider;
 
 require_once __DIR__ . '/../libs/CalendarProviderType.php';
+require_once __DIR__ . '/../libs/CalendarHttpClient.php';
+require_once __DIR__ . '/../libs/ICalendarAuthentication.php';
+require_once __DIR__ . '/../libs/ICalendarFeedProvider.php';
 
 class OpenCalendarDiscovery extends IPSModuleStrict
 {
@@ -113,7 +119,9 @@ class OpenCalendarDiscovery extends IPSModuleStrict
 
         foreach ($form['actions'] as $action) {
             if (($action['name'] ?? '') === 'SetupWizard') {
-                $form['actions'][] = $this->extensionWizardAction($action);
+                $extensionWizard = $this->extensionWizardAction($action);
+                $form['actions'][] = $extensionWizard;
+                $form['actions'][] = $this->iCalendarSubscriptionWizardAction($extensionWizard);
                 break;
             }
         }
@@ -269,6 +277,116 @@ class OpenCalendarDiscovery extends IPSModuleStrict
     }
 
     /**
+     * Builds a read-only feed subscription flow that commits the new source on the final page.
+     *
+     * @param array<string, mixed> $extensionWizard Existing-account wizard with prepared view/result pages.
+     * @return array<string, mixed>
+     */
+    private function iCalendarSubscriptionWizardAction(array $extensionWizard): array
+    {
+        $accounts = $this->calendarAccountSelectOptions(true, CalendarProviderType::ICS);
+        $pages = [[
+            'name'     => 'icsAccount',
+            'caption'  => 'Choose an ICS/Webcal account',
+            'items'    => [
+                [
+                    'type'    => 'Label',
+                    'caption' => 'Choose an existing ICS/Webcal account. To create an account, use the main setup assistant.'
+                ],
+                [
+                    'type'    => 'Select',
+                    'name'    => 'ICSSubscriptionAccountID',
+                    'caption' => 'Calendar account',
+                    'value'   => 0,
+                    'options' => $accounts
+                ]
+            ],
+            'validate' => 'return IPSKALDISCOVERY_ValidateWizardICSSubscriptionAccount($id, $ICSSubscriptionAccountID);',
+            'nextPage' => 'icsFeed'
+        ], [
+            'name'     => 'icsFeed',
+            'caption'  => 'Check ICS/Webcal subscription',
+            'items'    => [
+                [
+                    'type'    => 'ValidationTextBox',
+                    'name'    => 'ICSSubscriptionURL',
+                    'caption' => 'iCalendar URL',
+                    'validate' => '^(https?|webcal)://.+'
+                ],
+                [
+                    'type'    => 'ValidationTextBox',
+                    'name'    => 'ICSSubscriptionName',
+                    'caption' => 'Calendar name'
+                ],
+                [
+                    'type'    => 'RadioButtonGroup',
+                    'name'    => 'ICSSubscriptionAuthenticationMode',
+                    'caption' => 'Authentication',
+                    'value'   => self::ICALENDAR_AUTH_URL_ACCESS_KEY,
+                    'options' => [
+                        ['caption' => 'URL / access key', 'value' => self::ICALENDAR_AUTH_URL_ACCESS_KEY],
+                        ['caption' => 'Username / password', 'value' => self::ICALENDAR_AUTH_USERNAME_PASSWORD]
+                    ]
+                ],
+                ['type' => 'ValidationTextBox', 'name' => 'ICSSubscriptionUsername', 'caption' => 'Username'],
+                ['type' => 'PasswordTextBox', 'name' => 'ICSSubscriptionPassword', 'caption' => 'Password'],
+                [
+                    'type'    => 'Label',
+                    'caption' => 'The feed is checked now and saved only after you confirm the summary. Existing subscriptions remain unchanged.'
+                ]
+            ],
+            'validate' => 'return IPSKALDISCOVERY_ValidateWizardICSSubscriptionFeed($id, $ICSSubscriptionURL, $ICSSubscriptionName, $ICSSubscriptionAuthenticationMode, $ICSSubscriptionUsername, $ICSSubscriptionPassword);',
+            'nextPage' => 'view'
+        ]];
+
+        foreach ($extensionWizard['popup']['pages'] as $page) {
+            $pageName = (string) ($page['name'] ?? '');
+            if (!in_array($pageName, ['view', 'summary', 'result'], true)) {
+                continue;
+            }
+            if ($pageName === 'view') {
+                foreach ($page['items'] as &$item) {
+                    if (str_starts_with((string) ($item['name'] ?? ''), 'Extension')) {
+                        $item['name'] = 'ICS' . substr($item['name'], strlen('Extension'));
+                    }
+                }
+                unset($item);
+                $page['validate'] = str_replace('$Extension', '$ICS', (string) $page['validate']);
+                $page['onConfirm'] = str_replace('$Extension', '$ICS', (string) $page['onConfirm']);
+            } elseif ($pageName === 'summary') {
+                $page['caption'] = 'Review ICS/Webcal subscription';
+                $page['items'] = [
+                    ['type' => 'Label', 'caption' => 'The new feed was checked successfully. Its URL and credentials will be saved to the selected account only when you continue.'],
+                    ['type' => 'Label', 'caption' => 'OpenCalendar then creates or reuses its calendar instance, adds it to the chosen view and checks synchronization. Existing subscriptions and view assignments remain unchanged.']
+                ];
+                $page['onConfirm'] = 'IPS_RequestAction($id, \'WizardFinishICSSubscription\', json_encode([\'url\' => $ICSSubscriptionURL, \'name\' => $ICSSubscriptionName, \'authenticationMode\' => $ICSSubscriptionAuthenticationMode, \'username\' => $ICSSubscriptionUsername, \'password\' => $ICSSubscriptionPassword], JSON_THROW_ON_ERROR));';
+            } else {
+                $page['caption'] = 'ICS/Webcal subscription completed';
+                foreach ($page['items'] as &$item) {
+                    if (str_starts_with((string) ($item['name'] ?? ''), 'ExtensionResult')) {
+                        $item['name'] = 'ICS' . substr($item['name'], strlen('Extension'));
+                    }
+                }
+                unset($item);
+            }
+            $pages[] = $page;
+        }
+
+        return [
+            'type'    => 'PopupButton',
+            'name'    => 'AddICSSubscriptionWizard',
+            'caption' => 'Add an ICS/Webcal subscription',
+            'enabled' => count($accounts) > 1,
+            'width'   => '400px',
+            'popup'   => [
+                'caption'      => 'Add an ICS/Webcal subscription',
+                'closeCaption' => 'Cancel',
+                'pages'        => $pages
+            ]
+        ];
+    }
+
+    /**
      * Handles discovery-wizard actions and forwards unsupported actions to the Symcon base module.
      *
      * @param string $Ident Action identifier supplied by the configuration form.
@@ -345,6 +463,10 @@ class OpenCalendarDiscovery extends IPSModuleStrict
 
             case 'WizardFinishAccount':
                 $this->finishWizardAccount();
+                break;
+
+            case 'WizardFinishICSSubscription':
+                $this->finishWizardICSSubscription($Value);
                 break;
 
             case 'WizardRetryVerification':
@@ -446,6 +568,180 @@ class OpenCalendarDiscovery extends IPSModuleStrict
         } catch (InvalidArgumentException | RuntimeException | JsonException $exception) {
             return $exception->getMessage();
         }
+    }
+
+    /**
+     * Selects an existing active ICS account without changing its stored feeds.
+     */
+    public function ValidateWizardICSSubscriptionAccount(int $AccountID): string
+    {
+        if ($AccountID <= 0 || !IPS_InstanceExists($AccountID)
+            || !in_array($AccountID, IPS_GetInstanceListByModuleID(self::CALENDAR_ACCOUNT_MODULE_ID), true)) {
+            return $this->Translate('Please select an existing calendar account.');
+        }
+        if ((int) IPS_GetProperty($AccountID, 'Provider') !== CalendarProviderType::ICS) {
+            return $this->Translate('Choose an ICS/Webcal calendar account.');
+        }
+        if (!(bool) IPS_GetProperty($AccountID, 'Active')) {
+            return $this->Translate('Choose an active calendar account to add calendars.');
+        }
+
+        $this->completeWizardSession();
+        $this->SetBuffer('WizardExtensionMode', 'ics');
+        $this->SetBuffer('WizardProvider', 'ics');
+        $this->SetBuffer('WizardAccountID', (string) $AccountID);
+        return '';
+    }
+
+    /**
+     * Checks a new ICS/Webcal feed before the account configuration is changed.
+     */
+    public function ValidateWizardICSSubscriptionFeed(
+        string $URL,
+        string $Name,
+        int $AuthenticationMode,
+        string $Username,
+        string $Password
+    ): string {
+        $this->SetBuffer('WizardConnectionVerified', '0');
+        $this->SetBuffer('WizardICSPreviewHash', '');
+        try {
+            if ($this->GetBuffer('WizardExtensionMode') !== 'ics') {
+                throw new InvalidArgumentException($this->Translate('Choose an ICS/Webcal calendar account.'));
+            }
+            $accountID = $this->wizardAccountID();
+            $this->assertWizardProviderMatchesAccount($accountID, 'ics');
+            if (!(bool) IPS_GetProperty($accountID, 'Active')) {
+                throw new InvalidArgumentException($this->Translate('Choose an active calendar account to add calendars.'));
+            }
+            $feed = $this->normalizeWizardICSSubscription($URL, $Name, $AuthenticationMode, $Username, $Password);
+            $this->assertWizardICSSubscriptionNotConfigured($accountID, $feed['url']);
+        } catch (InvalidArgumentException | RuntimeException $exception) {
+            return $exception->getMessage();
+        }
+
+        try {
+            $discovered = $this->inspectWizardICSFeed($accountID, $feed);
+        } catch (Throwable) {
+            return $this->Translate('The ICS/Webcal feed could not be checked. Verify its URL and credentials.');
+        }
+
+        $calendarID = (string) $discovered['id'];
+        $calendar = [
+            'id'             => $calendarID,
+            'providerId'     => $calendarID,
+            'name'           => $feed['name'],
+            'url'            => '',
+            'color'          => (string) ($discovered['color'] ?? ''),
+            'capabilities'   => ['read' => true, 'create' => false, 'update' => false, 'delete' => false],
+            'updateSchedule' => (int) IPS_GetProperty($accountID, 'UpdateSchedule'),
+            'updateInterval' => (int) IPS_GetProperty($accountID, 'UpdateInterval')
+        ];
+        $this->SetBuffer('WizardCalendars', json_encode([$calendar], JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE));
+        $this->SetBuffer('WizardSelectedCalendarIDs', json_encode([$calendarID], JSON_THROW_ON_ERROR));
+        $this->SetBuffer('WizardICSPreviewHash', hash('sha256', json_encode($feed, JSON_THROW_ON_ERROR)));
+        $this->SetBuffer('WizardConnectionVerified', '1');
+        return '';
+    }
+
+    /**
+     * @param array{url: string, name: string, authenticationMode: int, username: string, password: string} $feed
+     * @return array<string, mixed>
+     */
+    protected function inspectWizardICSFeed(int $accountID, array $feed): array
+    {
+        $credentials = ICalendarAuthentication::credentials(
+            $feed['authenticationMode'],
+            $feed['username'],
+            $feed['password']
+        );
+        $provider = new ICalendarFeedProvider(
+            new CalendarHttpClient(
+                max(5, min(120, (int) IPS_GetProperty($accountID, 'RequestTimeout'))),
+                (bool) IPS_GetProperty($accountID, 'VerifyTLS'),
+                $credentials['username'],
+                $credentials['password']
+            ),
+            $feed['url'],
+            $feed['name']
+        );
+        $discovered = $provider->getCalendars()[0] ?? null;
+        if (!is_array($discovered) || trim((string) ($discovered['id'] ?? '')) === '') {
+            throw new RuntimeException('No calendar returned.');
+        }
+        return $discovered;
+    }
+
+    /**
+     * @return array{url: string, name: string, authenticationMode: int, username: string, password: string}
+     */
+    private function normalizeWizardICSSubscription(
+        string $url,
+        string $name,
+        int $authenticationMode,
+        string $username,
+        string $password
+    ): array {
+        $url = trim($url);
+        $normalizedURL = $this->wizardICSUrlKey($url);
+        if (filter_var($normalizedURL, FILTER_VALIDATE_URL) === false
+            || !in_array(strtolower((string) parse_url($normalizedURL, PHP_URL_SCHEME)), ['http', 'https'], true)) {
+            throw new InvalidArgumentException($this->Translate('Please enter a valid iCalendar URL.'));
+        }
+        $name = trim($name);
+        if ($name === '') {
+            throw new InvalidArgumentException($this->Translate('Please enter a calendar name.'));
+        }
+        if (!in_array($authenticationMode, [self::ICALENDAR_AUTH_URL_ACCESS_KEY, self::ICALENDAR_AUTH_USERNAME_PASSWORD], true)) {
+            throw new InvalidArgumentException($this->Translate('Please select an iCalendar authentication mode.'));
+        }
+        $username = trim($username);
+        if ($authenticationMode === self::ICALENDAR_AUTH_USERNAME_PASSWORD && ($username === '' || $password === '')) {
+            throw new InvalidArgumentException($this->Translate('Please enter the iCalendar username and password.'));
+        }
+
+        return [
+            'url'                => $url,
+            'name'               => $name,
+            'authenticationMode' => $authenticationMode,
+            'username'           => $authenticationMode === self::ICALENDAR_AUTH_USERNAME_PASSWORD ? $username : '',
+            'password'           => $authenticationMode === self::ICALENDAR_AUTH_USERNAME_PASSWORD ? $password : ''
+        ];
+    }
+
+    private function wizardICSUrlKey(string $url): string
+    {
+        $url = trim($url);
+        return str_starts_with(strtolower($url), 'webcal://') ? 'https://' . substr($url, 9) : $url;
+    }
+
+    private function assertWizardICSSubscriptionNotConfigured(int $accountID, string $url): void
+    {
+        $key = $this->wizardICSUrlKey($url);
+        $legacyURL = trim((string) IPS_GetProperty($accountID, 'ServerURL'));
+        if ($legacyURL !== '' && $legacyURL !== self::APPLE_CALDAV_URL
+            && $this->wizardICSUrlKey($legacyURL) === $key) {
+            throw new InvalidArgumentException($this->Translate('This ICS/Webcal URL is already configured.'));
+        }
+        foreach ($this->readWizardICSFeedRows($accountID) as $row) {
+            if ($this->wizardICSUrlKey((string) ($row['URL'] ?? $row['url'] ?? '')) === $key) {
+                throw new InvalidArgumentException($this->Translate('This ICS/Webcal URL is already configured.'));
+            }
+        }
+    }
+
+    /** @return list<array<string, mixed>> */
+    private function readWizardICSFeedRows(int $accountID): array
+    {
+        try {
+            $rows = json_decode((string) IPS_GetProperty($accountID, 'ICalendarFeeds'), true, 512, JSON_THROW_ON_ERROR);
+        } catch (JsonException) {
+            throw new RuntimeException($this->Translate('The existing iCalendar subscription list is invalid.'));
+        }
+        if (!is_array($rows) || !array_is_list($rows) || count(array_filter($rows, 'is_array')) !== count($rows)) {
+            throw new RuntimeException($this->Translate('The existing iCalendar subscription list is invalid.'));
+        }
+        return $rows;
     }
 
     private function providerKeyForAccount(int $accountID): string
@@ -980,6 +1276,80 @@ class OpenCalendarDiscovery extends IPSModuleStrict
     }
 
     /**
+     * Commits one verified feed and delegates instance/view setup to the existing finalization path.
+     */
+    private function finishWizardICSSubscription(mixed $value): void
+    {
+        if ($this->GetBuffer('WizardExtensionMode') !== 'ics' || !is_string($value)) {
+            throw new InvalidArgumentException($this->Translate('The iCalendar subscription selection is invalid.'));
+        }
+        try {
+            $selection = json_decode($value, true, 32, JSON_THROW_ON_ERROR);
+        } catch (JsonException) {
+            throw new InvalidArgumentException($this->Translate('The iCalendar subscription selection is invalid.'));
+        }
+        if (!is_array($selection)) {
+            throw new InvalidArgumentException($this->Translate('The iCalendar subscription selection is invalid.'));
+        }
+        $feed = $this->normalizeWizardICSSubscription(
+            (string) ($selection['url'] ?? ''),
+            (string) ($selection['name'] ?? ''),
+            (int) ($selection['authenticationMode'] ?? -1),
+            (string) ($selection['username'] ?? ''),
+            (string) ($selection['password'] ?? '')
+        );
+        $accountID = $this->wizardAccountID();
+        $this->assertWizardProviderMatchesAccount($accountID, 'ics');
+        if (!(bool) IPS_GetProperty($accountID, 'Active')) {
+            throw new InvalidArgumentException($this->Translate('Choose an active calendar account to add calendars.'));
+        }
+        $calendarID = hash('sha256', 'ics|' . $this->wizardICSUrlKey($feed['url']));
+        $previewHash = $this->GetBuffer('WizardICSPreviewHash');
+        if ($this->readWizardSelectedCalendarIDs() !== [$calendarID]
+            || $previewHash === ''
+            || !hash_equals($previewHash, hash('sha256', json_encode($feed, JSON_THROW_ON_ERROR)))) {
+            throw new InvalidArgumentException($this->Translate('The verified iCalendar feed has changed. Check it again.'));
+        }
+        $confirmationError = $this->ValidateWizardConfirmation();
+        if ($confirmationError !== '') {
+            throw new RuntimeException($confirmationError);
+        }
+
+        if ($this->GetBuffer('WizardICSCommittedID') !== $calendarID) {
+            $this->assertWizardICSSubscriptionNotConfigured($accountID, $feed['url']);
+            $oldValue = (string) IPS_GetProperty($accountID, 'ICalendarFeeds');
+            $rows = $this->readWizardICSFeedRows($accountID);
+            $rows[] = [
+                'Active'             => true,
+                'Name'               => $feed['name'],
+                'URL'                => $feed['url'],
+                'AuthenticationMode' => $feed['authenticationMode'],
+                'Username'           => $feed['username'],
+                'Password'           => $feed['password'],
+                'Color'              => '',
+                'TranslationProfile' => 0,
+                'UpdateSchedule'     => (int) IPS_GetProperty($accountID, 'UpdateSchedule'),
+                'UpdateInterval'     => (int) IPS_GetProperty($accountID, 'UpdateInterval')
+            ];
+            $newValue = json_encode($rows, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            IPS_SetProperty($accountID, 'ICalendarFeeds', $newValue);
+            try {
+                IPS_ApplyChanges($accountID);
+            } catch (Throwable $exception) {
+                if (IPS_InstanceExists($accountID)
+                    && (string) IPS_GetProperty($accountID, 'ICalendarFeeds') === $newValue) {
+                    IPS_SetProperty($accountID, 'ICalendarFeeds', $oldValue);
+                    IPS_ApplyChanges($accountID);
+                }
+                throw $exception;
+            }
+            $this->SetBuffer('WizardICSCommittedID', $calendarID);
+        }
+
+        $this->finishWizardAccount();
+    }
+
+    /**
      * @param list<int> $calendarInstanceIDs
      * @return array{
      *     accountSynchronized: bool,
@@ -1215,7 +1585,11 @@ class OpenCalendarDiscovery extends IPSModuleStrict
      */
     private function updateWizardResultForm(array $result): void
     {
-        $fieldPrefix = $this->GetBuffer('WizardExtensionMode') === '1' ? 'Extension' : '';
+        $fieldPrefix = match ($this->GetBuffer('WizardExtensionMode')) {
+            '1'     => 'Extension',
+            'ics'   => 'ICS',
+            default => ''
+        };
         foreach ($this->wizardResultCaptions($result) as $field => $caption) {
             $this->UpdateFormField($fieldPrefix . $field, 'caption', $caption);
         }
@@ -1501,6 +1875,8 @@ class OpenCalendarDiscovery extends IPSModuleStrict
     private function completeWizardSession(): void
     {
         $this->SetBuffer('WizardExtensionMode', '0');
+        $this->SetBuffer('WizardICSCommittedID', '');
+        $this->SetBuffer('WizardICSPreviewHash', '');
         $this->SetBuffer('WizardProvider', '');
         $this->SetBuffer('WizardCreateConfigurator', '0');
         $this->SetBuffer('WizardAccountSelection', '');
@@ -2428,7 +2804,7 @@ class OpenCalendarDiscovery extends IPSModuleStrict
     /**
      * @return list<array{caption: string, value: int}>
      */
-    private function calendarAccountSelectOptions(bool $activeOnly = false): array
+    private function calendarAccountSelectOptions(bool $activeOnly = false, ?int $providerFilter = null): array
     {
         $options = [
             [
@@ -2440,6 +2816,9 @@ class OpenCalendarDiscovery extends IPSModuleStrict
         $accounts = [];
         foreach (IPS_GetInstanceListByModuleID(self::CALENDAR_ACCOUNT_MODULE_ID) as $accountID) {
             $provider = (int) IPS_GetProperty($accountID, 'Provider');
+            if ($providerFilter !== null && $provider !== $providerFilter) {
+                continue;
+            }
             if ($activeOnly && (
                 !(bool) IPS_GetProperty($accountID, 'Active')
                 || !isset(self::PROVIDER_LABELS[$provider])

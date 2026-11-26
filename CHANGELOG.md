@@ -2,6 +2,8 @@
 
 ## Neu
 
+- Ein geführter Ablauf prüft und ergänzt weitere ICS/Webcal-Abonnements eines
+  vorhandenen Kontos und führt bis zur Zuordnung in eine Kalender Ansicht.
 - Ein kurzer Assistent ergänzt weitere Kalender eines bestehenden Kontos,
   verwendet vorhandene Kalenderinstanzen und ordnet sie einer Kalender Ansicht zu.
   Der Kalender Konfigurator bietet einen Einstieg zur Kalender Einrichtung.
