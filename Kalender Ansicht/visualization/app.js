@@ -3071,6 +3071,12 @@ function openNewEvent(preferredDay = null) {
     eventTask.checked = false;
     eventTaskCompleted.checked = false;
     eventTaskRollForwardScope.value = 'occurrence';
+    document.getElementById('event-buffers-enabled').checked = false;
+    document.getElementById('event-buffer-before').checked = false;
+    document.getElementById('event-buffer-after').checked = false;
+    document.getElementById('event-buffer-mode').value = 'independent';
+    document.getElementById('event-buffer-before-title').value = t('Arrival');
+    document.getElementById('event-buffer-after-title').value = t('Departure');
     resetEventStateEditor();
     resetAnniversaryEditor();
     let start;
@@ -5259,6 +5265,7 @@ function updateRecurrenceControls() {
     eventRecurrenceIntervalUnit.textContent = enabled ? t(units[frequency] || 'Days') : '';
     updateRecurrenceEndDateMinimum();
     synchronizeIPSViewEventStatePickers();
+    updateEventBufferControls();
 }
 
 function updateRecurrenceEndDateMinimum() {
@@ -5361,6 +5368,7 @@ function setDialogEditable(editable, descriptionEditable = editable) {
     updateReminderControls();
     updateAnniversaryControls();
     updateEventStateControls();
+    updateEventBufferControls();
     if (String(selectedEvent?.sourceType || '').trim().toLowerCase() === 'microsoft-todo') {
         ['event-all-day', 'event-end', 'event-location'].forEach(id => {
             document.getElementById(id).disabled = true;
@@ -5381,6 +5389,7 @@ function setDateInputs(start, end, allDay, allDayEndExclusive = false) {
     endInput.value = allDay ? localDate(displayEnd) : localDateTime(displayEnd);
     startInput.ipsViewSync?.();
     endInput.ipsViewSync?.();
+    updateEventBufferControls();
 }
 
 function updateEndFromStart() {
@@ -5406,6 +5415,60 @@ function updateEndFromStart() {
     endInput.value = allDay ? localDate(end) : localDateTime(end);
     startInput.dataset.previousValue = startInput.value;
     endInput.ipsViewSync?.();
+    updateEventBufferControls();
+}
+
+function updateEventBufferControls() {
+    const section = document.getElementById('event-buffers');
+    const enabled = document.getElementById('event-buffers-enabled');
+    const eligible = !selectedEvent
+        && !document.getElementById('event-all-day').checked
+        && !eventTask.checked
+        && !eventAnniversaryType.value
+        && eventRecurrenceFrequency.value === 'none';
+    section.classList.toggle('hidden', !eligible);
+    if (!eligible) enabled.checked = false;
+    document.getElementById('event-buffers-options').classList.toggle('hidden', !eligible || !enabled.checked);
+    const start = readInputDate(document.getElementById('event-start').value);
+    const end = readInputDate(document.getElementById('event-end').value);
+    for (const side of ['before', 'after']) {
+        const checked = document.getElementById(`event-buffer-${side}`).checked;
+        const minutesInput = document.getElementById(`event-buffer-${side}-minutes`);
+        const titleInput = document.getElementById(`event-buffer-${side}-title`);
+        minutesInput.disabled = !eligible || !enabled.checked || !checked;
+        titleInput.disabled = minutesInput.disabled;
+        const minutes = Number(minutesInput.value);
+        const preview = document.getElementById(`event-buffer-${side}-preview`);
+        const valid = eligible && enabled.checked && checked && start && end && end > start
+            && Number.isInteger(minutes) && minutes >= 1 && minutes <= 1440;
+        if (!valid) {
+            preview.textContent = '';
+            continue;
+        }
+        const first = side === 'before' ? new Date(start.getTime() - minutes * 60000) : end;
+        const last = side === 'before' ? start : new Date(end.getTime() + minutes * 60000);
+        preview.textContent = `${localDateTime(first).replace('T', ' ')} – ${localDateTime(last).replace('T', ' ')}`;
+    }
+}
+
+function selectedEventBuffers() {
+    if (!document.getElementById('event-buffers-enabled').checked) return null;
+    const buffers = {};
+    for (const side of ['before', 'after']) {
+        if (!document.getElementById(`event-buffer-${side}`).checked) continue;
+        const minutesInput = document.getElementById(`event-buffer-${side}-minutes`);
+        const titleInput = document.getElementById(`event-buffer-${side}-title`);
+        if (!minutesInput.reportValidity() || !titleInput.value.trim()) {
+            if (!titleInput.value.trim()) showToast(t('Buffer title is required.'), 'error');
+            return false;
+        }
+        buffers[side] = { minutes: Number(minutesInput.value), summary: titleInput.value.trim() };
+    }
+    if (!Object.keys(buffers).length) {
+        showToast(t('Select at least one adjacent appointment.'), 'error');
+        return false;
+    }
+    return buffers;
 }
 
 function updateDialogColor() {
@@ -5479,6 +5542,8 @@ eventForm.addEventListener('submit', async event => {
         eventData.timezone = timezone;
     }
     if (!calendarInstanceId || !eventData.summary || !eventData.start || !eventData.end) return;
+    const buffers = !selectedEvent ? selectedEventBuffers() : null;
+    if (buffers === false) return;
     const selectedAnniversaryType = annualEventType(selectedEvent);
     if (moving && selectedAnniversaryType && ['series', 'following'].includes(selectedEvent?.writeScope)) {
         eventData.anniversaryType = selectedAnniversaryType;
@@ -5490,6 +5555,7 @@ eventForm.addEventListener('submit', async event => {
     if (selectedEvent?.onlineMeeting && !moving) delete eventData.description;
 
     const action = moving ? 'MoveEvent' : (selectedEvent ? 'UpdateEvent' : 'CreateEvent');
+    const finalAction = buffers ? 'CreateEventWithBuffers' : action;
     const value = moving
         ? {
             sourceCalendarInstanceId,
@@ -5518,9 +5584,13 @@ eventForm.addEventListener('submit', async event => {
                 }
             }
             : { calendarInstanceId, event: eventData });
+    if (buffers) {
+        value.buffers = buffers;
+        value.mode = document.getElementById('event-buffer-mode').value;
+    }
 
     releaseAgendaScrollWorkflowAfterState();
-    if (await sendAction(action, value)) {
+    if (await sendAction(finalAction, value)) {
         eventDialog.close();
     } else {
         cancelAgendaScrollWorkflowRelease();
@@ -5550,6 +5620,12 @@ document.getElementById('event-start').addEventListener('change', () => {
     updateEndFromStart();
     updateRecurrenceEndDateMinimum();
 });
+document.getElementById('event-end').addEventListener('change', updateEventBufferControls);
+document.getElementById('event-buffers-enabled').addEventListener('change', updateEventBufferControls);
+for (const side of ['before', 'after']) {
+    document.getElementById(`event-buffer-${side}`).addEventListener('change', updateEventBufferControls);
+    document.getElementById(`event-buffer-${side}-minutes`).addEventListener('input', updateEventBufferControls);
+}
 
 document.getElementById('event-all-day').addEventListener('change', event => {
     const start = readInputDate(document.getElementById('event-start').value) || new Date();
@@ -5572,6 +5648,7 @@ eventTask.addEventListener('change', () => {
     updateRecurrenceAvailability();
     updateAnniversaryControls();
     updateEventStateDefaults();
+    updateEventBufferControls();
 });
 eventTaskRollForwardScope.addEventListener('change', updateTaskMoveNote);
 eventCalendarInput.addEventListener('change', () => {
@@ -5603,6 +5680,7 @@ eventAnniversaryType.addEventListener('change', () => {
     }
     updateAnniversaryControls();
     updateEventStateDefaults();
+    updateEventBufferControls();
 });
 eventAnniversaryDate.addEventListener('change', () => {
     syncAnniversarySchedule();

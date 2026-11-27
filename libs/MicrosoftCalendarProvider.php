@@ -312,7 +312,7 @@ final class MicrosoftCalendarProvider implements CalendarEventLookupProviderInte
                     '/me/calendars/' . rawurlencode($calendarId) . '/events/' . rawurlencode($eventId)
                 );
                 if ((bool) ($item['isCancelled'] ?? false)) {
-                    throw new MicrosoftCalendarProviderException('The selected event is no longer available.');
+                    throw new MicrosoftCalendarProviderException('The selected event is no longer available.', 410);
                 }
 
                 $event = $this->mapEvent($calendarId, $item);

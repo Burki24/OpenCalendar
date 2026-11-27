@@ -4415,7 +4415,8 @@ assertTrueValue(
         && str_contains($viewScriptSource, 'return isNativeVisualization() || hasIPSViewActionBridge();')
         && str_contains($viewScriptSource, "return calendarVisualization.mode === 'symcon';")
         && str_contains($viewScriptSource, 'async function waitForNativeActionBridge(timeoutMilliseconds = 1500)')
-        && str_contains($viewScriptSource, 'if (await sendAction(action, value))')
+        && str_contains($viewScriptSource, 'if (await sendAction(finalAction, value))')
+        && str_contains($viewModuleSource, "case 'CreateEventWithBuffers':")
         && str_contains($viewScriptSource, "const action = moving ? 'MoveEvent' : (selectedEvent ? 'UpdateEvent' : 'CreateEvent');")
         && str_contains($viewScriptSource, "await sendAction('DeleteEvent',"),
     'The shared calendar interface must create, update, move, delete and refresh through either requestAction or the IPSView WebHook.'

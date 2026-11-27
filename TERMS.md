@@ -10,6 +10,8 @@ Der Anwender ist dafür verantwortlich, OpenCalendar nur mit Kalenderkonten, Ter
 
 Die Verfügbarkeit und Funktion externer Dienste wie Google Calendar, Microsoft 365/Outlook.com, Apple iCloud, CalDAV-Server, iCalendar-Anbieter und Symcon Connect liegt außerhalb der Kontrolle des OpenCalendar-Projekts. Für diese Dienste gelten zusätzlich die jeweiligen Bedingungen der Anbieter.
 
+Bei ausdrücklich verknüpften Pufferterminen kann eine Änderung oder bestätigte Löschung des Haupttermins später automatisch Änderungen oder Löschungen der Zusatztermine im selben Kalender auslösen.
+
 ## Keine Gewährleistung
 
 OpenCalendar wird im Rahmen der PolyForm Noncommercial License 1.0.0 ohne Gewährleistung bereitgestellt. Insbesondere besteht keine Garantie für ununterbrochene Verfügbarkeit, Fehlerfreiheit, Vollständigkeit synchronisierter Daten oder dauerhafte Kompatibilität mit externen Kalenderdiensten.
@@ -29,6 +31,8 @@ OpenCalendar is source-available software distributed under the [PolyForm Noncom
 Users are responsible for using OpenCalendar only with calendar accounts, events and file attachments they are authorized to access and modify. Credentials, OAuth tokens and private calendar URLs must be treated as confidential. Attachments stored with a provider are also subject to that provider's sharing and retention rules.
 
 Availability and operation of external services such as Google Calendar, Microsoft 365/Outlook.com, Apple iCloud, CalDAV servers, iCalendar providers and Symcon Connect are outside the control of the OpenCalendar project and are additionally subject to the respective providers' terms.
+
+For explicitly linked adjacent appointments, a later change or confirmed deletion of the main event may automatically update or delete the adjacent events in the same calendar.
 
 OpenCalendar is provided without warranty as described by the PolyForm Noncommercial License 1.0.0. In particular, there is no guarantee of uninterrupted availability, freedom from errors, completeness of synchronized data or permanent compatibility with external calendar services.
 

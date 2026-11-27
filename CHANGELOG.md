@@ -8,6 +8,10 @@
 
 ## Neu
 
+- Einzelne Termine mit Uhrzeit können in Kachel und IPSView Puffertermine davor
+  und danach erhalten. Diese bleiben wahlweise unabhängig oder folgen späteren
+  Änderungen und bestätigten Löschungen des Haupttermins, auch beim Anbieter.
+
 - Ein geführter Ablauf prüft und ergänzt weitere ICS/Webcal-Abonnements eines
   vorhandenen Kontos und führt bis zur Zuordnung in eine Kalender Ansicht.
 - Ein kurzer Assistent ergänzt weitere Kalender eines bestehenden Kontos,

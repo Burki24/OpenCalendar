@@ -3032,6 +3032,42 @@ class CalendarView extends IPSModuleStrict
                 $message = 'Event created.';
                 break;
 
+            case 'CreateEventWithBuffers':
+                $request = $this->decodeActionValue($value);
+                $instanceId = $this->requireWritableCalendar($request);
+                if (!is_array($request['event'] ?? null) || !is_array($request['buffers'] ?? null)) {
+                    throw new InvalidArgumentException($this->Translate('The event data is invalid.'));
+                }
+                $result = $this->decodeCalendarModuleJson(
+                    IPSKAL_CreateEventWithBuffers(
+                        $instanceId,
+                        json_encode([
+                            'event'   => $request['event'],
+                            'buffers' => $request['buffers'],
+                            'mode'    => $request['mode'] ?? ''
+                        ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR)
+                    ),
+                    $instanceId,
+                    'Event creation failed.'
+                );
+                if (!is_array($result) || !($result['success'] ?? false)) {
+                    $count = count(is_array($result['created'] ?? null) ? $result['created'] : []);
+                    $detail = trim((string) ($result['error'] ?? ''));
+                    $failureMessage = sprintf(
+                        $this->Translate('%d appointments were created. The remaining appointments could not be created: %s'),
+                        $count,
+                        $detail !== '' ? $detail : $this->Translate('Event creation failed.')
+                    );
+                    if ($count === 0) {
+                        throw new RuntimeException($failureMessage);
+                    }
+                    $level = 'error';
+                    $message = $failureMessage;
+                    break;
+                }
+                $message = 'Appointment and buffers created.';
+                break;
+
             case 'PrepareEventEdit':
                 $request = $this->decodeActionValue($value);
                 $instanceId = $this->requireWritableCalendar($request);
@@ -3177,6 +3213,12 @@ class CalendarView extends IPSModuleStrict
                 if (!is_array($sourceEvent) || array_is_list($sourceEvent)
                     || !is_array($event) || array_is_list($event)) {
                     throw new InvalidArgumentException($this->Translate('The event data is invalid.'));
+                }
+                if (IPSKAL_HasLinkedEventBuffers(
+                    $sourceInstanceId,
+                    json_encode($sourceEvent, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR)
+                )) {
+                    throw new RuntimeException($this->Translate('Linked adjacent appointments cannot be moved to another calendar.'));
                 }
                 $this->prepareTaskSeriesTransfer($sourceInstanceId, $sourceEvent, $event);
                 $sourceReminder = is_array($sourceEvent['reminder'] ?? null)

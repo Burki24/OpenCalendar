@@ -12,6 +12,11 @@ OpenCalendar ist eine Anwendung für Symcon, mit der Nutzer ihre Online-Kalender
 ![OpenCalendar: Kalender und Aufgaben in der Symcon-Kachelvisualisierung und in IPSView](docs/images/opencalendar-readme-hero-design-v2.png)
 
 Die gefundenen Kalender können einzeln synchronisiert, in einer gemeinsamen Kachel angezeigt und optional als interaktive HTML-Seite in IPSView verwendet werden.
+Für einzelne Termine mit Uhrzeit können in Kachel und IPSView zusätzliche Termine
+vor und nach dem Haupttermin im selben Kalender erstellt werden. Sie bleiben
+wahlweise unabhängig oder folgen Änderungen und bestätigten Löschungen des
+Haupttermins, auch wenn diese beim Anbieter erfolgen. Details stehen in der
+[Dokumentation der Kalender Ansicht](Kalender%20Ansicht/README.md#puffertermine-vor-und-nach-einem-termin).
 Die Kalender Ansicht kann in Symcon 9.1 wahlweise zusätzlich als native
 HTML-Vollbildansicht angeboten werden; die normale Kachel bleibt dabei erhalten.
 In der IPSView-HTML-Ausgabe steht bei Browserfreigabe ebenfalls ein Vollbild-Button

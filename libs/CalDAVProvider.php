@@ -1785,7 +1785,8 @@ final class CalDAVProvider implements CalendarEventLookupProviderInterface, Cale
             throw new CalDAVProviderException(
                 $matches === []
                     ? 'CalDAV did not return the selected event resource.'
-                    : 'CalDAV returned multiple resources for the selected event.'
+                    : 'CalDAV returned multiple resources for the selected event.',
+                $matches === [] ? 404 : 0
             );
         }
 

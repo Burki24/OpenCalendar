@@ -19,6 +19,8 @@ if (PHP_OS_FAMILY === 'Windows') {
 }
 
 $commands = [
+    ['Verify adjacent appointments and linked synchronization', [PHP_BINARY, 'tests/event-buffers.php']],
+    ['Verify adjacent appointment editor controls', ['node', 'tests/event-buffers-ui.js']],
     ['Verify embedded dialog bounds and errors', ['node', 'tests/dialog-embedding.js']],
     ['Verify empty HTML descriptions in event details', ['node', 'tests/empty-html-description.js']],
     ['Verify configurable quick-view buttons', ['node', 'tests/quick-view-buttons.js']],

@@ -5,6 +5,34 @@ gemeinsamen responsiven Darstellung zusammen. Sie kann direkt in der
 Symcon-Kachelvisualisierung oder über eine WebContent-Variable in IPSView
 verwendet werden.
 
+## Puffertermine vor und nach einem Termin
+
+Beim Anlegen eines einzelnen Termins mit Uhrzeit können in Kachel und IPSView
+optional Termine davor und danach ergänzt werden. Beide liegen immer im selben
+Kalender wie der Haupttermin. Dauer (1 bis 1440 Minuten) und Titel sind je Seite
+einstellbar; die Vorschau zeigt die berechneten Uhrzeiten. Ganztägige Termine,
+Aufgaben, Jahresereignisse und Serientermine bieten diese Auswahl nicht.
+Schreibgeschützte ICS-/Webcal-Kalender können keine Puffertermine anlegen.
+
+**Unabhängige Termine** bleiben auch nach Änderungen oder Löschen des
+Haupttermins unverändert. **Änderungen des Haupttermins folgen** speichert eine
+Verknüpfung in der Kalenderinstanz: Bei Änderungen über OpenCalendar oder nach
+einer erfolgreichen Anbieter-Synchronisierung werden die Pufferzeiten angepasst.
+Nach einer vom Anbieter bestätigten Löschung des Haupttermins werden verknüpfte
+Puffer gelöscht. Ein Netzfehler oder ein nicht eindeutig aufgelöster Termin gilt
+nicht als Löschung. Wird ein Puffer selbst beim Anbieter gelöscht, wird die
+Verknüpfung dieser Seite entfernt; der Puffer wird nicht neu angelegt.
+Wird der Haupttermin später ganztägig oder zu einer Serie, endet die Verknüpfung;
+die vorhandenen Zusatztermine bleiben als unabhängige Termine bestehen.
+Ein Wechsel des Haupttermins in einen anderen Kalender wird bei aktiver
+Verknüpfung vor dem Schreiben abgelehnt, da dabei die Anbieterkennung wechselt.
+
+Die drei Schreibvorgänge werden vom jeweiligen Anbieter einzeln bestätigt.
+Falls ein späterer Vorgang scheitert, bleiben bereits erstellte Termine bestehen;
+die Fehlermeldung nennt ihre Anzahl. Ein automatischer Wiederholungsversuch würde
+Duplikate erzeugen und findet deshalb nicht statt. Für einen Kalender werden
+höchstens 200 aktive Verknüpfungen gespeichert.
+
 Lokale Kalender ohne Konto lassen sich genauso auswählen und bearbeiten wie
 schreibbare Online-Kalender. Sie können mit diesen in derselben Ansicht kombiniert
 werden. **Kalender synchronisieren** aktualisiert ihren lokalen Datenbestand ohne

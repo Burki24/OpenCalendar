@@ -108,6 +108,7 @@ class Calendar extends IPSModuleStrict
         'writeAccessKnown'             => ['name' => 'DetectedWriteAccessKnown', 'type' => 'boolean', 'default' => false],
         'available'                    => ['name' => 'CalendarMetadataAvailable', 'type' => 'boolean', 'default' => false]
     ];
+    private bool $reconcilingLinkedBuffers = false;
 
     /**
      * Registers properties, attributes, variables, and timers for the calendar instance.
@@ -141,6 +142,7 @@ class Calendar extends IPSModuleStrict
         $this->RegisterAttributeString('AnniversaryMetadata', '[]');
         $this->RegisterAttributeString('BirthdayMetadata', '[]');
         $this->RegisterAttributeString('PendingTaskSeries', '{}');
+        $this->RegisterAttributeString('LinkedEventBuffers', '[]');
         // Original calendar objects, never part of the disposable event cache.
         $this->RegisterAttributeString('LocalCalendarResources', '{}');
         $this->RegisterAttributeString('LocalAttachmentOriginals', '');
@@ -458,6 +460,7 @@ class Calendar extends IPSModuleStrict
             $this->refreshCalendarMetadataSafely();
             $events = $this->rollForwardTaskEvents($this->requestEvents());
             $this->storeEvents($events);
+            $this->reconcileLinkedEventBuffers($events);
             $taskCount = $this->synchronizeMicrosoftTasksSafely();
             $this->WriteAttributeString('LastError', '');
             $this->SetStatus(IS_ACTIVE);
@@ -952,6 +955,114 @@ class Calendar extends IPSModuleStrict
     }
 
     /**
+     * Creates a timed appointment and optional adjacent appointments in this calendar.
+     * Confirmed writes are reported individually; an incomplete bundle is never retried
+     * automatically because provider creates are not idempotent.
+     */
+    public function CreateEventWithBuffers(string $RequestJSON): string
+    {
+        $created = [];
+        try {
+            $request = $this->decodeObject($RequestJSON, 'request');
+            $event = $request['event'] ?? null;
+            $buffers = $request['buffers'] ?? null;
+            $mode = (string) ($request['mode'] ?? '');
+            if (!is_array($event) || array_is_list($event) || !is_array($buffers)
+                || !in_array($mode, ['independent', 'linked'], true)
+                || (bool) ($event['allDay'] ?? false) || (bool) ($event['task'] ?? false)
+                || !empty($event['recurrence']) || !empty($event['anniversaryType'])) {
+                throw new InvalidArgumentException('Event buffers require a single timed appointment.');
+            }
+            $start = $this->bufferEventTimestamp($event, 'start');
+            $end = $this->bufferEventTimestamp($event, 'end');
+            if ($start <= 0 || $end <= $start) {
+                throw new InvalidArgumentException('The event time range is invalid.');
+            }
+            $planned = [];
+            foreach (['before', 'after'] as $side) {
+                if (!array_key_exists($side, $buffers)) {
+                    continue;
+                }
+                $buffer = $buffers[$side];
+                if (!is_array($buffer) || array_is_list($buffer)
+                    || !is_int($buffer['minutes'] ?? null)
+                    || $buffer['minutes'] < 1 || $buffer['minutes'] > 1440
+                    || !is_string($buffer['summary'] ?? null)) {
+                    throw new InvalidArgumentException('The buffer settings are invalid.');
+                }
+                $summary = trim($buffer['summary']);
+                if ($summary === '' || strlen($summary) > 250) {
+                    throw new InvalidArgumentException('The buffer title is invalid.');
+                }
+                $planned[$side] = ['minutes' => $buffer['minutes'], 'summary' => $summary];
+            }
+            if ($planned === []) {
+                throw new InvalidArgumentException('Select at least one event buffer.');
+            }
+            if ($mode === 'linked' && count($this->readLinkedEventBuffers()) >= 200) {
+                throw new RuntimeException('The linked event buffer limit was reached.');
+            }
+
+            $main = $this->createBufferEvent($event);
+            $created['main'] = $main;
+            $link = [
+                'calendarId' => $this->effectiveCalendarId(),
+                'main'       => $this->bufferIdentity($main),
+                'start'      => $start,
+                'end'        => $end,
+                'companions' => []
+            ];
+            foreach ($planned as $side => $settings) {
+                [$bufferStart, $bufferEnd] = $this->bufferRange($side, $start, $end, $settings['minutes']);
+                $companion = $this->createBufferEvent([
+                    'summary'      => $settings['summary'],
+                    'start'        => gmdate('Y-m-d\TH:i:s\Z', $bufferStart),
+                    'end'          => gmdate('Y-m-d\TH:i:s\Z', $bufferEnd),
+                    'allDay'       => false,
+                    'timezone'     => (string) ($event['timezone'] ?? 'UTC'),
+                    'status'       => (string) ($event['status'] ?? 'CONFIRMED'),
+                    'transparency' => (string) ($event['transparency'] ?? 'OPAQUE')
+                ]);
+                $created[$side] = $companion;
+                if ($mode === 'linked') {
+                    $link['companions'][$side] = [
+                        'identity' => $this->bufferIdentity($companion),
+                        'minutes'  => $settings['minutes']
+                    ];
+                    $this->upsertLinkedEventBuffer($link);
+                }
+            }
+            return json_encode(['success' => true, 'created' => $created, 'error' => ''], JSON_THROW_ON_ERROR);
+        } catch (Throwable $exception) {
+            return json_encode([
+                'success' => false,
+                'created' => $created,
+                'error'   => $this->handleError($exception)
+            ], JSON_THROW_ON_ERROR);
+        }
+    }
+
+    /**
+     * Checks whether an event is the main appointment of a linked buffer group.
+     *
+     * @param string $EventJSON JSON-encoded event identity.
+     * @return bool True when the event has linked adjacent appointments.
+     */
+    public function HasLinkedEventBuffers(string $EventJSON): bool
+    {
+        $event = $this->decodeObject($EventJSON, 'event');
+        foreach ($this->readLinkedEventBuffers() as $link) {
+            if (is_array($link) && is_array($link['main'] ?? null)
+                && hash_equals((string) ($link['calendarId'] ?? ''), $this->effectiveCalendarId())
+                && $this->eventIdentityMatches($event, $link['main'])) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
      * Updates an existing event in the configured calendar.
      * A confirmed provider write remains successful if subsequent local processing fails;
      * the result error and LastError retain the follow-up diagnostic.
@@ -1144,6 +1255,7 @@ class Calendar extends IPSModuleStrict
                 $this->refreshAfterWrite();
             }
 
+            $this->reconcileLinkedEventBuffers();
             return $this->encodeResult(true, $updated);
         } catch (Throwable $exception) {
             return $this->encodeResult($writeConfirmed, $updated, $this->handleError($exception));
@@ -1211,6 +1323,7 @@ class Calendar extends IPSModuleStrict
                 'removedCount' => count($events) - count($filteredEvents),
                 'writeScope'   => $writeScope
             ]);
+            $this->reconcileLinkedEventBuffers();
             return true;
         } catch (Throwable $exception) {
             $this->handleError($exception);
@@ -1603,6 +1716,246 @@ class Calendar extends IPSModuleStrict
             throw new InvalidArgumentException('Invalid attachment cleanup selection.');
         }
         return $this->localAttachmentMaintenance('delete', $ids, $ExpectedRevision)['deleted'];
+    }
+
+    /** @param array<string, mixed> $event */
+    private function createBufferEvent(array $event): array
+    {
+        $result = json_decode($this->CreateEvent(json_encode($event, JSON_THROW_ON_ERROR)), true, 512, JSON_THROW_ON_ERROR);
+        if (!is_array($result) || !($result['success'] ?? false) || !is_array($result['event'] ?? null)) {
+            throw new RuntimeException((string) ($result['error'] ?? 'Event creation failed.'));
+        }
+        return array_merge($event, $result['event']);
+    }
+
+    /** @param array<string, mixed> $event */
+    private function bufferEventTimestamp(array $event, string $key): int
+    {
+        $value = $event[$key] ?? null;
+        if (!is_string($value)
+            || preg_match('/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2})?(?:Z|[+-]\d{2}:\d{2})?$/D', $value) !== 1) {
+            return 0;
+        }
+        try {
+            return (new DateTimeImmutable($value))->getTimestamp();
+        } catch (Throwable) {
+            return 0;
+        }
+    }
+
+    /** @return array{0: int, 1: int} */
+    private function bufferRange(string $side, int $start, int $end, int $minutes): array
+    {
+        $seconds = $minutes * 60;
+        return $side === 'before' ? [$start - $seconds, $start] : [$end, $end + $seconds];
+    }
+
+    /** @param array<string, mixed> $event @return array<string, mixed> */
+    private function bufferIdentity(array $event): array
+    {
+        $identity = [];
+        foreach (['uid', 'resourceUrl', 'eventReference', 'etag'] as $key) {
+            $identity[$key] = trim((string) ($event[$key] ?? ''));
+        }
+        if ($identity['resourceUrl'] === '' && $identity['eventReference'] === '') {
+            throw new UnexpectedValueException('The calendar did not return a stable event identity.');
+        }
+        return $identity;
+    }
+
+    /** @return list<array<string, mixed>> */
+    private function readLinkedEventBuffers(): array
+    {
+        $links = json_decode($this->ReadAttributeString('LinkedEventBuffers'), true, 64, JSON_THROW_ON_ERROR);
+        if (!is_array($links) || !array_is_list($links)) {
+            throw new UnexpectedValueException('The linked event buffer state is invalid.');
+        }
+        return $links;
+    }
+
+    /** @param list<array<string, mixed>> $links */
+    private function writeLinkedEventBuffers(array $links): void
+    {
+        if (!$this->WriteAttributeString('LinkedEventBuffers', json_encode(array_values($links), JSON_THROW_ON_ERROR))) {
+            throw new RuntimeException('Linked event buffers could not be saved.');
+        }
+    }
+
+    /** @param array<string, mixed> $link */
+    private function upsertLinkedEventBuffer(array $link, bool $allowInsert = true): void
+    {
+        $lock = 'OpenCalendar.LinkedBuffers.' . $this->InstanceID;
+        if (!IPS_SemaphoreEnter($lock, 5000)) {
+            throw new RuntimeException('The linked event buffer state is busy.');
+        }
+        try {
+            $links = $this->readLinkedEventBuffers();
+            foreach ($links as &$existing) {
+                if ($this->eventIdentityMatches($existing['main'], $link['main'])) {
+                    $existing = $link;
+                    $this->writeLinkedEventBuffers($links);
+                    return;
+                }
+            }
+            unset($existing);
+            if (!$allowInsert) {
+                return;
+            }
+            if (count($links) >= 200) {
+                throw new RuntimeException('The linked event buffer limit was reached.');
+            }
+            $links[] = $link;
+            $this->writeLinkedEventBuffers($links);
+        } finally {
+            IPS_SemaphoreLeave($lock);
+        }
+    }
+
+    /** @param array<string, mixed> $identity */
+    private function removeLinkedEventBuffer(array $identity): void
+    {
+        $lock = 'OpenCalendar.LinkedBuffers.' . $this->InstanceID;
+        if (!IPS_SemaphoreEnter($lock, 5000)) {
+            throw new RuntimeException('The linked event buffer state is busy.');
+        }
+        try {
+            $links = array_values(array_filter(
+                $this->readLinkedEventBuffers(),
+                fn (array $link): bool => !$this->eventIdentityMatches($link['main'], $identity)
+            ));
+            $this->writeLinkedEventBuffers($links);
+        } finally {
+            IPS_SemaphoreLeave($lock);
+        }
+    }
+
+    /**
+     * Reconciles only provider-confirmed identities. A failed lookup or an ambiguous
+     * missing event cannot authorize removal of another user's calendar data.
+     */
+    private function reconcileLinkedEventBuffers(?array $syncedEvents = null): void
+    {
+        if ($this->reconcilingLinkedBuffers) {
+            return;
+        }
+        $this->reconcilingLinkedBuffers = true;
+        try {
+            $links = $this->readLinkedEventBuffers();
+            foreach ($links as $index => $link) {
+                try {
+                    if (!is_array($link) || !is_array($link['main'] ?? null)
+                        || !is_array($link['companions'] ?? null)) {
+                        throw new UnexpectedValueException('The linked event buffer state is invalid.');
+                    }
+                    if (!hash_equals((string) ($link['calendarId'] ?? ''), $this->effectiveCalendarId())) {
+                        continue;
+                    }
+                    $mainState = $this->checkLinkedBufferEvent($link['main'], $syncedEvents);
+                    if (!$mainState['known']) {
+                        continue;
+                    }
+                    $main = $mainState['event'];
+                    if ($main !== null && ((bool) ($main['allDay'] ?? false)
+                        || (bool) ($main['recurring'] ?? false))) {
+                        $this->removeLinkedEventBuffer($link['main']);
+                        unset($links[$index]);
+                        continue;
+                    }
+                    $start = $main === null ? 0 : $this->bufferEventTimestamp($main, 'start');
+                    $end = $main === null ? 0 : $this->bufferEventTimestamp($main, 'end');
+                    if ($main !== null && ($start <= 0 || $end <= $start)) {
+                        continue;
+                    }
+                    foreach ($link['companions'] as $side => $companion) {
+                        if (!in_array($side, ['before', 'after'], true)
+                            || !is_array($companion) || !is_array($companion['identity'] ?? null)) {
+                            throw new UnexpectedValueException('The linked event buffer state is invalid.');
+                        }
+                        $state = $this->checkLinkedBufferEvent($companion['identity'], $syncedEvents);
+                        if (!$state['known']) {
+                            continue;
+                        }
+                        $current = $state['event'];
+                        if ($current === null) {
+                            unset($link['companions'][$side]);
+                            $links[$index] = $link;
+                            $this->upsertLinkedEventBuffer($link, false);
+                            continue;
+                        }
+                        if ($main === null) {
+                            if (!$this->DeleteEvent(json_encode($current, JSON_THROW_ON_ERROR))) {
+                                continue;
+                            }
+                            unset($link['companions'][$side]);
+                            $links[$index] = $link;
+                            $this->upsertLinkedEventBuffer($link, false);
+                            continue;
+                        }
+                        $minutes = (int) ($companion['minutes'] ?? 0);
+                        if ($minutes < 1 || $minutes > 1440) {
+                            throw new UnexpectedValueException('The linked event buffer duration is invalid.');
+                        }
+                        [$targetStart, $targetEnd] = $this->bufferRange($side, $start, $end, $minutes);
+                        if ($this->bufferEventTimestamp($current, 'start') === $targetStart
+                            && $this->bufferEventTimestamp($current, 'end') === $targetEnd) {
+                            continue;
+                        }
+                        $update = $current;
+                        $update['changes'] = [
+                            'start' => gmdate('Y-m-d\TH:i:s\Z', $targetStart),
+                            'end'   => gmdate('Y-m-d\TH:i:s\Z', $targetEnd)
+                        ];
+                        $result = json_decode($this->UpdateEvent(json_encode($update, JSON_THROW_ON_ERROR)), true, 512, JSON_THROW_ON_ERROR);
+                        if (!is_array($result) || !($result['success'] ?? false)) {
+                            continue;
+                        }
+                        $link['companions'][$side]['identity'] = $this->bufferIdentity(array_merge($current, is_array($result['event'] ?? null) ? $result['event'] : []));
+                        $links[$index] = $link;
+                        $this->upsertLinkedEventBuffer($link, false);
+                    }
+                    if ($link['companions'] === []) {
+                        unset($links[$index]);
+                        $this->removeLinkedEventBuffer($link['main']);
+                    } elseif ($main !== null) {
+                        $link['main'] = $this->bufferIdentity($main);
+                        $link['start'] = $start;
+                        $link['end'] = $end;
+                        if ($links[$index] !== $link) {
+                            $links[$index] = $link;
+                            $this->upsertLinkedEventBuffer($link, false);
+                        }
+                    }
+                } catch (Throwable $exception) {
+                    $this->SendSafeDebugException('LinkedBufferReconciliationDeferred', $exception);
+                }
+            }
+        } catch (Throwable $exception) {
+            $this->SendSafeDebugException('LinkedBufferReconciliationDeferred', $exception);
+        } finally {
+            $this->reconcilingLinkedBuffers = false;
+        }
+    }
+
+    /** @param array<string, mixed> $identity @return array{known: bool, event: ?array<string, mixed>} */
+    private function checkLinkedBufferEvent(array $identity, ?array $syncedEvents = null): array
+    {
+        if ($syncedEvents !== null) {
+            foreach ($syncedEvents as $event) {
+                if (is_array($event) && $this->eventIdentityMatches($event, $identity)) {
+                    return ['known' => true, 'event' => $event];
+                }
+            }
+        }
+        $result = $this->sendRequest('CheckLinkedBufferEvent', [
+            'EventReference' => (string) ($identity['eventReference'] ?? ''),
+            'ResourceURL'    => (string) ($identity['resourceUrl'] ?? ''),
+            'UID'            => (string) ($identity['uid'] ?? '')
+        ]);
+        if (!is_bool($result['known'] ?? null) || !array_key_exists('event', $result)
+            || ($result['event'] !== null && !is_array($result['event']))) {
+            throw new UnexpectedValueException('The calendar account returned an invalid event lookup.');
+        }
+        return $result;
     }
 
     /** @return array<string,string> Server-bound provider request fields. */
@@ -3052,11 +3405,11 @@ class Calendar extends IPSModuleStrict
                     self::LOCAL_EVENT_TRANSFER_SCOPE,
                     (string) ($request['Token'] ?? '')
                 )],
-                'GetEventForEdit', 'GetEventAfterWrite' => $provider->getEventForEdit($reference, $identity),
-                'CheckPendingTask'                      => $this->checkLocalPendingTask($provider, $reference, $identity),
-                'CheckRecurringSeries'                  => $this->checkLocalRecurringSeries($provider, $reference, $identity),
-                'GetRecurringSeries'                    => $provider->getRecurringSeries($reference, $identity['seriesId'], $identity['resourceUrl']),
-                'GetRecurringFollowing'                 => $provider->getRecurringFollowing(
+                'GetEventForEdit', 'GetEventAfterWrite'      => $provider->getEventForEdit($reference, $identity),
+                'CheckPendingTask', 'CheckLinkedBufferEvent' => $this->checkLocalPendingTask($provider, $reference, $identity),
+                'CheckRecurringSeries'                       => $this->checkLocalRecurringSeries($provider, $reference, $identity),
+                'GetRecurringSeries'                         => $provider->getRecurringSeries($reference, $identity['seriesId'], $identity['resourceUrl']),
+                'GetRecurringFollowing'                      => $provider->getRecurringFollowing(
                     $reference,
                     $identity['seriesId'],
                     $identity['occurrenceId'],

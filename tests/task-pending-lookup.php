@@ -152,4 +152,14 @@ taskPendingExpect($methods === ['GET', 'REPORT'], 'Only explicit stale URLs may 
 [$result, $methods] = $lookup([], array_replace($request, ['ResourceURL' => '', 'UID' => '']));
 taskPendingExpect($result['Success'] && !$result['Payload']['known'] && $methods === [], 'Missing identity must remain unknown without transport.');
 
+$bufferRequest = array_replace($request, ['Operation' => 'CheckLinkedBufferEvent']);
+[$result, $methods] = $lookup([
+    new CalendarHttpResponse(404, [], '', $resource),
+    new CalendarHttpResponse(207, [], '<d:multistatus xmlns:d="DAV:"/>', 'https://calendar.example/work/')
+], $bufferRequest);
+taskPendingExpect($result['Success'] && $result['Payload'] === ['known' => true, 'event' => null], 'A complete UID lookup must confirm a deleted linked main event.');
+taskPendingExpect($methods === ['GET', 'REPORT'], 'CalDAV must check for a moved UID before deleting linked buffers.');
+[$result] = $lookup([new CalendarHttpResponse(200, [], str_replace('UID:task', 'UID:other', taskPendingIcal('20261101')), $resource)], $bufferRequest);
+taskPendingExpect(!$result['Success'], 'A replaced CalDAV resource must not delete linked buffers.');
+
 fwrite(STDOUT, "Pending-task provider-neutral gateway tests passed.\n");

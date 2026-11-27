@@ -2,6 +2,16 @@
 
 Das Modul repräsentiert einen einzelnen Online- oder Symcon-lokalen Kalender.
 
+Verknüpfte Puffertermine, die in der Kalender Ansicht für einzelne Termine mit
+Uhrzeit angelegt wurden, werden in dieser Kalenderinstanz gespeichert. Dadurch
+wirken Terminänderungen und bestätigte Löschungen auch nach einem Neustart und
+nach Änderungen direkt beim Kalenderanbieter. Die Prüfung läuft bei der
+Synchronisierung dieses Kalenders. Bei nicht eindeutigem oder vorübergehend
+nicht erreichbarem Anbieterzustand bleiben die Puffer bis zur nächsten Prüfung
+erhalten. Unabhängige Puffertermine haben keine solche Verknüpfung.
+Ein Wechsel des Haupttermins in einen anderen Kalender wird bei aktiver
+Verknüpfung vor dem ersten Schreibvorgang abgelehnt.
+
 Die Dateianhangsfunktion befindet sich in `dev_9.1` weiterhin im Ausbau.
 Für Termine eines Symcon-lokalen Kalenders können berechtigte Ansichten bereits
 TXT-, PDF-, PNG- und JPEG-Dateien bis 2 MiB lokal speichern, herunterladen und
@@ -260,6 +270,8 @@ string IPSKAL_BeginEventsTransfer(int $InstanzID, int $StartTimestamp, int $EndT
 string IPSKAL_ReadEventsTransferPage(int $InstanzID, string $Token, int $Page);
 bool IPSKAL_FinishEventsTransfer(int $InstanzID, string $Token);
 string IPSKAL_CreateEvent(int $InstanzID, string $EventJSON);
+string IPSKAL_CreateEventWithBuffers(int $InstanzID, string $RequestJSON);
+bool IPSKAL_HasLinkedEventBuffers(int $InstanzID, string $EventJSON);
 string IPSKAL_UpdateEvent(int $InstanzID, string $EventJSON);
 bool IPSKAL_DeleteEvent(int $InstanzID, string $EventJSON);
 string IPSKAL_GetCalendarStatus(int $InstanzID);

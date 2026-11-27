@@ -302,4 +302,30 @@ foreach ([[49, 0, 'yesterday'], [50, 30, '-40 days']] as [$id, $pastDays, $day])
     localModuleCheck($restored->attributes['LocalCalendarResources'] === json_encode((object) $afterOriginals, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE), 'A repeated refresh must not duplicate or re-edit the recovered task.');
 }
 
+$bufferCalendar = localModuleNew(88);
+$bufferStart = new DateTimeImmutable('tomorrow 10:00');
+$bufferEnd = $bufferStart->modify('+1 hour');
+$bufferResult = json_decode($bufferCalendar->CreateEventWithBuffers(json_encode([
+    'mode'    => 'linked',
+    'event'   => ['summary' => 'Timed main', 'start' => $bufferStart->format(DATE_ATOM), 'end' => $bufferEnd->format(DATE_ATOM), 'allDay' => false],
+    'buffers' => ['before' => ['minutes' => 45, 'summary' => 'Arrival'], 'after' => ['minutes' => 30, 'summary' => 'Departure']]
+], JSON_THROW_ON_ERROR)), true, 512, JSON_THROW_ON_ERROR);
+localModuleCheck($bufferResult['success'] && count(json_decode($bufferCalendar->attributes['LocalCalendarResources'], true, 512, JSON_THROW_ON_ERROR)) === 3, 'Local calendar must persist the main and both buffers: ' . ($bufferResult['error'] ?? ''));
+$bufferRestart = new Calendar(88);
+$bufferRestart->Create();
+$bufferRestart->properties = $bufferCalendar->properties;
+$bufferRestart->attributes = $bufferCalendar->attributes;
+$bufferRestart->ApplyChanges();
+localModuleCheck($bufferRestart->Initialize(), 'Linked local buffers must survive restart.');
+$mainIdentity = $bufferResult['created']['main'];
+$newStart = $bufferStart->modify('+2 hours');
+$newEnd = $bufferEnd->modify('+2 hours');
+$update = json_decode($bufferRestart->UpdateEvent(json_encode($mainIdentity + ['changes' => ['start' => $newStart->format(DATE_ATOM), 'end' => $newEnd->format(DATE_ATOM)]], JSON_THROW_ON_ERROR)), true, 512, JSON_THROW_ON_ERROR);
+localModuleCheck($update['success'], 'Local main update failed: ' . ($update['error'] ?? ''));
+$events = json_decode($bufferRestart->GetEvents(), true, 512, JSON_THROW_ON_ERROR);
+$arrival = array_values(array_filter($events, static fn (array $event): bool => $event['summary'] === 'Arrival'));
+localModuleCheck(count($arrival) === 1 && strtotime($arrival[0]['start']) === $newStart->getTimestamp() - 45 * 60, 'Linked local arrival must follow a main update.');
+localModuleCheck($bufferRestart->DeleteEvent(json_encode(array_merge($mainIdentity, $update['event']), JSON_THROW_ON_ERROR)), 'Local main deletion failed.');
+localModuleCheck(json_decode($bufferRestart->GetEvents(), true, 512, JSON_THROW_ON_ERROR) === [], 'Linked local buffers must be deleted with the main event.');
+
 fwrite(STDOUT, "Local calendar module persistence, cache/restart/day-change, isolation and transaction locking passed.\n");

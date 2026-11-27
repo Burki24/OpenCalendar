@@ -273,6 +273,47 @@
                 <label for="event-description">Description</label>
                 <textarea id="event-description" maxlength="5000"></textarea>
             </div>
+            <fieldset class="event-buffers hidden" id="event-buffers">
+                <legend data-i18n="Adjacent appointments">Adjacent appointments</legend>
+                <label class="checkbox-row"><input id="event-buffers-enabled" type="checkbox"> <span data-i18n="Add appointments before or after">Add appointments before or after</span></label>
+                <div id="event-buffers-options" class="hidden">
+                <div class="form-row">
+                    <label for="event-buffer-mode" data-i18n="Connection">Connection</label>
+                    <select id="event-buffer-mode">
+                        <option value="independent" data-i18n="Independent appointments">Independent appointments</option>
+                        <option value="linked" data-i18n="Follow changes to the main appointment">Follow changes to the main appointment</option>
+                    </select>
+                </div>
+                <div class="event-buffer-side">
+                    <label class="checkbox-row"><input id="event-buffer-before" type="checkbox"> <span data-i18n="Before the appointment">Before the appointment</span></label>
+                    <div class="form-row two">
+                        <div class="form-row">
+                            <label for="event-buffer-before-minutes" data-i18n="Minutes">Minutes</label>
+                            <input id="event-buffer-before-minutes" type="number" min="1" max="1440" value="60">
+                        </div>
+                        <div class="form-row">
+                            <label for="event-buffer-before-title" data-i18n="Title">Title</label>
+                            <input id="event-buffer-before-title" maxlength="250" value="Arrival">
+                        </div>
+                    </div>
+                    <div class="event-buffer-preview" id="event-buffer-before-preview"></div>
+                </div>
+                <div class="event-buffer-side">
+                    <label class="checkbox-row"><input id="event-buffer-after" type="checkbox"> <span data-i18n="After the appointment">After the appointment</span></label>
+                    <div class="form-row two">
+                        <div class="form-row">
+                            <label for="event-buffer-after-minutes" data-i18n="Minutes">Minutes</label>
+                            <input id="event-buffer-after-minutes" type="number" min="1" max="1440" value="60">
+                        </div>
+                        <div class="form-row">
+                            <label for="event-buffer-after-title" data-i18n="Title">Title</label>
+                            <input id="event-buffer-after-title" maxlength="250" value="Departure">
+                        </div>
+                    </div>
+                    <div class="event-buffer-preview" id="event-buffer-after-preview"></div>
+                </div>
+                </div>
+            </fieldset>
             <div class="dialog-note hidden" id="event-description-html-note" role="note"></div>
             <div class="dialog-note hidden" id="dialog-note"></div>
         </div>

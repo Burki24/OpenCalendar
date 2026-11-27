@@ -78,6 +78,7 @@ trait KalenderKontoChildGatewayTrait
                 'GetEventAfterWrite'     => $this->getEventAfterWriteForChild($request),
                 'CheckRecurringSeries'   => $this->checkRecurringSeriesForChild($request),
                 'CheckPendingTask'       => $this->checkPendingTaskForChild($request),
+                'CheckLinkedBufferEvent' => $this->checkPendingTaskForChild($request),
                 'GetRecurringSeries'     => $this->getRecurringSeriesForChild($request),
                 'GetRecurringFollowing'  => $this->getRecurringFollowingForChild($request),
                 'CreateEvent'            => $this->createEventForChild($request),

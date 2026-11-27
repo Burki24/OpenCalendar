@@ -1,6 +1,6 @@
 # Datenschutzhinweise / Privacy Notice
 
-**Stand / Last updated: 25.11.2026**
+**Stand / Last updated: 27.11.2026**
 
 OpenCalendar ist eine quellverfügbare, unter der PolyForm Noncommercial License 1.0.0 bereitgestellte Bibliothek für Symcon. Die Kalenderverarbeitung findet grundsätzlich auf der Symcon-Installation des Anwenders statt. Der Modulautor betreibt keinen eigenen Kalender-Backenddienst und erhält über OpenCalendar keine Kalenderinhalte.
 
@@ -17,6 +17,8 @@ Je nach gewähltem Anbieter verarbeitet OpenCalendar insbesondere:
 - Synchronisationszeitpunkte, ETags und technische Fehlerzustände.
 
 Kalender- und Termindaten werden lokal in Symcon zwischengespeichert, soweit dies für Synchronisation, Darstellung und Bearbeitung erforderlich ist. Dadurch können diese Daten auch Bestandteil eines vom Anwender erstellten Symcon-Backups werden.
+
+Für ausdrücklich verknüpfte Puffertermine speichert die Kalenderinstanz die technischen Kennungen und Zeitabstände von Haupt- und Zusatzterminen dauerhaft. Nach Änderungen oder bestätigten Löschungen des Haupttermins kann OpenCalendar die Zusatztermine beim selben Kalenderanbieter automatisch ändern oder löschen. Bei nicht eindeutigem Anbieterzustand erfolgen keine solchen Löschungen.
 
 Bei einem **lokalen Kalender** ist Symcon selbst der ursprüngliche und einzige Kalenderdatenspeicher. Die Originaltermine mit Serienregeln und Ausnahmen werden dauerhaft in der Kalender-Instanz getrennt vom Anzeige-Cache gespeichert. Dafür sind kein Anbieter-Konto, keine OAuth-Berechtigungen und keine Übertragung an einen Kalenderdienst erforderlich. Aufgabenverarbeitung und Aktualisierung erfolgen lokal. Wählt der Anwender ausdrücklich einen externen Kalender als Verschiebeziel, werden die betroffenen Termindaten an dessen Anbieter übertragen. **Cache leeren** löscht die lokalen Originaltermine nicht; das Löschen der lokalen Kalender-Instanz dagegen entfernt auch ihren Originalbestand. Symcon-Backups können die Originale weiterhin enthalten und müssen separat geschützt beziehungsweise gelöscht werden.
 
@@ -68,6 +70,7 @@ Hierzu gehören:
 - Erstellen neuer Termine auf ausdrückliche Veranlassung des Anwenders,
 - Ändern bestehender Termine auf ausdrückliche Veranlassung des Anwenders,
 - Löschen bestehender Termine auf ausdrückliche Veranlassung des Anwenders,
+- automatisches Anpassen oder Löschen ausdrücklich verknüpfter Puffertermine beim selben Anbieter, wenn sich der Haupttermin ändert oder seine Löschung bestätigt wird,
 - automatisches Nachziehen offener Aufgaben bei der Synchronisation, nachdem der Anwender die Aufgabenfunktion für den Termin aktiviert hat, einschließlich der dafür erforderlichen Änderungen, Erstellungen und Löschungen bei Serien,
 - Übertragen von Terminen und unterstützten Serien in einen vom Anwender ausdrücklich ausgewählten Zielkalender, gegebenenfalls bei einem anderen Anbieter,
 - lokale Zwischenspeicherung der für Darstellung und Synchronisation erforderlichen Kalenderinformationen,
@@ -267,6 +270,8 @@ Depending on the selected provider, OpenCalendar processes in particular:
 
 Calendar and event data is cached locally in Symcon where required for synchronization, display and editing. This data may therefore also be included in Symcon backups created by the user.
 
+For explicitly linked adjacent appointments, the calendar instance persistently stores technical identifiers and time offsets of the main and adjacent events. After a change or confirmed deletion of the main event, OpenCalendar may automatically update or delete the adjacent events at the same provider. An ambiguous provider state does not authorize such a deletion.
+
 For a **local calendar**, Symcon itself is the original and sole calendar data store. Original events, recurrence rules and exceptions are stored persistently in the calendar instance, separately from the display cache. No provider account, OAuth permissions or transfer to a calendar service is required. Task processing and refreshes happen locally. If the user explicitly selects an external calendar as a move destination, the affected event data is transmitted to that provider. **Clear cache** does not delete local original events; deleting the local calendar instance does remove its original records. Symcon backups may still contain these records and must be protected or deleted separately.
 
 When the user marks an event as a **task appointment**, OpenCalendar additionally processes its task status and, where applicable, its association with an original series. During subsequent synchronizations, overdue open tasks are automatically moved forward until completed or no longer marked as tasks. This can update provider events and, for recurring tasks, create individual events and remove the corresponding original occurrences. The user's **Move planned follow-up appointments** option determines whether the following series schedule is adjusted. These calendar-based tasks use regular calendar events and no Google Tasks integration. For Microsoft 365, users may also select a Microsoft To Do list for new task appointments; these are processed as native Microsoft To Do tasks. Existing calendar-based task appointments are not transferred automatically.
@@ -319,6 +324,7 @@ This includes:
 - creating new events when explicitly initiated by the user,
 - updating existing events when explicitly initiated by the user,
 - deleting existing events when explicitly initiated by the user,
+- automatically updating or deleting explicitly linked adjacent events at the same provider after a main event changes or its deletion is confirmed,
 - automatically moving open tasks forward during synchronization after the user has enabled the task feature for the event, including the updates, creations and deletions required for recurring tasks,
 - transferring events and supported series to a destination calendar explicitly selected by the user, including calendars hosted by another provider,
 - locally caching calendar information required for display and synchronization,

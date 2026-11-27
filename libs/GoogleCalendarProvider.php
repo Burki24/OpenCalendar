@@ -231,7 +231,7 @@ final class GoogleCalendarProvider implements CalendarEventLookupProviderInterfa
                     '/calendars/' . rawurlencode($calendarId) . '/events/' . rawurlencode($eventId)
                 );
                 if (($item['status'] ?? '') === 'cancelled') {
-                    throw new GoogleCalendarProviderException('The selected event is no longer available.');
+                    throw new GoogleCalendarProviderException('The selected event is no longer available.', 410);
                 }
 
                 $event = $this->mapEvent($calendarId, $item, '');

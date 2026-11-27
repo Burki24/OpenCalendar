@@ -17,7 +17,7 @@ const fields = {
     'event-end': {value: ''},
     'event-all-day': {checked: false}
 };
-const context = vm.createContext({Date, document: {getElementById: id => fields[id]}});
+const context = vm.createContext({Date, document: {getElementById: id => fields[id]}, updateEventBufferControls() {}});
 for (const name of ['dayKey', 'localDate', 'localDateTime', 'readInputDate', 'setDateInputs', 'updateEndFromStart']) {
     vm.runInContext(extract(name), context);
 }
