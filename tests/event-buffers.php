@@ -253,6 +253,37 @@ bufferCheck(count(json_decode($restarted->GetEvents(), true, 512, JSON_THROW_ON_
 bufferCheck($private->DeleteEvent(json_encode($createdPrivate['created']['main'], JSON_THROW_ON_ERROR)), 'Main event deletion must succeed.');
 bufferCheck(json_decode($private->GetEvents(), true, 512, JSON_THROW_ON_ERROR) === [], 'Confirmed main deletion must remove linked private buffers.');
 
+$singlePrivate = new BufferCalendar(9);
+$singleRequest = $request;
+$singleRequest['storage'] = 'local';
+unset($singleRequest['buffers']['after']);
+$singleCreated = json_decode($singlePrivate->CreateEventWithBuffers(json_encode($singleRequest, JSON_THROW_ON_ERROR)), true, 512, JSON_THROW_ON_ERROR);
+$singlePrivate->failLookups = true;
+bufferCheck($singlePrivate->DeleteEvent(json_encode($singleCreated['created']['before'], JSON_THROW_ON_ERROR)), 'The last private buffer must be deletable without provider access.');
+bufferCheck(!$singlePrivate->HasLinkedEventBuffers(json_encode($singleCreated['created']['main'], JSON_THROW_ON_ERROR)), 'Deleting the last private buffer must release the main link immediately.');
+bufferCheck(count($singlePrivate->events) === 1, 'Deleting a private buffer must preserve the provider main event.');
+$singleRestarted = new BufferCalendar(9);
+$singleRestarted->attributes = $singlePrivate->attributes;
+bufferCheck(!$singleRestarted->HasLinkedEventBuffers(json_encode($singleCreated['created']['main'], JSON_THROW_ON_ERROR)), 'A deleted private buffer must not restore its link after restart.');
+
+$stalePrivate = new BufferCalendar(11);
+$staleCreated = json_decode($stalePrivate->CreateEventWithBuffers(json_encode($singleRequest, JSON_THROW_ON_ERROR)), true, 512, JSON_THROW_ON_ERROR);
+$staleBuffer = $staleCreated['created']['before'];
+$staleBuffer['etag'] = 'stale';
+bufferCheck(!$stalePrivate->DeleteEvent(json_encode($staleBuffer, JSON_THROW_ON_ERROR)), 'A stale private buffer deletion must be rejected.');
+bufferCheck($stalePrivate->HasLinkedEventBuffers(json_encode($staleCreated['created']['main'], JSON_THROW_ON_ERROR)), 'A rejected private buffer deletion must preserve the link.');
+
+$twoPrivate = new BufferCalendar(10);
+$twoRequest = $request;
+$twoRequest['storage'] = 'local';
+$twoCreated = json_decode($twoPrivate->CreateEventWithBuffers(json_encode($twoRequest, JSON_THROW_ON_ERROR)), true, 512, JSON_THROW_ON_ERROR);
+$twoPrivate->failLookups = true;
+bufferCheck($twoPrivate->DeleteEvent(json_encode($twoCreated['created']['before'], JSON_THROW_ON_ERROR)), 'The first private buffer must be deletable offline.');
+bufferCheck($twoPrivate->HasLinkedEventBuffers(json_encode($twoCreated['created']['main'], JSON_THROW_ON_ERROR)), 'The remaining private buffer must stay linked.');
+bufferCheck(count(json_decode($twoPrivate->attributes['LinkedEventBuffers'], true, 512, JSON_THROW_ON_ERROR)[0]['companions']) === 1, 'Only the deleted side must leave the link.');
+bufferCheck($twoPrivate->DeleteEvent(json_encode($twoCreated['created']['after'], JSON_THROW_ON_ERROR)), 'The remaining private buffer must be deletable offline.');
+bufferCheck(!$twoPrivate->HasLinkedEventBuffers(json_encode($twoCreated['created']['main'], JSON_THROW_ON_ERROR)), 'Deleting both private buffers must clear the link without synchronization.');
+
 $independentPrivate = new BufferCalendar(7);
 $privateRequest['mode'] = 'independent';
 $privateCreated = json_decode($independentPrivate->CreateEventWithBuffers(json_encode($privateRequest, JSON_THROW_ON_ERROR)), true, 512, JSON_THROW_ON_ERROR);

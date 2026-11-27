@@ -1312,6 +1312,7 @@ class Calendar extends IPSModuleStrict
             if ($this->isLocalBufferIdentity($event)) {
                 $this->deleteLocalBufferEvent($event);
                 $writeConfirmed = true;
+                $this->forgetLinkedLocalBuffer($event);
                 $this->notifyLocalBufferChange();
                 return true;
             }
@@ -2006,6 +2007,49 @@ class Calendar extends IPSModuleStrict
                 fn (array $link): bool => !$this->eventIdentityMatches($link['main'], $identity)
             ));
             $this->writeLinkedEventBuffers($links);
+        } finally {
+            IPS_SemaphoreLeave($lock);
+        }
+    }
+
+    /** @param array<string, mixed> $event */
+    private function forgetLinkedLocalBuffer(array $event): void
+    {
+        $resourceUrl = trim((string) ($event['resourceUrl'] ?? ''));
+        $lock = 'OpenCalendar.LinkedBuffers.' . $this->InstanceID;
+        if (!IPS_SemaphoreEnter($lock, 5000)) {
+            throw new RuntimeException('The linked event buffer state is busy.');
+        }
+        try {
+            $links = $this->readLinkedEventBuffers();
+            $changed = false;
+            foreach ($links as $index => $link) {
+                if (!is_array($link) || !is_array($link['companions'] ?? null)) {
+                    continue;
+                }
+                $linkChanged = false;
+                foreach ($link['companions'] as $side => $companion) {
+                    $storedUrl = is_array($companion) && is_array($companion['identity'] ?? null)
+                        ? trim((string) ($companion['identity']['resourceUrl'] ?? '')) : '';
+                    if ($resourceUrl === '' || $storedUrl === '' || !hash_equals($resourceUrl, $storedUrl)) {
+                        continue;
+                    }
+                    unset($link['companions'][$side]);
+                    $linkChanged = true;
+                }
+                if (!$linkChanged) {
+                    continue;
+                }
+                $changed = true;
+                if ($link['companions'] === []) {
+                    unset($links[$index]);
+                } else {
+                    $links[$index] = $link;
+                }
+            }
+            if ($changed) {
+                $this->writeLinkedEventBuffers($links);
+            }
         } finally {
             IPS_SemaphoreLeave($lock);
         }

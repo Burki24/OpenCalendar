@@ -20,6 +20,8 @@ Haupttermins, auch wenn diese beim Anbieter erfolgen. Details stehen in der
 Für die Zusatztermine kann wahlweise der Kalenderanbieter oder ausschließlich
 Symcon als Speicherort gewählt werden. Nur in Symcon gespeicherte Puffer sind
 für Nutzer der Symcon-Ansicht sichtbar, erscheinen aber nicht beim Anbieter.
+Wird ein solcher verknüpfter Puffer gelöscht, wird seine Verknüpfung sofort
+entfernt; nach dem letzten Puffer ist der Haupttermin wieder verschiebbar.
 Die Kalender Ansicht kann in Symcon 9.1 wahlweise zusätzlich als native
 HTML-Vollbildansicht angeboten werden; die normale Kachel bleibt dabei erhalten.
 In der IPSView-HTML-Ausgabe steht bei Browserfreigabe ebenfalls ein Vollbild-Button

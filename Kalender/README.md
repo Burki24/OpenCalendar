@@ -9,6 +9,8 @@ nach Änderungen direkt beim Kalenderanbieter. Die Prüfung läuft bei der
 Synchronisierung dieses Kalenders. Bei nicht eindeutigem oder vorübergehend
 nicht erreichbarem Anbieterzustand bleiben die Puffer bis zur nächsten Prüfung
 erhalten. Unabhängige Puffertermine haben keine solche Verknüpfung.
+Das bestätigte Löschen eines nur in Symcon gespeicherten Puffers entfernt seine
+Verknüpfung sofort, auch wenn der Anbieter nicht erreichbar ist.
 Wählt der Anwender **Nur in Symcon**, liegen die Zusatztermine getrennt vom
 Anbieter- und Anzeigecache dauerhaft in dieser Kalenderinstanz. Sie werden
 nicht an den Kalenderanbieter geschickt. Die Kalender Ansicht zeigt sie dennoch

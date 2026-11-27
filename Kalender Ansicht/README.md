@@ -28,6 +28,10 @@ Nach einer vom Anbieter bestätigten Löschung des Haupttermins werden verknüpf
 Puffer gelöscht. Ein Netzfehler oder ein nicht eindeutig aufgelöster Termin gilt
 nicht als Löschung. Wird ein Puffer selbst beim Anbieter gelöscht, wird die
 Verknüpfung dieser Seite entfernt; der Puffer wird nicht neu angelegt.
+Wird ein nur in Symcon gespeicherter Puffer über OpenCalendar gelöscht, endet
+seine Verknüpfung sofort, auch ohne Verbindung zum Anbieter. Nach dem Löschen
+des letzten Puffers kann der Haupttermin wieder in einen anderen Kalender
+verschoben werden.
 Wird der Haupttermin später ganztägig oder zu einer Serie, endet die Verknüpfung;
 die vorhandenen Zusatztermine bleiben als unabhängige Termine bestehen.
 Das gilt für beide Speicherorte. Lokale Puffer bleiben nach **Cache leeren** und

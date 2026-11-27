@@ -2,6 +2,9 @@
 
 ## Korrigiert
 
+- Das Löschen eines nur in Symcon gespeicherten Puffertermins entfernt seine
+  Verknüpfung sofort. Nach dem letzten Puffer kann der Haupttermin ohne erneute
+  Synchronisierung in einen anderen Kalender verschoben werden.
 - Der ICS/Webcal-Einstieg bleibt auch ohne aktives ICS-Konto verfügbar und
   führt dann durch die Kontoeinrichtung. Die drei Assistenten-Buttons haben
   kürzere Beschriftungen.
