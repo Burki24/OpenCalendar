@@ -46,6 +46,8 @@ Falls ein späterer Vorgang scheitert, bleiben bereits erstellte Termine bestehe
 die Fehlermeldung nennt ihre Anzahl. Ein automatischer Wiederholungsversuch würde
 Duplikate erzeugen und findet deshalb nicht statt. Für einen Kalender werden
 höchstens 200 aktive Verknüpfungen gespeichert.
+Die aus Kachel und IPSView gesendeten Zeitangaben können Millisekunden enthalten;
+Puffertermine werden auch mit diesem Zeitformat angelegt.
 Zusätzlich sind höchstens 400 nur in Symcon gespeicherte Puffer pro Kalenderinstanz
 möglich.
 

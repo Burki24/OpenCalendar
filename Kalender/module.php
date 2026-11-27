@@ -1916,7 +1916,7 @@ class Calendar extends IPSModuleStrict
     {
         $value = $event[$key] ?? null;
         if (!is_string($value)
-            || preg_match('/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2})?(?:Z|[+-]\d{2}:\d{2})?$/D', $value) !== 1) {
+            || preg_match('/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,6})?)?(?:Z|[+-]\d{2}:\d{2})?$/D', $value) !== 1) {
             return 0;
         }
         try {

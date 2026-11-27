@@ -2,6 +2,8 @@
 
 ## Korrigiert
 
+- Puffertermine lassen sich aus Kachel und IPSView auch dann anlegen, wenn die
+  übermittelten Uhrzeiten Millisekunden enthalten.
 - Das Löschen eines nur in Symcon gespeicherten Puffertermins entfernt seine
   Verknüpfung sofort. Nach dem letzten Puffer kann der Haupttermin ohne erneute
   Synchronisierung in einen anderen Kalender verschoben werden.
