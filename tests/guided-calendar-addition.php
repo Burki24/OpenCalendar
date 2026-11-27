@@ -112,6 +112,12 @@ function IPS_DeleteInstance(int $instanceID): void
 
 function IPSKALACC_TestConnection(int $accountID): string
 {
+    global $instances;
+    if (($instances[$accountID]['properties']['Provider'] ?? null) === CalendarProviderType::LOCAL) {
+        $name = trim((string) ($instances[$accountID]['properties']['LocalCalendarName'] ?? ''));
+        $color = $instances[$accountID]['properties']['LocalCalendarColor'] ?? null;
+        return json_encode(['success' => $name !== '' && is_int($color) && $color >= 0 && $color <= 0xFFFFFF], JSON_THROW_ON_ERROR);
+    }
     return json_encode(['success' => true], JSON_THROW_ON_ERROR);
 }
 
@@ -122,6 +128,16 @@ function IPSKALACC_Synchronize(int $accountID): bool
 
 function IPSKALACC_GetCalendars(int $accountID): string
 {
+    global $instances;
+    if (($instances[$accountID]['properties']['Provider'] ?? null) === CalendarProviderType::LOCAL) {
+        return json_encode([[
+            'id'            => 'local:' . $accountID,
+            'name'          => $instances[$accountID]['properties']['LocalCalendarName'],
+            'color'         => sprintf('#%06X', $instances[$accountID]['properties']['LocalCalendarColor']),
+            'localCalendar' => true,
+            'capabilities'  => ['create' => true, 'update' => true, 'delete' => true]
+        ]], JSON_THROW_ON_ERROR);
+    }
     return json_encode([
         ['id' => 'old', 'name' => 'Existing', 'primary' => true, 'capabilities' => ['create' => true]],
         ['id' => 'new', 'name' => 'New', 'primary' => false, 'capabilities' => ['create' => true]]
@@ -201,6 +217,8 @@ require_once __DIR__ . '/../Kalender Einrichtung/module.php';
 
 class TestOpenCalendarDiscovery extends OpenCalendarDiscovery
 {
+    public int $InstanceID = 400;
+
     /** @param array<string, mixed> $feed */
     protected function inspectWizardICSFeed(int $accountID, array $feed): array
     {
@@ -354,5 +372,67 @@ $formWithoutAccount = json_decode($discovery->GetConfigurationForm(), true, 512,
 $actionsWithoutAccount = array_column($formWithoutAccount['actions'], null, 'name');
 checkGuidedAddition($actionsWithoutAccount['AddCalendarWizard']['enabled'] === false, 'The shortcut must be disabled when no active account exists.');
 checkGuidedAddition(($actionsWithoutAccount['AddICSSubscriptionWizard']['enabled'] ?? true) === true, 'The ICS shortcut must remain available without any account.');
+
+$localDiscovery = new TestOpenCalendarDiscovery();
+$localDiscovery->Create();
+$localForm = json_decode($localDiscovery->GetConfigurationForm(), true, 512, JSON_THROW_ON_ERROR);
+$localPages = array_column(array_column($localForm['actions'], null, 'name')['SetupWizard']['popup']['pages'], null, 'name');
+checkGuidedAddition(in_array('local', array_column($localPages['provider']['items'][0]['options'], 'value'), true), 'The main wizard must offer Symcon-local calendars.');
+checkGuidedAddition(isset($localPages['local']) && str_contains($localPages['local']['validate'], 'ValidateWizardLocalConfiguration'), 'The local provider must have a configuration page.');
+$localDiscovery->RequestAction('WizardProvider', json_encode(['provider' => 'local', 'createConfigurator' => true], JSON_THROW_ON_ERROR));
+checkGuidedAddition($localDiscovery->GetWizardProviderPage() === 'local', 'Local accounts must route to the local provider page.');
+$localDiscovery->RequestAction('WizardPrepareAccount', json_encode(['mode' => 'new', 'existingAccountID' => 0, 'accountName' => 'Private account'], JSON_THROW_ON_ERROR));
+$localAccountID = max(IPS_GetInstanceListByModuleID(ACCOUNT_MODULE));
+checkGuidedAddition($instances[$localAccountID]['properties']['Provider'] === CalendarProviderType::LOCAL && !$instances[$localAccountID]['properties']['Active'], 'A local account must start inactive without provider credentials.');
+checkGuidedAddition($localDiscovery->ValidateWizardLocalConfiguration('', 0x123456) !== '', 'An empty local calendar name must be rejected.');
+checkGuidedAddition($localDiscovery->ValidateWizardLocalConfiguration('Private', -1) !== '', 'An invalid local calendar color must be rejected.');
+checkGuidedAddition($localDiscovery->ValidateWizardLocalConfiguration('Private', 0x123456) === '', 'A valid local calendar must pass without a provider connection.');
+checkGuidedAddition($instances[$localAccountID]['properties']['LocalCalendarName'] === 'Private' && $instances[$localAccountID]['properties']['LocalCalendarColor'] === 0x123456, 'The local account must retain the selected name and color.');
+$localValues = json_decode($localDiscovery->updatedFields['WizardCalendars']['values'], true, 512, JSON_THROW_ON_ERROR);
+checkGuidedAddition(count($localValues) === 1 && $localValues[0]['selected'] && $localValues[0]['calendarId'] === 'local:' . $localAccountID, 'The local account must offer its sole calendar for selection.');
+$localDiscovery->RequestAction('WizardSelectCalendars', '');
+$localDiscovery->RequestAction('WizardSelectCalendarView', json_encode(['mode' => 'existing', 'existingViewID' => 300, 'viewName' => ''], JSON_THROW_ON_ERROR));
+$localDiscovery->RequestAction('WizardFinishAccount', '');
+$localInstances = array_values(array_filter(IPS_GetInstanceListByModuleID(CALENDAR_MODULE), static fn (int $id): bool => $instances[$id]['connection'] === $localAccountID));
+checkGuidedAddition(count($localInstances) === 1, 'The local calendar instance must be created exactly once.');
+$localCalendar = $instances[$localInstances[0]]['properties'];
+checkGuidedAddition(($localCalendar['LocalCalendar'] ?? false) === true && $localCalendar['CalendarID'] === 'local:' . $localAccountID, 'The calendar must use the local storage contract and stable account identity.');
+checkGuidedAddition($localCalendar['ProviderCalendarID'] === '' && $localCalendar['UpdateSchedule'] === 11 && $localCalendar['CanWrite'] === true, 'Local calendars must be writable and have no provider ID or network schedule.');
+checkGuidedAddition($localCalendar['CalendarColor'] === '#123456', 'The local calendar color must reach the calendar instance.');
+checkGuidedAddition($instances[$localAccountID]['properties']['Active'] === true, 'A completed local account must be active.');
+$localConfigurators = array_values(array_filter(IPS_GetInstanceListByModuleID('{4A013D9D-3611-9900-5815-A8EC8A91287D}'), static fn (int $id): bool => $instances[$id]['connection'] === $localAccountID));
+checkGuidedAddition(count($localConfigurators) === 1, 'The optional local configurator must be connected to the new account.');
+$localViewCalendars = json_decode($instances[300]['properties']['Calendars'], true, 512, JSON_THROW_ON_ERROR);
+checkGuidedAddition(in_array($localInstances[0], array_column($localViewCalendars, 'InstanceID'), true), 'The existing view must include the local calendar without dropping previous assignments.');
+$localDiscovery->RequestAction('WizardFinishAccount', '');
+checkGuidedAddition(count(array_filter(IPS_GetInstanceListByModuleID(CALENDAR_MODULE), static fn (int $id): bool => $instances[$id]['connection'] === $localAccountID)) === 1, 'Repeating the finish action must not duplicate the local calendar.');
+
+$reusedLocal = new TestOpenCalendarDiscovery();
+$reusedLocal->Create();
+$reusedLocal->RequestAction('WizardProvider', 'local');
+$reusedLocal->RequestAction('WizardPrepareAccount', json_encode(['mode' => 'existing', 'existingAccountID' => $localAccountID, 'accountName' => ''], JSON_THROW_ON_ERROR));
+checkGuidedAddition($reusedLocal->ValidateWizardLocalConfiguration('Ignored', 0xABCDEF) === '', 'An existing local account must be usable by the main wizard.');
+checkGuidedAddition($instances[$localAccountID]['properties']['LocalCalendarName'] === 'Private' && $instances[$localAccountID]['properties']['LocalCalendarColor'] === 0x123456, 'The wizard must preserve the settings of an existing local account.');
+checkGuidedAddition(($reusedLocal->updatedFields['WizardLocalCalendarName']['visible'] ?? true) === false, 'Existing local accounts must not offer an ineffective name field.');
+
+$failedLocal = new TestOpenCalendarDiscovery();
+$failedLocal->Create();
+$failedLocal->RequestAction('WizardProvider', 'local');
+$failedLocal->RequestAction('WizardPrepareAccount', json_encode(['mode' => 'new', 'existingAccountID' => 0, 'accountName' => 'Rollback account'], JSON_THROW_ON_ERROR));
+$failedAccountID = max(IPS_GetInstanceListByModuleID(ACCOUNT_MODULE));
+checkGuidedAddition($failedLocal->ValidateWizardLocalConfiguration('Rollback', 0x654321) === '', 'A second local account must be configurable.');
+$failedLocal->RequestAction('WizardSelectCalendars', '');
+$failedLocal->RequestAction('WizardSelectCalendarView', json_encode(['mode' => 'existing', 'existingViewID' => 300, 'viewName' => ''], JSON_THROW_ON_ERROR));
+$failNextViewApply = true;
+try {
+    $failedLocal->RequestAction('WizardFinishAccount', '');
+    throw new RuntimeException('The simulated local view failure did not stop setup.');
+} catch (RuntimeException $exception) {
+    checkGuidedAddition(str_contains($exception->getMessage(), 'calendar view'), 'A local view failure must be reported.');
+}
+checkGuidedAddition($instances[$failedAccountID]['properties']['Active'] === false, 'A failed local setup must deactivate its new account.');
+checkGuidedAddition(count(array_filter(IPS_GetInstanceListByModuleID(CALENDAR_MODULE), static fn (int $id): bool => $instances[$id]['connection'] === $failedAccountID)) === 0, 'A failed local setup must remove the new calendar instance.');
+$failedLocal->RequestAction('WizardFinishAccount', '');
+checkGuidedAddition(count(array_filter(IPS_GetInstanceListByModuleID(CALENDAR_MODULE), static fn (int $id): bool => $instances[$id]['connection'] === $failedAccountID)) === 1, 'Retrying local setup must create exactly one calendar instance.');
 
 fwrite(STDOUT, "Guided calendar addition tests passed.\n");

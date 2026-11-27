@@ -18,11 +18,12 @@ $providers = [
     'caldav'    => CalendarProviderType::CALDAV,
     'google'    => CalendarProviderType::GOOGLE,
     'microsoft' => CalendarProviderType::MICROSOFT,
-    'ics'       => CalendarProviderType::ICS
+    'ics'       => CalendarProviderType::ICS,
+    'local'     => CalendarProviderType::LOCAL
 ];
 
 providerTypeExpect(
-    array_values($providers) === [0, 1, 2, 3, 4],
+    array_values($providers) === [0, 1, 2, 3, 4, 5],
     'Persisted calendar provider IDs must remain backward compatible.'
 );
 

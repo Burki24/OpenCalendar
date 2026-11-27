@@ -11,7 +11,6 @@ final class CalendarProviderType
     public const GOOGLE = 2;
     public const MICROSOFT = 3;
     public const ICS = 4;
-    // This provider is configured through Calendar Account only, not through the discovery wizard.
     public const LOCAL = 5;
 
     /** @var array<string, int> */
@@ -20,7 +19,8 @@ final class CalendarProviderType
         'caldav'    => self::CALDAV,
         'google'    => self::GOOGLE,
         'microsoft' => self::MICROSOFT,
-        'ics'       => self::ICS
+        'ics'       => self::ICS,
+        'local'     => self::LOCAL
     ];
 
     /**

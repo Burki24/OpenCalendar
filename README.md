@@ -71,6 +71,8 @@ müssen umfangreiche Kalenderdateien nicht manuell aufgeteilt werden.
 Lokale Kalender werden über ein **Kalender Konto** mit dem Anbieter
 **Symcon - Kalender** angelegt. Dort werden Name und Farbe festgelegt; ein
 verbundener **Kalender Konfigurator** erstellt anschließend die Kalenderinstanz.
+Alternativ führt die Discovery-Instanz **Kalender Einrichtung** durch diese
+Schritte bis zur Zuordnung in eine neue oder vorhandene Kalender Ansicht.
 OAuth, Zugangsdaten, Internetzugriff und eine externe Synchronisation sind dafür
 nicht erforderlich.
 

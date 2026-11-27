@@ -11,6 +11,9 @@
 
 ## Neu
 
+- Die Discovery-Instanz **Kalender Einrichtung** führt nun auch zusätzliche
+  Symcon-lokale Kalenderkonten mit Name, Farbe, Kalenderinstanz und
+  Ansichtszuordnung durch die vollständige Einrichtung.
 - Einzelne Termine mit Uhrzeit können in Kachel und IPSView Puffertermine davor
   und danach erhalten. Diese bleiben wahlweise unabhängig oder folgen späteren
   Änderungen und bestätigten Löschungen des Haupttermins, auch beim Anbieter.

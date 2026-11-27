@@ -6,11 +6,13 @@ use IPSKalender\CalendarHttpClient;
 use IPSKalender\CalendarProviderType;
 use IPSKalender\ICalendarAuthentication;
 use IPSKalender\ICalendarFeedProvider;
+use IPSKalender\SynchronizationSchedule;
 
 require_once __DIR__ . '/../libs/CalendarProviderType.php';
 require_once __DIR__ . '/../libs/CalendarHttpClient.php';
 require_once __DIR__ . '/../libs/ICalendarAuthentication.php';
 require_once __DIR__ . '/../libs/ICalendarFeedProvider.php';
+require_once __DIR__ . '/../libs/SynchronizationSchedule.php';
 
 class OpenCalendarDiscovery extends IPSModuleStrict
 {
@@ -26,7 +28,8 @@ class OpenCalendarDiscovery extends IPSModuleStrict
         CalendarProviderType::CALDAV    => 'CalDAV',
         CalendarProviderType::GOOGLE    => 'Google Calendar',
         CalendarProviderType::MICROSOFT => 'Microsoft 365 / Outlook.com',
-        CalendarProviderType::ICS       => 'ICS / Webcal'
+        CalendarProviderType::ICS       => 'ICS / Webcal',
+        CalendarProviderType::LOCAL     => 'Symcon - Calendar'
     ];
 
     /** @var array<string, string> */
@@ -35,7 +38,8 @@ class OpenCalendarDiscovery extends IPSModuleStrict
         'caldav'    => 'CalDAV',
         'google'    => 'Google',
         'microsoft' => 'O365',
-        'ics'       => 'ICS'
+        'ics'       => 'ICS',
+        'local'     => 'Symcon'
     ];
 
     private const ACCOUNT_MODE_NEW = 'new';
@@ -82,9 +86,13 @@ class OpenCalendarDiscovery extends IPSModuleStrict
 
             foreach ($action['popup']['pages'] as &$page) {
                 $pageName = (string) ($page['name'] ?? '');
-                if (!in_array($pageName, ['account', 'calendars', 'view', 'result'], true)) {
+                if (!in_array($pageName, ['account', 'local', 'calendars', 'view', 'result'], true)) {
                     continue;
                 }
+
+                $localAccountID = (int) $this->GetBuffer('WizardAccountID');
+                $localNew = $localAccountID <= 0
+                    || (int) $this->GetBuffer('WizardCreatedAccountID') === $localAccountID;
 
                 foreach ($page['items'] as &$item) {
                     if ($pageName === 'account' && ($item['name'] ?? '') === 'ExistingAccountID') {
@@ -93,6 +101,14 @@ class OpenCalendarDiscovery extends IPSModuleStrict
                         $item['values'] = $this->wizardCalendarListValues($this->readWizardCalendars());
                     } elseif ($pageName === 'view' && ($item['name'] ?? '') === 'ExistingViewID') {
                         $item['options'] = $this->calendarViewSelectOptions();
+                    } elseif ($pageName === 'local' && in_array(
+                        (string) ($item['name'] ?? ''),
+                        ['WizardLocalCalendarName', 'WizardLocalCalendarColor'],
+                        true
+                    )) {
+                        $item['visible'] = $localNew;
+                    } elseif ($pageName === 'local' && ($item['name'] ?? '') === 'WizardLocalExistingHint') {
+                        $item['visible'] = !$localNew;
                     } elseif ($pageName === 'result') {
                         $result = $this->readLastSetupResult();
                         $captions = $this->wizardResultCaptions($result);
@@ -399,8 +415,43 @@ class OpenCalendarDiscovery extends IPSModuleStrict
             'caldav'    => 'caldav',
             'google'    => 'google',
             'microsoft' => 'microsoft',
-            'ics'       => 'ics'
+            'ics'       => 'ics',
+            'local'     => 'local'
         };
+    }
+
+    /**
+     * Configures a new Symcon-local calendar or checks an existing local account.
+     *
+     * @param string $CalendarName Name of a new local calendar.
+     * @param int $CalendarColor RGB color of a new local calendar.
+     * @return string Empty string when valid, otherwise a localized error.
+     */
+    public function ValidateWizardLocalConfiguration(string $CalendarName, int $CalendarColor): string
+    {
+        try {
+            $accountID = $this->wizardAccountID();
+            $this->assertWizardProviderMatchesAccount($accountID, 'local');
+
+            if ((int) $this->GetBuffer('WizardCreatedAccountID') === $accountID) {
+                $name = trim($CalendarName);
+                if ($name === '') {
+                    throw new InvalidArgumentException($this->Translate('Please enter a local calendar name.'));
+                }
+                if ($CalendarColor < 0 || $CalendarColor > 0xFFFFFF) {
+                    throw new InvalidArgumentException($this->Translate('Please select a valid calendar color.'));
+                }
+
+                IPS_SetProperty($accountID, 'LocalCalendarName', $name);
+                IPS_SetProperty($accountID, 'LocalCalendarColor', $CalendarColor);
+                IPS_ApplyChanges($accountID);
+            }
+
+            return $this->testWizardConnection($accountID);
+        } catch (InvalidArgumentException | RuntimeException $exception) {
+            $this->SetBuffer('WizardConnectionVerified', '0');
+            return $exception->getMessage();
+        }
     }
 
     /**
@@ -1094,6 +1145,7 @@ class OpenCalendarDiscovery extends IPSModuleStrict
             CalendarProviderType::GOOGLE    => 'google',
             CalendarProviderType::MICROSOFT => 'microsoft',
             CalendarProviderType::ICS       => 'ics',
+            CalendarProviderType::LOCAL     => 'local',
             default                         => throw new InvalidArgumentException(
                 $this->Translate('The selected calendar account uses an unsupported provider.')
             )
@@ -1130,6 +1182,12 @@ class OpenCalendarDiscovery extends IPSModuleStrict
         $this->SetBuffer('WizardConnectionVerified', '0');
         $this->clearWizardCalendarSelection(true);
         $this->clearWizardCalendarViewSelection();
+        if ($provider === 'local') {
+            $isNew = $selection['mode'] === self::ACCOUNT_MODE_NEW;
+            $this->UpdateFormField('WizardLocalCalendarName', 'visible', $isNew);
+            $this->UpdateFormField('WizardLocalCalendarColor', 'visible', $isNew);
+            $this->UpdateFormField('WizardLocalExistingHint', 'visible', !$isNew);
+        }
     }
 
     private function finishWizardAccount(): void
@@ -2223,6 +2281,11 @@ class OpenCalendarDiscovery extends IPSModuleStrict
         $canWrite = (bool) ($capabilities['create'] ?? false)
             || (bool) ($capabilities['update'] ?? false)
             || (bool) ($capabilities['delete'] ?? false);
+        $isLocal = $provider === 'local';
+        if ($isLocal && (!(bool) ($calendar['localCalendar'] ?? false)
+            || $calendarID !== 'local:' . $accountID)) {
+            throw new UnexpectedValueException($this->Translate('The local calendar identity is invalid.'));
+        }
 
         $calendarInstanceID = 0;
 
@@ -2239,15 +2302,22 @@ class OpenCalendarDiscovery extends IPSModuleStrict
             }
 
             IPS_SetProperty($calendarInstanceID, 'CalendarID', $calendarID);
+            if ($isLocal) {
+                IPS_SetProperty($calendarInstanceID, 'LocalCalendar', true);
+            }
             IPS_SetProperty(
                 $calendarInstanceID,
                 'ProviderCalendarID',
-                (string) ($calendar['providerId'] ?? $calendarID)
+                $isLocal ? '' : (string) ($calendar['providerId'] ?? $calendarID)
             );
             IPS_SetProperty($calendarInstanceID, 'CalendarURL', (string) ($calendar['url'] ?? ''));
             IPS_SetProperty($calendarInstanceID, 'CalendarColor', (string) ($calendar['color'] ?? ''));
             IPS_SetProperty($calendarInstanceID, 'CanWrite', $canWrite);
-            IPS_SetProperty($calendarInstanceID, 'UpdateSchedule', (int) ($calendar['updateSchedule'] ?? 0));
+            IPS_SetProperty(
+                $calendarInstanceID,
+                'UpdateSchedule',
+                $isLocal ? SynchronizationSchedule::MANUAL : (int) ($calendar['updateSchedule'] ?? 0)
+            );
             IPS_SetProperty(
                 $calendarInstanceID,
                 'UpdateInterval',

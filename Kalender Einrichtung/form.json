@@ -10,7 +10,7 @@
         },
         {
             "type": "Label",
-            "caption": "1. Select the calendar provider (Google, Microsoft 365 / Outlook.com, Apple iCloud, CalDAV or ICS / Webcal)."
+            "caption": "1. Select the calendar provider (Google, Microsoft 365 / Outlook.com, Apple iCloud, CalDAV, ICS / Webcal or a local Symcon calendar)."
         },
         {
             "type": "Label",
@@ -18,7 +18,7 @@
         },
         {
             "type": "Label",
-            "caption": "3. Configure and verify the provider connection. Google and Microsoft use the native Symcon OAuth flow."
+            "caption": "3. Configure the calendar and check its connection. Local calendars do not need an external service; Google and Microsoft use the native Symcon OAuth flow."
         },
         {
             "type": "Label",
@@ -38,7 +38,7 @@
         },
         {
             "type": "Label",
-            "caption": "For easier identification, newly created calendar instances receive the provider as a name prefix, for example O365 - Family, Apple - Private, Google - Work, CalDAV - Family or ICS - Holidays."
+            "caption": "For easier identification, newly created calendar instances receive a source prefix, for example O365 - Family, Apple - Private, ICS - Holidays or Symcon - Private."
         },
         {
             "type": "Label",
@@ -115,6 +115,10 @@
                                     {
                                         "caption": "ICS / Webcal",
                                         "value": "ics"
+                                    },
+                                    {
+                                        "caption": "Symcon - Calendar",
+                                        "value": "local"
                                     }
                                 ]
                             },
@@ -182,7 +186,7 @@
                             },
                             {
                                 "type": "Label",
-                                "caption": "A new calendar account remains disabled while setup is incomplete. OpenCalendar activates it automatically after a successful connection test and completed setup."
+                                "caption": "A new calendar account remains disabled while setup is incomplete. OpenCalendar activates it automatically after successful configuration checks and completed setup."
                             }
                         ],
                         "validate": "return IPSKALDISCOVERY_ValidateWizardAccountSelection($id, $AccountMode, $ExistingAccountID, $AccountName);",
@@ -383,6 +387,42 @@
                         "nextPage": "calendars"
                     },
                     {
+                        "name": "local",
+                        "caption": "Configure local calendar",
+                        "closeCaption": "Set up later",
+                        "items": [
+                            {
+                                "type": "Label",
+                                "caption": "This calendar stores its original appointments only in Symcon. Include the Symcon installation in your backups."
+                            },
+                            {
+                                "type": "ValidationTextBox",
+                                "name": "WizardLocalCalendarName",
+                                "caption": "Local calendar name",
+                                "value": "Local Calendar"
+                            },
+                            {
+                                "type": "SelectColor",
+                                "name": "WizardLocalCalendarColor",
+                                "caption": "Calendar color",
+                                "value": 5223046,
+                                "allowTransparent": false
+                            },
+                            {
+                                "type": "Label",
+                                "name": "WizardLocalExistingHint",
+                                "caption": "An existing local calendar keeps its saved name and color. You can change them in its Calendar Account configuration.",
+                                "visible": false
+                            },
+                            {
+                                "type": "Label",
+                                "caption": "No internet connection or external provider is needed."
+                            }
+                        ],
+                        "validate": "return IPSKALDISCOVERY_ValidateWizardLocalConfiguration($id, (string) ($WizardLocalCalendarName ?? ''), (int) ($WizardLocalCalendarColor ?? 0));",
+                        "nextPage": "calendars"
+                    },
+                    {
                         "name": "calendars",
                         "caption": "Choose calendars",
                         "closeCaption": "Set up later",
@@ -511,7 +551,7 @@
                         "items": [
                             {
                                 "type": "Label",
-                                "caption": "The calendar account connection was verified successfully."
+                                "caption": "The calendar account configuration was verified successfully."
                             },
                             {
                                 "type": "Label",
@@ -531,7 +571,7 @@
                             },
                             {
                                 "type": "Label",
-                                "caption": "OpenCalendar then synchronizes the account and selected calendars, initializes the Calendar View and shows the result on the final page."
+                                "caption": "OpenCalendar then checks the account and selected calendars, initializes the Calendar View and shows the result on the final page."
                             },
                             {
                                 "type": "Label",

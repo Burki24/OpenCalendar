@@ -2,6 +2,8 @@
 
 Die **Kalender Einrichtung** ist die zentrale Discovery- und Einrichtungsinstanz
 für OpenCalendar ab Version 3.0 und benötigt Symcon 9.1 oder neuer.
+Sie kann auch nach der Erstinstallation erneut geöffnet werden, um ein weiteres
+Konto anzulegen. Dazu gehören nun auch Symcon-lokale Kalender ohne Anbieter.
 
 Für ein bereits eingerichtetes Konto gibt es zusätzlich **Kalender hinzufügen**.
 Dieser kürzere Assistent prüft die bestehende
@@ -124,6 +126,18 @@ Bei einem bereits eingerichteten ICS/Webcal-Konto kann die URL leer bleiben.
 Dann verändert der Wizard die bestehende iCalendar-Konfiguration nicht und führt
 nur den Verbindungstest aus.
 
+### Symcon-lokaler Kalender
+
+Unter **Symcon - Kalender** legt der Assistent ein neues lokales Kalender Konto
+mit wählbarem Kalendernamen und Farbe an. Er prüft die lokale Konfiguration
+ohne Netzwerkzugriff, legt genau eine lokale Kalenderinstanz an und ordnet sie
+der ausgewählten neuen oder vorhandenen Kalender Ansicht zu. Ein vorhandenes
+lokales Konto kann erneut ausgewählt werden; dessen Name und Farbe bleiben
+dabei unverändert. Optional kann auch ein Kalender Konfigurator entstehen.
+Die Originaltermine liegen ausschließlich in Symcon und gehören in die
+regelmäßige Symcon-Sicherung. Die manuelle Einrichtung über Kalender Konto und
+Kalender Konfigurator bleibt möglich.
+
 ### Kalenderauswahl
 
 Nach erfolgreicher Verbindungsprüfung ruft der Wizard die bereits vorhandene
@@ -155,6 +169,7 @@ Neu angelegte Kalenderinstanzen erhalten den Anbieter als Namenspräfix:
 - Google Kalender: `Google - <Kalendername>`
 - CalDAV: `CalDAV - <Kalendername>`
 - ICS / Webcal: `ICS - <Kalendername>`
+- Symcon-lokal: `Symcon - <Kalendername>`
 
 Die IDs der erzeugten beziehungsweise übernommenen Kalenderinstanzen werden in
 der Discovery-Instanz gespeichert und anschließend für die Kalender Ansicht
