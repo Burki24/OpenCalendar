@@ -11,6 +11,7 @@ Der Anwender ist dafür verantwortlich, OpenCalendar nur mit Kalenderkonten, Ter
 Die Verfügbarkeit und Funktion externer Dienste wie Google Calendar, Microsoft 365/Outlook.com, Apple iCloud, CalDAV-Server, iCalendar-Anbieter und Symcon Connect liegt außerhalb der Kontrolle des OpenCalendar-Projekts. Für diese Dienste gelten zusätzlich die jeweiligen Bedingungen der Anbieter.
 
 Bei ausdrücklich verknüpften Pufferterminen kann eine Änderung oder bestätigte Löschung des Haupttermins später automatisch Änderungen oder Löschungen der Zusatztermine im selben Kalender auslösen.
+Wählt der Anwender die lokale Speicherung, liegen die Zusatztermine ausschließlich in Symcon und sind für berechtigte Nutzer der Ansicht sichtbar.
 
 ## Keine Gewährleistung
 
@@ -33,6 +34,7 @@ Users are responsible for using OpenCalendar only with calendar accounts, events
 Availability and operation of external services such as Google Calendar, Microsoft 365/Outlook.com, Apple iCloud, CalDAV servers, iCalendar providers and Symcon Connect are outside the control of the OpenCalendar project and are additionally subject to the respective providers' terms.
 
 For explicitly linked adjacent appointments, a later change or confirmed deletion of the main event may automatically update or delete the adjacent events in the same calendar.
+If the user selects local storage, adjacent appointments reside only in Symcon and are visible to authorized users of the view.
 
 OpenCalendar is provided without warranty as described by the PolyForm Noncommercial License 1.0.0. In particular, there is no guarantee of uninterrupted availability, freedom from errors, completeness of synchronized data or permanent compatibility with external calendar services.
 

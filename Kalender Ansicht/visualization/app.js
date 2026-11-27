@@ -3075,6 +3075,7 @@ function openNewEvent(preferredDay = null) {
     document.getElementById('event-buffer-before').checked = false;
     document.getElementById('event-buffer-after').checked = false;
     document.getElementById('event-buffer-mode').value = 'independent';
+    document.getElementById('event-buffer-storage').value = 'provider';
     document.getElementById('event-buffer-before-title').value = t('Arrival');
     document.getElementById('event-buffer-after-title').value = t('Departure');
     resetEventStateEditor();
@@ -3174,7 +3175,7 @@ function calendarRuntimeEndpoint(runtime) {
 }
 
 function providerAttachmentSelector(event, calendar) {
-    if (!event || !calendar || calendar.canReadProviderAttachments !== true) return null;
+    if (!event || event.localBuffer || !calendar || calendar.canReadProviderAttachments !== true) return null;
     if (String(event.sourceType || '').trim().toLowerCase() === 'microsoft-todo') {
         const taskId = String(event.taskId || '').trim();
         const taskListId = String(event.taskListId || '').trim();
@@ -3198,7 +3199,7 @@ function providerAttachmentSelector(event, calendar) {
 }
 
 function localAttachmentSelector(event, calendar) {
-    if (!event || !calendar || calendar.canReadLocalAttachments !== true) return null;
+    if (!event || event.localBuffer || !calendar || calendar.canReadLocalAttachments !== true) return null;
     if (calendar.attachmentLocalOwnerType === 'google') {
         const eventReference = String(event.eventReference || '').trim();
         return eventReference && eventReference.length <= 8192 ? {eventReference} : null;
@@ -3760,7 +3761,9 @@ function openEventDetails(event) {
     const reason = eventReadOnlyReason(event);
     note.textContent = reason
         ? t(reason)
-        : (event.taskRolledForward ? t('This overdue task was continued from a series.') : '');
+        : (event.localBuffer
+            ? t('Stored only in Symcon; not sent to the calendar provider.')
+            : (event.taskRolledForward ? t('This overdue task was continued from a series.') : ''));
     note.classList.toggle('hidden', note.textContent === '');
     eventDetailsDialog.showModal();
 }
@@ -4076,6 +4079,7 @@ function eventCanUpdate(event) {
 
 function eventCanMove(event, writeScope = '') {
     if (!hasActionBridge() || !Boolean(event?.canWrite)) return false;
+    if (event.localBuffer) return false;
     if (String(event?.sourceType || '').trim().toLowerCase() === 'microsoft-todo') return false;
     const reminder = eventReminderState(event);
     if (reminder.mode === 'complex') return false;
@@ -4536,6 +4540,9 @@ function openExistingEvent(event, writeScope = '') {
         note.classList.remove('hidden');
     } else if (recurringOccurrence) {
         note.textContent = t('Only this occurrence of the recurring event will be changed.');
+        note.classList.remove('hidden');
+    } else if (selectedEvent.localBuffer) {
+        note.textContent = t('Stored only in Symcon; not sent to the calendar provider.');
         note.classList.remove('hidden');
     } else if (!descriptionEditable) {
         note.textContent = t('The description of Microsoft online meetings is protected and cannot be edited here.');
@@ -5429,6 +5436,11 @@ function updateEventBufferControls() {
     section.classList.toggle('hidden', !eligible);
     if (!eligible) enabled.checked = false;
     document.getElementById('event-buffers-options').classList.toggle('hidden', !eligible || !enabled.checked);
+    const localCalendar = Boolean(selectedCalendarEntry()?.localCalendar);
+    document.getElementById('event-buffer-storage-row').classList.toggle('hidden', localCalendar);
+    if (localCalendar) document.getElementById('event-buffer-storage').value = 'provider';
+    document.getElementById('event-buffer-storage-note').classList.toggle('hidden',
+        localCalendar || document.getElementById('event-buffer-storage').value !== 'local');
     const start = readInputDate(document.getElementById('event-start').value);
     const end = readInputDate(document.getElementById('event-end').value);
     for (const side of ['before', 'after']) {
@@ -5587,6 +5599,7 @@ eventForm.addEventListener('submit', async event => {
     if (buffers) {
         value.buffers = buffers;
         value.mode = document.getElementById('event-buffer-mode').value;
+        value.storage = document.getElementById('event-buffer-storage').value;
     }
 
     releaseAgendaScrollWorkflowAfterState();
@@ -5622,6 +5635,7 @@ document.getElementById('event-start').addEventListener('change', () => {
 });
 document.getElementById('event-end').addEventListener('change', updateEventBufferControls);
 document.getElementById('event-buffers-enabled').addEventListener('change', updateEventBufferControls);
+document.getElementById('event-buffer-storage').addEventListener('change', updateEventBufferControls);
 for (const side of ['before', 'after']) {
     document.getElementById(`event-buffer-${side}`).addEventListener('change', updateEventBufferControls);
     document.getElementById(`event-buffer-${side}-minutes`).addEventListener('input', updateEventBufferControls);
@@ -5660,6 +5674,7 @@ eventCalendarInput.addEventListener('change', () => {
     updateTaskControls();
     updateAnniversaryControls();
     updateEventStateDefaults();
+    updateEventBufferControls();
 });
 eventStatusInput.addEventListener('change', () => {
     eventStatusEdited = true;

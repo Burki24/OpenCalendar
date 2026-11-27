@@ -277,6 +277,14 @@
                 <legend data-i18n="Adjacent appointments">Adjacent appointments</legend>
                 <label class="checkbox-row"><input id="event-buffers-enabled" type="checkbox"> <span data-i18n="Add appointments before or after">Add appointments before or after</span></label>
                 <div id="event-buffers-options" class="hidden">
+                <div class="form-row" id="event-buffer-storage-row">
+                    <label for="event-buffer-storage" data-i18n="Store adjacent appointments">Store adjacent appointments</label>
+                    <select id="event-buffer-storage">
+                        <option value="provider" data-i18n="At the calendar provider">At the calendar provider</option>
+                        <option value="local" data-i18n="Only in Symcon">Only in Symcon</option>
+                    </select>
+                    <div class="event-buffer-storage-note hidden" id="event-buffer-storage-note" data-i18n="Symcon-only appointments are not sent to the calendar provider. People with access to this Symcon view can still see them.">Symcon-only appointments are not sent to the calendar provider. People with access to this Symcon view can still see them.</div>
+                </div>
                 <div class="form-row">
                     <label for="event-buffer-mode" data-i18n="Connection">Connection</label>
                     <select id="event-buffer-mode">

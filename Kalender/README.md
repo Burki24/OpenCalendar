@@ -9,6 +9,12 @@ nach Änderungen direkt beim Kalenderanbieter. Die Prüfung läuft bei der
 Synchronisierung dieses Kalenders. Bei nicht eindeutigem oder vorübergehend
 nicht erreichbarem Anbieterzustand bleiben die Puffer bis zur nächsten Prüfung
 erhalten. Unabhängige Puffertermine haben keine solche Verknüpfung.
+Wählt der Anwender **Nur in Symcon**, liegen die Zusatztermine getrennt vom
+Anbieter- und Anzeigecache dauerhaft in dieser Kalenderinstanz. Sie werden
+nicht an den Kalenderanbieter geschickt. Die Kalender Ansicht zeigt sie dennoch
+beim Hauptkalender an. Berechtigte Symcon-Nutzer und Symcon-Sicherungen können
+darauf zugreifen. **Cache leeren** entfernt sie nicht; das Löschen der Instanz
+entfernt ihren Originalbestand.
 Ein Wechsel des Haupttermins in einen anderen Kalender wird bei aktiver
 Verknüpfung vor dem ersten Schreibvorgang abgelehnt.
 
@@ -272,6 +278,7 @@ bool IPSKAL_FinishEventsTransfer(int $InstanzID, string $Token);
 string IPSKAL_CreateEvent(int $InstanzID, string $EventJSON);
 string IPSKAL_CreateEventWithBuffers(int $InstanzID, string $RequestJSON);
 bool IPSKAL_HasLinkedEventBuffers(int $InstanzID, string $EventJSON);
+bool IPSKAL_IsLocalBufferEvent(int $InstanzID, string $EventJSON);
 string IPSKAL_UpdateEvent(int $InstanzID, string $EventJSON);
 bool IPSKAL_DeleteEvent(int $InstanzID, string $EventJSON);
 string IPSKAL_GetCalendarStatus(int $InstanzID);

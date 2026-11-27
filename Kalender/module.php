@@ -28,6 +28,7 @@ use IPSKalender\CalendarProviderError;
 use IPSKalender\CalendarProviderErrorException;
 use IPSKalender\CalendarRecurrenceRule;
 use IPSKalender\CalendarTaskEvent;
+use IPSKalender\ICalendarCodec;
 use IPSKalender\LocalCalendarProvider;
 use IPSKalender\MicrosoftTodoTaskProjection;
 use IPSKalender\SynchronizationSchedule;
@@ -143,6 +144,7 @@ class Calendar extends IPSModuleStrict
         $this->RegisterAttributeString('BirthdayMetadata', '[]');
         $this->RegisterAttributeString('PendingTaskSeries', '{}');
         $this->RegisterAttributeString('LinkedEventBuffers', '[]');
+        $this->RegisterAttributeString('LocalBufferResources', '{}');
         // Original calendar objects, never part of the disposable event cache.
         $this->RegisterAttributeString('LocalCalendarResources', '{}');
         $this->RegisterAttributeString('LocalAttachmentOriginals', '');
@@ -484,7 +486,7 @@ class Calendar extends IPSModuleStrict
     public function GetEvents(): string
     {
         return json_encode(
-            $this->readEvents(),
+            $this->readDisplayEvents(),
             JSON_UNESCAPED_SLASHES
                 | JSON_UNESCAPED_UNICODE
                 | JSON_PRESERVE_ZERO_FRACTION
@@ -646,6 +648,9 @@ class Calendar extends IPSModuleStrict
     {
         try {
             $event = $this->decodeObject($EventJSON, 'event');
+            if ($this->isLocalBufferIdentity($event)) {
+                return json_encode($this->localBufferEventForEdit($event), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
+            }
             if ($this->isMicrosoftTodoEvent($event)) {
                 return json_encode(
                     $this->microsoftTodoEventForEdit($event),
@@ -811,7 +816,7 @@ class Calendar extends IPSModuleStrict
 
         $events = array_values(array_filter(
             array_merge(
-                $this->readEvents(),
+                $this->readDisplayEvents(),
                 MicrosoftTodoTaskProjection::project($this->readMicrosoftTasks())
             ),
             static function (array $event) use ($StartTimestamp, $EndTimestamp): bool
@@ -967,8 +972,10 @@ class Calendar extends IPSModuleStrict
             $event = $request['event'] ?? null;
             $buffers = $request['buffers'] ?? null;
             $mode = (string) ($request['mode'] ?? '');
+            $storage = (string) ($request['storage'] ?? 'provider');
             if (!is_array($event) || array_is_list($event) || !is_array($buffers)
                 || !in_array($mode, ['independent', 'linked'], true)
+                || !in_array($storage, ['provider', 'local'], true)
                 || (bool) ($event['allDay'] ?? false) || (bool) ($event['task'] ?? false)
                 || !empty($event['recurrence']) || !empty($event['anniversaryType'])) {
                 throw new InvalidArgumentException('Event buffers require a single timed appointment.');
@@ -1014,7 +1021,7 @@ class Calendar extends IPSModuleStrict
             ];
             foreach ($planned as $side => $settings) {
                 [$bufferStart, $bufferEnd] = $this->bufferRange($side, $start, $end, $settings['minutes']);
-                $companion = $this->createBufferEvent([
+                $bufferEvent = [
                     'summary'      => $settings['summary'],
                     'start'        => gmdate('Y-m-d\TH:i:s\Z', $bufferStart),
                     'end'          => gmdate('Y-m-d\TH:i:s\Z', $bufferEnd),
@@ -1022,7 +1029,10 @@ class Calendar extends IPSModuleStrict
                     'timezone'     => (string) ($event['timezone'] ?? 'UTC'),
                     'status'       => (string) ($event['status'] ?? 'CONFIRMED'),
                     'transparency' => (string) ($event['transparency'] ?? 'OPAQUE')
-                ]);
+                ];
+                $companion = $storage === 'local'
+                    ? $this->createLocalBufferEvent($bufferEvent)
+                    : $this->createBufferEvent($bufferEvent);
                 $created[$side] = $companion;
                 if ($mode === 'linked') {
                     $link['companions'][$side] = [
@@ -1063,6 +1073,25 @@ class Calendar extends IPSModuleStrict
     }
 
     /**
+     * Checks whether an event belongs to this instance's private adjacent appointment store.
+     *
+     * @param string $EventJSON JSON-encoded event identity.
+     * @return bool True only for a stored private adjacent appointment.
+     */
+    public function IsLocalBufferEvent(string $EventJSON): bool
+    {
+        $event = $this->decodeObject($EventJSON, 'event');
+        if (!$this->isLocalBufferIdentity($event)) {
+            return false;
+        }
+        $url = trim((string) ($event['resourceUrl'] ?? ''));
+        if ($url === '') {
+            $url = trim((string) ($event['eventReference'] ?? ''));
+        }
+        return array_key_exists($url, $this->readLocalBufferResources());
+    }
+
+    /**
      * Updates an existing event in the configured calendar.
      * A confirmed provider write remains successful if subsequent local processing fails;
      * the result error and LastError retain the follow-up diagnostic.
@@ -1079,6 +1108,12 @@ class Calendar extends IPSModuleStrict
             $changes = $event['changes'] ?? $event;
             if (!is_array($changes)) {
                 throw new InvalidArgumentException('The event changes are invalid.');
+            }
+            if ($this->isLocalBufferIdentity($event)) {
+                $updated = $this->updateLocalBufferEvent($event, $changes);
+                $writeConfirmed = true;
+                $this->notifyLocalBufferChange();
+                return $this->encodeResult(true, $updated);
             }
             if ($this->isMicrosoftTodoEvent($event)) {
                 $updated = $this->updateMicrosoftTodoEvent($event, $changes);
@@ -1274,6 +1309,12 @@ class Calendar extends IPSModuleStrict
         $writeConfirmed = false;
         try {
             $event = $this->decodeObject($EventJSON, 'event');
+            if ($this->isLocalBufferIdentity($event)) {
+                $this->deleteLocalBufferEvent($event);
+                $writeConfirmed = true;
+                $this->notifyLocalBufferChange();
+                return true;
+            }
             if ($this->isMicrosoftTodoEvent($event)) {
                 [$listId, $taskId] = $this->microsoftTodoIdentity($event);
                 $result = $this->sendRequest('DeleteTask', [
@@ -1404,7 +1445,7 @@ class Calendar extends IPSModuleStrict
         if (!is_array($defaultReminder) || array_is_list($defaultReminder)) {
             $defaultReminder = [];
         }
-        $events = $this->readEvents();
+        $events = $this->readDisplayEvents();
 
         return json_encode(
             [
@@ -1728,6 +1769,147 @@ class Calendar extends IPSModuleStrict
         return array_merge($event, $result['event']);
     }
 
+    private function localBufferReference(): string
+    {
+        return 'https://opencalendar.invalid/local/' . ($this->InstanceID * 10 + 1) . '/';
+    }
+
+    /** @return array<string, string> */
+    private function readLocalBufferResources(): array
+    {
+        $resources = json_decode($this->ReadAttributeString('LocalBufferResources'), true, 512, JSON_THROW_ON_ERROR);
+        if (!is_array($resources) || ($resources !== [] && array_is_list($resources))) {
+            throw new UnexpectedValueException('The private adjacent appointment store is invalid.');
+        }
+        return $resources;
+    }
+
+    /** @param callable(LocalCalendarProvider, string): mixed $operation */
+    private function withLocalBufferProvider(callable $operation): mixed
+    {
+        $lock = 'OpenCalendar.LocalBuffers.' . $this->InstanceID;
+        if (!IPS_SemaphoreEnter($lock, 5000)) {
+            throw new RuntimeException('The private adjacent appointment store is busy.');
+        }
+        try {
+            $resources = $this->readLocalBufferResources();
+            $reference = $this->localBufferReference();
+            $provider = new LocalCalendarProvider($resources, $reference);
+            $result = $operation($provider, $reference);
+            $updated = $provider->exportResources();
+            if ($updated !== $resources && !$this->WriteAttributeString(
+                'LocalBufferResources',
+                json_encode((object) $updated, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR)
+            )) {
+                throw new RuntimeException('Private adjacent appointments could not be saved.');
+            }
+            return $result;
+        } finally {
+            IPS_SemaphoreLeave($lock);
+        }
+    }
+
+    /** @param array<string, mixed> $event @return array<string, mixed> */
+    private function createLocalBufferEvent(array $event): array
+    {
+        $created = $this->withLocalBufferProvider(function (LocalCalendarProvider $provider, string $reference) use ($event): array
+        {
+            if (count($provider->exportResources()) >= 400) {
+                throw new RuntimeException('The private adjacent appointment limit was reached.');
+            }
+            return $provider->createEvent($reference, $event);
+        });
+        try {
+            $this->notifyLocalBufferChange();
+        } catch (Throwable $exception) {
+            $this->SendSafeDebugException('LocalBufferCounterDeferred', $exception);
+        }
+        return $this->decorateLocalBufferEvent(array_merge($event, $created));
+    }
+
+    /** @param array<string, mixed> $event @return array<string, mixed> */
+    private function decorateLocalBufferEvent(array $event): array
+    {
+        $event['sourceType'] = 'symcon-buffer';
+        $event['canWrite'] = true;
+        $event['localBuffer'] = true;
+        return $event;
+    }
+
+    /** @return list<array<string, mixed>> */
+    private function readLocalBufferEvents(): array
+    {
+        $resources = $this->readLocalBufferResources();
+        $events = [];
+        new LocalCalendarProvider($resources, $this->localBufferReference());
+        foreach ($resources as $url => $ical) {
+            $etag = '"' . hash('sha256', $ical) . '"';
+            foreach (ICalendarCodec::parseEvents($ical, $url, $etag) as $event) {
+                $events[] = $this->decorateLocalBufferEvent($event);
+            }
+        }
+        return $events;
+    }
+
+    /** @param array<string, mixed> $event */
+    private function isLocalBufferIdentity(array $event): bool
+    {
+        $resource = trim((string) ($event['resourceUrl'] ?? ''));
+        if ($resource === '') {
+            $resource = trim((string) ($event['eventReference'] ?? ''));
+        }
+        $reference = $this->localBufferReference();
+        return str_starts_with($resource, $reference)
+            && preg_match('~^[A-Za-z0-9_.%+-]+\.ics$~D', substr($resource, strlen($reference))) === 1;
+    }
+
+    /** @param array<string, mixed> $event @return array<string, mixed> */
+    private function localBufferEventForEdit(array $event): array
+    {
+        return $this->decorateLocalBufferEvent($this->withLocalBufferProvider(
+            fn (LocalCalendarProvider $provider, string $reference): array => $provider->getEventForEdit($reference, [
+                'resourceUrl'    => (string) ($event['resourceUrl'] ?? ''),
+                'eventReference' => (string) ($event['eventReference'] ?? ''),
+                'uid'            => (string) ($event['uid'] ?? '')
+            ])
+        ));
+    }
+
+    /** @param array<string, mixed> $event @param array<string, mixed> $changes @return array<string, mixed> */
+    private function updateLocalBufferEvent(array $event, array $changes): array
+    {
+        return $this->decorateLocalBufferEvent($this->withLocalBufferProvider(
+            fn (LocalCalendarProvider $provider, string $reference): array => $provider->updateEvent(
+                $reference,
+                (string) ($event['resourceUrl'] ?? ''),
+                (string) ($event['etag'] ?? ''),
+                (string) ($event['uid'] ?? ''),
+                $changes
+            )
+        ));
+    }
+
+    /** @param array<string, mixed> $event */
+    private function deleteLocalBufferEvent(array $event): void
+    {
+        $deleted = $this->withLocalBufferProvider(
+            fn (LocalCalendarProvider $provider, string $reference): bool => $provider->deleteEvent(
+                $reference,
+                (string) ($event['resourceUrl'] ?? ''),
+                (string) ($event['etag'] ?? '')
+            )
+        );
+        if (!$deleted) {
+            throw new RuntimeException('The private adjacent appointment could not be deleted.');
+        }
+    }
+
+    private function notifyLocalBufferChange(): void
+    {
+        $this->updateEventCounters($this->readEvents());
+        $this->SetValue('LastSynchronization', $this->ReadAttributeInteger('LastSynchronization'));
+    }
+
     /** @param array<string, mixed> $event */
     private function bufferEventTimestamp(array $event, string $key): int
     {
@@ -1939,6 +2121,16 @@ class Calendar extends IPSModuleStrict
     /** @param array<string, mixed> $identity @return array{known: bool, event: ?array<string, mixed>} */
     private function checkLinkedBufferEvent(array $identity, ?array $syncedEvents = null): array
     {
+        if ($this->isLocalBufferIdentity($identity)) {
+            try {
+                return ['known' => true, 'event' => $this->localBufferEventForEdit($identity)];
+            } catch (Throwable $exception) {
+                if (in_array(CalendarProviderError::fromThrowable($exception)['httpStatus'], [404, 410], true)) {
+                    return ['known' => true, 'event' => null];
+                }
+                throw $exception;
+            }
+        }
         if ($syncedEvents !== null) {
             foreach ($syncedEvents as $event) {
                 if (is_array($event) && $this->eventIdentityMatches($event, $identity)) {
@@ -3540,6 +3732,7 @@ class Calendar extends IPSModuleStrict
     /** @param list<array<string, mixed>> $events */
     private function updateEventCounters(array $events): void
     {
+        $events = array_merge($events, $this->readLocalBufferEvents());
         $this->SetValue('EventCount', count($events));
         $this->SetValue(
             'TodayEventCount',
@@ -3573,6 +3766,12 @@ class Calendar extends IPSModuleStrict
         } catch (UnexpectedValueException) {
             return [];
         }
+    }
+
+    /** @return list<array<string, mixed>> */
+    private function readDisplayEvents(): array
+    {
+        return array_merge($this->readEvents(), $this->readLocalBufferEvents());
     }
 
     /**

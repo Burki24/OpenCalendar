@@ -18,6 +18,9 @@ const classes = () => ({hidden: false, toggle(name, on) { if (name === 'hidden')
 const fields = {
     'event-buffers': {classList: classes()},
     'event-buffers-options': {classList: classes()},
+    'event-buffer-storage-row': {classList: classes()},
+    'event-buffer-storage-note': {classList: classes()},
+    'event-buffer-storage': {value: 'local'},
     'event-buffers-enabled': {checked: true},
     'event-buffer-mode': {value: 'linked'},
     'event-buffer-before': {checked: true},
@@ -39,6 +42,7 @@ const context = vm.createContext({
     eventTask: {checked: false},
     eventAnniversaryType: {value: ''},
     eventRecurrenceFrequency: {value: 'none'},
+    selectedCalendarEntry: () => ({localCalendar: false}),
     showToast() { throw new Error('Unexpected validation error'); },
     t: value => value
 });
@@ -51,6 +55,13 @@ assert.strictEqual(fields['event-buffer-after-preview'].textContent, '2026-03-29
 const chosen = context.selectedEventBuffers();
 assert.strictEqual(chosen.before.minutes, 60);
 assert.strictEqual(chosen.after.summary, 'Departure');
+assert.strictEqual(fields['event-buffer-storage-row'].classList.hidden, false);
+assert.strictEqual(fields['event-buffer-storage-note'].classList.hidden, false);
+context.selectedCalendarEntry = () => ({localCalendar: true});
+context.updateEventBufferControls();
+assert.strictEqual(fields['event-buffer-storage-row'].classList.hidden, true);
+assert.strictEqual(fields['event-buffer-storage'].value, 'provider');
+assert.strictEqual(fields['event-buffer-storage-note'].classList.hidden, true);
 fields['event-all-day'].checked = true;
 context.updateEventBufferControls();
 assert.strictEqual(fields['event-buffers'].classList.hidden, true);

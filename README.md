@@ -17,6 +17,9 @@ vor und nach dem Haupttermin im selben Kalender erstellt werden. Sie bleiben
 wahlweise unabhängig oder folgen Änderungen und bestätigten Löschungen des
 Haupttermins, auch wenn diese beim Anbieter erfolgen. Details stehen in der
 [Dokumentation der Kalender Ansicht](Kalender%20Ansicht/README.md#puffertermine-vor-und-nach-einem-termin).
+Für die Zusatztermine kann wahlweise der Kalenderanbieter oder ausschließlich
+Symcon als Speicherort gewählt werden. Nur in Symcon gespeicherte Puffer sind
+für Nutzer der Symcon-Ansicht sichtbar, erscheinen aber nicht beim Anbieter.
 Die Kalender Ansicht kann in Symcon 9.1 wahlweise zusätzlich als native
 HTML-Vollbildansicht angeboten werden; die normale Kachel bleibt dabei erhalten.
 In der IPSView-HTML-Ausgabe steht bei Browserfreigabe ebenfalls ein Vollbild-Button

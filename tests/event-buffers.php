@@ -13,6 +13,7 @@ final class BufferCalendar extends Calendar
     public int $createCount = 0;
     public int $failCreateAt = 0;
     public bool $failLookups = false;
+    public bool $failPrivateSave = false;
     public array $requests = [];
     public array $transferItems = [];
 
@@ -52,11 +53,14 @@ final class BufferCalendar extends Calendar
 
     protected function ReadAttributeString(string $Name): string
     {
-        return (string) ($this->attributes[$Name] ?? '[]');
+        return (string) ($this->attributes[$Name] ?? ($Name === 'LocalBufferResources' ? '{}' : '[]'));
     }
 
     protected function WriteAttributeString(string $Name, string $Value): bool
     {
+        if ($Name === 'LocalBufferResources' && $this->failPrivateSave) {
+            return false;
+        }
         $this->attributes[$Name] = $Value;
         return true;
     }
@@ -75,6 +79,11 @@ final class BufferCalendar extends Calendar
     protected function SetStatus(int $Status): bool
     {
         return true;
+    }
+
+    protected function GetBufferList(): array
+    {
+        return [];
     }
 
     protected function SendDataToParent(string $Data): string
@@ -158,6 +167,10 @@ foreach ([['allDay' => true], ['recurrence' => ['frequency' => 'DAILY']], ['task
     $rejected = json_decode($invalid->CreateEventWithBuffers(json_encode(array_replace($request, ['event' => array_replace($main, $forbidden)]), JSON_THROW_ON_ERROR)), true, 512, JSON_THROW_ON_ERROR);
     bufferCheck(!$rejected['success'] && $invalid->events === [], 'Unsupported appointment types must be rejected before any provider write.');
 }
+$badStorage = $request;
+$badStorage['storage'] = 'unexpected';
+$rejected = json_decode($invalid->CreateEventWithBuffers(json_encode($badStorage, JSON_THROW_ON_ERROR)), true, 512, JSON_THROW_ON_ERROR);
+bufferCheck(!$rejected['success'] && $invalid->events === [], 'Invalid storage must be rejected before the main provider event is created.');
 $calendar = new BufferCalendar(1);
 $result = json_decode($calendar->CreateEventWithBuffers(json_encode($request, JSON_THROW_ON_ERROR)), true, 512, JSON_THROW_ON_ERROR);
 bufferCheck($result['success'] === true && count($calendar->events) === 3, 'Main and both buffers must be created.');
@@ -205,5 +218,58 @@ bufferCheck($result['success'] && count($converted->events) === 2, 'A single bef
 $converted->events['buffer-1']['allDay'] = true;
 bufferCheck($converted->Synchronize(), 'All-day conversion must not break synchronization.');
 bufferCheck(count($converted->events) === 2 && json_decode($converted->attributes['LinkedEventBuffers'], true) === [], 'Unsupported conversion must detach without deleting the buffer.');
+
+$private = new BufferCalendar(6);
+$privateRequest = $request;
+$privateRequest['storage'] = 'local';
+$createdPrivate = json_decode($private->CreateEventWithBuffers(json_encode($privateRequest, JSON_THROW_ON_ERROR)), true, 512, JSON_THROW_ON_ERROR);
+bufferCheck($createdPrivate['success'] && count($private->events) === 1 && $private->createCount === 1, 'Private buffers must never be created at the provider.');
+$privateEvents = json_decode($private->GetEvents(), true, 512, JSON_THROW_ON_ERROR);
+bufferCheck(count($privateEvents) === 2, 'Private buffers must appear in the public event feed.');
+$privateBefore = $createdPrivate['created']['before'];
+bufferCheck(str_contains($privateBefore['resourceUrl'], 'opencalendar.invalid/local/'), 'Private buffer identity must belong to Symcon.');
+bufferCheck($private->IsLocalBufferEvent(json_encode($privateBefore, JSON_THROW_ON_ERROR)), 'Private buffer must be recognized for write routing.');
+bufferCheck(!$private->IsLocalBufferEvent(json_encode($createdPrivate['created']['main'], JSON_THROW_ON_ERROR)), 'Provider main event must not be mistaken for a private buffer.');
+$privateEdit = json_decode($private->GetEventForEdit(json_encode($privateBefore, JSON_THROW_ON_ERROR)), true, 512, JSON_THROW_ON_ERROR);
+bufferCheck(($privateEdit['sourceType'] ?? '') === 'symcon-buffer', 'Private buffers must be editable without provider lookup.');
+$privateUpdate = json_decode($private->UpdateEvent(json_encode(array_merge($privateEdit, ['changes' => ['summary' => 'Private arrival']]), JSON_THROW_ON_ERROR)), true, 512, JSON_THROW_ON_ERROR);
+bufferCheck($privateUpdate['success'] && count($private->events) === 1, 'Editing a private buffer must not write to the provider.');
+bufferCheck(!in_array('UpdateEvent', array_column($private->requests, 'Operation'), true), 'Private edits must not call the provider update operation.');
+$privateTransfer = json_decode($private->BeginEventsTransfer(strtotime('2026-03-28'), strtotime('2026-03-31')), true, 512, JSON_THROW_ON_ERROR);
+$privatePage = json_decode($private->ReadEventsTransferPage($privateTransfer['Token'], 0), true, 512, JSON_THROW_ON_ERROR);
+bufferCheck(count($privatePage['Items']) === 2, 'Private buffers must appear in the paged view transfer.');
+$private->FinishEventsTransfer($privateTransfer['Token']);
+$private->events['buffer-1']['start'] = '2026-03-29T04:30:00+02:00';
+$private->events['buffer-1']['end'] = '2026-03-29T05:30:00+02:00';
+bufferCheck($private->Synchronize(), 'External main changes must reconcile local buffers.');
+$privateEvents = json_decode($private->GetEvents(), true, 512, JSON_THROW_ON_ERROR);
+bufferCheck(count($private->events) === 1 && count($privateEvents) === 2, 'Synchronizing the provider must preserve private buffers.');
+bufferCheck(count(array_filter($privateEvents, static fn (array $event): bool => ($event['summary'] ?? '') === 'Private arrival'
+    && strtotime((string) $event['start']) === strtotime('2026-03-29T01:30:00Z'))) === 1, 'External changes must move the linked private buffer without losing its title.');
+$restarted = new BufferCalendar(6);
+$restarted->attributes = $private->attributes;
+$restarted->events = $private->events;
+bufferCheck(count(json_decode($restarted->GetEvents(), true, 512, JSON_THROW_ON_ERROR)) === 2, 'Private buffers must survive an instance restart.');
+bufferCheck($private->DeleteEvent(json_encode($createdPrivate['created']['main'], JSON_THROW_ON_ERROR)), 'Main event deletion must succeed.');
+bufferCheck(json_decode($private->GetEvents(), true, 512, JSON_THROW_ON_ERROR) === [], 'Confirmed main deletion must remove linked private buffers.');
+
+$independentPrivate = new BufferCalendar(7);
+$privateRequest['mode'] = 'independent';
+$privateCreated = json_decode($independentPrivate->CreateEventWithBuffers(json_encode($privateRequest, JSON_THROW_ON_ERROR)), true, 512, JSON_THROW_ON_ERROR);
+bufferCheck($privateCreated['success'] && count($independentPrivate->events) === 1, 'Independent private buffers must leave only the main event at the provider.');
+bufferCheck($independentPrivate->DeleteEvent(json_encode($privateCreated['created']['before'], JSON_THROW_ON_ERROR)), 'Private buffer deletion must succeed without provider access.');
+bufferCheck(count($independentPrivate->events) === 1 && count(json_decode($independentPrivate->GetEvents(), true, 512, JSON_THROW_ON_ERROR)) === 1, 'Deleting one private buffer must preserve the provider event and other private buffer.');
+$independentPrivate->ClearCache();
+bufferCheck(count(json_decode($independentPrivate->GetEvents(), true, 512, JSON_THROW_ON_ERROR)) === 1, 'Clearing the display cache must preserve private buffer originals.');
+
+$failedPrivateSave = new BufferCalendar(8);
+$failedPrivateSave->failPrivateSave = true;
+$failedResult = json_decode($failedPrivateSave->CreateEventWithBuffers(json_encode($privateRequest, JSON_THROW_ON_ERROR)), true, 512, JSON_THROW_ON_ERROR);
+bufferCheck(
+    !$failedResult['success'] && count($failedResult['created']) === 1
+    && count($failedPrivateSave->events) === 1
+    && json_decode($failedPrivateSave->GetEvents(), true, 512, JSON_THROW_ON_ERROR) === [],
+    'Failed private persistence must report only the confirmed provider main and must not expose a phantom buffer.'
+);
 
 echo "Event buffer tests passed.\n";

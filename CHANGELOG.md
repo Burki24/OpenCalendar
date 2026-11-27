@@ -11,6 +11,8 @@
 - Einzelne Termine mit Uhrzeit können in Kachel und IPSView Puffertermine davor
   und danach erhalten. Diese bleiben wahlweise unabhängig oder folgen späteren
   Änderungen und bestätigten Löschungen des Haupttermins, auch beim Anbieter.
+  Die Puffer können wahlweise beim Anbieter oder ausschließlich in Symcon
+  gespeichert werden.
 
 - Ein geführter Ablauf prüft und ergänzt weitere ICS/Webcal-Abonnements eines
   vorhandenen Kontos und führt bis zur Zuordnung in eine Kalender Ansicht.

@@ -83,7 +83,8 @@ final class MicrosoftTodoProjectionCalendarHarness extends Calendar
         parent::__construct(9021);
         $this->attributeValues = [
             'CachedEvents'         => json_encode($events, JSON_THROW_ON_ERROR),
-            'CachedMicrosoftTasks' => json_encode($tasks, JSON_THROW_ON_ERROR)
+            'CachedMicrosoftTasks' => json_encode($tasks, JSON_THROW_ON_ERROR),
+            'LocalBufferResources' => '{}'
         ];
     }
 

@@ -1809,7 +1809,7 @@ class CalendarView extends IPSModuleStrict
                     $event['calendarInstanceId'] = $calendar['instanceId'];
                     $event['calendarName'] = $calendar['name'];
                     $event['calendarColor'] = $calendar['color'];
-                    $event['canWrite'] = $calendar['canWrite']
+                    $event['canWrite'] = (bool) ($event['localBuffer'] ?? false) || $calendar['canWrite']
                         && (!array_key_exists('canWrite', $event) || (bool) $event['canWrite']);
                     if (CalendarEventRecurrence::isOccurrence($event)
                         && trim((string) ($event['originalStart'] ?? '')) === '') {
@@ -1951,7 +1951,7 @@ class CalendarView extends IPSModuleStrict
                 $event['calendarInstanceId'] = $calendar['instanceId'];
                 $event['calendarName'] = $calendar['name'];
                 $event['calendarColor'] = $calendar['color'];
-                $event['canWrite'] = $calendar['canWrite']
+                $event['canWrite'] = (bool) ($event['localBuffer'] ?? false) || $calendar['canWrite']
                     && (!array_key_exists('canWrite', $event) || (bool) $event['canWrite']);
                 if (CalendarEventRecurrence::isOccurrence($event)
                     && trim((string) ($event['originalStart'] ?? '')) === '') {
@@ -2823,6 +2823,7 @@ class CalendarView extends IPSModuleStrict
                 'name'                         => IPS_GetName($instanceId),
                 'color'                        => $color,
                 'canWrite'                     => $canWrite,
+                'localCalendar'                => $localCalendar,
                 'timezone'                     => trim((string) ($calendarStatus['timezone'] ?? '')),
                 'canCreateRecurrence'          => (bool) ($calendarStatus['canCreateRecurrence'] ?? false),
                 'canUpdateRecurrence'          => (bool) ($calendarStatus['canUpdateRecurrence'] ?? false),
@@ -3044,7 +3045,8 @@ class CalendarView extends IPSModuleStrict
                         json_encode([
                             'event'   => $request['event'],
                             'buffers' => $request['buffers'],
-                            'mode'    => $request['mode'] ?? ''
+                            'mode'    => $request['mode'] ?? '',
+                            'storage' => $request['storage'] ?? 'provider'
                         ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR)
                     ),
                     $instanceId,
@@ -3213,6 +3215,12 @@ class CalendarView extends IPSModuleStrict
                 if (!is_array($sourceEvent) || array_is_list($sourceEvent)
                     || !is_array($event) || array_is_list($event)) {
                     throw new InvalidArgumentException($this->Translate('The event data is invalid.'));
+                }
+                if (IPSKAL_IsLocalBufferEvent(
+                    $sourceInstanceId,
+                    json_encode($sourceEvent, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR)
+                )) {
+                    throw new RuntimeException($this->Translate('Symcon-only adjacent appointments cannot be moved to another calendar.'));
                 }
                 if (IPSKAL_HasLinkedEventBuffers(
                     $sourceInstanceId,
@@ -3758,7 +3766,12 @@ class CalendarView extends IPSModuleStrict
     {
         $instanceId = (int) ($request['calendarInstanceId'] ?? 0);
         foreach ($this->loadSelectedCalendars() as $calendar) {
-            if ($calendar['instanceId'] === $instanceId && $calendar['canWrite']) {
+            if ($calendar['instanceId'] === $instanceId && ($calendar['canWrite']
+                || (is_array($request['event'] ?? null)
+                    && IPSKAL_IsLocalBufferEvent(
+                        $instanceId,
+                        json_encode($request['event'], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR)
+                    )))) {
                 return $instanceId;
             }
         }

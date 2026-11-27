@@ -9,7 +9,13 @@ verwendet werden.
 
 Beim Anlegen eines einzelnen Termins mit Uhrzeit können in Kachel und IPSView
 optional Termine davor und danach ergänzt werden. Beide liegen immer im selben
-Kalender wie der Haupttermin. Dauer (1 bis 1440 Minuten) und Titel sind je Seite
+Kalender der Ansicht wie der Haupttermin. Als Speicherort kann entweder dieser
+Kalender beim Anbieter oder **Nur in Symcon** gewählt werden. Bei der zweiten
+Variante bleiben die Zusatztermine als Originale in der Symcon-Kalenderinstanz;
+sie werden nicht an den Anbieter übertragen und erscheinen nicht in dessen Apps.
+Andere Nutzer mit Zugriff auf die Symcon-Ansicht können sie weiterhin sehen.
+Bei einem Symcon-lokalen Kalender entfällt die Speicherortwahl, da bereits alle
+Termine lokal liegen. Dauer (1 bis 1440 Minuten) und Titel sind je Seite
 einstellbar; die Vorschau zeigt die berechneten Uhrzeiten. Ganztägige Termine,
 Aufgaben, Jahresereignisse und Serientermine bieten diese Auswahl nicht.
 Schreibgeschützte ICS-/Webcal-Kalender können keine Puffertermine anlegen.
@@ -24,6 +30,10 @@ nicht als Löschung. Wird ein Puffer selbst beim Anbieter gelöscht, wird die
 Verknüpfung dieser Seite entfernt; der Puffer wird nicht neu angelegt.
 Wird der Haupttermin später ganztägig oder zu einer Serie, endet die Verknüpfung;
 die vorhandenen Zusatztermine bleiben als unabhängige Termine bestehen.
+Das gilt für beide Speicherorte. Lokale Puffer bleiben nach **Cache leeren** und
+einem Neustart erhalten, sind aber mit dem Löschen der Kalenderinstanz verloren;
+Symcon-Sicherungen können sie enthalten. Lokal gespeicherte Puffer können nicht
+in einen anderen Kalender verschoben werden.
 Ein Wechsel des Haupttermins in einen anderen Kalender wird bei aktiver
 Verknüpfung vor dem Schreiben abgelehnt, da dabei die Anbieterkennung wechselt.
 
@@ -32,6 +42,8 @@ Falls ein späterer Vorgang scheitert, bleiben bereits erstellte Termine bestehe
 die Fehlermeldung nennt ihre Anzahl. Ein automatischer Wiederholungsversuch würde
 Duplikate erzeugen und findet deshalb nicht statt. Für einen Kalender werden
 höchstens 200 aktive Verknüpfungen gespeichert.
+Zusätzlich sind höchstens 400 nur in Symcon gespeicherte Puffer pro Kalenderinstanz
+möglich.
 
 Lokale Kalender ohne Konto lassen sich genauso auswählen und bearbeiten wie
 schreibbare Online-Kalender. Sie können mit diesen in derselben Ansicht kombiniert
